@@ -1,0 +1,46 @@
+{
+  "name": "adamantite",
+  "version": "0.0.1",
+  "description": "An strict and opinionated set of presets for modern TypeScript applications",
+  "keywords": [
+    "adamantite",
+    "biome",
+    "preset",
+    "formatter",
+    "linter",
+    "typescript"
+  ],
+  "homepage": "https://github.com/adelrodriguez/adamantite",
+  "bugs": {
+    "url": "https://github.com/adelrodriguez/adamantite/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adelrodriguez/adamantite.git"
+  },
+  "license": "MIT",
+  "author": "Adel Rodriguez <hello@adelrodriguez.com>",
+  "type": "module",
+  "exports": {
+    ".": "./config/biome.jsonc",
+    "./tsconfig": "./tsconfig.base.json"
+  },
+  "files": [
+    "src/config/biome.jsonc",
+    "src/config/tsconfig.json"
+  ],
+  "scripts": {
+    "test": "bun test",
+    "test:watch": "bun --watch test"
+  },
+  "dependencies": {
+    "@biomejs/biome": "2.1.2"
+  },
+  "devDependencies": {
+    "@types/bun": "1.2.19"
+  },
+  "peerDependencies": {
+    "typescript": "5.8.3"
+  },
+  "packageManager": "bun@1.2.18"
+}

@@ -1,5 +1,5 @@
 {
-  "extends": "./src/config/tsconfig.json",
+  "extends": "./presets/tsconfig.json",
   "compilerOptions": {
     "module": "Preserve",
     "moduleResolution": "bundler"

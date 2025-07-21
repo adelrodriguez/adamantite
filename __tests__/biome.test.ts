@@ -12,7 +12,7 @@ describe("biome", () => {
     const biomeVersion = packageJson.dependencies["@biomejs/biome"]
 
     // Read biome.jsonc to get the schema URL
-    const biomeConfigFile = Bun.file("./src/config/biome.jsonc")
+    const biomeConfigFile = Bun.file("biome.jsonc")
     const biomeConfigContent = await biomeConfigFile.text()
 
     // Parse biome.jsonc (strip comments for JSON parsing)

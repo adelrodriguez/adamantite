@@ -9,4 +9,6 @@ const title = `
  ░░░░░░░░  ░░░░░░░░  ░░░░░░░░ ░░░░░ ░░░ ░░░░░  ░░░░░░░░ ░░░░ ░░░░░    ░░░░░  ░░░░░    ░░░░░   ░░░░░░                   
 `
 
-process.stdout.write(title)
+export default function init() {
+  process.stdout.write(title)
+}

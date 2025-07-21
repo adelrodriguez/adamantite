@@ -1,5 +1,6 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
+
   // ----------------------------- FORMATTER -----------------------------
   // These are the generic settings that apply to all files in the project.
   "formatter": {
@@ -12,14 +13,15 @@
     "indentWidth": 2,
     // Use LF line endings.
     "lineEnding": "lf",
-    // Good middle ground between readability and line length.
-    "lineWidth": 100,
+    // The expected line width for most editors.
+    "lineWidth": 80,
     // Don't force attributes to be on the same line as the element.
     "attributePosition": "auto",
     "bracketSpacing": true
   },
+
   // ----------------------------- ASSIST -----------------------------
-  // This is used to help with code completion and other IDE features.
+  // Help with code organization.
   "assist": {
     "actions": {
       "source": {
@@ -39,7 +41,9 @@
       }
     }
   },
+
   // ----------------------------- LINTER -----------------------------
+
   "linter": {
     "enabled": true,
     "rules": {

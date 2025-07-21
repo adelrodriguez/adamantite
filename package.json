@@ -1,6 +1,6 @@
 {
   "name": "adamantite",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "An strict and opinionated set of presets for modern TypeScript applications",
   "keywords": [
     "adamantite",
@@ -22,19 +22,27 @@
   "author": "Adel Rodriguez <hello@adelrodriguez.com>",
   "type": "module",
   "main": "biome.jsonc",
+  "bin": {
+    "adamantite": "dist/index.js"
+  },
   "files": [
     "biome.jsonc",
-    "presets/tsconfig.json"
+    "presets/tsconfig.json",
+    "dist"
   ],
   "scripts": {
+    "build": "tsdown",
     "test": "bun test",
     "test:watch": "bun --watch test"
   },
   "dependencies": {
-    "@biomejs/biome": "2.1.2"
+    "@biomejs/biome": "2.1.2",
+    "commander": "^14.0.0"
   },
   "devDependencies": {
-    "@types/bun": "1.2.19"
+    "@clack/prompts": "0.11.0",
+    "@types/bun": "1.2.19",
+    "tsdown": "^0.12.9"
   },
   "peerDependencies": {
     "typescript": "5.8.3"

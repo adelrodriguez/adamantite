@@ -1,5 +1,5 @@
 import process from "node:process"
-import { runProcess } from "~/utils"
+import { runProcess } from "../utils"
 
 export default function lint(files: string[]) {
   try {

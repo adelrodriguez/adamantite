@@ -1,12 +1,15 @@
-import { Command } from "commander"
-import lint from "~/actions/lint"
-import format from "./actions/format"
+#!/usr/bin/env node
 
-const VERSION = "0.0.2"
+import { Command } from "commander"
+import format from "./actions/format"
+import lint from "./actions/lint"
+import { getPackageVersion } from "./utils"
+
+const version = getPackageVersion()
 
 const program = new Command()
 
-program.version(VERSION)
+program.version(version)
 
 program
   .command("lint")

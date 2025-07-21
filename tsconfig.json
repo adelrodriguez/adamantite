@@ -2,11 +2,7 @@
   "extends": "./presets/tsconfig.json",
   "compilerOptions": {
     "module": "esnext",
-    "moduleResolution": "bundler",
-    "paths": {
-      "~/*": ["./cli/*"]
-    },
-    "baseUrl": "."
+    "moduleResolution": "bundler"
   },
   "exclude": ["dist", "node_modules"]
 }

@@ -1,10 +1,61 @@
----
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
-alwaysApply: false
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ---
 
-Default to using Bun instead of Node.js.
+description: Use Bun instead of Node.js, npm, pnpm, or vite.
+globs: "_.ts, _.tsx, _.html, _.css, _.js, _.jsx, package.json"
+alwaysApply: false
+
+---
+
+## Project Overview
+
+Adamantite is an opinionated preset package for modern TypeScript applications that provides:
+
+- **Biome configuration** (`biome.jsonc`) - Comprehensive linting and formatting rules
+- **TypeScript preset** (`presets/tsconfig.json`) - Strict TypeScript configuration
+- **CLI tool** - Commands to run Biome linting and formatting via `adamantite` command
+
+## Development Commands
+
+Use Bun for all package management and script execution:
+
+- **Install dependencies**: `bun install`
+- **Build CLI**: `bun run build` (uses tsdown to bundle `cli/index.ts` → `dist/`)
+- **Run tests**: `bun test` or `bun run test:watch` for watch mode
+- **Type checking**: `bun run typecheck`
+- **Linting**: `bun run lint` (auto-fixes issues)
+- **Formatting**: `bun run format` (auto-formats code)
+
+## Release Workflow
+
+This project uses changesets for version management:
+
+1. **Create changeset**: `bunx changeset` (interactive prompt for version bump)
+2. **Version locally**: `bun run version` (bumps package.json and updates CHANGELOG)
+3. **Publish**: Push to main → CI passes → auto-publishes to npm
+
+## Architecture
+
+### CLI Structure (`cli/`)
+
+- **`index.ts`** - Main CLI entry point using Commander.js
+- **`actions/`** - Command implementations:
+  - `format.ts` - Runs Biome formatter via npx
+  - `lint.ts` - Runs Biome linter via npx
+- **`utils.ts`** - Shared utilities (process execution, package info)
+
+### Build Process
+
+- **tsdown** (`tsdown.config.ts`) bundles CLI to `dist/index.js` with minification
+- Entry point: `cli/index.ts` → Output: `dist/index.js` (executable via `adamantite` command)
+
+### Configuration Files
+
+- **`biome.jsonc`** - Main export, comprehensive Biome config with strict rules
+- **`presets/tsconfig.json`** - Reusable TypeScript configuration
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
 - Use `bun test` instead of `jest` or `vitest`
@@ -15,11 +66,6 @@ Default to using Bun instead of Node.js.
 
 ## APIs
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `bun:sqlite` for SQLite. Don't use `better-sqlite3`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
 - Prefer `Bun.file` over `node:fs`'s readFile/writeFile
 - Bun.$`ls` instead of execa.
 
@@ -34,78 +80,3 @@ test("hello world", () => {
   expect(1).toBe(1);
 });
 ```
-
-## Frontend
-
-Use HTML imports with `Bun.serve()`. Don't use `vite`. HTML imports fully support React, CSS, Tailwind.
-
-Server:
-
-```ts#index.ts
-import index from "./index.html"
-
-Bun.serve({
-  routes: {
-    "/": index,
-    "/api/users/:id": {
-      GET: (req) => {
-        return new Response(JSON.stringify({ id: req.params.id }));
-      },
-    },
-  },
-  // optional websocket support
-  websocket: {
-    open: (ws) => {
-      ws.send("Hello, world!");
-    },
-    message: (ws, message) => {
-      ws.send(message);
-    },
-    close: (ws) => {
-      // handle close
-    }
-  },
-  development: {
-    hmr: true,
-    console: true,
-  }
-})
-```
-
-HTML files can import .tsx, .jsx or .js files directly and Bun's bundler will transpile & bundle automatically. `<link>` tags can point to stylesheets and Bun's CSS bundler will bundle.
-
-```html#index.html
-<html>
-  <body>
-    <h1>Hello, world!</h1>
-    <script type="module" src="./frontend.tsx"></script>
-  </body>
-</html>
-```
-
-With the following `frontend.tsx`:
-
-```tsx#frontend.tsx
-import React from "react";
-
-// import .css files directly and it works
-import './index.css';
-
-import { createRoot } from "react-dom/client";
-
-const root = createRoot(document.body);
-
-export default function Frontend() {
-  return <h1>Hello, world!</h1>;
-}
-
-root.render(<Frontend />);
-```
-
-Then, run index.ts
-
-```sh
-bun --hot ./index.ts
-```
-
-For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.

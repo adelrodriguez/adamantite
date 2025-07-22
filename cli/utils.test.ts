@@ -547,5 +547,4 @@ describe("utils", () => {
       expect(result).toBe(true)
     })
   })
-
 })

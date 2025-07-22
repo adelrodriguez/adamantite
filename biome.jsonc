@@ -1,7 +1,7 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.1.2/schema.json",
 
-  // ----------------------------- FORMATTER -----------------------------
+  // ---------------------------- FORMATTER -----------------------------
   // These are the generic settings that apply to all files in the project.
   "formatter": {
     "enabled": true,
@@ -20,7 +20,7 @@
     "bracketSpacing": true
   },
 
-  // ----------------------------- ASSIST -----------------------------
+  // ------------------------------ ASSIST ------------------------------
   // Help with code organization.
   "assist": {
     "actions": {
@@ -42,7 +42,7 @@
     }
   },
 
-  // ----------------------------- LINTER -----------------------------
+  // ------------------------------ LINTER ------------------------------
 
   "linter": {
     "enabled": true,
@@ -102,8 +102,7 @@
         "useWhile": "error"
       },
       "correctness": {
-        // --------- JavaScript ---------
-
+        // ----------------------- JavaScript ------------------------
         "noChildrenProp": "error",
         "noConstantCondition": "error",
         "noConstantMathMinMaxClamp": "error",
@@ -147,7 +146,7 @@
         "useValidTypeof": "error",
         "useYield": "error",
 
-        // --------- CSS ---------
+        // --------------------------- CSS ---------------------------
         "noInvalidDirectionInLinearGradient": "error",
         "noInvalidGridAreas": "error",
         "noInvalidPositionAtImportRule": "error",
@@ -162,8 +161,7 @@
         "noUnmatchableAnbSelector": "error"
       },
       "nursery": {
-        // --------- JavaScript ---------
-
+        // ----------------------- JavaScript ------------------------
         "noAwaitInLoop": "error",
         "noBitwiseOperators": "error",
         "noConstantBinaryExpression": "error",
@@ -212,13 +210,13 @@
         "noImportCycles": "off",
         "noUnresolvedImports": "off",
 
-        // --------- CSS ---------
+        // --------------------------- CSS ---------------------------
         "noImportantStyles": "error",
         // Disabling this rule since we need custom at-rules for Tailwind
         "noUnknownAtRule": "off"
       },
       "performance": {
-        // --------- JavaScript ---------
+        // ----------------------- JavaScript ------------------------
 
         "noAccumulatingSpread": "error",
         "noBarrelFile": "off",
@@ -230,15 +228,14 @@
         "useTopLevelRegex": "error"
       },
       "security": {
-        // --------- JavaScript ---------
-
+        // ----------------------- JavaScript ------------------------
         "noBlankTarget": "error",
         "noDangerouslySetInnerHtml": "error",
         "noDangerouslySetInnerHtmlWithChildren": "error",
         "noGlobalEval": "error"
       },
       "style": {
-        // --------- JavaScript ---------
+        // ----------------------- JavaScript ------------------------
         "noCommonJs": "off",
         "noDefaultExport": "off",
         "noDoneCallback": "error",
@@ -305,7 +302,7 @@
         "useThrowOnlyError": "error",
         "useTrimStartEnd": "error",
 
-        // --------- CSS ---------
+        // --------------------------- CSS ---------------------------
         "noDescendingSpecificity": "error",
         "noValueAtRule": "error"
       },
@@ -384,7 +381,7 @@
         "useNumberToFixedDigitsArgument": "error",
         "useStrictMode": "error",
 
-        // --------- CSS ---------
+        // --------------------------- CSS ---------------------------
         "noDuplicateAtImportRules": "error",
         "noDuplicateCustomProperties": "error",
         "noDuplicateFontNames": "error",
@@ -396,7 +393,7 @@
       }
     }
   },
-  // ------------------------------ JAVASCRIPT ------------------------------
+  // ---------------------------- JAVASCRIPT ----------------------------
   // Options for JavaScript and TypeScript files.
   "javascript": {
     "formatter": {
@@ -415,7 +412,7 @@
       "trailingCommas": "es5"
     }
   },
-  // --------------------------------- CSS -------------------------------
+  // ------------------------------- CSS -------------------------------
   "css": {
     "formatter": {
       "quoteStyle": "double"
@@ -425,7 +422,7 @@
       "cssModules": false
     }
   },
-  // ------------------------------- JSON ------------------------------
+  // ------------------------------ JSON -------------------------------
   "json": {
     "assist": {
       "enabled": true

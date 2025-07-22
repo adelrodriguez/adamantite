@@ -32,9 +32,11 @@ export async function exists(path: string) {
 /**
  * Reads and parses package.json with caching and proper typing
  */
-export async function readPackageJson(cwd = process.cwd()): Promise<PackageJson> {
+export async function readPackageJson(
+  cwd = process.cwd()
+): Promise<PackageJson> {
   const currentPath = join(cwd, "package.json")
-  
+
   // Return cached version if we've already read the same file
   if (packageJsonCache && packageJsonPath === currentPath) {
     return packageJsonCache
@@ -48,43 +50,53 @@ export async function readPackageJson(cwd = process.cwd()): Promise<PackageJson>
   try {
     const content = await readFile(currentPath, "utf-8")
     const parsed = JSON.parse(content) as PackageJson
-    
+
     // Cache the result
     packageJsonCache = parsed
     packageJsonPath = currentPath
-    
+
     return parsed
   } catch (error) {
-    throw new Error(`Failed to parse package.json: ${error instanceof Error ? error.message : "Unknown error"}`)
+    throw new Error(
+      `Failed to parse package.json: ${error instanceof Error ? error.message : "Unknown error"}`
+    )
   }
 }
 
 /**
  * Writes package.json with proper formatting and cache invalidation
  */
-export async function writePackageJson(packageJson: PackageJson, cwd = process.cwd()): Promise<void> {
+export async function writePackageJson(
+  packageJson: PackageJson,
+  cwd = process.cwd()
+): Promise<void> {
   const currentPath = join(cwd, "package.json")
-  
+
   try {
     await writeFile(currentPath, JSON.stringify(packageJson, null, 2))
-    
+
     // Invalidate cache since we've modified the file
     if (packageJsonPath === currentPath) {
       packageJsonCache = packageJson
     }
   } catch (error) {
-    throw new Error(`Failed to write package.json: ${error instanceof Error ? error.message : "Unknown error"}`)
+    throw new Error(
+      `Failed to write package.json: ${error instanceof Error ? error.message : "Unknown error"}`
+    )
   }
 }
 
 /**
  * Checks if a package is installed as a dependency or devDependency
  */
-export async function isPackageInstalled(packageName: string, cwd = process.cwd()): Promise<boolean> {
+export async function isPackageInstalled(
+  packageName: string,
+  cwd = process.cwd()
+): Promise<boolean> {
   try {
     const packageJson = await readPackageJson(cwd)
     return !!(
-      packageJson.dependencies?.[packageName] || 
+      packageJson.dependencies?.[packageName] ||
       packageJson.devDependencies?.[packageName]
     )
   } catch {
@@ -95,12 +107,17 @@ export async function isPackageInstalled(packageName: string, cwd = process.cwd(
 /**
  * Gets the installed version of a package, or null if not installed
  */
-export async function getInstalledPackageVersion(packageName: string, cwd = process.cwd()): Promise<string | null> {
+export async function getInstalledPackageVersion(
+  packageName: string,
+  cwd = process.cwd()
+): Promise<string | null> {
   try {
     const packageJson = await readPackageJson(cwd)
-    return packageJson.dependencies?.[packageName] || 
-           packageJson.devDependencies?.[packageName] || 
-           null
+    return (
+      packageJson.dependencies?.[packageName] ||
+      packageJson.devDependencies?.[packageName] ||
+      null
+    )
   } catch {
     return null
   }
@@ -110,11 +127,10 @@ export async function getInstalledPackageVersion(packageName: string, cwd = proc
  * Checks if the installed package version matches the expected version
  */
 export async function isPackageVersionCorrect(
-  packageName: string, 
-  expectedVersion: string, 
+  packageName: string,
+  expectedVersion: string,
   cwd = process.cwd()
 ): Promise<boolean> {
   const installedVersion = await getInstalledPackageVersion(packageName, cwd)
   return installedVersion === expectedVersion
 }
-

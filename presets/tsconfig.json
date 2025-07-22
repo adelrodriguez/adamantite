@@ -9,14 +9,13 @@
     "resolveJsonModule": true,
     "moduleDetection": "force",
 
-    // Strictness and best practices
+    // Strictness and best practices. We only recommend settings that are not
+    // covered by linting rules.
     "strict": true,
     "noUncheckedIndexedAccess": true,
-    "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
     "forceConsistentCasingInFileNames": true,
-    "noUnusedParameters": true,
-    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitAny": true,
     "noImplicitThis": true,
     "noImplicitReturns": true
   }

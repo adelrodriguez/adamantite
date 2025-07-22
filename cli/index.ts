@@ -2,14 +2,24 @@
 
 import { Command } from "commander"
 import format from "./actions/format"
+import init from "./actions/init"
 import lint from "./actions/lint"
-import { getPackageVersion } from "./utils"
-
-const version = getPackageVersion()
+import version from "./actions/version"
 
 const program = new Command()
 
 program.version(version)
+
+program
+  .name("Adamantite")
+  .description(
+    "An opinionated set of presets for modern TypeScript applications."
+  )
+
+program
+  .command("init")
+  .description("Initialize Adamantite in the current directory")
+  .action(init)
 
 program
   .command("lint")

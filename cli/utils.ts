@@ -1,7 +1,14 @@
 import { type ExecSyncOptions, execSync } from "node:child_process"
-import { readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
+import { access, readFile, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+import type { PackageJson } from "type-fest"
+
+// The current version of Biome that this project supports
+export const BIOME_VERSION = "2.1.2"
+
+// Cache for package.json to avoid multiple reads
+let packageJsonCache: PackageJson | null = null
+let packageJsonPath: string | null = null
 
 export function runProcess(
   command: string,
@@ -13,12 +20,122 @@ export function runProcess(
   execSync(commandWithArgs, { ...options, stdio: "inherit" })
 }
 
-export function getPackageVersion() {
-  const __filename = fileURLToPath(import.meta.url)
-  const __dirname = dirname(__filename)
-  const packageJson = JSON.parse(
-    readFileSync(join(__dirname, "../package.json"), "utf-8")
-  )
+export async function exists(path: string) {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
 
-  return packageJson.version
+/**
+ * Reads and parses package.json with caching and proper typing
+ */
+export async function readPackageJson(cwd = process.cwd()): Promise<PackageJson> {
+  const currentPath = join(cwd, "package.json")
+  
+  // Return cached version if we've already read the same file
+  if (packageJsonCache && packageJsonPath === currentPath) {
+    return packageJsonCache
+  }
+
+  // Check if package.json exists
+  if (!(await exists(currentPath))) {
+    throw new Error("package.json not found in the current directory")
+  }
+
+  try {
+    const content = await readFile(currentPath, "utf-8")
+    const parsed = JSON.parse(content) as PackageJson
+    
+    // Cache the result
+    packageJsonCache = parsed
+    packageJsonPath = currentPath
+    
+    return parsed
+  } catch (error) {
+    throw new Error(`Failed to parse package.json: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
+}
+
+/**
+ * Writes package.json with proper formatting and cache invalidation
+ */
+export async function writePackageJson(packageJson: PackageJson, cwd = process.cwd()): Promise<void> {
+  const currentPath = join(cwd, "package.json")
+  
+  try {
+    await writeFile(currentPath, JSON.stringify(packageJson, null, 2))
+    
+    // Invalidate cache since we've modified the file
+    if (packageJsonPath === currentPath) {
+      packageJsonCache = packageJson
+    }
+  } catch (error) {
+    throw new Error(`Failed to write package.json: ${error instanceof Error ? error.message : "Unknown error"}`)
+  }
+}
+
+/**
+ * Checks if a package is installed as a dependency or devDependency
+ */
+export async function isPackageInstalled(packageName: string, cwd = process.cwd()): Promise<boolean> {
+  try {
+    const packageJson = await readPackageJson(cwd)
+    return !!(
+      packageJson.dependencies?.[packageName] || 
+      packageJson.devDependencies?.[packageName]
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Gets the installed version of a package, or null if not installed
+ */
+export async function getInstalledPackageVersion(packageName: string, cwd = process.cwd()): Promise<string | null> {
+  try {
+    const packageJson = await readPackageJson(cwd)
+    return packageJson.dependencies?.[packageName] || 
+           packageJson.devDependencies?.[packageName] || 
+           null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Checks if the installed package version matches the expected version
+ */
+export async function isPackageVersionCorrect(
+  packageName: string, 
+  expectedVersion: string, 
+  cwd = process.cwd()
+): Promise<boolean> {
+  const installedVersion = await getInstalledPackageVersion(packageName, cwd)
+  return installedVersion === expectedVersion
+}
+
+/**
+ * Installs a package as a dev dependency using the specified package manager
+ */
+export function installDevDependency(packageManager: string, packageName: string): void {
+  switch (packageManager) {
+    case "npm":
+      runProcess("npm", ["install", "--save-dev", packageName])
+      break
+    case "yarn":
+      runProcess("yarn", ["add", "--dev", packageName])
+      break
+    case "pnpm":
+      runProcess("pnpm", ["add", "--save-dev", packageName])
+      break
+    case "bun":
+      runProcess("bun", ["add", "--dev", packageName])
+      break
+    default:
+      throw new Error(`Invalid package manager: ${packageManager}`)
+  }
 }

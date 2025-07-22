@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">▶💠 <code>adamantite</code></h1>
+  <h1 align="center">💠 <code>adamantite</code></h1>
 
   <p align="center">
     <em><strong>Ship faster, with confidence.</strong></em>

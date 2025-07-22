@@ -9,7 +9,6 @@ import {
   BIOME_VERSION,
   exists,
   getInstalledPackageVersion,
-  installDevDependency,
   isPackageInstalled,
   isPackageVersionCorrect,
   readPackageJson,
@@ -549,61 +548,4 @@ describe("utils", () => {
     })
   })
 
-  describe("installDevDependency", () => {
-    test("should install using npm", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
-
-      installDevDependency("npm", "typescript")
-
-      expect(mockExecSync).toHaveBeenCalledWith(
-        "npm install --save-dev typescript",
-        {
-          stdio: "inherit",
-        }
-      )
-    })
-
-    test("should install using yarn", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
-
-      installDevDependency("yarn", "typescript")
-
-      expect(mockExecSync).toHaveBeenCalledWith("yarn add --dev typescript", {
-        stdio: "inherit",
-      })
-    })
-
-    test("should install using pnpm", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
-
-      installDevDependency("pnpm", "typescript")
-
-      expect(mockExecSync).toHaveBeenCalledWith(
-        "pnpm add --save-dev typescript",
-        {
-          stdio: "inherit",
-        }
-      )
-    })
-
-    test("should install using bun", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
-
-      installDevDependency("bun", "typescript")
-
-      expect(mockExecSync).toHaveBeenCalledWith("bun add --dev typescript", {
-        stdio: "inherit",
-      })
-    })
-
-    test("should throw error for invalid package manager", () => {
-      expect(() => {
-        installDevDependency("invalid-pm", "typescript")
-      }).toThrow("Invalid package manager: invalid-pm")
-    })
-  })
 })

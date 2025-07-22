@@ -118,24 +118,3 @@ export async function isPackageVersionCorrect(
   return installedVersion === expectedVersion
 }
 
-/**
- * Installs a package as a dev dependency using the specified package manager
- */
-export function installDevDependency(packageManager: string, packageName: string): void {
-  switch (packageManager) {
-    case "npm":
-      runProcess("npm", ["install", "--save-dev", packageName])
-      break
-    case "yarn":
-      runProcess("yarn", ["add", "--dev", packageName])
-      break
-    case "pnpm":
-      runProcess("pnpm", ["add", "--save-dev", packageName])
-      break
-    case "bun":
-      runProcess("bun", ["add", "--dev", packageName])
-      break
-    default:
-      throw new Error(`Invalid package manager: ${packageManager}`)
-  }
-}

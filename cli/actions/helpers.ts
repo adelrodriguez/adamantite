@@ -2,13 +2,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import defu from "defu"
 import { parse } from "jsonc-parser"
-import {
-  BIOME_VERSION,
-  exists,
-  getInstalledPackageVersion,
-  installDevDependency,
-  isPackageVersionCorrect,
-} from "../utils"
+import { exists } from "../utils"
 
 interface InitializationHelper {
   config: Record<string, string | string[]>
@@ -16,7 +10,6 @@ interface InitializationHelper {
   create?: () => Promise<void>
   update?: (...args: unknown[]) => Promise<void>
   delete?: () => Promise<void>
-  install?: (packageManager: PackageManager) => Promise<string>
 }
 
 export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const
@@ -124,24 +117,5 @@ export const biome = {
       join(process.cwd(), "biome.jsonc"),
       JSON.stringify(mergedConfig, null, 2)
     )
-  },
-  async install(packageManager: PackageManager): Promise<string> {
-    // Check if @biomejs/biome is already installed with correct version
-    const isVersionCorrect = await isPackageVersionCorrect(
-      "@biomejs/biome",
-      BIOME_VERSION
-    )
-
-    if (isVersionCorrect) {
-      return `@biomejs/biome@${BIOME_VERSION} is already installed`
-    }
-
-    // Check if a different version is installed
-    const installedVersion = await getInstalledPackageVersion("@biomejs/biome")
-    const action = installedVersion ? "updated" : "installed"
-
-    installDevDependency(packageManager, `@biomejs/biome@${BIOME_VERSION}`)
-
-    return `@biomejs/biome@${BIOME_VERSION} ${action} successfully`
   },
 } satisfies InitializationHelper

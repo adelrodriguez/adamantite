@@ -163,11 +163,54 @@ async function confirmAction(message: string): Promise<boolean> {
 async function installDependencies(packageManager: PackageManager) {
   const s = spinner()
 
-  s.start("Checking and installing dependencies...")
+  s.start("Installing dependencies...")
 
   try {
-    const result = await biome.install(packageManager)
-    s.stop(result)
+    const { runProcess, BIOME_VERSION } = await import("../utils")
+
+    // Install both packages in a single command with exact versions
+    switch (packageManager) {
+      case "npm":
+        runProcess("npm", [
+          "install",
+          "--save-dev",
+          "--exact",
+          "adamantite",
+          `@biomejs/biome@${BIOME_VERSION}`,
+        ])
+        break
+      case "yarn":
+        runProcess("yarn", [
+          "add",
+          "--dev",
+          "--exact",
+          "adamantite",
+          `@biomejs/biome@${BIOME_VERSION}`,
+        ])
+        break
+      case "pnpm":
+        runProcess("pnpm", [
+          "add",
+          "--save-dev",
+          "--save-exact",
+          "adamantite",
+          `@biomejs/biome@${BIOME_VERSION}`,
+        ])
+        break
+      case "bun":
+        runProcess("bun", [
+          "add",
+          "--dev",
+          "--exact",
+          "adamantite",
+          `@biomejs/biome@${BIOME_VERSION}`,
+        ])
+        break
+      default:
+        throw new Error(`Invalid package manager: ${packageManager}`)
+    }
+
+    s.stop("Dependencies installed successfully")
   } catch (error) {
     s.stop("Failed to install dependencies")
 

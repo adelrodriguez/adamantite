@@ -2,8 +2,8 @@
   <h1 align="center">💠 <code>adamantite</code></h1>
 
   <p align="center">
-    <em><strong>Ship faster, with confidence.</strong></em>
+    <em><strong>Bulletproof your code.</strong></em>
   </p>
 </p>
 
-An opinionated set of presets for linting, formatting and type-safety. Built for modern TypeScript applications and AI-ready.
+Opinionated linting, formatting, and type-safety presets for modern TypeScript applications. Designed for humans and AI.

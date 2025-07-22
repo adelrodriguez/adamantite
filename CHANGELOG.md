@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.2.0
+
+### Minor Changes
+
+- 8d76fbe: Remove unnecessary tsconfig settings
+
 ## 0.1.1
 
 ### Patch Changes

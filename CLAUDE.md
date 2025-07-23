@@ -23,7 +23,7 @@ Adamantite is an opinionated preset package for modern TypeScript applications t
 Use Bun for all package management and script execution:
 
 - **Install dependencies**: `bun install`
-- **Build CLI**: `bun run build` (uses tsdown to bundle `cli/index.ts` → `dist/`)
+- **Build CLI**: `bun run build` (uses tsdown to bundle `src/index.ts` → `dist/`)
 - **Run tests**: `bun test` or `bun run test:watch` for watch mode
 - **Type checking**: `bun run typecheck`
 - **Linting**: `bun run lint` (auto-fixes issues)
@@ -39,7 +39,7 @@ This project uses changesets for version management:
 
 ## Architecture
 
-### CLI Structure (`cli/`)
+### CLI Structure (`src/`)
 
 - **`index.ts`** - Main CLI entry point using Commander.js
 - **`actions/`** - Command implementations:
@@ -50,7 +50,7 @@ This project uses changesets for version management:
 ### Build Process
 
 - **tsdown** (`tsdown.config.ts`) bundles CLI to `dist/index.js` with minification
-- Entry point: `cli/index.ts` → Output: `dist/index.js` (executable via `adamantite` command)
+- Entry point: `src/index.ts` → Output: `dist/index.js` (executable via `adamantite` command)
 
 ### Configuration Files
 

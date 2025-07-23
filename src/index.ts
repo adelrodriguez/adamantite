@@ -1,10 +1,8 @@
-#!/usr/bin/env node
-
 import { Command } from "commander"
-import format from "./actions/format"
-import init from "./actions/init"
-import lint from "./actions/lint"
-import version from "./actions/version"
+import format from "./commands/format"
+import init from "./commands/init"
+import lint from "./commands/lint"
+import version from "./commands/version"
 
 const program = new Command()
 
@@ -13,7 +11,7 @@ program.version(version)
 program
   .name("Adamantite")
   .description(
-    "An opinionated set of presets for modern TypeScript applications."
+    "An opinionated set of presets for modern TypeScript applications"
   )
 
 program

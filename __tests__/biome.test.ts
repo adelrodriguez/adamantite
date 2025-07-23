@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import Bun from "bun"
-import { BIOME_VERSION } from "../cli/utils"
+import { BIOME_VERSION } from "../src/utils"
 
 // Define regex at top level for performance
 const SCHEMA_VERSION_REGEX = /\/schemas\/([^/]+)\/schema\.json$/

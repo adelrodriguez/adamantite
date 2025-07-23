@@ -5,7 +5,7 @@ import { join } from "node:path"
 describe("CLI", () => {
   describe("version", () => {
     test("displays correct version with --version flag", async () => {
-      const cliPath = join(import.meta.dir, "..", "cli", "index.ts")
+      const cliPath = join(import.meta.dir, "..", "src", "index.ts")
 
       const proc = spawn(["bun", cliPath, "--version"], {
         stdout: "pipe",

@@ -23,7 +23,7 @@
   "type": "module",
   "main": "biome.jsonc",
   "bin": {
-    "adamantite": "adamantite"
+    "adamantite": "bin/adamantite"
   },
   "files": [
     "biome.jsonc",

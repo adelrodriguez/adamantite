@@ -1,6 +1,7 @@
 import { join } from "node:path"
 import process from "node:process"
 import {
+  cancel,
   confirm,
   intro,
   isCancel,
@@ -292,6 +293,6 @@ export default async function init() {
   } catch (error) {
     log.error(`${error instanceof Error ? error.message : "Unknown error"}`)
 
-    outro("Failed to initialize Adamantite")
+    cancel("Failed to initialize Adamantite")
   }
 }

@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.3.1
+
+### Patch Changes
+
+- 1af8e2c: add version title to new version PR
+
 ## 0.3.0
 
 ### Minor Changes

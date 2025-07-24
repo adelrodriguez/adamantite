@@ -1,6 +1,7 @@
 import { join } from "node:path"
 import process from "node:process"
 import {
+  cancel,
   confirm,
   intro,
   isCancel,
@@ -9,14 +10,18 @@ import {
   select,
   spinner,
 } from "@clack/prompts"
-import { exists, readPackageJson, writePackageJson } from "../utils"
 import {
-  biome,
+  BIOME_VERSION,
   detectPackageManager,
+  exists,
   PACKAGE_MANAGERS,
   type PackageManager,
-  tsconfig,
-} from "./helpers"
+  readPackageJson,
+  runProcess,
+  SHERIF_VERSION,
+  writePackageJson,
+} from "../utils"
+import { biome, tsconfig } from "./helpers"
 
 const title = `
                █████                                                 █████     ███   █████            
@@ -89,11 +94,11 @@ async function setupBiomeConfig() {
 async function setupScripts({
   lint,
   format,
-  //   monorepoLinting,
+  lintMonorepo,
 }: {
   lint: boolean
   format: boolean
-  monorepoLinting: boolean
+  lintMonorepo: boolean
 }) {
   const s = spinner()
 
@@ -117,9 +122,9 @@ async function setupScripts({
     }
 
     // TODO: Add monorepo linting script
-    //   if (monorepoLinting) {
-    //     packageJson.scripts.lint = "adamantite lint --monorepo"
-    //   }
+    if (lintMonorepo) {
+      packageJson.scripts["lint:monorepo"] = "adamantite lint monorepo"
+    }
 
     await writePackageJson(packageJson)
 
@@ -160,14 +165,15 @@ async function confirmAction(message: string): Promise<boolean> {
   return result
 }
 
-async function installDependencies(packageManager: PackageManager) {
+function installDependencies(
+  packageManager: PackageManager,
+  options?: { monorepo?: boolean }
+) {
   const s = spinner()
 
   s.start("Installing dependencies...")
 
   try {
-    const { runProcess, BIOME_VERSION } = await import("../utils")
-
     // Install both packages in a single command with exact versions
     switch (packageManager) {
       case "npm":
@@ -177,6 +183,7 @@ async function installDependencies(packageManager: PackageManager) {
           "--exact",
           "adamantite",
           `@biomejs/biome@${BIOME_VERSION}`,
+          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
         ])
         break
       case "yarn":
@@ -186,6 +193,7 @@ async function installDependencies(packageManager: PackageManager) {
           "--exact",
           "adamantite",
           `@biomejs/biome@${BIOME_VERSION}`,
+          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
         ])
         break
       case "pnpm":
@@ -195,6 +203,7 @@ async function installDependencies(packageManager: PackageManager) {
           "--save-exact",
           "adamantite",
           `@biomejs/biome@${BIOME_VERSION}`,
+          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
         ])
         break
       case "bun":
@@ -204,6 +213,7 @@ async function installDependencies(packageManager: PackageManager) {
           "--exact",
           "adamantite",
           `@biomejs/biome@${BIOME_VERSION}`,
+          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
         ])
         break
       default:
@@ -213,31 +223,6 @@ async function installDependencies(packageManager: PackageManager) {
     s.stop("Dependencies installed successfully")
   } catch (error) {
     s.stop("Failed to install dependencies")
-
-    // Provide more specific error messages
-    if (error instanceof Error) {
-      if (
-        error.message.includes("EACCES") ||
-        error.message.includes("permission")
-      ) {
-        throw new Error(
-          "Failed to install dependencies: Permission denied. Try running with elevated permissions or check file permissions."
-        )
-      }
-      if (
-        error.message.includes("ENOTFOUND") ||
-        error.message.includes("network")
-      ) {
-        throw new Error(
-          "Failed to install dependencies: Network error. Check your internet connection and try again."
-        )
-      }
-      if (error.message.includes("Invalid package manager")) {
-        throw new Error(
-          `Failed to install dependencies: Unsupported package manager: ${packageManager}. Please use npm, yarn, pnpm, or bun.`
-        )
-      }
-    }
 
     throw new Error(
       `Failed to install dependencies: ${error instanceof Error ? error.message : "Unknown error"}`
@@ -272,7 +257,9 @@ export default async function init() {
     // TODO: Select editor configuration
     // TODO: Select AI assistant rules
 
-    await installDependencies(packageManager)
+    installDependencies(packageManager, {
+      monorepo: installMonorepoScript,
+    })
 
     await setupBiomeConfig()
 
@@ -280,7 +267,7 @@ export default async function init() {
       await setupScripts({
         lint: installScripts,
         format: installScripts,
-        monorepoLinting: installMonorepoScript,
+        lintMonorepo: installMonorepoScript,
       })
     }
 
@@ -292,6 +279,6 @@ export default async function init() {
   } catch (error) {
     log.error(`${error instanceof Error ? error.message : "Unknown error"}`)
 
-    outro("Failed to initialize Adamantite")
+    cancel("Failed to initialize Adamantite")
   }
 }

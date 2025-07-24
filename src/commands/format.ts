@@ -1,8 +1,13 @@
 import process from "node:process"
-import { runProcess } from "../utils"
+import { detectPackageManager, getExecutablePath, runProcess } from "../utils"
 
-export default function format(files: string[], options: { unsafe: boolean }) {
+export default async function format(
+  files: string[],
+  options: { unsafe: boolean }
+) {
   try {
+    const packageManager = await detectPackageManager()
+    const executablePath = getExecutablePath(packageManager)
     const args = ["@biomejs/biome", "check", "--write"]
 
     if (options.unsafe) {
@@ -13,7 +18,7 @@ export default function format(files: string[], options: { unsafe: boolean }) {
       args.push(...files)
     }
 
-    runProcess("npx", args)
+    runProcess(executablePath, args)
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred"

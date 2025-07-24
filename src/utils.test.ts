@@ -174,26 +174,6 @@ describe("utils", () => {
         "Failed to parse package.json"
       )
     })
-
-    test("should cache package.json content", async () => {
-      const packageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
-      }
-
-      await Bun.write(
-        join(testDir, "package.json"),
-        JSON.stringify(packageJson, null, 2)
-      )
-
-      // First read
-      const result1 = await readPackageJson(testDir)
-      // Second read should use cache
-      const result2 = await readPackageJson(testDir)
-
-      expect(result1).toEqual(result2)
-      expect(result1).toEqual(packageJson)
-    })
   })
 
   describe("writePackageJson", () => {
@@ -229,7 +209,7 @@ describe("utils", () => {
       expect(parsed).toEqual(packageJson)
     })
 
-    test("should update cache after writing", async () => {
+    test("should write and read updated content correctly", async () => {
       const originalPackageJson: PackageJson = {
         name: "test-package",
         version: "1.0.0",
@@ -240,17 +220,20 @@ describe("utils", () => {
         version: "2.0.0",
       }
 
-      // First read to populate cache
+      // Write initial content
       await Bun.write(
         join(testDir, "package.json"),
         JSON.stringify(originalPackageJson, null, 2)
       )
-      await readPackageJson(testDir)
 
-      // Write new content
+      // Verify initial content
+      const initialResult = await readPackageJson(testDir)
+      expect(initialResult).toEqual(originalPackageJson)
+
+      // Write updated content
       await writePackageJson(updatedPackageJson, testDir)
 
-      // Read again should return updated content from cache
+      // Read again should return updated content from disk
       const result = await readPackageJson(testDir)
       expect(result).toEqual(updatedPackageJson)
     })

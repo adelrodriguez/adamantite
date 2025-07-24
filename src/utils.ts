@@ -7,10 +7,6 @@ import type { PackageJson } from "type-fest"
 export const BIOME_VERSION = "2.1.2"
 export const SHERIF_VERSION = "1.6.1"
 
-// Cache for package.json to avoid multiple reads
-let packageJsonCache: PackageJson | null = null
-let packageJsonPath: string | null = null
-
 export function runProcess(
   command: string,
   args: string[] = [],
@@ -31,17 +27,12 @@ export async function exists(path: string) {
 }
 
 /**
- * Reads and parses package.json with caching and proper typing
+ * Reads and parses package.json with proper typing
  */
 export async function readPackageJson(
   cwd = process.cwd()
 ): Promise<PackageJson> {
   const currentPath = join(cwd, "package.json")
-
-  // Return cached version if we've already read the same file
-  if (packageJsonCache && packageJsonPath === currentPath) {
-    return packageJsonCache
-  }
 
   // Check if package.json exists
   if (!(await exists(currentPath))) {
@@ -52,10 +43,6 @@ export async function readPackageJson(
     const content = await readFile(currentPath, "utf-8")
     const parsed = JSON.parse(content) as PackageJson
 
-    // Cache the result
-    packageJsonCache = parsed
-    packageJsonPath = currentPath
-
     return parsed
   } catch (error) {
     throw new Error(
@@ -65,7 +52,7 @@ export async function readPackageJson(
 }
 
 /**
- * Writes package.json with proper formatting and cache invalidation
+ * Writes package.json with proper formatting
  */
 export async function writePackageJson(
   packageJson: PackageJson,
@@ -75,11 +62,6 @@ export async function writePackageJson(
 
   try {
     await writeFile(currentPath, JSON.stringify(packageJson, null, 2))
-
-    // Invalidate cache since we've modified the file
-    if (packageJsonPath === currentPath) {
-      packageJsonCache = packageJson
-    }
   } catch (error) {
     throw new Error(
       `Failed to write package.json: ${error instanceof Error ? error.message : "Unknown error"}`

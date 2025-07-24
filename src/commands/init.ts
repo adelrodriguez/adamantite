@@ -173,47 +173,26 @@ function installDependencies(
   s.start("Installing dependencies...")
 
   try {
-    // Install both packages in a single command with exact versions
+    // Build the list of packages to install
+    const packages = ["adamantite", `@biomejs/biome@${BIOME_VERSION}`]
+
+    if (options?.monorepo) {
+      packages.push(`sherif@${SHERIF_VERSION}`)
+    }
+
+    // Install packages in a single command with exact versions
     switch (packageManager) {
       case "npm":
-        runProcess("npm", [
-          "install",
-          "--save-dev",
-          "--exact",
-          "adamantite",
-          `@biomejs/biome@${BIOME_VERSION}`,
-          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
-        ])
+        runProcess("npm", ["install", "--save-dev", "--exact", ...packages])
         break
       case "yarn":
-        runProcess("yarn", [
-          "add",
-          "--dev",
-          "--exact",
-          "adamantite",
-          `@biomejs/biome@${BIOME_VERSION}`,
-          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
-        ])
+        runProcess("yarn", ["add", "--dev", "--exact", ...packages])
         break
       case "pnpm":
-        runProcess("pnpm", [
-          "add",
-          "--save-dev",
-          "--save-exact",
-          "adamantite",
-          `@biomejs/biome@${BIOME_VERSION}`,
-          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
-        ])
+        runProcess("pnpm", ["add", "--save-dev", "--save-exact", ...packages])
         break
       case "bun":
-        runProcess("bun", [
-          "add",
-          "--dev",
-          "--exact",
-          "adamantite",
-          `@biomejs/biome@${BIOME_VERSION}`,
-          options?.monorepo ? `sherif@${SHERIF_VERSION}` : "",
-        ])
+        runProcess("bun", ["add", "--dev", "--exact", ...packages])
         break
       default:
         throw new Error(`Invalid package manager: ${packageManager}`)

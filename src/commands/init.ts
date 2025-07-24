@@ -94,11 +94,11 @@ async function setupBiomeConfig() {
 async function setupScripts({
   lint,
   format,
-  lintMonorepo,
+  monorepo,
 }: {
   lint: boolean
   format: boolean
-  lintMonorepo: boolean
+  monorepo: boolean
 }) {
   const s = spinner()
 
@@ -121,9 +121,8 @@ async function setupScripts({
       packageJson.scripts["format"] = "adamantite format"
     }
 
-    // TODO: Add monorepo linting script
-    if (lintMonorepo) {
-      packageJson.scripts["lint:monorepo"] = "adamantite lint monorepo"
+    if (monorepo) {
+      packageJson.scripts["lint:monorepo"] = "adamantite monorepo"
     }
 
     await writePackageJson(packageJson)
@@ -267,7 +266,7 @@ export default async function init() {
       await setupScripts({
         lint: installScripts,
         format: installScripts,
-        lintMonorepo: installMonorepoScript,
+        monorepo: installMonorepoScript,
       })
     }
 

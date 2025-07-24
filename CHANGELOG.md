@@ -1,5 +1,12 @@
 # adamantite
 
+## 0.3.0
+
+### Minor Changes
+
+- c23ec2e: - Add support for running `sherif` to automatically fix monorepo-specific issues
+  - Add support for detecting the package manager and using the correct executable path
+
 ## 0.2.0
 
 ### Minor Changes

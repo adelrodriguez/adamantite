@@ -1,17 +1,12 @@
 import process from "node:process"
 import { detectPackageManager, getExecutablePath, runProcess } from "../utils"
 
-export default async function lint(files: string[]) {
+export default async function monorepo() {
   try {
     const packageManager = await detectPackageManager()
     const executablePath = getExecutablePath(packageManager)
-    const args = ["@biomejs/biome", "lint", "--fix"]
 
-    if (files.length > 0) {
-      args.push(...files)
-    }
-
-    runProcess(executablePath, args)
+    runProcess(executablePath, ["sherif", "--fix"])
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "An unknown error occurred"

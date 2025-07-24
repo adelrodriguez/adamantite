@@ -5,6 +5,7 @@ import type { PackageJson } from "type-fest"
 
 // The current version of Biome that this project supports
 export const BIOME_VERSION = "2.1.2"
+export const SHERIF_VERSION = "1.6.1"
 
 // Cache for package.json to avoid multiple reads
 let packageJsonCache: PackageJson | null = null
@@ -133,4 +134,55 @@ export async function isPackageVersionCorrect(
 ): Promise<boolean> {
   const installedVersion = await getInstalledPackageVersion(packageName, cwd)
   return installedVersion === expectedVersion
+}
+
+export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const
+export type PackageManager = (typeof PACKAGE_MANAGERS)[number]
+
+export async function detectPackageManager(): Promise<PackageManager | null> {
+  const cwd = process.cwd()
+
+  const isNpm = await exists(join(cwd, "package-lock.json"))
+
+  if (isNpm) {
+    return "npm"
+  }
+
+  const isYarn = await exists(join(cwd, "yarn.lock"))
+
+  if (isYarn) {
+    return "yarn"
+  }
+
+  const isPnpm = await exists(join(cwd, "pnpm-lock.yaml"))
+
+  if (isPnpm) {
+    return "pnpm"
+  }
+
+  const isBun =
+    (await exists(join(cwd, "bun.lockb"))) ||
+    (await exists(join(cwd, "bun.lock")))
+
+  if (isBun) {
+    return "bun"
+  }
+
+  return null
+}
+
+export function getExecutablePath(packageManager?: PackageManager | null) {
+  switch (packageManager) {
+    case "npm":
+      return "npx"
+    case "yarn":
+      return "yarn dlx"
+    case "pnpm":
+      return "pnpm dlx"
+    case "bun":
+      return "bunx"
+    // Default to npx if we can't determine the package manager
+    default:
+      return "npx"
+  }
 }

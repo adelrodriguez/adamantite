@@ -2,6 +2,7 @@ import { Command } from "commander"
 import format from "./commands/format"
 import init from "./commands/init"
 import lint from "./commands/lint"
+import monorepo from "./commands/monorepo"
 import version from "./commands/version"
 
 const program = new Command()
@@ -9,7 +10,7 @@ const program = new Command()
 program.version(version)
 
 program
-  .name("Adamantite")
+  .name("adamantite")
   .description(
     "An opinionated set of presets for modern TypeScript applications"
   )
@@ -31,5 +32,12 @@ program
   .argument("[files...]", "specific files to format (optional)")
   .option("--unsafe", "apply unsafe fixes")
   .action(format)
+
+program
+  .command("monorepo")
+  .description(
+    "Lint and automatically fix monorepo-specific issues using Sherif"
+  )
+  .action(monorepo)
 
 program.parse()

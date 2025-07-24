@@ -12,41 +12,6 @@ interface InitializationHelper {
   delete?: () => Promise<void>
 }
 
-export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const
-export type PackageManager = (typeof PACKAGE_MANAGERS)[number]
-
-export async function detectPackageManager(): Promise<PackageManager | null> {
-  const cwd = process.cwd()
-
-  const isNpm = await exists(join(cwd, "package-lock.json"))
-
-  if (isNpm) {
-    return "npm"
-  }
-
-  const isYarn = await exists(join(cwd, "yarn.lock"))
-
-  if (isYarn) {
-    return "yarn"
-  }
-
-  const isPnpm = await exists(join(cwd, "pnpm-lock.yaml"))
-
-  if (isPnpm) {
-    return "pnpm"
-  }
-
-  const isBun =
-    (await exists(join(cwd, "bun.lockb"))) ||
-    (await exists(join(cwd, "bun.lock")))
-
-  if (isBun) {
-    return "bun"
-  }
-
-  return null
-}
-
 export const tsconfig = {
   config: { extends: "adamantite/presets/tsconfig.json" },
   async exists() {

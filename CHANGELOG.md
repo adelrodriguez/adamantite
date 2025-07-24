@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.3.3
+
+### Patch Changes
+
+- 97c8ab3: fix monorepo lint script
+
 ## 0.3.2
 
 ### Patch Changes

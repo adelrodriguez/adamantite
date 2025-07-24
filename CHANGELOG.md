@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.3.2
+
+### Patch Changes
+
+- 5f5b8f4: fix `bin` location
+
 ## 0.3.1
 
 ### Patch Changes

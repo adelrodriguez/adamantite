@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.3.4
+
+### Patch Changes
+
+- 9280e56: remove package.json caching
+
 ## 0.3.3
 
 ### Patch Changes

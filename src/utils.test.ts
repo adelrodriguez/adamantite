@@ -45,8 +45,15 @@ describe("utils", () => {
   })
 
   describe("BIOME_VERSION", () => {
-    test("should export the current Biome version", () => {
-      expect(BIOME_VERSION).toBe("2.1.2")
+    test("should match the Biome version in package.json", async () => {
+      const projectRoot = join(__dirname, "..")
+      const packageJson = await readPackageJson(projectRoot)
+
+      const biomeVersionInPackageJson =
+        packageJson.devDependencies?.["@biomejs/biome"]
+
+      expect(biomeVersionInPackageJson).toBeDefined()
+      expect(BIOME_VERSION).toBe(biomeVersionInPackageJson as string)
       expect(typeof BIOME_VERSION).toBe("string")
     })
   })

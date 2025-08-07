@@ -4,7 +4,7 @@ import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 
 // The current version of Biome that this project supports
-export const BIOME_VERSION = "2.1.2"
+export const BIOME_VERSION = "2.1.3"
 export const SHERIF_VERSION = "1.6.1"
 
 export function runProcess(

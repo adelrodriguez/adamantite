@@ -1,0 +1,5 @@
+---
+"adamantite": patch
+---
+
+new title

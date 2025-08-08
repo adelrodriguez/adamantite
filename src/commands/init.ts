@@ -15,6 +15,7 @@ import {
   BIOME_VERSION,
   detectPackageManager,
   exists,
+  getTitle,
   PACKAGE_MANAGERS,
   type PackageManager,
   readPackageJson,
@@ -23,17 +24,6 @@ import {
   writePackageJson,
 } from "../utils"
 import { biome, tsconfig, vscode } from "./helpers"
-
-const title = `
-               █████                                                 █████     ███   █████            
-              ░░███                                                 ░░███     ░░░   ░░███             
-  ██████    ███████   ██████   █████████████    ██████   ████████   ███████   ████  ███████    ██████ 
- ░░░░░███  ███░░███  ░░░░░███ ░░███░░███░░███  ░░░░░███ ░░███░░███ ░░░███░   ░░███ ░░░███░    ███░░███
-  ███████ ░███ ░███   ███████  ░███ ░███ ░███   ███████  ░███ ░███   ░███     ░███   ░███    ░███████ 
- ███░░███ ░███ ░███  ███░░███  ░███ ░███ ░███  ███░░███  ░███ ░███   ░███ ███ ░███   ░███ ███░███░░░  
-░░████████░░████████░░████████ █████░███ █████░░████████ ████ █████  ░░█████  █████  ░░█████ ░░██████ 
- ░░░░░░░░  ░░░░░░░░  ░░░░░░░░ ░░░░░ ░░░ ░░░░░  ░░░░░░░░ ░░░░ ░░░░░    ░░░░░  ░░░░░    ░░░░░   ░░░░░░                   
-`
 
 async function selectPackageManager() {
   const selected = await select({
@@ -252,7 +242,7 @@ function installDependencies(
 }
 
 export default async function init() {
-  intro(title)
+  intro(getTitle())
 
   try {
     const packageManager = await selectPackageManager()

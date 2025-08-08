@@ -6,6 +6,7 @@ import {
   intro,
   isCancel,
   log,
+  multiselect,
   outro,
   select,
   spinner,
@@ -21,7 +22,7 @@ import {
   SHERIF_VERSION,
   writePackageJson,
 } from "../utils"
-import { biome, tsconfig } from "./helpers"
+import { biome, tsconfig, vscode } from "./helpers"
 
 const title = `
                █████                                                 █████     ███   █████            
@@ -154,6 +155,48 @@ async function setupTsConfig() {
   }
 }
 
+async function selectEditorConfig() {
+  const selected = await multiselect({
+    message: "Which editors do you want to configure (recommended)?",
+    options: [
+      { label: "VSCode / Cursor / Windsurf", value: "vscode" },
+      { label: "Zed (coming soon)", value: "zed" },
+    ],
+    required: false,
+  })
+
+  if (isCancel(selected)) {
+    throw new Error("Operation cancelled")
+  }
+
+  return selected
+}
+
+async function setupEditorConfig(selectedEditors: ("vscode" | "zed")[]) {
+  if (!selectedEditors || selectedEditors.length === 0) {
+    return
+  }
+
+  const s = spinner()
+
+  if (selectedEditors.includes("vscode")) {
+    if (await vscode.exists()) {
+      s.start("VSCode settings found, updating...")
+      await vscode.update()
+      s.stop("VSCode settings updated with Adamantite preset")
+    } else {
+      s.start("VSCode settings not found, creating...")
+      await vscode.create()
+      s.stop("VSCode settings created with Adamantite preset")
+    }
+  }
+
+  if (selectedEditors.includes("zed")) {
+    s.start("Zed configuration coming soon...")
+    s.stop("Zed configuration coming soon...")
+  }
+}
+
 async function confirmAction(message: string): Promise<boolean> {
   const result = await confirm({ message })
 
@@ -232,7 +275,8 @@ export default async function init() {
       "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?"
     )
 
-    // TODO: Select editor configuration
+    const selectedEditors = await selectEditorConfig()
+
     // TODO: Select AI assistant rules
 
     installDependencies(packageManager, {
@@ -252,6 +296,8 @@ export default async function init() {
     if (installTypeScript) {
       await setupTsConfig()
     }
+
+    await setupEditorConfig(selectedEditors)
 
     outro("💠 Adamantite initialized successfully!")
   } catch (error) {

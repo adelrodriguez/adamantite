@@ -2,10 +2,11 @@ import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import defu from "defu"
 import { parse } from "jsonc-parser"
+import type { JsonValue } from "type-fest"
 import { exists } from "../utils"
 
 interface InitializationHelper {
-  config: Record<string, string | string[]>
+  config: Record<string, JsonValue>
   exists: () => Promise<boolean>
   create?: () => Promise<void>
   update?: (...args: unknown[]) => Promise<void>
@@ -81,6 +82,51 @@ export const biome = {
     await writeFile(
       join(process.cwd(), "biome.jsonc"),
       JSON.stringify(mergedConfig, null, 2)
+    )
+  },
+} satisfies InitializationHelper
+
+export const vscode = {
+  config: {
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true,
+    "editor.codeActionsOnSave": {
+      "quickfix.biome": "explicit",
+      "source.organizeImports.biome": "explicit",
+      "source.fixAll.biome": "explicit",
+    },
+    "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]":
+      {
+        "editor.defaultFormatter": "biomejs.biome",
+      },
+  },
+  async exists() {
+    return await exists(join(process.cwd(), ".vscode", "settings.json"))
+  },
+  async create() {
+    await writeFile(
+      join(process.cwd(), ".vscode", "settings.json"),
+      JSON.stringify(this.config, null, 2)
+    )
+  },
+  async update() {
+    const vscodePath = (await exists(
+      join(process.cwd(), ".vscode", "settings.json")
+    ))
+      ? join(process.cwd(), ".vscode", "settings.json")
+      : join(process.cwd(), ".vscode", "settings.json")
+
+    const vscodeFile = await readFile(vscodePath, "utf-8")
+
+    const existingConfig = parse(vscodeFile)
+
+    const newConfig = defu(existingConfig, this.config)
+
+    await writeFile(
+      join(process.cwd(), ".vscode", "settings.json"),
+      JSON.stringify(newConfig, null, 2)
     )
   },
 } satisfies InitializationHelper

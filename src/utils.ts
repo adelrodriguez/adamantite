@@ -4,7 +4,21 @@ import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 
 // The current version of Biome that this project supports
-export const BIOME_VERSION = "2.1.3"
+export async function getBiomeVersion(cwd = process.cwd()): Promise<string> {
+  try {
+    const packageJson = await readPackageJson(cwd)
+    const biomeVersion = packageJson.devDependencies?.["@biomejs/biome"]
+    if (!biomeVersion) {
+      throw new Error("@biomejs/biome not found in devDependencies")
+    }
+
+    return biomeVersion
+  } catch (error) {
+    throw new Error(
+      `Failed to get Biome version: ${error instanceof Error ? error.message : "Unknown error"}`
+    )
+  }
+}
 export const SHERIF_VERSION = "1.6.1"
 
 export function runProcess(

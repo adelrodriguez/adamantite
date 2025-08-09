@@ -6,7 +6,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import {
-  BIOME_VERSION,
   exists,
   getInstalledPackageVersion,
   isPackageInstalled,
@@ -42,20 +41,6 @@ describe("utils", () => {
     // Restore original cwd and cleanup
     process.chdir(originalCwd)
     rmSync(testDir, { recursive: true, force: true })
-  })
-
-  describe("BIOME_VERSION", () => {
-    test("should match the Biome version in package.json", async () => {
-      const projectRoot = join(__dirname, "..")
-      const packageJson = await readPackageJson(projectRoot)
-
-      const biomeVersionInPackageJson =
-        packageJson.devDependencies?.["@biomejs/biome"]
-
-      expect(biomeVersionInPackageJson).toBeDefined()
-      expect(BIOME_VERSION).toBe(biomeVersionInPackageJson as string)
-      expect(typeof BIOME_VERSION).toBe("string")
-    })
   })
 
   describe("runProcess", () => {

@@ -12,9 +12,9 @@ import {
   spinner,
 } from "@clack/prompts"
 import {
-  BIOME_VERSION,
   detectPackageManager,
   exists,
+  getBiomeVersion,
   getTitle,
   PACKAGE_MANAGERS,
   type PackageManager,
@@ -197,7 +197,7 @@ async function confirmAction(message: string): Promise<boolean> {
   return result
 }
 
-function installDependencies(
+async function installDependencies(
   packageManager: PackageManager,
   options?: { monorepo?: boolean }
 ) {
@@ -207,7 +207,8 @@ function installDependencies(
 
   try {
     // Build the list of packages to install
-    const packages = ["adamantite", `@biomejs/biome@${BIOME_VERSION}`]
+    const biomeVersion = await getBiomeVersion()
+    const packages = ["adamantite", `@biomejs/biome@^${biomeVersion}`]
 
     if (options?.monorepo) {
       packages.push(`sherif@${SHERIF_VERSION}`)
@@ -269,7 +270,7 @@ export default async function init() {
 
     // TODO: Select AI assistant rules
 
-    installDependencies(packageManager, {
+    await installDependencies(packageManager, {
       monorepo: installMonorepoScript,
     })
 

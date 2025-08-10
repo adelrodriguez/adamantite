@@ -1,5 +1,18 @@
 # adamantite
 
+## 0.4.0
+
+### Minor Changes
+
+- c7edd5c: add editor rules for vscode
+
+### Patch Changes
+
+- 78a93ea: update biome version to 2.1.4
+- d0906c4: pin all versions to exact
+- 9d10cf1: update typescript peer dependency range
+- bdf3962: new title
+
 ## 0.3.4
 
 ### Patch Changes

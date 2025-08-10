@@ -51,8 +51,9 @@
     "@biomejs/biome": "2.1.4",
     "@changesets/cli": "2.29.5",
     "@types/bun": "1.2.19",
-    "tsdown": "0.13.3",
-    "type-fest": "4.41.0"
+    "tsdown": "0.13.5",
+    "type-fest": "4.41.0",
+    "typescript": "5.9.2"
   },
   "peerDependencies": {
     "typescript": "5.8.3"

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import Bun from "bun"
-import { execSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -12,11 +12,12 @@ import {
   writePackageJson,
 } from "../src/utils"
 
-// Mock execSync for testing
+// Mock spawnSync for testing
 mock.module("node:child_process", () => ({
-  execSync: mock(() => {
-    // Mock implementation
-  }),
+  spawnSync: mock(() => ({
+    status: 0,
+    error: null,
+  })),
 }))
 
 describe("utils", () => {
@@ -42,47 +43,68 @@ describe("utils", () => {
 
   describe("runProcess", () => {
     test("should execute command with default options", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
+      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
+      mockSpawnSync.mockClear()
 
       runProcess("echo", ["hello"])
 
-      expect(mockExecSync).toHaveBeenCalledWith("echo hello", {
+      expect(mockSpawnSync).toHaveBeenCalledWith("echo", ["hello"], {
         stdio: "inherit",
       })
     })
 
     test("should execute command with custom options", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
+      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
+      mockSpawnSync.mockClear()
 
       const customOptions = { cwd: "/tmp", env: { NODE_ENV: "test" } }
       runProcess("npm", ["install"], customOptions)
 
-      expect(mockExecSync).toHaveBeenCalledWith("npm install", {
+      expect(mockSpawnSync).toHaveBeenCalledWith("npm", ["install"], {
         ...customOptions,
         stdio: "inherit",
       })
     })
 
     test("should handle command with no args", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
+      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
+      mockSpawnSync.mockClear()
 
       runProcess("ls")
 
-      expect(mockExecSync).toHaveBeenCalledWith("ls ", { stdio: "inherit" })
+      expect(mockSpawnSync).toHaveBeenCalledWith("ls", [], { stdio: "inherit" })
     })
 
     test("should handle multiple args", () => {
-      const mockExecSync = execSync as unknown as ReturnType<typeof mock>
-      mockExecSync.mockClear()
+      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
+      mockSpawnSync.mockClear()
 
       runProcess("git", ["add", ".", "--all"])
 
-      expect(mockExecSync).toHaveBeenCalledWith("git add . --all", {
+      expect(mockSpawnSync).toHaveBeenCalledWith("git", ["add", ".", "--all"], {
         stdio: "inherit",
       })
+    })
+
+    test("should throw error when process fails", () => {
+      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
+      mockSpawnSync.mockReturnValue({
+        status: 1,
+        error: null,
+      })
+
+      expect(() => runProcess("failing-command")).toThrow("Process exited with code 1")
+    })
+
+    test("should throw error when spawn fails", () => {
+      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
+      const spawnError = new Error("ENOENT: no such file or directory")
+      mockSpawnSync.mockReturnValue({
+        status: null,
+        error: spawnError,
+      })
+
+      expect(() => runProcess("nonexistent-command")).toThrow(spawnError)
     })
   })
 

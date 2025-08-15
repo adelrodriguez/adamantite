@@ -1,17 +1,22 @@
-import { type ExecSyncOptions, execSync } from "node:child_process"
+import { type SpawnSyncOptions, spawnSync } from "node:child_process"
 import { access, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 
-
 export function runProcess(
   command: string,
   args: string[] = [],
-  options: Omit<ExecSyncOptions, "stdio"> = {}
+  options: Omit<SpawnSyncOptions, "stdio"> = {}
 ) {
-  const commandWithArgs = `${command} ${args.join(" ")}`
+  const result = spawnSync(command, args, { ...options, stdio: "inherit" })
 
-  execSync(commandWithArgs, { ...options, stdio: "inherit" })
+  if (result.error) {
+    throw result.error
+  }
+
+  if (result.status !== 0) {
+    throw new Error(`Process exited with code ${result.status}`)
+  }
 }
 
 export async function exists(path: string) {
@@ -65,7 +70,6 @@ export async function writePackageJson(
     )
   }
 }
-
 
 export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const
 export type PackageManager = (typeof PACKAGE_MANAGERS)[number]

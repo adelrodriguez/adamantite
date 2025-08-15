@@ -52,7 +52,7 @@
     "@changesets/cli": "2.29.5",
     "@types/bun": "1.2.20",
     "sherif": "1.6.1",
-    "tsdown": "0.13.5",
+    "tsdown": "0.14.1",
     "type-fest": "4.41.0",
     "typescript": "5.9.2"
   },

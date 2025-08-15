@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import defu from "defu"
 import { parse } from "jsonc-parser"
@@ -6,6 +6,7 @@ import type { JsonValue } from "type-fest"
 import { exists } from "../utils"
 
 interface InitializationHelper {
+  version?: string
   config: Record<string, JsonValue>
   exists: () => Promise<boolean>
   create?: () => Promise<void>
@@ -31,7 +32,7 @@ export const tsconfig = {
     )
     const existingConfig = parse(tsconfigFile)
 
-    const newConfig = defu(existingConfig, this.config)
+    const newConfig = defu(this.config, existingConfig)
 
     await writeFile(
       join(process.cwd(), "tsconfig.json"),
@@ -41,6 +42,7 @@ export const tsconfig = {
 } satisfies InitializationHelper
 
 export const biome = {
+  version: "2.1.4",
   config: {
     // Ensures that the schema always matches the installed version of Biome
     $schema: "./node_modules/@biomejs/biome/configuration_schema.json",
@@ -76,8 +78,8 @@ export const biome = {
       newConfig.extends.push("adamantite")
     }
 
-    // Merge other config properties (like $schema)
-    const mergedConfig = defu(newConfig, this.config)
+    // Merge other config properties (like $schema) - our config overrides existing
+    const mergedConfig = defu(this.config, newConfig)
 
     await writeFile(
       join(process.cwd(), "biome.jsonc"),
@@ -106,8 +108,12 @@ export const vscode = {
     return await exists(join(process.cwd(), ".vscode", "settings.json"))
   },
   async create() {
+    const vscodePath = join(process.cwd(), ".vscode")
+    // Create .vscode directory if it doesn't exist
+    await mkdir(vscodePath, { recursive: true })
+    
     await writeFile(
-      join(process.cwd(), ".vscode", "settings.json"),
+      join(vscodePath, "settings.json"),
       JSON.stringify(this.config, null, 2)
     )
   },
@@ -122,7 +128,7 @@ export const vscode = {
 
     const existingConfig = parse(vscodeFile)
 
-    const newConfig = defu(existingConfig, this.config)
+    const newConfig = defu(this.config, existingConfig)
 
     await writeFile(
       join(process.cwd(), ".vscode", "settings.json"),
@@ -130,3 +136,7 @@ export const vscode = {
     )
   },
 } satisfies InitializationHelper
+
+export const sherif = {
+  version: "1.6.1",
+}

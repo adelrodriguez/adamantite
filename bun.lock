@@ -13,6 +13,7 @@
         "@biomejs/biome": "2.1.4",
         "@changesets/cli": "2.29.5",
         "@types/bun": "1.2.19",
+        "sherif": "1.6.1",
         "tsdown": "0.13.5",
         "type-fest": "4.41.0",
         "typescript": "5.9.2",
@@ -338,6 +339,20 @@
     "shebang-command": ["shebang-command@2.0.0", "", { "dependencies": { "shebang-regex": "^3.0.0" } }, "sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA=="],
 
     "shebang-regex": ["shebang-regex@3.0.0", "", {}, "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A=="],
+
+    "sherif": ["sherif@1.6.1", "", { "optionalDependencies": { "sherif-darwin-arm64": "1.6.1", "sherif-darwin-x64": "1.6.1", "sherif-linux-arm64": "1.6.1", "sherif-linux-x64": "1.6.1", "sherif-windows-arm64": "1.6.1", "sherif-windows-x64": "1.6.1" }, "bin": { "sherif": "index.js" } }, "sha512-ZnwyTnmXoUOPClkOA37JWIyFxCoozMGHmhk/p7XbTREI554XXCnBAn3BMX8UsqkhSzQ9eNQsq4U+jnImEIppsQ=="],
+
+    "sherif-darwin-arm64": ["sherif-darwin-arm64@1.6.1", "", { "os": "darwin", "cpu": "arm64" }, "sha512-J15oBJcrnCAZ0rQE8WbMShYw3204A18akCH6C/uZrILTwX/vZyJIqi7lAt5L00LzsadA3HcyQqVjLNNCvuihoQ=="],
+
+    "sherif-darwin-x64": ["sherif-darwin-x64@1.6.1", "", { "os": "darwin", "cpu": "x64" }, "sha512-oLA/GtvUasi+qCl35LczOhQ4g/xY2mxE5/eiTYQGT3Ow7FKLscnkE6v5l28bgkFeR/uke0AgZ/CgHhozAf0ulg=="],
+
+    "sherif-linux-arm64": ["sherif-linux-arm64@1.6.1", "", { "os": "linux", "cpu": "arm64" }, "sha512-OoltlucT7v9BZdkYZRbs1QU0DYMCQ5qgpMqQdMW1Rq3w3amr7+oEiV9NHntD83udOo8xRxKq0uPXfNYu+VptJw=="],
+
+    "sherif-linux-x64": ["sherif-linux-x64@1.6.1", "", { "os": "linux", "cpu": "x64" }, "sha512-qyDyYqpi3ABGkRuCnjnxN3OMT8DxMiiLzhS9p9xC05Y9nr5hjkxvqP4DdJ4e5opm4E7vzRAS7VQoZ6m7h6tsgQ=="],
+
+    "sherif-windows-arm64": ["sherif-windows-arm64@1.6.1", "", { "os": "win32", "cpu": "arm64" }, "sha512-wAbCiqP//lo7bZUlHmZUV3/sGjnJxo6QB5/fqhz5/GUeWh4CTyvlSacJKZxLnXnzpiUSeFnWutquWnHkRov5Ug=="],
+
+    "sherif-windows-x64": ["sherif-windows-x64@1.6.1", "", { "os": "win32", "cpu": "x64" }, "sha512-2r0qMxZGCMO2aq8Hlq7npxtAsUFVDsEFtUM/6dFo1npa/jHe2mbU7ii/Ymy0bloSa/qw/azrSfRV6GLU7Gjtxg=="],
 
     "signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
 

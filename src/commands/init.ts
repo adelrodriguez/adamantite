@@ -14,16 +14,14 @@ import {
 import {
   detectPackageManager,
   exists,
-  getBiomeVersion,
   getTitle,
   PACKAGE_MANAGERS,
   type PackageManager,
   readPackageJson,
   runProcess,
-  SHERIF_VERSION,
   writePackageJson,
 } from "../utils"
-import { biome, tsconfig, vscode } from "./helpers"
+import { biome, sherif, tsconfig, vscode } from "./helpers"
 
 async function selectPackageManager() {
   const selected = await select({
@@ -197,7 +195,7 @@ async function confirmAction(message: string): Promise<boolean> {
   return result
 }
 
-async function installDependencies(
+function installDependencies(
   packageManager: PackageManager,
   options?: { monorepo?: boolean }
 ) {
@@ -207,11 +205,11 @@ async function installDependencies(
 
   try {
     // Build the list of packages to install
-    const biomeVersion = await getBiomeVersion()
+    const biomeVersion = biome.version
     const packages = ["adamantite", `@biomejs/biome@^${biomeVersion}`]
 
     if (options?.monorepo) {
-      packages.push(`sherif@${SHERIF_VERSION}`)
+      packages.push(`sherif@${sherif.version}`)
     }
 
     // Install packages in a single command with exact versions
@@ -270,7 +268,7 @@ export default async function init() {
 
     // TODO: Select AI assistant rules
 
-    await installDependencies(packageManager, {
+    installDependencies(packageManager, {
       monorepo: installMonorepoScript,
     })
 

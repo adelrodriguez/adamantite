@@ -3,6 +3,7 @@ import format from "./commands/format"
 import init from "./commands/init"
 import lint from "./commands/lint"
 import monorepo from "./commands/monorepo"
+import update from "./commands/update"
 import version from "./commands/version"
 
 const program = new Command()
@@ -39,5 +40,10 @@ program
     "Lint and automatically fix monorepo-specific issues using Sherif"
   )
   .action(monorepo)
+
+program
+  .command("update")
+  .description("Update adamantite dependencies to latest compatible versions")
+  .action(update)
 
 program.parse()

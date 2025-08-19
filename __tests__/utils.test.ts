@@ -93,7 +93,9 @@ describe("utils", () => {
         error: null,
       })
 
-      expect(() => runProcess("failing-command")).toThrow("Process exited with code 1")
+      expect(() => runProcess("failing-command")).toThrow(
+        "Process exited with code 1"
+      )
     })
 
     test("should throw error when spawn fails", () => {
@@ -262,5 +264,4 @@ describe("utils", () => {
       )
     })
   })
-
 })

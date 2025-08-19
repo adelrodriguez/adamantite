@@ -69,14 +69,17 @@ function updateDependencies(
 
   try {
     // Build the list of packages to install with exact versions
-    const packages = updates.map(
-      (dep) => `${dep.name}@${dep.targetVersion}`
-    )
+    const packages = updates.map((dep) => `${dep.name}@${dep.targetVersion}`)
 
     // Update packages in a single command with exact versions
     switch (packageManager) {
       case "npm":
-        runProcess("npm", ["install", "--save-dev", "--save-exact", ...packages])
+        runProcess("npm", [
+          "install",
+          "--save-dev",
+          "--save-exact",
+          ...packages,
+        ])
         break
       case "yarn":
         runProcess("yarn", ["add", "--dev", "--exact", ...packages])
@@ -106,9 +109,7 @@ async function confirmUpdate(updates: DependencyUpdate[]): Promise<boolean> {
   log.message("")
 
   for (const dep of updates) {
-    log.message(
-      `  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`
-    )
+    log.message(`  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`)
   }
 
   log.message("")

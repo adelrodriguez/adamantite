@@ -42,7 +42,7 @@ export const tsconfig = {
 } satisfies InitializationHelper
 
 export const biome = {
-  version: "2.1.4",
+  version: "2.2.0",
   config: {
     // Ensures that the schema always matches the installed version of Biome
     $schema: "./node_modules/@biomejs/biome/configuration_schema.json",
@@ -111,7 +111,7 @@ export const vscode = {
     const vscodePath = join(process.cwd(), ".vscode")
     // Create .vscode directory if it doesn't exist
     await mkdir(vscodePath, { recursive: true })
-    
+
     await writeFile(
       join(vscodePath, "settings.json"),
       JSON.stringify(this.config, null, 2)

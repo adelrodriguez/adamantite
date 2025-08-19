@@ -1,10 +1,11 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.1.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.0/schema.json",
 
   // ---------------------------- FORMATTER -----------------------------
   // These are the generic settings that apply to all files in the project.
   "formatter": {
     "enabled": true,
+
     // Format the code even if there are errors.
     "formatWithErrors": true,
     // Use spaces for indentation.
@@ -23,6 +24,8 @@
   // ------------------------------ ASSIST ------------------------------
   // Help with code organization.
   "assist": {
+    "enabled": true,
+
     "actions": {
       "source": {
         // Sort imports in a certain order. We prioritize runtime imports
@@ -34,7 +37,9 @@
             "groups": [":BUN:", ":NODE:", ":PACKAGE:", ":ALIAS:"]
           }
         },
+        // Enforce that the attributes of a JSX element are sorted.
         "useSortedAttributes": "on",
+        // Enforce that CSS properties are sorted.
         "useSortedProperties": "on",
         // Don't sort the keys of an object.
         "useSortedKeys": "off"
@@ -48,9 +53,13 @@
     "enabled": true,
     "rules": {
       "a11y": {
+        // Enforce that the `accesskey` attribute is not used on any HTML element.
         "noAccessKey": "error",
+        // Enforce that the `aria-hidden` attribute is not used on any focusable element.
         "noAriaHiddenOnFocusable": "error",
+        // Enforce that the `aria-unsupported-elements` attribute is not used on any HTML element.
         "noAriaUnsupportedElements": "error",
+        // Enforce that the `distracting-elements` attribute is not used on any HTML element.
         "noDistractingElements": "error",
         "noHeaderScope": "error",
         "noInteractiveElementToNoninteractiveRole": "error",
@@ -83,7 +92,8 @@
         "useValidAutocomplete": "error",
         "useValidLang": "error",
         "noAutofocus": "off",
-        "useGenericFontNames": "error"
+        "useGenericFontNames": "error",
+        "noNoninteractiveElementInteractions": "error"
       },
       "complexity": {
         "noAdjacentSpacesInRegex": "error",
@@ -99,7 +109,11 @@
         },
         "noExcessiveNestedTestSuites": "error",
         "useSimplifiedLogicExpression": "error",
-        "useWhile": "error"
+        "useWhile": "error",
+        "useIndexOf": "error",
+
+        // --------------------------- CSS ---------------------------
+        "noImportantStyles": "error"
       },
       "correctness": {
         // ----------------------- JavaScript ------------------------
@@ -158,43 +172,27 @@
         "noUnknownPseudoElement": "error",
         "noUnknownTypeSelector": "error",
         "noUnknownUnit": "error",
-        "noUnmatchableAnbSelector": "error"
+        "noUnmatchableAnbSelector": "error",
+        "noGlobalDirnameFilename": "error",
+        "noNestedComponentDefinitions": "error",
+        "noReactPropAssignments": "error",
+        "noRestrictedElements": "error",
+        "useJsonImportAttributes": "error",
+        "useParseIntRadix": "error",
+        "useSingleJsDocAsterisk": "error",
+
+        "noProcessGlobal": "off",
+        "useUniqueElementIds": "off"
       },
       "nursery": {
         // ----------------------- JavaScript ------------------------
-        "noAwaitInLoop": "error",
-        "noBitwiseOperators": "error",
-        "noConstantBinaryExpression": "error",
-        "noGlobalDirnameFilename": "error",
-        "noNestedComponentDefinitions": "error",
-        "noNoninteractiveElementInteractions": "error",
-        "noReactPropAssign": "error",
-        "noRestrictedElements": "error",
         "noShadow": "error",
-        "noTsIgnore": "error",
-        "noUnwantedPolyfillio": "error",
-        "noUselessBackrefInRegex": "error",
-        "noUselessEscapeInString": "error",
         "noUselessUndefined": "error",
-        "useAdjacentGetterSetter": "error",
-        "useConsistentObjectDefinition": "error",
-        "useConsistentResponse": "error",
         "useExhaustiveSwitchCases": "error",
-        "useGoogleFontPreconnect": "error",
-        "useIndexOf": "error",
-        "useIterableCallbackReturn": "error",
-        "useJsonImportAttribute": "error",
-        "useNumericSeparators": "error",
-        "useObjectSpread": "error",
-        "useParseIntRadix": "error",
-        "useSingleJsDocAsterisk": "error",
-        "useSymbolDescription": "error",
+        "noNonNullAssertedOptionalChain": "error",
 
         "useExplicitType": "off",
-
-        "noProcessGlobal": "off",
         "noSecrets": "off",
-        "useExportsLast": "off",
         "useSortedClasses": {
           "fix": "safe",
           "level": "error",
@@ -203,29 +201,28 @@
             "functions": ["clsx", "cva", "tw", "twMerge", "cn", "twJoin", "tv"]
           }
         },
-        "useUniqueElementIds": "off",
 
-        // These rules should be enabled eventually
+        // These rules should be enabled once improvements are made to
+        // performance
         "noFloatingPromises": "off",
         "noImportCycles": "off",
         "noUnresolvedImports": "off",
-
-        // --------------------------- CSS ---------------------------
-        "noImportantStyles": "error",
-        // Disabling this rule since we need custom at-rules for Tailwind
-        "noUnknownAtRule": "off"
+        "noMisusedPromises": "off"
       },
       "performance": {
         // ----------------------- JavaScript ------------------------
 
         "noAccumulatingSpread": "error",
-        "noBarrelFile": "off",
+        "noAwaitInLoops": "error",
+        "noBarrelFile": "error",
         "noDelete": "error",
         "noDynamicNamespaceImportAccess": "error",
         "noImgElement": "error",
         "noNamespaceImport": "off",
         "noReExportAll": "off",
-        "useTopLevelRegex": "error"
+        "useTopLevelRegex": "error",
+        "noUnwantedPolyfillio": "error",
+        "useGoogleFontPreconnect": "error"
       },
       "security": {
         // ----------------------- JavaScript ------------------------
@@ -304,7 +301,13 @@
 
         // --------------------------- CSS ---------------------------
         "noDescendingSpecificity": "error",
-        "noValueAtRule": "error"
+        "noValueAtRule": "error",
+        "useGroupedAccessorPairs": "error",
+        "useConsistentObjectDefinitions": "error",
+        "useNumericSeparators": "error",
+        "useObjectSpread": "error",
+        "useSymbolDescription": "error",
+        "useExportsLast": "off"
       },
       "suspicious": {
         "noApproximativeNumericConstant": "error",
@@ -389,7 +392,19 @@
         "noDuplicateSelectorsKeyframeBlock": "error",
         "noEmptyBlock": "error",
         "noImportantInKeyframe": "error",
-        "noShorthandPropertyOverrides": "error"
+        "noShorthandPropertyOverrides": "error",
+        "noBitwiseOperators": "error",
+        "noConstantBinaryExpressions": "error",
+        "noTsIgnore": "error",
+        "noUselessRegexBackrefs": "error",
+        "noUselessEscapeInString": "error",
+        "useStaticResponseMethods": "error",
+        "useIterableCallbackReturn": "error",
+        // Disabling this rule since we need custom at-rules for Tailwind
+        "noUnknownAtRules": "off",
+
+        // --------------------------- JSON ---------------------------
+        "useBiomeIgnoreFolder": "error"
       }
     }
   },
@@ -397,12 +412,13 @@
   // Options for JavaScript and TypeScript files.
   "javascript": {
     "formatter": {
+      "enabled": true,
+
       "arrowParentheses": "always",
       "attributePosition": "auto",
       "bracketSameLine": false,
       "bracketSpacing": true,
-      "enabled": true,
-      "indentStyle": "space",
+      "expand": "auto",
       "jsxQuoteStyle": "double",
       "quoteProperties": "asNeeded",
       "quoteStyle": "double",

@@ -214,7 +214,7 @@
 
         "noAccumulatingSpread": "error",
         "noAwaitInLoops": "error",
-        "noBarrelFile": "error",
+        "noBarrelFile": "off",
         "noDelete": "error",
         "noDynamicNamespaceImportAccess": "error",
         "noImgElement": "error",

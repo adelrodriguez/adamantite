@@ -87,7 +87,6 @@ describe("helpers", () => {
       const codeActions = vscode.config["editor.codeActionsOnSave"]
 
       expect(codeActions).toBeDefined()
-      expect(codeActions["quickfix.biome"]).toBe("explicit")
       expect(codeActions["source.organizeImports.biome"]).toBe("explicit")
       expect(codeActions["source.fixAll.biome"]).toBe("explicit")
     })

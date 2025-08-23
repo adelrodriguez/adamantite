@@ -3,7 +3,7 @@ import { join } from "node:path"
 import defu from "defu"
 import { parse } from "jsonc-parser"
 import type { JsonValue } from "type-fest"
-import { exists } from "../utils"
+import { checkIfExists } from "../utils"
 
 interface InitializationHelper {
   version?: string
@@ -17,7 +17,7 @@ interface InitializationHelper {
 export const tsconfig = {
   config: { extends: "adamantite/presets/tsconfig.json" },
   async exists() {
-    return await exists(join(process.cwd(), "tsconfig.json"))
+    return await checkIfExists(join(process.cwd(), "tsconfig.json"))
   },
   async create() {
     await writeFile(
@@ -48,7 +48,7 @@ export const biome = {
     $schema: "./node_modules/@biomejs/biome/configuration_schema.json",
   },
   async exists() {
-    return await exists(join(process.cwd(), "biome.jsonc"))
+    return await checkIfExists(join(process.cwd(), "biome.jsonc"))
   },
   async create() {
     await writeFile(
@@ -57,7 +57,7 @@ export const biome = {
     )
   },
   async update() {
-    const biomePath = (await exists(join(process.cwd(), "biome.jsonc")))
+    const biomePath = (await checkIfExists(join(process.cwd(), "biome.jsonc")))
       ? join(process.cwd(), "biome.jsonc")
       : join(process.cwd(), "biome.json")
 
@@ -91,11 +91,9 @@ export const biome = {
 export const vscode = {
   config: {
     "typescript.tsdk": "node_modules/typescript/lib",
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.codeActionsOnSave": {
-      "quickfix.biome": "explicit",
       "source.organizeImports.biome": "explicit",
       "source.fixAll.biome": "explicit",
     },
@@ -105,7 +103,7 @@ export const vscode = {
       },
   },
   async exists() {
-    return await exists(join(process.cwd(), ".vscode", "settings.json"))
+    return await checkIfExists(join(process.cwd(), ".vscode", "settings.json"))
   },
   async create() {
     const vscodePath = join(process.cwd(), ".vscode")
@@ -118,11 +116,7 @@ export const vscode = {
     )
   },
   async update() {
-    const vscodePath = (await exists(
-      join(process.cwd(), ".vscode", "settings.json")
-    ))
-      ? join(process.cwd(), ".vscode", "settings.json")
-      : join(process.cwd(), ".vscode", "settings.json")
+    const vscodePath = join(process.cwd(), ".vscode", "settings.json")
 
     const vscodeFile = await readFile(vscodePath, "utf-8")
 

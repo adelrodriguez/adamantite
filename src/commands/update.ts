@@ -7,13 +7,8 @@ import {
   outro,
   spinner,
 } from "@clack/prompts"
-import {
-  detectPackageManager,
-  getTitle,
-  type PackageManager,
-  readPackageJson,
-  runProcess,
-} from "../utils"
+import { addDevDependency } from "nypm"
+import { getTitle, readPackageJson } from "../utils"
 import { biome, sherif } from "./helpers"
 
 interface DependencyUpdate {
@@ -59,48 +54,56 @@ async function detectUpdatesNeeded(): Promise<DependencyUpdate[]> {
   }
 }
 
-function updateDependencies(
-  packageManager: PackageManager,
-  updates: DependencyUpdate[]
-) {
+async function updateDependencies(updates: DependencyUpdate[]) {
   const s = spinner()
 
   s.start("Updating dependencies...")
 
   try {
-    // Build the list of packages to install with exact versions
-    const packages = updates.map((dep) => `${dep.name}@${dep.targetVersion}`)
+    // Update each dependency with its exact version
+    const tasks = updates.map((dep) =>
+      addDevDependency(`${dep.name}@${dep.targetVersion}`)
+    )
 
-    // Update packages in a single command with exact versions
-    switch (packageManager) {
-      case "npm":
-        runProcess("npm", [
-          "install",
-          "--save-dev",
-          "--save-exact",
-          ...packages,
-        ])
-        break
-      case "yarn":
-        runProcess("yarn", ["add", "--dev", "--exact", ...packages])
-        break
-      case "pnpm":
-        runProcess("pnpm", ["add", "--save-dev", "--save-exact", ...packages])
-        break
-      case "bun":
-        runProcess("bun", ["add", "--dev", "--exact", ...packages])
-        break
-      default:
-        throw new Error(`Invalid package manager: ${packageManager}`)
+    const results = await Promise.allSettled(tasks)
+
+    // Check for failures and successes
+    const failures: string[] = []
+    const successes: string[] = []
+
+    for (const [index, result] of results.entries()) {
+      const dep = updates[index]
+
+      if (!dep) {
+        continue
+      }
+
+      const depName = dep.name
+      if (result.status === "fulfilled") {
+        successes.push(depName)
+      } else {
+        failures.push(
+          `${depName}: ${result.reason?.message || "Unknown error"}`
+        )
+      }
     }
 
-    s.stop("Dependencies updated successfully")
+    if (failures.length === 0) {
+      s.stop("Dependencies updated successfully")
+    } else if (successes.length === 0) {
+      s.stop("Failed to update dependencies")
+      throw new Error(`All dependency updates failed:\n${failures.join("\n")}`)
+    } else {
+      s.stop("Partial update completed")
+      log.warn("Some dependencies failed to update:")
+      for (const failure of failures) {
+        log.warn(`  ${failure}`)
+      }
+      log.success(`Successfully updated: ${successes.join(", ")}`)
+    }
   } catch (error) {
     s.stop("Failed to update dependencies")
-
-    throw new Error(
-      `Failed to update dependencies: ${error instanceof Error ? error.message : "Unknown error"}`
-    )
+    throw error
   }
 }
 
@@ -129,14 +132,6 @@ export default async function update() {
   intro(getTitle())
 
   try {
-    const packageManager = await detectPackageManager()
-
-    if (!packageManager) {
-      throw new Error(
-        "Unable to detect package manager. Please ensure you have a lock file (package-lock.json, yarn.lock, pnpm-lock.yaml, or bun.lock/bun.lockb) in your project."
-      )
-    }
-
     const updates = await detectUpdatesNeeded()
 
     if (updates.length === 0) {
@@ -152,7 +147,7 @@ export default async function update() {
       return
     }
 
-    updateDependencies(packageManager, updates)
+    await updateDependencies(updates)
 
     outro("💠 Dependencies updated successfully!")
   } catch (error) {

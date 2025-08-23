@@ -1,16 +1,10 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
 import Bun from "bun"
-import { spawnSync } from "node:child_process"
 import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
-import {
-  exists,
-  readPackageJson,
-  runProcess,
-  writePackageJson,
-} from "../src/utils"
+import { checkIfExists, readPackageJson, writePackageJson } from "../src/utils"
 
 // Mock spawnSync for testing
 mock.module("node:child_process", () => ({
@@ -41,98 +35,29 @@ describe("utils", () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
-  describe("runProcess", () => {
-    test("should execute command with default options", () => {
-      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
-      mockSpawnSync.mockClear()
-
-      runProcess("echo", ["hello"])
-
-      expect(mockSpawnSync).toHaveBeenCalledWith("echo", ["hello"], {
-        stdio: "inherit",
-      })
-    })
-
-    test("should execute command with custom options", () => {
-      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
-      mockSpawnSync.mockClear()
-
-      const customOptions = { cwd: "/tmp", env: { NODE_ENV: "test" } }
-      runProcess("npm", ["install"], customOptions)
-
-      expect(mockSpawnSync).toHaveBeenCalledWith("npm", ["install"], {
-        ...customOptions,
-        stdio: "inherit",
-      })
-    })
-
-    test("should handle command with no args", () => {
-      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
-      mockSpawnSync.mockClear()
-
-      runProcess("ls")
-
-      expect(mockSpawnSync).toHaveBeenCalledWith("ls", [], { stdio: "inherit" })
-    })
-
-    test("should handle multiple args", () => {
-      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
-      mockSpawnSync.mockClear()
-
-      runProcess("git", ["add", ".", "--all"])
-
-      expect(mockSpawnSync).toHaveBeenCalledWith("git", ["add", ".", "--all"], {
-        stdio: "inherit",
-      })
-    })
-
-    test("should throw error when process fails", () => {
-      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
-      mockSpawnSync.mockReturnValue({
-        status: 1,
-        error: null,
-      })
-
-      expect(() => runProcess("failing-command")).toThrow(
-        "Process exited with code 1"
-      )
-    })
-
-    test("should throw error when spawn fails", () => {
-      const mockSpawnSync = spawnSync as unknown as ReturnType<typeof mock>
-      const spawnError = new Error("ENOENT: no such file or directory")
-      mockSpawnSync.mockReturnValue({
-        status: null,
-        error: spawnError,
-      })
-
-      expect(() => runProcess("nonexistent-command")).toThrow(spawnError)
-    })
-  })
-
-  describe("exists", () => {
+  describe("checkIfExists", () => {
     test("should return true for existing file", async () => {
       const testFile = join(testDir, "test.txt")
       await Bun.write(testFile, "test content")
 
-      const result = await exists(testFile)
+      const result = await checkIfExists(testFile)
       expect(result).toBe(true)
     })
 
     test("should return true for existing directory", async () => {
-      const result = await exists(testDir)
+      const result = await checkIfExists(testDir)
       expect(result).toBe(true)
     })
 
     test("should return false for non-existing file", async () => {
       const nonExistentFile = join(testDir, "does-not-exist.txt")
-      const result = await exists(nonExistentFile)
+      const result = await checkIfExists(nonExistentFile)
       expect(result).toBe(false)
     })
 
     test("should return false for non-existing directory", async () => {
       const nonExistentDir = join(testDir, "does-not-exist")
-      const result = await exists(nonExistentDir)
+      const result = await checkIfExists(nonExistentDir)
       expect(result).toBe(false)
     })
   })

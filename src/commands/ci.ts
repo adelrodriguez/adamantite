@@ -1,5 +1,6 @@
-import process from "node:process"
-import { detectPackageManager, getExecutablePath, runProcess } from "../utils"
+import { execSync } from "node:child_process"
+import { dlxCommand } from "nypm"
+import { getPackageManagerName, handleCommandError } from "../utils"
 
 export default async function ci({
   github,
@@ -9,28 +10,22 @@ export default async function ci({
   monorepo?: boolean
 }) {
   try {
-    const packageManager = await detectPackageManager()
-    const executablePath = getExecutablePath(packageManager)
-    const args = ["@biomejs/biome", "ci"]
+    const packageManager = await getPackageManagerName()
 
-    if (github) {
-      args.push("--reporter", "github")
-    }
+    const tools = [
+      {
+        package: "@biomejs/biome",
+        args: ["ci", ...(github ? ["--reporter", "github"] : [])],
+      },
+      ...(monorepo ? [{ package: "sherif", args: [] }] : []),
+    ]
 
-    // Run Biome CI
-    runProcess(executablePath, args)
-
-    if (monorepo) {
-      // Run Sherif to fix monorepo-specific issues
-      runProcess(executablePath, ["sherif"])
+    for (const tool of tools) {
+      execSync(dlxCommand(packageManager, tool.package, { args: tool.args }), {
+        stdio: "inherit",
+      })
     }
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "An unknown error occurred"
-
-    // biome-ignore lint/suspicious/noConsole: We want to log the error to the console
-    console.error("Failed to run Adamantite:", message)
-
-    process.exit(1)
+    handleCommandError(error)
   }
 }

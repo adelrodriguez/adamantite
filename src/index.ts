@@ -1,4 +1,5 @@
 import { Command } from "commander"
+import ci from "./commands/ci"
 import format from "./commands/format"
 import init from "./commands/init"
 import lint from "./commands/lint"
@@ -25,18 +26,18 @@ program
   .command("lint")
   .description("Run Biome linter and fix files")
   .argument("[files...]", "specific files to lint (optional)")
-  .option("-s, --summary", "show summary of lint results")
-  .action(async (files, { summary }) => {
-    await lint(files, { summary })
+  .option("--summary", "show summary of lint results")
+  .action(async (files, options) => {
+    await lint(files, options)
   })
 
 program
   .command("format")
   .description("Run Biome formatter and fix files")
   .argument("[files...]", "specific files to format (optional)")
-  .option("-u, --unsafe", "apply unsafe fixes")
-  .action(async (files, { unsafe }) => {
-    await format(files, { unsafe })
+  .option("--unsafe", "apply unsafe fixes")
+  .action(async (files, options) => {
+    await format(files, options)
   })
 
 program
@@ -45,6 +46,15 @@ program
     "Lint and automatically fix monorepo-specific issues using Sherif"
   )
   .action(monorepo)
+
+program
+  .command("ci")
+  .description("Run Biome CI")
+  .option("--monorepo", "run additional monorepo-specific checks")
+  .option("--github", "use GitHub reporter")
+  .action(async (options) => {
+    await ci(options)
+  })
 
 program
   .command("update")

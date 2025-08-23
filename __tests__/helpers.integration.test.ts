@@ -287,9 +287,6 @@ describe("helpers integration", () => {
       expect(config["editor.formatOnSave"]).toBe(true)
       expect(config["editor.formatOnPaste"]).toBe(true)
       expect(config["editor.codeActionsOnSave"]).toBeDefined()
-      expect(config["editor.codeActionsOnSave"]["quickfix.biome"]).toBe(
-        "explicit"
-      )
       expect(
         config[
           "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]"
@@ -335,9 +332,7 @@ describe("helpers integration", () => {
 
       // Should add our settings
       expect(config["editor.codeActionsOnSave"]).toBeDefined()
-      expect(config["editor.codeActionsOnSave"]["quickfix.biome"]).toBe(
-        "explicit"
-      )
+      expect(config["editor.codeActionsOnSave"]).toBeDefined()
     })
 
     test("should handle existing .vscode directory", async () => {

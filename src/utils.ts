@@ -31,7 +31,7 @@ export function handleCommandError(error: unknown) {
   process.exit(1)
 }
 
-export async function exists(path: string) {
+export async function checkIfExists(path: string) {
   try {
     await access(path)
     return true
@@ -49,7 +49,7 @@ export async function readPackageJson(
   const currentPath = join(cwd, "package.json")
 
   // Check if package.json exists
-  if (!(await exists(currentPath))) {
+  if (!(await checkIfExists(currentPath))) {
     throw new Error("package.json not found in the current directory")
   }
 

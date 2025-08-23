@@ -11,14 +11,19 @@ import {
   spinner,
 } from "@clack/prompts"
 import { addDevDependency } from "nypm"
-import { exists, getTitle, readPackageJson, writePackageJson } from "../utils"
+import {
+  checkIfExists,
+  getTitle,
+  readPackageJson,
+  writePackageJson,
+} from "../utils"
 import { biome, sherif, tsconfig, vscode } from "./helpers"
 
 async function checkIsMonorepo() {
   const cwd = process.cwd()
 
   // Check for pnpm-workspace.yaml (pnpm-specific)
-  if (await exists(join(cwd, "pnpm-workspace.yaml"))) {
+  if (await checkIfExists(join(cwd, "pnpm-workspace.yaml"))) {
     return true
   }
 

@@ -4,7 +4,7 @@ import init from "./commands/init"
 import lint from "./commands/lint"
 import monorepo from "./commands/monorepo"
 import update from "./commands/update"
-import version from "./commands/version"
+import version from "./version"
 
 const program = new Command()
 
@@ -25,15 +25,19 @@ program
   .command("lint")
   .description("Run Biome linter and fix files")
   .argument("[files...]", "specific files to lint (optional)")
-  .option("--summary", "show summary of lint results")
-  .action(lint)
+  .option("-s, --summary", "show summary of lint results")
+  .action(async (files, { summary }) => {
+    await lint(files, { summary })
+  })
 
 program
   .command("format")
   .description("Run Biome formatter and fix files")
   .argument("[files...]", "specific files to format (optional)")
-  .option("--unsafe", "apply unsafe fixes")
-  .action(format)
+  .option("-u, --unsafe", "apply unsafe fixes")
+  .action(async (files, { unsafe }) => {
+    await format(files, { unsafe })
+  })
 
 program
   .command("monorepo")

@@ -3,7 +3,7 @@ import { detectPackageManager, getExecutablePath, runProcess } from "../utils"
 
 export default async function format(
   files: string[],
-  options: { unsafe: boolean }
+  options: { unsafe?: boolean }
 ) {
   try {
     const packageManager = await detectPackageManager()

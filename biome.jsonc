@@ -53,17 +53,16 @@
     "enabled": true,
     "rules": {
       "a11y": {
-        // Enforce that the `accesskey` attribute is not used on any HTML element.
+        // ----------------------- JavaScript ------------------------
         "noAccessKey": "error",
-        // Enforce that the `aria-hidden` attribute is not used on any focusable element.
         "noAriaHiddenOnFocusable": "error",
-        // Enforce that the `aria-unsupported-elements` attribute is not used on any HTML element.
         "noAriaUnsupportedElements": "error",
-        // Enforce that the `distracting-elements` attribute is not used on any HTML element.
+        "noAutofocus": "error",
         "noDistractingElements": "error",
         "noHeaderScope": "error",
         "noInteractiveElementToNoninteractiveRole": "error",
         "noLabelWithoutControl": "error",
+        "noNoninteractiveElementInteractions": "error",
         "noNoninteractiveElementToInteractiveRole": "error",
         "noNoninteractiveTabindex": "error",
         "noPositiveTabindex": "error",
@@ -91,26 +90,52 @@
         "useValidAriaValues": "error",
         "useValidAutocomplete": "error",
         "useValidLang": "error",
-        "noAutofocus": "off",
-        "useGenericFontNames": "error",
-        "noNoninteractiveElementInteractions": "error"
+
+        // --------------------------- CSS ---------------------------
+        "useGenericFontNames": "error"
       },
       "complexity": {
+        // ----------------------- JavaScript ------------------------
         "noAdjacentSpacesInRegex": "error",
         "noArguments": "error",
         "noBannedTypes": "error",
         "noCommaOperator": "error",
         "noEmptyTypeParameters": "error",
+        "noExtraBooleanCast": "error",
         "noExcessiveCognitiveComplexity": {
           "level": "error",
           "options": {
-            "maxAllowedComplexity": 18
+            "maxAllowedComplexity": 20
           }
         },
         "noExcessiveNestedTestSuites": "error",
+        "noStaticOnlyClass": "error",
+        "noThisInStatic": "error",
+        "noUselessContinue": "error",
+        "noUselessEmptyExport": "error",
+        "noUselessEscapeInRegex": "error",
+        "noUselessFragments": "error",
+        "noUselessLabel": "error",
+        "noUselessLoneBlockStatements": "error",
+        "noUselessRename": "error",
+        "noUselessStringConcat": "error",
+        "noUselessStringRaw": "error",
+        "noUselessSwitchCase": "error",
+        "noUselessTernary": "error",
+        "noUselessThisAlias": "error",
+        "noUselessTypeConstraint": "error",
+        "noUselessUndefinedInitialization": "error",
+        "useArrowFunction": "error",
+        "useDateNow": "error",
+        "useFlatMap": "error",
+        "useIndexOf": "error",
+        "useLiteralKeys": "error",
+        "useNumericLiterals": "error",
+        "useOptionalChain": "error",
+        "useRegexLiterals": "error",
+        "useSimpleNumberKeys": "error",
         "useSimplifiedLogicExpression": "error",
         "useWhile": "error",
-        "useIndexOf": "error",
 
         // --------------------------- CSS ---------------------------
         "noImportantStyles": "error"
@@ -124,21 +149,23 @@
         "noConstructorReturn": "error",
         "noEmptyCharacterClassInRegex": "error",
         "noEmptyPattern": "error",
+        "noGlobalDirnameFilename": "error",
         "noGlobalObjectCalls": "error",
         "noInnerDeclarations": "error",
         "noInvalidBuiltinInstantiation": "error",
         "noInvalidConstructorSuper": "error",
         "noInvalidUseBeforeDeclaration": "error",
+        "noNestedComponentDefinitions": "error",
         "noNodejsModules": "off",
         "noNonoctalDecimalEscape": "error",
         "noPrecisionLoss": "error",
         "noPrivateImports": "error",
+        "noProcessGlobal": "off",
         "noRenderReturnValue": "error",
         "noSelfAssign": "error",
         "noSetterReturn": "error",
         "noStringCaseMismatch": "error",
         "noSwitchDeclarations": "error",
-        "noUndeclaredDependencies": "off",
         "noUndeclaredVariables": "error",
         "noUnreachable": "error",
         "noUnreachableSuper": "error",
@@ -153,9 +180,12 @@
         "noVoidTypeReturn": "error",
         "useExhaustiveDependencies": "error",
         "useHookAtTopLevel": "error",
-        "useImportExtensions": "off",
         "useIsNan": "error",
+        "useJsonImportAttributes": "error",
         "useJsxKeyInIterable": "error",
+        "useParseIntRadix": "error",
+        "useSingleJsDocAsterisk": "error",
+        "useUniqueElementIds": "error",
         "useValidForDirection": "error",
         "useValidTypeof": "error",
         "useYield": "error",
@@ -165,6 +195,8 @@
         "noInvalidGridAreas": "error",
         "noInvalidPositionAtImportRule": "error",
         "noMissingVarFunction": "error",
+        "noReactPropAssignments": "error",
+        "noRestrictedElements": "error",
         "noUnknownFunction": "error",
         "noUnknownMediaFeatureName": "error",
         "noUnknownProperty": "error",
@@ -172,27 +204,19 @@
         "noUnknownPseudoElement": "error",
         "noUnknownTypeSelector": "error",
         "noUnknownUnit": "error",
-        "noUnmatchableAnbSelector": "error",
-        "noGlobalDirnameFilename": "error",
-        "noNestedComponentDefinitions": "error",
-        "noReactPropAssignments": "error",
-        "noRestrictedElements": "error",
-        "useJsonImportAttributes": "error",
-        "useParseIntRadix": "error",
-        "useSingleJsDocAsterisk": "error",
-
-        "noProcessGlobal": "off",
-        "useUniqueElementIds": "off"
+        "noUnmatchableAnbSelector": "error"
       },
       "nursery": {
         // ----------------------- JavaScript ------------------------
+        "noFloatingPromises": "error",
+        "noMisusedPromises": "error",
+        "noNonNullAssertedOptionalChain": "error",
         "noShadow": "error",
+        "noUnnecessaryConditions": "error",
         "noUselessUndefined": "error",
         "useExhaustiveSwitchCases": "error",
-        "noNonNullAssertedOptionalChain": "error",
-
-        "useExplicitType": "off",
-        "noSecrets": "off",
+        "useReactFunctionComponents": "error",
+        "useAnchorHref": "error",
         "useSortedClasses": {
           "fix": "safe",
           "level": "error",
@@ -200,26 +224,14 @@
             "attributes": ["className"],
             "functions": ["clsx", "cva", "tw", "twMerge", "cn", "twJoin", "tv"]
           }
-        },
-
-        // These rules should be enabled once improvements are made to
-        // performance
-        "noFloatingPromises": "off",
-        "noImportCycles": "off",
-        "noUnresolvedImports": "off",
-        "noMisusedPromises": "off"
+        }
       },
       "performance": {
         // ----------------------- JavaScript ------------------------
-
         "noAccumulatingSpread": "error",
         "noAwaitInLoops": "error",
-        "noBarrelFile": "off",
         "noDelete": "error",
         "noDynamicNamespaceImportAccess": "error",
-        "noImgElement": "error",
-        "noNamespaceImport": "off",
-        "noReExportAll": "off",
         "useTopLevelRegex": "error",
         "noUnwantedPolyfillio": "error",
         "useGoogleFontPreconnect": "error"
@@ -233,8 +245,6 @@
       },
       "style": {
         // ----------------------- JavaScript ------------------------
-        "noCommonJs": "off",
-        "noDefaultExport": "off",
         "noDoneCallback": "error",
         "noEnum": "error",
         "noExportedImports": "error",
@@ -243,11 +253,9 @@
         "noInferrableTypes": "error",
         "noNamespace": "error",
         "noNegationElse": "error",
-        "noNestedTernary": "off",
         "noNonNullAssertion": "error",
         "noParameterAssign": "error",
         "noParameterProperties": "error",
-        "noProcessEnv": "off",
         "noRestrictedGlobals": "error",
         "noRestrictedImports": "error",
         "noRestrictedTypes": "error",
@@ -262,7 +270,6 @@
         "useBlockStatements": "error",
         "useCollapsedElseIf": "error",
         "useCollapsedIf": "error",
-        "useComponentExportOnlyModules": "off",
         "useConsistentArrayType": "error",
         "useConsistentBuiltinInstantiation": "error",
         "useConsistentCurlyBraces": "off",
@@ -271,7 +278,7 @@
         "useDefaultParameterLast": "error",
         "useDefaultSwitchClause": "error",
         "useEnumInitializers": "error",
-        "useExplicitLengthCheck": "off",
+        "useExplicitLengthCheck": "error",
         "useExponentiationOperator": "error",
         "useExportType": "error",
         "useFilenamingConvention": {
@@ -282,18 +289,22 @@
             "match": "[-?%+]?(.+?)[.](.+)"
           }
         },
+        "useConsistentObjectDefinitions": "error",
         "useForOf": "error",
         "useFragmentSyntax": "error",
+        "useGroupedAccessorPairs": "error",
         "useImportType": "error",
         "useLiteralEnumMembers": "error",
-        "useNamingConvention": "off",
         "useNodeAssertStrict": "error",
         "useNodejsImportProtocol": "error",
         "useNumberNamespace": "error",
+        "useNumericSeparators": "error",
+        "useObjectSpread": "error",
         "useSelfClosingElements": "error",
         "useShorthandAssign": "error",
         "useShorthandFunctionType": "error",
-        "useSingleVarDeclarator": "off",
+        "useSingleVarDeclarator": "error",
+        "useSymbolDescription": "error",
         "useTemplate": "error",
         "useThrowNewError": "error",
         "useThrowOnlyError": "error",
@@ -301,19 +312,14 @@
 
         // --------------------------- CSS ---------------------------
         "noDescendingSpecificity": "error",
-        "noValueAtRule": "error",
-        "useGroupedAccessorPairs": "error",
-        "useConsistentObjectDefinitions": "error",
-        "useNumericSeparators": "error",
-        "useObjectSpread": "error",
-        "useSymbolDescription": "error",
-        "useExportsLast": "off"
+        "noValueAtRule": "error"
       },
       "suspicious": {
         "noApproximativeNumericConstant": "error",
         "noArrayIndexKey": "error",
         "noAssignInExpressions": "error",
         "noAsyncPromiseExecutor": "error",
+        "noBitwiseOperators": "error",
         "noCatchAssign": "error",
         "noClassAssign": "error",
         "noCommentText": "error",
@@ -322,6 +328,7 @@
         "noConfusingVoidType": "error",
         // Warn for the use of console to avoid accidental logging. Prefer a dedicated logger.
         "noConsole": "warn",
+        "noConstantBinaryExpressions": "error",
         "noConstEnum": "error",
         "noControlCharactersInRegex": "error",
         "noDebugger": "error",
@@ -358,6 +365,8 @@
         "noMisrefactoredShorthandAssign": "error",
         "noOctalEscape": "error",
         "noPrototypeBuiltins": "error",
+        // Disabling to allow passing specific props (like `className`) from
+        // parent to child components
         "noReactSpecificProps": "off",
         "noRedeclare": "error",
         "noRedundantUseStrict": "error",
@@ -368,8 +377,11 @@
         "noSuspiciousSemicolonInJsx": "error",
         "noTemplateCurlyInString": "error",
         "noThenProperty": "error",
+        "noTsIgnore": "error",
         "noUnsafeDeclarationMerging": "error",
         "noUnsafeNegation": "error",
+        "noUselessEscapeInString": "error",
+        "noUselessRegexBackrefs": "error",
         "noVar": "error",
         "noWith": "error",
         "useAdjacentOverloadSignatures": "error",
@@ -380,8 +392,10 @@
         "useGoogleFontDisplay": "error",
         "useGuardForIn": "error",
         "useIsArray": "error",
+        "useIterableCallbackReturn": "error",
         "useNamespaceKeyword": "error",
         "useNumberToFixedDigitsArgument": "error",
+        "useStaticResponseMethods": "error",
         "useStrictMode": "error",
 
         // --------------------------- CSS ---------------------------
@@ -393,17 +407,12 @@
         "noEmptyBlock": "error",
         "noImportantInKeyframe": "error",
         "noShorthandPropertyOverrides": "error",
-        "noBitwiseOperators": "error",
-        "noConstantBinaryExpressions": "error",
-        "noTsIgnore": "error",
-        "noUselessRegexBackrefs": "error",
-        "noUselessEscapeInString": "error",
-        "useStaticResponseMethods": "error",
-        "useIterableCallbackReturn": "error",
         // Disabling this rule since we need custom at-rules for Tailwind
         "noUnknownAtRules": "off",
 
         // --------------------------- JSON ---------------------------
+        "noBiomeFirstException": "error",
+        "noQuickfixBiome": "error",
         "useBiomeIgnoreFolder": "error"
       }
     }

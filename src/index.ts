@@ -25,6 +25,7 @@ program
   .command("lint")
   .description("Run Biome linter and fix files")
   .argument("[files...]", "specific files to lint (optional)")
+  .option("--summary", "show summary of lint results")
   .action(lint)
 
 program

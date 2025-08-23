@@ -105,4 +105,8 @@ Comprehensive update to Biome configuration rules with stricter linting and form
 - **Added**: `noBiomeFirstException` - error
 - **Added**: `noQuickfixBiome` - error
 
+## CLI Enhancements
+
+- **Added**: `--summary` flag to the `lint` command for concise lint result reporting using Biome's summary reporter
+
 This update significantly strengthens the linting rules with a focus on code quality, consistency, and best practices while maintaining TypeScript and React compatibility.

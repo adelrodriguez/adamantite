@@ -1,7 +1,10 @@
 import process from "node:process"
 import { detectPackageManager, getExecutablePath, runProcess } from "../utils"
 
-export default async function lint(files: string[]) {
+export default async function lint(
+  files: string[],
+  { summary }: { summary?: boolean }
+) {
   try {
     const packageManager = await detectPackageManager()
     const executablePath = getExecutablePath(packageManager)
@@ -9,6 +12,10 @@ export default async function lint(files: string[]) {
 
     if (files.length > 0) {
       args.push(...files)
+    }
+
+    if (summary) {
+      args.push("--reporter", "summary")
     }
 
     runProcess(executablePath, args)

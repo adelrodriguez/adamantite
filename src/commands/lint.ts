@@ -1,31 +1,28 @@
-import process from "node:process"
-import { detectPackageManager, getExecutablePath, runProcess } from "../utils"
+import { execSync } from "node:child_process"
+import { dlxCommand } from "nypm"
+import { getPackageManagerName, handleCommandError } from "../utils"
 
 export default async function lint(
   files: string[],
   { summary }: { summary?: boolean }
 ) {
   try {
-    const packageManager = await detectPackageManager()
-    const executablePath = getExecutablePath(packageManager)
-    const args = ["@biomejs/biome", "lint", "--fix"]
+    const packageManager = await getPackageManagerName()
 
-    if (files.length > 0) {
-      args.push(...files)
-    }
+    const args = ["lint", "--fix"]
 
     if (summary) {
       args.push("--reporter", "summary")
     }
 
-    runProcess(executablePath, args)
+    if (files.length > 0) {
+      args.push(...files)
+    }
+
+    execSync(dlxCommand(packageManager, "@biomejs/biome", { args }), {
+      stdio: "inherit",
+    })
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "An unknown error occurred"
-
-    // biome-ignore lint/suspicious/noConsole: We want to log the error to the console
-    console.error("Failed to run Adamantite:", message)
-
-    process.exit(1)
+    handleCommandError(error)
   }
 }

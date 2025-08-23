@@ -91,11 +91,9 @@ export const biome = {
 export const vscode = {
   config: {
     "typescript.tsdk": "node_modules/typescript/lib",
-    "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.codeActionsOnSave": {
-      "quickfix.biome": "explicit",
       "source.organizeImports.biome": "explicit",
       "source.fixAll.biome": "explicit",
     },
@@ -118,11 +116,7 @@ export const vscode = {
     )
   },
   async update() {
-    const vscodePath = (await exists(
-      join(process.cwd(), ".vscode", "settings.json")
-    ))
-      ? join(process.cwd(), ".vscode", "settings.json")
-      : join(process.cwd(), ".vscode", "settings.json")
+    const vscodePath = join(process.cwd(), ".vscode", "settings.json")
 
     const vscodeFile = await readFile(vscodePath, "utf-8")
 

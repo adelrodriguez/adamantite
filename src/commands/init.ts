@@ -8,41 +8,11 @@ import {
   log,
   multiselect,
   outro,
-  select,
   spinner,
 } from "@clack/prompts"
-import {
-  detectPackageManager,
-  exists,
-  getTitle,
-  PACKAGE_MANAGERS,
-  type PackageManager,
-  readPackageJson,
-  runProcess,
-  writePackageJson,
-} from "../utils"
+import { addDevDependency } from "nypm"
+import { exists, getTitle, readPackageJson, writePackageJson } from "../utils"
 import { biome, sherif, tsconfig, vscode } from "./helpers"
-
-async function selectPackageManager() {
-  const selected = await select({
-    message: "Select your package manager",
-    options: PACKAGE_MANAGERS.map((pm) => ({
-      label: pm,
-      value: pm,
-    })),
-    initialValue: await detectPackageManager(),
-  })
-
-  if (isCancel(selected) || selected === null) {
-    throw new Error("No package manager selected")
-  }
-
-  if (selected === undefined) {
-    throw new Error("Invalid package manager selected")
-  }
-
-  return selected
-}
 
 async function checkIsMonorepo() {
   const cwd = process.cwd()
@@ -195,39 +165,21 @@ async function confirmAction(message: string): Promise<boolean> {
   return result
 }
 
-function installDependencies(
-  packageManager: PackageManager,
-  options?: { monorepo?: boolean }
-) {
+async function installDependencies(options?: { monorepo?: boolean }) {
   const s = spinner()
 
   s.start("Installing dependencies...")
 
   try {
-    // Build the list of packages to install
+    // Install adamantite first
+    await addDevDependency("adamantite")
+
+    // Install Biome with exact version
     const biomeVersion = biome.version
-    const packages = ["adamantite", `@biomejs/biome@^${biomeVersion}`]
+    await addDevDependency(`@biomejs/biome@${biomeVersion}`)
 
     if (options?.monorepo) {
-      packages.push(`sherif@${sherif.version}`)
-    }
-
-    // Install packages in a single command with exact versions
-    switch (packageManager) {
-      case "npm":
-        runProcess("npm", ["install", "--save-dev", "--exact", ...packages])
-        break
-      case "yarn":
-        runProcess("yarn", ["add", "--dev", "--exact", ...packages])
-        break
-      case "pnpm":
-        runProcess("pnpm", ["add", "--save-dev", "--save-exact", ...packages])
-        break
-      case "bun":
-        runProcess("bun", ["add", "--dev", "--exact", ...packages])
-        break
-      default:
-        throw new Error(`Invalid package manager: ${packageManager}`)
+      await addDevDependency(`sherif@${sherif.version}`)
     }
 
     s.stop("Dependencies installed successfully")
@@ -244,8 +196,6 @@ export default async function init() {
   intro(getTitle())
 
   try {
-    const packageManager = await selectPackageManager()
-
     const isMonorepo = await checkIsMonorepo()
 
     // TODO: Select whether to migrate the project to Adamantite (remove ESLint, Prettier, etc.)
@@ -268,7 +218,7 @@ export default async function init() {
 
     // TODO: Select AI assistant rules
 
-    installDependencies(packageManager, {
+    await installDependencies({
       monorepo: installMonorepoScript,
     })
 

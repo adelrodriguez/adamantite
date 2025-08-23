@@ -1,22 +1,34 @@
-import { type SpawnSyncOptions, spawnSync } from "node:child_process"
 import { access, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import process from "node:process"
+import { detectPackageManager } from "nypm"
 import type { PackageJson } from "type-fest"
 
-export function runProcess(
-  command: string,
-  args: string[] = [],
-  options: Omit<SpawnSyncOptions, "stdio"> = {}
-) {
-  const result = spawnSync(command, args, { ...options, stdio: "inherit" })
+export async function getPackageManagerName() {
+  const result = await detectPackageManager(process.cwd())
 
-  if (result.error) {
-    throw result.error
+  if (!result) {
+    throw new Error("No package manager found")
   }
 
-  if (result.status !== 0) {
-    throw new Error(`Process exited with code ${result.status}`)
+  const { warnings, ...packageManager } = result
+
+  if (warnings && warnings.length > 0) {
+    // biome-ignore lint/suspicious/noConsole: We want to log the warnings to the console
+    console.warn(warnings.join("\n"))
   }
+
+  return packageManager.name
+}
+
+export function handleCommandError(error: unknown) {
+  const message =
+    error instanceof Error ? error.message : "An unknown error occurred"
+
+  // biome-ignore lint/suspicious/noConsole: We want to log the error to the console
+  console.error("Failed to run Adamantite:", message)
+
+  process.exit(1)
 }
 
 export async function exists(path: string) {
@@ -68,57 +80,6 @@ export async function writePackageJson(
     throw new Error(
       `Failed to write package.json: ${error instanceof Error ? error.message : "Unknown error"}`
     )
-  }
-}
-
-export const PACKAGE_MANAGERS = ["npm", "yarn", "pnpm", "bun"] as const
-export type PackageManager = (typeof PACKAGE_MANAGERS)[number]
-
-export async function detectPackageManager(): Promise<PackageManager | null> {
-  const cwd = process.cwd()
-
-  const isNpm = await exists(join(cwd, "package-lock.json"))
-
-  if (isNpm) {
-    return "npm"
-  }
-
-  const isYarn = await exists(join(cwd, "yarn.lock"))
-
-  if (isYarn) {
-    return "yarn"
-  }
-
-  const isPnpm = await exists(join(cwd, "pnpm-lock.yaml"))
-
-  if (isPnpm) {
-    return "pnpm"
-  }
-
-  const isBun =
-    (await exists(join(cwd, "bun.lockb"))) ||
-    (await exists(join(cwd, "bun.lock")))
-
-  if (isBun) {
-    return "bun"
-  }
-
-  return null
-}
-
-export function getExecutablePath(packageManager?: PackageManager | null) {
-  switch (packageManager) {
-    case "npm":
-      return "npx"
-    case "yarn":
-      return "yarn dlx"
-    case "pnpm":
-      return "pnpm dlx"
-    case "bun":
-      return "bunx"
-    // Default to npx if we can't determine the package manager
-    default:
-      return "npx"
   }
 }
 

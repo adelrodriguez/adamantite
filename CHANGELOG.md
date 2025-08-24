@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.7.2
+
+### Patch Changes
+
+- dfa0225: Update Biome to v2.2.2 for improved linting and formatting
+
 ## 0.7.1
 
 ### Patch Changes

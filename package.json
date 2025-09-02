@@ -26,15 +26,16 @@
     "adamantite": "bin/adamantite"
   },
   "files": [
+    "bin",
     "biome.jsonc",
-    "presets/tsconfig.json",
-    "dist"
+    "dist",
+    "presets/tsconfig.json"
   ],
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "format": "biome check --write",
-    "lint": "biome lint --fix",
+    "check": "biome check",
+    "fix": "biome check --write",
     "release": "changeset publish",
     "test": "bun test",
     "test:watch": "bun --watch test",

@@ -2,17 +2,17 @@ import { execSync } from "node:child_process"
 import { dlxCommand } from "nypm"
 import { getPackageManagerName, handleCommandError } from "../utils"
 
-export default async function lint(
+export default async function fix(
   files: string[],
-  { summary }: { summary?: boolean }
+  options: { unsafe?: boolean }
 ) {
   try {
     const packageManager = await getPackageManagerName()
 
-    const args = ["lint", "--fix"]
+    const args = ["check", "--write"]
 
-    if (summary) {
-      args.push("--reporter", "summary")
+    if (options.unsafe) {
+      args.push("--unsafe")
     }
 
     if (files.length > 0) {

@@ -80,34 +80,34 @@ echo '{ "extends": "adamantite/presets/tsconfig.json" }' > tsconfig.json
 
 Adamantite provides a comprehensive CLI for all your code quality needs:
 
-### `adamantite lint`
+### `adamantite check`
 
-Lint and automatically fix issues in your codebase:
+Check your code for issues without automatically fixing them:
 
 ```shell
-# Lint all files
-adamantite lint
+# Check all files
+adamantite check
 
-# Lint specific files
-adamantite lint src/components/**/*.ts
+# Check specific files
+adamantite check src/components/**/*.ts
 
 # Show summary of results
-adamantite lint --summary
+adamantite check --summary
 ```
 
-### `adamantite format`
+### `adamantite fix`
 
-Format your code with consistent style:
+Fix issues in your code with automatic formatting and safe fixes:
 
 ```shell
-# Format all files
-adamantite format
+# Fix all files
+adamantite fix
 
-# Format specific files
-adamantite format src/utils.ts
+# Fix specific files
+adamantite fix src/utils.ts
 
-# Apply unsafe formatting fixes
-adamantite format --unsafe
+# Apply unsafe fixes
+adamantite fix --unsafe
 ```
 
 ### `adamantite ci`

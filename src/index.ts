@@ -1,8 +1,8 @@
 import { Command } from "commander"
+import check from "./commands/check"
 import ci from "./commands/ci"
-import format from "./commands/format"
+import fix from "./commands/fix"
 import init from "./commands/init"
-import lint from "./commands/lint"
 import monorepo from "./commands/monorepo"
 import update from "./commands/update"
 import version from "./version"
@@ -23,21 +23,21 @@ program
   .action(init)
 
 program
-  .command("lint")
-  .description("Run Biome linter and fix files")
+  .command("check")
+  .description("Run Biome linter and check files for issues")
   .argument("[files...]", "specific files to lint (optional)")
   .option("--summary", "show summary of lint results")
   .action(async (files, options) => {
-    await lint(files, options)
+    await check(files, options)
   })
 
 program
-  .command("format")
-  .description("Run Biome formatter and fix files")
-  .argument("[files...]", "specific files to format (optional)")
+  .command("fix")
+  .description("Run Biome linter and fix issues in files")
+  .argument("[files...]", "specific files to fix (optional)")
   .option("--unsafe", "apply unsafe fixes")
   .action(async (files, options) => {
-    await format(files, options)
+    await fix(files, options)
   })
 
 program
@@ -49,7 +49,7 @@ program
 
 program
   .command("ci")
-  .description("Run Biome CI")
+  .description("Run Adamantitte in a CI environment")
   .option("--monorepo", "run additional monorepo-specific checks")
   .option("--github", "use GitHub reporter")
   .action(async (options) => {

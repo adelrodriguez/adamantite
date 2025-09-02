@@ -2,17 +2,17 @@ import { execSync } from "node:child_process"
 import { dlxCommand } from "nypm"
 import { getPackageManagerName, handleCommandError } from "../utils"
 
-export default async function format(
+export default async function check(
   files: string[],
-  options: { unsafe?: boolean }
+  { summary }: { summary?: boolean }
 ) {
   try {
     const packageManager = await getPackageManagerName()
 
-    const args = ["check", "--write"]
+    const args = ["check"]
 
-    if (options.unsafe) {
-      args.push("--unsafe")
+    if (summary) {
+      args.push("--reporter", "summary")
     }
 
     if (files.length > 0) {

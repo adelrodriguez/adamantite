@@ -132,7 +132,7 @@ Use conventional commit format:
 ### Before Submitting
 
 1. Ensure all tests pass: `bun test`
-2. Run linting: `bun run lint`
+2. Run linting: `bun run fix`
 3. Run type checking: `bun run typecheck`
 4. **Add a changeset**: Run `bunx changeset` to document your changes
 5. Update documentation if needed

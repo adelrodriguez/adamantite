@@ -56,12 +56,12 @@ async function setupBiomeConfig() {
 }
 
 async function setupScripts({
-  lint,
-  format,
+  check,
+  fix,
   monorepo,
 }: {
-  lint: boolean
-  format: boolean
+  check: boolean
+  fix: boolean
   monorepo: boolean
 }) {
   const s = spinner()
@@ -76,13 +76,13 @@ async function setupScripts({
       packageJson.scripts = {}
     }
 
-    if (lint) {
-      // biome-ignore lint/complexity/useLiteralKeys: Lint script is not listed in the type
-      packageJson.scripts["lint"] = "adamantite lint"
+    if (check) {
+      // biome-ignore lint/complexity/useLiteralKeys: Check script is not listed in the type
+      packageJson.scripts["check"] = "adamantite check"
     }
-    if (format) {
-      // biome-ignore lint/complexity/useLiteralKeys: Format script is not listed in the type
-      packageJson.scripts["format"] = "adamantite format"
+    if (fix) {
+      // biome-ignore lint/complexity/useLiteralKeys: Fix script is not listed in the type
+      packageJson.scripts["fix"] = "adamantite fix"
     }
 
     if (monorepo) {
@@ -206,7 +206,7 @@ export default async function init() {
     // TODO: Select whether to migrate the project to Adamantite (remove ESLint, Prettier, etc.)
 
     const installScripts = await confirmAction(
-      "Do you want to add the `format` and `lint` scripts to your `package.json`?"
+      "Do you want to add the `check` and `fix` scripts to your `package.json`?"
     )
 
     const installMonorepoScript = isMonorepo
@@ -231,8 +231,8 @@ export default async function init() {
 
     if (installScripts || installMonorepoScript) {
       await setupScripts({
-        lint: installScripts,
-        format: installScripts,
+        check: installScripts,
+        fix: installScripts,
         monorepo: installMonorepoScript,
       })
     }

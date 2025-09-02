@@ -26,8 +26,8 @@ Use Bun for all package management and script execution:
 - **Build CLI**: `bun run build` (uses tsdown to bundle `src/index.ts` → `dist/`)
 - **Run tests**: `bun test` or `bun run test:watch` for watch mode
 - **Type checking**: `bun run typecheck`
-- **Linting**: `bun run lint` (auto-fixes issues)
-- **Formatting**: `bun run format` (auto-formats code)
+- **Code checking**: `bun run check` (checks for issues)
+- **Code fixing**: `bun run fix` (auto-fixes issues and formats code)
 
 ## Release Workflow
 
@@ -42,9 +42,9 @@ This project uses changesets for version management:
 ### CLI Structure (`src/`)
 
 - **`index.ts`** - Main CLI entry point using Commander.js
-- **`actions/`** - Command implementations:
-  - `format.ts` - Runs Biome formatter via npx
-  - `lint.ts` - Runs Biome linter via npx
+- **`commands/`** - Command implementations:
+  - `fix.ts` - Runs Biome formatter and fixes issues via npx
+  - `check.ts` - Runs Biome linter to check for issues via npx
 - **`utils.ts`** - Shared utilities (process execution, package info)
 
 ### Build Process

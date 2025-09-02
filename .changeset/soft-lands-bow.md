@@ -1,5 +1,5 @@
 ---
-"adamantite": major
+"adamantite": minor
 ---
 
 Rename CLI commands for clearer intent: `lint` → `check` and `format` → `fix`

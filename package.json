@@ -51,7 +51,7 @@
     "nypm": "0.6.1"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.2",
+    "@biomejs/biome": "2.2.4",
     "@changesets/cli": "2.29.6",
     "@types/bun": "1.2.20",
     "sherif": "1.6.1",

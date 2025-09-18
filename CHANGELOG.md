@@ -1,5 +1,22 @@
 # adamantite
 
+## 0.9.0
+
+### Minor Changes
+
+- 6d7a5a3: Add noUncheckedSideEffectImports to TypeScript preset for enhanced type safety
+
+  The TypeScript preset now includes the `noUncheckedSideEffectImports` compiler option, which helps prevent potential runtime errors from unchecked side effects in imports. Additionally, compiler options in the preset have been reorganized alphabetically for better maintainability.
+
+### Patch Changes
+
+- 3c86461: Update dependencies to latest versions for improved stability and performance
+
+  - Update Biome from 2.2.2 to 2.2.4
+  - Update commander from 14.0.0 to 14.0.1
+  - Update nypm from 0.6.1 to 0.6.2
+  - Update build and development dependencies (tsdown, type-fest, @changesets/cli, @types/bun)
+
 ## 0.8.0
 
 ### Minor Changes

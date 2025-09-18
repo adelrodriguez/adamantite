@@ -45,18 +45,18 @@
   "dependencies": {
     "@clack/prompts": "0.11.0",
     "@commander-js/extra-typings": "^14.0.0",
-    "commander": "14.0.0",
+    "commander": "14.0.1",
     "defu": "6.1.4",
     "jsonc-parser": "3.3.1",
-    "nypm": "0.6.1"
+    "nypm": "0.6.2"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.2",
-    "@changesets/cli": "2.29.6",
-    "@types/bun": "1.2.20",
+    "@biomejs/biome": "2.2.4",
+    "@changesets/cli": "2.29.7",
+    "@types/bun": "1.2.22",
     "sherif": "1.6.1",
-    "tsdown": "0.14.2",
-    "type-fest": "4.41.0",
+    "tsdown": "0.15.2",
+    "type-fest": "5.0.0",
     "typescript": "5.9.2"
   },
   "peerDependencies": {

@@ -56,7 +56,7 @@
     "@types/bun": "1.2.22",
     "sherif": "1.6.1",
     "tsdown": "0.15.2",
-    "type-fest": "5.0.0",
+    "type-fest": "5.0.1",
     "typescript": "5.9.2"
   },
   "peerDependencies": {

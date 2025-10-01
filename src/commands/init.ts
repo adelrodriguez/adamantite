@@ -10,6 +10,7 @@ import {
   outro,
   spinner,
 } from "@clack/prompts"
+import { defineCommand } from "citty"
 import { addDevDependency } from "nypm"
 import {
   checkIfExists,
@@ -197,56 +198,62 @@ async function installDependencies(options?: { monorepo?: boolean }) {
   }
 }
 
-export default async function init() {
-  intro(getTitle())
+export default defineCommand({
+  meta: {
+    name: "init",
+    description: "Initialize Adamantite in the current directory",
+  },
+  run: async () => {
+    intro(getTitle())
 
-  try {
-    const isMonorepo = await checkIsMonorepo()
+    try {
+      const isMonorepo = await checkIsMonorepo()
 
-    // TODO: Select whether to migrate the project to Adamantite (remove ESLint, Prettier, etc.)
+      // TODO: Select whether to migrate the project to Adamantite (remove ESLint, Prettier, etc.)
 
-    const installScripts = await confirmAction(
-      "Do you want to add the `check` and `fix` scripts to your `package.json`?"
-    )
+      const installScripts = await confirmAction(
+        "Do you want to add the `check` and `fix` scripts to your `package.json`?"
+      )
 
-    const installMonorepoScript = isMonorepo
-      ? await confirmAction(
-          "We've detected a monorepo setup in your project. Would you like to install monorepo linting scripts?"
-        )
-      : false
+      const installMonorepoScript = isMonorepo
+        ? await confirmAction(
+            "We've detected a monorepo setup in your project. Would you like to install monorepo linting scripts?"
+          )
+        : false
 
-    const installTypeScript = await confirmAction(
-      "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?"
-    )
+      const installTypeScript = await confirmAction(
+        "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?"
+      )
 
-    const selectedEditors = await selectEditorConfig()
+      const selectedEditors = await selectEditorConfig()
 
-    // TODO: Select AI assistant rules
+      // TODO: Select AI assistant rules
 
-    await installDependencies({
-      monorepo: installMonorepoScript,
-    })
-
-    await setupBiomeConfig()
-
-    if (installScripts || installMonorepoScript) {
-      await setupScripts({
-        check: installScripts,
-        fix: installScripts,
+      await installDependencies({
         monorepo: installMonorepoScript,
       })
+
+      await setupBiomeConfig()
+
+      if (installScripts || installMonorepoScript) {
+        await setupScripts({
+          check: installScripts,
+          fix: installScripts,
+          monorepo: installMonorepoScript,
+        })
+      }
+
+      if (installTypeScript) {
+        await setupTsConfig()
+      }
+
+      await setupEditorConfig(selectedEditors)
+
+      outro("💠 Adamantite initialized successfully!")
+    } catch (error) {
+      log.error(`${error instanceof Error ? error.message : "Unknown error"}`)
+
+      cancel("Failed to initialize Adamantite")
     }
-
-    if (installTypeScript) {
-      await setupTsConfig()
-    }
-
-    await setupEditorConfig(selectedEditors)
-
-    outro("💠 Adamantite initialized successfully!")
-  } catch (error) {
-    log.error(`${error instanceof Error ? error.message : "Unknown error"}`)
-
-    cancel("Failed to initialize Adamantite")
-  }
-}
+  },
+})

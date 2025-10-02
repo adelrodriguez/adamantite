@@ -283,7 +283,8 @@
         "useFilenamingConvention": {
           "level": "error",
           "options": {
-            "filenameCases": ["kebab-case"]
+            "filenameCases": ["kebab-case"],
+            "requireAscii": false
           }
         },
         "useConsistentObjectDefinitions": "error",

@@ -41,11 +41,16 @@ This project uses changesets for version management:
 
 ### CLI Structure (`src/`)
 
-- **`index.ts`** - Main CLI entry point using Commander.js
+- **`index.ts`** - Main CLI entry point using citty
 - **`commands/`** - Command implementations:
-  - `fix.ts` - Runs Biome formatter and fixes issues via npx
-  - `check.ts` - Runs Biome linter to check for issues via npx
-- **`utils.ts`** - Shared utilities (process execution, package info)
+  - `fix.ts` - Runs Biome formatter and fixes issues
+  - `check.ts` - Runs Biome linter to check for issues
+  - `ci.ts` - Runs Adamantite in CI environments
+  - `init.ts` - Initializes Adamantite configuration
+  - `monorepo.ts` - Runs monorepo-specific checks
+  - `update.ts` - Updates Adamantite configuration
+- **`utils.ts`** - Shared utilities (package manager detection, error handling)
+- **`version.ts`** - Package version detection
 
 ### Build Process
 

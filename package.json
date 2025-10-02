@@ -33,8 +33,8 @@
   ],
   "scripts": {
     "build": "tsdown",
-    "dev": "tsdown --watch",
     "check": "biome check",
+    "dev": "tsdown --watch",
     "fix": "biome check --write",
     "release": "changeset publish",
     "test": "bun test",
@@ -44,8 +44,7 @@
   },
   "dependencies": {
     "@clack/prompts": "0.11.0",
-    "@commander-js/extra-typings": "^14.0.0",
-    "commander": "14.0.1",
+    "citty": "0.1.6",
     "defu": "6.1.4",
     "jsonc-parser": "3.3.1",
     "nypm": "0.6.2"

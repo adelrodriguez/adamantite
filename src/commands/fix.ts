@@ -1,28 +1,48 @@
 import { execSync } from "node:child_process"
+import { defineCommand } from "citty"
 import { dlxCommand } from "nypm"
 import { getPackageManagerName, handleCommandError } from "../utils"
 
-export default async function fix(
-  files: string[],
-  options: { unsafe?: boolean }
-) {
-  try {
-    const packageManager = await getPackageManagerName()
+export default defineCommand({
+  meta: {
+    name: "fix",
+    description: "Run Biome linter and fix issues in files",
+  },
+  args: {
+    files: {
+      description: "Specific files to fix (optional)",
+      type: "positional",
+      required: false,
+    },
+    unsafe: {
+      description: "Apply unsafe fixes",
+      type: "boolean",
+    },
+  },
+  run: async ({ args }) => {
+    try {
+      const packageManager = await getPackageManagerName()
 
-    const args = ["check", "--write"]
+      const biomeArgs = ["check", "--write"]
 
-    if (options.unsafe) {
-      args.push("--unsafe")
+      if (args.unsafe) {
+        biomeArgs.push("--unsafe")
+      }
+
+      const files = args._
+
+      if (files.length > 0) {
+        biomeArgs.push(...files)
+      }
+
+      execSync(
+        dlxCommand(packageManager, "@biomejs/biome", { args: biomeArgs }),
+        {
+          stdio: "inherit",
+        }
+      )
+    } catch (error) {
+      handleCommandError(error)
     }
-
-    if (files.length > 0) {
-      args.push(...files)
-    }
-
-    execSync(dlxCommand(packageManager, "@biomejs/biome", { args }), {
-      stdio: "inherit",
-    })
-  } catch (error) {
-    handleCommandError(error)
-  }
-}
+  },
+})

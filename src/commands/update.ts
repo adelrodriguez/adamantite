@@ -1,14 +1,7 @@
-import {
-  cancel,
-  confirm,
-  intro,
-  isCancel,
-  log,
-  outro,
-  spinner,
-} from "@clack/prompts"
+import { confirm, intro, isCancel, log, outro, spinner } from "@clack/prompts"
+import { defineCommand } from "citty"
 import { addDevDependency } from "nypm"
-import { getTitle, readPackageJson } from "../utils"
+import { getTitle, handleCommandError, readPackageJson } from "../utils"
 import { biome, sherif } from "./helpers"
 
 interface DependencyUpdate {
@@ -128,30 +121,35 @@ async function confirmUpdate(updates: DependencyUpdate[]): Promise<boolean> {
   return result
 }
 
-export default async function update() {
-  intro(getTitle())
+export default defineCommand({
+  meta: {
+    name: "update",
+    description: "Update adamantite dependencies to latest compatible versions",
+  },
+  run: async () => {
+    intro(getTitle())
 
-  try {
-    const updates = await detectUpdatesNeeded()
+    try {
+      const updates = await detectUpdatesNeeded()
 
-    if (updates.length === 0) {
-      log.success("All adamantite dependencies are already up to date!")
-      outro("💠 No updates needed")
-      return
+      if (updates.length === 0) {
+        log.success("All adamantite dependencies are already up to date!")
+        outro("💠 No updates needed")
+        return
+      }
+
+      const shouldUpdate = await confirmUpdate(updates)
+
+      if (!shouldUpdate) {
+        outro("💠 Update cancelled")
+        return
+      }
+
+      await updateDependencies(updates)
+
+      outro("💠 Dependencies updated successfully!")
+    } catch (error) {
+      handleCommandError(error)
     }
-
-    const shouldUpdate = await confirmUpdate(updates)
-
-    if (!shouldUpdate) {
-      outro("💠 Update cancelled")
-      return
-    }
-
-    await updateDependencies(updates)
-
-    outro("💠 Dependencies updated successfully!")
-  } catch (error) {
-    log.error(`${error instanceof Error ? error.message : "Unknown error"}`)
-    cancel("Failed to update dependencies")
-  }
-}
+  },
+})

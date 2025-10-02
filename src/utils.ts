@@ -1,6 +1,7 @@
 import { access, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
+import { cancel } from "@clack/prompts"
 import { detectPackageManager } from "nypm"
 import type { PackageJson } from "type-fest"
 
@@ -26,7 +27,9 @@ export function handleCommandError(error: unknown) {
     error instanceof Error ? error.message : "An unknown error occurred"
 
   // biome-ignore lint/suspicious/noConsole: We want to log the error to the console
-  console.error("Failed to run Adamantite:", message)
+  console.error(message)
+
+  cancel("Failed to run Adamantite")
 
   process.exit(1)
 }

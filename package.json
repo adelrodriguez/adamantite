@@ -33,6 +33,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "bump:deps": "bun update --interactive",
     "check": "biome check",
     "dev": "tsdown --watch",
     "fix": "biome check --write",
@@ -54,12 +55,12 @@
     "@changesets/cli": "2.29.7",
     "@types/bun": "1.2.22",
     "sherif": "1.6.1",
-    "tsdown": "0.15.2",
-    "type-fest": "5.0.0",
-    "typescript": "5.9.2"
+    "tsdown": "0.15.6",
+    "type-fest": "5.0.1",
+    "typescript": "5.9.3"
   },
   "peerDependencies": {
-    "typescript": ">=5.8"
+    "typescript": ">=5.6.0"
   },
   "packageManager": "bun@1.2.20"
 }

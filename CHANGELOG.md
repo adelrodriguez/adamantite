@@ -1,5 +1,27 @@
 # adamantite
 
+## 0.9.3
+
+### Patch Changes
+
+- 4b6df97: Migrate CLI framework from Commander.js to citty for improved developer experience. This change brings better type safety through citty's TypeScript-first design, improved ergonomics as part of the UnJS ecosystem, and a more declarative command definition API.
+
+  Key improvements:
+
+  - **Better type safety**: Commands are now defined using `defineCommand()` with fully typed argument definitions
+  - **Declarative API**: Command metadata, arguments, and handlers are defined in a single, clear structure rather than chained method calls
+  - **Improved DX**: Arguments are automatically parsed and typed, with built-in support for positional arguments, boolean flags, and command metadata
+  - **UnJS ecosystem**: citty is part of the UnJS ecosystem, providing better compatibility with other modern JavaScript tooling and conventions
+
+- 67d8ea3: Update development dependencies and TypeScript peer dependency requirement
+
+  - Update tsdown from 0.15.2 to 0.15.6 for improved build performance and bug fixes
+  - Update type-fest from 5.0.0 to 5.0.1 for latest type utilities
+  - Update TypeScript from 5.9.2 to 5.9.3 for latest compiler improvements
+  - Update TypeScript peer dependency to >=5.6.0 (required for noUncheckedSideEffectImports compiler option)
+
+  This ensures compatibility with the TypeScript preset's `noUncheckedSideEffectImports` option which requires TypeScript 5.6 or higher.
+
 ## 0.9.2
 
 ### Patch Changes

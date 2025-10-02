@@ -1,5 +1,4 @@
 <p align="center">
-  <img src="https://github.com/adelrodriguez/adamantite/raw/main/.github/assets/logo.svg" alt="Adamantite" width="120" height="120">
   <h1 align="center">💠 Adamantite</h1>
   <p align="center">
     <em><strong>Bulletproof your code.</strong></em>

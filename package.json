@@ -53,7 +53,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
     "@changesets/cli": "2.29.7",
-    "@types/bun": "1.2.22",
+    "@types/bun": "1.2.23",
     "sherif": "1.6.1",
     "tsdown": "0.15.6",
     "type-fest": "5.0.1",

@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.10.0
+
+### Minor Changes
+
+- f975e73: /
+
 ## 0.9.5
 
 ### Patch Changes

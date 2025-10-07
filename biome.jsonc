@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
 
   // ---------------------------- FORMATTER -----------------------------
   // These are the generic settings that apply to all files in the project.
@@ -211,12 +211,14 @@
         "noFloatingPromises": "error",
         "noMisusedPromises": "error",
         "noNonNullAssertedOptionalChain": "error",
+        "noReactForwardRef": "error",
         "noShadow": "error",
         "noUnnecessaryConditions": "error",
         "noUselessUndefined": "error",
         "useExhaustiveSwitchCases": "error",
         "useReactFunctionComponents": "error",
         "useAnchorHref": "error",
+        "useConsistentArrowReturn": "error",
         "useSortedClasses": {
           "fix": "safe",
           "level": "error",

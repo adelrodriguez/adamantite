@@ -1,5 +1,0 @@
----
-"adamantite": minor
----
-
-/

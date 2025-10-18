@@ -4,7 +4,6 @@ import { join } from "node:path"
 import { biome, sherif, tsconfig, vscode } from "../src/commands/helpers"
 import { readPackageJson } from "../src/utils"
 
-const SCHEMA_VERSION_REGEX = /\/schemas\/([^/]+)\/schema\.json$/
 const SEMVER_REGEX = /^\d+\.\d+\.\d+$/
 const SEMVER_RANGE_REGEX = /[\^~><=]/
 
@@ -25,7 +24,7 @@ describe("helpers", () => {
       expect(biomeInPackage).toBe(biome.version)
     })
 
-    test("should keep biome.jsonc schema URL in sync with helper version", async () => {
+    test("should use local schema path from helper config", async () => {
       const biomeConfigContent = await Bun.file("biome.jsonc").text()
       const cleanedContent = biomeConfigContent
         .split("\n")
@@ -33,13 +32,11 @@ describe("helpers", () => {
         .join("\n")
 
       const biomeConfig = JSON.parse(cleanedContent)
-      const schemaUrl = biomeConfig.$schema
-      const schemaVersionMatch = schemaUrl.match(SCHEMA_VERSION_REGEX)
+      const schemaPath = biomeConfig.$schema
 
-      expect(schemaVersionMatch).not.toBeNull()
-      const schemaVersion = schemaVersionMatch[1]
+      expect(schemaPath).toBe(biome.config.$schema)
 
-      expect(schemaVersion).toBe(biome.version)
+      expect(schemaPath).toContain("node_modules/@biomejs/biome")
     })
   })
 
@@ -63,7 +60,7 @@ describe("helpers", () => {
   describe("tsconfig", () => {
     test("should provide a config that extends adamantite tsconfig preset", () => {
       expect(tsconfig.config).toHaveProperty("extends")
-      expect(tsconfig.config.extends).toBe("adamantite/presets/tsconfig.json")
+      expect(tsconfig.config.extends).toBe("adamantite/tsconfig")
     })
   })
 

@@ -21,22 +21,27 @@
   "license": "MIT",
   "author": "Adel Rodriguez <hello@adelrodriguez.com>",
   "type": "module",
-  "main": "biome.jsonc",
+  "main": "src/presets/biome.jsonc",
   "bin": {
     "adamantite": "bin/adamantite"
   },
+  "exports": {
+    ".": "./src/presets/biome.jsonc",
+    "./biome": "./src/presets/biome.jsonc",
+    "./tsconfig": "./src/presets/tsconfig.json",
+    "./presets/*": "./src/presets/*"
+  },
   "files": [
     "bin",
-    "biome.jsonc",
     "dist",
-    "presets/tsconfig.json"
+    "src/presets"
   ],
   "scripts": {
     "build": "tsdown",
     "bump:deps": "bun update --interactive",
-    "check": "biome check",
+    "check": "bun --bun run src/index.ts check",
     "dev": "tsdown --watch",
-    "fix": "biome check --write",
+    "fix": "bun --bun run src/index.ts fix",
     "release": "changeset publish",
     "test": "bun test",
     "test:watch": "bun --watch test",

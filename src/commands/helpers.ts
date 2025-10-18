@@ -15,7 +15,7 @@ interface InitializationHelper {
 }
 
 export const tsconfig = {
-  config: { extends: "adamantite/presets/tsconfig.json" },
+  config: { extends: "adamantite/tsconfig" },
   async exists() {
     return await checkIfExists(join(process.cwd(), "tsconfig.json"))
   },

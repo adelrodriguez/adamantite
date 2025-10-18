@@ -42,7 +42,7 @@ export const tsconfig = {
 } satisfies InitializationHelper
 
 export const biome = {
-  version: "2.2.5",
+  version: "2.2.6",
   config: {
     // Ensures that the schema always matches the installed version of Biome
     $schema: "./node_modules/@biomejs/biome/configuration_schema.json",

@@ -1,6 +1,6 @@
 {
   "name": "adamantite",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "An strict and opinionated set of presets for modern TypeScript applications",
   "keywords": [
     "adamantite",

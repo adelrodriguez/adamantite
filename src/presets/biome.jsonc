@@ -12,8 +12,8 @@
     "indentStyle": "space",
     // Use 2 spaces for indentation.
     "indentWidth": 2,
-    // Use LF line endings.
-    "lineEnding": "lf",
+    // Use the system line ending.
+    "lineEnding": "auto",
     // The expected line width for most editors.
     "lineWidth": 80,
     // Don't force attributes to be on the same line as the element.
@@ -180,6 +180,7 @@
         "noVoidTypeReturn": "error",
         "useExhaustiveDependencies": "error",
         "useHookAtTopLevel": "error",
+        "useImageSize": "error",
         "useIsNan": "error",
         "useJsonImportAttributes": "error",
         "useJsxKeyInIterable": "error",
@@ -210,14 +211,11 @@
         // ----------------------- JavaScript ------------------------
         "noFloatingPromises": "error",
         "noMisusedPromises": "error",
-        "noNonNullAssertedOptionalChain": "error",
         "noReactForwardRef": "error",
         "noShadow": "error",
         "noUnnecessaryConditions": "error",
         "noUselessUndefined": "error",
         "useExhaustiveSwitchCases": "error",
-        "useReactFunctionComponents": "error",
-        "useAnchorHref": "error",
         "useConsistentArrowReturn": "error",
         "useSortedClasses": {
           "fix": "safe",
@@ -301,6 +299,7 @@
         "useNumberNamespace": "error",
         "useNumericSeparators": "error",
         "useObjectSpread": "error",
+        "useReactFunctionComponents": "error",
         "useSelfClosingElements": "error",
         "useShorthandAssign": "error",
         "useShorthandFunctionType": "error",
@@ -365,6 +364,7 @@
         "noMisrefactoredShorthandAssign": "error",
         "noOctalEscape": "error",
         "noPrototypeBuiltins": "error",
+        "noNonNullAssertedOptionalChain": "error",
         // Disabling to allow passing specific props (like `className`) from
         // parent to child components
         "noReactSpecificProps": "off",
@@ -407,8 +407,7 @@
         "noEmptyBlock": "error",
         "noImportantInKeyframe": "error",
         "noShorthandPropertyOverrides": "error",
-        // Disabling this rule since we need custom at-rules for Tailwind
-        "noUnknownAtRules": "off",
+        "noUnknownAtRules": "error",
 
         // --------------------------- JSON ---------------------------
         "noBiomeFirstException": "error",
@@ -444,7 +443,8 @@
     },
     "parser": {
       "allowWrongLineComments": false,
-      "cssModules": false
+      "cssModules": false,
+      "tailwindDirectives": true
     }
   },
   // ------------------------------ JSON -------------------------------
@@ -456,7 +456,7 @@
       "enabled": true,
       "indentStyle": "space",
       "indentWidth": 2,
-      "lineEnding": "lf",
+      "lineEnding": "auto",
       "lineWidth": 80,
       "trailingCommas": "none"
     },
@@ -464,10 +464,34 @@
       "enabled": true
     }
   },
+  "html": {
+    "assist": {
+      "enabled": true
+    },
+    "experimentalFullSupportEnabled": true,
+    "formatter": {
+      "enabled": true,
+
+      "attributePosition": "auto",
+      "bracketSameLine": false,
+      "indentStyle": "space",
+      "indentScriptAndStyle": false,
+      "lineEnding": "auto",
+      "selfCloseVoidElements": "always",
+      "whitespaceSensitivity": "strict"
+    },
+    "linter": {
+      "enabled": true
+    },
+    "parser": {
+      "interpolation": true
+    }
+  },
   "vcs": {
+    "enabled": true,
+
     "clientKind": "git",
     "defaultBranch": "main",
-    "enabled": true,
     "useIgnoreFile": true
   }
 }

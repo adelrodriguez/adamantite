@@ -475,7 +475,7 @@
       "attributePosition": "auto",
       "bracketSameLine": false,
       "indentStyle": "space",
-      "indentScriptAndStyle": false,
+      "indentScriptAndStyle": true,
       "lineEnding": "auto",
       "selfCloseVoidElements": "always",
       "whitespaceSensitivity": "strict"

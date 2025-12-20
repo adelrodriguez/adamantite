@@ -43,11 +43,20 @@ export const checkIfExists = (path: string) =>
     () => false
   )
 
-export const parseJson = fromThrowable(parse, (error) =>
-  Fault.wrap(error)
-    .withTag("FAILED_TO_PARSE_FILE")
-    .withDescription("Failed to parse JSON", "We're unable to parse the provided JSON file.")
-)
+export const parseJson = (content: string) => {
+  const errors: ParseError[] = []
+
+  const parsed = parse(content, errors)
+
+  if (errors.length > 0) {
+    return err(
+      Fault.create("FAILED_TO_PARSE_FILE")
+        .withDescription("Failed to parse JSON", "We're unable to parse the provided JSON file.")
+        .withContext({ errors })
+    )
+  }
+  return ok(parsed)
+}
 
 export const mergeConfig = fromThrowable(defu, (error) =>
   Fault.wrap(error)
@@ -58,9 +67,8 @@ export const mergeConfig = fromThrowable(defu, (error) =>
     )
 )
 
-export const readPackageJson = (cwd = process.cwd()) => {
-  const errors: ParseError[] = []
-  return fromPromise(readFile(join(cwd, "package.json"), "utf-8"), (error) =>
+export const readPackageJson = (cwd = process.cwd()) =>
+  fromPromise(readFile(join(cwd, "package.json"), "utf-8"), (error) =>
     Fault.wrap(error)
       .withTag("FAILED_TO_READ_FILE")
       .withDescription(
@@ -69,22 +77,8 @@ export const readPackageJson = (cwd = process.cwd()) => {
       )
       .withContext({ path: join(cwd, "package.json") })
   )
-    .andThen((content) => parseJson(content, errors))
-    .andThen((parsed) => {
-      if (errors.length > 0) {
-        return err(
-          Fault.create("FAILED_TO_PARSE_FILE")
-            .withDescription(
-              "Failed to parse JSON",
-              "We're unable to parse the provided JSON file."
-            )
-            .withContext({ errors })
-        )
-      }
-
-      return ok(parsed as PackageJson)
-    })
-}
+    .andThen((content) => parseJson(content))
+    .andThen((parsed) => ok(parsed as unknown as PackageJson))
 
 export function getTitle() {
   const terminalWidth = process.stdout.columns || 80

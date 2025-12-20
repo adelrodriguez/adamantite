@@ -1,4 +1,4 @@
-import { cancel, log } from "@clack/prompts"
+import process from "node:process"
 import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
 import { biome } from "#helpers/packages/biome.ts"
@@ -30,7 +30,7 @@ export default defineCommand({
       ]
 
       if (argv.monorepo) {
-        tools.push({ package: sherif.name, args: ["--fix"] })
+        tools.push({ package: sherif.name, args: [] })
       }
 
       for (const tool of tools) {
@@ -50,10 +50,6 @@ export default defineCommand({
       return
     }
 
-    const error = result.error
-
-    log.error(`Failed while running CI checks: ${error.flatten()}`)
-
-    cancel("Failed to run Adamantite")
+    process.exit(1)
   },
 })

@@ -1,17 +1,18 @@
-import { cancel, log } from "@clack/prompts"
+import process from "node:process"
 import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
 import { biome } from "#helpers/packages/biome.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "check",
+  command: "check [files..]",
   describe: "Run Biome linter and check files for issues",
   builder: (yargs) =>
     yargs
       .positional("files", {
         describe: "Specific files to lint (optional)",
         type: "string",
+        array: true,
       })
       .option("summary", {
         type: "boolean",
@@ -42,10 +43,6 @@ export default defineCommand({
       return
     }
 
-    const error = result.error
-
-    log.error(`Failed while checking for issues: ${error.flatten()}`)
-
-    cancel("Failed to run Adamantite")
+    process.exit(1)
   },
 })

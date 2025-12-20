@@ -62,10 +62,7 @@ export const vscode = {
 
       const existingConfig = yield* parseJson(vscodeFile)
 
-      const newConfig = yield* mergeConfig(vscode.config, existingConfig, {
-        path: vscodePath,
-        configName: "VSCode",
-      })
+      const newConfig = yield* mergeConfig(vscode.config, existingConfig)
 
       yield* fromPromise(
         writeFile(

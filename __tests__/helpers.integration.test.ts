@@ -175,15 +175,15 @@ describe("helpers integration", () => {
       const { path } = await biome.exists()
       expect(path).toBe(join(process.cwd(), "biome.json"))
 
-      // But update should still work and convert to biome.jsonc
+      // Update should preserve the original file extension
       const updateResult = await biome.update()
       updateResult._unsafeUnwrap()
 
-      // Should now exist as biome.jsonc
+      // Should still exist as biome.json (preserves original extension)
       const existsAfter = await biome.exists()
-      expect(existsAfter.path).toBeDefined()
+      expect(existsAfter.path).toBe(join(process.cwd(), "biome.json"))
 
-      const content = await Bun.file("biome.jsonc").text()
+      const content = await Bun.file("biome.json").text()
       const config = JSON.parse(content)
 
       expect(config.extends).toEqual(["adamantite"])

@@ -20,7 +20,7 @@ export default defineCommand({
     const cwd = process.cwd()
 
     const result = await safeTry(async function* () {
-      const packageJson = yield* readPackageJson()
+      let packageJson = yield* readPackageJson()
       const hasPnpmWorkspace = await checkIfExists(join(process.cwd(), "pnpm-workspace.yaml"))
 
       const isMonorepo = packageJson.workspaces !== undefined || hasPnpmWorkspace
@@ -110,6 +110,7 @@ export default defineCommand({
       // =============================== ADD SCRIPTS ===============================
       if (shouldInstallScripts) {
         const addingScripts = spinner()
+        packageJson = yield* readPackageJson()
         addingScripts.start("Adding scripts to your `package.json`...")
 
         if (!packageJson.scripts) {
@@ -202,5 +203,6 @@ export default defineCommand({
 
     log.error(result.error.message)
     cancel("Failed to initialize Adamantite")
+    process.exit(1)
   },
 })

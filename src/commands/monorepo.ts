@@ -1,4 +1,4 @@
-import { cancel, log } from "@clack/prompts"
+import process from "node:process"
 import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
 import { sherif } from "#helpers/packages/sherif.ts"
@@ -27,10 +27,6 @@ export default defineCommand({
       return
     }
 
-    const error = result.error
-
-    log.error(`Failed while linting monorepo: ${error.flatten()}`)
-
-    cancel("Failed to run Adamantite")
+    process.exit(1)
   },
 })

@@ -71,34 +71,27 @@ export const biome = {
         )
       }
 
-      // Clone the existing config
       const newConfig = { ...existingConfig }
 
       if (!Array.isArray(newConfig.extends)) {
-        // Ensure extends is an array
         newConfig.extends = newConfig.extends ? [newConfig.extends] : []
       }
 
       if (!newConfig.extends.includes("adamantite")) {
-        // Only add "adamantite" if it's not already present
         newConfig.extends.push("adamantite")
       }
 
-      // Merge other config properties (like $schema) - our config overrides existing
-      const mergedConfig = yield* mergeConfig(biome.config, newConfig, {
-        path: exists.path,
-        configName: "Biome",
-      })
+      const mergedConfig = yield* mergeConfig(newConfig, biome.config)
+      mergedConfig.$schema = biome.config.$schema
 
-      yield* fromPromise(
-        writeFile(join(process.cwd(), "biome.jsonc"), JSON.stringify(mergedConfig, null, 2)),
-        (error) =>
-          Fault.wrap(error)
-            .withTag("FAILED_TO_WRITE_FILE")
-            .withDescription(
-              "Failed to write Biome configuration",
-              "We're unable to write the Biome configuration to the current directory."
-            )
+      yield* fromPromise(writeFile(exists.path, JSON.stringify(mergedConfig, null, 2)), (error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_WRITE_FILE")
+          .withDescription(
+            "Failed to write Biome configuration",
+            "We're unable to write the Biome configuration to the current directory."
+          )
+          .withContext({ path: exists.path })
       )
 
       return ok()

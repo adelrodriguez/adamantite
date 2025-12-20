@@ -1,3 +1,4 @@
+import process from "node:process"
 import { cancel, confirm, intro, isCancel, log, outro, spinner } from "@clack/prompts"
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
@@ -99,5 +100,6 @@ export default defineCommand({
 
     log.error(result.error.message)
     cancel("Failed to update dependencies")
+    process.exit(1)
   },
 })

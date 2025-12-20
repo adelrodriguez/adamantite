@@ -4,7 +4,7 @@ import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
-import { checkIfExists, readPackageJson, writePackageJson } from "#utils.ts"
+import { checkIfExists, getTitle, mergeConfig, parseJson, readPackageJson } from "#utils.ts"
 
 // Mock spawnSync for testing
 mock.module("node:child_process", () => ({
@@ -20,10 +20,7 @@ describe("utils", () => {
 
   beforeEach(() => {
     // Create a temporary directory for each test
-    testDir = join(
-      tmpdir(),
-      `adamantite-test-${Date.now()}-${Math.random().toString(36).slice(2)}`
-    )
+    testDir = join(tmpdir(), `adamantite-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(testDir, { recursive: true })
     originalCwd = process.cwd()
     process.chdir(testDir)
@@ -75,13 +72,11 @@ describe("utils", () => {
         },
       }
 
-      await Bun.write(
-        join(testDir, "package.json"),
-        JSON.stringify(packageJson, null, 2)
-      )
+      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await readPackageJson(testDir)
-      expect(result).toEqual(packageJson)
+      expect(result.isOk()).toBe(true)
+      expect(result._unsafeUnwrap()).toEqual(packageJson)
     })
 
     test("should use current working directory by default", async () => {
@@ -90,102 +85,153 @@ describe("utils", () => {
         version: "1.0.0",
       }
 
-      await Bun.write(
-        join(testDir, "package.json"),
-        JSON.stringify(packageJson, null, 2)
-      )
+      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await readPackageJson()
-      expect(result).toEqual(packageJson)
+      expect(result.isOk()).toBe(true)
+      expect(result._unsafeUnwrap()).toEqual(packageJson)
     })
 
-    test("should throw error when package.json does not exist", async () => {
-      await expect(readPackageJson(testDir)).rejects.toThrow(
-        "package.json not found in the current directory"
-      )
+    test("should return error when package.json does not exist", async () => {
+      const result = await readPackageJson(testDir)
+      expect(result.isErr()).toBe(true)
     })
 
-    test("should throw error when package.json is invalid JSON", async () => {
+    test("should return error when package.json is invalid JSON", async () => {
       await Bun.write(join(testDir, "package.json"), "invalid json content")
 
-      await expect(readPackageJson(testDir)).rejects.toThrow(
-        "Failed to parse package.json"
-      )
+      const result = await readPackageJson(testDir)
+      expect(result.isErr()).toBe(true)
     })
   })
 
-  describe("writePackageJson", () => {
-    test("should write package.json with proper formatting", async () => {
-      const packageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
-        dependencies: {
-          react: "^18.0.0",
-        },
-      }
+  describe("parseJson", () => {
+    test("should parse valid JSON", () => {
+      const validJson = '{"name": "test", "version": "1.0.0"}'
+      const result = parseJson(validJson)
 
-      await writePackageJson(packageJson, testDir)
-
-      const written = await Bun.file(join(testDir, "package.json")).text()
-      const parsed = JSON.parse(written)
-      expect(parsed).toEqual(packageJson)
-
-      // Check formatting (should be pretty-printed with 2 spaces)
-      expect(written).toContain('  "name": "test-package"')
+      expect(result.isOk()).toBe(true)
+      expect(result._unsafeUnwrap()).toEqual({ name: "test", version: "1.0.0" })
     })
 
-    test("should use current working directory by default", async () => {
-      const packageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
-      }
+    test("should parse valid JSONC with comments", () => {
+      const jsonc = `{
+        // This is a comment
+        "name": "test",
+        "version": "1.0.0"
+      }`
+      const result = parseJson(jsonc)
 
-      await writePackageJson(packageJson)
-
-      const written = await Bun.file(join(testDir, "package.json")).text()
-      const parsed = JSON.parse(written)
-      expect(parsed).toEqual(packageJson)
+      expect(result.isOk()).toBe(true)
+      expect(result._unsafeUnwrap()).toEqual({ name: "test", version: "1.0.0" })
     })
 
-    test("should write and read updated content correctly", async () => {
-      const originalPackageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
-      }
+    test("should return error for invalid JSON", () => {
+      const invalidJson = '{"name": "test", "version":}'
+      const result = parseJson(invalidJson)
 
-      const updatedPackageJson: PackageJson = {
-        name: "test-package",
-        version: "2.0.0",
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("FAILED_TO_PARSE_FILE")
       }
+    })
 
-      // Write initial content
-      await Bun.write(
-        join(testDir, "package.json"),
-        JSON.stringify(originalPackageJson, null, 2)
+    test("should return error for empty string", () => {
+      const result = parseJson("")
+
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("FAILED_TO_PARSE_FILE")
+      }
+    })
+  })
+
+  describe("mergeConfig", () => {
+    test("should merge two objects", () => {
+      const base = { a: 1, b: 2 }
+      const override = { b: 3, c: 4 }
+      const result = mergeConfig(base, override)
+
+      expect(result.isOk()).toBe(true)
+      // defu merges left-to-right, so base (first arg) wins for 'b'
+      expect(result._unsafeUnwrap()).toEqual({ a: 1, b: 2, c: 4 })
+    })
+
+    test("should give priority to first argument (defu behavior)", () => {
+      const first = { a: 1, b: 2 }
+      const second = { a: 3, b: 4 }
+      const result = mergeConfig(first, second)
+
+      expect(result.isOk()).toBe(true)
+      // defu merges left-to-right, so first argument wins
+      expect(result._unsafeUnwrap()).toEqual({ a: 1, b: 2 })
+    })
+
+    test("should handle nested objects", () => {
+      const base = { a: { x: 1, y: 2 }, b: 3 }
+      const override = { a: { y: 4, z: 5 }, b: 6 }
+      const result = mergeConfig(base, override)
+
+      expect(result.isOk()).toBe(true)
+      // defu merges left-to-right, so base values win
+      expect(result._unsafeUnwrap()).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
+    })
+  })
+
+  describe("getTitle", () => {
+    let originalColumns: number | undefined
+
+    beforeEach(() => {
+      originalColumns = process.stdout.columns
+    })
+
+    afterEach(() => {
+      if (originalColumns !== undefined) {
+        process.stdout.columns = originalColumns
+      } else {
+        ;(process.stdout as { columns?: number }).columns = undefined
+      }
+    })
+
+    test("should return large ASCII art for wide terminals", () => {
+      process.stdout.columns = 150
+      const result = getTitle()
+
+      expect(result).toContain("█████")
+      expect(result).not.toContain(
+        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
       )
-
-      // Verify initial content
-      const initialResult = await readPackageJson(testDir)
-      expect(initialResult).toEqual(originalPackageJson)
-
-      // Write updated content
-      await writePackageJson(updatedPackageJson, testDir)
-
-      // Read again should return updated content from disk
-      const result = await readPackageJson(testDir)
-      expect(result).toEqual(updatedPackageJson)
     })
 
-    test("should throw error when write fails", async () => {
-      const packageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
-      }
+    test("should return simple box for narrow terminals", () => {
+      process.stdout.columns = 80
+      const result = getTitle()
 
-      // Try to write to non-existent directory
-      const invalidDir = join(testDir, "non-existent", "directory")
-      await expect(writePackageJson(packageJson, invalidDir)).rejects.toThrow(
-        "Failed to write package.json"
+      expect(result).toContain(
+        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+      )
+      expect(result).toContain("ADAMANTITE")
+      expect(result).not.toContain("█████")
+    })
+
+    test("should return simple box when columns is undefined", () => {
+      ;(process.stdout as { columns?: number }).columns = undefined
+      const result = getTitle()
+
+      expect(result).toContain(
+        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
+      )
+      expect(result).toContain("ADAMANTITE")
+    })
+
+    test("should return large ASCII art for exactly 120 columns", () => {
+      process.stdout.columns = 120
+      const result = getTitle()
+
+      // At exactly 120, should use large art (>= 120)
+      expect(result).toContain("█████")
+      expect(result).not.toContain(
+        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
       )
     })
   })

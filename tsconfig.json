@@ -1,5 +1,5 @@
 {
-  "extends": "./src/presets/tsconfig.json",
+  "extends": "./presets/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "esnext",

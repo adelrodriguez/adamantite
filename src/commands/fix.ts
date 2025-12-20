@@ -1,28 +1,26 @@
-import { execSync } from "node:child_process"
+import process from "node:process"
+import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
-import { biome } from "#commands/helpers.ts"
-import {
-  defineCommand,
-  getPackageManagerName,
-  handleCommandError,
-} from "#utils.ts"
+import { biome } from "#helpers/packages/biome.ts"
+import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "fix",
+  command: "fix [files..]",
   describe: "Run Biome linter and fix issues in files",
   builder: (yargs) =>
     yargs
       .positional("files", {
         describe: "Specific files to fix (optional)",
         type: "string",
+        array: true,
       })
       .option("unsafe", {
         type: "boolean",
         description: "Apply unsafe fixes",
       }),
   handler: async (argv) => {
-    try {
-      const packageManager = await getPackageManagerName()
+    const result = await safeTry(async function* () {
+      const packageManager = yield* getPackageManagerName()
 
       const args = ["check", "--write"]
 
@@ -34,11 +32,19 @@ export default defineCommand({
         args.push(...argv.files)
       }
 
-      execSync(dlxCommand(packageManager, biome.name, { args }), {
+      const command = dlxCommand(packageManager, biome.name, { args })
+
+      yield* runCommand(command, {
         stdio: "inherit",
       })
-    } catch (error) {
-      handleCommandError(error)
+
+      return ok(undefined)
+    })
+
+    if (result.isOk()) {
+      return
     }
+
+    process.exit(1)
   },
 })

@@ -41,7 +41,7 @@ This project uses changesets for version management:
 
 ### CLI Structure (`src/`)
 
-- **`index.ts`** - Main CLI entry point using citty
+- **`index.ts`** - Main CLI entry point using yargs
 - **`commands/`** - Command implementations:
   - `fix.ts` - Runs Biome formatter and fixes issues
   - `check.ts` - Runs Biome linter to check for issues

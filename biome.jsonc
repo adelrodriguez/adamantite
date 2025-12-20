@@ -1,5 +1,8 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "root": true,
-  "extends": ["src/presets/biome.jsonc"]
+  "extends": ["presets/biome.jsonc"],
+  "linter": {
+    "rules": { "suspicious": { "useAwait": "off" } }
+  }
 }

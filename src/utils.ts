@@ -1,99 +1,86 @@
-import { access, readFile, writeFile } from "node:fs/promises"
+import { execSync } from "node:child_process"
+import { access, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
-import { cancel } from "@clack/prompts"
+import defu from "defu"
+import { Fault } from "faultier"
+import { type ParseError, parse } from "jsonc-parser"
+import { err, fromPromise, fromThrowable, ok } from "neverthrow"
 import { detectPackageManager } from "nypm"
 import type { PackageJson } from "type-fest"
 import type { CommandModule } from "yargs"
 
-export function defineCommand<T, U>(
-  input: CommandModule<T, U>
-): CommandModule<T, U> {
+export function defineCommand<T, U>(input: CommandModule<T, U>): CommandModule<T, U> {
   return input
 }
 
-export async function getPackageManagerName() {
-  const result = await detectPackageManager(process.cwd())
+export const runCommand = fromThrowable(execSync, (error) =>
+  Fault.wrap(error).withTag("FAILED_TO_RUN_COMMAND")
+)
 
-  if (!result) {
-    throw new Error("No package manager found")
-  }
+export const getPackageManagerName = () =>
+  fromPromise(detectPackageManager(process.cwd()), () =>
+    Fault.create("NO_PACKAGE_MANAGER").withDescription(
+      "Error while detecting the package manager.",
+      "We're unable to detect the package manager used in this project."
+    )
+  ).andThen((result) => {
+    if (!result) {
+      return err(
+        Fault.create("NO_PACKAGE_MANAGER").withDescription(
+          "No package manager detected.",
+          "We're unable to detect the package manager used in this project."
+        )
+      )
+    }
 
-  const { warnings, ...packageManager } = result
+    return ok(result.name)
+  })
 
-  if (warnings && warnings.length > 0) {
-    // biome-ignore lint/suspicious/noConsole: We want to log the warnings to the console
-    console.warn(warnings.join("\n"))
-  }
+export const checkIfExists = (path: string) =>
+  fromPromise(access(path), () => new Error("File not found")).match(
+    () => true,
+    () => false
+  )
 
-  return packageManager.name
-}
+export const parseJson = (content: string) => {
+  const errors: ParseError[] = []
 
-export function handleCommandError(error: unknown) {
-  const message =
-    error instanceof Error ? error.message : "An unknown error occurred"
+  const parsed = parse(content, errors)
 
-  // biome-ignore lint/suspicious/noConsole: We want to log the error to the console
-  console.error(message)
-
-  cancel("Failed to run Adamantite")
-
-  process.exit(1)
-}
-
-export async function checkIfExists(path: string) {
-  try {
-    await access(path)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/**
- * Reads and parses package.json with proper typing
- */
-export async function readPackageJson(
-  cwd = process.cwd()
-): Promise<PackageJson> {
-  const currentPath = join(cwd, "package.json")
-
-  // Check if package.json exists
-  if (!(await checkIfExists(currentPath))) {
-    throw new Error("package.json not found in the current directory")
-  }
-
-  try {
-    const content = await readFile(currentPath, "utf-8")
-    const parsed = JSON.parse(content) as PackageJson
-
-    return parsed
-  } catch (error) {
-    throw new Error(
-      `Failed to parse package.json: ${error instanceof Error ? error.message : "Unknown error"}`
+  if (errors.length > 0) {
+    return err(
+      Fault.create("FAILED_TO_PARSE_FILE")
+        .withDescription("Failed to parse JSON", "We're unable to parse the provided JSON file.")
+        .withContext({ errors })
     )
   }
+  return ok(parsed)
 }
 
-/**
- * Writes package.json with proper formatting
- */
-export async function writePackageJson(
-  packageJson: PackageJson,
-  cwd = process.cwd()
-): Promise<void> {
-  const currentPath = join(cwd, "package.json")
-
-  try {
-    await writeFile(currentPath, JSON.stringify(packageJson, null, 2))
-  } catch (error) {
-    throw new Error(
-      `Failed to write package.json: ${error instanceof Error ? error.message : "Unknown error"}`
+export const mergeConfig = fromThrowable(defu, (error) =>
+  Fault.wrap(error)
+    .withTag("FAILED_TO_MERGE_CONFIG")
+    .withDescription(
+      "Failed to merge configuration",
+      "We're unable to merge the configuration files."
     )
-  }
-}
+)
 
-export function getTitle(): string {
+export const readPackageJson = (cwd = process.cwd()) =>
+  fromPromise(readFile(join(cwd, "package.json"), "utf-8"), (error) =>
+    Fault.wrap(error)
+      .withTag("FAILED_TO_READ_FILE")
+      .withDescription(
+        "Failed to read package.json",
+        "We're unable to read the package.json file in the current directory."
+      )
+      .withContext({ path: join(cwd, "package.json") })
+  )
+    .andThen((content) => parseJson(content))
+    .andThen((parsed) => ok(parsed as unknown as PackageJson))
+
+export function getTitle() {
   const terminalWidth = process.stdout.columns || 80
 
   if (terminalWidth >= 120) {

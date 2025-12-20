@@ -165,7 +165,7 @@ Adamantite's Biome preset includes:
   - React/JSX patterns
 - **File Patterns**: Pre-configured for TypeScript, JavaScript, JSON, and more
 
-### TypeScript Configuration ([presets/tsconfig.json](./src/presets/tsconfig.json))
+### TypeScript Configuration ([presets/tsconfig.json](./presets/tsconfig.json))
 
 The TypeScript preset includes strict settings for maximum type safety:
 

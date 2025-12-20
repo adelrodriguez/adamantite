@@ -1,5 +1,69 @@
 # adamantite
 
+## 0.13.1
+
+### Patch Changes
+
+- c34d925: Update dependency versions to fix test failures
+
+  **Updated Dependencies:**
+
+  Development dependencies:
+
+  - `@biomejs/biome` from 2.3.8 to 2.3.10
+  - `@types/bun` from 1.3.3 to 1.3.5
+  - `tsdown` from 0.17.0-beta.4 to 0.18.1
+  - `type-fest` from 5.2.0 to 5.3.1
+
+  Peer dependencies:
+
+  - `@biomejs/biome` from 2.3.8 to 2.3.10
+
+  **Internal Changes:**
+
+  - Updated hardcoded `biome.version` in helpers from 2.3.2 to 2.3.10 to match installed package
+  - Updated hardcoded `sherif.version` in helpers from 1.7.0 to 1.9.0 to match installed package
+
+  These changes ensure version consistency between hardcoded references in the codebase and actual installed dependencies, resolving test failures that check for version alignment.
+
+- 89f6f83: Add self-referencing dependency and update development tooling
+
+  **New Features:**
+
+  - Added `adamantite` as a dependency to enable dogfooding and self-testing of the package configuration
+
+  **Updated Dependencies:**
+
+  Development dependencies:
+
+  - `sherif` from 1.7.0 to 1.7.1
+  - `tsdown` from 0.15.11 to 0.15.12
+
+  This change allows the project to use its own presets and configurations, ensuring consistency and validating that the package works correctly in real-world usage. The development dependency updates bring the latest bug fixes and improvements from upstream packages.
+
+- d354b60: Update development dependencies and Biome peer dependency to latest versions
+
+  **Updated Dependencies:**
+
+  Development dependencies:
+
+  - `@biomejs/biome` from 2.3.2 to 2.3.8
+  - `@changesets/cli` from 2.29.7 to 2.29.8
+  - `@types/bun` from 1.3.1 to 1.3.3
+  - `sherif` from 1.7.1 to 1.9.0
+  - `tsdown` from 0.15.12 to 0.17.0-beta.4
+  - `type-fest` from 5.1.0 to 5.2.0
+
+  Peer dependencies:
+
+  - `@biomejs/biome` from 2.3.2 to 2.3.8
+
+  Package manager:
+
+  - `bun` from 1.2.20 to 1.3.3
+
+  These updates bring the latest bug fixes, performance improvements, and new features from upstream packages, ensuring the development environment stays current with the latest tooling improvements.
+
 ## 0.13.0
 
 ### Minor Changes

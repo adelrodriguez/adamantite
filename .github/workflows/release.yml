@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  id-token: write # Required for OIDC
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -23,6 +24,17 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      # Setup Node.js to enable trusted publishing with OIDC authentication.
+      # The registry-url configures npm to use GitHub Actions OIDC tokens for
+      # authentication, eliminating the need for NPM_TOKEN secrets. When
+      # changeset publish runs npm publish, it will automatically use OIDC
+      # and generate provenance attestations.
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -43,4 +55,4 @@ jobs:
           title: "chore: release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          HOME: ${{ github.workspace }}

@@ -1,5 +1,5 @@
 {
-  "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+  "$schema": "../node_modules/@biomejs/biome/configuration_schema.json",
   "root": false,
   // ---------------------------- FORMATTER -----------------------------
   // These are the generic settings that apply to all files in the project.
@@ -15,7 +15,7 @@
     // Use the system line ending.
     "lineEnding": "auto",
     // The expected line width for most editors.
-    "lineWidth": 80,
+    "lineWidth": 100,
     // Don't force attributes to be on the same line as the element.
     "attributePosition": "auto",
     "bracketSpacing": true
@@ -103,9 +103,9 @@
         "noEmptyTypeParameters": "error",
         "noExtraBooleanCast": "error",
         "noExcessiveCognitiveComplexity": {
-          "level": "error",
+          "level": "warn",
           "options": {
-            "maxAllowedComplexity": 20
+            "maxAllowedComplexity": 40
           }
         },
         "noExcessiveNestedTestSuites": "error",

@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import Bun from "bun"
 import { join } from "node:path"
-import { biome, sherif, tsconfig, vscode } from "#commands/helpers.ts"
+import { vscode } from "#helpers/editors/vscode.ts"
+import { biome } from "#helpers/packages/biome.ts"
+import { sherif } from "#helpers/packages/sherif.ts"
+import { tsconfig } from "#helpers/tsconfig.ts"
 import { readPackageJson } from "#utils.ts"
 
 const SEMVER_REGEX = /^\d+\.\d+\.\d+$/
@@ -18,7 +21,8 @@ describe("helpers", () => {
     })
 
     test("should match the version specified in package.json devDependencies", async () => {
-      const packageJson = await readPackageJson(join(__dirname, ".."))
+      const packageJsonResult = await readPackageJson(join(__dirname, ".."))
+      const packageJson = packageJsonResult._unsafeUnwrap()
       const biomeInPackage = packageJson.devDependencies?.["@biomejs/biome"]
 
       expect(biomeInPackage).toBe(biome.version)
@@ -50,7 +54,8 @@ describe("helpers", () => {
     })
 
     test("should match the version specified in package.json devDependencies", async () => {
-      const packageJson = await readPackageJson(join(__dirname, ".."))
+      const packageJsonResult = await readPackageJson(join(__dirname, ".."))
+      const packageJson = packageJsonResult._unsafeUnwrap()
       const sherifInPackage = packageJson.devDependencies?.sherif
 
       expect(sherifInPackage).toBe(sherif.version)

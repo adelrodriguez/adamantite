@@ -1,11 +1,8 @@
-import { execSync } from "node:child_process"
+import { cancel, log } from "@clack/prompts"
+import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
-import { biome } from "#commands/helpers.ts"
-import {
-  defineCommand,
-  getPackageManagerName,
-  handleCommandError,
-} from "#utils.ts"
+import { biome } from "#helpers/packages/biome.ts"
+import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
   command: "fix",
@@ -21,8 +18,8 @@ export default defineCommand({
         description: "Apply unsafe fixes",
       }),
   handler: async (argv) => {
-    try {
-      const packageManager = await getPackageManagerName()
+    const result = await safeTry(async function* () {
+      const packageManager = yield* getPackageManagerName()
 
       const args = ["check", "--write"]
 
@@ -34,11 +31,23 @@ export default defineCommand({
         args.push(...argv.files)
       }
 
-      execSync(dlxCommand(packageManager, biome.name, { args }), {
+      const command = dlxCommand(packageManager, biome.name, { args })
+
+      yield* runCommand(command, {
         stdio: "inherit",
       })
-    } catch (error) {
-      handleCommandError(error)
+
+      return ok(undefined)
+    })
+
+    if (result.isOk()) {
+      return
     }
+
+    const error = result.error
+
+    log.error(`Failed while fixing issues: ${error.flatten()}`)
+
+    cancel("Failed to run Adamantite")
   },
 })

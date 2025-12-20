@@ -21,7 +21,7 @@
   "license": "MIT",
   "author": "Adel Rodriguez <hello@adelrodriguez.com>",
   "type": "module",
-  "main": "src/presets/biome.jsonc",
+  "main": "presets/biome.jsonc",
   "bin": {
     "adamantite": "bin/adamantite"
   },
@@ -29,15 +29,15 @@
     "#*": "./src/*"
   },
   "exports": {
-    ".": "./src/presets/biome.jsonc",
-    "./biome": "./src/presets/biome.jsonc",
-    "./tsconfig": "./src/presets/tsconfig.json",
-    "./presets/*": "./src/presets/*"
+    ".": "./presets/biome.jsonc",
+    "./biome": "./presets/biome.jsonc",
+    "./tsconfig": "./presets/tsconfig.json",
+    "./presets/*": "./presets/*"
   },
   "files": [
     "bin",
     "dist",
-    "src/presets"
+    "presets"
   ],
   "scripts": {
     "build": "tsdown",
@@ -54,7 +54,9 @@
   "dependencies": {
     "@clack/prompts": "0.11.0",
     "defu": "6.1.4",
+    "faultier": "^1.0.3",
     "jsonc-parser": "3.3.1",
+    "neverthrow": "8.2.0",
     "nypm": "0.6.2",
     "yargs": "18.0.0"
   },

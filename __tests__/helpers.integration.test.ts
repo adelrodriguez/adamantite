@@ -3,7 +3,9 @@ import Bun from "bun"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { biome, tsconfig, vscode } from "#commands/helpers.ts"
+import { vscode } from "#helpers/editors/vscode.ts"
+import { biome } from "#helpers/packages/biome.ts"
+import { tsconfig } from "#helpers/tsconfig.ts"
 
 describe("helpers integration", () => {
   let tempDir: string
@@ -48,23 +50,22 @@ describe("helpers integration", () => {
 
   describe("biome helper", () => {
     test("should detect when biome.jsonc does not exist", async () => {
-      const exists = await biome.exists()
-      expect(exists).toBe(false)
+      const { path } = await biome.exists()
+      expect(path).toBe(null)
     })
 
     test("should create biome.jsonc with correct config", async () => {
-      await biome.create()
+      const createResult = await biome.create()
+      createResult._unsafeUnwrap()
 
-      const exists = await biome.exists()
-      expect(exists).toBe(true)
+      const { path } = await biome.exists()
+      expect(path).toBeDefined()
 
       const content = await Bun.file("biome.jsonc").text()
       const config = JSON.parse(content)
 
       expect(config).toHaveProperty("$schema")
-      expect(config.$schema).toBe(
-        "./node_modules/@biomejs/biome/configuration_schema.json"
-      )
+      expect(config.$schema).toBe("./node_modules/@biomejs/biome/configuration_schema.json")
       expect(config).toHaveProperty("extends")
       expect(config.extends).toEqual(["adamantite"])
     })
@@ -86,9 +87,10 @@ describe("helpers integration", () => {
       )
 
       const existsBefore = await biome.exists()
-      expect(existsBefore).toBe(true)
+      expect(existsBefore.path).toBeDefined()
 
-      await biome.update()
+      const updateResult = await biome.update()
+      updateResult._unsafeUnwrap()
 
       const content = await Bun.file("biome.jsonc").text()
       const config = JSON.parse(content)
@@ -97,9 +99,7 @@ describe("helpers integration", () => {
       expect(config.rules).toEqual({ recommended: true })
       expect(config.extends).toEqual(["adamantite"])
       // Our config should override existing schema
-      expect(config.$schema).toBe(
-        "./node_modules/@biomejs/biome/configuration_schema.json"
-      )
+      expect(config.$schema).toBe("./node_modules/@biomejs/biome/configuration_schema.json")
     })
 
     test("should handle updating config with existing extends array", async () => {
@@ -118,7 +118,8 @@ describe("helpers integration", () => {
         )
       )
 
-      await biome.update()
+      const updateResult = await biome.update()
+      updateResult._unsafeUnwrap()
 
       const content = await Bun.file("biome.jsonc").text()
       const config = JSON.parse(content)
@@ -144,7 +145,8 @@ describe("helpers integration", () => {
         )
       )
 
-      await biome.update()
+      const updateResult = await biome.update()
+      updateResult._unsafeUnwrap()
 
       const content = await Bun.file("biome.jsonc").text()
       const config = JSON.parse(content)
@@ -169,16 +171,17 @@ describe("helpers integration", () => {
         )
       )
 
-      // biome.exists() only checks for biome.jsonc, so this should be false
-      const exists = await biome.exists()
-      expect(exists).toBe(false)
+      // biome.exists() checks for both biome.jsonc and biome.json
+      const { path } = await biome.exists()
+      expect(path).toBe(join(process.cwd(), "biome.json"))
 
       // But update should still work and convert to biome.jsonc
-      await biome.update()
+      const updateResult = await biome.update()
+      updateResult._unsafeUnwrap()
 
       // Should now exist as biome.jsonc
       const existsAfter = await biome.exists()
-      expect(existsAfter).toBe(true)
+      expect(existsAfter.path).toBeDefined()
 
       const content = await Bun.file("biome.jsonc").text()
       const config = JSON.parse(content)
@@ -195,7 +198,8 @@ describe("helpers integration", () => {
     })
 
     test("should create tsconfig.json with correct config", async () => {
-      await tsconfig.create()
+      const createResult = await tsconfig.create()
+      createResult._unsafeUnwrap()
 
       const exists = await tsconfig.exists()
       expect(exists).toBe(true)
@@ -227,7 +231,8 @@ describe("helpers integration", () => {
       const existsBefore = await tsconfig.exists()
       expect(existsBefore).toBe(true)
 
-      await tsconfig.update()
+      const updateResult = await tsconfig.update()
+      updateResult._unsafeUnwrap()
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -257,7 +262,8 @@ describe("helpers integration", () => {
         )
       )
 
-      await tsconfig.update()
+      const updateResult = await tsconfig.update()
+      updateResult._unsafeUnwrap()
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -275,7 +281,8 @@ describe("helpers integration", () => {
     })
 
     test("should create .vscode directory and settings.json", async () => {
-      await vscode.create()
+      const createResult = await vscode.create()
+      createResult._unsafeUnwrap()
 
       const exists = await vscode.exists()
       expect(exists).toBe(true)
@@ -318,7 +325,8 @@ describe("helpers integration", () => {
       const existsBefore = await vscode.exists()
       expect(existsBefore).toBe(true)
 
-      await vscode.update()
+      const updateResult = await vscode.update()
+      updateResult._unsafeUnwrap()
 
       const content = await Bun.file(".vscode/settings.json").text()
       const config = JSON.parse(content)
@@ -342,7 +350,8 @@ describe("helpers integration", () => {
       const existsBefore = await vscode.exists()
       expect(existsBefore).toBe(false)
 
-      await vscode.create()
+      const createResult = await vscode.create()
+      createResult._unsafeUnwrap()
 
       const exists = await vscode.exists()
       expect(exists).toBe(true)

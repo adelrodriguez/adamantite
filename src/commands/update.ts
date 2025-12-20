@@ -1,129 +1,10 @@
-import { confirm, intro, isCancel, log, outro, spinner } from "@clack/prompts"
+import { cancel, confirm, intro, isCancel, log, outro, spinner } from "@clack/prompts"
+import { Fault } from "faultier"
+import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
-import { biome, sherif } from "#commands/helpers.ts"
-import {
-  defineCommand,
-  getTitle,
-  handleCommandError,
-  readPackageJson,
-} from "#utils.ts"
-
-interface DependencyUpdate {
-  name: string
-  currentVersion: string
-  targetVersion: string
-  isDevDependency: boolean
-}
-
-async function detectUpdatesNeeded(): Promise<DependencyUpdate[]> {
-  const updates: DependencyUpdate[] = []
-
-  try {
-    const packageJson = await readPackageJson()
-
-    // Check @biomejs/biome
-    const biomeDep = packageJson.devDependencies?.["@biomejs/biome"]
-    if (biomeDep && biomeDep !== biome.version) {
-      updates.push({
-        name: "@biomejs/biome",
-        currentVersion: biomeDep,
-        targetVersion: biome.version,
-        isDevDependency: true,
-      })
-    }
-
-    // Check sherif
-    const sherifDep = packageJson.devDependencies?.sherif
-    if (sherifDep && sherifDep !== sherif.version) {
-      updates.push({
-        name: "sherif",
-        currentVersion: sherifDep,
-        targetVersion: sherif.version,
-        isDevDependency: true,
-      })
-    }
-
-    return updates
-  } catch (error) {
-    throw new Error(
-      `Failed to read package.json: ${error instanceof Error ? error.message : "Unknown error"}`
-    )
-  }
-}
-
-async function updateDependencies(updates: DependencyUpdate[]) {
-  const s = spinner()
-
-  s.start("Updating dependencies...")
-
-  try {
-    // Update each dependency with its exact version
-    const tasks = updates.map((dep) =>
-      addDevDependency(`${dep.name}@${dep.targetVersion}`)
-    )
-
-    const results = await Promise.allSettled(tasks)
-
-    // Check for failures and successes
-    const failures: string[] = []
-    const successes: string[] = []
-
-    for (const [index, result] of results.entries()) {
-      const dep = updates[index]
-
-      if (!dep) {
-        continue
-      }
-
-      const depName = dep.name
-      if (result.status === "fulfilled") {
-        successes.push(depName)
-      } else {
-        failures.push(
-          `${depName}: ${result.reason?.message || "Unknown error"}`
-        )
-      }
-    }
-
-    if (failures.length === 0) {
-      s.stop("Dependencies updated successfully")
-    } else if (successes.length === 0) {
-      s.stop("Failed to update dependencies")
-      throw new Error(`All dependency updates failed:\n${failures.join("\n")}`)
-    } else {
-      s.stop("Partial update completed")
-      log.warn("Some dependencies failed to update:")
-      for (const failure of failures) {
-        log.warn(`  ${failure}`)
-      }
-      log.success(`Successfully updated: ${successes.join(", ")}`)
-    }
-  } catch (error) {
-    s.stop("Failed to update dependencies")
-    throw error
-  }
-}
-
-async function confirmUpdate(updates: DependencyUpdate[]): Promise<boolean> {
-  log.message("The following dependencies will be updated:")
-  log.message("")
-
-  for (const dep of updates) {
-    log.message(`  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`)
-  }
-
-  log.message("")
-
-  const result = await confirm({
-    message: "Do you want to proceed with these updates?",
-  })
-
-  if (isCancel(result)) {
-    throw new Error("Operation cancelled")
-  }
-
-  return result
-}
+import { biome } from "#helpers/packages/biome.ts"
+import { sherif } from "#helpers/packages/sherif.ts"
+import { defineCommand, getTitle, readPackageJson } from "#utils.ts"
 
 export default defineCommand({
   command: "update",
@@ -132,27 +13,91 @@ export default defineCommand({
   handler: async () => {
     intro(getTitle())
 
-    try {
-      const updates = await detectUpdatesNeeded()
+    const result = await safeTry(async function* () {
+      // Read package.json using yield*
+      const packageJson = yield* readPackageJson()
 
+      // Detect updates needed
+      const updates: {
+        name: string
+        currentVersion: string
+        targetVersion: string
+        isDevDependency: boolean
+      }[] = []
+
+      for (const pkg of [biome, sherif]) {
+        const dependency = packageJson.devDependencies?.[pkg.name]
+        if (dependency && dependency !== pkg.version) {
+          updates.push({
+            name: pkg.name,
+            currentVersion: dependency,
+            targetVersion: pkg.version,
+            isDevDependency: true,
+          })
+        }
+      }
+
+      // Early exit if no updates
       if (updates.length === 0) {
         log.success("All adamantite dependencies are already up to date!")
-        outro("💠 No updates needed")
-        return
+        return ok("no-updates" as const)
       }
 
-      const shouldUpdate = await confirmUpdate(updates)
+      // Confirm updates using fromSafePromise + isCancel check
+      log.message("The following dependencies will be updated:")
+      log.message("")
+
+      for (const dep of updates) {
+        log.message(`  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`)
+      }
+
+      log.message("")
+
+      const shouldUpdate = yield* fromSafePromise(
+        confirm({
+          message: "Do you want to proceed with these updates?",
+        })
+      ).andThen((r) => (isCancel(r) ? err(Fault.create("OPERATION_CANCELLED")) : ok(r)))
 
       if (!shouldUpdate) {
-        outro("💠 Update cancelled")
-        return
+        return ok("cancelled" as const)
       }
 
-      await updateDependencies(updates)
+      // Update dependencies with spinner and fromPromise
+      const s = spinner()
+      s.start("Updating dependencies...")
 
-      outro("💠 Dependencies updated successfully!")
-    } catch (error) {
-      handleCommandError(error)
+      for (const dep of updates) {
+        yield* fromPromise(addDevDependency(`${dep.name}@${dep.targetVersion}`), (error) =>
+          Fault.wrap(error)
+            .withTag("FAILED_TO_INSTALL_DEPENDENCY")
+            .withMessage(`Failed to update ${dep.name}`)
+        )
+      }
+
+      s.stop("Dependencies updated successfully")
+      return ok("updated" as const)
+    })
+
+    // Unified error handling at the end
+    if (result.isOk()) {
+      if (result.value === "no-updates") {
+        outro("💠 No updates needed")
+      } else if (result.value === "cancelled") {
+        outro("💠 Update cancelled")
+      } else if (result.value === "updated") {
+        outro("💠 Dependencies updated successfully!")
+      }
+
+      return
     }
+
+    if (result.error.tag === "OPERATION_CANCELLED") {
+      cancel("You've cancelled the update process.")
+      return
+    }
+
+    log.error(result.error.message)
+    cancel("Failed to update dependencies")
   },
 })

@@ -1,24 +1,36 @@
-import { execSync } from "node:child_process"
+import { cancel, log } from "@clack/prompts"
+import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
-import {
-  defineCommand,
-  getPackageManagerName,
-  handleCommandError,
-} from "#utils.ts"
+import { sherif } from "#helpers/packages/sherif.ts"
+import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
   command: "monorepo",
   describe: "Lint and automatically fix monorepo-specific issues using Sherif",
   builder: (yargs) => yargs,
   handler: async () => {
-    try {
-      const packageManager = await getPackageManagerName()
+    const result = await safeTry(async function* () {
+      const packageManager = yield* getPackageManagerName()
 
-      execSync(dlxCommand(packageManager, "sherif", { args: ["--fix"] }), {
+      const args = ["--fix"]
+
+      const command = dlxCommand(packageManager, sherif.name, { args })
+
+      yield* runCommand(command, {
         stdio: "inherit",
       })
-    } catch (error) {
-      handleCommandError(error)
+
+      return ok(undefined)
+    })
+
+    if (result.isOk()) {
+      return
     }
+
+    const error = result.error
+
+    log.error(`Failed while linting monorepo: ${error.flatten()}`)
+
+    cancel("Failed to run Adamantite")
   },
 })

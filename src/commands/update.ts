@@ -1,8 +1,12 @@
 import { confirm, intro, isCancel, log, outro, spinner } from "@clack/prompts"
-import { defineCommand } from "citty"
 import { addDevDependency } from "nypm"
-import { getTitle, handleCommandError, readPackageJson } from "../utils"
-import { biome, sherif } from "./helpers"
+import { biome, sherif } from "#commands/helpers.ts"
+import {
+  defineCommand,
+  getTitle,
+  handleCommandError,
+  readPackageJson,
+} from "#utils.ts"
 
 interface DependencyUpdate {
   name: string
@@ -122,11 +126,10 @@ async function confirmUpdate(updates: DependencyUpdate[]): Promise<boolean> {
 }
 
 export default defineCommand({
-  meta: {
-    name: "update",
-    description: "Update adamantite dependencies to latest compatible versions",
-  },
-  run: async () => {
+  command: "update",
+  describe: "Update adamantite dependencies to latest compatible versions",
+  builder: (yargs) => yargs,
+  handler: async () => {
     intro(getTitle())
 
     try {

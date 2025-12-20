@@ -1,32 +1,33 @@
 import { execSync } from "node:child_process"
-import { defineCommand } from "citty"
 import { dlxCommand } from "nypm"
-import { getPackageManagerName, handleCommandError } from "../utils"
+import {
+  defineCommand,
+  getPackageManagerName,
+  handleCommandError,
+} from "#utils.ts"
 
 export default defineCommand({
-  meta: {
-    name: "ci",
-    description: "Run Adamantite in a CI environment",
-  },
-  args: {
-    monorepo: {
-      description: "Run additional monorepo-specific checks",
-      type: "boolean",
-    },
-    github: {
-      description: "Use GitHub reporter",
-      type: "boolean",
-    },
-  },
-  run: async ({ args }) => {
+  command: "ci",
+  describe: "Run Adamantite in a CI environment",
+  builder: (yargs) =>
+    yargs
+      .option("monorepo", {
+        type: "boolean",
+        description: "Run additional monorepo-specific checks",
+      })
+      .option("github", {
+        type: "boolean",
+        description: "Use GitHub reporter",
+      }),
+  handler: async (argv) => {
     try {
       const packageManager = await getPackageManagerName()
       const tools = [
         {
           package: "@biomejs/biome",
-          args: ["ci", ...(args.github ? ["--reporter", "github"] : [])],
+          args: ["ci", ...(argv.github ? ["--reporter", "github"] : [])],
         },
-        ...(args.monorepo ? [{ package: "sherif", args: [] }] : []),
+        ...(argv.monorepo ? [{ package: "sherif", args: [] }] : []),
       ]
       for (const tool of tools) {
         execSync(

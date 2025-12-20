@@ -3,9 +3,10 @@ import { join } from "node:path"
 import defu from "defu"
 import { parse } from "jsonc-parser"
 import type { JsonValue } from "type-fest"
-import { checkIfExists } from "../utils"
+import { checkIfExists } from "#utils.ts"
 
 interface InitializationHelper {
+  name: string
   version?: string
   config: Record<string, JsonValue>
   exists: () => Promise<boolean>
@@ -15,6 +16,7 @@ interface InitializationHelper {
 }
 
 export const tsconfig = {
+  name: "tsconfig",
   config: { extends: "adamantite/tsconfig" },
   async exists() {
     return await checkIfExists(join(process.cwd(), "tsconfig.json"))
@@ -42,6 +44,7 @@ export const tsconfig = {
 } satisfies InitializationHelper
 
 export const biome = {
+  name: "@biomejs/biome",
   version: "2.3.10",
   config: {
     // Ensures that the schema always matches the installed version of Biome
@@ -89,6 +92,7 @@ export const biome = {
 } satisfies InitializationHelper
 
 export const vscode = {
+  name: ".vscode",
   config: {
     "typescript.tsdk": "node_modules/typescript/lib",
     "editor.formatOnSave": true,

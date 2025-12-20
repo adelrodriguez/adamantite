@@ -1,15 +1,16 @@
 import { execSync } from "node:child_process"
-import { defineCommand } from "citty"
 import { dlxCommand } from "nypm"
-import { getPackageManagerName, handleCommandError } from "../utils"
+import {
+  defineCommand,
+  getPackageManagerName,
+  handleCommandError,
+} from "#utils.ts"
 
 export default defineCommand({
-  meta: {
-    name: "monorepo",
-    description:
-      "Lint and automatically fix monorepo-specific issues using Sherif",
-  },
-  run: async () => {
+  command: "monorepo",
+  describe: "Lint and automatically fix monorepo-specific issues using Sherif",
+  builder: (yargs) => yargs,
+  handler: async () => {
     try {
       const packageManager = await getPackageManagerName()
 

@@ -3,7 +3,7 @@ import Bun from "bun"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { biome, tsconfig, vscode } from "../src/commands/helpers"
+import { biome, tsconfig, vscode } from "#commands/helpers.ts"
 
 describe("helpers integration", () => {
   let tempDir: string

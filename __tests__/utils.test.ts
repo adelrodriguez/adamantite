@@ -4,7 +4,7 @@ import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
-import { checkIfExists, readPackageJson, writePackageJson } from "../src/utils"
+import { checkIfExists, readPackageJson, writePackageJson } from "#utils.ts"
 
 // Mock spawnSync for testing
 mock.module("node:child_process", () => ({

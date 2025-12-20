@@ -10,15 +10,15 @@ import {
   outro,
   spinner,
 } from "@clack/prompts"
-import { defineCommand } from "citty"
 import { addDevDependency } from "nypm"
+import { biome, sherif, tsconfig, vscode } from "#commands/helpers.ts"
 import {
   checkIfExists,
+  defineCommand,
   getTitle,
   readPackageJson,
   writePackageJson,
-} from "../utils"
-import { biome, sherif, tsconfig, vscode } from "./helpers"
+} from "#utils.ts"
 
 async function checkIsMonorepo() {
   const cwd = process.cwd()
@@ -199,11 +199,10 @@ async function installDependencies(options?: { monorepo?: boolean }) {
 }
 
 export default defineCommand({
-  meta: {
-    name: "init",
-    description: "Initialize Adamantite in the current directory",
-  },
-  run: async () => {
+  command: "init",
+  describe: "Initialize Adamantite in the current directory",
+  builder: (yargs) => yargs,
+  handler: async () => {
     intro(getTitle())
 
     try {

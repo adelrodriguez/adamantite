@@ -1,27 +1,23 @@
-import { defineCommand, runMain } from "citty"
-import check from "./commands/check"
-import ci from "./commands/ci"
-import fix from "./commands/fix"
-import init from "./commands/init"
-import monorepo from "./commands/monorepo"
-import update from "./commands/update"
-import version from "./version"
+import yargs from "yargs"
+import { hideBin } from "yargs/helpers"
+import check from "#commands/check.ts"
+import ci from "#commands/ci.ts"
+import fix from "#commands/fix.ts"
+import init from "#commands/init.ts"
+import monorepo from "#commands/monorepo.ts"
+import update from "#commands/update.ts"
+import version from "#version.ts"
 
-const main = defineCommand({
-  meta: {
-    name: "adamantite",
-    description:
-      "An opinionated set of presets for modern TypeScript applications",
-    version,
-  },
-  subCommands: {
-    check,
-    ci,
-    fix,
-    init,
-    monorepo,
-    update,
-  },
-})
-
-void runMain(main)
+yargs(hideBin(process.argv))
+  .scriptName("adamantite")
+  .version(version)
+  .command(check)
+  .command(ci)
+  .command(fix)
+  .command(init)
+  .command(monorepo)
+  .command(update)
+  .demandCommand(1)
+  .strict()
+  .help()
+  .parse()

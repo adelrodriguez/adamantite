@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import Bun from "bun"
 import { join } from "node:path"
-import { biome, sherif, tsconfig, vscode } from "../src/commands/helpers"
-import { readPackageJson } from "../src/utils"
+import { biome, sherif, tsconfig, vscode } from "#commands/helpers.ts"
+import { readPackageJson } from "#utils.ts"
 
 const SEMVER_REGEX = /^\d+\.\d+\.\d+$/
 const SEMVER_RANGE_REGEX = /[\^~><=]/

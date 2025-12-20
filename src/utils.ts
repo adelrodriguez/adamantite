@@ -4,6 +4,13 @@ import process from "node:process"
 import { cancel } from "@clack/prompts"
 import { detectPackageManager } from "nypm"
 import type { PackageJson } from "type-fest"
+import type { CommandModule } from "yargs"
+
+export function defineCommand<T, U>(
+  input: CommandModule<T, U>
+): CommandModule<T, U> {
+  return input
+}
 
 export async function getPackageManagerName() {
   const result = await detectPackageManager(process.cwd())

@@ -33,7 +33,7 @@ export const tsconfig = {
       )
       const existingConfig = yield* parseJson(tsconfigFile)
 
-      const newConfig = yield* mergeConfig([tsconfig.config, existingConfig], {
+      const newConfig = yield* mergeConfig(tsconfig.config, existingConfig, {
         path: join(process.cwd(), "tsconfig.json"),
         configName: "TypeScript",
       })

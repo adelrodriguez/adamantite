@@ -85,7 +85,7 @@ export const biome = {
       }
 
       // Merge other config properties (like $schema) - our config overrides existing
-      const mergedConfig = yield* mergeConfig([biome.config, newConfig], {
+      const mergedConfig = yield* mergeConfig(biome.config, newConfig, {
         path: exists.path,
         configName: "Biome",
       })

@@ -1,5 +1,17 @@
 # adamantite
 
+## 0.14.1
+
+### Patch Changes
+
+- f2a9cd1: Migrate build tool from tsdown to bunup
+
+  Updates the build configuration to use bunup instead of tsdown for bundling the CLI. This is an internal tooling change that improves build performance and aligns with Bun's ecosystem, with no impact on the public API or CLI functionality.
+
+- 9c4ba8c: Improve error handling across CLI commands
+
+  Enhances error handling in all CLI commands by adding proper error logging for package manager detection failures and improving user cancellation handling in interactive prompts. Commands now display clearer error messages when package manager detection fails or when users cancel interactive operations, making troubleshooting easier and providing better user experience.
+
 ## 0.14.0
 
 ### Minor Changes

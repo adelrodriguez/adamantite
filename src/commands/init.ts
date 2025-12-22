@@ -28,45 +28,49 @@ export default defineCommand({
 
       const isMonorepo = packageJson.workspaces !== undefined || hasPnpmWorkspace
 
-      const shouldInstallScripts = yield* fromSafePromise(
+      const shouldInstallScriptsResponse = yield* fromSafePromise(
         confirm({
           message: "Do you want to add the `check` and `fix` scripts to your `package.json`?",
         })
       )
 
-      if (isCancel(shouldInstallScripts)) {
+      if (isCancel(shouldInstallScriptsResponse)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
+
+      const shouldInstallScripts = shouldInstallScriptsResponse
 
       let shouldInstallMonorepoScripts = false
 
       if (isMonorepo) {
-        const shouldInstallMonorepoScriptsConfirmation = yield* fromSafePromise(
+        const shouldInstallMonorepoScriptsResponse = yield* fromSafePromise(
           confirm({
             message:
               "We've detected a monorepo setup in your project. Would you like to install monorepo linting scripts?",
           })
         )
 
-        if (isCancel(shouldInstallMonorepoScriptsConfirmation)) {
+        if (isCancel(shouldInstallMonorepoScriptsResponse)) {
           return err(Fault.create("OPERATION_CANCELLED"))
         }
 
-        shouldInstallMonorepoScripts = shouldInstallMonorepoScriptsConfirmation
+        shouldInstallMonorepoScripts = shouldInstallMonorepoScriptsResponse
       }
 
-      const shouldInstallTypeScriptPreset = yield* fromSafePromise(
+      const shouldInstallTypeScriptPresetResponse = yield* fromSafePromise(
         confirm({
           message:
             "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?",
         })
       )
 
-      if (isCancel(shouldInstallTypeScriptPreset)) {
+      if (isCancel(shouldInstallTypeScriptPresetResponse)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
-      const selectedEditors = yield* fromSafePromise(
+      const shouldInstallTypeScriptPreset = shouldInstallTypeScriptPresetResponse
+
+      const selectedEditorsResponse = yield* fromSafePromise(
         multiselect({
           message: "Which editors do you want to configure (recommended)?",
           options: [
@@ -77,9 +81,11 @@ export default defineCommand({
         })
       )
 
-      if (isCancel(selectedEditors)) {
+      if (isCancel(selectedEditorsResponse)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
+
+      const selectedEditors = selectedEditorsResponse
 
       // =============================== ADD DEPENDENCIES ===============================
       const installingDependencies = spinner()

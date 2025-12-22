@@ -6,11 +6,11 @@ import fix from "#commands/fix.ts"
 import init from "#commands/init.ts"
 import monorepo from "#commands/monorepo.ts"
 import update from "#commands/update.ts"
-import version from "#version.ts"
+import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
 yargs(hideBin(process.argv))
   .scriptName("adamantite")
-  .version(version)
+  .version(getPackageVersion())
   .command(check)
   .command(ci)
   .command(fix)

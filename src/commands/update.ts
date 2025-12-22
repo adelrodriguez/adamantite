@@ -11,12 +11,12 @@ export default defineCommand({
   command: "update",
   describe: "Update adamantite dependencies to latest compatible versions",
   builder: (yargs) => yargs,
-  handler: async () => {
-    intro(getTitle())
-
-    const result = await safeTry(async function* () {
+  handler: async () =>
+    safeTry(async function* () {
       // Read package.json using yield*
       const packageJson = yield* readPackageJson()
+
+      intro(getTitle())
 
       // Detect updates needed
       const updates: {
@@ -58,7 +58,11 @@ export default defineCommand({
         confirm({
           message: "Do you want to proceed with these updates?",
         })
-      ).andThen((r) => (isCancel(r) ? err(Fault.create("OPERATION_CANCELLED")) : ok(r)))
+      )
+
+      if (isCancel(shouldUpdate)) {
+        return err(Fault.create("OPERATION_CANCELLED"))
+      }
 
       if (!shouldUpdate) {
         return ok("cancelled" as const)
@@ -78,28 +82,33 @@ export default defineCommand({
 
       s.stop("Dependencies updated successfully")
       return ok("updated" as const)
-    })
+    }).match(
+      (value) => {
+        if (value === "no-updates") {
+          outro("💠 No updates needed")
+        } else if (value === "cancelled") {
+          outro("💠 Update cancelled")
+        } else if (value === "updated") {
+          outro("💠 Dependencies updated successfully!")
+        }
 
-    // Unified error handling at the end
-    if (result.isOk()) {
-      if (result.value === "no-updates") {
-        outro("💠 No updates needed")
-      } else if (result.value === "cancelled") {
-        outro("💠 Update cancelled")
-      } else if (result.value === "updated") {
-        outro("💠 Dependencies updated successfully!")
+        process.exit(0)
+      },
+      (error) => {
+        if (Fault.isFault(error) && error.tag === "OPERATION_CANCELLED") {
+          cancel("You've cancelled the update process.")
+          process.exit(0)
+          return
+        }
+
+        if (Fault.isFault(error)) {
+          log.error(error.flatten())
+        } else {
+          log.error(String(error))
+        }
+
+        cancel("Failed to update dependencies")
+        process.exit(1)
       }
-
-      return
-    }
-
-    if (result.error.tag === "OPERATION_CANCELLED") {
-      cancel("You've cancelled the update process.")
-      return
-    }
-
-    log.error(result.error.message)
-    cancel("Failed to update dependencies")
-    process.exit(1)
-  },
+    ),
 })

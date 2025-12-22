@@ -19,23 +19,19 @@ export const runCommand = fromThrowable(execSync, (error) =>
 )
 
 export const getPackageManagerName = () =>
-  fromPromise(detectPackageManager(process.cwd()), () =>
-    Fault.create("NO_PACKAGE_MANAGER").withDescription(
-      "Error while detecting the package manager.",
-      "We're unable to detect the package manager used in this project."
+  fromPromise(
+    detectPackageManager(process.cwd()),
+    () => "Failed to detect package manager" as const
+  )
+    .andThen((result) =>
+      result ? ok(result.name) : err("Failed to resolve package manager" as const)
     )
-  ).andThen((result) => {
-    if (!result) {
-      return err(
-        Fault.create("NO_PACKAGE_MANAGER").withDescription(
-          "No package manager detected.",
-          "We're unable to detect the package manager used in this project."
-        )
+    .mapErr((message) =>
+      Fault.create("NO_PACKAGE_MANAGER").withDescription(
+        message,
+        "We're unable to detect the package manager used in this project. Please ensure you have a package.json file in the current directory."
       )
-    }
-
-    return ok(result.name)
-  })
+    )
 
 export const checkIfExists = (path: string) =>
   fromPromise(access(path), () => new Error("File not found")).match(

@@ -16,11 +16,14 @@ export default defineCommand({
   describe: "Initialize Adamantite in the current directory",
   builder: (yargs) => yargs,
   handler: async () => {
-    intro(getTitle())
     const cwd = process.cwd()
 
-    const result = await safeTry(async function* () {
+    return safeTry(async function* () {
+      // Check first if we are in a project with a package.json file
       let packageJson = yield* readPackageJson()
+
+      intro(getTitle())
+
       const hasPnpmWorkspace = await checkIfExists(join(process.cwd(), "pnpm-workspace.yaml"))
 
       const isMonorepo = packageJson.workspaces !== undefined || hasPnpmWorkspace
@@ -29,23 +32,39 @@ export default defineCommand({
         confirm({
           message: "Do you want to add the `check` and `fix` scripts to your `package.json`?",
         })
-      ).andThen((r) => (isCancel(r) ? err(Fault.create("OPERATION_CANCELLED")) : ok(r)))
+      )
 
-      const shouldInstallMonorepoScripts = isMonorepo
-        ? yield* fromSafePromise(
-            confirm({
-              message:
-                "We've detected a monorepo setup in your project. Would you like to install monorepo linting scripts?",
-            })
-          ).andThen((r) => (isCancel(r) ? err(Fault.create("OPERATION_CANCELLED")) : ok(r)))
-        : false
+      if (isCancel(shouldInstallScripts)) {
+        return err(Fault.create("OPERATION_CANCELLED"))
+      }
+
+      let shouldInstallMonorepoScripts = false
+
+      if (isMonorepo) {
+        const shouldInstallMonorepoScriptsConfirmation = yield* fromSafePromise(
+          confirm({
+            message:
+              "We've detected a monorepo setup in your project. Would you like to install monorepo linting scripts?",
+          })
+        )
+
+        if (isCancel(shouldInstallMonorepoScriptsConfirmation)) {
+          return err(Fault.create("OPERATION_CANCELLED"))
+        }
+
+        shouldInstallMonorepoScripts = shouldInstallMonorepoScriptsConfirmation
+      }
 
       const shouldInstallTypeScriptPreset = yield* fromSafePromise(
         confirm({
           message:
             "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?",
         })
-      ).andThen((r) => (isCancel(r) ? err(Fault.create("OPERATION_CANCELLED")) : ok(r)))
+      )
+
+      if (isCancel(shouldInstallTypeScriptPreset)) {
+        return err(Fault.create("OPERATION_CANCELLED"))
+      }
 
       const selectedEditors = yield* fromSafePromise(
         multiselect({
@@ -56,7 +75,11 @@ export default defineCommand({
           ],
           required: false,
         })
-      ).andThen((r) => (isCancel(r) ? err(Fault.create("OPERATION_CANCELLED")) : ok(r)))
+      )
+
+      if (isCancel(selectedEditors)) {
+        return err(Fault.create("OPERATION_CANCELLED"))
+      }
 
       // =============================== ADD DEPENDENCIES ===============================
       const installingDependencies = spinner()
@@ -189,20 +212,27 @@ export default defineCommand({
       }
 
       return ok()
-    })
+    }).match(
+      () => {
+        outro("💠 Adamantite initialized successfully!")
+        process.exit(0)
+      },
+      (error) => {
+        if (Fault.isFault(error) && error.tag === "OPERATION_CANCELLED") {
+          cancel("You've cancelled the initialization process.")
+          process.exit(0)
+          return
+        }
 
-    if (result.isOk()) {
-      outro("💠 Adamantite initialized successfully!")
-      return
-    }
+        if (Fault.isFault(error)) {
+          log.error(error.flatten())
+        } else {
+          log.error(String(error))
+        }
 
-    if (result.error.tag === "OPERATION_CANCELLED") {
-      cancel("You've cancelled the initialization process.")
-      return
-    }
-
-    log.error(result.error.message)
-    cancel("Failed to initialize Adamantite")
-    process.exit(1)
+        cancel("Failed to initialize Adamantite")
+        process.exit(1)
+      }
+    )
   },
 })

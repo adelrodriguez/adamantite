@@ -1,4 +1,6 @@
 import process from "node:process"
+import { log } from "@clack/prompts"
+import { Fault } from "faultier"
 import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
 import { biome } from "#helpers/packages/biome.ts"
@@ -43,6 +45,10 @@ export default defineCommand({
 
     if (result.isOk()) {
       return
+    }
+
+    if (Fault.isFault(result.error) && result.error.tag !== "NO_PACKAGE_MANAGER") {
+      log.error(result.error.flatten())
     }
 
     process.exit(1)

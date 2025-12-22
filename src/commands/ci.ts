@@ -20,7 +20,7 @@ export default defineCommand({
         type: "boolean",
         description: "Use GitHub reporter",
       }),
-  handler: async (argv) =>
+  handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 

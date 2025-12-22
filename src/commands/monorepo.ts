@@ -10,7 +10,7 @@ export default defineCommand({
   command: "monorepo",
   describe: "Lint and automatically fix monorepo-specific issues using Sherif",
   builder: (yargs) => yargs,
-  handler: async () =>
+  handler: () =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 

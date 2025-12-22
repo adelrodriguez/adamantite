@@ -15,16 +15,16 @@ export default defineCommand({
   command: "init",
   describe: "Initialize Adamantite in the current directory",
   builder: (yargs) => yargs,
-  handler: async () => {
-    const cwd = process.cwd()
+  handler: () =>
+    safeTry(async function* () {
+      const cwd = process.cwd()
 
-    return safeTry(async function* () {
       // Check first if we are in a project with a package.json file
       let packageJson = yield* readPackageJson()
 
       intro(getTitle())
 
-      const hasPnpmWorkspace = await checkIfExists(join(process.cwd(), "pnpm-workspace.yaml"))
+      const hasPnpmWorkspace = await checkIfExists(join(cwd, "pnpm-workspace.yaml"))
 
       const isMonorepo = packageJson.workspaces !== undefined || hasPnpmWorkspace
 
@@ -221,7 +221,6 @@ export default defineCommand({
         if (Fault.isFault(error) && error.tag === "OPERATION_CANCELLED") {
           cancel("You've cancelled the initialization process.")
           process.exit(0)
-          return
         }
 
         if (Fault.isFault(error)) {
@@ -233,6 +232,5 @@ export default defineCommand({
         cancel("Failed to initialize Adamantite")
         process.exit(1)
       }
-    )
-  },
+    ),
 })

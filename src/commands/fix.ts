@@ -20,7 +20,7 @@ export default defineCommand({
         type: "boolean",
         description: "Apply unsafe fixes",
       }),
-  handler: async (argv) =>
+  handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 

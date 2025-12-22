@@ -20,7 +20,7 @@ export default defineCommand({
         type: "boolean",
         description: "Show summary of lint results",
       }),
-  handler: async (argv) =>
+  handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 

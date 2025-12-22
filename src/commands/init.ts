@@ -28,17 +28,15 @@ export default defineCommand({
 
       const isMonorepo = packageJson.workspaces !== undefined || hasPnpmWorkspace
 
-      const shouldInstallScriptsResponse = yield* fromSafePromise(
+      const shouldInstallScripts = yield* fromSafePromise(
         confirm({
           message: "Do you want to add the `check` and `fix` scripts to your `package.json`?",
         })
       )
 
-      if (isCancel(shouldInstallScriptsResponse)) {
+      if (isCancel(shouldInstallScripts)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
-
-      const shouldInstallScripts = shouldInstallScriptsResponse
 
       let shouldInstallMonorepoScripts = false
 
@@ -57,20 +55,18 @@ export default defineCommand({
         shouldInstallMonorepoScripts = shouldInstallMonorepoScriptsResponse
       }
 
-      const shouldInstallTypeScriptPresetResponse = yield* fromSafePromise(
+      const shouldInstallTypeScriptPreset = yield* fromSafePromise(
         confirm({
           message:
             "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?",
         })
       )
 
-      if (isCancel(shouldInstallTypeScriptPresetResponse)) {
+      if (isCancel(shouldInstallTypeScriptPreset)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
-      const shouldInstallTypeScriptPreset = shouldInstallTypeScriptPresetResponse
-
-      const selectedEditorsResponse = yield* fromSafePromise(
+      const selectedEditors = yield* fromSafePromise(
         multiselect({
           message: "Which editors do you want to configure (recommended)?",
           options: [
@@ -81,11 +77,9 @@ export default defineCommand({
         })
       )
 
-      if (isCancel(selectedEditorsResponse)) {
+      if (isCancel(selectedEditors)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
-
-      const selectedEditors = selectedEditorsResponse
 
       // =============================== ADD DEPENDENCIES ===============================
       const installingDependencies = spinner()

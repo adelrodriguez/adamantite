@@ -18,7 +18,7 @@ export default defineCommand({
   handler: async () => {
     const cwd = process.cwd()
 
-    const result = await safeTry(async function* () {
+    return safeTry(async function* () {
       // Check first if we are in a project with a package.json file
       let packageJson = yield* readPackageJson()
 
@@ -218,20 +218,27 @@ export default defineCommand({
       }
 
       return ok()
-    })
+    }).match(
+      () => {
+        outro("💠 Adamantite initialized successfully!")
+        process.exit(0)
+      },
+      (error) => {
+        if (Fault.isFault(error) && error.tag === "OPERATION_CANCELLED") {
+          cancel("You've cancelled the initialization process.")
+          process.exit(0)
+          return
+        }
 
-    if (result.isOk()) {
-      outro("💠 Adamantite initialized successfully!")
-      return
-    }
+        if (Fault.isFault(error)) {
+          log.error(error.flatten())
+        } else {
+          log.error(String(error))
+        }
 
-    if (result.error.tag === "OPERATION_CANCELLED") {
-      cancel("You've cancelled the initialization process.")
-      return
-    }
-
-    log.error(result.error.message)
-    cancel("Failed to initialize Adamantite")
-    process.exit(1)
+        cancel("Failed to initialize Adamantite")
+        process.exit(1)
+      }
+    )
   },
 })

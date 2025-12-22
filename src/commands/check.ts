@@ -20,8 +20,8 @@ export default defineCommand({
         type: "boolean",
         description: "Show summary of lint results",
       }),
-  handler: async (argv) => {
-    const result = await safeTry(async function* () {
+  handler: async (argv) =>
+    safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 
       const args = ["check"]
@@ -39,16 +39,17 @@ export default defineCommand({
       yield* runCommand(command, { stdio: "inherit" })
 
       return ok(undefined)
-    })
+    }).match(
+      () => {
+        // Exit the process with success code
+        process.exit(0)
+      },
+      (error) => {
+        if (Fault.isFault(error) && error.tag === "NO_PACKAGE_MANAGER") {
+          log.error(error.flatten())
+        }
 
-    if (result.isOk()) {
-      return
-    }
-
-    if (Fault.isFault(result.error) && result.error.tag === "NO_PACKAGE_MANAGER") {
-      log.error(result.error.flatten())
-    }
-
-    process.exit(1)
-  },
+        process.exit(1)
+      }
+    ),
 })

@@ -91,20 +91,20 @@ bun test __tests__/cli.test.ts
 Example test structure:
 
 ```typescript
-import { test, expect, describe } from "bun:test";
+import { test, expect, describe } from "bun:test"
 
 describe("feature name", () => {
   test("should do something specific", () => {
     // Arrange
-    const input = "test input";
+    const input = "test input"
 
     // Act
-    const result = yourFunction(input);
+    const result = yourFunction(input)
 
     // Assert
-    expect(result).toBe("expected output");
-  });
-});
+    expect(result).toBe("expected output")
+  })
+})
 ```
 
 ## 📝 Code Standards

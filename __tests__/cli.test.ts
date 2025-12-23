@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import Bun, { spawn } from "bun"
 import { join } from "node:path"
+import Bun, { spawn } from "bun"
 
 const LOG_PREFIX_REGEX = /^\[log\]\s*/
 

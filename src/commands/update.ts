@@ -4,8 +4,9 @@ import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
 import { biome } from "#helpers/packages/biome.ts"
+import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
-import { defineCommand, printTitle, readPackageJson } from "#utils.ts"
+import { defineCommand, normalizeDependencyVersion, printTitle, readPackageJson } from "#utils.ts"
 
 export default defineCommand({
   command: "update",
@@ -27,9 +28,9 @@ export default defineCommand({
         isDevDependency: boolean
       }[] = []
 
-      for (const pkg of [biome, sherif]) {
+      for (const pkg of [biome, oxfmt, sherif]) {
         const dependency = packageJson.devDependencies?.[pkg.name]
-        if (dependency && dependency !== pkg.version) {
+        if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
           updates.push({
             name: pkg.name,
             currentVersion: dependency,

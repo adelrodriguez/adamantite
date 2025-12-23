@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import Bun from "bun"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import Bun from "bun"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
 import { tsconfig } from "#helpers/tsconfig.ts"
@@ -418,7 +418,7 @@ describe("helpers integration", () => {
         config[
           "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]"
         ]["editor.defaultFormatter"]
-      ).toBe("biomejs.biome")
+      ).toBe("oxc.oxc-vscode")
     })
 
     test("should update existing .vscode/settings.json config", async () => {
@@ -480,7 +480,7 @@ describe("helpers integration", () => {
         config[
           "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]"
         ]["editor.defaultFormatter"]
-      ).toBe("biomejs.biome")
+      ).toBe("oxc.oxc-vscode")
     })
 
     test("should handle create() failure when directory creation fails", async () => {

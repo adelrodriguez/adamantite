@@ -1,15 +1,17 @@
+import type { PackageJson } from "type-fest"
+
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
-import Bun from "bun"
 import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PackageJson } from "type-fest"
+import Bun from "bun"
 import {
   checkIfExists,
   checkIsMonorepo,
   defineCommand,
   getPackageManagerName,
   mergeConfig,
+  normalizeDependencyVersion,
   parseJson,
   printTitle,
   readPackageJson,
@@ -17,11 +19,20 @@ import {
 } from "#utils.ts"
 
 // Mock spawnSync for testing
+let spawnSyncResult: {
+  status?: number
+  error?: Error | null
+  stdout?: string | Buffer | null
+  stderr?: string | Buffer | null
+} = {
+  status: 0,
+  error: null,
+  stdout: Buffer.from(""),
+  stderr: Buffer.from(""),
+}
+
 mock.module("node:child_process", () => ({
-  spawnSync: mock(() => ({
-    status: 0,
-    error: null,
-  })),
+  spawnSync: mock(() => spawnSyncResult),
 }))
 
 describe("utils", () => {
@@ -29,6 +40,14 @@ describe("utils", () => {
   let originalCwd: string
 
   beforeEach(() => {
+    // Reset spawnSync mock result
+    spawnSyncResult = {
+      status: 0,
+      error: null,
+      stdout: Buffer.from(""),
+      stderr: Buffer.from(""),
+    }
+
     // Create a temporary directory for each test
     testDir = join(tmpdir(), `adamantite-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(testDir, { recursive: true })
@@ -121,7 +140,10 @@ describe("utils", () => {
       const result = parseJson(validJson)
 
       expect(result.isOk()).toBe(true)
-      expect(result._unsafeUnwrap()).toEqual({ name: "test", version: "1.0.0" })
+      expect(result._unsafeUnwrap()).toEqual({
+        name: "test",
+        version: "1.0.0",
+      })
     })
 
     test("should parse valid JSONC with comments", () => {
@@ -133,7 +155,10 @@ describe("utils", () => {
       const result = parseJson(jsonc)
 
       expect(result.isOk()).toBe(true)
-      expect(result._unsafeUnwrap()).toEqual({ name: "test", version: "1.0.0" })
+      expect(result._unsafeUnwrap()).toEqual({
+        name: "test",
+        version: "1.0.0",
+      })
     })
 
     test("should return error for invalid JSON", () => {
@@ -233,17 +258,11 @@ describe("utils", () => {
       expect(result.isOk()).toBe(true)
     })
 
-    test("should return the command output", () => {
-      const result = runCommand("echo hello world")
-
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        const output = result.value.toString()
-        expect(output).toContain("hello world")
-      }
-    })
-
     test("should return error with FAILED_TO_RUN_COMMAND tag for invalid command", () => {
+      spawnSyncResult = {
+        error: new Error("spawn nonexistent-command-12345 ENOENT"),
+      }
+
       const result = runCommand("nonexistent-command-12345")
 
       expect(result.isErr()).toBe(true)
@@ -417,6 +436,70 @@ describe("utils", () => {
       printTitle()
 
       expect(callCount).toBe(0)
+    })
+  })
+
+  describe("runCommand", () => {
+    test("should return ok when command succeeds", () => {
+      spawnSyncResult = {
+        status: 0,
+        error: null,
+        stdout: null,
+        stderr: null,
+      }
+
+      const result = runCommand("echo success")
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value.status).toBe(0)
+      }
+    })
+
+    test("should return err when command fails with non-zero status", () => {
+      spawnSyncResult = {
+        status: 1,
+        error: null,
+        stdout: null,
+        stderr: null,
+      }
+
+      const result = runCommand("exit 1")
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("FAILED_TO_RUN_COMMAND")
+        expect(result.error.message).toBe("An unknown error occurred while running the command")
+        expect(result.error.debug).toContain(
+          "Failed to run command: An unknown error occurred while running the command"
+        )
+      }
+    })
+
+    test("should return err when spawn fails", () => {
+      spawnSyncResult = {
+        error: new Error("spawn failed"),
+      }
+
+      const result = runCommand("invalid-command")
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("FAILED_TO_RUN_COMMAND")
+        expect(result.error.message).toBe("spawn failed")
+      }
+    })
+  })
+
+  describe("normalizeDependencyVersion", () => {
+    test("should strip caret and tilde prefixes", () => {
+      expect(normalizeDependencyVersion("^0.20.0")).toBe("0.20.0")
+      expect(normalizeDependencyVersion("~0.20.0")).toBe("0.20.0")
+    })
+
+    test("should preserve exact versions", () => {
+      expect(normalizeDependencyVersion("0.20.0")).toBe("0.20.0")
+    })
+
+    test("should trim whitespace and strip workspace prefix", () => {
+      expect(normalizeDependencyVersion("  workspace:^0.20.0  ")).toBe("0.20.0")
     })
   })
 })

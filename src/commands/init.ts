@@ -7,6 +7,7 @@ import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
+import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { tsconfig } from "#helpers/tsconfig.ts"
 import {
@@ -60,6 +61,30 @@ const setupBiomeConfig = () =>
     return ok()
   })
 
+const setupOxfmtConfig = () =>
+  safeTry(async function* () {
+    const spinner = p.spinner()
+    spinner.start("Setting up oxfmt config...")
+
+    const oxfmtPath = await oxfmt.exists()
+
+    if (oxfmtPath.path) {
+      spinner.message(`Found \`${oxfmtPath.path}\`, updating...`)
+
+      yield* oxfmt.update()
+
+      spinner.stop("oxfmt config updated successfully.")
+    } else {
+      spinner.message("`.oxfmtrc.jsonc` or `.oxfmtrc.json` not found, creating...")
+
+      yield* oxfmt.create()
+
+      spinner.stop("oxfmt config created successfully.")
+    }
+
+    return ok()
+  })
+
 const addScripts = (scripts: string[]) =>
   safeTry(async function* () {
     const cwd = process.cwd()
@@ -78,6 +103,9 @@ const addScripts = (scripts: string[]) =>
           break
         case "fix":
           packageJson.scripts.fix = "adamantite fix"
+          break
+        case "format":
+          packageJson.scripts.format = "adamantite format"
           break
         case "check:monorepo":
           packageJson.scripts["check:monorepo"] = "adamantite monorepo"
@@ -179,16 +207,20 @@ export default defineCommand({
           message: "Which scripts do you want to add to your `package.json`?",
           options: [
             {
-              label: "check - find issues in your code using Biome",
+              label: "check - find issues in code using Biome",
               value: "check",
               hint: "recommended",
             },
             {
-              label: "fix - fix issues and format your code using Biome",
+              label: "fix - fix code issues using Biome",
               value: "fix",
               hint: "recommended",
             },
-
+            {
+              label: "format - code formatting using oxfmt",
+              value: "format",
+              hint: "recommended",
+            },
             {
               label: "check:monorepo - check for monorepo-specific issues using Sherif",
               value: "check:monorepo",
@@ -236,6 +268,7 @@ export default defineCommand({
       }
 
       const hasBiome = scripts.includes("check") || scripts.includes("fix")
+      const hasOxfmt = scripts.includes("format")
       const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
 
       const dependencies = ["adamantite"]
@@ -244,11 +277,19 @@ export default defineCommand({
         dependencies.push(`${biome.name}@${biome.version}`)
       }
 
+      if (hasOxfmt) {
+        dependencies.push(`${oxfmt.name}@${oxfmt.version}`)
+      }
+
       if (hasSherif) {
         dependencies.push(`${sherif.name}@${sherif.version}`)
       }
 
       yield* installDependencies(dependencies)
+
+      if (hasOxfmt) {
+        yield* setupOxfmtConfig()
+      }
 
       if (hasBiome) {
         yield* setupBiomeConfig()

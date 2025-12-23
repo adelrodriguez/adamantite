@@ -26,9 +26,7 @@ export default defineCommand({
 
       const command = dlxCommand(packageManager, sherif.name, { args })
 
-      yield* runCommand(command, {
-        stdio: "inherit",
-      })
+      yield* runCommand(command)
 
       return ok(undefined)
     }).match(

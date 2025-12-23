@@ -3,42 +3,42 @@ import { log } from "@clack/prompts"
 import { Fault } from "faultier"
 import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
-import { biome } from "#helpers/packages/biome.ts"
+import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "fix [files..]",
-  describe: "Fix issues in code using Biome",
+  command: "format [files..]",
+  describe: "Format files using oxfmt",
   builder: (yargs) =>
     yargs
       .positional("files", {
-        describe: "Specific files to fix (optional)",
+        describe: "Specific files to format (optional)",
         type: "string",
         array: true,
       })
-      .option("unsafe", {
+      .option("check", {
         type: "boolean",
-        description: "Apply unsafe fixes",
+        description: "Check if files are formatted without writing",
       }),
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 
-      const args = ["check", "--write"]
+      const args: string[] = []
 
-      if (argv.unsafe) {
-        args.push("--unsafe")
+      if (argv.check) {
+        args.push("--check")
       }
 
       if (argv.files && argv.files.length > 0) {
         args.push(...argv.files)
       }
 
-      const command = dlxCommand(packageManager, biome.name, { args })
+      const command = dlxCommand(packageManager, oxfmt.name, { args })
 
-      yield* runCommand(command)
+      const result = yield* runCommand(command)
 
-      return ok()
+      return ok(result)
     }).match(
       () => {
         // Exit the process with success code

@@ -36,9 +36,9 @@ export default defineCommand({
 
       const command = dlxCommand(packageManager, biome.name, { args })
 
-      yield* runCommand(command, { stdio: "inherit" })
+      const result = yield* runCommand(command)
 
-      return ok(undefined)
+      return ok(result)
     }).match(
       () => {
         // Exit the process with success code

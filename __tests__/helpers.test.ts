@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
-import Bun from "bun"
 import { join } from "node:path"
+import Bun from "bun"
+import { parse } from "jsonc-parser"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
+import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { tsconfig } from "#helpers/tsconfig.ts"
 import { readPackageJson } from "#utils.ts"
@@ -35,7 +37,7 @@ describe("helpers", () => {
         .filter((line) => !line.trim().startsWith("//"))
         .join("\n")
 
-      const biomeConfig = JSON.parse(cleanedContent)
+      const biomeConfig = parse(cleanedContent)
       const schemaPath = biomeConfig.$schema
 
       expect(schemaPath).toBe(biome.config.$schema)
@@ -62,6 +64,24 @@ describe("helpers", () => {
     })
   })
 
+  describe("oxfmt", () => {
+    test("should define version as exact semver without range prefixes", () => {
+      const version = oxfmt.version
+
+      expect(typeof version).toBe("string")
+      expect(version).toMatch(SEMVER_REGEX)
+      expect(version).not.toMatch(SEMVER_RANGE_REGEX)
+    })
+
+    test("should match the version specified in package.json devDependencies", async () => {
+      const packageJsonResult = await readPackageJson(join(__dirname, ".."))
+      const packageJson = packageJsonResult._unsafeUnwrap()
+      const oxfmtInPackage = packageJson.devDependencies?.oxfmt
+
+      expect(oxfmtInPackage).toBe(oxfmt.version)
+    })
+  })
+
   describe("tsconfig", () => {
     test("should provide a config that extends adamantite tsconfig preset", () => {
       expect(tsconfig.config).toHaveProperty("extends")
@@ -77,7 +97,7 @@ describe("helpers", () => {
         ]
 
       expect(fileTypeConfig).toBeDefined()
-      expect(fileTypeConfig["editor.defaultFormatter"]).toBe("biomejs.biome")
+      expect(fileTypeConfig["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
     })
 
     test("should enable format on save and paste", () => {
@@ -89,7 +109,6 @@ describe("helpers", () => {
       const codeActions = vscode.config["editor.codeActionsOnSave"]
 
       expect(codeActions).toBeDefined()
-      expect(codeActions["source.organizeImports.biome"]).toBe("explicit")
       expect(codeActions["source.fixAll.biome"]).toBe("explicit")
     })
   })

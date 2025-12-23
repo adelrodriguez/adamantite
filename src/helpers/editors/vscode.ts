@@ -10,11 +10,10 @@ export const vscode = {
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.codeActionsOnSave": {
-      "source.organizeImports.biome": "explicit",
       "source.fixAll.biome": "explicit",
     },
     "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]": {
-      "editor.defaultFormatter": "biomejs.biome",
+      "editor.defaultFormatter": "oxc.oxc-vscode",
     },
   },
   exists: () => checkIfExists(join(process.cwd(), ".vscode", "settings.json")),

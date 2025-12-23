@@ -3,6 +3,6 @@
   "root": true,
   "extends": ["presets/biome.jsonc"],
   "linter": {
-    "rules": { "suspicious": { "useAwait": "off" } }
-  }
+    "rules": { "suspicious": { "useAwait": "off" } },
+  },
 }

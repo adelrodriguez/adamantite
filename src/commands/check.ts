@@ -8,7 +8,7 @@ import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
   command: "check [files..]",
-  describe: "Run Biome linter and check files for issues",
+  describe: "Find issues in code using Biome",
   builder: (yargs) =>
     yargs
       .positional("files", {

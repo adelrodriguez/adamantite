@@ -47,7 +47,7 @@ This project uses changesets for version management:
   - `check.ts` - Runs Biome linter to check for issues
   - `ci.ts` - Runs Adamantite in CI environments
   - `init.ts` - Initializes Adamantite configuration
-  - `monorepo.ts` - Runs monorepo-specific checks
+  - `monorepo.ts` - Runs monorepo-specific checks (use `--fix` to auto-fix issues)
   - `update.ts` - Updates Adamantite configuration
 - **`utils.ts`** - Shared utilities (package manager detection, error handling)
 - **`version.ts`** - Package version detection

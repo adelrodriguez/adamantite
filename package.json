@@ -21,10 +21,6 @@
   "license": "MIT",
   "author": "Adel Rodriguez <hello@adelrodriguez.com>",
   "type": "module",
-  "main": "presets/biome.jsonc",
-  "bin": {
-    "adamantite": "bin/adamantite"
-  },
   "imports": {
     "#*": "./src/*"
   },
@@ -33,6 +29,10 @@
     "./biome": "./presets/biome.jsonc",
     "./tsconfig": "./presets/tsconfig.json",
     "./presets/*": "./presets/*"
+  },
+  "main": "presets/biome.jsonc",
+  "bin": {
+    "adamantite": "bin/adamantite"
   },
   "files": [
     "bin",
@@ -47,12 +47,13 @@
     "fix": "bun --bun run src/index.ts fix",
     "release": "changeset publish",
     "test": "bun test",
+    "test:coverage": "bun test --coverage",
     "test:watch": "bun --watch test",
     "typecheck": "tsc --noEmit",
     "version": "changeset version"
   },
   "dependencies": {
-    "@clack/prompts": "0.11.0",
+    "@clack/prompts": "1.0.0-alpha.9",
     "defu": "6.1.4",
     "faultier": "^1.1.0",
     "jsonc-parser": "3.3.1",

@@ -107,6 +107,9 @@ const addScripts = (scripts: string[]) =>
         case "format":
           packageJson.scripts.format = "adamantite format"
           break
+        case "typecheck":
+          packageJson.scripts.typecheck = "tsc --noEmit"
+          break
         case "check:monorepo":
           packageJson.scripts["check:monorepo"] = "adamantite monorepo"
           break
@@ -222,6 +225,11 @@ export default defineCommand({
               hint: "recommended",
             },
             {
+              label: "typecheck - type-check your code using strict TypeScript preset",
+              value: "typecheck",
+              hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
+            },
+            {
               label: "check:monorepo - check for monorepo-specific issues using Sherif",
               value: "check:monorepo",
               hint: isMonorepo ? undefined : "available for monorepo projects",
@@ -238,17 +246,6 @@ export default defineCommand({
       )
 
       if (p.isCancel(scripts)) {
-        return err(Fault.create("OPERATION_CANCELLED"))
-      }
-
-      const typescriptPreset = yield* fromSafePromise(
-        p.confirm({
-          message:
-            "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?",
-        })
-      )
-
-      if (p.isCancel(typescriptPreset)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
@@ -270,6 +267,7 @@ export default defineCommand({
       const hasBiome = scripts.includes("check") || scripts.includes("fix")
       const hasOxfmt = scripts.includes("format")
       const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
+      const hasTypecheck = scripts.includes("typecheck")
 
       const dependencies = ["adamantite"]
 
@@ -297,7 +295,7 @@ export default defineCommand({
 
       yield* addScripts(scripts)
 
-      if (typescriptPreset) {
+      if (hasTypecheck) {
         yield* setupTypescript()
       }
 

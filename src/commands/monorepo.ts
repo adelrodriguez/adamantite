@@ -8,13 +8,21 @@ import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
   command: "monorepo",
-  describe: "Lint and automatically fix monorepo-specific issues using Sherif",
-  builder: (yargs) => yargs,
-  handler: () =>
+  describe: "Find and fix monorepo-specific issues using Sherif",
+  builder: (yargs) =>
+    yargs.option("fix", {
+      type: "boolean",
+      description: "Automatically fix issues",
+    }),
+  handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 
-      const args = ["--fix"]
+      const args: string[] = []
+
+      if (argv.fix) {
+        args.push("--fix")
+      }
 
       const command = dlxCommand(packageManager, sherif.name, { args })
 

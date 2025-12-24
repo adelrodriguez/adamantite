@@ -5,7 +5,7 @@ import process from "node:process"
 import defu from "defu"
 import { Fault } from "faultier"
 import { type ParseError, parse } from "jsonc-parser"
-import { err, fromPromise, fromThrowable, ok } from "neverthrow"
+import { err, fromPromise, fromThrowable, ok, safeTry } from "neverthrow"
 import { detectPackageManager } from "nypm"
 import type { PackageJson } from "type-fest"
 import type { CommandModule } from "yargs"
@@ -76,25 +76,32 @@ export const readPackageJson = (cwd = process.cwd()) =>
     .andThen((content) => parseJson(content))
     .andThen((parsed) => ok(parsed as unknown as PackageJson))
 
-export function getTitle() {
-  const terminalWidth = process.stdout.columns || 80
+export const checkIsMonorepo = () =>
+  safeTry(async function* () {
+    const pnpmWorkspace = await checkIfExists(join(process.cwd(), "pnpm-workspace.yaml"))
 
-  if (terminalWidth >= 120) {
-    return `
-               █████                                                 █████     ███   █████            
-              ░░███                                                 ░░███     ░░░   ░░███             
-  ██████    ███████   ██████   █████████████    ██████   ████████   ███████   ████  ███████    ██████ 
- ░░░░░███  ███░░███  ░░░░░███ ░░███░░███░░███  ░░░░░███ ░░███░░███ ░░░███░   ░░███ ░░░███░    ███░░███
-  ███████ ░███ ░███   ███████  ░███ ░███ ░███   ███████  ░███ ░███   ░███     ░███   ░███    ░███████ 
- ███░░███ ░███ ░███  ███░░███  ░███ ░███ ░███  ███░░███  ░███ ░███   ░███ ███ ░███   ░███ ███░███░░░  
-░░████████░░████████░░████████ █████░███ █████░░████████ ████ █████  ░░█████  █████  ░░█████ ░░██████ 
- ░░░░░░░░  ░░░░░░░░  ░░░░░░░░ ░░░░░ ░░░ ░░░░░  ░░░░░░░░ ░░░░ ░░░░░    ░░░░░  ░░░░░    ░░░░░   ░░░░░░                   
+    if (pnpmWorkspace) {
+      return ok(true)
+    }
+
+    const packageJson = yield* readPackageJson()
+
+    return ok(packageJson?.workspaces !== undefined)
+  })
+
+const TITLE = `
+     o      ooooooooo      o      oooo     oooo      o      oooo   oooo ooooooooooo ooooo ooooooooooo ooooooooooo
+    888      888    88o   888      8888o   888      888      8888o  88  88  888  88  888  88  888  88  888    88 
+   8  88     888    888  8  88     88 888o8 88     8  88     88 888o88      888      888      888      888ooo8   
+  8oooo88    888    888 8oooo88    88  888  88    8oooo88    88   8888      888      888      888      888    oo 
+o88o  o888o o888ooo88 o88o  o888o o88o  8  o88o o88o  o888o o88o    88     o888o    o888o    o888o    o888ooo8888                                                                       
 `
+
+export function printTitle() {
+  const columns = TITLE.split("\n").reduce((max, line) => Math.max(max, line.trim().length), 0)
+
+  if (process.stdout.columns && process.stdout.columns >= columns) {
+    // biome-ignore lint/suspicious/noConsole: we're using console.log to print the title
+    console.log(TITLE)
   }
-
-  return `
-┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃                              ADAMANTITE                              ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-`
 }

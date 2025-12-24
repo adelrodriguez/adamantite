@@ -1,7 +1,7 @@
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
-import { cancel, confirm, intro, isCancel, log, multiselect, outro, spinner } from "@clack/prompts"
+import * as p from "@clack/prompts"
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
@@ -9,7 +9,150 @@ import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { tsconfig } from "#helpers/tsconfig.ts"
-import { checkIfExists, defineCommand, getTitle, readPackageJson } from "#utils.ts"
+import {
+  checkIsMonorepo,
+  defineCommand,
+  getPackageManagerName,
+  printTitle,
+  readPackageJson,
+} from "#utils.ts"
+
+const installDependencies = (packages: string[]) =>
+  safeTry(async function* () {
+    const s = p.spinner()
+    s.start("Installing dependencies...")
+    const isMonorepo = yield* checkIsMonorepo()
+
+    for (const pkg of packages) {
+      yield* fromPromise(addDevDependency(pkg, { silent: true, workspace: isMonorepo }), (error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_INSTALL_DEPENDENCY")
+          .withMessage(`Failed to install ${pkg}`)
+      )
+    }
+
+    s.stop("Dependencies installed.")
+
+    return ok()
+  })
+
+const setupBiomeConfig = () =>
+  safeTry(async function* () {
+    const spinner = p.spinner()
+    spinner.start("Setting up Biome config...")
+
+    const biomePath = await biome.exists()
+
+    if (biomePath.path) {
+      spinner.message(`Found \`${biomePath.path}\`, updating...`)
+
+      yield* biome.update()
+
+      spinner.stop("Biome config updated successfully.")
+    } else {
+      spinner.message("`.biome.jsonc` or `.biome.json` not found, creating...")
+
+      yield* biome.create()
+
+      spinner.stop("Biome config created successfully.")
+    }
+
+    return ok()
+  })
+
+const addScripts = (scripts: string[]) =>
+  safeTry(async function* () {
+    const cwd = process.cwd()
+    const packageJson = yield* readPackageJson()
+    const spinner = p.spinner()
+    spinner.start("Adding scripts to your `package.json`...")
+
+    if (!packageJson.scripts) {
+      packageJson.scripts = {}
+    }
+
+    for (const script of scripts) {
+      switch (script) {
+        case "check":
+          packageJson.scripts.check = "adamantite check"
+          break
+        case "fix":
+          packageJson.scripts.fix = "adamantite fix"
+          break
+        case "check:monorepo":
+          packageJson.scripts["check:monorepo"] = "adamantite monorepo"
+          break
+        case "fix:monorepo":
+          packageJson.scripts["fix:monorepo"] = "adamantite monorepo --fix"
+          break
+        default:
+          return err(Fault.create("UNKNOWN_SCRIPT").withContext({ script }))
+      }
+    }
+
+    yield* fromPromise(
+      writeFile(join(cwd, "package.json"), JSON.stringify(packageJson, null, 2)),
+      (error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_WRITE_FILE")
+          .withDescription(
+            "Failed to write package.json",
+            "We're unable to update the package.json file."
+          )
+          .withContext({ path: join(cwd, "package.json") })
+    )
+
+    spinner.stop("Scripts added to your `package.json`")
+
+    return ok()
+  })
+
+const setupTypescript = () =>
+  safeTry(async function* () {
+    const spinner = p.spinner()
+    spinner.start("Setting up TypeScript config...")
+
+    if (await tsconfig.exists()) {
+      spinner.message("`tsconfig.json` found, updating...")
+
+      yield* tsconfig.update()
+
+      spinner.stop("`tsconfig.json` updated successfully")
+    } else {
+      spinner.message("`tsconfig.json` not found, creating...")
+
+      yield* tsconfig.create()
+
+      spinner.stop("`tsconfig.json` created successfully")
+    }
+
+    return ok()
+  })
+
+const setupEditors = (editors: string[]) =>
+  safeTry(async function* () {
+    if (editors.includes("vscode")) {
+      const spinner = p.spinner()
+
+      spinner.start("Checking for `.vscode/settings.json`...")
+
+      if (await vscode.exists()) {
+        spinner.message("`.vscode/settings.json` found, updating...")
+        yield* vscode.update()
+        spinner.stop("`.vscode/settings.json` updated with Adamantite preset.")
+      } else {
+        spinner.message("`.vscode/settings.json` not found, creating...")
+        yield* vscode.create()
+        spinner.stop("`.vscode/settings.json` created with Adamantite preset.")
+      }
+    }
+
+    if (editors.includes("zed")) {
+      // TODO: Implement Zed configuration
+    }
+
+    return ok()
+  })
 
 export default defineCommand({
   command: "init",
@@ -17,219 +160,130 @@ export default defineCommand({
   builder: (yargs) => yargs,
   handler: () =>
     safeTry(async function* () {
-      const cwd = process.cwd()
+      const packageManager = yield* getPackageManagerName()
 
-      // Check first if we are in a project with a package.json file
-      let packageJson = yield* readPackageJson()
+      printTitle()
 
-      intro(getTitle())
+      p.intro("💠 adamantite init")
 
-      const hasPnpmWorkspace = await checkIfExists(join(cwd, "pnpm-workspace.yaml"))
+      p.log.info(`Detected package manager: ${packageManager}`)
 
-      const isMonorepo = packageJson.workspaces !== undefined || hasPnpmWorkspace
+      const isMonorepo = yield* checkIsMonorepo()
 
-      const shouldInstallScripts = yield* fromSafePromise(
-        confirm({
-          message: "Do you want to add the `check` and `fix` scripts to your `package.json`?",
+      if (isMonorepo) {
+        p.log.info("We've detected a monorepo setup in your project.")
+      }
+
+      const scripts = yield* fromSafePromise(
+        p.multiselect({
+          message: "Which scripts do you want to add to your `package.json`?",
+          options: [
+            {
+              label: "check - find issues in your code using Biome",
+              value: "check",
+              hint: "recommended",
+            },
+            {
+              label: "fix - fix issues and format your code using Biome",
+              value: "fix",
+              hint: "recommended",
+            },
+
+            {
+              label: "check:monorepo - check for monorepo-specific issues using Sherif",
+              value: "check:monorepo",
+              hint: isMonorepo ? undefined : "available for monorepo projects",
+              disabled: !isMonorepo,
+            },
+            {
+              label: "fix:monorepo - fix monorepo-specific issues using Sherif",
+              value: "fix:monorepo",
+              hint: isMonorepo ? undefined : "available for monorepo projects",
+              disabled: !isMonorepo,
+            },
+          ],
         })
       )
 
-      if (isCancel(shouldInstallScripts)) {
+      if (p.isCancel(scripts)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
-      let shouldInstallMonorepoScripts = false
-
-      if (isMonorepo) {
-        const shouldInstallMonorepoScriptsResponse = yield* fromSafePromise(
-          confirm({
-            message:
-              "We've detected a monorepo setup in your project. Would you like to install monorepo linting scripts?",
-          })
-        )
-
-        if (isCancel(shouldInstallMonorepoScriptsResponse)) {
-          return err(Fault.create("OPERATION_CANCELLED"))
-        }
-
-        shouldInstallMonorepoScripts = shouldInstallMonorepoScriptsResponse
-      }
-
-      const shouldInstallTypeScriptPreset = yield* fromSafePromise(
-        confirm({
+      const typescriptPreset = yield* fromSafePromise(
+        p.confirm({
           message:
             "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to install it?",
         })
       )
 
-      if (isCancel(shouldInstallTypeScriptPreset)) {
+      if (p.isCancel(typescriptPreset)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
-      const selectedEditors = yield* fromSafePromise(
-        multiselect({
-          message: "Which editors do you want to configure (recommended)?",
+      const editors = yield* fromSafePromise(
+        p.multiselect({
+          message: "Which editors do you want to configure? (optional)",
           options: [
             { label: "VSCode / Cursor / Windsurf", value: "vscode" },
-            { label: "Zed (coming soon)", value: "zed" },
+            { label: "Zed", value: "zed", disabled: true, hint: "coming soon" },
           ],
           required: false,
         })
       )
 
-      if (isCancel(selectedEditors)) {
+      if (p.isCancel(editors)) {
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
-      // =============================== ADD DEPENDENCIES ===============================
-      const installingDependencies = spinner()
+      const hasBiome = scripts.includes("check") || scripts.includes("fix")
+      const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
 
-      installingDependencies.start("Installing dependencies...")
+      const dependencies = ["adamantite"]
 
-      // Install Adamantite first
-      yield* fromPromise(addDevDependency("adamantite"), (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_INSTALL_DEPENDENCY")
-          .withMessage("Failed to install Adamantite")
-      )
-
-      yield* fromPromise(addDevDependency(`${biome.name}@${biome.version}`), (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_INSTALL_DEPENDENCY")
-          .withMessage("Failed to install Biome")
-      )
-
-      if (shouldInstallMonorepoScripts) {
-        yield* fromPromise(addDevDependency(`${sherif.name}@${sherif.version}`), (error) =>
-          Fault.wrap(error)
-            .withTag("FAILED_TO_INSTALL_DEPENDENCY")
-            .withMessage("Failed to install Sherif")
-        )
+      if (hasBiome) {
+        dependencies.push(`${biome.name}@${biome.version}`)
       }
 
-      installingDependencies.stop("Dependencies installed successfully")
-
-      // =============================== SETUP BIOME CONFIG ===============================
-      const settingUpBiomeConfig = spinner()
-
-      settingUpBiomeConfig.start("Setting up Biome config...")
-
-      const biomePath = await biome.exists()
-
-      if (biomePath.path) {
-        settingUpBiomeConfig.message("Biome config found, updating...")
-
-        yield* biome.update()
-
-        settingUpBiomeConfig.stop("Biome config updated successfully")
-      } else {
-        settingUpBiomeConfig.message("Biome config not found, creating...")
-
-        yield* biome.create()
-
-        settingUpBiomeConfig.stop("Biome config created successfully")
+      if (hasSherif) {
+        dependencies.push(`${sherif.name}@${sherif.version}`)
       }
 
-      // =============================== ADD SCRIPTS ===============================
-      if (shouldInstallScripts) {
-        const addingScripts = spinner()
-        packageJson = yield* readPackageJson()
-        addingScripts.start("Adding scripts to your `package.json`...")
+      yield* installDependencies(dependencies)
 
-        if (!packageJson.scripts) {
-          packageJson.scripts = {}
-        }
-
-        packageJson.scripts.check = "adamantite check"
-        packageJson.scripts.fix = "adamantite fix"
-
-        if (shouldInstallMonorepoScripts) {
-          packageJson.scripts["lint:monorepo"] = "adamantite monorepo"
-        }
-
-        yield* fromPromise(
-          writeFile(join(cwd, "package.json"), JSON.stringify(packageJson, null, 2)),
-          (error) =>
-            Fault.wrap(error)
-              .withTag("FAILED_TO_WRITE_FILE")
-              .withDescription(
-                "Failed to write package.json",
-                "We're unable to update the package.json file."
-              )
-              .withContext({ path: join(cwd, "package.json") })
-        )
-
-        addingScripts.stop("Scripts added to your `package.json`")
+      if (hasBiome) {
+        yield* setupBiomeConfig()
       }
 
-      // =============================== SETUP TYPESCRIPT CONFIG ===============================
+      yield* addScripts(scripts)
 
-      if (shouldInstallTypeScriptPreset) {
-        const settingUpTypeScriptConfig = spinner()
-        settingUpTypeScriptConfig.start("Setting up TypeScript config...")
-
-        if (await tsconfig.exists()) {
-          settingUpTypeScriptConfig.message("`tsconfig.json` found, updating...")
-
-          yield* tsconfig.update()
-
-          settingUpTypeScriptConfig.stop("`tsconfig.json` updated successfully")
-        } else {
-          settingUpTypeScriptConfig.message("`tsconfig.json` not found, creating...")
-
-          yield* tsconfig.create()
-
-          settingUpTypeScriptConfig.stop("`tsconfig.json` created successfully")
-        }
+      if (typescriptPreset) {
+        yield* setupTypescript()
       }
 
-      // =============================== SETUP EDITOR CONFIG ===============================
-
-      if (selectedEditors.length > 0) {
-        const settingUpEditorConfig = spinner()
-        settingUpEditorConfig.start("Setting up editor config...")
-
-        if (selectedEditors.includes("vscode")) {
-          const settingUpVSCodeConfig = spinner()
-          settingUpVSCodeConfig.start("Setting up VSCode config...")
-
-          if (await vscode.exists()) {
-            settingUpVSCodeConfig.message("VSCode settings found, updating...")
-            yield* vscode.update()
-            settingUpVSCodeConfig.stop("VSCode settings updated with Adamantite preset")
-          } else {
-            settingUpVSCodeConfig.message("VSCode settings not found, creating...")
-            yield* vscode.create()
-            settingUpVSCodeConfig.stop("VSCode settings created with Adamantite preset")
-          }
-        }
-
-        if (selectedEditors.includes("zed")) {
-          log.warning("Zed configuration coming soon...")
-        }
-
-        settingUpEditorConfig.stop("Editor config set up successfully")
-      }
+      yield* setupEditors(editors)
 
       return ok()
     }).match(
       () => {
-        outro("💠 Adamantite initialized successfully!")
+        p.outro("💠 Adamantite initialized successfully!")
         process.exit(0)
       },
       (error) => {
         if (Fault.isFault(error) && error.tag === "OPERATION_CANCELLED") {
-          cancel("You've cancelled the initialization process.")
+          p.cancel("You've cancelled the initialization process.")
           process.exit(0)
         }
 
-        if (Fault.isFault(error)) {
-          log.error(error.flatten())
-        } else {
-          log.error(String(error))
+        if (!Fault.isFault(error)) {
+          // We should never reach this point
+          p.log.error(`An unexpected error occurred: ${String(error)}`)
+          p.cancel("Failed to initialize Adamantite")
+          process.exit(1)
         }
 
-        cancel("Failed to initialize Adamantite")
+        p.log.error(error.flatten())
+
+        p.cancel("Failed to initialize Adamantite")
         process.exit(1)
       }
     ),

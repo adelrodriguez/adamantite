@@ -129,8 +129,11 @@ adamantite ci --monorepo
 Special tooling for monorepo projects using [Sherif](https://github.com/QuiiBz/sherif):
 
 ```shell
-# Lint and fix monorepo-specific issues
+# Check for monorepo-specific issues
 adamantite monorepo
+
+# Fix monorepo-specific issues
+adamantite monorepo --fix
 ```
 
 Automatically detects and fixes:

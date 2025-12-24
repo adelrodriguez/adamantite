@@ -4,7 +4,17 @@ import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
-import { checkIfExists, getTitle, mergeConfig, parseJson, readPackageJson } from "#utils.ts"
+import {
+  checkIfExists,
+  checkIsMonorepo,
+  defineCommand,
+  getPackageManagerName,
+  mergeConfig,
+  parseJson,
+  printTitle,
+  readPackageJson,
+  runCommand,
+} from "#utils.ts"
 
 // Mock spawnSync for testing
 mock.module("node:child_process", () => ({
@@ -176,63 +186,237 @@ describe("utils", () => {
       // defu merges left-to-right, so base values win
       expect(result._unsafeUnwrap()).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
     })
+
+    test("should handle mergeConfig error when defu throws", () => {
+      // Use a Proxy that throws when any property is accessed
+      // This simulates defu encountering an error during merge
+      const throwingBase = new Proxy(
+        {},
+        {
+          get() {
+            throw new Error("Simulated defu error")
+          },
+          ownKeys() {
+            throw new Error("Simulated defu error")
+          },
+        }
+      )
+
+      const result = mergeConfig(throwingBase, { b: 2 })
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("FAILED_TO_MERGE_CONFIG")
+      }
+    })
   })
 
-  describe("getTitle", () => {
-    let originalColumns: number | undefined
+  describe("defineCommand", () => {
+    test("should return the input command module unchanged", () => {
+      const mockCommand = {
+        command: "test",
+        describe: "Test command",
+        handler: () => {
+          // Empty handler for testing
+        },
+      }
 
-    beforeEach(() => {
-      originalColumns = process.stdout.columns
+      const result = defineCommand(mockCommand)
+      expect(result).toBe(mockCommand)
+      expect(result).toEqual(mockCommand)
+    })
+  })
+
+  describe("runCommand", () => {
+    test("should successfully run a valid command", () => {
+      const result = runCommand("echo test")
+
+      expect(result.isOk()).toBe(true)
     })
 
-    afterEach(() => {
-      if (originalColumns !== undefined) {
-        process.stdout.columns = originalColumns
-      } else {
-        ;(process.stdout as { columns?: number }).columns = undefined
+    test("should return the command output", () => {
+      const result = runCommand("echo hello world")
+
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        const output = result.value.toString()
+        expect(output).toContain("hello world")
       }
     })
 
-    test("should return large ASCII art for wide terminals", () => {
-      process.stdout.columns = 150
-      const result = getTitle()
+    test("should return error with FAILED_TO_RUN_COMMAND tag for invalid command", () => {
+      const result = runCommand("nonexistent-command-12345")
 
-      expect(result).toContain("█████")
-      expect(result).not.toContain(
-        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-      )
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("FAILED_TO_RUN_COMMAND")
+      }
+    })
+  })
+
+  describe("getPackageManagerName", () => {
+    test("should detect bun when bun.lock exists", async () => {
+      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
+      await Bun.write(join(testDir, "bun.lock"), "")
+
+      const result = await getPackageManagerName()
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe("bun")
+      }
     })
 
-    test("should return simple box for narrow terminals", () => {
-      process.stdout.columns = 80
-      const result = getTitle()
+    test("should detect npm when package-lock.json exists", async () => {
+      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
+      await Bun.write(join(testDir, "package-lock.json"), "{}")
 
-      expect(result).toContain(
-        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-      )
-      expect(result).toContain("ADAMANTITE")
-      expect(result).not.toContain("█████")
+      const result = await getPackageManagerName()
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe("npm")
+      }
     })
 
-    test("should return simple box when columns is undefined", () => {
-      ;(process.stdout as { columns?: number }).columns = undefined
-      const result = getTitle()
+    test("should detect pnpm when pnpm-lock.yaml exists", async () => {
+      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
+      await Bun.write(join(testDir, "pnpm-lock.yaml"), "")
 
-      expect(result).toContain(
-        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-      )
-      expect(result).toContain("ADAMANTITE")
+      const result = await getPackageManagerName()
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe("pnpm")
+      }
     })
 
-    test("should return large ASCII art for exactly 120 columns", () => {
-      process.stdout.columns = 120
-      const result = getTitle()
+    test("should detect yarn when yarn.lock exists", async () => {
+      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
+      await Bun.write(join(testDir, "yarn.lock"), "")
 
-      // At exactly 120, should use large art (>= 120)
-      expect(result).toContain("█████")
-      expect(result).not.toContain(
-        "┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓"
-      )
+      const result = await getPackageManagerName()
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe("yarn")
+      }
+    })
+
+    test("should return error with NO_PACKAGE_MANAGER tag when no lockfile exists", async () => {
+      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
+
+      const result = await getPackageManagerName()
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("NO_PACKAGE_MANAGER")
+      }
+    })
+  })
+
+  describe("checkIsMonorepo", () => {
+    test("should return true when pnpm-workspace.yaml exists", async () => {
+      await Bun.write(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
+
+      const result = await checkIsMonorepo()
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe(true)
+      }
+    })
+
+    test("should return true when package.json has workspaces field", async () => {
+      const packageJson: PackageJson = {
+        name: "test-package",
+        workspaces: ["packages/*"],
+      }
+
+      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+
+      const result = await checkIsMonorepo()
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe(true)
+      }
+    })
+
+    test("should return false when neither condition is met", async () => {
+      const packageJson: PackageJson = {
+        name: "test-package",
+        version: "1.0.0",
+      }
+
+      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+
+      const result = await checkIsMonorepo()
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe(false)
+      }
+    })
+
+    test("should return error when package.json does not exist and no pnpm-workspace.yaml", async () => {
+      const result = await checkIsMonorepo()
+      expect(result.isErr()).toBe(true)
+    })
+  })
+
+  describe("printTitle", () => {
+    let originalColumns: number | undefined
+    let originalConsoleLog: typeof console.log
+    let callCount: number
+
+    beforeEach(() => {
+      originalColumns = process.stdout.columns
+      // biome-ignore lint/suspicious/noConsole: saving original console.log for restoration
+      originalConsoleLog = console.log
+      callCount = 0
+      const mockLog = mock(() => {
+        callCount++
+      })
+
+      console.log = mockLog as typeof console.log
+    })
+
+    afterEach(() => {
+      Object.defineProperty(process.stdout, "columns", {
+        value: originalColumns,
+        writable: true,
+        configurable: true,
+      })
+
+      console.log = originalConsoleLog
+    })
+
+    test("should print title when terminal is wide enough", () => {
+      Object.defineProperty(process.stdout, "columns", {
+        value: 120,
+        writable: true,
+        configurable: true,
+      })
+
+      printTitle()
+
+      expect(callCount).toBe(1)
+    })
+
+    test("should not print title when terminal is too narrow", () => {
+      Object.defineProperty(process.stdout, "columns", {
+        value: 50,
+        writable: true,
+        configurable: true,
+      })
+
+      printTitle()
+
+      expect(callCount).toBe(0)
+    })
+
+    test("should not print title when process.stdout.columns is undefined", () => {
+      Object.defineProperty(process.stdout, "columns", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      })
+
+      printTitle()
+
+      expect(callCount).toBe(0)
     })
   })
 })

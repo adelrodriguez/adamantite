@@ -5,7 +5,7 @@ import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
 import { biome } from "#helpers/packages/biome.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
-import { defineCommand, getTitle, readPackageJson } from "#utils.ts"
+import { defineCommand, printTitle, readPackageJson } from "#utils.ts"
 
 export default defineCommand({
   command: "update",
@@ -13,10 +13,11 @@ export default defineCommand({
   builder: (yargs) => yargs,
   handler: async () =>
     safeTry(async function* () {
-      // Read package.json using yield*
       const packageJson = yield* readPackageJson()
 
-      intro(getTitle())
+      printTitle()
+
+      intro("💠 adamantite update")
 
       // Detect updates needed
       const updates: {
@@ -85,11 +86,11 @@ export default defineCommand({
     }).match(
       (value) => {
         if (value === "no-updates") {
-          outro("💠 No updates needed")
+          outro("✅ No updates needed")
         } else if (value === "cancelled") {
-          outro("💠 Update cancelled")
+          outro("⚠️ Update cancelled")
         } else if (value === "updated") {
-          outro("💠 Dependencies updated successfully!")
+          outro("✅ Dependencies updated successfully!")
         }
 
         process.exit(0)
@@ -98,7 +99,6 @@ export default defineCommand({
         if (Fault.isFault(error) && error.tag === "OPERATION_CANCELLED") {
           cancel("You've cancelled the update process.")
           process.exit(0)
-          return
         }
 
         if (Fault.isFault(error)) {

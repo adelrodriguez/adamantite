@@ -85,7 +85,7 @@ describe("helpers", () => {
   describe("tsconfig", () => {
     test("should provide a config that extends adamantite tsconfig preset", () => {
       expect(tsconfig.config).toHaveProperty("extends")
-      expect(tsconfig.config.extends).toBe("adamantite/tsconfig")
+      expect(tsconfig.config.extends).toBe("adamantite/typescript")
     })
   })
 

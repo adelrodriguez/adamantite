@@ -12,6 +12,8 @@ interface WorkflowOptions {
   scripts: string[]
 }
 
+const CI_COMPATIBLE_SCRIPTS = ["check", "format", "typecheck", "check:monorepo"] as const
+
 const setupSteps: Record<PackageManagerName, string> = {
   bun: `      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -78,19 +80,19 @@ const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string 
   const jobs: string[] = []
 
   // Map scripts to jobs
-  if (scripts.includes("check")) {
+  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[0])) { // check
     jobs.push(generateJob("lint", "Run linter", "check", packageManager))
   }
 
-  if (scripts.includes("format")) {
+  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[1])) { // format
     jobs.push(generateJob("format", "Check formatting", "format --check", packageManager))
   }
 
-  if (scripts.includes("typecheck")) {
+  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[2])) { // typecheck
     jobs.push(generateJob("typecheck", "Run type check", "typecheck", packageManager))
   }
 
-  if (scripts.includes("check:monorepo")) {
+  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[3])) { // check:monorepo
     jobs.push(generateJob("monorepo", "Check monorepo", "check:monorepo", packageManager))
   }
 
@@ -122,8 +124,7 @@ jobs:${jobs.join("\n")}`
  * CI-compatible scripts are: check, format, typecheck, check:monorepo
  */
 export const hasCICompatibleScripts = (scripts: string[]): boolean => {
-  const ciScripts = ["check", "format", "typecheck", "check:monorepo"]
-  return scripts.some((script) => ciScripts.includes(script))
+  return scripts.some((script) => CI_COMPATIBLE_SCRIPTS.includes(script as typeof CI_COMPATIBLE_SCRIPTS[number]))
 }
 
 export const github = {

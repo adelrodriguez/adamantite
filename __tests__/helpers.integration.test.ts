@@ -602,6 +602,20 @@ describe("helpers integration", () => {
       expect(content).toContain("yarn run check")
     })
 
+    test("should generate correct workflow for deno", async () => {
+      const createResult = await github.create({
+        packageManager: "deno",
+        scripts: ["check"],
+      })
+      createResult._unsafeUnwrap()
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("Setup Deno")
+      expect(content).toContain("denoland/setup-deno@v2")
+      expect(content).toContain("deno install --frozen")
+      expect(content).toContain("deno task check")
+    })
+
     test("should include all CI-compatible scripts as jobs", async () => {
       const createResult = await github.create({
         packageManager: "bun",

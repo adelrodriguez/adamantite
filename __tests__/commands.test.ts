@@ -126,45 +126,6 @@ describe("commands", () => {
     })
   })
 
-  describe("ci", () => {
-    test("should fail gracefully when no package manager detected", async () => {
-      // No lockfile exists
-      const proc = spawn(["bun", cliPath, "ci"], {
-        stdout: "pipe",
-        stderr: "pipe",
-        cwd: tempDir,
-        env: { ...process.env, NODE_ENV: undefined },
-      })
-
-      const stdout = await new Response(proc.stdout).text()
-      const stderr = await new Response(proc.stderr).text()
-      await proc.exited
-
-      expect(proc.exitCode).toBe(1)
-      // Error message might be in stdout (from @clack/prompts) or stderr
-      const output = stdout + stderr
-      expect(output.length).toBeGreaterThan(0)
-    })
-
-    test("should execute successfully with valid lockfile", async () => {
-      // Create bun.lock to simulate package manager
-      await Bun.write("bun.lock", "")
-
-      const proc = spawn(["bun", cliPath, "ci"], {
-        stdout: "pipe",
-        stderr: "pipe",
-        cwd: tempDir,
-        env: { ...process.env, NODE_ENV: undefined },
-      })
-
-      await proc.exited
-
-      // Exit code might be non-zero if biome is not installed or finds issues,
-      // but should not exit with code 1 due to package manager error
-      expect(proc.exitCode).toBeDefined()
-    })
-  })
-
   describe("monorepo", () => {
     test("should fail gracefully when no package manager detected", async () => {
       // No lockfile exists

@@ -83,7 +83,7 @@ const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string 
   }
 
   if (scripts.includes("format")) {
-    jobs.push(generateJob("format", "Check formatting", "format", packageManager))
+    jobs.push(generateJob("format", "Check formatting", "format --check", packageManager))
   }
 
   if (scripts.includes("typecheck")) {

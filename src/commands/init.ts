@@ -4,12 +4,9 @@ import process from "node:process"
 import * as p from "@clack/prompts"
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
+import type { PackageManagerName } from "nypm"
 import { addDevDependency } from "nypm"
-import {
-  github,
-  hasCICompatibleScripts,
-  type SupportedPackageManager,
-} from "#helpers/ci/github.ts"
+import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
@@ -190,7 +187,7 @@ const setupEditors = (editors: string[]) =>
     return ok()
   })
 
-const setupGitHubActions = (packageManager: SupportedPackageManager, scripts: string[]) =>
+const setupGitHubActions = (packageManager: PackageManagerName, scripts: string[]) =>
   safeTry(async function* () {
     const spinner = p.spinner()
     spinner.start("Setting up GitHub Actions workflow...")
@@ -347,7 +344,7 @@ export default defineCommand({
       yield* setupEditors(editors)
 
       if (enableGitHubActions) {
-        yield* setupGitHubActions(packageManager as SupportedPackageManager, scripts)
+        yield* setupGitHubActions(packageManager, scripts)
       }
 
       return ok()

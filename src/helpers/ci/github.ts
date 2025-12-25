@@ -7,15 +7,12 @@ import type { PackageManagerName } from "nypm"
 import { runScriptCommand } from "nypm"
 import { checkIfExists } from "#utils.ts"
 
-// Supported package managers for GitHub Actions setup (excludes deno)
-type SupportedPackageManager = Exclude<PackageManagerName, "deno">
-
 interface WorkflowOptions {
-  packageManager: SupportedPackageManager
+  packageManager: PackageManagerName
   scripts: string[]
 }
 
-const setupSteps: Record<SupportedPackageManager, string> = {
+const setupSteps: Record<PackageManagerName, string> = {
   bun: `      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -51,13 +48,19 @@ const setupSteps: Record<SupportedPackageManager, string> = {
 
       - name: Install dependencies
         run: npm ci`,
+
+  deno: `      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+
+      - name: Install dependencies
+        run: deno install --frozen`,
 }
 
 const generateJob = (
   jobName: string,
   stepName: string,
   script: string,
-  packageManager: SupportedPackageManager
+  packageManager: PackageManagerName
 ): string => `
   ${jobName}:
     runs-on: ubuntu-latest
@@ -187,4 +190,4 @@ export const github = {
     }),
 }
 
-export type { SupportedPackageManager, WorkflowOptions }
+export type { WorkflowOptions }

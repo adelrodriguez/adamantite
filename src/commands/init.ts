@@ -283,6 +283,10 @@ export default defineCommand({
         dependencies.push(`${sherif.name}@${sherif.version}`)
       }
 
+      if (hasTypecheck) {
+        dependencies.push("typescript")
+      }
+
       yield* installDependencies(dependencies)
 
       if (hasOxfmt) {

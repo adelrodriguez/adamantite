@@ -1,0 +1,9 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["nextjs"],
+  "rules": {
+    // ======================= NEXT.JS =======================
+    // Note: oxlint Next.js support may be limited compared to ESLint plugin
+    // Add Next.js-specific rules here as they become available in oxlint
+  }
+}

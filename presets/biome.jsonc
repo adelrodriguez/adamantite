@@ -1,25 +1,6 @@
 {
   "$schema": "../node_modules/@biomejs/biome/configuration_schema.json",
   "root": false,
-  // ---------------------------- FORMATTER -----------------------------
-  // These are the generic settings that apply to all files in the project.
-  "formatter": {
-    "enabled": true,
-
-    // Format the code even if there are errors.
-    "formatWithErrors": true,
-    // Use spaces for indentation.
-    "indentStyle": "space",
-    // Use 2 spaces for indentation.
-    "indentWidth": 2,
-    // Use the system line ending.
-    "lineEnding": "auto",
-    // The expected line width for most editors.
-    "lineWidth": 100,
-    // Don't force attributes to be on the same line as the element.
-    "attributePosition": "auto",
-    "bracketSpacing": true
-  },
 
   // ------------------------------ ASSIST ------------------------------
   // Help with code organization.
@@ -28,23 +9,15 @@
 
     "actions": {
       "source": {
-        // Sort imports in a certain order. We prioritize runtime imports
-        // first (Bun, Node, etc.). Then external packages, and finally
-        // aliased imports.
-        "organizeImports": {
-          "level": "on",
-          "options": {
-            "groups": [":BUN:", ":NODE:", ":PACKAGE:", ":ALIAS:"]
-          }
-        },
+        "organizeImports": "off",
         // Enforce that the attributes of a JSX element are sorted.
         "useSortedAttributes": "on",
         // Enforce that CSS properties are sorted.
         "useSortedProperties": "on",
         // Don't sort the keys of an object.
-        "useSortedKeys": "off"
-      }
-    }
+        "useSortedKeys": "off",
+      },
+    },
   },
 
   // ------------------------------ LINTER ------------------------------
@@ -92,7 +65,7 @@
         "useValidLang": "error",
 
         // --------------------------- CSS ---------------------------
-        "useGenericFontNames": "error"
+        "useGenericFontNames": "error",
       },
       "complexity": {
         // ----------------------- JavaScript ------------------------
@@ -105,8 +78,8 @@
         "noExcessiveCognitiveComplexity": {
           "level": "warn",
           "options": {
-            "maxAllowedComplexity": 40
-          }
+            "maxAllowedComplexity": 40,
+          },
         },
         "noExcessiveNestedTestSuites": "error",
         "noStaticOnlyClass": "error",
@@ -138,7 +111,7 @@
         "useWhile": "error",
 
         // --------------------------- CSS ---------------------------
-        "noImportantStyles": "error"
+        "noImportantStyles": "error",
       },
       "correctness": {
         // ----------------------- JavaScript ------------------------
@@ -205,7 +178,7 @@
         "noUnknownPseudoElement": "error",
         "noUnknownTypeSelector": "error",
         "noUnknownUnit": "error",
-        "noUnmatchableAnbSelector": "error"
+        "noUnmatchableAnbSelector": "error",
       },
       "nursery": {
         // ----------------------- JavaScript ------------------------
@@ -222,9 +195,9 @@
           "level": "error",
           "options": {
             "attributes": ["className"],
-            "functions": ["clsx", "cva", "tw", "twMerge", "cn", "twJoin", "tv"]
-          }
-        }
+            "functions": ["clsx", "cva", "tw", "twMerge", "cn", "twJoin", "tv"],
+          },
+        },
       },
       "performance": {
         // ----------------------- JavaScript ------------------------
@@ -234,14 +207,14 @@
         "noDynamicNamespaceImportAccess": "error",
         "useTopLevelRegex": "error",
         "noUnwantedPolyfillio": "error",
-        "useGoogleFontPreconnect": "error"
+        "useGoogleFontPreconnect": "error",
       },
       "security": {
         // ----------------------- JavaScript ------------------------
         "noBlankTarget": "error",
         "noDangerouslySetInnerHtml": "error",
         "noDangerouslySetInnerHtmlWithChildren": "error",
-        "noGlobalEval": "error"
+        "noGlobalEval": "error",
       },
       "style": {
         // ----------------------- JavaScript ------------------------
@@ -285,8 +258,8 @@
           "options": {
             "filenameCases": ["kebab-case"],
             "requireAscii": false,
-            "match": "[+_\\-\\[]*[a-z0-9]+[a-z0-9\\-_.\\$\\[\\]]*[.][a-z]+"
-          }
+            "match": "[+_\\-\\[]*[a-z0-9]+[a-z0-9\\-_.\\$\\[\\]]*[.][a-z]+",
+          },
         },
         "useConsistentObjectDefinitions": "error",
         "useForOf": "error",
@@ -312,7 +285,7 @@
 
         // --------------------------- CSS ---------------------------
         "noDescendingSpecificity": "error",
-        "noValueAtRule": "error"
+        "noValueAtRule": "error",
       },
       "suspicious": {
         "noApproximativeNumericConstant": "error",
@@ -412,86 +385,55 @@
         // --------------------------- JSON ---------------------------
         "noBiomeFirstException": "error",
         "noQuickfixBiome": "error",
-        "useBiomeIgnoreFolder": "error"
-      }
-    }
+        "useBiomeIgnoreFolder": "error",
+      },
+    },
   },
-  // ---------------------------- JAVASCRIPT ----------------------------
-  // Options for JavaScript and TypeScript files.
   "javascript": {
     "formatter": {
-      "enabled": true,
-
-      "arrowParentheses": "always",
-      "attributePosition": "auto",
-      "bracketSameLine": false,
-      "bracketSpacing": true,
-      "expand": "auto",
-      "jsxQuoteStyle": "double",
-      "quoteProperties": "asNeeded",
-      "quoteStyle": "double",
-      // Only use semicolons to clear up ambiguity. We are of the opinion that
-      // JavaScript code without semicolons is more elegant.
-      "semicolons": "asNeeded",
-      "trailingCommas": "es5"
-    }
+      "enabled": false,
+    },
   },
   // ------------------------------- CSS -------------------------------
   "css": {
     "formatter": {
-      "quoteStyle": "double"
+      "enabled": false,
     },
     "parser": {
       "allowWrongLineComments": false,
       "cssModules": false,
-      "tailwindDirectives": true
-    }
+      "tailwindDirectives": true,
+    },
   },
   // ------------------------------ JSON -------------------------------
   "json": {
     "assist": {
-      "enabled": true
+      "enabled": false,
     },
     "formatter": {
-      "enabled": true,
-      "indentStyle": "space",
-      "indentWidth": 2,
-      "lineEnding": "auto",
-      "lineWidth": 80,
-      "trailingCommas": "none"
+      "enabled": false,
     },
     "linter": {
-      "enabled": true
-    }
+      "enabled": true,
+    },
   },
   "html": {
     "assist": {
-      "enabled": true
+      "enabled": true,
     },
     "experimentalFullSupportEnabled": true,
-    "formatter": {
-      "enabled": true,
-
-      "attributePosition": "auto",
-      "bracketSameLine": false,
-      "indentStyle": "space",
-      "indentScriptAndStyle": true,
-      "lineEnding": "auto",
-      "selfCloseVoidElements": "always",
-      "whitespaceSensitivity": "strict"
-    },
     "linter": {
-      "enabled": true
+      "enabled": true,
     },
     "parser": {
-      "interpolation": true
-    }
+      "interpolation": true,
+    },
   },
   "vcs": {
     "enabled": true,
 
     "clientKind": "git",
     "defaultBranch": "main",
-    "useIgnoreFile": true
-  }
+    "useIgnoreFile": true,
+  },
 }

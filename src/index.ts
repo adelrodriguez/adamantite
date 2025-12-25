@@ -3,6 +3,7 @@ import { hideBin } from "yargs/helpers"
 import check from "#commands/check.ts"
 import ci from "#commands/ci.ts"
 import fix from "#commands/fix.ts"
+import format from "#commands/format.ts"
 import init from "#commands/init.ts"
 import monorepo from "#commands/monorepo.ts"
 import update from "#commands/update.ts"
@@ -14,6 +15,7 @@ yargs(hideBin(process.argv))
   .command(check)
   .command(ci)
   .command(fix)
+  .command(format)
   .command(init)
   .command(monorepo)
   .command(update)

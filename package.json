@@ -4,33 +4,22 @@
   "description": "An strict and opinionated set of presets for modern TypeScript applications",
   "keywords": [
     "adamantite",
-    "typescript",
     "biome",
-    "preset",
     "formatter",
-    "linter"
+    "linter",
+    "preset",
+    "typescript"
   ],
   "homepage": "https://github.com/adelrodriguez/adamantite",
   "bugs": {
     "url": "https://github.com/adelrodriguez/adamantite/issues"
   },
+  "license": "MIT",
+  "author": "Adel Rodriguez <hello@adelrodriguez.com>",
   "repository": {
     "type": "git",
     "url": "https://github.com/adelrodriguez/adamantite.git"
   },
-  "license": "MIT",
-  "author": "Adel Rodriguez <hello@adelrodriguez.com>",
-  "type": "module",
-  "imports": {
-    "#*": "./src/*"
-  },
-  "exports": {
-    ".": "./presets/biome.jsonc",
-    "./biome": "./presets/biome.jsonc",
-    "./tsconfig": "./presets/tsconfig.json",
-    "./presets/*": "./presets/*"
-  },
-  "main": "presets/biome.jsonc",
   "bin": {
     "adamantite": "bin/adamantite"
   },
@@ -39,12 +28,25 @@
     "dist",
     "presets"
   ],
+  "type": "module",
+  "main": "presets/biome.jsonc",
+  "imports": {
+    "#*": "./src/*",
+    "#presets/*": "./presets/*"
+  },
+  "exports": {
+    ".": "./presets/biome.jsonc",
+    "./biome": "./presets/biome.jsonc",
+    "./tsconfig": "./presets/tsconfig.json",
+    "./presets/*": "./presets/*"
+  },
   "scripts": {
     "build": "bunup",
     "bump:deps": "bun update --interactive",
-    "check": "bun --bun run src/index.ts check",
+    "check": "bun run src/index.ts check",
     "dev": "bunup --watch",
-    "fix": "bun --bun run src/index.ts fix",
+    "fix": "bun run src/index.ts fix",
+    "format": "bun run src/index.ts format",
     "release": "changeset publish",
     "test": "bun test",
     "test:coverage": "bun test --coverage",
@@ -54,6 +56,7 @@
   },
   "dependencies": {
     "@clack/prompts": "1.0.0-alpha.9",
+    "consola": "3.4.2",
     "defu": "6.1.4",
     "faultier": "^1.1.0",
     "jsonc-parser": "3.3.1",
@@ -67,6 +70,7 @@
     "@types/bun": "1.3.5",
     "@types/yargs": "17.0.35",
     "bunup": "0.16.11",
+    "oxfmt": "0.20.0",
     "sherif": "1.9.0",
     "type-fest": "5.3.1",
     "typescript": "5.9.3"

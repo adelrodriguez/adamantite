@@ -11,6 +11,7 @@ declare module "faultier" {
     FAILED_TO_WRITE_FILE: { path?: string }
     FILE_NOT_FOUND: { path?: string }
     INVALID_BIOME_CONFIG: { path?: string }
+    INVALID_OXFMT_CONFIG: { path?: string }
     NO_PACKAGE_MANAGER: never
     OPERATION_CANCELLED: never
     UNKNOWN_SCRIPT: { script: string }

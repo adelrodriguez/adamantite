@@ -1,4 +1,7 @@
-import { execSync } from "node:child_process"
+import type { PackageJson } from "type-fest"
+import type { CommandModule } from "yargs"
+
+import { spawnSync } from "node:child_process"
 import { access, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
@@ -7,16 +10,30 @@ import { Fault } from "faultier"
 import { type ParseError, parse } from "jsonc-parser"
 import { err, fromPromise, fromThrowable, ok, safeTry } from "neverthrow"
 import { detectPackageManager } from "nypm"
-import type { PackageJson } from "type-fest"
-import type { CommandModule } from "yargs"
 
 export function defineCommand<T, U>(input: CommandModule<T, U>): CommandModule<T, U> {
   return input
 }
 
-export const runCommand = fromThrowable(execSync, (error) =>
-  Fault.wrap(error).withTag("FAILED_TO_RUN_COMMAND")
-)
+export const runCommand = (command: string) => {
+  const result = spawnSync(command, {
+    stdio: "inherit",
+    shell: true,
+    maxBuffer: 100 * 1024 * 1024,
+  })
+
+  if (result.error || result.status !== 0) {
+    const message = result.error?.message ?? "An unknown error occurred while running the command"
+
+    return err(
+      Fault.wrap(result.error ?? new Error(message))
+        .withTag("FAILED_TO_RUN_COMMAND")
+        .withDebug(`Failed to run command: ${message}`)
+    )
+  }
+
+  return ok(result)
+}
 
 export const getPackageManagerName = () =>
   fromPromise(
@@ -53,6 +70,16 @@ export const parseJson = (content: string) => {
   }
   return ok(parsed)
 }
+
+const WORKSPACE_PREFIX_REGEX = /^workspace:/
+const RANGE_PREFIX_REGEX = /^[\^~]/
+
+/**
+ * Normalize a dependency version specifier (e.g. `^1.2.3`, `~1.2.3`) to its bare version.
+ * This is useful when comparing package.json ranges to pinned versions.
+ */
+export const normalizeDependencyVersion = (specifier: string) =>
+  specifier.trim().replace(WORKSPACE_PREFIX_REGEX, "").replace(RANGE_PREFIX_REGEX, "")
 
 export const mergeConfig = fromThrowable(defu, (error) =>
   Fault.wrap(error)

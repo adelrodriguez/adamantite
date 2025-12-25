@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import Bun, { spawn } from "bun"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import Bun, { spawn } from "bun"
 
 const cliPath = join(import.meta.dir, "..", "src", "index.ts")
 

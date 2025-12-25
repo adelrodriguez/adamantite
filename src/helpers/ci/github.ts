@@ -123,9 +123,7 @@ jobs:${jobs.join("\n")}`
  * Check if any CI-compatible scripts are in the list.
  * CI-compatible scripts are: check, format, typecheck, check:monorepo
  */
-export const hasCICompatibleScripts = (scripts: string[]): boolean => {
-  return scripts.some((script) => CI_COMPATIBLE_SCRIPTS.includes(script as typeof CI_COMPATIBLE_SCRIPTS[number]))
-}
+export const hasCICompatibleScripts = (scripts: string[]): boolean => scripts.some((script) => CI_COMPATIBLE_SCRIPTS.includes(script as typeof CI_COMPATIBLE_SCRIPTS[number]))
 
 export const github = {
   workflowPath: ".github/workflows/adamantite.yml",

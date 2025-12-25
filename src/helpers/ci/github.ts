@@ -3,16 +3,19 @@ import { join } from "node:path"
 import process from "node:process"
 import { Fault } from "faultier"
 import { fromPromise, ok, safeTry } from "neverthrow"
+import type { PackageManagerName } from "nypm"
+import { runScriptCommand } from "nypm"
 import { checkIfExists } from "#utils.ts"
 
-type PackageManager = "npm" | "yarn" | "pnpm" | "bun"
+// Supported package managers for GitHub Actions setup (excludes deno)
+type SupportedPackageManager = Exclude<PackageManagerName, "deno">
 
 interface WorkflowOptions {
-  packageManager: PackageManager
+  packageManager: SupportedPackageManager
   scripts: string[]
 }
 
-const setupSteps: Record<PackageManager, string> = {
+const setupSteps: Record<SupportedPackageManager, string> = {
   bun: `      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
@@ -50,18 +53,11 @@ const setupSteps: Record<PackageManager, string> = {
         run: npm ci`,
 }
 
-const runCommands: Record<PackageManager, (script: string) => string> = {
-  bun: (script) => `bun run ${script}`,
-  pnpm: (script) => `pnpm run ${script}`,
-  yarn: (script) => `yarn ${script}`,
-  npm: (script) => `npm run ${script}`,
-}
-
 const generateJob = (
   jobName: string,
   stepName: string,
   script: string,
-  packageManager: PackageManager
+  packageManager: SupportedPackageManager
 ): string => `
   ${jobName}:
     runs-on: ubuntu-latest
@@ -73,9 +69,9 @@ const generateJob = (
 ${setupSteps[packageManager]}
 
       - name: ${stepName}
-        run: ${runCommands[packageManager](script)}`
+        run: ${runScriptCommand(packageManager, script)}`
 
-const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string => {
+const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string | null => {
   const jobs: string[] = []
 
   // Map scripts to jobs
@@ -95,6 +91,11 @@ const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string 
     jobs.push(generateJob("monorepo", "Check monorepo", "check:monorepo", packageManager))
   }
 
+  // Return null if no CI-compatible scripts were selected
+  if (jobs.length === 0) {
+    return null
+  }
+
   const workflow = `name: CI
 
 on:
@@ -111,6 +112,15 @@ concurrency:
 jobs:${jobs.join("\n")}`
 
   return `${workflow}\n`
+}
+
+/**
+ * Check if any CI-compatible scripts are in the list.
+ * CI-compatible scripts are: check, format, typecheck, check:monorepo
+ */
+export const hasCICompatibleScripts = (scripts: string[]): boolean => {
+  const ciScripts = ["check", "format", "typecheck", "check:monorepo"]
+  return scripts.some((script) => ciScripts.includes(script))
 }
 
 export const github = {
@@ -135,6 +145,10 @@ export const github = {
 
       const workflowContent = generateWorkflow(options)
 
+      if (!workflowContent) {
+        return ok()
+      }
+
       yield* fromPromise(
         writeFile(join(workflowDir, "adamantite.yml"), workflowContent),
         (error) =>
@@ -155,6 +169,10 @@ export const github = {
       const workflowPath = join(process.cwd(), ".github", "workflows", "adamantite.yml")
       const workflowContent = generateWorkflow(options)
 
+      if (!workflowContent) {
+        return ok()
+      }
+
       yield* fromPromise(writeFile(workflowPath, workflowContent), (error) =>
         Fault.wrap(error)
           .withTag("FAILED_TO_WRITE_FILE")
@@ -168,3 +186,5 @@ export const github = {
       return ok()
     }),
 }
+
+export type { SupportedPackageManager, WorkflowOptions }

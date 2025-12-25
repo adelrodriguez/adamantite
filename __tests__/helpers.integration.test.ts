@@ -3,6 +3,7 @@ import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Bun from "bun"
+import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
 import { tsconfig } from "#helpers/tsconfig.ts"
@@ -529,6 +530,192 @@ describe("helpers integration", () => {
       if (updateResult.isErr()) {
         expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
       }
+    })
+  })
+
+  describe("github helper", () => {
+    test("should detect when adamantite.yml does not exist", async () => {
+      const exists = await github.exists()
+      expect(exists).toBe(false)
+    })
+
+    test("should create .github/workflows directory and adamantite.yml", async () => {
+      const createResult = await github.create({
+        packageManager: "bun",
+        scripts: ["check", "typecheck"],
+      })
+      createResult._unsafeUnwrap()
+
+      const exists = await github.exists()
+      expect(exists).toBe(true)
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("name: CI")
+      expect(content).toContain("lint:")
+      expect(content).toContain("typecheck:")
+      expect(content).toContain("Setup Bun")
+      expect(content).toContain("bun install --frozen-lockfile")
+      expect(content).toContain("bun run check")
+      expect(content).toContain("bun run typecheck")
+    })
+
+    test("should generate correct workflow for npm", async () => {
+      const createResult = await github.create({
+        packageManager: "npm",
+        scripts: ["check"],
+      })
+      createResult._unsafeUnwrap()
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("Setup Node.js")
+      expect(content).toContain('cache: "npm"')
+      expect(content).toContain("npm ci")
+      expect(content).toContain("npm run check")
+    })
+
+    test("should generate correct workflow for pnpm", async () => {
+      const createResult = await github.create({
+        packageManager: "pnpm",
+        scripts: ["check"],
+      })
+      createResult._unsafeUnwrap()
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("Setup pnpm")
+      expect(content).toContain("pnpm/action-setup@v4")
+      expect(content).toContain('cache: "pnpm"')
+      expect(content).toContain("pnpm install --frozen-lockfile")
+      expect(content).toContain("pnpm run check")
+    })
+
+    test("should generate correct workflow for yarn", async () => {
+      const createResult = await github.create({
+        packageManager: "yarn",
+        scripts: ["check"],
+      })
+      createResult._unsafeUnwrap()
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("Setup Node.js")
+      expect(content).toContain('cache: "yarn"')
+      expect(content).toContain("yarn install --frozen-lockfile")
+      expect(content).toContain("yarn run check")
+    })
+
+    test("should include all CI-compatible scripts as jobs", async () => {
+      const createResult = await github.create({
+        packageManager: "bun",
+        scripts: ["check", "format", "typecheck", "check:monorepo"],
+      })
+      createResult._unsafeUnwrap()
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("lint:")
+      expect(content).toContain("format:")
+      expect(content).toContain("typecheck:")
+      expect(content).toContain("monorepo:")
+    })
+
+    test("should not create workflow when no CI-compatible scripts", async () => {
+      const createResult = await github.create({
+        packageManager: "bun",
+        scripts: ["fix", "fix:monorepo"],
+      })
+      createResult._unsafeUnwrap()
+
+      // The workflow should not be created
+      const exists = await github.exists()
+      expect(exists).toBe(false)
+    })
+
+    test("should update existing workflow", async () => {
+      // Create initial workflow
+      mkdirSync(".github/workflows", { recursive: true })
+      await Bun.write(".github/workflows/adamantite.yml", "name: Old Workflow")
+
+      const updateResult = await github.update({
+        packageManager: "bun",
+        scripts: ["check"],
+      })
+      updateResult._unsafeUnwrap()
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("name: CI")
+      expect(content).toContain("lint:")
+      expect(content).not.toContain("Old Workflow")
+    })
+
+    test("should include concurrency settings", async () => {
+      const createResult = await github.create({
+        packageManager: "bun",
+        scripts: ["check"],
+      })
+      createResult._unsafeUnwrap()
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("concurrency:")
+      expect(content).toContain("cancel-in-progress: true")
+    })
+
+    test("should handle create() failure when directory creation fails", async () => {
+      // Create a file with the name .github to prevent directory creation
+      writeFileSync(".github", "not a directory")
+
+      const createResult = await github.create({
+        packageManager: "bun",
+        scripts: ["check"],
+      })
+      expect(createResult.isErr()).toBe(true)
+      if (createResult.isErr()) {
+        expect(createResult.error.tag).toBe("FAILED_TO_CREATE_DIRECTORY")
+      }
+    })
+
+    test("should handle update() failure when writing workflow fails", async () => {
+      // Create .github/workflows directory
+      mkdirSync(".github/workflows", { recursive: true })
+      // Create a read-only file to prevent writing
+      writeFileSync(".github/workflows/adamantite.yml", "name: Old")
+      chmodSync(".github/workflows/adamantite.yml", 0o444) // Read-only
+
+      const updateResult = await github.update({
+        packageManager: "bun",
+        scripts: ["check"],
+      })
+      expect(updateResult.isErr()).toBe(true)
+      if (updateResult.isErr()) {
+        expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
+      }
+    })
+  })
+
+  describe("hasCICompatibleScripts", () => {
+    test("should return true when check script is present", () => {
+      expect(hasCICompatibleScripts(["check"])).toBe(true)
+    })
+
+    test("should return true when format script is present", () => {
+      expect(hasCICompatibleScripts(["format"])).toBe(true)
+    })
+
+    test("should return true when typecheck script is present", () => {
+      expect(hasCICompatibleScripts(["typecheck"])).toBe(true)
+    })
+
+    test("should return true when check:monorepo script is present", () => {
+      expect(hasCICompatibleScripts(["check:monorepo"])).toBe(true)
+    })
+
+    test("should return false when only fix scripts are present", () => {
+      expect(hasCICompatibleScripts(["fix", "fix:monorepo"])).toBe(false)
+    })
+
+    test("should return false for empty array", () => {
+      expect(hasCICompatibleScripts([])).toBe(false)
+    })
+
+    test("should return true when mix of CI and non-CI scripts", () => {
+      expect(hasCICompatibleScripts(["fix", "check", "fix:monorepo"])).toBe(true)
     })
   })
 })

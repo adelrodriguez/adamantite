@@ -25,7 +25,7 @@ const setupSteps: Record<PackageManagerName, string> = {
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "pnpm"
@@ -34,7 +34,7 @@ const setupSteps: Record<PackageManagerName, string> = {
         run: pnpm install --frozen-lockfile`,
 
   yarn: `      - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "yarn"
@@ -43,7 +43,7 @@ const setupSteps: Record<PackageManagerName, string> = {
         run: yarn install --frozen-lockfile`,
 
   npm: `      - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: "npm"
@@ -80,19 +80,19 @@ const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string 
   const jobs: string[] = []
 
   // Map scripts to jobs
-  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[0])) { // check
+  if (scripts.includes("check")) {
     jobs.push(generateJob("lint", "Run linter", "check", packageManager))
   }
 
-  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[1])) { // format
+  if (scripts.includes("format")) {
     jobs.push(generateJob("format", "Check formatting", "format --check", packageManager))
   }
 
-  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[2])) { // typecheck
+  if (scripts.includes("typecheck")) {
     jobs.push(generateJob("typecheck", "Run type check", "typecheck", packageManager))
   }
 
-  if (scripts.includes(CI_COMPATIBLE_SCRIPTS[3])) { // check:monorepo
+  if (scripts.includes("check:monorepo")) {
     jobs.push(generateJob("monorepo", "Check monorepo", "check:monorepo", packageManager))
   }
 

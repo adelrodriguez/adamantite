@@ -5,6 +5,7 @@ import * as p from "@clack/prompts"
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
+import { github } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
@@ -180,6 +181,27 @@ const setupEditors = (editors: string[]) =>
 
     if (editors.includes("zed")) {
       // TODO: Implement Zed configuration
+    }
+
+    return ok()
+  })
+
+const setupGitHubActions = (
+  packageManager: "npm" | "yarn" | "pnpm" | "bun",
+  scripts: string[]
+) =>
+  safeTry(async function* () {
+    const spinner = p.spinner()
+    spinner.start("Setting up GitHub Actions workflow...")
+
+    if (await github.exists()) {
+      spinner.message("`.github/workflows/adamantite.yml` found, updating...")
+      yield* github.update({ packageManager, scripts })
+      spinner.stop("GitHub Actions workflow updated successfully.")
+    } else {
+      spinner.message("Creating `.github/workflows/adamantite.yml`...")
+      yield* github.create({ packageManager, scripts })
+      spinner.stop("GitHub Actions workflow created successfully.")
     }
 
     return ok()

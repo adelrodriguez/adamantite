@@ -37,7 +37,7 @@
   "exports": {
     ".": "./presets/biome.jsonc",
     "./biome": "./presets/biome.jsonc",
-    "./tsconfig": "./presets/tsconfig.json",
+    "./typescript": "./presets/tsconfig.json",
     "./presets/*": "./presets/*"
   },
   "scripts": {

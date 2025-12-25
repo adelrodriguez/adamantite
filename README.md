@@ -33,12 +33,21 @@ npx adamantite init
 
 Adamantite will automatically configure your project with linting, formatting, and type-safety rules.
 
+```shell
+adamantite check          # Check code for issues without fixing using oxlint
+adamantite fix            # Fix code issues using oxlint
+adamantite format         # Format code using oxfmt
+adamantite typecheck      # Run TypeScript type checking using the strict preset
+adamantite monorepo       # Check monorepo for dependency issues using Sherif
+adamantite update         # Update Adamantite's dependencies to the latest compatible versions
+```
+
 ## Features
 
-- **⚡ Fast performance**: Built on Biome's Rust-based architecture for efficient linting and formatting
-- **🔍 Extensive linting**: 200+ rules covering correctness, performance, security, and accessibility
+- **⚡ Fast performance**: Built on oxlint's Rust-based architecture for 10-40x faster linting than ESLint
+- **🔍 Extensive linting**: 500+ rules covering correctness, performance, security, and accessibility
 - **🎯 Zero configuration**: Works out of the box with sensible defaults, no setup required
-- **🔧 Single tool solution**: Replaces ESLint + Prettier + multiple config files with one unified approach
+- **🔧 Single tool solution**: Combines oxlint + oxfmt for linting and formatting
 - **🛡️ Strict type safety**: Comes with a strict TypeScript preset to improve type safety across your codebase
 - **🏗️ Monorepo support**: Unified configuration and dependency management across workspace packages
 - **🤖 AI-friendly patterns**: Consistent code style designed for effective AI collaboration
@@ -53,8 +62,9 @@ npx adamantite init
 
 This interactive command will:
 
-- Install Adamantite and [Biome](https://biomejs.dev/) as dev dependencies
-- Create `biome.jsonc` with opinionated presets
+- Install Adamantite, [oxlint](https://oxc.rs/docs/guide/usage/linter.html), and [oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) as dev dependencies
+- Create `.oxlintrc.json` with opinionated presets
+- Create `.oxfmtrc.json` with formatting configuration
 - Set up `tsconfig.json` with strict TypeScript rules
 - Add lint/format scripts to your `package.json`
 - Configure editor settings (VSCode/Cursor/Windsurf)
@@ -66,10 +76,13 @@ If you prefer manual configuration:
 
 ```shell
 # Install dependencies
-npm install --save-dev adamantite @biomejs/biome
+npm install --save-dev adamantite oxlint oxfmt
 
-# Extend the Biome configuration
-echo '{ "extends": ["adamantite"] }' > biome.jsonc
+# Extend the oxlint configuration
+echo '{ "extends": ["adamantite/lint"] }' > .oxlintrc.json
+
+# Create oxfmt configuration (uses defaults)
+echo '{}' > .oxfmtrc.json
 
 # Extend TypeScript configuration
 echo '{ "extends": "adamantite/typescript" }' > tsconfig.json
@@ -109,21 +122,6 @@ adamantite fix src/utils.ts
 adamantite fix --unsafe
 ```
 
-### `adamantite ci`
-
-Run in continuous integration environments:
-
-```shell
-# Basic CI check
-adamantite ci
-
-# With GitHub reporter (for PR comments)
-adamantite ci --github
-
-# Include monorepo checks
-adamantite ci --monorepo
-```
-
 ### `adamantite monorepo`
 
 Special tooling for monorepo projects using [Sherif](https://github.com/QuiiBz/sherif):
@@ -154,38 +152,29 @@ adamantite update
 
 ## Presets
 
-### Biome Configuration ([biome.jsonc](./biome.jsonc))
+### Linting ([presets/oxlint/](./presets/oxlint/))
 
-Adamantite's Biome preset includes:
+Adamantite provides comprehensive linting rules for TypeScript and JavaScript:
 
-- **Formatting**: 2-space indentation, 80-character line width, LF line endings
-- **Import Organization**: Automatic import sorting with custom groups (Bun → Node → Packages → Aliases)
-- **Linting Rules**: 200+ rules covering:
-  - Code correctness and bug prevention
-  - Performance optimizations
-  - Security best practices
-  - Accessibility guidelines
-  - React/JSX patterns
-- **File Patterns**: Pre-configured for TypeScript, JavaScript, JSON, and more
+#### Core ([core.json](./presets/oxlint/core.json))
 
-### TypeScript Configuration ([presets/tsconfig.json](./presets/tsconfig.json))
+Extensive ruleset covering:
 
-The TypeScript preset includes strict settings for maximum type safety:
+- **Correctness**: Bug prevention and code correctness enforcement
+- **Performance**: Optimization patterns and performance best practices
+- **Restriction**: Enforcing coding standards and preventing problematic patterns
+- **Suspicious**: Detecting code smells and potential bugs
+- **Pedantic**: Strict code quality and consistency enforcement
+- **Style**: Consistent code formatting and naming conventions
+- **Nursery**: Experimental rules under active development
 
-```json
-{
-  "compilerOptions": {
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitReturns": true,
-    "verbatimModuleSyntax": true
-  }
-}
-```
+### Formatting ([presets/oxfmt.json](./presets/oxfmt.json))
 
-These settings catch errors at compile-time that would otherwise cause runtime failures.
+Opinionated code formatting with oxfmt, configured for consistency and readability. Includes automatic import sorting and organization.
+
+### TypeScript ([presets/tsconfig.json](./presets/tsconfig.json))
+
+Strict TypeScript configuration for maximum type safety. Catches errors at compile-time that would otherwise cause runtime failures.
 
 ## 🛠️ Development
 

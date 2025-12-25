@@ -1,10 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
-import type { PackageManagerName } from "nypm"
 import { Fault } from "faultier"
 import { fromPromise, ok, safeTry } from "neverthrow"
-import { runScriptCommand } from "nypm"
+import { type PackageManagerName, runScriptCommand } from "nypm"
 import { checkIfExists } from "#utils.ts"
 
 interface WorkflowOptions {

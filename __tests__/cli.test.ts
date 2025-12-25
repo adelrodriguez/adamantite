@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
+import type { PackageJson } from "type-fest"
 import Bun, { spawn } from "bun"
 
 const LOG_PREFIX_REGEX = /^\[log\]\s*/
@@ -19,10 +20,10 @@ describe("CLI", () => {
       await proc.exited
 
       // Read package.json to get expected version
-      const packageJson = await Bun.file("package.json").json()
+      const packageJson = (await Bun.file("package.json").json()) as PackageJson
       // Strip citty's [log] prefix if present (added by consola in CI environments)
       const version = output.trim().replace(LOG_PREFIX_REGEX, "")
-      expect(version).toBe(packageJson.version)
+      expect(version).toBe(packageJson.version ?? "")
 
       expect(proc.exitCode).toBe(0)
     })

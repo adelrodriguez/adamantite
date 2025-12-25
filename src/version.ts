@@ -1,8 +1,21 @@
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { Fault } from "faultier"
+import { readPackageJson } from "#utils.ts"
 
-export function getPackageVersion() {
-  const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf-8"))
+export async function getPackageVersion() {
+  const packageJson = await readPackageJson()
 
-  return packageJson.version
+  if (packageJson.isErr()) {
+    throw packageJson.error
+  }
+
+  const version = packageJson.value.version
+
+  if (!version) {
+    throw Fault.create("MISSING_PACKAGE_VERSION").withDescription(
+      "Missing package version",
+      "The package version is not specified in the package.json file."
+    )
+  }
+
+  return version
 }

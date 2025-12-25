@@ -10,6 +10,7 @@ import {
   checkIsMonorepo,
   defineCommand,
   getPackageManagerName,
+  isJsonObject,
   mergeConfig,
   normalizeDependencyVersion,
   parseJson,
@@ -31,7 +32,7 @@ let spawnSyncResult: {
   stderr: Buffer.from(""),
 }
 
-mock.module("node:child_process", () => ({
+void mock.module("node:child_process", () => ({
   spawnSync: mock(() => spawnSyncResult),
 }))
 
@@ -181,6 +182,22 @@ describe("utils", () => {
     })
   })
 
+  describe("isJsonObject", () => {
+    test("should return true for plain JSON objects", () => {
+      expect(isJsonObject({})).toBe(true)
+      expect(isJsonObject({ a: 1, b: "x", c: null, d: [1, 2, 3] })).toBe(true)
+    })
+
+    test("should return false for null, arrays, and primitives", () => {
+      expect(isJsonObject(null)).toBe(false)
+      expect(isJsonObject([])).toBe(false)
+      expect(isJsonObject([1, 2, 3])).toBe(false)
+      expect(isJsonObject("x")).toBe(false)
+      expect(isJsonObject(123)).toBe(false)
+      expect(isJsonObject(true)).toBe(false)
+    })
+  })
+
   describe("mergeConfig", () => {
     test("should merge two objects", () => {
       const base = { a: 1, b: 2 }
@@ -188,7 +205,7 @@ describe("utils", () => {
       const result = mergeConfig(base, override)
 
       expect(result.isOk()).toBe(true)
-      // defu merges left-to-right, so base (first arg) wins for 'b'
+      // Defu merges left-to-right, so base (first arg) wins for 'b'
       expect(result._unsafeUnwrap()).toEqual({ a: 1, b: 2, c: 4 })
     })
 
@@ -198,7 +215,7 @@ describe("utils", () => {
       const result = mergeConfig(first, second)
 
       expect(result.isOk()).toBe(true)
-      // defu merges left-to-right, so first argument wins
+      // Defu merges left-to-right, so first argument wins
       expect(result._unsafeUnwrap()).toEqual({ a: 1, b: 2 })
     })
 
@@ -208,7 +225,7 @@ describe("utils", () => {
       const result = mergeConfig(base, override)
 
       expect(result.isOk()).toBe(true)
-      // defu merges left-to-right, so base values win
+      // Defu merges left-to-right, so base values win
       expect(result._unsafeUnwrap()).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
     })
 
@@ -377,19 +394,19 @@ describe("utils", () => {
 
   describe("printTitle", () => {
     let originalColumns: number | undefined
-    let originalConsoleLog: typeof console.log
+    let originalConsoleInfo: typeof console.info
     let callCount: number
 
     beforeEach(() => {
       originalColumns = process.stdout.columns
-      // biome-ignore lint/suspicious/noConsole: saving original console.log for restoration
-      originalConsoleLog = console.log
+      // oxlint-disable-next-line no-console - saving original console.info for restoration
+      originalConsoleInfo = console.info
       callCount = 0
       const mockLog = mock(() => {
-        callCount++
+        callCount += 1
       })
 
-      console.log = mockLog as typeof console.log
+      console.info = mockLog as typeof console.info
     })
 
     afterEach(() => {
@@ -399,7 +416,7 @@ describe("utils", () => {
         configurable: true,
       })
 
-      console.log = originalConsoleLog
+      console.info = originalConsoleInfo
     })
 
     test("should print title when terminal is wide enough", () => {

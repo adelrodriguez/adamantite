@@ -3,12 +3,12 @@ import { log } from "@clack/prompts"
 import { Fault } from "faultier"
 import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
-import { biome } from "#helpers/packages/biome.ts"
+import { oxlint } from "#helpers/packages/oxlint.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
   command: "fix [files..]",
-  describe: "Fix issues in code using Biome",
+  describe: "Fix issues in code using oxlint",
   builder: (yargs) =>
     yargs
       .positional("files", {
@@ -16,25 +16,47 @@ export default defineCommand({
         type: "string",
         array: true,
       })
-      .option("unsafe", {
+      .option("suggested", {
         type: "boolean",
-        description: "Apply unsafe fixes",
+        description: "Apply suggested fixes",
+        default: false,
+      })
+      .option("dangerous", {
+        type: "boolean",
+        description: "Apply dangerous fixes",
+        default: false,
+      })
+      .option("all", {
+        type: "boolean",
+        description: "Apply all fixes, including suggested and dangerous fixes",
+        default: false,
       }),
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
 
-      const args = ["check", "--write"]
+      const args = new Set<string>(["--type-aware", "--fix"])
 
-      if (argv.unsafe) {
-        args.push("--unsafe")
+      if (argv.suggested) {
+        args.add("--fix-suggestions")
+      }
+
+      if (argv.dangerous) {
+        args.add("--fix-dangerously")
+      }
+
+      if (argv.all) {
+        args.add("--fix-suggestions")
+        args.add("--fix-dangerously")
       }
 
       if (argv.files && argv.files.length > 0) {
-        args.push(...argv.files)
+        for (const file of argv.files) {
+          args.add(file)
+        }
       }
 
-      const command = dlxCommand(packageManager, biome.name, { args })
+      const command = dlxCommand(packageManager, oxlint.name, { args: Array.from(args) })
 
       yield* runCommand(command)
 

@@ -9,9 +9,11 @@ import typecheck from "#commands/typecheck.ts"
 import update from "#commands/update.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
-yargs(hideBin(process.argv))
+const version = await getPackageVersion()
+
+void yargs(hideBin(process.argv))
   .scriptName("adamantite")
-  .version(getPackageVersion())
+  .version(version)
   .command(check)
   .command(fix)
   .command(format)

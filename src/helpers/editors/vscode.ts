@@ -1,8 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Fault } from "faultier"
-import { fromPromise, ok, safeTry } from "neverthrow"
-import { checkIfExists, mergeConfig, parseJson } from "#utils.ts"
+import { err, fromPromise, ok, safeTry } from "neverthrow"
+import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const vscode = {
   config: {
@@ -10,7 +10,7 @@ export const vscode = {
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.codeActionsOnSave": {
-      "source.fixAll.biome": "explicit",
+      "source.fixAll.oxc": "explicit",
     },
     "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]": {
       "editor.defaultFormatter": "oxc.oxc-vscode",
@@ -49,7 +49,7 @@ export const vscode = {
     safeTry(async function* () {
       const vscodePath = join(process.cwd(), ".vscode", "settings.json")
 
-      const vscodeFile = yield* fromPromise(readFile(vscodePath, "utf-8"), (error) =>
+      const vscodeFile = yield* fromPromise(readFile(vscodePath, "utf8"), (error) =>
         Fault.wrap(error)
           .withTag("FAILED_TO_READ_FILE")
           .withDescription(
@@ -61,6 +61,17 @@ export const vscode = {
 
       const existingConfig = yield* parseJson(vscodeFile)
 
+      // Merge config: Adamantite's config takes precedence (first argument in defu)
+      // This ensures Adamantite's settings are always applied
+      // Empty configs are allowed and will be merged with Adamantite's config
+      if (!isJsonObject(existingConfig)) {
+        return err(
+          Fault.create("INVALID_CONFIG_FORMAT").withDescription(
+            "Invalid .vscode/settings.json format",
+            "The VS Code settings file must be a JSON object."
+          )
+        )
+      }
       const newConfig = yield* mergeConfig(vscode.config, existingConfig)
 
       yield* fromPromise(

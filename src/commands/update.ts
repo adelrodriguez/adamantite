@@ -3,8 +3,8 @@ import { cancel, confirm, intro, isCancel, log, outro, spinner } from "@clack/pr
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
-import { biome } from "#helpers/packages/biome.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
+import { oxlint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { defineCommand, normalizeDependencyVersion, printTitle, readPackageJson } from "#utils.ts"
 
@@ -12,7 +12,7 @@ export default defineCommand({
   command: "update",
   describe: "Update adamantite dependencies to latest compatible versions",
   builder: (yargs) => yargs,
-  handler: async () =>
+  handler: () =>
     safeTry(async function* () {
       const packageJson = yield* readPackageJson()
 
@@ -21,14 +21,14 @@ export default defineCommand({
       intro("💠 adamantite update")
 
       // Detect updates needed
-      const updates: {
+      const updates: Array<{
         name: string
         currentVersion: string
         targetVersion: string
         isDevDependency: boolean
-      }[] = []
+      }> = []
 
-      for (const pkg of [biome, oxfmt, sherif]) {
+      for (const pkg of [oxlint, oxfmt, sherif]) {
         const dependency = packageJson.devDependencies?.[pkg.name]
         if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
           updates.push({

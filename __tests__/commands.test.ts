@@ -80,7 +80,7 @@ describe("commands", () => {
 
       await proc.exited
 
-      // Exit code might be non-zero if biome is not installed or finds issues,
+      // Exit code might be non-zero if oxlint is not installed or finds issues,
       // but should not exit with code 1 due to package manager error
       // We just verify it doesn't crash immediately
       expect(proc.exitCode).toBeDefined()
@@ -120,7 +120,7 @@ describe("commands", () => {
 
       await proc.exited
 
-      // Exit code might be non-zero if biome is not installed or finds issues,
+      // Exit code might be non-zero if oxlint is not installed or finds issues,
       // but should not exit with code 1 due to package manager error
       expect(proc.exitCode).toBeDefined()
     })

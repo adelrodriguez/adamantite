@@ -10,9 +10,9 @@ declare module "faultier" {
     FAILED_TO_RUN_COMMAND: { command?: string }
     FAILED_TO_WRITE_FILE: { path?: string }
     FILE_NOT_FOUND: { path?: string }
-    INVALID_BIOME_CONFIG: { path?: string }
-    INVALID_OXFMT_CONFIG: { path?: string }
+    INVALID_CONFIG_FORMAT: { path?: string }
     NO_PACKAGE_MANAGER: never
+    MISSING_PACKAGE_VERSION: never
     OPERATION_CANCELLED: never
     UNKNOWN_SCRIPT: { script: string }
   }

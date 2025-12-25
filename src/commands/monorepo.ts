@@ -28,7 +28,7 @@ export default defineCommand({
 
       yield* runCommand(command)
 
-      return ok(undefined)
+      return ok()
     }).match(
       () => {
         // Exit the process with success code

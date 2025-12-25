@@ -1,8 +1,8 @@
 import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Fault } from "faultier"
-import { fromPromise, ok, safeTry } from "neverthrow"
-import { checkIfExists, mergeConfig, parseJson } from "#utils.ts"
+import { err, fromPromise, ok, safeTry } from "neverthrow"
+import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const typescript = {
   name: "tsc",
@@ -23,7 +23,7 @@ export const typescript = {
   update: () =>
     safeTry(async function* () {
       const tsconfigFile = yield* fromPromise(
-        readFile(join(process.cwd(), "tsconfig.json"), "utf-8"),
+        readFile(join(process.cwd(), "tsconfig.json"), "utf8"),
         (error) =>
           Fault.wrap(error)
             .withTag("FAILED_TO_READ_FILE")
@@ -34,6 +34,17 @@ export const typescript = {
       )
       const existingConfig = yield* parseJson(tsconfigFile)
 
+      // Merge config: Adamantite's config takes precedence (first argument in defu)
+      // This ensures Adamantite's extends is always applied
+      // Empty configs are allowed and will be merged with Adamantite's config
+      if (!isJsonObject(existingConfig)) {
+        return err(
+          Fault.create("INVALID_CONFIG_FORMAT").withDescription(
+            "Invalid tsconfig.json format",
+            "The tsconfig.json file must be a JSON object."
+          )
+        )
+      }
       const newConfig = yield* mergeConfig(typescript.config, existingConfig)
 
       yield* fromPromise(

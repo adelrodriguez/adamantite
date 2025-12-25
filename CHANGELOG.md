@@ -1,5 +1,31 @@
 # adamantite
 
+## 0.15.0
+
+### Minor Changes
+
+- 4f94699: Add `format` command powered by oxfmt
+
+  Formats JavaScript, TypeScript, JSX, TSX, JSON, JSONC, and CSS files using oxfmt (oxc's formatter). The formatter is configured via `.oxfmtrc.json` with opinionated defaults including:
+
+  - 100 character line width
+  - 2 space indentation
+  - No semicolons
+  - Sorted imports with customizable grouping
+  - Trailing commas for ES5 compatibility
+
+  Configuration is automatically generated when running `adamantite init` or `adamantite update`. VSCode settings are updated to use oxc-vscode extension as the default formatter.
+
+- 69cb0be: Improve `init` and `monorepo` commands with better UX
+
+  The `init` command now provides clearer interactive prompts using @clack/prompts, detects monorepo configurations automatically, and offers granular control over which scripts to install. Users can choose individual scripts (check, fix, check:monorepo, fix:monorepo) instead of all-or-nothing installation.
+
+  The `monorepo` command now requires the `--fix` flag to auto-fix issues. Running without the flag only checks for issues, making the behavior consistent with the `check` command and preventing unintended modifications.
+
+### Patch Changes
+
+- ded7779: Update faultier dependency to improve error handling and CLI output
+
 ## 0.14.2
 
 ### Patch Changes
@@ -7,16 +33,19 @@
 - 1cd1eea: Improve error handling and refactor CLI commands for consistency
 
   **Error Handling Improvements:**
+
   - Enhanced error logging for package manager detection failures across all CLI commands
   - Improved user cancellation handling in interactive prompts (`init`, `update`)
   - Commands now display clearer error messages when operations fail, making troubleshooting easier
 
   **Refactoring:**
+
   - Refactored all CLI commands (`check`, `ci`, `fix`, `monorepo`, `init`, `update`) to use `.match()` method on `safeTry` results for consistent error handling pattern
   - Standardized error handling across the codebase, improving maintainability and readability
   - Cleaned up unnecessary intermediate variable assignments in `init` command
 
   **Type Improvements:**
+
   - Updated `types.ts` with more precise type definitions, using `never` for empty error data and optional properties where appropriate
 
 ## 0.14.1
@@ -40,11 +69,13 @@
   This release updates the Biome formatter preset with more practical defaults and includes significant internal improvements to error handling and code organization. All changes are backwards compatible - CLI commands and package exports remain unchanged.
 
   **Biome Preset Updates:**
+
   - **Increased line width** from 80 to 100 characters for better readability on modern displays
   - **Relaxed cognitive complexity** rule from error to warning level and increased threshold from 20 to 40 for more pragmatic complexity checks
   - These changes will affect formatting and linting output but can be overridden in your local `biome.jsonc` configuration
 
   **Internal Refactoring:**
+
   - **Result-based error handling**: Introduced `neverthrow` library for type-safe error handling across all commands, replacing try-catch patterns with composable Result types
   - **Improved error messages**: All commands now provide better error context using structured error flattening
   - **Modular helper organization**: Restructured helper functions from monolithic file into organized modules:
@@ -55,6 +86,7 @@
   - **Relocated preset files** from `src/presets/` to `presets/` directory (package exports unchanged - users are unaffected)
 
   **Dependencies:**
+
   - Added `neverthrow@8.2.0` for Result type handling
   - Added `faultier@^1.0.3` for error utilities
   - Moved `yargs` from devDependencies to dependencies
@@ -68,6 +100,7 @@
   This internal refactoring migrates the CLI implementation to use yargs instead of citty, providing more robust argument parsing and better TypeScript support. The change also introduces import maps with "#\*" syntax for cleaner internal module resolution.
 
   **Technical changes:**
+
   - Migrated all command handlers from citty's `defineCommand` to yargs command modules
   - Added `#*` import maps in package.json pointing to `./src/*` for path-based imports
   - Updated all internal imports to use `#commands/*` and `#utils.ts` syntax
@@ -86,15 +119,18 @@
   **Updated Dependencies:**
 
   Development dependencies:
+
   - `@biomejs/biome` from 2.3.8 to 2.3.10
   - `@types/bun` from 1.3.3 to 1.3.5
   - `tsdown` from 0.17.0-beta.4 to 0.18.1
   - `type-fest` from 5.2.0 to 5.3.1
 
   Peer dependencies:
+
   - `@biomejs/biome` from 2.3.8 to 2.3.10
 
   **Internal Changes:**
+
   - Updated hardcoded `biome.version` in helpers from 2.3.2 to 2.3.10 to match installed package
   - Updated hardcoded `sherif.version` in helpers from 1.7.0 to 1.9.0 to match installed package
 
@@ -103,11 +139,13 @@
 - 89f6f83: Add self-referencing dependency and update development tooling
 
   **New Features:**
+
   - Added `adamantite` as a dependency to enable dogfooding and self-testing of the package configuration
 
   **Updated Dependencies:**
 
   Development dependencies:
+
   - `sherif` from 1.7.0 to 1.7.1
   - `tsdown` from 0.15.11 to 0.15.12
 
@@ -118,6 +156,7 @@
   **Updated Dependencies:**
 
   Development dependencies:
+
   - `@biomejs/biome` from 2.3.2 to 2.3.8
   - `@changesets/cli` from 2.29.7 to 2.29.8
   - `@types/bun` from 1.3.1 to 1.3.3
@@ -126,9 +165,11 @@
   - `type-fest` from 5.1.0 to 5.2.0
 
   Peer dependencies:
+
   - `@biomejs/biome` from 2.3.2 to 2.3.8
 
   Package manager:
+
   - `bun` from 1.2.20 to 1.3.3
 
   These updates bring the latest bug fixes, performance improvements, and new features from upstream packages, ensuring the development environment stays current with the latest tooling improvements.
@@ -142,12 +183,15 @@
   **Updated Dependencies:**
 
   Core dependencies:
+
   - `@biomejs/biome` from 2.3.0 to 2.3.2
 
   Development dependencies:
+
   - `tsdown` from 0.15.9 to 0.15.11
 
   **Configuration Changes:**
+
   - **Script and style indentation**: Changed `indentScriptAndStyle` from `false` to `true` in the HTML formatter configuration. This enables automatic indentation of code within `<script>` and `<style>` tags in HTML and JSX files, improving code readability and consistency. Previously, content within these tags was not indented, but now they will be formatted with proper indentation matching the rest of the document.
 
   These updates bring the latest bug fixes and improvements from Biome 2.3.2, along with enhanced formatting consistency for HTML and JSX files containing embedded scripts and styles.
@@ -161,18 +205,22 @@
   **Updated Dependencies:**
 
   Core dependencies:
+
   - `@biomejs/biome` from 2.2.6 to 2.3.0
 
   Development dependencies:
+
   - `@types/bun` from 1.3.0 to 1.3.1
   - `sherif` from 1.6.1 to 1.7.0
   - `tsdown` from 0.15.7 to 0.15.9
 
   **Configuration Changes:**
+
   - **Line endings**: Changed from `"lf"` to `"auto"` for better cross-platform compatibility. The formatter will now preserve the existing line ending style in files rather than enforcing Unix-style line endings.
   - **New rule**: Added `useImageSize` rule (set to `"error"`) to enforce width and height attributes on image elements for improved performance and layout stability.
 
   **Development Environment:**
+
   - VSCode settings updated to use Biome as the default formatter
   - Added `test/` directory for future test infrastructure
 
@@ -185,6 +233,7 @@
 - 3121c4e: Update development dependencies to their latest versions
 
   Updated the following devDependencies:
+
   - `@biomejs/biome` from 2.2.5 to 2.2.6
   - `@types/bun` from 1.2.23 to 1.3.0
   - `tsdown` from 0.15.6 to 0.15.7
@@ -201,6 +250,7 @@
   **Breaking Changes:**
 
   The package structure has been reorganized to consolidate presets in the `src/presets` directory and adopt a more maintainable configuration pattern:
+
   - **Biome configuration**: The root `biome.jsonc` now extends from `src/presets/biome.jsonc` instead of containing the full configuration inline
   - **TypeScript preset**: Moved from `presets/tsconfig.json` to `src/presets/tsconfig.json` for consistency
   - **Package exports**: Added clean export paths via package.json exports field:
@@ -214,11 +264,13 @@
   **Migration:**
 
   If you're importing Adamantite's Biome configuration:
+
   - Update imports from `adamantite/biome.jsonc` to `adamantite` (the package main export)
   - If extending the TypeScript preset, update the path from `adamantite/presets/tsconfig.json` to `adamantite/tsconfig`
   - If your project relies on `verbatimModuleSyntax`, add it to your local tsconfig.json as it's no longer included in the preset
 
   **Internal improvements:**
+
   - Tests now validate local schema paths instead of remote URL formats, improving offline development experience
   - Configuration structure better aligns with modern preset patterns using `extends`
 
@@ -251,12 +303,14 @@
 - 4b6df97: Migrate CLI framework from Commander.js to citty for improved developer experience. This change brings better type safety through citty's TypeScript-first design, improved ergonomics as part of the UnJS ecosystem, and a more declarative command definition API.
 
   Key improvements:
+
   - **Better type safety**: Commands are now defined using `defineCommand()` with fully typed argument definitions
   - **Declarative API**: Command metadata, arguments, and handlers are defined in a single, clear structure rather than chained method calls
   - **Improved DX**: Arguments are automatically parsed and typed, with built-in support for positional arguments, boolean flags, and command metadata
   - **UnJS ecosystem**: citty is part of the UnJS ecosystem, providing better compatibility with other modern JavaScript tooling and conventions
 
 - 67d8ea3: Update development dependencies and TypeScript peer dependency requirement
+
   - Update tsdown from 0.15.2 to 0.15.6 for improved build performance and bug fixes
   - Update type-fest from 5.0.0 to 5.0.1 for latest type utilities
   - Update TypeScript from 5.9.2 to 5.9.3 for latest compiler improvements
@@ -305,11 +359,13 @@
 - b8ed24b: Rename CLI commands for clearer intent: `lint` → `check` and `format` → `fix`
 
   **Breaking Changes:**
+
   - The `lint` command is now `check` and only reports issues (no auto-fixing)
   - The `format` command is now `fix` and applies formatting and lint fixes
   - Update your scripts and workflows to use the new command names
 
   **Migration:**
+
   - Replace `adamantite lint` with `adamantite check` (for checking only)
   - Replace `adamantite format` with `adamantite fix` (for fixing issues)
 
@@ -340,6 +396,7 @@
 - a6a1853: Add `ci` command for continuous integration workflows with enhanced reporter options.
 
   ## CLI Enhancements
+
   - **Added**: `ci` command for running Biome CI checks in continuous integration environments
   - **Added**: `--github` flag to the `ci` command for GitHub Actions reporter output
   - **Added**: `--monorepo` flag to the `ci` command for additional monorepo-specific checks using Sherif
@@ -356,12 +413,14 @@
   ## Rule Changes
 
   ### A11y Section
+
   - **Added**: `noAutofocus` - error (previously off)
   - **Added**: `noNoninteractiveElementInteractions` - error
   - **Reorganized**: Better organization with JavaScript and CSS subsections
   - **Removed**: Verbose rule comments for cleaner configuration
 
   ### Complexity Section
+
   - **Added 25+ new rules** including:
     - `noExtraBooleanCast` - error
     - `noStaticOnlyClass` - error
@@ -391,6 +450,7 @@
   - **Changed**: `maxAllowedComplexity` increased from 18 to 20
 
   ### Correctness Section
+
   - **Added**: `noGlobalDirnameFilename` - error
   - **Added**: `noNestedComponentDefinitions` - error
   - **Added**: `noProcessGlobal` - off
@@ -404,6 +464,7 @@
   - **Removed**: `useImportExtensions` - off
 
   ### Nursery Section
+
   - **Enabled previously disabled rules**:
     - `noFloatingPromises` - error (was off)
     - `noMisusedPromises` - error (was off)
@@ -416,12 +477,14 @@
   - **Removed**: `noImportCycles` - off
 
   ### Performance Section
+
   - **Removed**: `noBarrelFile` - off
   - **Removed**: `noImgElement` - error
   - **Removed**: `noNamespaceImport` - off
   - **Removed**: `noReExportAll` - off
 
   ### Style Section
+
   - **Added**: `useConsistentObjectDefinitions` - error
   - **Added**: `useExportsLast` - error (was off)
   - **Added**: `useGroupedAccessorPairs` - error
@@ -437,6 +500,7 @@
   - **Removed**: `useComponentExportOnlyModules` - off
 
   ### Suspicious Section
+
   - **Added**: `noBitwiseOperators` - error
   - **Added**: `noConstantBinaryExpressions` - error
   - **Added**: `noTsIgnore` - error
@@ -448,6 +512,7 @@
   - **Added**: `noQuickfixBiome` - error
 
   ## CLI Enhancements
+
   - **Added**: `--summary` flag to the `lint` command for concise lint result reporting using Biome's summary reporter
 
   This update significantly strengthens the linting rules with a focus on code quality, consistency, and best practices while maintaining TypeScript and React compatibility.

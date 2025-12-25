@@ -1,9 +1,9 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
 import { Fault } from "faultier"
 import { fromPromise, ok, safeTry } from "neverthrow"
-import { checkIfExists, mergeConfig, parseJson } from "#utils.ts"
+import { checkIfExists } from "#utils.ts"
 
 type PackageManager = "npm" | "yarn" | "pnpm" | "bun"
 
@@ -12,17 +12,14 @@ interface WorkflowOptions {
   scripts: string[]
 }
 
-const getSetupSteps = (packageManager: PackageManager): string => {
-  switch (packageManager) {
-    case "bun":
-      return `      - name: Setup Bun
+const setupSteps: Record<PackageManager, string> = {
+  bun: `      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile`
+        run: bun install --frozen-lockfile`,
 
-    case "pnpm":
-      return `      - name: Setup pnpm
+  pnpm: `      - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
@@ -32,43 +29,32 @@ const getSetupSteps = (packageManager: PackageManager): string => {
           cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile`
+        run: pnpm install --frozen-lockfile`,
 
-    case "yarn":
-      return `      - name: Setup Node.js
+  yarn: `      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "yarn"
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile`
+        run: yarn install --frozen-lockfile`,
 
-    case "npm":
-    default:
-      return `      - name: Setup Node.js
+  npm: `      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci`
-  }
+        run: npm ci`,
 }
 
-const getRunCommand = (packageManager: PackageManager, script: string): string => {
-  switch (packageManager) {
-    case "bun":
-      return `bun run ${script}`
-    case "pnpm":
-      return `pnpm run ${script}`
-    case "yarn":
-      return `yarn ${script}`
-    case "npm":
-    default:
-      return `npm run ${script}`
-  }
+const runCommands: Record<PackageManager, (script: string) => string> = {
+  bun: (script) => `bun run ${script}`,
+  pnpm: (script) => `pnpm run ${script}`,
+  yarn: (script) => `yarn ${script}`,
+  npm: (script) => `npm run ${script}`,
 }
 
 const generateJob = (
@@ -76,8 +62,7 @@ const generateJob = (
   stepName: string,
   script: string,
   packageManager: PackageManager
-): string => {
-  return `
+): string => `
   ${jobName}:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -85,11 +70,10 @@ const generateJob = (
       - name: Checkout code
         uses: actions/checkout@v4
 
-${getSetupSteps(packageManager)}
+${setupSteps[packageManager]}
 
       - name: ${stepName}
-        run: ${getRunCommand(packageManager, script)}`
-}
+        run: ${runCommands[packageManager](script)}`
 
 const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string => {
   const jobs: string[] = []

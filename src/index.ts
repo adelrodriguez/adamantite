@@ -1,7 +1,6 @@
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 import check from "#commands/check.ts"
-import ci from "#commands/ci.ts"
 import fix from "#commands/fix.ts"
 import format from "#commands/format.ts"
 import init from "#commands/init.ts"
@@ -13,7 +12,6 @@ yargs(hideBin(process.argv))
   .scriptName("adamantite")
   .version(getPackageVersion())
   .command(check)
-  .command(ci)
   .command(fix)
   .command(format)
   .command(init)

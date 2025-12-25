@@ -286,6 +286,17 @@ export default defineCommand({
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
+      const enableGitHubActions = yield* fromSafePromise(
+        p.confirm({
+          message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
+          initialValue: false,
+        })
+      )
+
+      if (p.isCancel(enableGitHubActions)) {
+        return err(Fault.create("OPERATION_CANCELLED"))
+      }
+
       const hasBiome = scripts.includes("check") || scripts.includes("fix")
       const hasOxfmt = scripts.includes("format")
       const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
@@ -326,6 +337,10 @@ export default defineCommand({
       }
 
       yield* setupEditors(editors)
+
+      if (enableGitHubActions) {
+        yield* setupGitHubActions(packageManager as "npm" | "yarn" | "pnpm" | "bun", scripts)
+      }
 
       return ok()
     }).match(

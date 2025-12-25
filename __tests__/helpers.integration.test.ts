@@ -278,7 +278,7 @@ describe("helpers integration", () => {
       const config = JSON.parse(content)
 
       expect(config).toHaveProperty("extends")
-      expect(config.extends).toBe("adamantite/tsconfig")
+      expect(config.extends).toBe("adamantite/typescript")
     })
 
     test("should update existing tsconfig.json config", async () => {
@@ -313,7 +313,7 @@ describe("helpers integration", () => {
         strict: true,
       })
       expect(config.include).toEqual(["src/**/*"])
-      expect(config.extends).toBe("adamantite/tsconfig")
+      expect(config.extends).toBe("adamantite/typescript")
     })
 
     test("should preserve existing extends when updating", async () => {
@@ -339,7 +339,7 @@ describe("helpers integration", () => {
       const config = JSON.parse(content)
 
       // Our extends should override existing extends
-      expect(config.extends).toBe("adamantite/tsconfig")
+      expect(config.extends).toBe("adamantite/typescript")
       expect(config.compilerOptions).toEqual({ target: "ES2020" })
     })
 

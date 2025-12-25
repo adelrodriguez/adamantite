@@ -72,7 +72,7 @@ npm install --save-dev adamantite @biomejs/biome
 echo '{ "extends": ["adamantite"] }' > biome.jsonc
 
 # Extend TypeScript configuration
-echo '{ "extends": "adamantite/tsconfig" }' > tsconfig.json
+echo '{ "extends": "adamantite/typescript" }' > tsconfig.json
 ```
 
 ## 📋 Commands

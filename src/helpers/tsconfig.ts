@@ -5,7 +5,7 @@ import { fromPromise, ok, safeTry } from "neverthrow"
 import { checkIfExists, mergeConfig, parseJson } from "#utils.ts"
 
 export const tsconfig = {
-  config: { extends: "adamantite/tsconfig" },
+  config: { extends: "adamantite/typescript" },
   exists: () => checkIfExists(join(process.cwd(), "tsconfig.json")),
   create: () =>
     fromPromise(

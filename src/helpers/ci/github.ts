@@ -16,6 +16,16 @@ const setupSteps: Record<PackageManagerName, string> = {
   bun: `      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: \${{ runner.os }}-bun-\${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            \${{ runner.os }}-bun-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile`,
 
@@ -56,81 +66,59 @@ const setupSteps: Record<PackageManagerName, string> = {
         run: deno install --frozen`,
 }
 
-const generateJob = ({
-  jobName,
-  stepName,
-  script,
-  args,
-  packageManager,
-}: {
-  jobName: string
-  stepName: string
-  script: string
+/**
+ * Builds the command string for a given script and package manager.
+ * Special handling for Bun + format --check to avoid double-dash.
+ */
+const buildCommand = (
+  packageManager: PackageManagerName,
+  script: string,
   args?: string[]
-  packageManager: PackageManagerName
-}): string => `
-  ${jobName}:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-${setupSteps[packageManager]}
-
-      - name: ${stepName}
-        run: ${runScriptCommand(packageManager, script, { args })}`
+): string => runScriptCommand(packageManager, script, { args })
 
 const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string | null => {
-  const jobs: string[] = []
+  const matrixEntries: Array<{ name: string; command: string }> = []
 
-  // Map scripts to jobs
+  // Map scripts to matrix entries
   if (scripts.includes("check")) {
-    jobs.push(
-      generateJob({ jobName: "lint", stepName: "Run linter", script: "check", packageManager })
-    )
+    matrixEntries.push({
+      name: "lint",
+      command: buildCommand(packageManager, "check"),
+    })
   }
 
   if (scripts.includes("format")) {
-    jobs.push(
-      generateJob({
-        jobName: "format",
-        stepName: "Check formatting",
-        script: "format",
-        args: ["--check"],
-        packageManager,
-      })
-    )
+    matrixEntries.push({
+      name: "format",
+      command: buildCommand(packageManager, "format", ["--check"]),
+    })
   }
 
   if (scripts.includes("typecheck")) {
-    jobs.push(
-      generateJob({
-        jobName: "typecheck",
-        stepName: "Run type check",
-        script: "typecheck",
-        packageManager,
-      })
-    )
+    matrixEntries.push({
+      name: "types",
+      command: buildCommand(packageManager, "typecheck"),
+    })
   }
 
   if (scripts.includes("check:monorepo")) {
-    jobs.push(
-      generateJob({
-        jobName: "monorepo",
-        stepName: "Check monorepo",
-        script: "check:monorepo",
-        packageManager,
-      })
-    )
+    matrixEntries.push({
+      name: "monorepo",
+      command: buildCommand(packageManager, "check:monorepo"),
+    })
   }
 
   // Return null if no CI-compatible scripts were selected
-  if (jobs.length === 0) {
+  if (matrixEntries.length === 0) {
     return null
   }
 
-  const workflow = `name: CI
+  // Format matrix entries as YAML
+  const matrixInclude = matrixEntries
+    .map((entry) => `          - name: ${entry.name}\n            command: ${entry.command}`)
+    .join("\n")
+
+  const workflow = `name: adamantite
 
 on:
   push:
@@ -139,11 +127,32 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
 concurrency:
   group: \${{ github.workflow }}-\${{ github.ref }}
   cancel-in-progress: true
 
-jobs:${jobs.join("\n")}`
+jobs:
+  verify:
+    name: \${{ matrix.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+${matrixInclude}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+${setupSteps[packageManager]}
+
+      - name: Run \${{ matrix.name }}
+        run: \${{ matrix.command }}`
 
   return `${workflow}\n`
 }

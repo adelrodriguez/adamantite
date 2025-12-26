@@ -5,6 +5,7 @@ import fix from "#commands/fix.ts"
 import format from "#commands/format.ts"
 import init from "#commands/init.ts"
 import monorepo from "#commands/monorepo.ts"
+import typecheck from "#commands/typecheck.ts"
 import update from "#commands/update.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
@@ -16,6 +17,7 @@ yargs(hideBin(process.argv))
   .command(format)
   .command(init)
   .command(monorepo)
+  .command(typecheck)
   .command(update)
   .demandCommand(1)
   .strict()

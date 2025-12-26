@@ -1,17 +1,17 @@
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
+import type { PackageManagerName } from "nypm"
 import * as p from "@clack/prompts"
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
-import type { PackageManagerName } from "nypm"
 import { addDevDependency } from "nypm"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
-import { tsconfig } from "#helpers/tsconfig.ts"
+import { typescript } from "#helpers/packages/typescript.ts"
 import {
   checkIsMonorepo,
   defineCommand,
@@ -110,7 +110,7 @@ const addScripts = (scripts: string[]) =>
           packageJson.scripts.format = "adamantite format"
           break
         case "typecheck":
-          packageJson.scripts.typecheck = "tsc --noEmit"
+          packageJson.scripts.typecheck = "adamantite typecheck"
           break
         case "check:monorepo":
           packageJson.scripts["check:monorepo"] = "adamantite monorepo"
@@ -145,16 +145,16 @@ const setupTypescript = () =>
     const spinner = p.spinner()
     spinner.start("Setting up TypeScript config...")
 
-    if (await tsconfig.exists()) {
+    if (await typescript.exists()) {
       spinner.message("`tsconfig.json` found, updating...")
 
-      yield* tsconfig.update()
+      yield* typescript.update()
 
       spinner.stop("`tsconfig.json` updated successfully")
     } else {
       spinner.message("`tsconfig.json` not found, creating...")
 
-      yield* tsconfig.create()
+      yield* typescript.create()
 
       spinner.stop("`tsconfig.json` created successfully")
     }

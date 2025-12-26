@@ -6,7 +6,7 @@ import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
-import { tsconfig } from "#helpers/tsconfig.ts"
+import { typescript } from "#helpers/packages/typescript.ts"
 import { readPackageJson } from "#utils.ts"
 
 const SEMVER_REGEX = /^\d+\.\d+\.\d+$/
@@ -82,10 +82,10 @@ describe("helpers", () => {
     })
   })
 
-  describe("tsconfig", () => {
+  describe("typescript", () => {
     test("should provide a config that extends adamantite tsconfig preset", () => {
-      expect(tsconfig.config).toHaveProperty("extends")
-      expect(tsconfig.config.extends).toBe("adamantite/typescript")
+      expect(typescript.config).toHaveProperty("extends")
+      expect(typescript.config.extends).toBe("adamantite/typescript")
     })
   })
 

@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
+import type { PackageManagerName } from "nypm"
 import { Fault } from "faultier"
 import { fromPromise, ok, safeTry } from "neverthrow"
-import type { PackageManagerName } from "nypm"
 import { runScriptCommand } from "nypm"
 import { checkIfExists } from "#utils.ts"
 
@@ -11,8 +11,6 @@ interface WorkflowOptions {
   packageManager: PackageManagerName
   scripts: string[]
 }
-
-const CI_COMPATIBLE_SCRIPTS = ["check", "format", "typecheck", "check:monorepo"] as const
 
 const setupSteps: Record<PackageManagerName, string> = {
   bun: `      - name: Setup Bun
@@ -58,12 +56,19 @@ const setupSteps: Record<PackageManagerName, string> = {
         run: deno install --frozen`,
 }
 
-const generateJob = (
-  jobName: string,
-  stepName: string,
-  script: string,
+const generateJob = ({
+  jobName,
+  stepName,
+  script,
+  args,
+  packageManager,
+}: {
+  jobName: string
+  stepName: string
+  script: string
+  args?: string[]
   packageManager: PackageManagerName
-): string => `
+}): string => `
   ${jobName}:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -74,26 +79,50 @@ const generateJob = (
 ${setupSteps[packageManager]}
 
       - name: ${stepName}
-        run: ${runScriptCommand(packageManager, script)}`
+        run: ${runScriptCommand(packageManager, script, { args })}`
 
 const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string | null => {
   const jobs: string[] = []
 
   // Map scripts to jobs
   if (scripts.includes("check")) {
-    jobs.push(generateJob("lint", "Run linter", "check", packageManager))
+    jobs.push(
+      generateJob({ jobName: "lint", stepName: "Run linter", script: "check", packageManager })
+    )
   }
 
   if (scripts.includes("format")) {
-    jobs.push(generateJob("format", "Check formatting", "format --check", packageManager))
+    jobs.push(
+      generateJob({
+        jobName: "format",
+        stepName: "Check formatting",
+        script: "format",
+        args: ["--check"],
+        packageManager,
+      })
+    )
   }
 
   if (scripts.includes("typecheck")) {
-    jobs.push(generateJob("typecheck", "Run type check", "typecheck", packageManager))
+    jobs.push(
+      generateJob({
+        jobName: "typecheck",
+        stepName: "Run type check",
+        script: "typecheck",
+        packageManager,
+      })
+    )
   }
 
   if (scripts.includes("check:monorepo")) {
-    jobs.push(generateJob("monorepo", "Check monorepo", "check:monorepo", packageManager))
+    jobs.push(
+      generateJob({
+        jobName: "monorepo",
+        stepName: "Check monorepo",
+        script: "check:monorepo",
+        packageManager,
+      })
+    )
   }
 
   // Return null if no CI-compatible scripts were selected
@@ -123,7 +152,8 @@ jobs:${jobs.join("\n")}`
  * Check if any CI-compatible scripts are in the list.
  * CI-compatible scripts are: check, format, typecheck, check:monorepo
  */
-export const hasCICompatibleScripts = (scripts: string[]): boolean => scripts.some((script) => CI_COMPATIBLE_SCRIPTS.includes(script as typeof CI_COMPATIBLE_SCRIPTS[number]))
+export const hasCICompatibleScripts = (scripts: string[]): boolean =>
+  scripts.some((script) => ["check", "format", "typecheck", "check:monorepo"].includes(script))
 
 export const github = {
   workflowPath: ".github/workflows/adamantite.yml",
@@ -151,16 +181,14 @@ export const github = {
         return ok()
       }
 
-      yield* fromPromise(
-        writeFile(join(workflowDir, "adamantite.yml"), workflowContent),
-        (error) =>
-          Fault.wrap(error)
-            .withTag("FAILED_TO_WRITE_FILE")
-            .withDescription(
-              "Failed to write GitHub Actions workflow",
-              "We're unable to write the GitHub Actions workflow file."
-            )
-            .withContext({ path: join(workflowDir, "adamantite.yml") })
+      yield* fromPromise(writeFile(join(workflowDir, "adamantite.yml"), workflowContent), (error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_WRITE_FILE")
+          .withDescription(
+            "Failed to write GitHub Actions workflow",
+            "We're unable to write the GitHub Actions workflow file."
+          )
+          .withContext({ path: join(workflowDir, "adamantite.yml") })
       )
 
       return ok()

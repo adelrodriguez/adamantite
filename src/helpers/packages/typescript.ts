@@ -4,12 +4,13 @@ import { Fault } from "faultier"
 import { fromPromise, ok, safeTry } from "neverthrow"
 import { checkIfExists, mergeConfig, parseJson } from "#utils.ts"
 
-export const tsconfig = {
+export const typescript = {
+  name: "tsc",
   config: { extends: "adamantite/typescript" },
   exists: () => checkIfExists(join(process.cwd(), "tsconfig.json")),
   create: () =>
     fromPromise(
-      writeFile(join(process.cwd(), "tsconfig.json"), JSON.stringify(tsconfig.config, null, 2)),
+      writeFile(join(process.cwd(), "tsconfig.json"), JSON.stringify(typescript.config, null, 2)),
       (error) =>
         Fault.wrap(error)
           .withTag("FAILED_TO_WRITE_FILE")
@@ -33,7 +34,7 @@ export const tsconfig = {
       )
       const existingConfig = yield* parseJson(tsconfigFile)
 
-      const newConfig = yield* mergeConfig(tsconfig.config, existingConfig)
+      const newConfig = yield* mergeConfig(typescript.config, existingConfig)
 
       yield* fromPromise(
         writeFile(join(process.cwd(), "tsconfig.json"), JSON.stringify(newConfig, null, 2)),

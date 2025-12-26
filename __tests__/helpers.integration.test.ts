@@ -6,7 +6,7 @@ import Bun from "bun"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { biome } from "#helpers/packages/biome.ts"
-import { tsconfig } from "#helpers/tsconfig.ts"
+import { typescript } from "#helpers/packages/typescript.ts"
 
 describe("helpers integration", () => {
   let tempDir: string
@@ -262,17 +262,17 @@ describe("helpers integration", () => {
     })
   })
 
-  describe("tsconfig helper", () => {
+  describe("typescript helper", () => {
     test("should detect when tsconfig.json does not exist", async () => {
-      const exists = await tsconfig.exists()
+      const exists = await typescript.exists()
       expect(exists).toBe(false)
     })
 
     test("should create tsconfig.json with correct config", async () => {
-      const createResult = await tsconfig.create()
+      const createResult = await typescript.create()
       createResult._unsafeUnwrap()
 
-      const exists = await tsconfig.exists()
+      const exists = await typescript.exists()
       expect(exists).toBe(true)
 
       const content = await Bun.file("tsconfig.json").text()
@@ -299,10 +299,10 @@ describe("helpers integration", () => {
         )
       )
 
-      const existsBefore = await tsconfig.exists()
+      const existsBefore = await typescript.exists()
       expect(existsBefore).toBe(true)
 
-      const updateResult = await tsconfig.update()
+      const updateResult = await typescript.update()
       updateResult._unsafeUnwrap()
 
       const content = await Bun.file("tsconfig.json").text()
@@ -333,7 +333,7 @@ describe("helpers integration", () => {
         )
       )
 
-      const updateResult = await tsconfig.update()
+      const updateResult = await typescript.update()
       updateResult._unsafeUnwrap()
 
       const content = await Bun.file("tsconfig.json").text()
@@ -350,7 +350,7 @@ describe("helpers integration", () => {
       chmodSync("readonly-dir", 0o555) // Read-only directory
       process.chdir("readonly-dir")
 
-      const createResult = await tsconfig.create()
+      const createResult = await typescript.create()
       // This might succeed on some systems, but if it fails, it should have the right error
       if (createResult.isErr()) {
         expect(createResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
@@ -362,7 +362,7 @@ describe("helpers integration", () => {
 
     test("should handle update() failure when reading tsconfig.json fails", async () => {
       // Try to update a non-existent file
-      const updateResult = await tsconfig.update()
+      const updateResult = await typescript.update()
       expect(updateResult.isErr()).toBe(true)
       if (updateResult.isErr()) {
         expect(updateResult.error.tag).toBe("FAILED_TO_READ_FILE")
@@ -382,7 +382,7 @@ describe("helpers integration", () => {
       // Make it read-only to prevent writing
       chmodSync("tsconfig.json", 0o444)
 
-      const updateResult = await tsconfig.update()
+      const updateResult = await typescript.update()
       expect(updateResult.isErr()).toBe(true)
       if (updateResult.isErr()) {
         expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")

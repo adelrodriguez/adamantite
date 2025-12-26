@@ -550,13 +550,20 @@ describe("helpers integration", () => {
       expect(exists).toBe(true)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
-      expect(content).toContain("name: CI")
-      expect(content).toContain("lint:")
-      expect(content).toContain("typecheck:")
+      expect(content).toContain("name: adamantite")
+      expect(content).toContain("verify:")
+      expect(content).toContain("strategy:")
+      expect(content).toContain("matrix:")
+      expect(content).toContain("include:")
+      expect(content).toContain("name: lint")
+      expect(content).toContain("name: types")
+      expect(content).toContain("command: bun run check")
+      expect(content).toContain("command: bun run typecheck")
       expect(content).toContain("Setup Bun")
+      expect(content).toContain("Cache dependencies")
+      expect(content).toContain("actions/cache@v4")
+      expect(content).toContain("~/.bun/install/cache")
       expect(content).toContain("bun install --frozen-lockfile")
-      expect(content).toContain("bun run check")
-      expect(content).toContain("bun run typecheck")
     })
 
     test("should generate correct workflow for npm", async () => {
@@ -568,9 +575,10 @@ describe("helpers integration", () => {
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
+      expect(content).toContain("actions/setup-node@v6")
       expect(content).toContain('cache: "npm"')
       expect(content).toContain("npm ci")
-      expect(content).toContain("npm run check")
+      expect(content).toContain("command: npm run check")
     })
 
     test("should generate correct workflow for pnpm", async () => {
@@ -583,9 +591,10 @@ describe("helpers integration", () => {
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup pnpm")
       expect(content).toContain("pnpm/action-setup@v4")
+      expect(content).toContain("actions/setup-node@v6")
       expect(content).toContain('cache: "pnpm"')
       expect(content).toContain("pnpm install --frozen-lockfile")
-      expect(content).toContain("pnpm run check")
+      expect(content).toContain("command: pnpm run check")
     })
 
     test("should generate correct workflow for yarn", async () => {
@@ -597,9 +606,10 @@ describe("helpers integration", () => {
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
+      expect(content).toContain("actions/setup-node@v6")
       expect(content).toContain('cache: "yarn"')
       expect(content).toContain("yarn install --frozen-lockfile")
-      expect(content).toContain("yarn run check")
+      expect(content).toContain("command: yarn run check")
     })
 
     test("should generate correct workflow for deno", async () => {
@@ -624,10 +634,14 @@ describe("helpers integration", () => {
       createResult._unsafeUnwrap()
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
-      expect(content).toContain("lint:")
-      expect(content).toContain("format:")
-      expect(content).toContain("typecheck:")
-      expect(content).toContain("monorepo:")
+      expect(content).toContain("name: lint")
+      expect(content).toContain("name: format")
+      expect(content).toContain("name: types")
+      expect(content).toContain("name: monorepo")
+      // Check that format command includes both format and --check (less brittle)
+      expect(content).toContain("command:")
+      expect(content).toContain("format")
+      expect(content).toContain("--check")
     })
 
     test("should not create workflow when no CI-compatible scripts", async () => {
@@ -654,8 +668,9 @@ describe("helpers integration", () => {
       updateResult._unsafeUnwrap()
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
-      expect(content).toContain("name: CI")
-      expect(content).toContain("lint:")
+      expect(content).toContain("name: adamantite")
+      expect(content).toContain("name: lint")
+      expect(content).toContain("verify:")
       expect(content).not.toContain("Old Workflow")
     })
 
@@ -667,6 +682,8 @@ describe("helpers integration", () => {
       createResult._unsafeUnwrap()
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain("permissions:")
+      expect(content).toContain("contents: read")
       expect(content).toContain("concurrency:")
       expect(content).toContain("cancel-in-progress: true")
     })

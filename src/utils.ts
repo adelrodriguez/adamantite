@@ -116,19 +116,22 @@ export const checkIsMonorepo = () =>
     return ok(packageJson?.workspaces !== undefined)
   })
 
-const TITLE = `
-     o      ooooooooo      o      oooo     oooo      o      oooo   oooo ooooooooooo ooooo ooooooooooo ooooooooooo
-    888      888    88o   888      8888o   888      888      8888o  88  88  888  88  888  88  888  88  888    88 
-   8  88     888    888  8  88     88 888o8 88     8  88     88 888o88      888      888      888      888ooo8   
-  8oooo88    888    888 8oooo88    88  888  88    8oooo88    88   8888      888      888      888      888    oo 
-o88o  o888o o888ooo88 o88o  o888o o88o  8  o88o o88o  o888o o88o    88     o888o    o888o    o888o    o888ooo8888                                                                       
-`
-
 export function printTitle() {
-  const columns = TITLE.split("\n").reduce((max, line) => Math.max(max, line.trim().length), 0)
+  // Roman style ASCII art
+  const title = `
+                .o8                                                        .    o8o      .            
+               "888                                                      .o8    \`"'    .o8            
+ .oooo.    .oooo888   .oooo.   ooo. .oo.  .oo.    .oooo.   ooo. .oo.   .o888oo oooo  .o888oo  .ooooo. 
+\`P  )88b  d88' \`888  \`P  )88b  \`888P"Y88bP"Y88b  \`P  )88b  \`888P"Y88b    888   \`888    888   d88' \`88b
+ .oP"888  888   888   .oP"888   888   888   888   .oP"888   888   888    888    888    888   888ooo888
+d8(  888  888   888  d8(  888   888   888   888  d8(  888   888   888    888 .  888    888 . 888    .o
+\`Y888""8o \`Y8bod88P" \`Y888""8o o888o o888o o888o \`Y888""8o o888o o888o   "888" o888o   "888" \`Y8bod8P'                                                     
+    `
+
+  const columns = title.split("\n").reduce((max, line) => Math.max(max, line.trim().length), 0)
 
   if (process.stdout.columns && process.stdout.columns >= columns) {
     // biome-ignore lint/suspicious/noConsole: we're using console.log to print the title
-    console.log(TITLE)
+    console.log(title)
   }
 }

@@ -51,7 +51,7 @@
     "test": "bun test",
     "test:coverage": "bun test --coverage",
     "test:watch": "bun --watch test",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "bun run src/index.ts typecheck",
     "version": "changeset version"
   },
   "dependencies": {

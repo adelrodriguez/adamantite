@@ -19,7 +19,8 @@
 
 Adamantite is a collection of presets for
 [oxlint](https://oxc.rs/docs/guide/usage/linter.html),
-[oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and
+[oxfmt](https://oxc.rs/docs/guide/usage/formatter.html),
+[tsgo](https://github.com/microsoft/typescript-go) and
 [sherif](https://github.com/QuiiBz/sherif) that are designed to help humans and agents write
 maintainable and scalable type-safe code, both for individual projects and monorepos.
 
@@ -144,7 +145,7 @@ Automatically detects and fixes:
 
 ### `adamantite typecheck`
 
-Run TypeScript type checking using the strict preset:
+Run TypeScript type checking using tsgo (TypeScript Go) and the strict preset:
 
 ```shell
 # Type check all files

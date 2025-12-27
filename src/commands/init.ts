@@ -242,7 +242,7 @@ export default defineCommand({
               hint: "recommended",
             },
             {
-              label: "typecheck - type-check your code using strict TypeScript preset",
+              label: "typecheck - type-check your code using tsgo",
               value: "typecheck",
               hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
             },
@@ -320,7 +320,7 @@ export default defineCommand({
       }
 
       if (hasTypecheck) {
-        dependencies.push("typescript")
+        dependencies.push(`${typescript.name}@${typescript.version}`)
       }
 
       yield* installDependencies(dependencies)

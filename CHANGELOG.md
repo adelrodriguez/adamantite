@@ -1,5 +1,31 @@
 # adamantite
 
+## 0.18.0
+
+### Minor Changes
+
+- b0ccb57: Replace Biome with oxlint and oxfmt for linting and formatting
+
+  **Breaking changes:**
+  - `biome.jsonc` is no longer supported - use `.oxlintrc.json` and `.oxfmtrc.jsonc` instead
+  - Configuration now extends `adamantite/lint` (oxlint) and uses oxfmt for formatting
+  - Biome must be uninstalled - `oxlint` and `oxfmt` are the new peer dependencies
+  - CLI commands (`check`, `fix`, `format`) now use oxlint/oxfmt instead of Biome
+
+  **New features:**
+  - Modular oxlint presets: `core`, `react`, and `next` configurations
+  - 500+ linting rules (up from 200+ with Biome)
+  - 10-40x faster linting performance
+  - Separate formatting configuration via oxfmt
+
+  Run `adamantite update` to migrate existing projects automatically.
+
+- 6a43df7: Add `typecheck` command to run TypeScript type checking
+
+  Runs `tsc --noEmit` to check for type errors. Supports `--project` flag to specify custom tsconfig path and `--watch` flag for continuous type checking.
+
+  Improve generated GitHub Actions workflows with matrix strategy, caching, and optimizations. Workflows now use a matrix strategy to run jobs in parallel, cache dependencies for faster builds, skip documentation-only changes, and use minimal required permissions.
+
 ## 0.17.0
 
 ### Minor Changes

@@ -34,6 +34,7 @@ Use Bun for all package management and script execution:
 ## Code Quality Workflow
 
 After editing files, always run:
+
 1. `bun run test` - Run tests to ensure everything works
 2. `bun run typecheck` - Verify TypeScript types
 3. `bun run check` - Check for linting issues

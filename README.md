@@ -1,11 +1,7 @@
 <p align="center">
   <h1 align="center">💠 Adamantite</h1>
   <p align="center">
-    <em><strong>Bulletproof your code.</strong></em>
-  </p>
-  <p align="center">
-    Opinionated linting, formatting, and type-safety presets for modern TypeScript applications.<br>
-    Designed for humans and AI.
+    <strong>Opinionated linting, formatting, type-safety and code quality presets for modern TypeScript applications.</strong>
   </p>
 </p>
 
@@ -20,6 +16,12 @@
     <img src="https://img.shields.io/github/license/adelrodriguez/adamantite.svg" alt="license">
   </a>
 </p>
+
+Adamantite is a collection of presets for
+[oxlint](https://oxc.rs/docs/guide/usage/linter.html),
+[oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) and
+[sherif](https://github.com/QuiiBz/sherif) that are designed to help humans and agents write
+maintainable and scalable type-safe code, both for individual projects and monorepos.
 
 ---
 
@@ -44,12 +46,13 @@ adamantite update         # Update Adamantite's dependencies to the latest compa
 
 ## Features
 
-- **⚡ Fast performance**: Built on oxlint's Rust-based architecture for 10-40x faster linting than ESLint
+- **⚡ Fast performance**: Built on oxc's Rust-based architecture for 10-40x faster linting than ESLint
 - **🔍 Extensive linting**: 500+ rules covering correctness, performance, security, and accessibility
 - **🎯 Zero configuration**: Works out of the box with sensible defaults, no setup required
-- **🔧 Single tool solution**: Combines oxlint + oxfmt for linting and formatting
+- **🔧 Single tool solution**: Leverages the oxc ecosystem for linting and formatting
 - **🛡️ Strict type safety**: Comes with a strict TypeScript preset to improve type safety across your codebase
 - **🏗️ Monorepo support**: Unified configuration and dependency management across workspace packages
+- **⚙️ CI-friendly**: Automatically configures GitHub Actions workflows to run checks in CI
 - **🤖 AI-friendly patterns**: Consistent code style designed for effective AI collaboration
 
 ## Installation
@@ -67,34 +70,14 @@ This interactive command will:
 - Create `.oxfmtrc.json` with formatting configuration
 - Set up `tsconfig.json` with strict TypeScript rules
 - Add lint/format scripts to your `package.json`
-- Configure editor settings (VSCode/Cursor/Windsurf)
-- Install [Sherif](https://github.com/QuiiBz/sherif) for monorepo support
-
-### Manual Setup
-
-If you prefer manual configuration:
-
-```shell
-# Install dependencies
-npm install --save-dev adamantite oxlint oxfmt
-
-# Extend the oxlint configuration
-echo '{ "extends": ["adamantite/lint"] }' > .oxlintrc.json
-
-# Create oxfmt configuration (uses defaults)
-echo '{}' > .oxfmtrc.json
-
-# Extend TypeScript configuration
-echo '{ "extends": "adamantite/typescript" }' > tsconfig.json
-```
+  - Also adds monorepo-specific scripts if running a monorepo
+- Configure editor settings
 
 ## 📋 Commands
 
-Adamantite provides a comprehensive CLI for all your code quality needs:
-
 ### `adamantite check`
 
-Check your code for issues without automatically fixing them:
+Check your code for issues without automatically fixing them using oxlint:
 
 ```shell
 # Check all files
@@ -102,9 +85,6 @@ adamantite check
 
 # Check specific files
 adamantite check src/components/**/*.ts
-
-# Show summary of results
-adamantite check --summary
 ```
 
 ### `adamantite fix`
@@ -118,8 +98,29 @@ adamantite fix
 # Fix specific files
 adamantite fix src/utils.ts
 
-# Apply unsafe fixes
-adamantite fix --unsafe
+# Apply suggested fixes
+adamantite fix --suggested
+
+# Apply dangerous fixes
+adamantite fix --dangerous
+
+# Apply all fixes
+adamantite fix --all
+```
+
+### `adamantite format`
+
+Format your code using oxfmt:
+
+```shell
+# Format all files
+adamantite format
+
+# Format specific files
+adamantite format src/utils.ts
+
+# Check if files are formatted without writing
+adamantite format --check
 ```
 
 ### `adamantite monorepo`
@@ -140,6 +141,18 @@ Automatically detects and fixes:
 - Missing dependencies in package.json
 - Unused dependencies
 - Package.json formatting issues
+
+### `adamantite typecheck`
+
+Run TypeScript type checking using the strict preset:
+
+```shell
+# Type check all files
+adamantite typecheck
+
+# Type check specific files
+adamantite typecheck src/utils.ts
+```
 
 ### `adamantite update`
 

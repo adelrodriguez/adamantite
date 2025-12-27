@@ -5,6 +5,9 @@ on:
     branches:
       - main
       - changeset-release/*
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read

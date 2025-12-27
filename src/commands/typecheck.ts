@@ -35,7 +35,7 @@ export default defineCommand({
         args.push("--watch")
       }
 
-      const command = dlxCommand(packageManager, typescript.name, { args })
+      const command = dlxCommand(packageManager, typescript.command, { args })
 
       const result = yield* runCommand(command)
 

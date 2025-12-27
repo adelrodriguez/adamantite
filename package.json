@@ -8,8 +8,8 @@
     "linter",
     "oxfmt",
     "oxlint",
-    "tsgo",
     "preset",
+    "tsgo",
     "typescript"
   ],
   "homepage": "https://github.com/adelrodriguez/adamantite",

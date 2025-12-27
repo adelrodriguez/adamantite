@@ -26,6 +26,7 @@ const installDependencies = (packages: string[]) =>
     const isMonorepo = yield* checkIsMonorepo()
 
     for (const pkg of packages) {
+      s.message(`Installing dependency: ${pkg}...`)
       yield* fromPromise(addDevDependency(pkg, { silent: true, workspace: isMonorepo }), (error) =>
         Fault.wrap(error)
           .withTag("FAILED_TO_INSTALL_DEPENDENCY")
@@ -38,7 +39,7 @@ const installDependencies = (packages: string[]) =>
     return ok()
   })
 
-const setupOxlintConfig = () =>
+const setupOxlintConfig = (presets: string[]) =>
   safeTry(async function* () {
     const spinner = p.spinner()
     spinner.start("Setting up oxlint config...")
@@ -48,13 +49,13 @@ const setupOxlintConfig = () =>
     if (oxlintPath.path) {
       spinner.message(`Found \`${oxlintPath.path}\`, updating...`)
 
-      yield* oxlint.update()
+      yield* oxlint.update(presets)
 
       spinner.stop("oxlint config updated successfully.")
     } else {
       spinner.message("`.oxlintrc.json` not found, creating...")
 
-      yield* oxlint.create()
+      yield* oxlint.create(presets)
 
       spinner.stop("oxlint config created successfully.")
     }
@@ -266,6 +267,32 @@ export default defineCommand({
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
+      const hasOxlint = scripts.includes("check") || scripts.includes("fix")
+
+      let presets: string[] = []
+      if (hasOxlint) {
+        const presetsResponse = yield* fromSafePromise(
+          p.multiselect({
+            message: "Which presets do you want to install? (core is always included)",
+            options: [
+              { label: "React", value: "react" },
+              { label: "Next.js", value: "nextjs" },
+              { label: "Vue", value: "vue" },
+              { label: "Jest", value: "jest" },
+              { label: "Vitest", value: "vitest" },
+              { label: "Node", value: "node" },
+            ],
+            required: false,
+          })
+        )
+
+        if (p.isCancel(presetsResponse)) {
+          return err(Fault.create("OPERATION_CANCELLED"))
+        }
+
+        presets = presetsResponse
+      }
+
       const editors = yield* fromSafePromise(
         p.multiselect({
           message: "Which editors do you want to configure? (optional)",
@@ -299,7 +326,6 @@ export default defineCommand({
         enableGitHubActions = response
       }
 
-      const hasOxlint = scripts.includes("check") || scripts.includes("fix")
       const hasOxfmt = scripts.includes("format")
       const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
       const hasTypecheck = scripts.includes("typecheck")
@@ -330,7 +356,7 @@ export default defineCommand({
       }
 
       if (hasOxlint) {
-        yield* setupOxlintConfig()
+        yield* setupOxlintConfig(presets)
       }
 
       yield* addScripts(scripts)

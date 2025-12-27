@@ -182,6 +182,17 @@ Extensive ruleset covering:
 - **Style**: Consistent code formatting and naming conventions
 - **Nursery**: Experimental rules under active development
 
+#### Framework Presets
+
+Framework-specific presets are available for:
+
+- **React** ([react.json](./presets/oxlint/react.json)) - React, React-perf, and JSX-a11y rules
+- **Next.js** ([nextjs.json](./presets/oxlint/nextjs.json)) - Next.js-specific rules
+- **Vue** ([vue.json](./presets/oxlint/vue.json)) - Vue.js rules
+- **Node.js** ([node.json](./presets/oxlint/node.json)) - Node.js-specific rules
+- **Jest** ([jest.json](./presets/oxlint/jest.json)) - Jest testing rules
+- **Vitest** ([vitest.json](./presets/oxlint/vitest.json)) - Vitest testing rules
+
 ### Formatting ([presets/oxfmt.json](./presets/oxfmt.json))
 
 Opinionated code formatting with oxfmt, configured for consistency and readability. Includes automatic import sorting and organization.

@@ -2,7 +2,10 @@
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "plugins": ["node"],
   "rules": {
-    // ======================= RESTRICTION =======================
-    "node/no-new-require": "error"
+    // ==================== RESTRICTION ====================
+    "node/no-new-require": "error",
+
+    // ======================= STYLE =======================
+    "node/no-exports-assign": "error"
   }
 }

@@ -5,7 +5,9 @@ import { err, fromPromise, ok, safeTry } from "neverthrow"
 import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const typescript = {
-  name: "tsc",
+  name: "@typescript/native-preview",
+  version: "7.0.0-dev.20251227.1",
+  command: "tsgo",
   config: { extends: "adamantite/typescript" },
   exists: () => checkIfExists(join(process.cwd(), "tsconfig.json")),
   create: () =>

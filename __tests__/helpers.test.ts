@@ -110,6 +110,12 @@ describe("helpers", () => {
         expect(typescript.config).toHaveProperty("extends")
         expect(typescript.config.extends).toBe("adamantite/typescript")
       })
+
+      test("should have name, version, and command properties", () => {
+        expect(typescript.name).toBe("@typescript/native-preview")
+        expect(typescript.version).toBeDefined()
+        expect(typescript.command).toBe("tsgo")
+      })
     })
   })
 

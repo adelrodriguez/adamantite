@@ -42,7 +42,7 @@ Thanks for your interest in contributing to Adamantite! This guide will help you
 - `bun run check` - Check for code issues using oxlint
 - `bun run fix` - Auto-fix code issues using oxlint
 - `bun run format` - Format code using oxfmt
-- `bun run typecheck` - Run TypeScript type checking
+- `bun run typecheck` - Run TypeScript type checking using tsgo
 
 ### Making Changes
 

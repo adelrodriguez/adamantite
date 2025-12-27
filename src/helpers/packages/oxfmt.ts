@@ -3,7 +3,7 @@ import { join } from "node:path"
 import { Fault } from "faultier"
 import { err, fromPromise, ok, safeTry } from "neverthrow"
 import preset from "#presets/oxfmt.json" with { type: "json" }
-import { checkIfExists, mergeConfig, parseJson } from "#utils.ts"
+import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const oxfmt = {
   name: "oxfmt",
@@ -47,7 +47,7 @@ export const oxfmt = {
         )
       }
 
-      const oxfmtFile = yield* fromPromise(readFile(exists.path, "utf-8"), (error) =>
+      const oxfmtFile = yield* fromPromise(readFile(exists.path, "utf8"), (error) =>
         Fault.wrap(error)
           .withTag("FAILED_TO_READ_FILE")
           .withDescription(
@@ -58,17 +58,15 @@ export const oxfmt = {
 
       const existingConfig = yield* parseJson(oxfmtFile)
 
-      if (!existingConfig || Object.keys(existingConfig).length === 0) {
+      // Empty configs are allowed and will be merged with Adamantite's config
+      if (!isJsonObject(existingConfig)) {
         return err(
-          Fault.create("INVALID_OXFMT_CONFIG")
-            .withDescription(
-              "Invalid oxfmt configuration",
-              "The oxfmt configuration file is empty or invalid."
-            )
-            .withContext({ path: exists.path })
+          Fault.create("INVALID_CONFIG_FORMAT").withDescription(
+            "Invalid oxfmt configuration format",
+            "The oxfmt configuration must be a JSON object."
+          )
         )
       }
-
       const mergedConfig = yield* mergeConfig(existingConfig, oxfmt.config)
       mergedConfig.$schema = oxfmt.config.$schema
 

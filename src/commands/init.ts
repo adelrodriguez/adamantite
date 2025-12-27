@@ -1,15 +1,14 @@
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
-import type { PackageManagerName } from "nypm"
 import * as p from "@clack/prompts"
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
-import { addDevDependency } from "nypm"
+import { type PackageManagerName, addDevDependency } from "nypm"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
-import { biome } from "#helpers/packages/biome.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
+import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 import {
@@ -39,25 +38,25 @@ const installDependencies = (packages: string[]) =>
     return ok()
   })
 
-const setupBiomeConfig = () =>
+const setupOxlintConfig = () =>
   safeTry(async function* () {
     const spinner = p.spinner()
-    spinner.start("Setting up Biome config...")
+    spinner.start("Setting up oxlint config...")
 
-    const biomePath = await biome.exists()
+    const oxlintPath = await oxlint.exists()
 
-    if (biomePath.path) {
-      spinner.message(`Found \`${biomePath.path}\`, updating...`)
+    if (oxlintPath.path) {
+      spinner.message(`Found \`${oxlintPath.path}\`, updating...`)
 
-      yield* biome.update()
+      yield* oxlint.update()
 
-      spinner.stop("Biome config updated successfully.")
+      spinner.stop("oxlint config updated successfully.")
     } else {
-      spinner.message("`.biome.jsonc` or `.biome.json` not found, creating...")
+      spinner.message("`.oxlintrc.json` not found, creating...")
 
-      yield* biome.create()
+      yield* oxlint.create()
 
-      spinner.stop("Biome config created successfully.")
+      spinner.stop("oxlint config created successfully.")
     }
 
     return ok()
@@ -94,9 +93,7 @@ const addScripts = (scripts: string[]) =>
     const spinner = p.spinner()
     spinner.start("Adding scripts to your `package.json`...")
 
-    if (!packageJson.scripts) {
-      packageJson.scripts = {}
-    }
+    packageJson.scripts ??= {}
 
     for (const script of scripts) {
       switch (script) {
@@ -230,12 +227,12 @@ export default defineCommand({
           message: "Which scripts do you want to add to your `package.json`?",
           options: [
             {
-              label: "check - find issues in code using Biome",
+              label: "check - find issues in code using oxlint",
               value: "check",
               hint: "recommended",
             },
             {
-              label: "fix - fix code issues using Biome",
+              label: "fix - fix code issues using oxlint",
               value: "fix",
               hint: "recommended",
             },
@@ -302,15 +299,16 @@ export default defineCommand({
         enableGitHubActions = response
       }
 
-      const hasBiome = scripts.includes("check") || scripts.includes("fix")
+      const hasOxlint = scripts.includes("check") || scripts.includes("fix")
       const hasOxfmt = scripts.includes("format")
       const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
       const hasTypecheck = scripts.includes("typecheck")
 
       const dependencies = ["adamantite"]
 
-      if (hasBiome) {
-        dependencies.push(`${biome.name}@${biome.version}`)
+      if (hasOxlint) {
+        dependencies.push(`${oxlint.name}@${oxlint.version}`)
+        dependencies.push(`${tsgolint.name}@${tsgolint.version}`)
       }
 
       if (hasOxfmt) {
@@ -331,8 +329,8 @@ export default defineCommand({
         yield* setupOxfmtConfig()
       }
 
-      if (hasBiome) {
-        yield* setupBiomeConfig()
+      if (hasOxlint) {
+        yield* setupOxlintConfig()
       }
 
       yield* addScripts(scripts)

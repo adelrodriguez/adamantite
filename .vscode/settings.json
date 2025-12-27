@@ -6,8 +6,5 @@
   "editor.codeActionsOnSave": {},
   "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
-  },
-  "[typescript]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode"
   }
 }

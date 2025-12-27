@@ -1,11 +1,11 @@
-import type { PackageJson } from "type-fest"
+import type { JsonObject, JsonValue, PackageJson } from "type-fest"
 import type { CommandModule } from "yargs"
 
 import { spawnSync } from "node:child_process"
 import { access, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
-import defu from "defu"
+import { defu } from "defu"
 import { Fault } from "faultier"
 import { type ParseError, parse } from "jsonc-parser"
 import { err, fromPromise, fromThrowable, ok, safeTry } from "neverthrow"
@@ -59,7 +59,7 @@ export const checkIfExists = (path: string) =>
 export const parseJson = (content: string) => {
   const errors: ParseError[] = []
 
-  const parsed = parse(content, errors)
+  const parsed = parse(content, errors) as JsonValue
 
   if (errors.length > 0) {
     return err(
@@ -70,6 +70,9 @@ export const parseJson = (content: string) => {
   }
   return ok(parsed)
 }
+
+export const isJsonObject = (value: unknown): value is JsonObject =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
 const RANGE_PREFIX_REGEX = /^[\^~]/
@@ -91,7 +94,7 @@ export const mergeConfig = fromThrowable(defu, (error) =>
 )
 
 export const readPackageJson = (cwd = process.cwd()) =>
-  fromPromise(readFile(join(cwd, "package.json"), "utf-8"), (error) =>
+  fromPromise(readFile(join(cwd, "package.json"), "utf8"), (error) =>
     Fault.wrap(error)
       .withTag("FAILED_TO_READ_FILE")
       .withDescription(
@@ -131,7 +134,6 @@ d8(  888  888   888  d8(  888   888   888   888  d8(  888   888   888    888 .  
   const columns = title.split("\n").reduce((max, line) => Math.max(max, line.trim().length), 0)
 
   if (process.stdout.columns && process.stdout.columns >= columns) {
-    // biome-ignore lint/suspicious/noConsole: we're using console.log to print the title
-    console.log(title)
+    console.info(title)
   }
 }

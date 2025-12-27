@@ -14,9 +14,10 @@ alwaysApply: false
 
 Adamantite is an opinionated preset package for modern TypeScript applications that provides:
 
-- **Biome configuration** (`biome.jsonc`) - Comprehensive linting and formatting rules
+- **oxlint configuration** (`presets/oxlint/*.json`) - Modular linting rules (core, React, Next.js)
+- **oxfmt configuration** (`presets/oxfmt.json`) - Code formatting configuration
 - **TypeScript preset** (`presets/tsconfig.json`) - Strict TypeScript configuration
-- **CLI tool** - Commands to run Biome linting and formatting via `adamantite` command
+- **CLI tool** - Commands to run oxlint linting and oxfmt formatting via `adamantite` command
 
 ## Development Commands
 
@@ -43,9 +44,9 @@ This project uses changesets for version management:
 
 - **`index.ts`** - Main CLI entry point using yargs
 - **`commands/`** - Command implementations:
-  - `fix.ts` - Runs Biome formatter and fixes issues
-  - `check.ts` - Runs Biome linter to check for issues
-  - `ci.ts` - Runs Adamantite in CI environments
+  - `fix.ts` - Runs oxlint to fix issues
+  - `check.ts` - Runs oxlint to check for issues
+  - `format.ts` - Runs oxfmt for code formatting
   - `init.ts` - Initializes Adamantite configuration
   - `monorepo.ts` - Runs monorepo-specific checks (use `--fix` to auto-fix issues)
   - `update.ts` - Updates Adamantite configuration
@@ -59,5 +60,8 @@ This project uses changesets for version management:
 
 ### Configuration Files
 
-- **`biome.jsonc`** - Main export, comprehensive Biome config with strict rules
+- **`presets/oxlint/core.json`** - Core linting rules for all TypeScript/JavaScript projects
+- **`presets/oxlint/react.json`** - React and JSX-A11Y linting rules
+- **`presets/oxlint/next.json`** - Next.js-specific linting rules
+- **`presets/oxfmt.json`** - Code formatting configuration
 - **`presets/tsconfig.json`** - Reusable TypeScript configuration

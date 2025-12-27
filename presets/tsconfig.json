@@ -11,6 +11,8 @@
     // Strictness and best practices. We only recommend settings that are not
     // covered by linting rules.
     "strict": true,
+
+    "allowUnreachableCode": false,
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": true,
     "noImplicitOverride": true,

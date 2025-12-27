@@ -39,8 +39,9 @@ Thanks for your interest in contributing to Adamantite! This guide will help you
 - `bun run dev` - Build in watch mode for development
 - `bun test` - Run all tests
 - `bun run test:watch` - Run tests in watch mode
-- `bun run lint` - Lint and auto-fix code issues
-- `bun run format` - Format code with Biome
+- `bun run check` - Check for code issues using oxlint
+- `bun run fix` - Auto-fix code issues using oxlint
+- `bun run format` - Format code using oxfmt
 - `bun run typecheck` - Run TypeScript type checking
 
 ### Making Changes
@@ -60,7 +61,8 @@ Thanks for your interest in contributing to Adamantite! This guide will help you
 
 3. **Before committing**: Ensure code quality:
    ```bash
-   bun run lint
+   bun run check
+   bun run fix
    bun run format
    bun run typecheck
    bun test
@@ -111,7 +113,7 @@ describe("feature name", () => {
 
 ### Code Style
 
-- We use Biome for linting and formatting
+- We use [oxc](https://oxc.rs/) (oxlint and oxfmt) for linting and formatting
 - Code is automatically formatted on commit
 - Follow TypeScript strict mode requirements
 - Use meaningful variable and function names
@@ -132,11 +134,13 @@ Use conventional commit format:
 ### Before Submitting
 
 1. Ensure all tests pass: `bun test`
-2. Run linting: `bun run fix`
-3. Run type checking: `bun run typecheck`
-4. **Add a changeset**: Run `bunx changeset` to document your changes
-5. Update documentation if needed
-6. Add tests for new features
+2. Check for issues: `bun run check`
+3. Auto-fix issues: `bun run fix`
+4. Format code: `bun run format`
+5. Run type checking: `bun run typecheck`
+6. **Add a changeset**: Run `bunx changeset` to document your changes
+7. Update documentation if needed
+8. Add tests for new features
 
 ### Submitting Your PR
 
@@ -217,9 +221,15 @@ bun run build
 ```
 src/
 ├── commands/          # CLI command implementations
+├── helpers/           # Helper modules (packages, editors, CI)
 ├── index.ts          # Main CLI entry point
+├── types.ts          # TypeScript type definitions
 ├── utils.ts          # Shared utilities
 └── version.ts        # Version information
+presets/
+├── oxlint/           # oxlint configuration presets
+├── oxfmt.json        # oxfmt configuration preset
+└── tsconfig.json     # TypeScript configuration preset
 ```
 
 ## 📞 Getting Help

@@ -8,6 +8,7 @@
     "linter",
     "oxfmt",
     "oxlint",
+    "tsgo",
     "preset",
     "typescript"
   ],

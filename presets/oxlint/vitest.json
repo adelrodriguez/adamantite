@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "plugins": ["vitest"],
+  "rules": {
+    // ==================== CORRECTNESS ====================
+    "vitest/no-conditional-tests": "error",
+    "vitest/require-local-test-context-for-concurrent-snapshots": "error",
+
+    // ======================= STYLE =======================
+    "vitest/no-import-node-test": "error",
+    "vitest/prefer-called-times": "error",
+    "vitest/prefer-to-be-falsy": "error",
+    "vitest/prefer-to-be-object": "error",
+    "vitest/prefer-to-be-truthy": "error"
+  }
+}

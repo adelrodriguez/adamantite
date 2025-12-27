@@ -18,11 +18,16 @@ export const oxlint = {
 
     return { path: null }
   },
-  create: () =>
-    fromPromise(
+  create: (presets: string[] = []) => {
+    const extendsArray = ["adamantite/lint"]
+    for (const preset of presets) {
+      extendsArray.push(`adamantite/lint/${preset}`)
+    }
+
+    return fromPromise(
       writeFile(
         join(process.cwd(), ".oxlintrc.json"),
-        JSON.stringify({ ...oxlint.config, extends: ["adamantite/lint"] }, null, 2)
+        JSON.stringify({ ...oxlint.config, extends: extendsArray }, null, 2)
       ),
       (error) =>
         Fault.wrap(error)
@@ -31,8 +36,9 @@ export const oxlint = {
             "Failed to write oxlint configuration",
             "We're unable to write the oxlint configuration to the current directory."
           )
-    ),
-  update: () =>
+    )
+  },
+  update: (presets: string[] = []) =>
     safeTry(async function* () {
       const exists = await oxlint.exists()
 
@@ -82,6 +88,14 @@ export const oxlint = {
 
       if (!hasAdamantite) {
         extendsArray.push("adamantite/lint")
+      }
+
+      // Add selected presets, avoiding duplicates
+      for (const preset of presets) {
+        const presetPath = `adamantite/lint/${preset}`
+        if (!extendsArray.includes(presetPath)) {
+          extendsArray.push(presetPath)
+        }
       }
 
       newConfig.extends = extendsArray

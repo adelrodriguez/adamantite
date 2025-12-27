@@ -2,7 +2,7 @@
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   "rules": {
-    // ======================= CORRECTNESS =======================
+    // ==================== CORRECTNESS ====================
     "constructor-super": "error",
     "for-direction": "error",
     "no-async-promise-executor": "error",
@@ -128,7 +128,7 @@
     "unicorn/prefer-set-size": "error",
     "unicorn/prefer-string-starts-ends-with": "error",
 
-    // ======================= PERFORMANCE =======================
+    // ==================== PERFORMANCE ====================
     "no-await-in-loop": "error",
     "no-useless-call": "error",
 
@@ -139,7 +139,7 @@
     "unicorn/prefer-array-flat-map": "error",
     "unicorn/prefer-set-has": "error",
 
-    // ======================= RESTRICTION =======================
+    // ==================== RESTRICTION ====================
     "class-methods-use-this": "warn",
     "default-case": "error",
     "no-console": ["warn", { "allow": ["info"] }],
@@ -191,7 +191,7 @@
     "unicorn/prefer-node-protocol": "error",
     "unicorn/prefer-number-properties": "error",
 
-    // ======================= SUSPICIOUS =======================
+    // ==================== SUSPICIOUS =====================
     "block-scoped-var": "error",
     "no-extend-native": "error",
     "no-extra-bind": "error",
@@ -234,7 +234,7 @@
     "unicorn/require-module-specifiers": "error",
     "unicorn/require-post-message-target-origin": "error",
 
-    // ===================== PEDANTIC =======================
+    // ===================== PEDANTIC ======================
     "accessor-pairs": "error",
     "array-callback-return": "error",
     "eqeqeq": "error",
@@ -331,7 +331,7 @@
     "unicorn/prefer-string-slice": "error",
     "unicorn/require-number-to-fixed-digits-argument": "error",
 
-    // ===================== STYLE =======================
+    // ======================= STYLE =======================
     "arrow-body-style": ["error", "as-needed"],
     "capitalized-comments": [
       "error",
@@ -425,7 +425,7 @@
     "unicorn/text-encoding-identifier-case": "error",
     "unicorn/throw-new-error": "error",
 
-    // ===================== NURSERY =======================
+    // ====================== NURSERY ======================
     "getter-return": "error",
 
     "import/export": "error",

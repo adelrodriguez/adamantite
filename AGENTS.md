@@ -29,6 +29,16 @@ Use Bun for all package management and script execution:
 - **Type checking**: `bun run typecheck`
 - **Code checking**: `bun run check` (checks for issues)
 - **Code fixing**: `bun run fix` (auto-fixes issues and formats code)
+- **Code formatting**: `bun run format` (formats code with oxfmt)
+
+## Code Quality Workflow
+
+After editing files, always run:
+1. `bun run test` - Run tests to ensure everything works
+2. `bun run typecheck` - Verify TypeScript types
+3. `bun run check` - Check for linting issues
+4. `bun run fix` - Auto-fix issues and format code
+5. `bun run format` - Format code explicitly (run after editing various files)
 
 ## Release Workflow
 
@@ -61,7 +71,5 @@ This project uses changesets for version management:
 ### Configuration Files
 
 - **`presets/oxlint/core.json`** - Core linting rules for all TypeScript/JavaScript projects
-- **`presets/oxlint/react.json`** - React and JSX-A11Y linting rules
-- **`presets/oxlint/next.json`** - Next.js-specific linting rules
 - **`presets/oxfmt.json`** - Code formatting configuration
 - **`presets/tsconfig.json`** - Reusable TypeScript configuration

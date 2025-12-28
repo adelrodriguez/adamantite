@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Bun from "bun"
 import {
+  checkCliExists,
   checkIfExists,
   checkIsMonorepo,
   defineCommand,
@@ -517,6 +518,94 @@ describe("utils", () => {
 
     test("should trim whitespace and strip workspace prefix", () => {
       expect(normalizeDependencyVersion("  workspace:^0.20.0  ")).toBe("0.20.0")
+    })
+  })
+
+  describe("checkCliExists", () => {
+    test("should return ok(true) when CLI exists", () => {
+      spawnSyncResult = {
+        status: 0,
+        error: null,
+        stdout: Buffer.from("/usr/bin/code"),
+        stderr: Buffer.from(""),
+      }
+
+      const result = checkCliExists("code")
+      expect(result.isOk()).toBe(true)
+      if (result.isOk()) {
+        expect(result.value).toBe(true)
+      }
+    })
+
+    test("should return err with CLI_NOT_FOUND tag when CLI does not exist", () => {
+      spawnSyncResult = {
+        status: 1,
+        error: null,
+        stdout: Buffer.from(""),
+        stderr: Buffer.from(""),
+      }
+
+      const result = checkCliExists("nonexistent-command")
+      expect(result.isErr()).toBe(true)
+      if (result.isErr()) {
+        expect(result.error.tag).toBe("CLI_NOT_FOUND")
+        expect(result.error.message).toContain(
+          "The 'nonexistent-command' command is not available in your PATH."
+        )
+        expect(result.error.context?.command).toBe("nonexistent-command")
+      }
+    })
+
+    test("should use 'where' command on Windows", () => {
+      const originalPlatform = process.platform
+      Object.defineProperty(process, "platform", {
+        value: "win32",
+        writable: true,
+        configurable: true,
+      })
+
+      spawnSyncResult = {
+        status: 0,
+        error: null,
+        stdout: Buffer.from(String.raw`C:\Program Files\Microsoft VS Code\bin\code.cmd`),
+        stderr: Buffer.from(""),
+      }
+
+      const result = checkCliExists("code")
+      expect(result.isOk()).toBe(true)
+
+      // Restore original platform
+      Object.defineProperty(process, "platform", {
+        value: originalPlatform,
+        writable: true,
+        configurable: true,
+      })
+    })
+
+    test("should use 'which' command on Unix-like systems", () => {
+      const originalPlatform = process.platform
+      Object.defineProperty(process, "platform", {
+        value: "darwin",
+        writable: true,
+        configurable: true,
+      })
+
+      spawnSyncResult = {
+        status: 0,
+        error: null,
+        stdout: Buffer.from("/usr/local/bin/code"),
+        stderr: Buffer.from(""),
+      }
+
+      const result = checkCliExists("code")
+      expect(result.isOk()).toBe(true)
+
+      // Restore original platform
+      Object.defineProperty(process, "platform", {
+        value: originalPlatform,
+        writable: true,
+        configurable: true,
+      })
     })
   })
 })

@@ -1,10 +1,9 @@
-import type { JsonObject, JsonValue, PackageJson } from "type-fest"
-import type { CommandModule } from "yargs"
-
 import { spawnSync } from "node:child_process"
 import { access, readFile } from "node:fs/promises"
 import { join } from "node:path"
 import process from "node:process"
+import type { JsonObject, JsonValue, PackageJson } from "type-fest"
+import type { CommandModule } from "yargs"
 import { defu } from "defu"
 import { Fault } from "faultier"
 import { type ParseError, parse } from "jsonc-parser"
@@ -55,6 +54,25 @@ export const checkIfExists = (path: string) =>
     () => true,
     () => false
   )
+
+export const checkCliExists = (command: string) => {
+  const result = spawnSync(process.platform === "win32" ? "where" : "which", [command], {
+    stdio: "pipe",
+  })
+
+  if (result.status !== 0) {
+    return err(
+      Fault.create("CLI_NOT_FOUND")
+        .withDescription(
+          `CLI '${command}' not found`,
+          `The '${command}' command is not available in your PATH.`
+        )
+        .withContext({ command })
+    )
+  }
+
+  return ok(true)
+}
 
 export const parseJson = (content: string) => {
   const errors: ParseError[] = []

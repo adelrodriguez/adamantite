@@ -185,6 +185,24 @@ const setupEditors = (editors: string[]) =>
     return ok()
   })
 
+const installEditorExtensions = (editors: string[]) =>
+  safeTry(function* () {
+    const spinner = p.spinner()
+    spinner.start("Installing editor extensions...")
+
+    if (editors.includes("vscode")) {
+      spinner.message("Installing VS Code extension...")
+      yield* vscode.extension()
+    }
+
+    if (editors.includes("zed")) {
+      // TODO: Implement Zed extension installation
+    }
+
+    spinner.stop("Editor extensions installed successfully.")
+    return ok()
+  })
+
 const setupGitHubActions = (packageManager: PackageManagerName, scripts: string[]) =>
   safeTry(async function* () {
     const spinner = p.spinner()
@@ -269,9 +287,9 @@ export default defineCommand({
 
       const hasOxlint = scripts.includes("check") || scripts.includes("fix")
 
-      let presets: string[] = []
+      let presets: string[] | symbol = []
       if (hasOxlint) {
-        const presetsResponse = yield* fromSafePromise(
+        presets = yield* fromSafePromise(
           p.multiselect({
             message: "Which presets do you want to install? (core is always included)",
             options: [
@@ -286,11 +304,9 @@ export default defineCommand({
           })
         )
 
-        if (p.isCancel(presetsResponse)) {
+        if (p.isCancel(presets)) {
           return err(Fault.create("OPERATION_CANCELLED"))
         }
-
-        presets = presetsResponse
       }
 
       const editors = yield* fromSafePromise(
@@ -308,22 +324,35 @@ export default defineCommand({
         return err(Fault.create("OPERATION_CANCELLED"))
       }
 
-      const hasCIScripts = hasCICompatibleScripts(scripts)
-
-      let enableGitHubActions = false
-      if (hasCIScripts) {
-        const response = yield* fromSafePromise(
+      let installExtensions = false
+      if (editors.length > 0) {
+        const installExtensionsResponse = yield* fromSafePromise(
           p.confirm({
-            message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
-            initialValue: false,
+            message: "Do you want to install the recommended editor extensions?",
+            initialValue: true,
           })
         )
 
-        if (p.isCancel(response)) {
+        if (p.isCancel(installExtensionsResponse)) {
           return err(Fault.create("OPERATION_CANCELLED"))
         }
 
-        enableGitHubActions = response
+        installExtensions = installExtensionsResponse
+      }
+
+      const hasCIScripts = hasCICompatibleScripts(scripts)
+
+      let enableGitHubActions: boolean | symbol = false
+      if (hasCIScripts) {
+        enableGitHubActions = yield* fromSafePromise(
+          p.confirm({
+            message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
+          })
+        )
+
+        if (p.isCancel(enableGitHubActions)) {
+          return err(Fault.create("OPERATION_CANCELLED"))
+        }
       }
 
       const hasOxfmt = scripts.includes("format")
@@ -366,6 +395,10 @@ export default defineCommand({
       }
 
       yield* setupEditors(editors)
+
+      if (installExtensions) {
+        yield* installEditorExtensions(editors)
+      }
 
       if (enableGitHubActions) {
         yield* setupGitHubActions(packageManager, scripts)

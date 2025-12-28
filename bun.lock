@@ -6,7 +6,6 @@
       "name": "celestine",
       "dependencies": {
         "@clack/prompts": "1.0.0-alpha.9",
-        "consola": "3.4.2",
         "defu": "6.1.4",
         "faultier": "^1.1.0",
         "jsonc-parser": "3.3.1",

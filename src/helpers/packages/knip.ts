@@ -1,0 +1,86 @@
+import { readFile, writeFile } from "node:fs/promises"
+import { join } from "node:path"
+import { Fault } from "faultier"
+import { err, fromPromise, ok, safeTry } from "neverthrow"
+import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+
+export const knip = {
+  name: "knip",
+  version: "5.78.0",
+  config: {
+    // Ensures that the schema always matches the installed version of knip
+    $schema: "https://unpkg.com/knip@5/schema-jsonc.json",
+  },
+  exists: async () => {
+    if (await checkIfExists(join(process.cwd(), "knip.json"))) {
+      return { path: join(process.cwd(), "knip.json") }
+    }
+
+    if (await checkIfExists(join(process.cwd(), "knip.jsonc"))) {
+      return { path: join(process.cwd(), "knip.jsonc") }
+    }
+
+    return { path: null }
+  },
+  create: () =>
+    fromPromise(
+      writeFile(join(process.cwd(), "knip.jsonc"), JSON.stringify(knip.config, null, 2)),
+      (error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_WRITE_FILE")
+          .withDescription(
+            "Failed to write knip configuration",
+            "We're unable to write the knip configuration to the current directory."
+          )
+    ),
+  update: () =>
+    safeTry(async function* () {
+      const exists = await knip.exists()
+
+      if (!exists.path) {
+        return err(
+          Fault.create("FILE_NOT_FOUND").withDescription(
+            "No `knip.json` or `knip.jsonc` found",
+            "We're unable to find a knip configuration in the current directory."
+          )
+        )
+      }
+
+      const knipFile = yield* fromPromise(readFile(exists.path, "utf8"), (error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_READ_FILE")
+          .withDescription(
+            "Failed to read knip configuration",
+            "We're unable to read the knip configuration from the current directory."
+          )
+      )
+
+      const existingConfig = yield* parseJson(knipFile)
+
+      // Empty configs are allowed and will be merged with Adamantite's config
+      // Ensure existingConfig is a JSON object (not null, array, or primitive)
+      if (!isJsonObject(existingConfig)) {
+        return err(
+          Fault.create("INVALID_CONFIG_FORMAT").withDescription(
+            "Invalid knip configuration format",
+            "The knip configuration must be a JSON object."
+          )
+        )
+      }
+
+      const mergedConfig = yield* mergeConfig(existingConfig, knip.config)
+      mergedConfig.$schema = knip.config.$schema
+
+      yield* fromPromise(writeFile(exists.path, JSON.stringify(mergedConfig, null, 2)), (error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_WRITE_FILE")
+          .withDescription(
+            "Failed to write knip configuration",
+            "We're unable to write the knip configuration to the current directory."
+          )
+          .withContext({ path: exists.path })
+      )
+
+      return ok()
+    }),
+}

@@ -44,6 +44,7 @@
     "./presets/*": "./presets/*"
   },
   "scripts": {
+    "analyze": "bun run src/index.ts analyze",
     "build": "bunup",
     "bump:deps": "bun update --interactive",
     "check": "bun run src/index.ts check",
@@ -72,6 +73,7 @@
     "@types/yargs": "17.0.35",
     "@typescript/native-preview": "7.0.0-dev.20251227.1",
     "bunup": "0.16.11",
+    "knip": "5.78.0",
     "oxfmt": "0.20.0",
     "oxlint": "1.35.0",
     "oxlint-tsgolint": "0.10.0",

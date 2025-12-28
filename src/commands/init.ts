@@ -7,6 +7,7 @@ import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { type PackageManagerName, addDevDependency } from "nypm"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
+import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
@@ -116,6 +117,9 @@ const addScripts = (scripts: string[]) =>
         case "fix:monorepo":
           packageJson.scripts["fix:monorepo"] = "adamantite monorepo --fix"
           break
+        case "analyze":
+          packageJson.scripts.analyze = "adamantite analyze"
+          break
         default:
           return err(Fault.create("UNKNOWN_SCRIPT").withContext({ script }))
       }
@@ -134,6 +138,30 @@ const addScripts = (scripts: string[]) =>
     )
 
     spinner.stop("Scripts added to your `package.json`")
+
+    return ok()
+  })
+
+const setupKnipConfig = () =>
+  safeTry(async function* () {
+    const spinner = p.spinner()
+    spinner.start("Setting up knip config...")
+
+    const knipPath = await knip.exists()
+
+    if (knipPath.path) {
+      spinner.message(`Found \`${knipPath.path}\`, updating...`)
+
+      yield* knip.update()
+
+      spinner.stop("knip config updated successfully.")
+    } else {
+      spinner.message("`knip.json` not found, creating...")
+
+      yield* knip.create()
+
+      spinner.stop("knip config created successfully.")
+    }
 
     return ok()
   })
@@ -277,6 +305,10 @@ export default defineCommand({
               hint: isMonorepo ? undefined : "available for monorepo projects",
               disabled: !isMonorepo,
             },
+            {
+              label: "analyze - find unused dependencies, exports, and files using knip",
+              value: "analyze",
+            },
           ],
         })
       )
@@ -358,6 +390,7 @@ export default defineCommand({
       const hasOxfmt = scripts.includes("format")
       const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
       const hasTypecheck = scripts.includes("typecheck")
+      const hasKnip = scripts.includes("analyze")
 
       const dependencies = ["adamantite"]
 
@@ -378,6 +411,10 @@ export default defineCommand({
         dependencies.push(`${typescript.name}@${typescript.version}`)
       }
 
+      if (hasKnip) {
+        dependencies.push(`${knip.name}@${knip.version}`)
+      }
+
       yield* installDependencies(dependencies)
 
       if (hasOxfmt) {
@@ -386,6 +423,10 @@ export default defineCommand({
 
       if (hasOxlint) {
         yield* setupOxlintConfig(presets)
+      }
+
+      if (hasKnip) {
+        yield* setupKnipConfig()
       }
 
       yield* addScripts(scripts)

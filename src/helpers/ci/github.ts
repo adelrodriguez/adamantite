@@ -107,6 +107,13 @@ const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string 
     })
   }
 
+  if (scripts.includes("analyze")) {
+    matrixEntries.push({
+      name: "analyze",
+      command: buildCommand(packageManager, "analyze"),
+    })
+  }
+
   // Return null if no CI-compatible scripts were selected
   if (matrixEntries.length === 0) {
     return null
@@ -158,10 +165,12 @@ ${setupSteps[packageManager]}
 
 /**
  * Check if any CI-compatible scripts are in the list.
- * CI-compatible scripts are: check, format, typecheck, check:monorepo
+ * CI-compatible scripts are: check, format, typecheck, check:monorepo, analyze
  */
 export const hasCICompatibleScripts = (scripts: string[]): boolean =>
-  scripts.some((script) => ["check", "format", "typecheck", "check:monorepo"].includes(script))
+  scripts.some((script) =>
+    ["check", "format", "typecheck", "check:monorepo", "analyze"].includes(script)
+  )
 
 export const github = {
   workflowPath: ".github/workflows/adamantite.yml",

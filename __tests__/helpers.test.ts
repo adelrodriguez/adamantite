@@ -3,6 +3,7 @@ import { join } from "node:path"
 import Bun from "bun"
 import { parse } from "jsonc-parser"
 import { vscode } from "#helpers/editors/vscode.ts"
+import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
@@ -102,6 +103,30 @@ describe("helpers", () => {
         const sherifInPackage = packageJson.devDependencies?.sherif
 
         expect(sherifInPackage).toBe(sherif.version)
+      })
+    })
+
+    describe("knip", () => {
+      test("should define version as exact semver without range prefixes", () => {
+        const version = knip.version
+
+        expect(typeof version).toBe("string")
+        expect(version).toMatch(SEMVER_REGEX)
+        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
+      })
+
+      test("should match the version specified in package.json devDependencies", async () => {
+        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
+        const packageJson = packageJsonResult._unsafeUnwrap()
+        const knipInPackage = packageJson.devDependencies?.knip
+
+        expect(knipInPackage).toBe(knip.version)
+      })
+
+      test("should use schema URL from helper config", () => {
+        expect(knip.config.$schema).toBeDefined()
+        expect(knip.config.$schema).toContain("unpkg.com/knip")
+        expect(knip.config.$schema).toContain("schema-jsonc.json")
       })
     })
 

@@ -2,21 +2,59 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Fault } from "faultier"
 import { err, fromPromise, ok, safeTry } from "neverthrow"
-import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+import {
+  checkCliExists,
+  checkIfExists,
+  isJsonObject,
+  mergeConfig,
+  parseJson,
+  runCommand,
+} from "#utils.ts"
 
 export const vscode = {
   config: {
     "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.defaultFormatter": "oxc.oxc-vscode",
     "editor.formatOnSave": true,
     "editor.formatOnPaste": true,
     "editor.codeActionsOnSave": {
       "source.fixAll.oxc": "explicit",
     },
-    "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]": {
+    "[javascript]": {
+      "editor.defaultFormatter": "oxc.oxc-vscode",
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "oxc.oxc-vscode",
+    },
+    "[javascriptreact]": {
+      "editor.defaultFormatter": "oxc.oxc-vscode",
+    },
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "oxc.oxc-vscode",
+    },
+    "[json]": {
+      "editor.defaultFormatter": "oxc.oxc-vscode",
+    },
+    "[jsonc]": {
+      "editor.defaultFormatter": "oxc.oxc-vscode",
+    },
+    "[css]": {
+      "editor.defaultFormatter": "oxc.oxc-vscode",
+    },
+    "[graphql]": {
       "editor.defaultFormatter": "oxc.oxc-vscode",
     },
   },
   exists: () => checkIfExists(join(process.cwd(), ".vscode", "settings.json")),
+  cliExists: () =>
+    checkCliExists("code").mapErr((error) =>
+      Fault.wrap(error)
+        .withTag("VSCODE_CLI_NOT_FOUND")
+        .withDescription(
+          "VS Code CLI not found",
+          "The 'code' CLI command is not available. Please install the VS Code command-line tools by opening VS Code and running 'Shell Command: Install code command in PATH' from the command palette (Cmd+Shift+P)."
+        )
+    ),
   create: () =>
     safeTry(async function* () {
       const vscodePath = join(process.cwd(), ".vscode")
@@ -87,6 +125,21 @@ export const vscode = {
               "We're unable to write the .vscode/settings.json file in the current directory."
             )
             .withContext({ path: vscodePath })
+      )
+
+      return ok()
+    }),
+  extension: () =>
+    safeTry(function* () {
+      yield* vscode.cliExists()
+
+      yield* runCommand("code --install-extension oxc.oxc-vscode").mapErr((error) =>
+        Fault.wrap(error)
+          .withTag("FAILED_TO_INSTALL_EXTENSION")
+          .withDescription(
+            "Failed to install VS Code extension",
+            "An error occurred while installing the VS Code extension."
+          )
       )
 
       return ok()

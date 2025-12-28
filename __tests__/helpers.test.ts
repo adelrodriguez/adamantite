@@ -122,13 +122,23 @@ describe("helpers", () => {
   describe("editors", () => {
     describe("vscode", () => {
       test("should configure oxc as default formatter for supported file types", () => {
-        const fileTypeConfig =
-          vscode.config[
-            "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][css][graphql]"
-          ]
+        const supportedFileTypes = [
+          "[javascript]",
+          "[typescript]",
+          "[javascriptreact]",
+          "[typescriptreact]",
+          "[json]",
+          "[jsonc]",
+          "[css]",
+          "[graphql]",
+        ]
 
-        expect(fileTypeConfig).toBeDefined()
-        expect(fileTypeConfig["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
+        for (const fileType of supportedFileTypes) {
+          // @ts-expect-error - fileType is a valid key of vscode.config
+          const fileTypeConfig = vscode.config[fileType]
+          expect(fileTypeConfig).toBeDefined()
+          expect(fileTypeConfig["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
+        }
       })
 
       test("should enable format on save and paste", () => {

@@ -224,5 +224,3 @@ export const github = {
       return ok()
     }),
 }
-
-export type { WorkflowOptions }

@@ -1,5 +1,17 @@
 import type { ParseError } from "jsonc-parser"
 
+/**
+ * Available scripts that can be added to package.json during initialization.
+ */
+export type Script =
+  | "check"
+  | "fix"
+  | "format"
+  | "typecheck"
+  | "check:monorepo"
+  | "fix:monorepo"
+  | "analyze"
+
 declare module "faultier" {
   interface FaultRegistry {
     CLI_NOT_FOUND: { command: string }

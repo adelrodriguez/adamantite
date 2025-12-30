@@ -5,6 +5,7 @@ import * as p from "@clack/prompts"
 import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { type PackageManagerName, addDevDependency } from "nypm"
+import type { Script } from "#types.ts"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { knip } from "#helpers/packages/knip.ts"
@@ -88,7 +89,7 @@ const setupOxfmtConfig = () =>
     return ok()
   })
 
-const addScripts = (scripts: string[]) =>
+const addScripts = (scripts: Script[]) =>
   safeTry(async function* () {
     const cwd = process.cwd()
     const packageJson = yield* readPackageJson()
@@ -213,14 +214,14 @@ const setupEditors = (editors: string[]) =>
     return ok()
   })
 
-const installEditorExtensions = (editors: string[]) =>
+const installEditorExtensions = (editors: string[], scripts: Script[]) =>
   safeTry(function* () {
     const spinner = p.spinner()
     spinner.start("Installing editor extensions...")
 
     if (editors.includes("vscode")) {
       spinner.message("Installing VS Code extension...")
-      yield* vscode.extension()
+      yield* vscode.extension(scripts)
     }
 
     if (editors.includes("zed")) {
@@ -231,7 +232,7 @@ const installEditorExtensions = (editors: string[]) =>
     return ok()
   })
 
-const setupGitHubActions = (packageManager: PackageManagerName, scripts: string[]) =>
+const setupGitHubActions = (packageManager: PackageManagerName, scripts: Script[]) =>
   safeTry(async function* () {
     const spinner = p.spinner()
     spinner.start("Setting up GitHub Actions workflow...")
@@ -438,7 +439,7 @@ export default defineCommand({
       yield* setupEditors(editors)
 
       if (installExtensions) {
-        yield* installEditorExtensions(editors)
+        yield* installEditorExtensions(editors, scripts)
       }
 
       if (enableGitHubActions) {

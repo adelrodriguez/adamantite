@@ -37,9 +37,10 @@
     "#presets/*": "./presets/*"
   },
   "exports": {
+    "./analyze": "./presets/knip.json",
+    "./format": "./presets/oxfmt.json",
     "./lint": "./presets/oxlint/core.json",
     "./lint/*": "./presets/oxlint/*.json",
-    "./format": "./presets/oxfmt.json",
     "./typescript": "./presets/tsconfig.json",
     "./presets/*": "./presets/*"
   },

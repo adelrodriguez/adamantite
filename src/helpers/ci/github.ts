@@ -4,11 +4,12 @@ import process from "node:process"
 import { Fault } from "faultier"
 import { fromPromise, ok, safeTry } from "neverthrow"
 import { type PackageManagerName, runScriptCommand } from "nypm"
+import type { Script } from "#types.ts"
 import { checkIfExists } from "#utils.ts"
 
 interface WorkflowOptions {
   packageManager: PackageManagerName
-  scripts: string[]
+  scripts: Script[]
 }
 
 const setupSteps: Record<PackageManagerName, string> = {
@@ -163,14 +164,21 @@ ${setupSteps[packageManager]}
   return `${workflow}\n`
 }
 
+/** CI-compatible scripts that can be run in GitHub Actions */
+const CI_COMPATIBLE_SCRIPTS = new Set<Script>([
+  "check",
+  "format",
+  "typecheck",
+  "check:monorepo",
+  "analyze",
+])
+
 /**
  * Check if any CI-compatible scripts are in the list.
  * CI-compatible scripts are: check, format, typecheck, check:monorepo, analyze
  */
-export const hasCICompatibleScripts = (scripts: string[]): boolean =>
-  scripts.some((script) =>
-    ["check", "format", "typecheck", "check:monorepo", "analyze"].includes(script)
-  )
+export const hasCICompatibleScripts = (scripts: Script[]): boolean =>
+  scripts.some((script) => CI_COMPATIBLE_SCRIPTS.has(script))
 
 export const github = {
   workflowPath: ".github/workflows/adamantite.yml",

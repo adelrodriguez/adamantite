@@ -126,7 +126,48 @@ describe("helpers", () => {
       test("should use schema URL from helper config", () => {
         expect(knip.config.$schema).toBeDefined()
         expect(knip.config.$schema).toContain("unpkg.com/knip")
-        expect(knip.config.$schema).toContain("schema-jsonc.json")
+        expect(knip.config.$schema).toContain("schema.json")
+      })
+
+      test("should set correct schema URL based on file extension in update()", async () => {
+        const fs = await import("node:fs/promises")
+        const os = await import("node:os")
+        const path = await import("node:path")
+
+        // Create a temporary directory for testing
+        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "knip-test-"))
+        const originalCwd = process.cwd()
+
+        try {
+          // Change to temp directory
+          process.chdir(tmpDir)
+
+          // Test .json file
+          const jsonPath = path.join(tmpDir, "knip.json")
+          await fs.writeFile(jsonPath, JSON.stringify({ $schema: "old-schema" }, null, 2))
+
+          const resultJson = await knip.update()
+          expect(resultJson.isOk()).toBe(true)
+
+          const jsonContent = JSON.parse(await fs.readFile(jsonPath, "utf8"))
+          expect(jsonContent.$schema).toBe("https://unpkg.com/knip@5/schema.json")
+
+          // Clean up and test .jsonc file
+          await fs.unlink(jsonPath)
+
+          const jsoncPath = path.join(tmpDir, "knip.jsonc")
+          await fs.writeFile(jsoncPath, JSON.stringify({ $schema: "old-schema" }, null, 2))
+
+          const resultJsonc = await knip.update()
+          expect(resultJsonc.isOk()).toBe(true)
+
+          const jsoncContent = JSON.parse(await fs.readFile(jsoncPath, "utf8"))
+          expect(jsoncContent.$schema).toBe("https://unpkg.com/knip@5/schema-jsonc.json")
+        } finally {
+          // Restore original directory and clean up
+          process.chdir(originalCwd)
+          await fs.rm(tmpDir, { recursive: true, force: true })
+        }
       })
     })
 

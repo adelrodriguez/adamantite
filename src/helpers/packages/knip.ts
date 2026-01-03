@@ -2,15 +2,13 @@ import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Fault } from "faultier"
 import { err, fromPromise, ok, safeTry } from "neverthrow"
+import preset from "#presets/knip.json" with { type: "json" }
 import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const knip = {
   name: "knip",
   version: "5.78.0",
-  config: {
-    // Ensures that the schema always matches the installed version of knip
-    $schema: "https://unpkg.com/knip@5/schema-jsonc.json",
-  },
+  config: preset,
   exists: async () => {
     if (await checkIfExists(join(process.cwd(), "knip.json"))) {
       return { path: join(process.cwd(), "knip.json") }
@@ -24,7 +22,7 @@ export const knip = {
   },
   create: () =>
     fromPromise(
-      writeFile(join(process.cwd(), "knip.jsonc"), JSON.stringify(knip.config, null, 2)),
+      writeFile(join(process.cwd(), "knip.json"), JSON.stringify(knip.config, null, 2)),
       (error) =>
         Fault.wrap(error)
           .withTag("FAILED_TO_WRITE_FILE")
@@ -69,7 +67,12 @@ export const knip = {
       }
 
       const mergedConfig = yield* mergeConfig(existingConfig, knip.config)
-      mergedConfig.$schema = knip.config.$schema
+
+      // Set schema based on file extension
+      const isJsonc = exists.path.endsWith(".jsonc")
+      mergedConfig.$schema = isJsonc
+        ? "https://unpkg.com/knip@5/schema-jsonc.json"
+        : "https://unpkg.com/knip@5/schema.json"
 
       yield* fromPromise(writeFile(exists.path, JSON.stringify(mergedConfig, null, 2)), (error) =>
         Fault.wrap(error)

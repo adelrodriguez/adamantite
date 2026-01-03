@@ -539,8 +539,8 @@ describe("helpers integration", () => {
         expect(hasCICompatibleScripts(["typecheck"])).toBe(true)
         expect(hasCICompatibleScripts(["check:monorepo"])).toBe(true)
         expect(hasCICompatibleScripts(["fix"])).toBe(false)
-        expect(hasCICompatibleScripts(["build"])).toBe(false)
-        expect(hasCICompatibleScripts(["check", "build"])).toBe(true)
+        expect(hasCICompatibleScripts(["fix:monorepo"])).toBe(false)
+        expect(hasCICompatibleScripts(["check", "fix:monorepo"])).toBe(true)
       })
 
       test("should detect when GitHub Actions workflow does not exist", async () => {

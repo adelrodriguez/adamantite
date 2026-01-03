@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Fault } from "faultier"
 import { err, fromPromise, ok, safeTry } from "neverthrow"
+import type { Script } from "#types.ts"
 import {
   checkCliExists,
   checkIfExists,
@@ -129,18 +130,46 @@ export const vscode = {
 
       return ok()
     }),
-  extension: () =>
+  extension: (scripts: Script[] = []) =>
     safeTry(function* () {
       yield* vscode.cliExists()
 
-      yield* runCommand("code --install-extension oxc.oxc-vscode").mapErr((error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_INSTALL_EXTENSION")
-          .withDescription(
-            "Failed to install VS Code extension",
-            "An error occurred while installing the VS Code extension."
-          )
-      )
+      if (scripts.includes("check") || scripts.includes("fix") || scripts.includes("format")) {
+        // Always install the core OXC extension
+        yield* runCommand("code --install-extension oxc.oxc-vscode").mapErr((error) =>
+          Fault.wrap(error)
+            .withTag("FAILED_TO_INSTALL_EXTENSION")
+            .withDescription(
+              "Failed to install VS Code extension",
+              "An error occurred while installing the VS Code extension."
+            )
+        )
+      }
+
+      // Install Knip extension when analyze is selected
+      if (scripts.includes("analyze")) {
+        yield* runCommand("code --install-extension webpro.vscode-knip").mapErr((error) =>
+          Fault.wrap(error)
+            .withTag("FAILED_TO_INSTALL_EXTENSION")
+            .withDescription(
+              "Failed to install VS Code extension",
+              "An error occurred while installing the VS Code extension."
+            )
+        )
+      }
+
+      // Install TypeScript Native Preview when typecheck is selected
+      if (scripts.includes("typecheck")) {
+        yield* runCommand("code --install-extension TypeScriptTeam.native-preview").mapErr(
+          (error) =>
+            Fault.wrap(error)
+              .withTag("FAILED_TO_INSTALL_EXTENSION")
+              .withDescription(
+                "Failed to install VS Code extension",
+                "An error occurred while installing the VS Code extension."
+              )
+        )
+      }
 
       return ok()
     }),

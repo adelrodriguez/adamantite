@@ -1,10 +1,10 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema-jsonc.json",
+  "$schema": "https://unpkg.com/knip@5/schema.json",
   "rules": {
     "files": "error",
     "dependencies": "error",
-    "devDependencies": "off",
-    "optionalPeerDependencies": "off",
+    "devDependencies": "error",
+    "optionalPeerDependencies": "warn",
     "unlisted": "error",
     "binaries": "error",
     "unresolved": "error",
@@ -14,8 +14,16 @@
     "nsTypes": "warn",
     "enumMembers": "off",
     "classMembers": "off",
-    "duplicates": "warn",
+    "duplicates": "warn"
   },
   "ignoreExportsUsedInFile": true,
-  "ignore": ["bunup.config.ts", "src/types.ts"],
+  "ignoreFiles": [
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/.next/**",
+    "**/.vercel/**",
+    "**/.turbo/**"
+  ],
+  "ignore": ["**/*.d.ts"]
 }

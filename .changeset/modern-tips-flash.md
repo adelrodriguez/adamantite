@@ -9,3 +9,5 @@ Ships new `adamantite/analyze` preset with opinionated knip rules for detecting 
 The init command now installs relevant VS Code extensions based on selected scripts (OXC for lint/fix, Knip for analyze, TypeScript Native Preview for typecheck).
 
 Also updates oxlint core rules to allow tagged templates and ternaries in expressions.
+
+Updates tooling dependencies: knip 5.79.0, oxfmt 0.21.0, oxlint 1.36.0, oxlint-tsgolint 0.10.1, and TypeScript native preview 7.0.0-dev.20260103.1.

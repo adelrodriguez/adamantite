@@ -7,7 +7,7 @@ import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const oxfmt = {
   name: "oxfmt",
-  version: "0.20.0",
+  version: "0.21.0",
   config: {
     $schema: "./node_modules/oxfmt/configuration_schema.json",
     ...preset,

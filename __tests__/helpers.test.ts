@@ -172,6 +172,24 @@ describe("helpers", () => {
     })
 
     describe("typescript", () => {
+      test("should define version as exact semver without range prefixes", () => {
+        const version = typescript.version
+
+        expect(typeof version).toBe("string")
+        // TypeScript uses dev versions (e.g., 7.0.0-dev.20260103.1)
+        // Check that it starts with semver format and doesn't have range prefixes
+        expect(version).toMatch(/^\d+\.\d+\.\d+/)
+        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
+      })
+
+      test("should match the version specified in package.json devDependencies", async () => {
+        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
+        const packageJson = packageJsonResult._unsafeUnwrap()
+        const typescriptInPackage = packageJson.devDependencies?.["@typescript/native-preview"]
+
+        expect(typescriptInPackage).toBe(typescript.version)
+      })
+
       test("should provide a config that extends adamantite tsconfig preset", () => {
         expect(typescript.config).toHaveProperty("extends")
         expect(typescript.config.extends).toBe("adamantite/typescript")

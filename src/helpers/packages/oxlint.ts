@@ -6,7 +6,7 @@ import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const oxlint = {
   name: "oxlint",
-  version: "1.35.0",
+  version: "1.36.0",
   config: {
     // Ensures that the schema always matches the installed version of oxlint
     $schema: "./node_modules/oxlint/configuration_schema.json",
@@ -119,5 +119,5 @@ export const oxlint = {
 
 export const tsgolint = {
   name: "oxlint-tsgolint",
-  version: "0.10.0",
+  version: "0.10.1",
 }

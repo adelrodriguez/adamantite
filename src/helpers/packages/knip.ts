@@ -7,7 +7,7 @@ import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const knip = {
   name: "knip",
-  version: "5.78.0",
+  version: "5.79.0",
   config: preset,
   exists: async () => {
     if (await checkIfExists(join(process.cwd(), "knip.json"))) {

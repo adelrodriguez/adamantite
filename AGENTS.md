@@ -1,14 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
----
-
-description: Use Bun instead of Node.js, npm, pnpm, or vite.
-globs: "_.ts, _.tsx, _.html, _.css, _.js, _.jsx, package.json"
-alwaysApply: false
-
----
+This file provides guidance to AI agents when working with code in this repository.
 
 ## Project Overview
 
@@ -40,6 +32,8 @@ After editing files, always run:
 3. `bun run check` - Check for linting issues
 4. `bun run fix` - Auto-fix issues and format code
 5. `bun run format` - Format code explicitly (run after editing various files)
+
+Make sure to always run format after editing files, including creating documentation like changesets and README.md.
 
 ## Release Workflow
 

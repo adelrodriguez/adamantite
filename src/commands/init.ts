@@ -27,14 +27,13 @@ const installDependencies = (packages: string[]) =>
     s.start("Installing dependencies...")
     const isMonorepo = yield* checkIsMonorepo()
 
-    for (const pkg of packages) {
-      s.message(`Installing dependency: ${pkg}...`)
-      yield* fromPromise(addDevDependency(pkg, { silent: true, workspace: isMonorepo }), (error) =>
+    yield* fromPromise(
+      addDevDependency(packages, { silent: true, workspace: isMonorepo }),
+      (error) =>
         Fault.wrap(error)
           .withTag("FAILED_TO_INSTALL_DEPENDENCY")
-          .withMessage(`Failed to install ${pkg}`)
-      )
-    }
+          .withMessage(`Failed to install dependencies: ${packages.join(", ")}`)
+    )
 
     s.stop("Dependencies installed.")
 

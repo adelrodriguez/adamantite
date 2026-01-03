@@ -48,13 +48,10 @@ export default defineCommand({
 
       // Confirm updates using fromSafePromise + isCancel check
       log.message("The following dependencies will be updated:")
-      log.message("")
 
       for (const dep of updates) {
         log.message(`  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`)
       }
-
-      log.message("")
 
       const shouldUpdate = yield* fromSafePromise(
         confirm({
@@ -74,13 +71,18 @@ export default defineCommand({
       const s = spinner()
       s.start("Updating dependencies...")
 
-      for (const dep of updates) {
-        yield* fromPromise(addDevDependency(`${dep.name}@${dep.targetVersion}`), (error) =>
+      yield* fromPromise(
+        addDevDependency(
+          updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
+          { silent: true }
+        ),
+        (error) =>
           Fault.wrap(error)
             .withTag("FAILED_TO_INSTALL_DEPENDENCY")
-            .withMessage(`Failed to update ${dep.name}`)
-        )
-      }
+            .withMessage(
+              `Failed to update dependencies: ${updates.map((dep) => dep.name).join(", ")}`
+            )
+      )
 
       s.stop("Dependencies updated successfully")
       return ok("updated" as const)

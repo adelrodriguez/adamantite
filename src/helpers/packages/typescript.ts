@@ -6,7 +6,7 @@ import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const typescript = {
   name: "@typescript/native-preview",
-  version: "7.0.0-dev.20251227.1",
+  version: "7.0.0-dev.20260103.1",
   command: "tsgo",
   config: { extends: "adamantite/typescript" },
   exists: () => checkIfExists(join(process.cwd(), "tsconfig.json")),

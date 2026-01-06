@@ -7,30 +7,30 @@ import { oxlint } from "#helpers/packages/oxlint.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "fix [files..]",
-  describe: "Fix issues in code using oxlint",
   builder: (yargs) =>
     yargs
       .positional("files", {
+        array: true,
         describe: "Specific files to fix (optional)",
         type: "string",
-        array: true,
       })
       .option("suggested", {
-        type: "boolean",
-        description: "Apply suggested fixes",
         default: false,
+        description: "Apply suggested fixes",
+        type: "boolean",
       })
       .option("dangerous", {
-        type: "boolean",
-        description: "Apply dangerous fixes",
         default: false,
+        description: "Apply dangerous fixes",
+        type: "boolean",
       })
       .option("all", {
-        type: "boolean",
-        description: "Apply all fixes, including suggested and dangerous fixes",
         default: false,
+        description: "Apply all fixes, including suggested and dangerous fixes",
+        type: "boolean",
       }),
+  command: "fix [files..]",
+  describe: "Fix issues in code using oxlint",
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()

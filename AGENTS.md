@@ -6,8 +6,8 @@ This file provides guidance to AI agents when working with code in this reposito
 
 Adamantite is an opinionated preset package for modern TypeScript applications that provides:
 
-- **oxlint configuration** (`presets/oxlint/*.json`) - Modular linting rules (core, React, Next.js)
-- **oxfmt configuration** (`presets/oxfmt.json`) - Code formatting configuration
+- **oxlint configuration** (`presets/lint/*.json`) - Modular linting rules (core, React, Next.js)
+- **oxfmt configuration** (`presets/format.json`) - Code formatting configuration
 - **TypeScript preset** (`presets/tsconfig.json`) - Strict TypeScript configuration
 - **CLI tool** - Commands to run oxlint linting and oxfmt formatting via `adamantite` command
 
@@ -58,6 +58,12 @@ This project uses changesets for version management:
 - **`utils.ts`** - Shared utilities (package manager detection, error handling)
 - **`version.ts`** - Package version detection
 
+### Dependency Management
+
+Adamantite depends on multiple packages to perform its tasks. These dependencies are defined inside the `src/helpers/packages/` directory.
+
+Each package has a version property that is used to determine the version of the package to install, and it should match the version of the package in the `package.json` file. If the version in the `package.json` file is higher, we should update the version in its respective helper object.
+
 ### Build Process
 
 - **bunup** (`bunup.config.ts`) bundles CLI to `dist/index.js` with minification
@@ -65,6 +71,6 @@ This project uses changesets for version management:
 
 ### Configuration Files
 
-- **`presets/oxlint/core.json`** - Core linting rules for all TypeScript/JavaScript projects
-- **`presets/oxfmt.json`** - Code formatting configuration
+- **`presets/lint/core.json`** - Core linting rules for all TypeScript/JavaScript projects
+- **`presets/format.json`** - Code formatting configuration
 - **`presets/tsconfig.json`** - Reusable TypeScript configuration

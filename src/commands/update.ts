@@ -9,9 +9,9 @@ import { sherif } from "#helpers/packages/sherif.ts"
 import { defineCommand, normalizeDependencyVersion, printTitle, readPackageJson } from "#utils.ts"
 
 export default defineCommand({
+  builder: (yargs) => yargs,
   command: "update",
   describe: "Update adamantite dependencies to latest compatible versions",
-  builder: (yargs) => yargs,
   handler: () =>
     safeTry(async function* () {
       const packageJson = yield* readPackageJson()
@@ -32,10 +32,10 @@ export default defineCommand({
         const dependency = packageJson.devDependencies?.[pkg.name]
         if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
           updates.push({
-            name: pkg.name,
             currentVersion: dependency,
-            targetVersion: pkg.version,
             isDevDependency: true,
+            name: pkg.name,
+            targetVersion: pkg.version,
           })
         }
       }

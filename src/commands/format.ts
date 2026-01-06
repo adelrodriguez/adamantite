@@ -7,19 +7,19 @@ import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "format [files..]",
-  describe: "Format files using oxfmt",
   builder: (yargs) =>
     yargs
       .positional("files", {
+        array: true,
         describe: "Specific files to format (optional)",
         type: "string",
-        array: true,
       })
       .option("check", {
-        type: "boolean",
         description: "Check if files are formatted without writing",
+        type: "boolean",
       }),
+  command: "format [files..]",
+  describe: "Format files using oxfmt",
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()

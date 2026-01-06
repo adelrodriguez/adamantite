@@ -7,23 +7,23 @@ import { knip } from "#helpers/packages/knip.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "analyze [files..]",
-  describe: "Find unused dependencies, exports, and files using knip",
   builder: (yargs) =>
     yargs
       .positional("files", {
+        array: true,
         describe: "Specific files to analyze (optional)",
         type: "string",
-        array: true,
       })
       .option("fix", {
-        type: "boolean",
         description: "Automatically fix issues",
+        type: "boolean",
       })
       .option("strict", {
-        type: "boolean",
         description: "Enable strict mode",
+        type: "boolean",
       }),
+  command: "analyze [files..]",
+  describe: "Find unused dependencies, exports, and files using knip",
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()

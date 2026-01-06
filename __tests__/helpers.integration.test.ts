@@ -29,9 +29,9 @@ describe("helpers integration", () => {
       "package.json",
       JSON.stringify(
         {
+          devDependencies: {},
           name: "test-project",
           version: "1.0.0",
-          devDependencies: {},
         },
         null,
         2
@@ -45,7 +45,7 @@ describe("helpers integration", () => {
 
     // Clean up temp directory
     try {
-      rmSync(tempDir, { recursive: true, force: true })
+      rmSync(tempDir, { force: true, recursive: true })
     } catch {
       // Ignore cleanup errors in tests
     }
@@ -71,7 +71,7 @@ describe("helpers integration", () => {
         expect(config).toHaveProperty("$schema")
         expect(config.$schema).toBe("./node_modules/oxlint/configuration_schema.json")
         expect(config).toHaveProperty("extends")
-        expect(config.extends).toEqual(["adamantite/lint"])
+        expect(config.extends).toEqual(["./node_modules/adamantite/presets/lint/core.json"])
       })
 
       test("should update existing .oxlintrc.json config", async () => {
@@ -99,14 +99,12 @@ describe("helpers integration", () => {
         const content = await Bun.file(".oxlintrc.json").text()
         const config = parse(content)
 
-        // Should preserve existing rules but add adamantite to extends and override schema
+        // Should preserve existing rules and override schema
         expect(config.rules).toEqual({ "no-console": "warn" })
         expect(config.$schema).toBe("./node_modules/oxlint/configuration_schema.json")
-        // Check that extends contains either "adamantite/lint" or "adamantite/lint/core" (they're equivalent)
+        // Check that extends contains the core preset
         const extendsArray = Array.isArray(config.extends) ? (config.extends as string[]) : []
-        expect(
-          extendsArray.some((ext) => ext === "adamantite/lint" || ext === "adamantite/lint/core")
-        ).toBe(true)
+        expect(extendsArray).toContain("./node_modules/adamantite/presets/lint/core.json")
       })
 
       test("should handle update() failure when reading oxlint config fails", async () => {
@@ -132,10 +130,9 @@ describe("helpers integration", () => {
 
         // Should merge empty config with Adamantite's config
         expect(config.$schema).toBe("./node_modules/oxlint/configuration_schema.json")
+        // Check that extends contains the core preset
         const extendsArray = Array.isArray(config.extends) ? (config.extends as string[]) : []
-        expect(
-          extendsArray.some((ext) => ext === "adamantite/lint" || ext === "adamantite/lint/core")
-        ).toBe(true)
+        expect(extendsArray).toContain("./node_modules/adamantite/presets/lint/core.json")
       })
 
       test("should handle update() failure when writing oxlint config fails", async () => {
@@ -296,8 +293,8 @@ describe("helpers integration", () => {
           JSON.stringify(
             {
               compilerOptions: {
-                target: "ES2020",
                 strict: true,
+                target: "ES2020",
               },
               include: ["src/**/*"],
             },
@@ -317,8 +314,8 @@ describe("helpers integration", () => {
 
         // Should preserve existing config but add extends
         expect(config.compilerOptions).toEqual({
-          target: "ES2020",
           strict: true,
+          target: "ES2020",
         })
         expect(config.include).toEqual(["src/**/*"])
         expect(config.extends).toBe("adamantite/typescript")
@@ -330,10 +327,10 @@ describe("helpers integration", () => {
           "tsconfig.json",
           JSON.stringify(
             {
-              extends: "@company/tsconfig",
               compilerOptions: {
                 target: "ES2020",
               },
+              extends: "@company/tsconfig",
             },
             null,
             2

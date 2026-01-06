@@ -25,9 +25,9 @@ describe("commands", () => {
       "package.json",
       JSON.stringify(
         {
+          devDependencies: {},
           name: "test-project",
           version: "1.0.0",
-          devDependencies: {},
         },
         null,
         2
@@ -41,7 +41,7 @@ describe("commands", () => {
 
     // Clean up temp directory
     try {
-      rmSync(tempDir, { recursive: true, force: true })
+      rmSync(tempDir, { force: true, recursive: true })
     } catch {
       // Ignore cleanup errors in tests
     }
@@ -51,10 +51,10 @@ describe("commands", () => {
     test("should fail gracefully when no package manager detected", async () => {
       // No lockfile exists
       const proc = spawn(["bun", cliPath, "check"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       const stdout = await new Response(proc.stdout).text()
@@ -72,10 +72,10 @@ describe("commands", () => {
       await Bun.write("bun.lock", "")
 
       const proc = spawn(["bun", cliPath, "check"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       await proc.exited
@@ -91,10 +91,10 @@ describe("commands", () => {
     test("should fail gracefully when no package manager detected", async () => {
       // No lockfile exists
       const proc = spawn(["bun", cliPath, "fix"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       const stdout = await new Response(proc.stdout).text()
@@ -112,10 +112,10 @@ describe("commands", () => {
       await Bun.write("bun.lock", "")
 
       const proc = spawn(["bun", cliPath, "fix"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       await proc.exited
@@ -130,10 +130,10 @@ describe("commands", () => {
     test("should fail gracefully when no package manager detected", async () => {
       // No lockfile exists
       const proc = spawn(["bun", cliPath, "monorepo"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       const stdout = await new Response(proc.stdout).text()
@@ -151,10 +151,10 @@ describe("commands", () => {
       await Bun.write("bun.lock", "")
 
       const proc = spawn(["bun", cliPath, "monorepo"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       await proc.exited
@@ -169,10 +169,10 @@ describe("commands", () => {
     test("should fail gracefully when no package manager detected", async () => {
       // No lockfile exists
       const proc = spawn(["bun", cliPath, "analyze"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       const stdout = await new Response(proc.stdout).text()
@@ -190,10 +190,10 @@ describe("commands", () => {
       await Bun.write("bun.lock", "")
 
       const proc = spawn(["bun", cliPath, "analyze"], {
-        stdout: "pipe",
-        stderr: "pipe",
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       await proc.exited

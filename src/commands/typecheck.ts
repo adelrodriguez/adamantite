@@ -7,20 +7,20 @@ import { typescript } from "#helpers/packages/typescript.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "typecheck",
-  describe: "Run TypeScript type checking",
   builder: (yargs) =>
     yargs
       .option("project", {
         alias: "p",
-        type: "string",
         description: "Path to tsconfig.json file",
+        type: "string",
       })
       .option("watch", {
         alias: "w",
-        type: "boolean",
         description: "Run in watch mode",
+        type: "boolean",
       }),
+  command: "typecheck",
+  describe: "Run TypeScript type checking",
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()

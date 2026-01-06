@@ -33,7 +33,7 @@ describe("helpers", () => {
       })
 
       test("should use local schema path from helper config", async () => {
-        const oxlintConfigContent = await Bun.file("presets/oxlint/core.json").text()
+        const oxlintConfigContent = await Bun.file("presets/lint/core.json").text()
         const cleanedContent = oxlintConfigContent
           .split("\n")
           .filter((line) => !line.trim().startsWith("//"))
@@ -42,7 +42,7 @@ describe("helpers", () => {
         const oxlintConfig = parse(cleanedContent)
         const presetSchemaPath = oxlintConfig.$schema
 
-        // Preset file is in presets/oxlint/, so it needs ../../ to reach node_modules
+        // Preset file is in presets/lint/, so it needs ../../ to reach node_modules
         expect(presetSchemaPath).toContain("node_modules/oxlint")
         expect(presetSchemaPath).toContain("configuration_schema.json")
 
@@ -166,7 +166,7 @@ describe("helpers", () => {
         } finally {
           // Restore original directory and clean up
           process.chdir(originalCwd)
-          await fs.rm(tmpDir, { recursive: true, force: true })
+          await fs.rm(tmpDir, { force: true, recursive: true })
         }
       })
     })

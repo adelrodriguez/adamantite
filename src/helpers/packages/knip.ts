@@ -6,20 +6,7 @@ import preset from "#presets/knip.json" with { type: "json" }
 import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const knip = {
-  name: "knip",
-  version: "5.79.0",
   config: preset,
-  exists: async () => {
-    if (await checkIfExists(join(process.cwd(), "knip.json"))) {
-      return { path: join(process.cwd(), "knip.json") }
-    }
-
-    if (await checkIfExists(join(process.cwd(), "knip.jsonc"))) {
-      return { path: join(process.cwd(), "knip.jsonc") }
-    }
-
-    return { path: null }
-  },
   create: () =>
     fromPromise(
       writeFile(join(process.cwd(), "knip.json"), JSON.stringify(knip.config, null, 2)),
@@ -31,6 +18,18 @@ export const knip = {
             "We're unable to write the knip configuration to the current directory."
           )
     ),
+  exists: async () => {
+    if (await checkIfExists(join(process.cwd(), "knip.json"))) {
+      return { path: join(process.cwd(), "knip.json") }
+    }
+
+    if (await checkIfExists(join(process.cwd(), "knip.jsonc"))) {
+      return { path: join(process.cwd(), "knip.jsonc") }
+    }
+
+    return { path: null }
+  },
+  name: "knip",
   update: () =>
     safeTry(async function* () {
       const exists = await knip.exists()
@@ -86,4 +85,5 @@ export const knip = {
 
       return ok()
     }),
+  version: "5.80.0",
 }

@@ -250,9 +250,9 @@ const setupGitHubActions = (packageManager: PackageManagerName, scripts: Script[
   })
 
 export default defineCommand({
+  builder: (yargs) => yargs,
   command: "init",
   describe: "Initialize Adamantite in the current directory",
-  builder: (yargs) => yargs,
   handler: () =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()
@@ -274,36 +274,36 @@ export default defineCommand({
           message: "Which scripts do you want to add to your `package.json`?",
           options: [
             {
+              hint: "recommended",
               label: "check - find issues in code using oxlint",
               value: "check",
-              hint: "recommended",
             },
             {
+              hint: "recommended",
               label: "fix - fix code issues using oxlint",
               value: "fix",
-              hint: "recommended",
             },
             {
+              hint: "recommended",
               label: "format - code formatting using oxfmt",
               value: "format",
-              hint: "recommended",
             },
             {
+              hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
               label: "typecheck - type-check your code using tsgo",
               value: "typecheck",
-              hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
             },
             {
+              disabled: !isMonorepo,
+              hint: isMonorepo ? undefined : "available for monorepo projects",
               label: "check:monorepo - check for monorepo-specific issues using Sherif",
               value: "check:monorepo",
-              hint: isMonorepo ? undefined : "available for monorepo projects",
-              disabled: !isMonorepo,
             },
             {
+              disabled: !isMonorepo,
+              hint: isMonorepo ? undefined : "available for monorepo projects",
               label: "fix:monorepo - fix monorepo-specific issues using Sherif",
               value: "fix:monorepo",
-              hint: isMonorepo ? undefined : "available for monorepo projects",
-              disabled: !isMonorepo,
             },
             {
               label: "analyze - find unused dependencies, exports, and files using knip",
@@ -346,7 +346,7 @@ export default defineCommand({
           message: "Which editors do you want to configure? (optional)",
           options: [
             { label: "VSCode / Cursor / Windsurf", value: "vscode" },
-            { label: "Zed", value: "zed", disabled: true, hint: "coming soon" },
+            { disabled: true, hint: "coming soon", label: "Zed", value: "zed" },
           ],
           required: false,
         })
@@ -360,8 +360,8 @@ export default defineCommand({
       if (editors.length > 0) {
         const installExtensionsResponse = yield* fromSafePromise(
           p.confirm({
-            message: "Do you want to install the recommended editor extensions?",
             initialValue: true,
+            message: "Do you want to install the recommended editor extensions?",
           })
         )
 

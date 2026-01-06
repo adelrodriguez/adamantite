@@ -166,11 +166,11 @@ adamantite update
 
 ## Presets
 
-### Linting ([presets/oxlint/](./presets/oxlint/))
+### Linting ([presets/lint/](./presets/lint/))
 
 Adamantite provides comprehensive linting rules for TypeScript and JavaScript:
 
-#### Core ([core.json](./presets/oxlint/core.json))
+#### Core ([core.json](./presets/lint/core.json))
 
 Extensive ruleset covering:
 
@@ -186,14 +186,14 @@ Extensive ruleset covering:
 
 Framework-specific presets are available for:
 
-- **React** ([react.json](./presets/oxlint/react.json)) - React, React-perf, and JSX-a11y rules
-- **Next.js** ([nextjs.json](./presets/oxlint/nextjs.json)) - Next.js-specific rules
-- **Vue** ([vue.json](./presets/oxlint/vue.json)) - Vue.js rules
-- **Node.js** ([node.json](./presets/oxlint/node.json)) - Node.js-specific rules
-- **Jest** ([jest.json](./presets/oxlint/jest.json)) - Jest testing rules
-- **Vitest** ([vitest.json](./presets/oxlint/vitest.json)) - Vitest testing rules
+- **React** ([react.json](./presets/lint/react.json)) - React, React-perf, and JSX-a11y rules
+- **Next.js** ([nextjs.json](./presets/lint/nextjs.json)) - Next.js-specific rules
+- **Vue** ([vue.json](./presets/lint/vue.json)) - Vue.js rules
+- **Node.js** ([node.json](./presets/lint/node.json)) - Node.js-specific rules
+- **Jest** ([jest.json](./presets/lint/jest.json)) - Jest testing rules
+- **Vitest** ([vitest.json](./presets/lint/vitest.json)) - Vitest testing rules
 
-### Formatting ([presets/oxfmt.json](./presets/oxfmt.json))
+### Formatting ([presets/format.json](./presets/format.json))
 
 Opinionated code formatting with oxfmt, configured for consistency and readability. Includes automatic import sorting and organization.
 

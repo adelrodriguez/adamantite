@@ -57,6 +57,11 @@
     "no-useless-rename": "error",
     "no-with": "error",
     "require-yield": "error",
+    "sort-keys": [
+      "error",
+      "asc",
+      { "allowLineSeparatedGroups": true, "caseSensitive": true, "natural": true }
+    ],
     "use-isnan": "error",
     "valid-typeof": "error",
 
@@ -185,8 +190,6 @@
     "typescript/use-unknown-in-catch-callback-variable": "error",
 
     "unicorn/no-abusive-eslint-disable": "error",
-    "unicorn/no-anonymous-default-export": "error",
-    "unicorn/no-array-for-each": "error",
     "unicorn/no-document-cookie": "error",
     "unicorn/no-length-as-slice-end": "error",
     "unicorn/no-magic-array-flat-depth": "error",
@@ -207,8 +210,6 @@
 
     "import/no-absolute-path": "error",
     "import/no-empty-named-blocks": "error",
-    "import/no-named-as-default": "error",
-    "import/no-named-as-default-member": "error",
     "import/no-self-import": "error",
 
     "oxc/approx-constant": "error",
@@ -280,7 +281,6 @@
     "typescript/no-unsafe-call": "error",
     "typescript/no-unsafe-function-type": "error",
     "typescript/no-unsafe-return": "error",
-    "typescript/only-throw-error": "error",
     "typescript/prefer-enum-initializers": "error",
     "typescript/prefer-includes": "error",
     "typescript/prefer-nullish-coalescing": "error",
@@ -348,7 +348,6 @@
     "default-case-last": "error",
     "default-param-last": "error",
     "grouped-accessor-pairs": "error",
-    "new-cap": "error",
     "no-extra-label": "error",
     "no-label-var": "error",
     "no-lone-blocks": "error",
@@ -419,7 +418,6 @@
     "unicorn/prefer-optional-catch-binding": "error",
     "unicorn/prefer-reflect-apply": "error",
     "unicorn/prefer-response-static-json": "error",
-    "unicorn/prefer-string-raw": "error",
     "unicorn/prefer-string-trim-start-end": "error",
     "unicorn/prefer-structured-clone": "error",
     "unicorn/require-array-join-separator": "error",
@@ -431,7 +429,6 @@
     // ====================== NURSERY ======================
     "getter-return": "error",
 
-    "import/export": "error",
     "import/named": "error",
 
     "oxc/branches-sharing-code": "error",

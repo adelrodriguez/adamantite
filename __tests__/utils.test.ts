@@ -27,10 +27,10 @@ let spawnSyncResult: {
   stdout?: string | Buffer | null
   stderr?: string | Buffer | null
 } = {
-  status: 0,
   error: null,
-  stdout: Buffer.from(""),
+  status: 0,
   stderr: Buffer.from(""),
+  stdout: Buffer.from(""),
 }
 
 void mock.module("node:child_process", () => ({
@@ -44,10 +44,10 @@ describe("utils", () => {
   beforeEach(() => {
     // Reset spawnSync mock result
     spawnSyncResult = {
-      status: 0,
       error: null,
-      stdout: Buffer.from(""),
+      status: 0,
       stderr: Buffer.from(""),
+      stdout: Buffer.from(""),
     }
 
     // Create a temporary directory for each test
@@ -60,7 +60,7 @@ describe("utils", () => {
   afterEach(() => {
     // Restore original cwd and cleanup
     process.chdir(originalCwd)
-    rmSync(testDir, { recursive: true, force: true })
+    rmSync(testDir, { force: true, recursive: true })
   })
 
   describe("checkIfExists", () => {
@@ -93,14 +93,14 @@ describe("utils", () => {
   describe("readPackageJson", () => {
     test("should read and parse valid package.json", async () => {
       const packageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
         dependencies: {
           react: "^18.0.0",
         },
         devDependencies: {
           typescript: "^5.0.0",
         },
+        name: "test-package",
+        version: "1.0.0",
       }
 
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
@@ -412,9 +412,9 @@ describe("utils", () => {
 
     afterEach(() => {
       Object.defineProperty(process.stdout, "columns", {
+        configurable: true,
         value: originalColumns,
         writable: true,
-        configurable: true,
       })
 
       console.info = originalConsoleInfo
@@ -422,9 +422,9 @@ describe("utils", () => {
 
     test("should print title when terminal is wide enough", () => {
       Object.defineProperty(process.stdout, "columns", {
+        configurable: true,
         value: 120,
         writable: true,
-        configurable: true,
       })
 
       printTitle()
@@ -434,9 +434,9 @@ describe("utils", () => {
 
     test("should not print title when terminal is too narrow", () => {
       Object.defineProperty(process.stdout, "columns", {
+        configurable: true,
         value: 50,
         writable: true,
-        configurable: true,
       })
 
       printTitle()
@@ -446,9 +446,9 @@ describe("utils", () => {
 
     test("should not print title when process.stdout.columns is undefined", () => {
       Object.defineProperty(process.stdout, "columns", {
+        configurable: true,
         value: undefined,
         writable: true,
-        configurable: true,
       })
 
       printTitle()
@@ -460,10 +460,10 @@ describe("utils", () => {
   describe("runCommand", () => {
     test("should return ok when command succeeds", () => {
       spawnSyncResult = {
-        status: 0,
         error: null,
-        stdout: null,
+        status: 0,
         stderr: null,
+        stdout: null,
       }
 
       const result = runCommand("echo success")
@@ -475,10 +475,10 @@ describe("utils", () => {
 
     test("should return err when command fails with non-zero status", () => {
       spawnSyncResult = {
-        status: 1,
         error: null,
-        stdout: null,
+        status: 1,
         stderr: null,
+        stdout: null,
       }
 
       const result = runCommand("exit 1")
@@ -524,10 +524,10 @@ describe("utils", () => {
   describe("checkCliExists", () => {
     test("should return ok(true) when CLI exists", () => {
       spawnSyncResult = {
-        status: 0,
         error: null,
-        stdout: Buffer.from("/usr/bin/code"),
+        status: 0,
         stderr: Buffer.from(""),
+        stdout: Buffer.from("/usr/bin/code"),
       }
 
       const result = checkCliExists("code")
@@ -539,10 +539,10 @@ describe("utils", () => {
 
     test("should return err with CLI_NOT_FOUND tag when CLI does not exist", () => {
       spawnSyncResult = {
-        status: 1,
         error: null,
-        stdout: Buffer.from(""),
+        status: 1,
         stderr: Buffer.from(""),
+        stdout: Buffer.from(""),
       }
 
       const result = checkCliExists("nonexistent-command")
@@ -559,16 +559,16 @@ describe("utils", () => {
     test("should use 'where' command on Windows", () => {
       const originalPlatform = process.platform
       Object.defineProperty(process, "platform", {
+        configurable: true,
         value: "win32",
         writable: true,
-        configurable: true,
       })
 
       spawnSyncResult = {
-        status: 0,
         error: null,
-        stdout: Buffer.from(String.raw`C:\Program Files\Microsoft VS Code\bin\code.cmd`),
+        status: 0,
         stderr: Buffer.from(""),
+        stdout: Buffer.from(String.raw`C:\Program Files\Microsoft VS Code\bin\code.cmd`),
       }
 
       const result = checkCliExists("code")
@@ -576,25 +576,25 @@ describe("utils", () => {
 
       // Restore original platform
       Object.defineProperty(process, "platform", {
+        configurable: true,
         value: originalPlatform,
         writable: true,
-        configurable: true,
       })
     })
 
     test("should use 'which' command on Unix-like systems", () => {
       const originalPlatform = process.platform
       Object.defineProperty(process, "platform", {
+        configurable: true,
         value: "darwin",
         writable: true,
-        configurable: true,
       })
 
       spawnSyncResult = {
-        status: 0,
         error: null,
-        stdout: Buffer.from("/usr/local/bin/code"),
+        status: 0,
         stderr: Buffer.from(""),
+        stdout: Buffer.from("/usr/local/bin/code"),
       }
 
       const result = checkCliExists("code")
@@ -602,9 +602,9 @@ describe("utils", () => {
 
       // Restore original platform
       Object.defineProperty(process, "platform", {
+        configurable: true,
         value: originalPlatform,
         writable: true,
-        configurable: true,
       })
     })
   })

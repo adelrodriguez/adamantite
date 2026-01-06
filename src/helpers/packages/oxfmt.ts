@@ -2,26 +2,13 @@ import { readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { Fault } from "faultier"
 import { err, fromPromise, ok, safeTry } from "neverthrow"
-import preset from "#presets/oxfmt.json" with { type: "json" }
+import preset from "#presets/format.json" with { type: "json" }
 import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const oxfmt = {
-  name: "oxfmt",
-  version: "0.21.0",
   config: {
     $schema: "./node_modules/oxfmt/configuration_schema.json",
     ...preset,
-  },
-  exists: async () => {
-    if (await checkIfExists(join(process.cwd(), ".oxfmtrc.jsonc"))) {
-      return { path: join(process.cwd(), ".oxfmtrc.jsonc") }
-    }
-
-    if (await checkIfExists(join(process.cwd(), ".oxfmtrc.json"))) {
-      return { path: join(process.cwd(), ".oxfmtrc.json") }
-    }
-
-    return { path: null }
   },
   create: () =>
     fromPromise(
@@ -34,6 +21,18 @@ export const oxfmt = {
             "We're unable to write the oxfmt configuration to the current directory."
           )
     ),
+  exists: async () => {
+    if (await checkIfExists(join(process.cwd(), ".oxfmtrc.jsonc"))) {
+      return { path: join(process.cwd(), ".oxfmtrc.jsonc") }
+    }
+
+    if (await checkIfExists(join(process.cwd(), ".oxfmtrc.json"))) {
+      return { path: join(process.cwd(), ".oxfmtrc.json") }
+    }
+
+    return { path: null }
+  },
+  name: "oxfmt",
   update: () =>
     safeTry(async function* () {
       const exists = await oxfmt.exists()
@@ -82,4 +81,5 @@ export const oxfmt = {
 
       return ok()
     }),
+  version: "0.22.0",
 }

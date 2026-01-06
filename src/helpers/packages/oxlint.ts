@@ -5,23 +5,14 @@ import { err, fromPromise, ok, safeTry } from "neverthrow"
 import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const oxlint = {
-  name: "oxlint",
-  version: "1.36.0",
   config: {
     // Ensures that the schema always matches the installed version of oxlint
     $schema: "./node_modules/oxlint/configuration_schema.json",
   },
-  exists: async () => {
-    if (await checkIfExists(join(process.cwd(), ".oxlintrc.json"))) {
-      return { path: join(process.cwd(), ".oxlintrc.json") }
-    }
-
-    return { path: null }
-  },
   create: (presets: string[] = []) => {
-    const extendsArray = ["adamantite/lint"]
+    const extendsArray = ["./node_modules/adamantite/presets/lint/core.json"]
     for (const preset of presets) {
-      extendsArray.push(`adamantite/lint/${preset}`)
+      extendsArray.push(`./node_modules/adamantite/presets/lint/${preset}.json`)
     }
 
     return fromPromise(
@@ -38,6 +29,14 @@ export const oxlint = {
           )
     )
   },
+  exists: async () => {
+    if (await checkIfExists(join(process.cwd(), ".oxlintrc.json"))) {
+      return { path: join(process.cwd(), ".oxlintrc.json") }
+    }
+
+    return { path: null }
+  },
+  name: "oxlint",
   update: (presets: string[] = []) =>
     safeTry(async function* () {
       const exists = await oxlint.exists()
@@ -81,18 +80,15 @@ export const oxlint = {
           ? [newConfig.extends]
           : []
 
-      // Check if either "adamantite/lint" or "adamantite/lint/core" is already present (they're equivalent)
-      const hasAdamantite = extendsArray.some(
-        (ext) => ext === "adamantite/lint" || ext === "adamantite/lint/core"
-      )
-
-      if (!hasAdamantite) {
-        extendsArray.push("adamantite/lint")
+      // Ensure core preset is always present
+      const corePath = "./node_modules/adamantite/presets/lint/core.json"
+      if (!extendsArray.includes(corePath)) {
+        extendsArray.unshift(corePath)
       }
 
       // Add selected presets, avoiding duplicates
       for (const preset of presets) {
-        const presetPath = `adamantite/lint/${preset}`
+        const presetPath = `./node_modules/adamantite/presets/lint/${preset}.json`
         if (!extendsArray.includes(presetPath)) {
           extendsArray.push(presetPath)
         }
@@ -115,6 +111,7 @@ export const oxlint = {
 
       return ok()
     }),
+  version: "1.37.0",
 }
 
 export const tsgolint = {

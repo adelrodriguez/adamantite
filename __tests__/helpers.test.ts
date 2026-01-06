@@ -5,7 +5,8 @@ import { parse } from "jsonc-parser"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
+import { oxlint, tsgolint } from "#helpers/packages/oxlint/index.ts"
+import { jsPlugins } from "#helpers/packages/oxlint/plugins.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 import { readPackageJson } from "#utils.ts"
@@ -199,6 +200,32 @@ describe("helpers", () => {
         expect(typescript.name).toBe("@typescript/native-preview")
         expect(typescript.version).toBeDefined()
         expect(typescript.command).toBe("tsgo")
+      })
+    })
+
+    describe("jsPlugins.tailwind", () => {
+      test("should define version as exact semver without range prefixes", () => {
+        const version = jsPlugins.tailwind.version
+
+        expect(typeof version).toBe("string")
+        expect(version).toMatch(SEMVER_REGEX)
+        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
+      })
+
+      test("should match the version specified in package.json devDependencies", async () => {
+        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
+        const packageJson = packageJsonResult._unsafeUnwrap()
+        const tailwindPluginInPackage =
+          packageJson.devDependencies?.["eslint-plugin-better-tailwindcss"]
+
+        // Strip caret prefix from package.json version for comparison
+        const normalizedVersion = tailwindPluginInPackage?.replace(/^[\^~]/, "")
+        expect(normalizedVersion).toBe(jsPlugins.tailwind.version)
+      })
+
+      test("should have name and version properties", () => {
+        expect(jsPlugins.tailwind.name).toBe("eslint-plugin-better-tailwindcss")
+        expect(jsPlugins.tailwind.version).toBeDefined()
       })
     })
   })

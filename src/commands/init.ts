@@ -10,7 +10,8 @@ import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
+import { oxlint, tsgolint } from "#helpers/packages/oxlint/index.ts"
+import { getPluginDependencies } from "#helpers/packages/oxlint/plugins.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 import {
@@ -328,6 +329,7 @@ export default defineCommand({
               { label: "React", value: "react" },
               { label: "Next.js", value: "nextjs" },
               { label: "Vue", value: "vue" },
+              { label: "Tailwind", value: "tailwind" },
               { label: "Jest", value: "jest" },
               { label: "Vitest", value: "vitest" },
               { label: "Node", value: "node" },
@@ -391,6 +393,7 @@ export default defineCommand({
       const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
       const hasTypecheck = scripts.includes("typecheck")
       const hasKnip = scripts.includes("analyze")
+      const pluginDeps = getPluginDependencies(presets)
 
       const dependencies = ["adamantite"]
 
@@ -413,6 +416,10 @@ export default defineCommand({
 
       if (hasKnip) {
         dependencies.push(`${knip.name}@${knip.version}`)
+      }
+
+      for (const plugin of pluginDeps) {
+        dependencies.push(`${plugin.name}@${plugin.version}`)
       }
 
       yield* installDependencies(dependencies)

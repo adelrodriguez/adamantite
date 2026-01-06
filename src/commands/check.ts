@@ -3,7 +3,7 @@ import { log } from "@clack/prompts"
 import { Fault } from "faultier"
 import { ok, safeTry } from "neverthrow"
 import { dlxCommand } from "nypm"
-import { oxlint } from "#helpers/packages/oxlint.ts"
+import { oxlint } from "#helpers/packages/oxlint/index.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({

@@ -4,7 +4,8 @@ import { Fault } from "faultier"
 import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
 import { addDevDependency } from "nypm"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint } from "#helpers/packages/oxlint.ts"
+import { oxlint } from "#helpers/packages/oxlint/index.ts"
+import { jsPlugins } from "#helpers/packages/oxlint/plugins.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { defineCommand, normalizeDependencyVersion, printTitle, readPackageJson } from "#utils.ts"
 
@@ -36,6 +37,19 @@ export default defineCommand({
             isDevDependency: true,
             name: pkg.name,
             targetVersion: pkg.version,
+          })
+        }
+      }
+
+      // Check JS plugins for updates (only if already installed)
+      for (const plugin of Object.values(jsPlugins)) {
+        const dependency = packageJson.devDependencies?.[plugin.name]
+        if (dependency && normalizeDependencyVersion(dependency) !== plugin.version) {
+          updates.push({
+            currentVersion: dependency,
+            isDevDependency: true,
+            name: plugin.name,
+            targetVersion: plugin.version,
           })
         }
       }

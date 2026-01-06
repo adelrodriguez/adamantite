@@ -1,0 +1,20 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": ["eslint-plugin-better-tailwindcss"],
+  "rules": {
+    // ==================== STYLISTIC ======================
+    "better-tailwindcss/enforce-consistent-line-wrapping": "warn",
+    "better-tailwindcss/enforce-consistent-class-order": "warn",
+    "better-tailwindcss/enforce-consistent-variable-syntax": "warn",
+    "better-tailwindcss/enforce-consistent-important-position": "warn",
+    "better-tailwindcss/enforce-shorthand-classes": "warn",
+    "better-tailwindcss/no-duplicate-classes": "warn",
+    "better-tailwindcss/no-deprecated-classes": "warn",
+    "better-tailwindcss/no-unnecessary-whitespace": "warn",
+
+    // ==================== CORRECTNESS ====================
+    "better-tailwindcss/no-unregistered-classes": "error",
+    "better-tailwindcss/no-conflicting-classes": "error",
+    "better-tailwindcss/no-restricted-classes": "error"
+  }
+}

@@ -16,9 +16,9 @@ export function defineCommand<T, U>(input: CommandModule<T, U>): CommandModule<T
 
 export const runCommand = (command: string) => {
   const result = spawnSync(command, {
-    stdio: "inherit",
-    shell: true,
     maxBuffer: 100 * 1024 * 1024,
+    shell: true,
+    stdio: "inherit",
   })
 
   if (result.error || result.status !== 0) {

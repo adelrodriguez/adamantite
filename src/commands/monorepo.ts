@@ -7,13 +7,13 @@ import { sherif } from "#helpers/packages/sherif.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "monorepo",
-  describe: "Find and fix monorepo-specific issues using Sherif",
   builder: (yargs) =>
     yargs.option("fix", {
-      type: "boolean",
       description: "Automatically fix issues",
+      type: "boolean",
     }),
+  command: "monorepo",
+  describe: "Find and fix monorepo-specific issues using Sherif",
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()

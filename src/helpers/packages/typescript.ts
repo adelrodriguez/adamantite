@@ -5,11 +5,8 @@ import { err, fromPromise, ok, safeTry } from "neverthrow"
 import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const typescript = {
-  name: "@typescript/native-preview",
-  version: "7.0.0-dev.20260103.1",
   command: "tsgo",
   config: { extends: "adamantite/typescript" },
-  exists: () => checkIfExists(join(process.cwd(), "tsconfig.json")),
   create: () =>
     fromPromise(
       writeFile(join(process.cwd(), "tsconfig.json"), JSON.stringify(typescript.config, null, 2)),
@@ -21,7 +18,8 @@ export const typescript = {
             "We're unable to write the tsconfig.json file in the current directory."
           )
     ),
-
+  exists: () => checkIfExists(join(process.cwd(), "tsconfig.json")),
+  name: "@typescript/native-preview",
   update: () =>
     safeTry(async function* () {
       const tsconfigFile = yield* fromPromise(
@@ -62,4 +60,6 @@ export const typescript = {
 
       return ok()
     }),
+
+  version: "7.0.0-dev.20260105.1",
 }

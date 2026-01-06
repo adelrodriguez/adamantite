@@ -29,6 +29,21 @@ const setupSteps: Record<PackageManagerName, string> = {
       - name: Install dependencies
         run: bun install --frozen-lockfile`,
 
+  deno: `      - name: Setup Deno
+        uses: denoland/setup-deno@v2
+
+      - name: Install dependencies
+        run: deno install --frozen`,
+
+  npm: `      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci`,
+
   pnpm: `      - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -49,21 +64,6 @@ const setupSteps: Record<PackageManagerName, string> = {
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile`,
-
-  npm: `      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci`,
-
-  deno: `      - name: Setup Deno
-        uses: denoland/setup-deno@v2
-
-      - name: Install dependencies
-        run: deno install --frozen`,
 }
 
 /**
@@ -82,36 +82,36 @@ const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string 
   // Map scripts to matrix entries
   if (scripts.includes("check")) {
     matrixEntries.push({
-      name: "lint",
       command: buildCommand(packageManager, "check"),
+      name: "lint",
     })
   }
 
   if (scripts.includes("format")) {
     matrixEntries.push({
-      name: "format",
       command: buildCommand(packageManager, "format", ["--check"]),
+      name: "format",
     })
   }
 
   if (scripts.includes("typecheck")) {
     matrixEntries.push({
-      name: "types",
       command: buildCommand(packageManager, "typecheck"),
+      name: "types",
     })
   }
 
   if (scripts.includes("check:monorepo")) {
     matrixEntries.push({
-      name: "monorepo",
       command: buildCommand(packageManager, "check:monorepo"),
+      name: "monorepo",
     })
   }
 
   if (scripts.includes("analyze")) {
     matrixEntries.push({
-      name: "analyze",
       command: buildCommand(packageManager, "analyze"),
+      name: "analyze",
     })
   }
 
@@ -181,10 +181,6 @@ export const hasCICompatibleScripts = (scripts: Script[]): boolean =>
   scripts.some((script) => CI_COMPATIBLE_SCRIPTS.has(script))
 
 export const github = {
-  workflowPath: ".github/workflows/adamantite.yml",
-
-  exists: () => checkIfExists(join(process.cwd(), ".github", "workflows", "adamantite.yml")),
-
   create: (options: WorkflowOptions) =>
     safeTry(async function* () {
       const workflowDir = join(process.cwd(), ".github", "workflows")
@@ -219,6 +215,8 @@ export const github = {
       return ok()
     }),
 
+  exists: () => checkIfExists(join(process.cwd(), ".github", "workflows", "adamantite.yml")),
+
   update: (options: WorkflowOptions) =>
     safeTry(async function* () {
       const workflowPath = join(process.cwd(), ".github", "workflows", "adamantite.yml")
@@ -240,4 +238,6 @@ export const github = {
 
       return ok()
     }),
+
+  workflowPath: ".github/workflows/adamantite.yml",
 }

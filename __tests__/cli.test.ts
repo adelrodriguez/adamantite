@@ -11,9 +11,9 @@ describe("CLI", () => {
       const cliPath = join(import.meta.dir, "..", "src", "index.ts")
 
       const proc = spawn(["bun", cliPath, "--version"], {
-        stdout: "pipe",
-        stderr: "pipe",
         env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
       })
 
       const output = await new Response(proc.stdout).text()

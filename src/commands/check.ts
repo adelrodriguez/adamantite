@@ -7,14 +7,14 @@ import { oxlint } from "#helpers/packages/oxlint.ts"
 import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
 
 export default defineCommand({
-  command: "check [files..]",
-  describe: "Find issues in code using oxlint",
   builder: (yargs) =>
     yargs.positional("files", {
+      array: true,
       describe: "Specific files to lint (optional)",
       type: "string",
-      array: true,
     }),
+  command: "check [files..]",
+  describe: "Find issues in code using oxlint",
   handler: (argv) =>
     safeTry(async function* () {
       const packageManager = yield* getPackageManagerName()

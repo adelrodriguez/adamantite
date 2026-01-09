@@ -190,7 +190,6 @@ Framework-specific presets are available for:
 - **Next.js** ([nextjs.json](./presets/lint/nextjs.json)) - Next.js-specific rules
 - **Vue** ([vue.json](./presets/lint/vue.json)) - Vue.js rules
 - **Node.js** ([node.json](./presets/lint/node.json)) - Node.js-specific rules
-- **Tailwind** ([tailwind.json](./presets/lint/tailwind.json)) - Tailwind CSS rules via [eslint-plugin-better-tailwindcss](https://www.npmjs.com/package/eslint-plugin-better-tailwindcss)
 - **Jest** ([jest.json](./presets/lint/jest.json)) - Jest testing rules
 - **Vitest** ([vitest.json](./presets/lint/vitest.json)) - Vitest testing rules
 

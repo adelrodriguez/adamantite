@@ -85,5 +85,5 @@ export const knip = {
 
       return ok()
     }),
-  version: "5.80.0",
+  version: "5.80.1",
 }

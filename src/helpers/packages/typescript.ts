@@ -61,5 +61,5 @@ export const typescript = {
       return ok()
     }),
 
-  version: "7.0.0-dev.20260105.1",
+  version: "7.0.0-dev.20260108.1",
 }

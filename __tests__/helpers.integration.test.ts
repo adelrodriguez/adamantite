@@ -7,7 +7,7 @@ import { parse } from "jsonc-parser"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint } from "#helpers/packages/oxlint/index.ts"
+import { oxlint } from "#helpers/packages/oxlint.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 
 describe("helpers integration", () => {

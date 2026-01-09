@@ -7,8 +7,8 @@ import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
 export const oxfmt = {
   config: {
-    $schema: "./node_modules/oxfmt/configuration_schema.json",
     ...preset,
+    $schema: "./node_modules/oxfmt/configuration_schema.json",
   },
   create: () =>
     fromPromise(
@@ -81,5 +81,5 @@ export const oxfmt = {
 
       return ok()
     }),
-  version: "0.22.0",
+  version: "0.23.0",
 }

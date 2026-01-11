@@ -2,13 +2,21 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import * as NodeContext from "@effect/platform-node/NodeContext"
 import Bun from "bun"
+import { Effect, Either } from "effect"
 import { parse } from "jsonc-parser"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint } from "#helpers/packages/oxlint.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
+
+// Helper to run Effect and get Either for error testing
+async function runEither<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  const provided = effect.pipe(Effect.provide(NodeContext.layer)) as Effect.Effect<A, E>
+  return await provided.pipe(Effect.either, Effect.runPromise)
+}
 
 describe("helpers integration", () => {
   let tempDir: string
@@ -54,15 +62,18 @@ describe("helpers integration", () => {
   describe("packages", () => {
     describe("oxlint", () => {
       test("should detect when .oxlintrc.json does not exist", async () => {
-        const { path } = await oxlint.exists()
+        const { path } = await oxlint
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(path).toBe(null)
       })
 
       test("should create .oxlintrc.json with correct config", async () => {
-        const createResult = await oxlint.create()
-        createResult._unsafeUnwrap()
+        await oxlint.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
-        const { path } = await oxlint.exists()
+        const { path } = await oxlint
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(path).toBeDefined()
 
         const content = await Bun.file(".oxlintrc.json").text()
@@ -90,11 +101,12 @@ describe("helpers integration", () => {
           )
         )
 
-        const existsBefore = await oxlint.exists()
+        const existsBefore = await oxlint
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(existsBefore.path).toBeDefined()
 
-        const updateResult = await oxlint.update()
-        updateResult._unsafeUnwrap()
+        await oxlint.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".oxlintrc.json").text()
         const config = parse(content)
@@ -111,10 +123,10 @@ describe("helpers integration", () => {
         // Create a directory named .oxlintrc.json to cause read failure
         mkdirSync(".oxlintrc.json", { recursive: true })
 
-        const updateResult = await oxlint.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_READ_FILE")
+        const result = await runEither(oxlint.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
         }
       })
 
@@ -122,8 +134,7 @@ describe("helpers integration", () => {
         // Create empty .oxlintrc.json
         await Bun.write(".oxlintrc.json", "{}")
 
-        const updateResult = await oxlint.update()
-        updateResult._unsafeUnwrap()
+        await oxlint.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".oxlintrc.json").text()
         const config = parse(content)
@@ -148,33 +159,38 @@ describe("helpers integration", () => {
         // Make it read-only to prevent writing
         chmodSync(".oxlintrc.json", 0o444)
 
-        const updateResult = await oxlint.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
+        const result = await runEither(oxlint.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
         }
       })
     })
 
     describe("oxfmt", () => {
       test("should detect when .oxfmtrc.jsonc does not exist", async () => {
-        const { path } = await oxfmt.exists()
+        const { path } = await oxfmt
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(path).toBe(null)
       })
 
       test("should detect when .oxfmtrc.json exists", async () => {
         await Bun.write(".oxfmtrc.json", JSON.stringify({}))
 
-        const { path } = await oxfmt.exists()
+        const { path } = await oxfmt
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(path).toBeDefined()
         expect(path).toContain(".oxfmtrc.json")
       })
 
       test("should create .oxfmtrc.jsonc with correct config", async () => {
-        const createResult = await oxfmt.create()
-        createResult._unsafeUnwrap()
+        await oxfmt.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
-        const { path } = await oxfmt.exists()
+        const { path } = await oxfmt
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(path).toBeDefined()
 
         const content = await Bun.file(".oxfmtrc.jsonc").text()
@@ -198,11 +214,12 @@ describe("helpers integration", () => {
           )
         )
 
-        const existsBefore = await oxfmt.exists()
+        const existsBefore = await oxfmt
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(existsBefore.path).toBeDefined()
 
-        const updateResult = await oxfmt.update()
-        updateResult._unsafeUnwrap()
+        await oxfmt.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".oxfmtrc.jsonc").text()
         const config = parse(content)
@@ -216,10 +233,10 @@ describe("helpers integration", () => {
         // Create a directory named .oxfmtrc.jsonc to cause read failure
         mkdirSync(".oxfmtrc.jsonc", { recursive: true })
 
-        const updateResult = await oxfmt.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_READ_FILE")
+        const result = await runEither(oxfmt.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
         }
       })
 
@@ -227,8 +244,7 @@ describe("helpers integration", () => {
         // Create empty .oxfmtrc.jsonc
         await Bun.write(".oxfmtrc.jsonc", "{}")
 
-        const updateResult = await oxfmt.update()
-        updateResult._unsafeUnwrap()
+        await oxfmt.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".oxfmtrc.jsonc").text()
         const config = parse(content)
@@ -240,10 +256,10 @@ describe("helpers integration", () => {
       test("should return INVALID_CONFIG_FORMAT when oxfmt config is not a JSON object", async () => {
         await Bun.write(".oxfmtrc.jsonc", "[]")
 
-        const updateResult = await oxfmt.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("INVALID_CONFIG_FORMAT")
+        const result = await runEither(oxfmt.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
         }
       })
 
@@ -258,25 +274,28 @@ describe("helpers integration", () => {
         // Make it read-only to prevent writing
         chmodSync(".oxfmtrc.jsonc", 0o444)
 
-        const updateResult = await oxfmt.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
+        const result = await runEither(oxfmt.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
         }
       })
     })
 
     describe("typescript", () => {
       test("should detect when tsconfig.json does not exist", async () => {
-        const exists = await typescript.exists()
+        const exists = await typescript
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(exists).toBe(false)
       })
 
       test("should create tsconfig.json with correct config", async () => {
-        const createResult = await typescript.create()
-        createResult._unsafeUnwrap()
+        await typescript.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
-        const exists = await typescript.exists()
+        const exists = await typescript
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(exists).toBe(true)
 
         const content = await Bun.file("tsconfig.json").text()
@@ -303,11 +322,12 @@ describe("helpers integration", () => {
           )
         )
 
-        const existsBefore = await typescript.exists()
+        const existsBefore = await typescript
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(existsBefore).toBe(true)
 
-        const updateResult = await typescript.update()
-        updateResult._unsafeUnwrap()
+        await typescript.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file("tsconfig.json").text()
         const config = JSON.parse(content)
@@ -337,8 +357,7 @@ describe("helpers integration", () => {
           )
         )
 
-        const updateResult = await typescript.update()
-        updateResult._unsafeUnwrap()
+        await typescript.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file("tsconfig.json").text()
         const config = JSON.parse(content)
@@ -354,10 +373,10 @@ describe("helpers integration", () => {
         chmodSync("readonly-dir", 0o555) // Read-only directory
         process.chdir("readonly-dir")
 
-        const createResult = await typescript.create()
+        const result = await runEither(typescript.create())
         // This might succeed on some systems, but if it fails, it should have the right error
-        if (createResult.isErr()) {
-          expect(createResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
         }
 
         // Restore directory
@@ -368,8 +387,7 @@ describe("helpers integration", () => {
         // Create empty tsconfig.json
         await Bun.write("tsconfig.json", "{}")
 
-        const updateResult = await typescript.update()
-        updateResult._unsafeUnwrap()
+        await typescript.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file("tsconfig.json").text()
         const config = JSON.parse(content)
@@ -381,19 +399,19 @@ describe("helpers integration", () => {
       test("should return INVALID_CONFIG_FORMAT when tsconfig.json is not a JSON object", async () => {
         await Bun.write("tsconfig.json", "true")
 
-        const updateResult = await typescript.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("INVALID_CONFIG_FORMAT")
+        const result = await runEither(typescript.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
         }
       })
 
       test("should handle update() failure when reading tsconfig.json fails", async () => {
         // Try to update a non-existent file
-        const updateResult = await typescript.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_READ_FILE")
+        const result = await runEither(typescript.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
         }
       })
 
@@ -410,10 +428,10 @@ describe("helpers integration", () => {
         // Make it read-only to prevent writing
         chmodSync("tsconfig.json", 0o444)
 
-        const updateResult = await typescript.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
+        const result = await runEither(typescript.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
         }
       })
     })
@@ -422,15 +440,18 @@ describe("helpers integration", () => {
   describe("editors", () => {
     describe("vscode", () => {
       test("should detect when .vscode/settings.json does not exist", async () => {
-        const exists = await vscode.exists()
+        const exists = await vscode
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(exists).toBe(false)
       })
 
       test("should create .vscode directory and settings.json", async () => {
-        const createResult = await vscode.create()
-        createResult._unsafeUnwrap()
+        await vscode.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
-        const exists = await vscode.exists()
+        const exists = await vscode
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(exists).toBe(true)
 
         const content = await Bun.file(".vscode/settings.json").text()
@@ -455,11 +476,12 @@ describe("helpers integration", () => {
           )
         )
 
-        const existsBefore = await vscode.exists()
+        const existsBefore = await vscode
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(existsBefore).toBe(true)
 
-        const updateResult = await vscode.update()
-        updateResult._unsafeUnwrap()
+        await vscode.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".vscode/settings.json").text()
         const config = JSON.parse(content)
@@ -476,8 +498,7 @@ describe("helpers integration", () => {
         mkdirSync(".vscode", { recursive: true })
         await Bun.write(".vscode/settings.json", "{}")
 
-        const updateResult = await vscode.update()
-        updateResult._unsafeUnwrap()
+        await vscode.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".vscode/settings.json").text()
         const config = JSON.parse(content)
@@ -491,19 +512,19 @@ describe("helpers integration", () => {
         mkdirSync(".vscode", { recursive: true })
         await Bun.write(".vscode/settings.json", "[]")
 
-        const updateResult = await vscode.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("INVALID_CONFIG_FORMAT")
+        const result = await runEither(vscode.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
         }
       })
 
       test("should handle update() failure when reading .vscode/settings.json fails", async () => {
         // Try to update a non-existent file
-        const updateResult = await vscode.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_READ_FILE")
+        const result = await runEither(vscode.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
         }
       })
 
@@ -519,10 +540,10 @@ describe("helpers integration", () => {
         // Make it read-only to prevent writing
         chmodSync(".vscode/settings.json", 0o444)
 
-        const updateResult = await vscode.update()
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
+        const result = await runEither(vscode.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
         }
       })
     })
@@ -541,18 +562,23 @@ describe("helpers integration", () => {
       })
 
       test("should detect when GitHub Actions workflow does not exist", async () => {
-        const exists = await github.exists()
+        const exists = await github
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(exists).toBe(false)
       })
 
       test("should create GitHub Actions workflow with correct structure", async () => {
-        const createResult = await github.create({
-          packageManager: "bun",
-          scripts: ["check", "format", "typecheck"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "bun",
+            scripts: ["check", "format", "typecheck"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
-        const exists = await github.exists()
+        const exists = await github
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(exists).toBe(true)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
@@ -573,11 +599,12 @@ describe("helpers integration", () => {
       })
 
       test("should generate correct workflow for npm", async () => {
-        const createResult = await github.create({
-          packageManager: "npm",
-          scripts: ["check"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "npm",
+            scripts: ["check"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
         expect(content).toContain("Setup Node.js")
@@ -588,11 +615,12 @@ describe("helpers integration", () => {
       })
 
       test("should generate correct workflow for pnpm", async () => {
-        const createResult = await github.create({
-          packageManager: "pnpm",
-          scripts: ["check"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "pnpm",
+            scripts: ["check"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
         expect(content).toContain("Setup pnpm")
@@ -604,11 +632,12 @@ describe("helpers integration", () => {
       })
 
       test("should generate correct workflow for yarn", async () => {
-        const createResult = await github.create({
-          packageManager: "yarn",
-          scripts: ["check"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "yarn",
+            scripts: ["check"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
         expect(content).toContain("Setup Node.js")
@@ -619,11 +648,12 @@ describe("helpers integration", () => {
       })
 
       test("should generate correct workflow for deno", async () => {
-        const createResult = await github.create({
-          packageManager: "deno",
-          scripts: ["check"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "deno",
+            scripts: ["check"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
         expect(content).toContain("Setup Deno")
@@ -633,11 +663,12 @@ describe("helpers integration", () => {
       })
 
       test("should include all CI-compatible scripts as jobs", async () => {
-        const createResult = await github.create({
-          packageManager: "bun",
-          scripts: ["check", "format", "typecheck", "check:monorepo"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "bun",
+            scripts: ["check", "format", "typecheck", "check:monorepo"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
         expect(content).toContain("name: lint")
@@ -651,14 +682,17 @@ describe("helpers integration", () => {
       })
 
       test("should not create workflow when no CI-compatible scripts", async () => {
-        const createResult = await github.create({
-          packageManager: "bun",
-          scripts: ["fix", "fix:monorepo"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "bun",
+            scripts: ["fix", "fix:monorepo"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         // The workflow should not be created
-        const exists = await github.exists()
+        const exists = await github
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
         expect(exists).toBe(false)
       })
 
@@ -667,11 +701,12 @@ describe("helpers integration", () => {
         mkdirSync(".github/workflows", { recursive: true })
         await Bun.write(".github/workflows/adamantite.yml", "name: Old Workflow")
 
-        const updateResult = await github.update({
-          packageManager: "bun",
-          scripts: ["check"],
-        })
-        updateResult._unsafeUnwrap()
+        await github
+          .update({
+            packageManager: "bun",
+            scripts: ["check"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
         expect(content).toContain("name: adamantite")
@@ -681,11 +716,12 @@ describe("helpers integration", () => {
       })
 
       test("should include concurrency settings", async () => {
-        const createResult = await github.create({
-          packageManager: "bun",
-          scripts: ["check"],
-        })
-        createResult._unsafeUnwrap()
+        await github
+          .create({
+            packageManager: "bun",
+            scripts: ["check"],
+          })
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
         const content = await Bun.file(".github/workflows/adamantite.yml").text()
         expect(content).toContain("permissions:")
@@ -698,13 +734,15 @@ describe("helpers integration", () => {
         // Create a file with the name .github to prevent directory creation
         writeFileSync(".github", "not a directory")
 
-        const createResult = await github.create({
-          packageManager: "bun",
-          scripts: ["check"],
-        })
-        expect(createResult.isErr()).toBe(true)
-        if (createResult.isErr()) {
-          expect(createResult.error.tag).toBe("FAILED_TO_CREATE_DIRECTORY")
+        const result = await runEither(
+          github.create({
+            packageManager: "bun",
+            scripts: ["check"],
+          })
+        )
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToCreateDirectory" })
         }
       })
 
@@ -715,13 +753,15 @@ describe("helpers integration", () => {
         writeFileSync(".github/workflows/adamantite.yml", "name: Old")
         chmodSync(".github/workflows/adamantite.yml", 0o444) // Read-only
 
-        const updateResult = await github.update({
-          packageManager: "bun",
-          scripts: ["check"],
-        })
-        expect(updateResult.isErr()).toBe(true)
-        if (updateResult.isErr()) {
-          expect(updateResult.error.tag).toBe("FAILED_TO_WRITE_FILE")
+        const result = await runEither(
+          github.update({
+            packageManager: "bun",
+            scripts: ["check"],
+          })
+        )
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
         }
       })
     })

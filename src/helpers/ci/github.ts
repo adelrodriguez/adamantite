@@ -1,11 +1,9 @@
-import { mkdir, writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import process from "node:process"
-import { Fault } from "faultier"
-import { fromPromise, ok, safeTry } from "neverthrow"
+import { FileSystem, Path } from "@effect/platform"
+import { Effect } from "effect"
 import { type PackageManagerName, runScriptCommand } from "nypm"
 import type { Script } from "#types.ts"
-import { checkIfExists } from "#utils.ts"
+import { FailedToWriteFile } from "#errors.ts"
+import { ensureDirectory } from "#utils.ts"
 
 interface WorkflowOptions {
   packageManager: PackageManagerName
@@ -182,61 +180,47 @@ export const hasCICompatibleScripts = (scripts: Script[]): boolean =>
 
 export const github = {
   create: (options: WorkflowOptions) =>
-    safeTry(async function* () {
-      const workflowDir = join(process.cwd(), ".github", "workflows")
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const workflowDir = path.join(process.cwd(), ".github", "workflows")
 
       // Create .github/workflows directory if it doesn't exist
-      yield* fromPromise(mkdir(workflowDir, { recursive: true }), (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_CREATE_DIRECTORY")
-          .withDescription(
-            "Failed to create .github/workflows directory",
-            "We're unable to create the .github/workflows directory in the current directory."
-          )
-          .withContext({ path: workflowDir })
-      )
+      yield* ensureDirectory(workflowDir)
 
       const workflowContent = generateWorkflow(options)
 
       if (!workflowContent) {
-        return ok()
+        return
       }
 
-      yield* fromPromise(writeFile(join(workflowDir, "adamantite.yml"), workflowContent), (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_WRITE_FILE")
-          .withDescription(
-            "Failed to write GitHub Actions workflow",
-            "We're unable to write the GitHub Actions workflow file."
-          )
-          .withContext({ path: join(workflowDir, "adamantite.yml") })
-      )
-
-      return ok()
+      const workflowPath = path.join(workflowDir, "adamantite.yml")
+      yield* fs
+        .writeFileString(workflowPath, workflowContent)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
     }),
 
-  exists: () => checkIfExists(join(process.cwd(), ".github", "workflows", "adamantite.yml")),
+  exists: () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      return yield* fs.exists(path.join(process.cwd(), ".github", "workflows", "adamantite.yml"))
+    }),
 
   update: (options: WorkflowOptions) =>
-    safeTry(async function* () {
-      const workflowPath = join(process.cwd(), ".github", "workflows", "adamantite.yml")
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const workflowPath = path.join(process.cwd(), ".github", "workflows", "adamantite.yml")
       const workflowContent = generateWorkflow(options)
 
       if (!workflowContent) {
-        return ok()
+        return
       }
 
-      yield* fromPromise(writeFile(workflowPath, workflowContent), (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_WRITE_FILE")
-          .withDescription(
-            "Failed to write GitHub Actions workflow",
-            "We're unable to update the GitHub Actions workflow file."
-          )
-          .withContext({ path: workflowPath })
-      )
-
-      return ok()
+      yield* fs
+        .writeFileString(workflowPath, workflowContent)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
     }),
 
   workflowPath: ".github/workflows/adamantite.yml",

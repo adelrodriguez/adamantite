@@ -1,11 +1,15 @@
-import { writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import process from "node:process"
-import * as p from "@clack/prompts"
-import { Fault } from "faultier"
-import { err, fromPromise, fromSafePromise, ok, safeTry } from "neverthrow"
-import { type PackageManagerName, addDevDependency } from "nypm"
+import { isCancel } from "@clack/prompts"
+import { Command } from "@effect/cli"
+import { FileSystem, Path } from "@effect/platform"
+import { Effect } from "effect"
+import { addDevDependency, type PackageManagerName } from "nypm"
 import type { Script } from "#types.ts"
+import {
+  FailedToInstallDependency,
+  FailedToWriteFile,
+  OperationCancelled,
+  UnknownScript,
+} from "#errors.ts"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { knip } from "#helpers/packages/knip.ts"
@@ -13,39 +17,39 @@ import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
-import {
-  checkIsMonorepo,
-  defineCommand,
-  getPackageManagerName,
-  printTitle,
-  readPackageJson,
-} from "#utils.ts"
+import { Cwd } from "#services/cwd.ts"
+import { PackageManager } from "#services/package-manager.ts"
+import { Prompter } from "#services/prompter.ts"
+import { checkIsMonorepo, printTitle, readPackageJson } from "#utils.ts"
 
 const installDependencies = (packages: string[]) =>
-  safeTry(async function* () {
-    const s = p.spinner()
-    s.start("Installing dependencies...")
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
+    spinner.start("Installing dependencies...")
     const isMonorepo = yield* checkIsMonorepo()
 
-    yield* fromPromise(
-      addDevDependency(packages, { silent: true, workspace: isMonorepo }),
-      (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_INSTALL_DEPENDENCY")
-          .withMessage(`Failed to install dependencies: ${packages.join(", ")}`)
+    yield* Effect.tryPromise({
+      catch: (cause) => new FailedToInstallDependency({ cause, packages }),
+      try: () => addDevDependency(packages, { silent: true, workspace: isMonorepo }),
+    }).pipe(
+      Effect.tapError(() =>
+        Effect.sync(() => {
+          spinner.stop("Failed to install dependencies.")
+        })
+      )
     )
 
-    s.stop("Dependencies installed.")
-
-    return ok()
+    spinner.stop("Dependencies installed.")
   })
 
 const setupOxlintConfig = (presets: string[]) =>
-  safeTry(async function* () {
-    const spinner = p.spinner()
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
     spinner.start("Setting up oxlint config...")
 
-    const oxlintPath = await oxlint.exists()
+    const oxlintPath = yield* oxlint.exists()
 
     if (oxlintPath.path) {
       spinner.message(`Found \`${oxlintPath.path}\`, updating...`)
@@ -60,16 +64,15 @@ const setupOxlintConfig = (presets: string[]) =>
 
       spinner.stop("oxlint config created successfully.")
     }
-
-    return ok()
   })
 
 const setupOxfmtConfig = () =>
-  safeTry(async function* () {
-    const spinner = p.spinner()
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
     spinner.start("Setting up oxfmt config...")
 
-    const oxfmtPath = await oxfmt.exists()
+    const oxfmtPath = yield* oxfmt.exists()
 
     if (oxfmtPath.path) {
       spinner.message(`Found \`${oxfmtPath.path}\`, updating...`)
@@ -84,15 +87,16 @@ const setupOxfmtConfig = () =>
 
       spinner.stop("oxfmt config created successfully.")
     }
-
-    return ok()
   })
 
 const addScripts = (scripts: Script[]) =>
-  safeTry(async function* () {
-    const cwd = process.cwd()
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const cwd = yield* Cwd
+    const prompter = yield* Prompter
     const packageJson = yield* readPackageJson()
-    const spinner = p.spinner()
+    const spinner = prompter.spinner()
     spinner.start("Adding scripts to your `package.json`...")
 
     packageJson.scripts ??= {}
@@ -121,33 +125,26 @@ const addScripts = (scripts: Script[]) =>
           packageJson.scripts.analyze = "adamantite analyze"
           break
         default:
-          return err(Fault.create("UNKNOWN_SCRIPT").withContext({ script }))
+          return yield* Effect.fail(new UnknownScript({ script }))
       }
     }
 
-    yield* fromPromise(
-      writeFile(join(cwd, "package.json"), JSON.stringify(packageJson, null, 2)),
-      (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_WRITE_FILE")
-          .withDescription(
-            "Failed to write package.json",
-            "We're unable to update the package.json file."
-          )
-          .withContext({ path: join(cwd, "package.json") })
-    )
+    const currentDir = yield* cwd.get
+    const packagePath = path.join(currentDir, "package.json")
+    yield* fs
+      .writeFileString(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
+      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
 
     spinner.stop("Scripts added to your `package.json`")
-
-    return ok()
   })
 
 const setupKnipConfig = () =>
-  safeTry(async function* () {
-    const spinner = p.spinner()
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
     spinner.start("Setting up knip config...")
 
-    const knipPath = await knip.exists()
+    const knipPath = yield* knip.exists()
 
     if (knipPath.path) {
       spinner.message(`Found \`${knipPath.path}\`, updating...`)
@@ -162,16 +159,17 @@ const setupKnipConfig = () =>
 
       spinner.stop("knip config created successfully.")
     }
-
-    return ok()
   })
 
 const setupTypescript = () =>
-  safeTry(async function* () {
-    const spinner = p.spinner()
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
     spinner.start("Setting up TypeScript config...")
 
-    if (await typescript.exists()) {
+    const typescriptExists = yield* typescript.exists()
+
+    if (typescriptExists) {
       spinner.message("`tsconfig.json` found, updating...")
 
       yield* typescript.update()
@@ -184,18 +182,18 @@ const setupTypescript = () =>
 
       spinner.stop("`tsconfig.json` created successfully")
     }
-
-    return ok()
   })
 
 const setupEditors = (editors: string[]) =>
-  safeTry(async function* () {
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
     if (editors.includes("vscode")) {
-      const spinner = p.spinner()
+      const spinner = prompter.spinner()
 
       spinner.start("Checking for `.vscode/settings.json`...")
 
-      if (await vscode.exists()) {
+      const hasVscodeSettings = yield* vscode.exists()
+      if (hasVscodeSettings) {
         spinner.message("`.vscode/settings.json` found, updating...")
         yield* vscode.update()
         spinner.stop("`.vscode/settings.json` updated with Adamantite preset.")
@@ -209,34 +207,68 @@ const setupEditors = (editors: string[]) =>
     if (editors.includes("zed")) {
       // TODO: Implement Zed configuration
     }
-
-    return ok()
   })
 
 const installEditorExtensions = (editors: string[], scripts: Script[]) =>
-  safeTry(function* () {
-    const spinner = p.spinner()
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
     spinner.start("Installing editor extensions...")
 
-    if (editors.includes("vscode")) {
-      spinner.message("Installing VS Code extension...")
-      yield* vscode.extension(scripts)
-    }
+    const result = yield* Effect.gen(function* () {
+      if (editors.includes("vscode")) {
+        spinner.message("Installing VS Code extension...")
+        yield* vscode.extension(scripts)
+      }
 
-    if (editors.includes("zed")) {
-      // TODO: Implement Zed extension installation
-    }
+      if (editors.includes("zed")) {
+        // TODO: Implement Zed extension installation
+      }
 
-    spinner.stop("Editor extensions installed successfully.")
-    return ok()
+      return true as const
+    }).pipe(
+      Effect.tapError(() =>
+        Effect.sync(() => {
+          spinner.stop()
+        })
+      ),
+      Effect.catchTags({
+        FailedToInstallExtension: (error) =>
+          Effect.gen(function* () {
+            yield* prompter.log.warning(
+              `⚠️ Failed to install the \`${error.extension}\` extension.`
+            )
+            yield* prompter.log.warning("Please install it manually after setup completes.")
+            return false as const
+          }),
+        VscodeCliNotFound: () =>
+          Effect.gen(function* () {
+            yield* prompter.log.error("VSCode CLI ('code' command) not found.")
+            yield* prompter.log.info("To install it:")
+            yield* prompter.log.info("  1. Open VS Code")
+            yield* prompter.log.info(
+              "  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)"
+            )
+            yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
+            return false as const
+          }),
+      })
+    )
+
+    if (result) {
+      spinner.stop("Editor extensions installed successfully.")
+    }
   })
 
 const setupGitHubActions = (packageManager: PackageManagerName, scripts: Script[]) =>
-  safeTry(async function* () {
-    const spinner = p.spinner()
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
     spinner.start("Setting up GitHub Actions workflow...")
 
-    if (await github.exists()) {
+    const workflowExists = yield* github.exists()
+
+    if (workflowExists) {
       spinner.message("`.github/workflows/adamantite.yml` found, updating...")
       yield* github.update({ packageManager, scripts })
       spinner.stop("GitHub Actions workflow updated successfully.")
@@ -245,152 +277,144 @@ const setupGitHubActions = (packageManager: PackageManagerName, scripts: Script[
       yield* github.create({ packageManager, scripts })
       spinner.stop("GitHub Actions workflow created successfully.")
     }
+  }).pipe(Effect.option)
 
-    return ok()
-  })
+export default Command.make("init").pipe(
+  Command.withDescription("Initialize Adamantite in the current directory"),
+  Command.withHandler(() =>
+    Effect.gen(function* () {
+      const pm = yield* PackageManager
+      const prompter = yield* Prompter
 
-export default defineCommand({
-  builder: (yargs) => yargs,
-  command: "init",
-  describe: "Initialize Adamantite in the current directory",
-  handler: () =>
-    safeTry(async function* () {
-      const packageManager = yield* getPackageManagerName()
+      yield* printTitle()
 
-      printTitle()
+      yield* prompter.intro("💠 adamantite init")
 
-      p.intro("💠 adamantite init")
-
-      p.log.info(`Detected package manager: ${packageManager}`)
+      yield* prompter.log.info(`Detected package manager: ${pm.name}`)
 
       const isMonorepo = yield* checkIsMonorepo()
 
       if (isMonorepo) {
-        p.log.info("We've detected a monorepo setup in your project.")
+        yield* prompter.log.info("We've detected a monorepo setup in your project.")
       }
 
-      const scripts = yield* fromSafePromise(
-        p.multiselect({
-          message: "Which scripts do you want to add to your `package.json`?",
-          options: [
-            {
-              hint: "recommended",
-              label: "check - find issues in code using oxlint",
-              value: "check",
-            },
-            {
-              hint: "recommended",
-              label: "fix - fix code issues using oxlint",
-              value: "fix",
-            },
-            {
-              hint: "recommended",
-              label: "format - code formatting using oxfmt",
-              value: "format",
-            },
-            {
-              hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
-              label: "typecheck - type-check your code using tsgo",
-              value: "typecheck",
-            },
-            {
-              disabled: !isMonorepo,
-              hint: isMonorepo ? undefined : "available for monorepo projects",
-              label: "check:monorepo - check for monorepo-specific issues using Sherif",
-              value: "check:monorepo",
-            },
-            {
-              disabled: !isMonorepo,
-              hint: isMonorepo ? undefined : "available for monorepo projects",
-              label: "fix:monorepo - fix monorepo-specific issues using Sherif",
-              value: "fix:monorepo",
-            },
-            {
-              label: "analyze - find unused dependencies, exports, and files using knip",
-              value: "analyze",
-            },
-          ],
-        })
-      )
+      const selectedScripts = yield* prompter.multiselect({
+        message: "Which scripts do you want to add to your `package.json`?",
+        options: [
+          {
+            hint: "recommended",
+            label: "check - find issues in code using oxlint",
+            value: "check",
+          },
+          {
+            hint: "recommended",
+            label: "fix - fix code issues using oxlint",
+            value: "fix",
+          },
+          {
+            hint: "recommended",
+            label: "format - code formatting using oxfmt",
+            value: "format",
+          },
+          {
+            hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
+            label: "typecheck - type-check your code using tsgo",
+            value: "typecheck",
+          },
+          {
+            disabled: !isMonorepo,
+            hint: isMonorepo ? undefined : "available for monorepo projects",
+            label: "check:monorepo - check for monorepo-specific issues using Sherif",
+            value: "check:monorepo",
+          },
+          {
+            disabled: !isMonorepo,
+            hint: isMonorepo ? undefined : "available for monorepo projects",
+            label: "fix:monorepo - fix monorepo-specific issues using Sherif",
+            value: "fix:monorepo",
+          },
+          {
+            label: "analyze - find unused dependencies, exports, and files using knip",
+            value: "analyze",
+          },
+        ],
+      })
 
-      if (p.isCancel(scripts)) {
-        return err(Fault.create("OPERATION_CANCELLED"))
+      if (isCancel(selectedScripts)) {
+        return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
       }
 
-      const hasOxlint = scripts.includes("check") || scripts.includes("fix")
+      const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
 
-      let presets: string[] | symbol = []
+      let presets: string[] = []
       if (hasOxlint) {
-        presets = yield* fromSafePromise(
-          p.multiselect({
-            message: "Which presets do you want to install? (core is always included)",
-            options: [
-              { label: "React", value: "react" },
-              { label: "Next.js", value: "nextjs" },
-              { label: "Vue", value: "vue" },
-              { label: "Jest", value: "jest" },
-              { label: "Vitest", value: "vitest" },
-              { label: "Node", value: "node" },
-            ],
-            required: false,
-          })
-        )
-
-        if (p.isCancel(presets)) {
-          return err(Fault.create("OPERATION_CANCELLED"))
-        }
-      }
-
-      const editors = yield* fromSafePromise(
-        p.multiselect({
-          message: "Which editors do you want to configure? (optional)",
+        const selectedPresets = yield* prompter.multiselect({
+          message: "Which presets do you want to install? (core is always included)",
           options: [
-            { label: "VSCode / Cursor / Windsurf", value: "vscode" },
-            { disabled: true, hint: "coming soon", label: "Zed", value: "zed" },
+            { label: "React", value: "react" },
+            { label: "Next.js", value: "nextjs" },
+            { label: "Vue", value: "vue" },
+            { label: "Jest", value: "jest" },
+            { label: "Vitest", value: "vitest" },
+            { label: "Node", value: "node" },
           ],
           required: false,
         })
-      )
 
-      if (p.isCancel(editors)) {
-        return err(Fault.create("OPERATION_CANCELLED"))
+        if (isCancel(selectedPresets)) {
+          return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
+        }
+
+        presets = selectedPresets
       }
 
-      let installExtensions = false
-      if (editors.length > 0) {
-        const installExtensionsResponse = yield* fromSafePromise(
-          p.confirm({
-            initialValue: true,
-            message: "Do you want to install the recommended editor extensions?",
-          })
-        )
+      const selectedEditors = yield* prompter.multiselect({
+        message: "Which editors do you want to configure? (optional)",
+        options: [
+          { label: "VSCode / Cursor / Windsurf", value: "vscode" },
+          { disabled: true, hint: "coming soon", label: "Zed", value: "zed" },
+        ],
+        required: false,
+      })
 
-        if (p.isCancel(installExtensionsResponse)) {
-          return err(Fault.create("OPERATION_CANCELLED"))
+      if (isCancel(selectedEditors)) {
+        return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
+      }
+      let installExtensions = false
+
+      if (selectedEditors.length > 0) {
+        const installExtensionsResponse = yield* prompter.confirm({
+          initialValue: true,
+          message: "Do you want to install the recommended editor extensions?",
+        })
+
+        if (isCancel(installExtensionsResponse)) {
+          return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
         }
 
         installExtensions = installExtensionsResponse
       }
 
-      const hasCIScripts = hasCICompatibleScripts(scripts)
+      const hasCIScripts = hasCICompatibleScripts(selectedScripts)
+      let enableGitHubActions = false
 
-      let enableGitHubActions: boolean | symbol = false
       if (hasCIScripts) {
-        enableGitHubActions = yield* fromSafePromise(
-          p.confirm({
-            message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
-          })
-        )
+        const enableGitHubActionsResponse = yield* prompter.confirm({
+          message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
+        })
 
-        if (p.isCancel(enableGitHubActions)) {
-          return err(Fault.create("OPERATION_CANCELLED"))
+        if (isCancel(enableGitHubActionsResponse)) {
+          return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
         }
+
+        enableGitHubActions = enableGitHubActionsResponse
       }
 
-      const hasOxfmt = scripts.includes("format")
-      const hasSherif = scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")
-      const hasTypecheck = scripts.includes("typecheck")
-      const hasKnip = scripts.includes("analyze")
+      const hasOxfmt = selectedScripts.includes("format")
+      const hasSherif =
+        selectedScripts.includes("check:monorepo") || selectedScripts.includes("fix:monorepo")
+      const hasTypecheck = selectedScripts.includes("typecheck")
+      const hasKnip = selectedScripts.includes("analyze")
 
       const dependencies = ["adamantite"]
 
@@ -429,45 +453,33 @@ export default defineCommand({
         yield* setupKnipConfig()
       }
 
-      yield* addScripts(scripts)
+      yield* addScripts(selectedScripts)
 
       if (hasTypecheck) {
         yield* setupTypescript()
       }
 
-      yield* setupEditors(editors)
+      yield* setupEditors(selectedEditors)
 
       if (installExtensions) {
-        yield* installEditorExtensions(editors, scripts)
+        yield* installEditorExtensions(selectedEditors, selectedScripts)
       }
 
       if (enableGitHubActions) {
-        yield* setupGitHubActions(packageManager, scripts)
+        yield* setupGitHubActions(pm.name, selectedScripts)
       }
 
-      return ok()
-    }).match(
-      () => {
-        p.outro("💠 Adamantite initialized successfully!")
-        process.exit(0)
-      },
-      (error) => {
-        if (Fault.isFault(error) && error.tag === "OPERATION_CANCELLED") {
-          p.cancel("You've cancelled the initialization process.")
-          process.exit(0)
-        }
+      yield* prompter.log.success("Your project is now configured")
 
-        if (!Fault.isFault(error)) {
-          // We should never reach this point
-          p.log.error(`An unexpected error occurred: ${String(error)}`)
-          p.cancel("Failed to initialize Adamantite")
-          process.exit(1)
-        }
-
-        p.log.error(error.flatten())
-
-        p.cancel("Failed to initialize Adamantite")
-        process.exit(1)
-      }
-    ),
-})
+      yield* prompter.outro("💠 Adamantite initialized successfully!")
+    }).pipe(
+      Effect.catchTags({
+        OperationCancelled: () =>
+          Effect.gen(function* () {
+            const prompter = yield* Prompter
+            yield* prompter.cancel("You've cancelled the initialization process.")
+          }),
+      })
+    )
+  )
+)

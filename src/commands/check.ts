@@ -1,46 +1,33 @@
-import process from "node:process"
-import { log } from "@clack/prompts"
-import { Fault } from "faultier"
-import { ok, safeTry } from "neverthrow"
-import { dlxCommand } from "nypm"
+import { Args, Command } from "@effect/cli"
+import { Command as ShellCommand } from "@effect/platform"
+import { Effect, Option } from "effect"
 import { oxlint } from "#helpers/packages/oxlint.ts"
-import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
+import { PackageManager } from "#services/package-manager.ts"
 
-export default defineCommand({
-  builder: (yargs) =>
-    yargs.positional("files", {
-      array: true,
-      describe: "Specific files to lint (optional)",
-      type: "string",
-    }),
-  command: "check [files..]",
-  describe: "Find issues in code using oxlint",
-  handler: (argv) =>
-    safeTry(async function* () {
-      const packageManager = yield* getPackageManagerName()
+const files = Args.file({ exists: "yes" }).pipe(
+  Args.withDescription("Specific files to lint (optional)"),
+  Args.repeated,
+  Args.optional
+)
+
+export default Command.make("check", { files }).pipe(
+  Command.withDescription("Find issues in code using oxlint"),
+  Command.withHandler(({ files }) =>
+    Effect.gen(function* () {
+      const pm = yield* PackageManager
+      const [command, ...commandArgs] = pm.command
 
       const args: string[] = ["--type-aware"]
 
-      if (argv.files && argv.files.length > 0) {
-        args.push(...argv.files)
+      if (Option.isSome(files)) {
+        args.push(...files.value)
       }
 
-      const command = dlxCommand(packageManager, oxlint.name, { args })
-
-      const result = yield* runCommand(command)
-
-      return ok(result)
-    }).match(
-      () => {
-        // Exit the process with success code
-        process.exit(0)
-      },
-      (error) => {
-        if (Fault.isFault(error) && error.tag === "NO_PACKAGE_MANAGER") {
-          log.error(error.flatten())
-        }
-
-        process.exit(1)
-      }
-    ),
-})
+      return yield* ShellCommand.make(command, ...commandArgs, oxlint.name, ...args).pipe(
+        ShellCommand.stdout("inherit"),
+        ShellCommand.stderr("inherit"),
+        ShellCommand.exitCode
+      )
+    })
+  )
+)

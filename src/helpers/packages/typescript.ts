@@ -1,64 +1,53 @@
-import { readFile, writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import { Fault } from "faultier"
-import { err, fromPromise, ok, safeTry } from "neverthrow"
-import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+import { FileSystem, Path } from "@effect/platform"
+import { Effect } from "effect"
+import { FailedToReadFile, FailedToWriteFile, InvalidConfigFormat } from "#errors.ts"
+import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+
+const CONFIG_FILE = "tsconfig.json"
 
 export const typescript = {
   command: "tsgo",
   config: { extends: "adamantite/typescript" },
   create: () =>
-    fromPromise(
-      writeFile(join(process.cwd(), "tsconfig.json"), JSON.stringify(typescript.config, null, 2)),
-      (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_WRITE_FILE")
-          .withDescription(
-            "Failed to write tsconfig.json",
-            "We're unable to write the tsconfig.json file in the current directory."
-          )
-    ),
-  exists: () => checkIfExists(join(process.cwd(), "tsconfig.json")),
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const configPath = path.join(process.cwd(), CONFIG_FILE)
+      const payload = JSON.stringify(typescript.config, null, 2)
+
+      yield* fs
+        .writeFileString(configPath, `${payload}\n`)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+    }),
+  exists: () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      return yield* fs.exists(path.join(process.cwd(), CONFIG_FILE))
+    }),
   name: "@typescript/native-preview",
   update: () =>
-    safeTry(async function* () {
-      const tsconfigFile = yield* fromPromise(
-        readFile(join(process.cwd(), "tsconfig.json"), "utf8"),
-        (error) =>
-          Fault.wrap(error)
-            .withTag("FAILED_TO_READ_FILE")
-            .withDescription(
-              "Failed to read tsconfig.json",
-              "We're unable to read the tsconfig.json file in the current directory."
-            )
-      )
-      const existingConfig = yield* parseJson(tsconfigFile)
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const configPath = path.join(process.cwd(), CONFIG_FILE)
+
+      const tsconfigFile = yield* fs
+        .readFileString(configPath)
+        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
+      const existingConfig = yield* parseJson(tsconfigFile, configPath)
 
       // Merge config: Adamantite's config takes precedence (first argument in defu)
       // This ensures Adamantite's extends is always applied
       // Empty configs are allowed and will be merged with Adamantite's config
       if (!isJsonObject(existingConfig)) {
-        return err(
-          Fault.create("INVALID_CONFIG_FORMAT").withDescription(
-            "Invalid tsconfig.json format",
-            "The tsconfig.json file must be a JSON object."
-          )
-        )
+        return yield* Effect.fail(new InvalidConfigFormat({ path: configPath }))
       }
       const newConfig = yield* mergeConfig(typescript.config, existingConfig)
 
-      yield* fromPromise(
-        writeFile(join(process.cwd(), "tsconfig.json"), JSON.stringify(newConfig, null, 2)),
-        (error) =>
-          Fault.wrap(error)
-            .withTag("FAILED_TO_WRITE_FILE")
-            .withDescription(
-              "Failed to write tsconfig.json",
-              "We're unable to write the tsconfig.json file in the current directory."
-            )
-      )
-
-      return ok()
+      yield* fs
+        .writeFileString(configPath, `${JSON.stringify(newConfig, null, 2)}\n`)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
 
   version: "7.0.0-dev.20260108.1",

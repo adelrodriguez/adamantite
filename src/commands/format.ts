@@ -1,55 +1,41 @@
-import process from "node:process"
-import { log } from "@clack/prompts"
-import { Fault } from "faultier"
-import { ok, safeTry } from "neverthrow"
-import { dlxCommand } from "nypm"
+import { Args, Command, Options } from "@effect/cli"
+import { Command as ShellCommand } from "@effect/platform"
+import { Effect, Option } from "effect"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
+import { PackageManager } from "#services/package-manager.ts"
 
-export default defineCommand({
-  builder: (yargs) =>
-    yargs
-      .positional("files", {
-        array: true,
-        describe: "Specific files to format (optional)",
-        type: "string",
-      })
-      .option("check", {
-        description: "Check if files are formatted without writing",
-        type: "boolean",
-      }),
-  command: "format [files..]",
-  describe: "Format files using oxfmt",
-  handler: (argv) =>
-    safeTry(async function* () {
-      const packageManager = yield* getPackageManagerName()
+const files = Args.file({ exists: "yes" }).pipe(
+  Args.withDescription("Specific files to format (optional)"),
+  Args.repeated,
+  Args.optional
+)
+
+const check = Options.boolean("check").pipe(
+  Options.withDescription("Check if files are formatted without writing")
+)
+
+export default Command.make("format", { check, files }).pipe(
+  Command.withDescription("Format files using oxfmt"),
+  Command.withHandler(({ check, files }) =>
+    Effect.gen(function* () {
+      const pm = yield* PackageManager
+      const [command, ...commandArgs] = pm.command
 
       const args: string[] = []
 
-      if (argv.check) {
+      if (check) {
         args.push("--check")
       }
 
-      if (argv.files && argv.files.length > 0) {
-        args.push(...argv.files)
+      if (Option.isSome(files)) {
+        args.push(...files.value)
       }
 
-      const command = dlxCommand(packageManager, oxfmt.name, { args })
-
-      const result = yield* runCommand(command)
-
-      return ok(result)
-    }).match(
-      () => {
-        // Exit the process with success code
-        process.exit(0)
-      },
-      (error) => {
-        if (Fault.isFault(error) && error.tag === "NO_PACKAGE_MANAGER") {
-          log.error(error.flatten())
-        }
-
-        process.exit(1)
-      }
-    ),
-})
+      return yield* ShellCommand.make(command, ...commandArgs, oxfmt.name, ...args).pipe(
+        ShellCommand.stdout("inherit"),
+        ShellCommand.stderr("inherit"),
+        ShellCommand.exitCode
+      )
+    })
+  )
+)

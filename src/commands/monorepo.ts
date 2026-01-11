@@ -1,45 +1,29 @@
-import process from "node:process"
-import { log } from "@clack/prompts"
-import { Fault } from "faultier"
-import { ok, safeTry } from "neverthrow"
-import { dlxCommand } from "nypm"
+import { Command, Options } from "@effect/cli"
+import { Command as ShellCommand } from "@effect/platform"
+import { Effect } from "effect"
 import { sherif } from "#helpers/packages/sherif.ts"
-import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
+import { PackageManager } from "#services/package-manager.ts"
 
-export default defineCommand({
-  builder: (yargs) =>
-    yargs.option("fix", {
-      description: "Automatically fix issues",
-      type: "boolean",
-    }),
-  command: "monorepo",
-  describe: "Find and fix monorepo-specific issues using Sherif",
-  handler: (argv) =>
-    safeTry(async function* () {
-      const packageManager = yield* getPackageManagerName()
+const fix = Options.boolean("fix").pipe(Options.withDescription("Automatically fix issues"))
+
+export default Command.make("monorepo", { fix }).pipe(
+  Command.withDescription("Find and fix monorepo-specific issues using Sherif"),
+  Command.withHandler(({ fix }) =>
+    Effect.gen(function* () {
+      const pm = yield* PackageManager
+      const [command, ...commandArgs] = pm.command
 
       const args: string[] = []
 
-      if (argv.fix) {
+      if (fix) {
         args.push("--fix")
       }
 
-      const command = dlxCommand(packageManager, sherif.name, { args })
-
-      yield* runCommand(command)
-
-      return ok()
-    }).match(
-      () => {
-        // Exit the process with success code
-        process.exit(0)
-      },
-      (error) => {
-        if (Fault.isFault(error) && error.tag === "NO_PACKAGE_MANAGER") {
-          log.error(error.flatten())
-        }
-
-        process.exit(1)
-      }
-    ),
-})
+      return yield* ShellCommand.make(command, ...commandArgs, sherif.name, ...args).pipe(
+        ShellCommand.stdout("inherit"),
+        ShellCommand.stderr("inherit"),
+        ShellCommand.exitCode
+      )
+    })
+  )
+)

@@ -1,56 +1,42 @@
-import process from "node:process"
-import { log } from "@clack/prompts"
-import { Fault } from "faultier"
-import { ok, safeTry } from "neverthrow"
-import { dlxCommand } from "nypm"
+import { Command, Options } from "@effect/cli"
+import { Command as ShellCommand } from "@effect/platform"
+import { Effect, Option } from "effect"
 import { typescript } from "#helpers/packages/typescript.ts"
-import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
+import { PackageManager } from "#services/package-manager.ts"
 
-export default defineCommand({
-  builder: (yargs) =>
-    yargs
-      .option("project", {
-        alias: "p",
-        description: "Path to tsconfig.json file",
-        type: "string",
-      })
-      .option("watch", {
-        alias: "w",
-        description: "Run in watch mode",
-        type: "boolean",
-      }),
-  command: "typecheck",
-  describe: "Run TypeScript type checking",
-  handler: (argv) =>
-    safeTry(async function* () {
-      const packageManager = yield* getPackageManagerName()
+const project = Options.text("project").pipe(
+  Options.withAlias("p"),
+  Options.optional,
+  Options.withDescription("Path to tsconfig.json file")
+)
+
+const watch = Options.boolean("watch").pipe(
+  Options.withAlias("w"),
+  Options.withDescription("Run in watch mode")
+)
+
+export default Command.make("typecheck", { project, watch }).pipe(
+  Command.withDescription("Run TypeScript type checking"),
+  Command.withHandler(({ project, watch }) =>
+    Effect.gen(function* () {
+      const pm = yield* PackageManager
+      const [command, ...commandArgs] = pm.command
 
       const args = ["--noEmit"]
 
-      if (argv.project) {
-        args.push("--project", argv.project)
+      if (Option.isSome(project)) {
+        args.push("--project", project.value)
       }
 
-      if (argv.watch) {
+      if (watch) {
         args.push("--watch")
       }
 
-      const command = dlxCommand(packageManager, typescript.command, { args })
-
-      const result = yield* runCommand(command)
-
-      return ok(result)
-    }).match(
-      () => {
-        // Exit the process with success code
-        process.exit(0)
-      },
-      (error) => {
-        if (Fault.isFault(error) && error.tag === "NO_PACKAGE_MANAGER") {
-          log.error(error.flatten())
-        }
-
-        process.exit(1)
-      }
-    ),
-})
+      return yield* ShellCommand.make(command, ...commandArgs, typescript.command, ...args).pipe(
+        ShellCommand.stdout("inherit"),
+        ShellCommand.stderr("inherit"),
+        ShellCommand.exitCode
+      )
+    })
+  )
+)

@@ -1,55 +1,38 @@
 import type { PackageJson } from "type-fest"
 
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { Terminal } from "@effect/platform"
+import * as NodeContext from "@effect/platform-node/NodeContext"
 import Bun from "bun"
+import { Console, Effect, Either, Layer } from "effect"
+import { CwdLive } from "#services/cwd.ts"
 import {
   checkCliExists,
-  checkIfExists,
   checkIsMonorepo,
-  defineCommand,
-  getPackageManagerName,
   isJsonObject,
   mergeConfig,
   normalizeDependencyVersion,
   parseJson,
   printTitle,
   readPackageJson,
-  runCommand,
 } from "#utils.ts"
 
-// Mock spawnSync for testing
-let spawnSyncResult: {
-  status?: number
-  error?: Error | null
-  stdout?: string | Buffer | null
-  stderr?: string | Buffer | null
-} = {
-  error: null,
-  status: 0,
-  stderr: Buffer.from(""),
-  stdout: Buffer.from(""),
+// Helper to run Effect and get Either for error testing
+async function runEither<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  const provided = effect.pipe(
+    Effect.provide(Layer.merge(NodeContext.layer, CwdLive))
+  ) as Effect.Effect<A, E>
+  return await provided.pipe(Effect.either, Effect.runPromise)
 }
-
-void mock.module("node:child_process", () => ({
-  spawnSync: mock(() => spawnSyncResult),
-}))
 
 describe("utils", () => {
   let testDir: string
   let originalCwd: string
 
   beforeEach(() => {
-    // Reset spawnSync mock result
-    spawnSyncResult = {
-      error: null,
-      status: 0,
-      stderr: Buffer.from(""),
-      stdout: Buffer.from(""),
-    }
-
     // Create a temporary directory for each test
     testDir = join(tmpdir(), `adamantite-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(testDir, { recursive: true })
@@ -61,33 +44,6 @@ describe("utils", () => {
     // Restore original cwd and cleanup
     process.chdir(originalCwd)
     rmSync(testDir, { force: true, recursive: true })
-  })
-
-  describe("checkIfExists", () => {
-    test("should return true for existing file", async () => {
-      const testFile = join(testDir, "test.txt")
-      await Bun.write(testFile, "test content")
-
-      const result = await checkIfExists(testFile)
-      expect(result).toBe(true)
-    })
-
-    test("should return true for existing directory", async () => {
-      const result = await checkIfExists(testDir)
-      expect(result).toBe(true)
-    })
-
-    test("should return false for non-existing file", async () => {
-      const nonExistentFile = join(testDir, "does-not-exist.txt")
-      const result = await checkIfExists(nonExistentFile)
-      expect(result).toBe(false)
-    })
-
-    test("should return false for non-existing directory", async () => {
-      const nonExistentDir = join(testDir, "does-not-exist")
-      const result = await checkIfExists(nonExistentDir)
-      expect(result).toBe(false)
-    })
   })
 
   describe("readPackageJson", () => {
@@ -105,9 +61,11 @@ describe("utils", () => {
 
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
-      const result = await readPackageJson(testDir)
-      expect(result.isOk()).toBe(true)
-      expect(result._unsafeUnwrap()).toEqual(packageJson)
+      const result = await readPackageJson(testDir).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+      expect(result).toEqual(packageJson)
     })
 
     test("should use current working directory by default", async () => {
@@ -118,67 +76,77 @@ describe("utils", () => {
 
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
-      const result = await readPackageJson()
-      expect(result.isOk()).toBe(true)
-      expect(result._unsafeUnwrap()).toEqual(packageJson)
+      const result = await readPackageJson().pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+      expect(result).toEqual(packageJson)
     })
 
     test("should return error when package.json does not exist", async () => {
-      const result = await readPackageJson(testDir)
-      expect(result.isErr()).toBe(true)
+      const result = await runEither(readPackageJson(testDir))
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+      }
     })
 
     test("should return error when package.json is invalid JSON", async () => {
       await Bun.write(join(testDir, "package.json"), "invalid json content")
 
-      const result = await readPackageJson(testDir)
-      expect(result.isErr()).toBe(true)
+      const result = await runEither(readPackageJson(testDir))
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
+      }
     })
   })
 
   describe("parseJson", () => {
-    test("should parse valid JSON", () => {
+    test("should parse valid JSON", async () => {
       const validJson = '{"name": "test", "version": "1.0.0"}'
-      const result = parseJson(validJson)
+      const result = await parseJson(validJson).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
 
-      expect(result.isOk()).toBe(true)
-      expect(result._unsafeUnwrap()).toEqual({
+      expect(result).toEqual({
         name: "test",
         version: "1.0.0",
       })
     })
 
-    test("should parse valid JSONC with comments", () => {
+    test("should parse valid JSONC with comments", async () => {
       const jsonc = `{
         // This is a comment
         "name": "test",
         "version": "1.0.0"
       }`
-      const result = parseJson(jsonc)
+      const result = await parseJson(jsonc).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
 
-      expect(result.isOk()).toBe(true)
-      expect(result._unsafeUnwrap()).toEqual({
+      expect(result).toEqual({
         name: "test",
         version: "1.0.0",
       })
     })
 
-    test("should return error for invalid JSON", () => {
+    test("should return error for invalid JSON", async () => {
       const invalidJson = '{"name": "test", "version":}'
-      const result = parseJson(invalidJson)
-
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("FAILED_TO_PARSE_FILE")
+      const result = await runEither(parseJson(invalidJson))
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
       }
     })
 
-    test("should return error for empty string", () => {
-      const result = parseJson("")
-
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("FAILED_TO_PARSE_FILE")
+    test("should return error for empty string", async () => {
+      const result = await runEither(parseJson(""))
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
       }
     })
   })
@@ -200,37 +168,43 @@ describe("utils", () => {
   })
 
   describe("mergeConfig", () => {
-    test("should merge two objects", () => {
+    test("should merge two objects", async () => {
       const base = { a: 1, b: 2 }
       const override = { b: 3, c: 4 }
-      const result = mergeConfig(base, override)
+      const result = await mergeConfig(base, override).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
 
-      expect(result.isOk()).toBe(true)
       // Defu merges left-to-right, so base (first arg) wins for 'b'
-      expect(result._unsafeUnwrap()).toEqual({ a: 1, b: 2, c: 4 })
+      expect(result).toEqual({ a: 1, b: 2, c: 4 })
     })
 
-    test("should give priority to first argument (defu behavior)", () => {
+    test("should give priority to first argument (defu behavior)", async () => {
       const first = { a: 1, b: 2 }
       const second = { a: 3, b: 4 }
-      const result = mergeConfig(first, second)
+      const result = await mergeConfig(first, second).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
 
-      expect(result.isOk()).toBe(true)
       // Defu merges left-to-right, so first argument wins
-      expect(result._unsafeUnwrap()).toEqual({ a: 1, b: 2 })
+      expect(result).toEqual({ a: 1, b: 2 })
     })
 
-    test("should handle nested objects", () => {
+    test("should handle nested objects", async () => {
       const base = { a: { x: 1, y: 2 }, b: 3 }
       const override = { a: { y: 4, z: 5 }, b: 6 }
-      const result = mergeConfig(base, override)
+      const result = await mergeConfig(base, override).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
 
-      expect(result.isOk()).toBe(true)
       // Defu merges left-to-right, so base values win
-      expect(result._unsafeUnwrap()).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
+      expect(result).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
     })
 
-    test("should handle mergeConfig error when defu throws", () => {
+    test("should handle mergeConfig error when defu throws", async () => {
       // Use a Proxy that throws when any property is accessed
       // This simulates defu encountering an error during merge
       const throwingBase = new Proxy(
@@ -245,103 +219,10 @@ describe("utils", () => {
         }
       )
 
-      const result = mergeConfig(throwingBase, { b: 2 })
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("FAILED_TO_MERGE_CONFIG")
-      }
-    })
-  })
-
-  describe("defineCommand", () => {
-    test("should return the input command module unchanged", () => {
-      const mockCommand = {
-        command: "test",
-        describe: "Test command",
-        handler: () => {
-          // Empty handler for testing
-        },
-      }
-
-      const result = defineCommand(mockCommand)
-      expect(result).toBe(mockCommand)
-      expect(result).toEqual(mockCommand)
-    })
-  })
-
-  describe("runCommand", () => {
-    test("should successfully run a valid command", () => {
-      const result = runCommand("echo test")
-
-      expect(result.isOk()).toBe(true)
-    })
-
-    test("should return error with FAILED_TO_RUN_COMMAND tag for invalid command", () => {
-      spawnSyncResult = {
-        error: new Error("spawn nonexistent-command-12345 ENOENT"),
-      }
-
-      const result = runCommand("nonexistent-command-12345")
-
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("FAILED_TO_RUN_COMMAND")
-      }
-    })
-  })
-
-  describe("getPackageManagerName", () => {
-    test("should detect bun when bun.lock exists", async () => {
-      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
-      await Bun.write(join(testDir, "bun.lock"), "")
-
-      const result = await getPackageManagerName()
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe("bun")
-      }
-    })
-
-    test("should detect npm when package-lock.json exists", async () => {
-      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
-      await Bun.write(join(testDir, "package-lock.json"), "{}")
-
-      const result = await getPackageManagerName()
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe("npm")
-      }
-    })
-
-    test("should detect pnpm when pnpm-lock.yaml exists", async () => {
-      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
-      await Bun.write(join(testDir, "pnpm-lock.yaml"), "")
-
-      const result = await getPackageManagerName()
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe("pnpm")
-      }
-    })
-
-    test("should detect yarn when yarn.lock exists", async () => {
-      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
-      await Bun.write(join(testDir, "yarn.lock"), "")
-
-      const result = await getPackageManagerName()
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe("yarn")
-      }
-    })
-
-    test("should return error with NO_PACKAGE_MANAGER tag when no lockfile exists", async () => {
-      await Bun.write(join(testDir, "package.json"), JSON.stringify({ name: "test" }))
-
-      const result = await getPackageManagerName()
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("NO_PACKAGE_MANAGER")
+      const result = await runEither(mergeConfig(throwingBase, { b: 2 }))
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({ _tag: "FailedToMergeConfig" })
       }
     })
   })
@@ -350,11 +231,11 @@ describe("utils", () => {
     test("should return true when pnpm-workspace.yaml exists", async () => {
       await Bun.write(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
 
-      const result = await checkIsMonorepo()
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe(true)
-      }
+      const result = await checkIsMonorepo().pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+      expect(result).toBe(true)
     })
 
     test("should return true when package.json has workspaces field", async () => {
@@ -365,11 +246,11 @@ describe("utils", () => {
 
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
-      const result = await checkIsMonorepo()
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe(true)
-      }
+      const result = await checkIsMonorepo().pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+      expect(result).toBe(true)
     })
 
     test("should return false when neither condition is met", async () => {
@@ -380,129 +261,93 @@ describe("utils", () => {
 
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
-      const result = await checkIsMonorepo()
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe(false)
-      }
+      const result = await checkIsMonorepo().pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+      expect(result).toBe(false)
     })
 
     test("should return error when package.json does not exist and no pnpm-workspace.yaml", async () => {
-      const result = await checkIsMonorepo()
-      expect(result.isErr()).toBe(true)
+      const result = await runEither(checkIsMonorepo())
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+      }
     })
   })
 
   describe("printTitle", () => {
-    let originalColumns: number | undefined
-    let originalConsoleInfo: typeof console.info
-    let callCount: number
+    let capturedLogs: string[]
 
     beforeEach(() => {
-      originalColumns = process.stdout.columns
-      // oxlint-disable-next-line no-console - saving original console.info for restoration
-      originalConsoleInfo = console.info
-      callCount = 0
-      const mockLog = mock(() => {
-        callCount += 1
+      capturedLogs = []
+    })
+
+    const makeTerminalLayer = (columns?: number) =>
+      Layer.succeed(Terminal.Terminal, {
+        columns:
+          columns === undefined
+            ? Effect.succeed(undefined as unknown as number)
+            : Effect.succeed(columns),
+        display: () => Effect.void,
+        readInput: Effect.never,
+        readLine: Effect.never,
       })
 
-      console.info = mockLog as typeof console.info
-    })
-
-    afterEach(() => {
-      Object.defineProperty(process.stdout, "columns", {
-        configurable: true,
-        value: originalColumns,
-        writable: true,
-      })
-
-      console.info = originalConsoleInfo
-    })
-
-    test("should print title when terminal is wide enough", () => {
-      Object.defineProperty(process.stdout, "columns", {
-        configurable: true,
-        value: 120,
-        writable: true,
-      })
-
-      printTitle()
-
-      expect(callCount).toBe(1)
-    })
-
-    test("should not print title when terminal is too narrow", () => {
-      Object.defineProperty(process.stdout, "columns", {
-        configurable: true,
-        value: 50,
-        writable: true,
-      })
-
-      printTitle()
-
-      expect(callCount).toBe(0)
-    })
-
-    test("should not print title when process.stdout.columns is undefined", () => {
-      Object.defineProperty(process.stdout, "columns", {
-        configurable: true,
-        value: undefined,
-        writable: true,
-      })
-
-      printTitle()
-
-      expect(callCount).toBe(0)
-    })
-  })
-
-  describe("runCommand", () => {
-    test("should return ok when command succeeds", () => {
-      spawnSyncResult = {
-        error: null,
-        status: 0,
-        stderr: null,
-        stdout: null,
+    const makeConsoleLayer = () => {
+      const mockConsole: Console.Console = {
+        [Console.TypeId]: Console.TypeId,
+        assert: () => Effect.void,
+        clear: Effect.void,
+        count: () => Effect.void,
+        countReset: () => Effect.void,
+        debug: () => Effect.void,
+        dir: () => Effect.void,
+        dirxml: () => Effect.void,
+        error: () => Effect.void,
+        group: () => Effect.void,
+        groupEnd: Effect.void,
+        info: (...args: unknown[]) => {
+          const message = args.map(String).join(" ")
+          capturedLogs.push(message)
+          return Effect.void
+        },
+        log: () => Effect.void,
+        table: () => Effect.void,
+        time: () => Effect.void,
+        timeEnd: () => Effect.void,
+        timeLog: () => Effect.void,
+        trace: () => Effect.void,
+        unsafe: globalThis.console,
+        warn: () => Effect.void,
       }
+      return Console.setConsole(mockConsole)
+    }
 
-      const result = runCommand("echo success")
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value.status).toBe(0)
-      }
+    test("should print title when terminal is wide enough", async () => {
+      const testLayer = Layer.merge(makeTerminalLayer(120), makeConsoleLayer())
+
+      await printTitle().pipe(Effect.provide(testLayer), Effect.runPromise)
+
+      expect(capturedLogs.length).toBe(1)
+      expect(capturedLogs[0]).toContain(".ooooo.")
     })
 
-    test("should return err when command fails with non-zero status", () => {
-      spawnSyncResult = {
-        error: null,
-        status: 1,
-        stderr: null,
-        stdout: null,
-      }
+    test("should not print title when terminal is too narrow", async () => {
+      const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(50), makeConsoleLayer())
 
-      const result = runCommand("exit 1")
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("FAILED_TO_RUN_COMMAND")
-        expect(result.error.message).toBe("An unknown error occurred while running the command")
-        expect(result.error.debug).toContain(
-          "Failed to run command: An unknown error occurred while running the command"
-        )
-      }
+      await printTitle().pipe(Effect.provide(testLayer), Effect.runPromise)
+
+      expect(capturedLogs.length).toBe(0)
     })
 
-    test("should return err when spawn fails", () => {
-      spawnSyncResult = {
-        error: new Error("spawn failed"),
-      }
+    test("should not print title when process.stdout.columns is undefined", async () => {
+      const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(), makeConsoleLayer())
 
-      const result = runCommand("invalid-command")
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("FAILED_TO_RUN_COMMAND")
-        expect(result.error.message).toBe("spawn failed")
-      }
+      await printTitle().pipe(Effect.provide(testLayer), Effect.runPromise)
+
+      expect(capturedLogs.length).toBe(0)
     })
   })
 
@@ -522,90 +367,48 @@ describe("utils", () => {
   })
 
   describe("checkCliExists", () => {
-    test("should return ok(true) when CLI exists", () => {
-      spawnSyncResult = {
-        error: null,
-        status: 0,
-        stderr: Buffer.from(""),
-        stdout: Buffer.from("/usr/bin/code"),
-      }
+    // Note: These tests run actual commands since @effect/platform's Command
+    // module doesn't use spawnSync. We use commands guaranteed to exist.
+    test("should return ok(true) when CLI exists", async () => {
+      // Use 'ls' which exists on all Unix-like systems
+      const command = process.platform === "win32" ? "cmd" : "ls"
 
-      const result = checkCliExists("code")
-      expect(result.isOk()).toBe(true)
-      if (result.isOk()) {
-        expect(result.value).toBe(true)
+      const result = await checkCliExists(command).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+      expect(result).toBe(true)
+    })
+
+    test("should return err with CLI_NOT_FOUND tag when CLI does not exist", async () => {
+      const result = await runEither(
+        checkCliExists("nonexistent-command-that-definitely-does-not-exist-12345")
+      )
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({ _tag: "CliNotFound" })
       }
     })
 
-    test("should return err with CLI_NOT_FOUND tag when CLI does not exist", () => {
-      spawnSyncResult = {
-        error: null,
-        status: 1,
-        stderr: Buffer.from(""),
-        stdout: Buffer.from(""),
-      }
+    test.skipIf(process.platform !== "win32")("should use 'where' command on Windows", async () => {
+      // Use 'cmd' which exists on all Windows systems
+      const result = await checkCliExists("cmd").pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+      expect(result).toBe(true)
+    })
 
-      const result = checkCliExists("nonexistent-command")
-      expect(result.isErr()).toBe(true)
-      if (result.isErr()) {
-        expect(result.error.tag).toBe("CLI_NOT_FOUND")
-        expect(result.error.message).toContain(
-          "The 'nonexistent-command' command is not available in your PATH."
+    test.skipIf(process.platform === "win32")(
+      "should find CLI using 'which' on Unix-like systems",
+      async () => {
+        // Use 'sh' which exists on all Unix-like systems
+        const result = await checkCliExists("sh").pipe(
+          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+          Effect.runPromise
         )
-        expect(result.error.context?.command).toBe("nonexistent-command")
+        expect(result).toBe(true)
       }
-    })
-
-    test("should use 'where' command on Windows", () => {
-      const originalPlatform = process.platform
-      Object.defineProperty(process, "platform", {
-        configurable: true,
-        value: "win32",
-        writable: true,
-      })
-
-      spawnSyncResult = {
-        error: null,
-        status: 0,
-        stderr: Buffer.from(""),
-        stdout: Buffer.from(String.raw`C:\Program Files\Microsoft VS Code\bin\code.cmd`),
-      }
-
-      const result = checkCliExists("code")
-      expect(result.isOk()).toBe(true)
-
-      // Restore original platform
-      Object.defineProperty(process, "platform", {
-        configurable: true,
-        value: originalPlatform,
-        writable: true,
-      })
-    })
-
-    test("should use 'which' command on Unix-like systems", () => {
-      const originalPlatform = process.platform
-      Object.defineProperty(process, "platform", {
-        configurable: true,
-        value: "darwin",
-        writable: true,
-      })
-
-      spawnSyncResult = {
-        error: null,
-        status: 0,
-        stderr: Buffer.from(""),
-        stdout: Buffer.from("/usr/local/bin/code"),
-      }
-
-      const result = checkCliExists("code")
-      expect(result.isOk()).toBe(true)
-
-      // Restore original platform
-      Object.defineProperty(process, "platform", {
-        configurable: true,
-        value: originalPlatform,
-        writable: true,
-      })
-    })
+    )
   })
 })

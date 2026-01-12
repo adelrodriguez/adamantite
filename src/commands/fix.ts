@@ -1,77 +1,55 @@
-import process from "node:process"
-import { log } from "@clack/prompts"
-import { Fault } from "faultier"
-import { ok, safeTry } from "neverthrow"
-import { dlxCommand } from "nypm"
+import { Args, Command, Options } from "@effect/cli"
+import { Command as ShellCommand } from "@effect/platform"
+import { Effect, Option } from "effect"
 import { oxlint } from "#helpers/packages/oxlint.ts"
-import { defineCommand, getPackageManagerName, runCommand } from "#utils.ts"
+import { PackageManager } from "#services/package-manager.ts"
 
-export default defineCommand({
-  builder: (yargs) =>
-    yargs
-      .positional("files", {
-        array: true,
-        describe: "Specific files to fix (optional)",
-        type: "string",
-      })
-      .option("suggested", {
-        default: false,
-        description: "Apply suggested fixes",
-        type: "boolean",
-      })
-      .option("dangerous", {
-        default: false,
-        description: "Apply dangerous fixes",
-        type: "boolean",
-      })
-      .option("all", {
-        default: false,
-        description: "Apply all fixes, including suggested and dangerous fixes",
-        type: "boolean",
-      }),
-  command: "fix [files..]",
-  describe: "Fix issues in code using oxlint",
-  handler: (argv) =>
-    safeTry(async function* () {
-      const packageManager = yield* getPackageManagerName()
+const files = Args.file({ exists: "yes" }).pipe(
+  Args.withDescription("Specific files to fix (optional)"),
+  Args.repeated,
+  Args.optional
+)
+
+const suggested = Options.boolean("suggested").pipe(
+  Options.withDescription("Apply suggested fixes")
+)
+
+const dangerous = Options.boolean("dangerous").pipe(
+  Options.withDescription("Apply dangerous fixes")
+)
+
+const all = Options.boolean("all").pipe(
+  Options.withDescription("Apply all fixes, including suggested and dangerous fixes")
+)
+
+export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
+  Command.withDescription("Fix issues in code using oxlint"),
+  Command.withHandler(({ all, dangerous, files, suggested }) =>
+    Effect.gen(function* () {
+      const pm = yield* PackageManager
+      const [command, ...commandArgs] = pm.command
 
       const args = new Set<string>(["--type-aware", "--fix"])
 
-      if (argv.suggested) {
+      if (suggested || all) {
         args.add("--fix-suggestions")
       }
 
-      if (argv.dangerous) {
+      if (dangerous || all) {
         args.add("--fix-dangerously")
       }
 
-      if (argv.all) {
-        args.add("--fix-suggestions")
-        args.add("--fix-dangerously")
-      }
-
-      if (argv.files && argv.files.length > 0) {
-        for (const file of argv.files) {
+      if (Option.isSome(files)) {
+        for (const file of files.value) {
           args.add(file)
         }
       }
 
-      const command = dlxCommand(packageManager, oxlint.name, { args: Array.from(args) })
-
-      yield* runCommand(command)
-
-      return ok()
-    }).match(
-      () => {
-        // Exit the process with success code
-        process.exit(0)
-      },
-      (error) => {
-        if (Fault.isFault(error) && error.tag === "NO_PACKAGE_MANAGER") {
-          log.error(error.flatten())
-        }
-
-        process.exit(1)
-      }
-    ),
-})
+      return yield* ShellCommand.make(command, ...commandArgs, oxlint.name, ...args).pipe(
+        ShellCommand.stdout("inherit"),
+        ShellCommand.stderr("inherit"),
+        ShellCommand.exitCode
+      )
+    })
+  )
+)

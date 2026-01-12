@@ -1,9 +1,11 @@
-import { readFile, writeFile } from "node:fs/promises"
-import { join } from "node:path"
-import { Fault } from "faultier"
-import { err, fromPromise, ok, safeTry } from "neverthrow"
+import { FileSystem, Path } from "@effect/platform"
+import { Effect } from "effect"
+import { FailedToReadFile, FailedToWriteFile, FileNotFound, InvalidConfigFormat } from "#errors.ts"
 import preset from "#presets/format.json" with { type: "json" }
-import { checkIfExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+
+const CONFIG_FILE_JSONC = ".oxfmtrc.jsonc"
+const CONFIG_FILE_JSON = ".oxfmtrc.json"
 
 export const oxfmt = {
   config: {
@@ -11,75 +13,60 @@ export const oxfmt = {
     $schema: "./node_modules/oxfmt/configuration_schema.json",
   },
   create: () =>
-    fromPromise(
-      writeFile(join(process.cwd(), ".oxfmtrc.jsonc"), JSON.stringify(oxfmt.config, null, 2)),
-      (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_WRITE_FILE")
-          .withDescription(
-            "Failed to write oxfmt configuration",
-            "We're unable to write the oxfmt configuration to the current directory."
-          )
-    ),
-  exists: async () => {
-    if (await checkIfExists(join(process.cwd(), ".oxfmtrc.jsonc"))) {
-      return { path: join(process.cwd(), ".oxfmtrc.jsonc") }
-    }
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const configPath = path.join(process.cwd(), CONFIG_FILE_JSONC)
+      const payload = JSON.stringify(oxfmt.config, null, 2)
 
-    if (await checkIfExists(join(process.cwd(), ".oxfmtrc.json"))) {
-      return { path: join(process.cwd(), ".oxfmtrc.json") }
-    }
+      yield* fs
+        .writeFileString(configPath, `${payload}\n`)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+    }),
+  exists: () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const jsoncPath = path.join(process.cwd(), CONFIG_FILE_JSONC)
+      const jsonPath = path.join(process.cwd(), CONFIG_FILE_JSON)
 
-    return { path: null }
-  },
-  name: "oxfmt",
-  update: () =>
-    safeTry(async function* () {
-      const exists = await oxfmt.exists()
-
-      if (!exists.path) {
-        return err(
-          Fault.create("FILE_NOT_FOUND").withDescription(
-            "No `.oxfmtrc.jsonc` or `.oxfmtrc.json` found",
-            "We're unable to find an oxfmt configuration in the current directory."
-          )
-        )
+      if (yield* fs.exists(jsoncPath)) {
+        return { path: jsoncPath }
       }
 
-      const oxfmtFile = yield* fromPromise(readFile(exists.path, "utf8"), (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_READ_FILE")
-          .withDescription(
-            "Failed to read oxfmt configuration",
-            "We're unable to read the oxfmt configuration from the current directory."
-          )
-      )
+      if (yield* fs.exists(jsonPath)) {
+        return { path: jsonPath }
+      }
 
-      const existingConfig = yield* parseJson(oxfmtFile)
+      return { path: null }
+    }),
+  name: "oxfmt",
+  update: () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const { path: configPath } = yield* oxfmt.exists()
+
+      if (!configPath) {
+        return yield* Effect.fail(new FileNotFound({ path: CONFIG_FILE_JSONC }))
+      }
+
+      const oxfmtFile = yield* fs
+        .readFileString(configPath)
+        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
+
+      const existingConfig = yield* parseJson(oxfmtFile, configPath)
 
       // Empty configs are allowed and will be merged with Adamantite's config
       if (!isJsonObject(existingConfig)) {
-        return err(
-          Fault.create("INVALID_CONFIG_FORMAT").withDescription(
-            "Invalid oxfmt configuration format",
-            "The oxfmt configuration must be a JSON object."
-          )
-        )
+        return yield* Effect.fail(new InvalidConfigFormat({ path: configPath }))
       }
+
       const mergedConfig = yield* mergeConfig(existingConfig, oxfmt.config)
       mergedConfig.$schema = oxfmt.config.$schema
 
-      yield* fromPromise(writeFile(exists.path, JSON.stringify(mergedConfig, null, 2)), (error) =>
-        Fault.wrap(error)
-          .withTag("FAILED_TO_WRITE_FILE")
-          .withDescription(
-            "Failed to write oxfmt configuration",
-            "We're unable to write the oxfmt configuration to the current directory."
-          )
-          .withContext({ path: exists.path })
-      )
-
-      return ok()
+      yield* fs
+        .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   version: "0.23.0",
 }

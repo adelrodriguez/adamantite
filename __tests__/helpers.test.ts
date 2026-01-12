@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
+import * as NodeContext from "@effect/platform-node/NodeContext"
 import Bun from "bun"
+import { Effect, Layer } from "effect"
 import { parse } from "jsonc-parser"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { knip } from "#helpers/packages/knip.ts"
@@ -8,6 +10,7 @@ import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
+import { CwdLive } from "#services/cwd.ts"
 import { readPackageJson } from "#utils.ts"
 
 const SEMVER_REGEX = /^\d+\.\d+\.\d+$/
@@ -25,8 +28,10 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
-        const packageJson = packageJsonResult._unsafeUnwrap()
+        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+          Effect.runPromise
+        )
         const oxlintInPackage = packageJson.devDependencies?.oxlint
 
         expect(oxlintInPackage).toBe(oxlint.version)
@@ -62,8 +67,10 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
-        const packageJson = packageJsonResult._unsafeUnwrap()
+        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+          Effect.runPromise
+        )
         const tsgolintInPackage = packageJson.devDependencies?.["oxlint-tsgolint"]
 
         expect(tsgolintInPackage).toBe(tsgolint.version)
@@ -80,8 +87,10 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
-        const packageJson = packageJsonResult._unsafeUnwrap()
+        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+          Effect.runPromise
+        )
         const oxfmtInPackage = packageJson.devDependencies?.oxfmt
 
         expect(oxfmtInPackage).toBe(oxfmt.version)
@@ -98,8 +107,10 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
-        const packageJson = packageJsonResult._unsafeUnwrap()
+        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+          Effect.runPromise
+        )
         const sherifInPackage = packageJson.devDependencies?.sherif
 
         expect(sherifInPackage).toBe(sherif.version)
@@ -116,8 +127,10 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
-        const packageJson = packageJsonResult._unsafeUnwrap()
+        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+          Effect.runPromise
+        )
         const knipInPackage = packageJson.devDependencies?.knip
 
         expect(knipInPackage).toBe(knip.version)
@@ -146,8 +159,7 @@ describe("helpers", () => {
           const jsonPath = path.join(tmpDir, "knip.json")
           await fs.writeFile(jsonPath, JSON.stringify({ $schema: "old-schema" }, null, 2))
 
-          const resultJson = await knip.update()
-          expect(resultJson.isOk()).toBe(true)
+          await knip.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
           const jsonContent = JSON.parse(await fs.readFile(jsonPath, "utf8"))
           expect(jsonContent.$schema).toBe("https://unpkg.com/knip@5/schema.json")
@@ -158,8 +170,7 @@ describe("helpers", () => {
           const jsoncPath = path.join(tmpDir, "knip.jsonc")
           await fs.writeFile(jsoncPath, JSON.stringify({ $schema: "old-schema" }, null, 2))
 
-          const resultJsonc = await knip.update()
-          expect(resultJsonc.isOk()).toBe(true)
+          await knip.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
           const jsoncContent = JSON.parse(await fs.readFile(jsoncPath, "utf8"))
           expect(jsoncContent.$schema).toBe("https://unpkg.com/knip@5/schema-jsonc.json")
@@ -183,8 +194,10 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJsonResult = await readPackageJson(join(__dirname, ".."))
-        const packageJson = packageJsonResult._unsafeUnwrap()
+        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+          Effect.runPromise
+        )
         const typescriptInPackage = packageJson.devDependencies?.["@typescript/native-preview"]
 
         expect(typescriptInPackage).toBe(typescript.version)

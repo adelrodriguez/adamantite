@@ -1,5 +1,13 @@
 # adamantite
 
+## 0.26.0
+
+### Minor Changes
+
+- 0663946: Remove support for passing positional file lists to `adamantite analyze`.
+
+  Use your Knip config (or run `knip` directly) to scope analysis instead.
+
 ## 0.25.0
 
 ### Minor Changes

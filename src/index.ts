@@ -13,20 +13,18 @@ import update from "#commands/update.ts"
 import { CwdLive } from "#services/cwd.ts"
 import { PackageManagerLive } from "#services/package-manager.ts"
 import { PrompterLive } from "#services/prompter.ts"
-import { getPackageVersion } from "#utils.ts"
+import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
 const main = Command.make("adamantite").pipe(
   Command.withDescription("Opinionated preset package for modern TypeScript applications"),
   Command.withSubcommands([analyze, check, fix, format, init, monorepo, typecheck, update])
 )
 
-const program = Effect.gen(function* () {
-  const version = yield* getPackageVersion()
-  const cli = Command.run(main, { name: "adamantite", version })
-  yield* cli(process.argv)
-})
+const version = await getPackageVersion()
 
-program.pipe(
+const program = Command.run(main, { name: "adamantite", version })
+
+program(process.argv).pipe(
   Effect.provide(Layer.mergeAll(NodeContext.layer, PackageManagerLive, PrompterLive, CwdLive)),
   NodeRuntime.runMain
 )

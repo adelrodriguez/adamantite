@@ -10,7 +10,6 @@ import {
   FailedToMergeConfig,
   FailedToParseFile,
   FailedToReadFile,
-  MissingPackageVersion,
 } from "#errors.ts"
 import { Cwd } from "#services/cwd.ts"
 
@@ -119,12 +118,3 @@ d8(  888  888   888  d8(  888   888   888   888  d8(  888   888   888    888 .  
 
     yield* Console.info(title)
   })
-
-export const getPackageVersion = () =>
-  readPackageJson().pipe(
-    Effect.flatMap((packageJson) =>
-      packageJson.version
-        ? Effect.succeed(packageJson.version)
-        : Effect.fail(new MissingPackageVersion({ path: "package.json" }))
-    )
-  )

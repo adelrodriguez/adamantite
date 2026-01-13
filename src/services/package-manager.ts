@@ -33,7 +33,7 @@ export const PackageManagerLive = Layer.effect(
       return yield* Effect.fail(new NoPackageManager({}))
     }
 
-    if (result.warnings && result.warnings.length > 0) {
+    if (result.warnings?.length) {
       for (const warning of result.warnings) {
         yield* prompter.log.warning(warning)
       }

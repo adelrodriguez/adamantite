@@ -88,10 +88,10 @@ export const oxlint = {
         .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  version: "1.38.0",
+  version: "1.39.0",
 }
 
 export const tsgolint = {
   name: "oxlint-tsgolint",
-  version: "0.10.1",
+  version: "0.11.0",
 }

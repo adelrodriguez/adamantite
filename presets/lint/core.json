@@ -284,6 +284,7 @@
     "typescript/prefer-enum-initializers": "error",
     "typescript/prefer-includes": "error",
     "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
     "typescript/prefer-promise-reject-errors": "error",
     "typescript/prefer-ts-expect-error": "error",
     "typescript/related-getter-setter-pairs": "error",

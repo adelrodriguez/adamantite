@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.27.1
+
+### Patch Changes
+
+- 787fb7c: Fix `MissingPackageVersion` error when running CLI in packages without a version field
+
 ## 0.27.0
 
 ### Minor Changes

@@ -4,7 +4,7 @@ import { Effect, Option } from "effect"
 import { typescript } from "#helpers/packages/typescript.ts"
 import { PackageManager } from "#services/package-manager.ts"
 
-const project = Options.text("project").pipe(
+const project = Options.file("project").pipe(
   Options.withAlias("p"),
   Options.optional,
   Options.withDescription("Path to tsconfig.json file")

@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.27.3
+
+### Patch Changes
+
+- 8656cbe: Update development dependencies for tooling and type support
+
 ## 0.27.2
 
 ### Patch Changes

@@ -20,6 +20,7 @@ export default Command.make("monorepo", { fix }).pipe(
       }
 
       return yield* ShellCommand.make(command, ...commandArgs, sherif.name, ...args).pipe(
+        ShellCommand.stdin("inherit"),
         ShellCommand.stdout("inherit"),
         ShellCommand.stderr("inherit"),
         ShellCommand.exitCode

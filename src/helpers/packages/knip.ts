@@ -71,5 +71,5 @@ export const knip = {
         .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  version: "5.80.2",
+  version: "5.81.0",
 }

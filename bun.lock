@@ -23,7 +23,7 @@
         "oxfmt": "0.24.0",
         "oxlint": "1.39.0",
         "oxlint-tsgolint": "0.11.1",
-        "sherif": "1.9.0",
+        "sherif": "1.10.0",
         "type-fest": "5.4.1",
         "typescript": "5.9.3",
       },
@@ -558,23 +558,23 @@
 
     "shebang-regex": ["shebang-regex@3.0.0", "", {}, "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A=="],
 
-    "sherif": ["sherif@1.9.0", "", { "optionalDependencies": { "sherif-darwin-arm64": "1.9.0", "sherif-darwin-x64": "1.9.0", "sherif-linux-arm64": "1.9.0", "sherif-linux-arm64-musl": "1.9.0", "sherif-linux-x64": "1.9.0", "sherif-linux-x64-musl": "1.9.0", "sherif-windows-arm64": "1.9.0", "sherif-windows-x64": "1.9.0" }, "bin": { "sherif": "index.js" } }, "sha512-5n7zqPAjL+RzR7n09NPKpWBXmDCtuRpQzIL+ycj8pe6MayV7cDuFmceoyPQJ0c95oFj6feY7SZvhX/+S0i1ukg=="],
+    "sherif": ["sherif@1.10.0", "", { "optionalDependencies": { "sherif-darwin-arm64": "1.10.0", "sherif-darwin-x64": "1.10.0", "sherif-linux-arm64": "1.10.0", "sherif-linux-arm64-musl": "1.10.0", "sherif-linux-x64": "1.10.0", "sherif-linux-x64-musl": "1.10.0", "sherif-windows-arm64": "1.10.0", "sherif-windows-x64": "1.10.0" }, "bin": { "sherif": "index.js" } }, "sha512-DHg6+Pj7ORhYyC+CaSAr8DeRxqf9GXB90yqLmUILPtY7WhZuJatMir3id2MNjuF5I/1313SbrTTItIDu//G4jg=="],
 
-    "sherif-darwin-arm64": ["sherif-darwin-arm64@1.9.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-R+RpKSzlqZgBHean04CqHrdlmBBKu6Dhd/9BcdCpjx/KpqsalZsh9LzBVxTWLTtT9IBb/ccr23PNqFzWQTuh6A=="],
+    "sherif-darwin-arm64": ["sherif-darwin-arm64@1.10.0", "", { "os": "darwin", "cpu": "arm64" }, "sha512-fHRg/fgyxHebCH9vuGEhImyGqmwlBq67BVyI8Ugda8GM+W+Ofj1cQnzDX82cYuCHU+KJ7hQFq8iPHkRizXWOrA=="],
 
-    "sherif-darwin-x64": ["sherif-darwin-x64@1.9.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-b/KX9MczzkzmyEjngGxYuBq/rOdM6CbGcDLFdQ0H990Dmn9foj4C/UpLlyqSxXcsJhy586ATMEVN68aM2hFQdQ=="],
+    "sherif-darwin-x64": ["sherif-darwin-x64@1.10.0", "", { "os": "darwin", "cpu": "x64" }, "sha512-7rhayQ+jlIj3SscnHMi6JVCYR9od/HiqIGIBgOQeux31YRzc/XvfKjE9X+FrCRU+72qz7sqw5ZY7jl7bRxbOUg=="],
 
-    "sherif-linux-arm64": ["sherif-linux-arm64@1.9.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-TyuGhaD/efCxGIk4scx09n6NsTr3qfKvH5qHYdyxtelv1mHRgbzVHwJ+Jj98jVktuzOZoexHpxr/hz7RUjd/nw=="],
+    "sherif-linux-arm64": ["sherif-linux-arm64@1.10.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-QtEju3eLPpEb7hv9QRVdsi2J3bhIFEBbRk0vjdnAEKyRb3q9MjyqEhps69JgaCv8olEiBjGcU1hGP7vl5QVG4A=="],
 
-    "sherif-linux-arm64-musl": ["sherif-linux-arm64-musl@1.9.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-OZ4cKcCXTJTl8zaTxKnP8z0wu05nDeGtttxRQjaXHSKK+fjBwGkH/1qqFEVDcRANUxtLRLLdwmDyxvqQrCzhPQ=="],
+    "sherif-linux-arm64-musl": ["sherif-linux-arm64-musl@1.10.0", "", { "os": "linux", "cpu": "arm64" }, "sha512-TsaQSefkaIJ+oFGGaaPm5BzrjVRnvcquh4q3/e5LB6JdhPTveNPo3o2Pzmq6sKry9dzk3p7sKtzJpLz4q5V/+Q=="],
 
-    "sherif-linux-x64": ["sherif-linux-x64@1.9.0", "", { "os": "linux", "cpu": "x64" }, "sha512-iO+hTxndO36r0hgmipBRjntWFqFHKrrYFRODz0WnmDquVek88LInSzAY1xpS18/Thbff8IVc6ssefYNVFQQPWw=="],
+    "sherif-linux-x64": ["sherif-linux-x64@1.10.0", "", { "os": "linux", "cpu": "x64" }, "sha512-/1ydjgJxXbqnGWViAENHxlX9lEDhATO99qtFcMseUFkPpEAxQ9qFctWf3OB2rciPlHLuPzhphkJAt7ZkX1R5eA=="],
 
-    "sherif-linux-x64-musl": ["sherif-linux-x64-musl@1.9.0", "", { "os": "linux", "cpu": "x64" }, "sha512-JSbA6DN0HkWSabYU858BUkS4cMmkTsAamDZEYuUVDW+XvW9IjaI6o0HNatUr7oCjrITIfcjzqlqy7uizmNlr/A=="],
+    "sherif-linux-x64-musl": ["sherif-linux-x64-musl@1.10.0", "", { "os": "linux", "cpu": "x64" }, "sha512-iSYRYEFE0xfOJVwPjsUN4o8CoNSEyxJHsSliBDxfEZQubN0rmE9f1hs83HPPAkEozGestI7PxKFKcyTgTxEoXg=="],
 
-    "sherif-windows-arm64": ["sherif-windows-arm64@1.9.0", "", { "os": "win32", "cpu": "arm64" }, "sha512-lPqQXDB/95SJodtIbGAJc90O/KyxcunvKTycZqo+6RGjkOSYZB/XnRzm/tJ7If/6kz0/wcDP4uvkJmJxrxcj3A=="],
+    "sherif-windows-arm64": ["sherif-windows-arm64@1.10.0", "", { "os": "win32", "cpu": "arm64" }, "sha512-CBNys+m7TsWD/1/5WQRJCNjfm08VhmBP9JSmecoHCsfDF+o0vt52NDrzVOOeai/c/yYunCBvAAx9EIFXBmgpHw=="],
 
-    "sherif-windows-x64": ["sherif-windows-x64@1.9.0", "", { "os": "win32", "cpu": "x64" }, "sha512-3cL+XVGLpmyLC3UOZYiPr4vY2OFBQqPZnCoCwoRKN+ONm8VfGMirO9iqI0OckgFBUtJoG4AQY/MWxoPhNmzD8A=="],
+    "sherif-windows-x64": ["sherif-windows-x64@1.10.0", "", { "os": "win32", "cpu": "x64" }, "sha512-XRN4SuZQud0X4UKZZxLe4IyVkbo9qa8rvmFhgCoULaRScucNdJJ4r6hnjZ7DR0spl7zSPJNZUNcgnnJmxWfs1Q=="],
 
     "signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
 

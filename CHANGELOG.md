@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.27.4
+
+### Patch Changes
+
+- fdaa945: Update lint/format/tooling dependencies and align internal version metadata.
+
 ## 0.27.3
 
 ### Patch Changes

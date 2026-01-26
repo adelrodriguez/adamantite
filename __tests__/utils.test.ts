@@ -284,15 +284,20 @@ describe("utils", () => {
       capturedLogs = []
     })
 
-    const makeTerminalLayer = (columns?: number) =>
+    const makeTerminalLayer = (columns?: number, rows?: number, isTTY = false) =>
       Layer.succeed(Terminal.Terminal, {
         columns:
           columns === undefined
             ? Effect.succeed(undefined as unknown as number)
             : Effect.succeed(columns),
         display: () => Effect.void,
+        isTTY: Effect.succeed(isTTY),
         readInput: Effect.never,
         readLine: Effect.never,
+        rows:
+          rows === undefined
+            ? Effect.succeed(undefined as unknown as number)
+            : Effect.succeed(rows),
       })
 
     const makeConsoleLayer = () => {

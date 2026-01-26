@@ -50,5 +50,5 @@ export const typescript = {
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
 
-  version: "7.0.0-dev.20260115.1",
+  version: "7.0.0-dev.20260124.1",
 }

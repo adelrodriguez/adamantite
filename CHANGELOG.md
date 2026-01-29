@@ -1,5 +1,17 @@
 # adamantite
 
+## 0.28.0
+
+### Minor Changes
+
+- d9210c3: Add Zed editor support
+
+  The `init` command now configures Zed alongside VS Code/Cursor/Windsurf. Creates `.zed/settings.json` with oxlint and oxfmt LSP settings, enables format-on-save for JS/TS/JSON/CSS/HTML/Markdown/YAML, and prompts to install the `oxc` extension.
+
+- a49bd3f: Replace tsgo with standard TypeScript compiler (tsc) for type checking
+
+  The `typecheck` command now uses `tsc` instead of the experimental `@typescript/native-preview` (tsgo). This provides better stability and compatibility since tsgo is still in development. Commands no longer require package manager detection to run - they execute tools directly.
+
 ## 0.27.4
 
 ### Patch Changes

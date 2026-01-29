@@ -187,7 +187,6 @@ describe("helpers", () => {
         const version = typescript.version
 
         expect(typeof version).toBe("string")
-        // TypeScript uses dev versions (e.g., 7.0.0-dev.20260103.1)
         // Check that it starts with semver format and doesn't have range prefixes
         expect(version).toMatch(/^\d+\.\d+\.\d+/)
         expect(version).not.toMatch(SEMVER_RANGE_REGEX)
@@ -198,7 +197,7 @@ describe("helpers", () => {
           Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
           Effect.runPromise
         )
-        const typescriptInPackage = packageJson.devDependencies?.["@typescript/native-preview"]
+        const typescriptInPackage = packageJson.devDependencies?.["typescript"]
 
         expect(typescriptInPackage).toBe(typescript.version)
       })
@@ -209,9 +208,9 @@ describe("helpers", () => {
       })
 
       test("should have name, version, and command properties", () => {
-        expect(typescript.name).toBe("@typescript/native-preview")
+        expect(typescript.name).toBe("typescript")
         expect(typescript.version).toBeDefined()
-        expect(typescript.command).toBe("tsgo")
+        expect(typescript.command).toBe("tsc")
       })
     })
   })

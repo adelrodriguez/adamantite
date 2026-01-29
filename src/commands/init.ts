@@ -1,12 +1,15 @@
+import process from "node:process"
 import { isCancel } from "@clack/prompts"
-import { Command } from "@effect/cli"
-import { FileSystem, Path } from "@effect/platform"
-import { Effect } from "effect"
-import { addDevDependency, type PackageManagerName } from "nypm"
+import * as Command from "@effect/cli/Command"
+import * as FileSystem from "@effect/platform/FileSystem"
+import * as Path from "@effect/platform/Path"
+import * as Effect from "effect/Effect"
+import { addDevDependency, detectPackageManager, type PackageManagerName } from "nypm"
 import type { Script } from "#types.ts"
 import {
   FailedToInstallDependency,
   FailedToWriteFile,
+  NoPackageManager,
   OperationCancelled,
   UnknownScript,
 } from "#errors.ts"
@@ -18,7 +21,6 @@ import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 import { Cwd } from "#services/cwd.ts"
-import { PackageManager } from "#services/package-manager.ts"
 import { Prompter } from "#services/prompter.ts"
 import { checkIsMonorepo, printTitle, readPackageJson } from "#utils.ts"
 
@@ -283,14 +285,28 @@ export default Command.make("init").pipe(
   Command.withDescription("Initialize Adamantite in the current directory"),
   Command.withHandler(() =>
     Effect.gen(function* () {
-      const pm = yield* PackageManager
       const prompter = yield* Prompter
 
       yield* printTitle()
 
       yield* prompter.intro("💠 adamantite init")
 
-      yield* prompter.log.info(`Detected package manager: ${pm.name}`)
+      const packageManager = yield* Effect.tryPromise({
+        catch: (cause) => new NoPackageManager({ cause }),
+        try: () => detectPackageManager(process.cwd()),
+      })
+
+      if (!packageManager) {
+        return yield* Effect.fail(new NoPackageManager({}))
+      }
+
+      if (packageManager.warnings?.length) {
+        for (const warning of packageManager.warnings) {
+          yield* prompter.log.warning(warning)
+        }
+      }
+
+      yield* prompter.log.info(`Detected package manager: ${packageManager.name}`)
 
       const isMonorepo = yield* checkIsMonorepo()
 
@@ -318,7 +334,7 @@ export default Command.make("init").pipe(
           },
           {
             hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
-            label: "typecheck - type-check your code using tsgo",
+            label: "typecheck - type-check your code using tsc",
             value: "typecheck",
           },
           {
@@ -466,7 +482,7 @@ export default Command.make("init").pipe(
       }
 
       if (enableGitHubActions) {
-        yield* setupGitHubActions(pm.name, selectedScripts)
+        yield* setupGitHubActions(packageManager.name, selectedScripts)
       }
 
       yield* prompter.log.success("Your project is now configured")

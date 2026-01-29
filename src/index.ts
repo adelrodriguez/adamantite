@@ -11,7 +11,6 @@ import monorepo from "#commands/monorepo.ts"
 import typecheck from "#commands/typecheck.ts"
 import update from "#commands/update.ts"
 import { CwdLive } from "#services/cwd.ts"
-import { PackageManagerLive } from "#services/package-manager.ts"
 import { PrompterLive } from "#services/prompter.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
@@ -25,6 +24,6 @@ const version = await getPackageVersion()
 const program = Command.run(main, { name: "adamantite", version })
 
 program(process.argv).pipe(
-  Effect.provide(Layer.mergeAll(NodeContext.layer, PackageManagerLive, PrompterLive, CwdLive)),
+  Effect.provide(Layer.mergeAll(NodeContext.layer, PrompterLive, CwdLive)),
   NodeRuntime.runMain
 )

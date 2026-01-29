@@ -6,7 +6,7 @@ import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 const CONFIG_FILE = "tsconfig.json"
 
 export const typescript = {
-  command: "tsgo",
+  command: "tsc",
   config: { extends: "adamantite/typescript" },
   create: () =>
     Effect.gen(function* () {
@@ -25,7 +25,7 @@ export const typescript = {
       const path = yield* Path.Path
       return yield* fs.exists(path.join(process.cwd(), CONFIG_FILE))
     }),
-  name: "@typescript/native-preview",
+  name: "typescript",
   update: () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
@@ -50,5 +50,5 @@ export const typescript = {
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
 
-  version: "7.0.0-dev.20260124.1",
+  version: "5.9.3",
 }

@@ -2,7 +2,6 @@ import { Args, Command, Options } from "@effect/cli"
 import { Command as ShellCommand } from "@effect/platform"
 import { Effect, Option } from "effect"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { PackageManager } from "#services/package-manager.ts"
 
 const files = Args.file({ exists: "yes" }).pipe(
   Args.withDescription("Specific files to format (optional)"),
@@ -18,9 +17,6 @@ export default Command.make("format", { check, files }).pipe(
   Command.withDescription("Format files using oxfmt"),
   Command.withHandler(({ check, files }) =>
     Effect.gen(function* () {
-      const pm = yield* PackageManager
-      const [command, ...commandArgs] = pm.command
-
       const args: string[] = []
 
       if (check) {
@@ -31,7 +27,7 @@ export default Command.make("format", { check, files }).pipe(
         args.push(...files.value)
       }
 
-      return yield* ShellCommand.make(command, ...commandArgs, oxfmt.name, ...args).pipe(
+      return yield* ShellCommand.make(oxfmt.name, ...args).pipe(
         ShellCommand.stdout("inherit"),
         ShellCommand.stderr("inherit"),
         ShellCommand.exitCode

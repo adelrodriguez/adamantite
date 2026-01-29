@@ -2,7 +2,6 @@ import { Command, Options } from "@effect/cli"
 import { Command as ShellCommand } from "@effect/platform"
 import { Effect } from "effect"
 import { knip } from "#helpers/packages/knip.ts"
-import { PackageManager } from "#services/package-manager.ts"
 
 const fix = Options.boolean("fix").pipe(Options.withDescription("Automatically fix issues"))
 
@@ -12,9 +11,6 @@ export default Command.make("analyze", { fix, strict }).pipe(
   Command.withDescription("Find unused dependencies, exports, and files using knip"),
   Command.withHandler(({ fix, strict }) =>
     Effect.gen(function* () {
-      const pm = yield* PackageManager
-      const [command, ...commandArgs] = pm.command
-
       const args: string[] = []
 
       if (fix) {
@@ -25,7 +21,7 @@ export default Command.make("analyze", { fix, strict }).pipe(
         args.push("--production", "--strict")
       }
 
-      return yield* ShellCommand.make(command, ...commandArgs, knip.name, ...args).pipe(
+      return yield* ShellCommand.make(knip.name, ...args).pipe(
         ShellCommand.stdout("inherit"),
         ShellCommand.stderr("inherit"),
         ShellCommand.exitCode

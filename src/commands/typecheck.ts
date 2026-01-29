@@ -2,7 +2,7 @@ import { Command, Options } from "@effect/cli"
 import { Command as ShellCommand } from "@effect/platform"
 import { Effect, Option } from "effect"
 import { typescript } from "#helpers/packages/typescript.ts"
-import { PackageManager } from "#services/package-manager.ts"
+import { Cwd } from "#services/cwd.ts"
 
 const project = Options.file("project").pipe(
   Options.withAlias("p"),
@@ -19,8 +19,8 @@ export default Command.make("typecheck", { project, watch }).pipe(
   Command.withDescription("Run TypeScript type checking"),
   Command.withHandler(({ project, watch }) =>
     Effect.gen(function* () {
-      const pm = yield* PackageManager
-      const [command, ...commandArgs] = pm.command
+      const cwd = yield* Cwd
+      const currentDir = yield* cwd.get
 
       const args = ["--noEmit"]
 
@@ -32,7 +32,8 @@ export default Command.make("typecheck", { project, watch }).pipe(
         args.push("--watch")
       }
 
-      return yield* ShellCommand.make(command, ...commandArgs, typescript.command, ...args).pipe(
+      return yield* ShellCommand.make(typescript.command, ...args).pipe(
+        ShellCommand.workingDirectory(currentDir),
         ShellCommand.stdout("inherit"),
         ShellCommand.stderr("inherit"),
         ShellCommand.exitCode

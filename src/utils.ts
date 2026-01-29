@@ -101,9 +101,9 @@ export const printTitle = () =>
     const terminalColumns = yield* terminal.columns
 
     const title = `
-                .o8                                                        .    o8o      .            
-               "888                                                      .o8    \`"'    .o8            
- .oooo.    .oooo888   .oooo.   ooo. .oo.  .oo.    .oooo.   ooo. .oo.   .o888oo oooo  .o888oo  .ooooo. 
+                .o8                                                        .    o8o      .
+               "888                                                      .o8    \`"'    .o8
+ .oooo.    .oooo888   .oooo.   ooo. .oo.  .oo.    .oooo.   ooo. .oo.   .o888oo oooo  .o888oo  .ooooo.
 \`P  )88b  d88' \`888  \`P  )88b  \`888P"Y88bP"Y88b  \`P  )88b  \`888P"Y88b    888   \`888    888   d88' \`88b
  .oP"888  888   888   .oP"888   888   888   888   .oP"888   888   888    888    888    888   888ooo888
 d8(  888  888   888  d8(  888   888   888   888  d8(  888   888   888    888 .  888    888 . 888    .o

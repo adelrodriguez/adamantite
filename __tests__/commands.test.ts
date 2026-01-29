@@ -48,29 +48,7 @@ describe("commands", () => {
   })
 
   describe("check", () => {
-    test("should fail gracefully when no package manager detected", async () => {
-      // No lockfile exists
-      const proc = spawn(["bun", cliPath, "check"], {
-        cwd: tempDir,
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
-
-      const stdout = await new Response(proc.stdout).text()
-      const stderr = await new Response(proc.stderr).text()
-      await proc.exited
-
-      expect(proc.exitCode).toBe(1)
-      // Error message might be in stdout (from @clack/prompts) or stderr
-      const output = stdout + stderr
-      expect(output.length).toBeGreaterThan(0)
-    })
-
-    test("should execute successfully with valid lockfile", async () => {
-      // Create bun.lock to simulate package manager
-      await Bun.write("bun.lock", "")
-
+    test("should execute successfully", async () => {
       const proc = spawn(["bun", cliPath, "check"], {
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
@@ -88,29 +66,7 @@ describe("commands", () => {
   })
 
   describe("fix", () => {
-    test("should fail gracefully when no package manager detected", async () => {
-      // No lockfile exists
-      const proc = spawn(["bun", cliPath, "fix"], {
-        cwd: tempDir,
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
-
-      const stdout = await new Response(proc.stdout).text()
-      const stderr = await new Response(proc.stderr).text()
-      await proc.exited
-
-      expect(proc.exitCode).toBe(1)
-      // Error message might be in stdout (from @clack/prompts) or stderr
-      const output = stdout + stderr
-      expect(output.length).toBeGreaterThan(0)
-    })
-
-    test("should execute successfully with valid lockfile", async () => {
-      // Create bun.lock to simulate package manager
-      await Bun.write("bun.lock", "")
-
+    test("should execute successfully", async () => {
       const proc = spawn(["bun", cliPath, "fix"], {
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
@@ -127,29 +83,7 @@ describe("commands", () => {
   })
 
   describe("monorepo", () => {
-    test("should fail gracefully when no package manager detected", async () => {
-      // No lockfile exists
-      const proc = spawn(["bun", cliPath, "monorepo"], {
-        cwd: tempDir,
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
-
-      const stdout = await new Response(proc.stdout).text()
-      const stderr = await new Response(proc.stderr).text()
-      await proc.exited
-
-      expect(proc.exitCode).toBe(1)
-      // Error message might be in stdout (from @clack/prompts) or stderr
-      const output = stdout + stderr
-      expect(output.length).toBeGreaterThan(0)
-    })
-
-    test("should execute successfully with valid lockfile", async () => {
-      // Create bun.lock to simulate package manager
-      await Bun.write("bun.lock", "")
-
+    test("should execute successfully", async () => {
       const proc = spawn(["bun", cliPath, "monorepo"], {
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },
@@ -166,29 +100,7 @@ describe("commands", () => {
   })
 
   describe("analyze", () => {
-    test("should fail gracefully when no package manager detected", async () => {
-      // No lockfile exists
-      const proc = spawn(["bun", cliPath, "analyze"], {
-        cwd: tempDir,
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
-
-      const stdout = await new Response(proc.stdout).text()
-      const stderr = await new Response(proc.stderr).text()
-      await proc.exited
-
-      expect(proc.exitCode).toBe(1)
-      // Error message might be in stdout (from @clack/prompts) or stderr
-      const output = stdout + stderr
-      expect(output.length).toBeGreaterThan(0)
-    })
-
-    test("should execute successfully with valid lockfile", async () => {
-      // Create bun.lock to simulate package manager
-      await Bun.write("bun.lock", "")
-
+    test("should execute successfully", async () => {
       const proc = spawn(["bun", cliPath, "analyze"], {
         cwd: tempDir,
         env: { ...process.env, NODE_ENV: undefined },

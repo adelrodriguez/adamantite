@@ -32,7 +32,7 @@ Use Bun for all package management and script execution:
 - **Install dependencies**: `bun install`
 - **Build CLI**: `bun run build` (uses bunup to bundle `src/index.ts` → `dist/`)
 - **Run tests**: `bun test` or `bun run test:watch` for watch mode
-- **Type checking**: `bun run typecheck` (uses tsgo - TypeScript Go)
+- **Type checking**: `bun run typecheck` (uses tsc)
 - **Code checking**: `bun run check` (checks for issues)
 - **Code fixing**: `bun run fix` (auto-fixes issues and formats code)
 - **Code formatting**: `bun run format` (formats code with oxfmt)
@@ -42,7 +42,7 @@ Use Bun for all package management and script execution:
 After editing files, always run:
 
 1. `bun run test` - Run tests to ensure everything works
-2. `bun run typecheck` - Verify TypeScript types using tsgo
+2. `bun run typecheck` - Verify TypeScript types using tsc
 3. `bun run check` - Check for linting issues
 4. `bun run fix` - Auto-fix issues and format code
 5. `bun run format` - Format code explicitly (run after editing various files)

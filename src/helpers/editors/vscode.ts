@@ -90,9 +90,6 @@ export const vscode = {
           ? installExtension("oxc.oxc-vscode")
           : Effect.void,
         scripts.includes("analyze") ? installExtension("webpro.vscode-knip") : Effect.void,
-        scripts.includes("typecheck")
-          ? installExtension("TypeScriptTeam.native-preview")
-          : Effect.void,
       ]
 
       const results = yield* Effect.all(extensions, { mode: "either" })

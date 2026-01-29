@@ -8,6 +8,7 @@ import { Effect, Either } from "effect"
 import { parse } from "jsonc-parser"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
+import { zed } from "#helpers/editors/zed.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint } from "#helpers/packages/oxlint.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
@@ -541,6 +542,103 @@ describe("helpers integration", () => {
         chmodSync(".vscode/settings.json", 0o444)
 
         const result = await runEither(vscode.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
+        }
+      })
+    })
+
+    describe("zed", () => {
+      test("should detect when .zed/settings.json does not exist", async () => {
+        const exists = await zed.exists().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        expect(exists).toBe(false)
+      })
+
+      test("should create .zed directory and settings.json", async () => {
+        await zed.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+
+        const exists = await zed.exists().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        expect(exists).toBe(true)
+
+        const content = await Bun.file(".zed/settings.json").text()
+        const config = JSON.parse(content)
+
+        expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
+        expect(config.languages.JavaScript.format_on_save).toBe("on")
+      })
+
+      test("should update existing .zed/settings.json config", async () => {
+        mkdirSync(".zed", { recursive: true })
+        await Bun.write(
+          ".zed/settings.json",
+          JSON.stringify(
+            {
+              ui_font_size: 14,
+            },
+            null,
+            2
+          )
+        )
+
+        const existsBefore = await zed
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        expect(existsBefore).toBe(true)
+
+        await zed.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+
+        const content = await Bun.file(".zed/settings.json").text()
+        const config = JSON.parse(content)
+
+        expect(config.ui_font_size).toBe(14)
+        expect(config.lsp.oxfmt.initialization_options.settings.run).toBe("onSave")
+      })
+
+      test("should handle empty config by merging with Adamantite's config", async () => {
+        mkdirSync(".zed", { recursive: true })
+        await Bun.write(".zed/settings.json", "{}")
+
+        await zed.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+
+        const content = await Bun.file(".zed/settings.json").text()
+        const config = JSON.parse(content)
+
+        expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
+        expect(config.languages.JavaScript.format_on_save).toBe("on")
+      })
+
+      test("should return INVALID_CONFIG_FORMAT when .zed/settings.json is not a JSON object", async () => {
+        mkdirSync(".zed", { recursive: true })
+        await Bun.write(".zed/settings.json", "[]")
+
+        const result = await runEither(zed.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
+        }
+      })
+
+      test("should handle update() failure when reading .zed/settings.json fails", async () => {
+        const result = await runEither(zed.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+        }
+      })
+
+      test("should handle update() failure when writing .zed/settings.json fails", async () => {
+        mkdirSync(".zed", { recursive: true })
+        await Bun.write(
+          ".zed/settings.json",
+          JSON.stringify({
+            ui_font_size: 12,
+          })
+        )
+
+        chmodSync(".zed/settings.json", 0o444)
+
+        const result = await runEither(zed.update())
         expect(Either.isLeft(result)).toBe(true)
         if (Either.isLeft(result)) {
           expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })

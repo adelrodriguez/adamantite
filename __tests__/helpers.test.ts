@@ -5,6 +5,7 @@ import Bun from "bun"
 import { Effect, Layer } from "effect"
 import { parse } from "jsonc-parser"
 import { vscode } from "#helpers/editors/vscode.ts"
+import { zed } from "#helpers/editors/zed.ts"
 import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
@@ -247,6 +248,23 @@ describe("helpers", () => {
 
         expect(codeActions).toBeDefined()
         expect(codeActions["source.fixAll.oxc"]).toBe("explicit")
+      })
+    })
+
+    describe("zed", () => {
+      test("should configure oxlint and oxfmt LSP settings", () => {
+        expect(zed.config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
+        expect(zed.config.lsp.oxlint.initialization_options.settings.typeAware).toBe(true)
+        expect(zed.config.lsp.oxfmt.initialization_options.settings.run).toBe("onSave")
+        expect(zed.config.lsp.oxfmt.initialization_options.settings["fmt.experimental"]).toBe(true)
+      })
+
+      test("should enable JavaScript formatting and code actions", () => {
+        const javascript = zed.config.languages.JavaScript
+
+        expect(javascript.format_on_save).toBe("on")
+        expect(javascript.formatter[0]).toEqual({ language_server: { name: "oxfmt" } })
+        expect(javascript.formatter[1]).toEqual({ code_action: "source.fixAll.oxc" })
       })
     })
   })

@@ -15,6 +15,7 @@ import {
 } from "#errors.ts"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
+import { zed } from "#helpers/editors/zed.ts"
 import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
@@ -207,7 +208,20 @@ const setupEditors = (editors: string[]) =>
     }
 
     if (editors.includes("zed")) {
-      // TODO: Implement Zed configuration
+      const spinner = prompter.spinner()
+
+      spinner.start("Checking for `.zed/settings.json`...")
+
+      const hasZedSettings = yield* zed.exists()
+      if (hasZedSettings) {
+        spinner.message("`.zed/settings.json` found, updating...")
+        yield* zed.update()
+        spinner.stop("`.zed/settings.json` updated with Adamantite preset.")
+      } else {
+        spinner.message("`.zed/settings.json` not found, creating...")
+        yield* zed.create()
+        spinner.stop("`.zed/settings.json` created with Adamantite preset.")
+      }
     }
   })
 
@@ -216,15 +230,13 @@ const installEditorExtensions = (editors: string[], scripts: Script[]) =>
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Installing editor extensions...")
+    const hasZed = editors.includes("zed")
+    const hasVscode = editors.includes("vscode")
 
     const result = yield* Effect.gen(function* () {
       if (editors.includes("vscode")) {
         spinner.message("Installing VS Code extension...")
         yield* vscode.extension(scripts)
-      }
-
-      if (editors.includes("zed")) {
-        // TODO: Implement Zed extension installation
       }
 
       return true as const
@@ -258,7 +270,15 @@ const installEditorExtensions = (editors: string[], scripts: Script[]) =>
     )
 
     if (result) {
-      spinner.stop("Editor extensions installed successfully.")
+      if (hasZed && !hasVscode) {
+        spinner.stop("Zed extensions require manual install.")
+      } else {
+        spinner.stop("Editor extensions installed successfully.")
+      }
+    }
+
+    if (hasZed) {
+      yield* prompter.log.info("Install the Zed `oxc` extension: zed://extension/oxc")
     }
   })
 
@@ -388,7 +408,7 @@ export default Command.make("init").pipe(
         message: "Which editors do you want to configure? (optional)",
         options: [
           { label: "VSCode / Cursor / Windsurf", value: "vscode" },
-          { disabled: true, hint: "coming soon", label: "Zed", value: "zed" },
+          { label: "Zed", value: "zed" },
         ],
         required: false,
       })

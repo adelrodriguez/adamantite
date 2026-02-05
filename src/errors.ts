@@ -3,6 +3,11 @@ import { Data } from "effect"
 
 export class CliNotFound extends Data.TaggedError("CliNotFound")<{ command: string }> {}
 
+export class CommandFailed extends Data.TaggedError("CommandFailed")<{
+  command: string
+  exitCode: number
+}> {}
+
 export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDirectory")<{
   path?: string
   cause?: unknown

@@ -1,6 +1,7 @@
 import { Command, Options } from "@effect/cli"
 import { Command as ShellCommand } from "@effect/platform"
 import { Effect, Option } from "effect"
+import { CommandFailed } from "#errors.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 import { Cwd } from "#services/cwd.ts"
 
@@ -36,7 +37,12 @@ export default Command.make("typecheck", { project, watch }).pipe(
         ShellCommand.workingDirectory(currentDir),
         ShellCommand.stdout("inherit"),
         ShellCommand.stderr("inherit"),
-        ShellCommand.exitCode
+        ShellCommand.exitCode,
+        Effect.filterOrFail(
+          (exitCode) => exitCode === 0,
+          (exitCode) => new CommandFailed({ command: typescript.command, exitCode })
+        ),
+        Effect.asVoid
       )
     })
   )

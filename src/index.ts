@@ -1,7 +1,9 @@
 import process from "node:process"
 import { Command } from "@effect/cli"
+import { Runtime } from "@effect/platform"
 import { NodeContext, NodeRuntime } from "@effect/platform-node"
 import { Effect, Layer } from "effect"
+import * as Exit from "effect/Exit"
 import analyze from "#commands/analyze.ts"
 import check from "#commands/check.ts"
 import fix from "#commands/fix.ts"
@@ -23,7 +25,27 @@ const version = await getPackageVersion()
 
 const program = Command.run(main, { name: "adamantite", version })
 
-program(process.argv).pipe(
+const teardown: Runtime.Teardown = (exit, onExit) => {
+  if (Exit.isSuccess(exit)) {
+    const value = exit.value
+
+    if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 255) {
+      onExit(value)
+      return
+    }
+  }
+
+  Runtime.defaultTeardown(exit, onExit)
+}
+
+const exitCode = program(process.argv).pipe(
+  Effect.as(0),
+  Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
+  Effect.tapErrorCause((cause) => Effect.logError(cause)),
+  Effect.catchAll(() => Effect.succeed(1))
+)
+
+exitCode.pipe(
   Effect.provide(Layer.mergeAll(NodeContext.layer, PrompterLive, CwdLive)),
-  NodeRuntime.runMain
+  NodeRuntime.runMain({ teardown })
 )

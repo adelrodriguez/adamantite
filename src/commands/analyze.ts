@@ -1,6 +1,7 @@
 import { Command, Options } from "@effect/cli"
 import { Command as ShellCommand } from "@effect/platform"
 import { Effect } from "effect"
+import { CommandFailed } from "#errors.ts"
 import { knip } from "#helpers/packages/knip.ts"
 
 const fix = Options.boolean("fix").pipe(Options.withDescription("Automatically fix issues"))
@@ -24,7 +25,12 @@ export default Command.make("analyze", { fix, strict }).pipe(
       return yield* ShellCommand.make(knip.name, ...args).pipe(
         ShellCommand.stdout("inherit"),
         ShellCommand.stderr("inherit"),
-        ShellCommand.exitCode
+        ShellCommand.exitCode,
+        Effect.filterOrFail(
+          (exitCode) => exitCode === 0,
+          (exitCode) => new CommandFailed({ command: knip.name, exitCode })
+        ),
+        Effect.asVoid
       )
     })
   )

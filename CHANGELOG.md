@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.28.1
+
+### Patch Changes
+
+- 525d5da: Propagate CLI exit codes so CI fails on tool errors.
+
 ## 0.28.0
 
 ### Minor Changes

@@ -59,7 +59,7 @@
     "version": "changeset version"
   },
   "dependencies": {
-    "@clack/prompts": "1.0.0",
+    "@clack/prompts": "1.0.1",
     "@effect/cli": "0.73.2",
     "@effect/platform": "0.94.4",
     "@effect/platform-node": "0.104.1",

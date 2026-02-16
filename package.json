@@ -61,7 +61,7 @@
   "dependencies": {
     "@clack/prompts": "1.0.0",
     "@effect/cli": "0.73.2",
-    "@effect/platform": "0.94.4",
+    "@effect/platform": "0.94.5",
     "@effect/platform-node": "0.104.1",
     "defu": "6.1.4",
     "effect": "3.19.16",

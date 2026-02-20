@@ -149,7 +149,7 @@
 
     // ==================== RESTRICTION ====================
     "class-methods-use-this": "warn",
-    "default-case": "error",
+    "default-case": "off",
     "no-console": ["warn", { "allow": ["info"] }],
     "no-div-regex": "error",
     "no-empty": "error",
@@ -291,8 +291,13 @@
     "typescript/require-await": "error",
     "typescript/restrict-plus-operands": "error",
     "typescript/return-await": ["error", "error-handling-correctness-only"],
-    "typescript/switch-exhaustiveness-check": "error",
-
+    "typescript/switch-exhaustiveness-check": [
+      "error",
+      {
+        "considerDefaultExhaustiveForUnions": true,
+        "requireDefaultForNonUnion": true
+      }
+    ],
     "unicorn/consistent-assert": "error",
     "unicorn/consistent-empty-array-spread": "error",
     "unicorn/escape-case": "error",

@@ -1,5 +1,6 @@
-import { FileSystem, Path } from "@effect/platform"
-import { Effect } from "effect"
+import * as FileSystem from "@effect/platform/FileSystem"
+import * as Path from "@effect/platform/Path"
+import * as Effect from "effect/Effect"
 import { FailedToReadFile, FailedToWriteFile, FileNotFound, InvalidConfigFormat } from "#errors.ts"
 import preset from "#presets/knip.json" with { type: "json" }
 import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"

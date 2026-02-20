@@ -51,7 +51,9 @@
 
     // ==================== RESTRICTION ====================
     "jsx-a11y/no-ambiguous-text": "error",
+    "react/display-name": "off",
     "react/no-danger": "error",
+    "react/no-multi-comp": "off",
     "react/no-unknown-property": "error",
 
     // ==================== SUSPICIOUS =====================

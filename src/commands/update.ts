@@ -1,6 +1,6 @@
 import { isCancel } from "@clack/prompts"
-import { Command } from "@effect/cli"
-import { Effect } from "effect"
+import * as Command from "@effect/cli/Command"
+import * as Effect from "effect/Effect"
 import { addDevDependency } from "nypm"
 import { FailedToInstallDependency, OperationCancelled } from "#errors.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"

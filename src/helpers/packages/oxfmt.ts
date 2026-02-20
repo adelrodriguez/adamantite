@@ -1,5 +1,6 @@
-import { FileSystem, Path } from "@effect/platform"
-import { Effect } from "effect"
+import * as FileSystem from "@effect/platform/FileSystem"
+import * as Path from "@effect/platform/Path"
+import * as Effect from "effect/Effect"
 import { FailedToReadFile, FailedToWriteFile, FileNotFound, InvalidConfigFormat } from "#errors.ts"
 import preset from "#presets/format.json" with { type: "json" }
 import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
@@ -68,5 +69,5 @@ export const oxfmt = {
         .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  version: "0.28.0",
+  version: "0.34.0",
 }

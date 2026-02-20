@@ -2,6 +2,9 @@
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "plugins": ["node"],
   "rules": {
+    // ==================== CORRECTNESS ====================
+    "node/no-path-concat": "error",
+
     // ==================== RESTRICTION ====================
     "node/no-new-require": "error",
 

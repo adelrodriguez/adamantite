@@ -1,5 +1,7 @@
-import { FileSystem, Path, Command as ShellCommand } from "@effect/platform"
-import { Effect } from "effect"
+import * as ShellCommand from "@effect/platform/Command"
+import * as FileSystem from "@effect/platform/FileSystem"
+import * as Path from "@effect/platform/Path"
+import * as Effect from "effect/Effect"
 import type { Script } from "#types.ts"
 import {
   FailedToCreateDirectory,

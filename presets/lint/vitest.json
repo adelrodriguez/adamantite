@@ -4,6 +4,7 @@
   "rules": {
     // ==================== CORRECTNESS ====================
     "vitest/no-conditional-tests": "error",
+    "vitest/no-importing-vitest-globals": "error",
     "vitest/no-unneeded-async-expect-function": "error",
     "vitest/require-local-test-context-for-concurrent-snapshots": "error",
 
@@ -14,6 +15,8 @@
     "vitest/prefer-called-once": "error",
     "vitest/prefer-called-times": "error",
     "vitest/prefer-describe-function-title": "error",
+    "vitest/prefer-expect-type-of": "error",
+    "vitest/prefer-import-in-mock": "error",
     "vitest/prefer-to-be-falsy": "error",
     "vitest/prefer-to-be-object": "error",
     "vitest/prefer-to-be-truthy": "error"

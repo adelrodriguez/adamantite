@@ -2,7 +2,7 @@ name: Release
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["build"]
     branches: [main]
     types:
       - completed
@@ -47,12 +47,15 @@ jobs:
       - name: Build project
         run: bun run build
 
+      - name: Configure npm authentication
+        run: echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc
+
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v1
         with:
           publish: bun run release
+          version: bun run version
           title: "chore: release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOME: ${{ github.workspace }}

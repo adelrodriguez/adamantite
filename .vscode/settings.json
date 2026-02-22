@@ -1,12 +1,13 @@
 {
   "typescript.tsdk": "node_modules/typescript/lib",
-  "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.formatOnSave": true,
   "editor.formatOnPaste": true,
-  "oxc.typeAware": true,
   "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit",
     "source.fixAll.oxc": "explicit"
   },
+  "editor.tabSize": 2,
+  "cSpell.words": ["Bunup", "Adamantite", "changesets"],
   "[javascript]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
   },
@@ -30,5 +31,7 @@
   },
   "[graphql]": {
     "editor.defaultFormatter": "oxc.oxc-vscode"
-  }
+  },
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "oxc.typeAware": true
 }

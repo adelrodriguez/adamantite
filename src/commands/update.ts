@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import { addDevDependency } from "nypm"
 import { FailedToInstallDependency, OperationCancelled } from "#errors.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint } from "#helpers/packages/oxlint.ts"
+import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { Prompter } from "#services/prompter.ts"
 import { normalizeDependencyVersion, printTitle, readPackageJson } from "#utils.ts"
@@ -28,7 +28,7 @@ export default Command.make("update").pipe(
         isDevDependency: boolean
       }> = []
 
-      for (const pkg of [oxlint, oxfmt, sherif]) {
+      for (const pkg of [oxlint, tsgolint, oxfmt, sherif]) {
         const dependency = packageJson.devDependencies?.[pkg.name]
         if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
           updates.push({

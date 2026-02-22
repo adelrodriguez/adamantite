@@ -1,8 +1,8 @@
-import { NodeContext } from "@effect/platform-node"
-import { Effect, Layer } from "effect"
+import * as NodeContext from "@effect/platform-node/NodeContext"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import { MissingPackageVersion } from "#errors.ts"
 import { CwdLive } from "#services/cwd.ts"
-
 import { readPackageJson } from "#utils.ts"
 
 export const getPackageVersion = () =>

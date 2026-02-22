@@ -1,5 +1,6 @@
-import { FileSystem, Path } from "@effect/platform"
-import { Effect } from "effect"
+import * as FileSystem from "@effect/platform/FileSystem"
+import * as Path from "@effect/platform/Path"
+import * as Effect from "effect/Effect"
 import { FailedToReadFile, FailedToWriteFile, FileNotFound, InvalidConfigFormat } from "#errors.ts"
 import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
 
@@ -88,10 +89,10 @@ export const oxlint = {
         .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  version: "1.43.0",
+  version: "1.49.0",
 }
 
 export const tsgolint = {
   name: "oxlint-tsgolint",
-  version: "0.11.5",
+  version: "0.14.1",
 }

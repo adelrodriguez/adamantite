@@ -1,5 +1,7 @@
-import { Command, Options } from "@effect/cli"
-import { Command as ShellCommand } from "@effect/platform"
+import * as Command from "@effect/cli/Command"
+import * as Options from "@effect/cli/Options"
+import * as ShellCommand from "@effect/platform/Command"
+import * as CommandExecutor from "@effect/platform/CommandExecutor"
 import { Effect } from "effect"
 import { CommandFailed } from "#errors.ts"
 import { knip } from "#helpers/packages/knip.ts"
@@ -27,7 +29,7 @@ export default Command.make("analyze", { fix, strict }).pipe(
         ShellCommand.stderr("inherit"),
         ShellCommand.exitCode,
         Effect.filterOrFail(
-          (exitCode) => exitCode === 0,
+          (exitCode) => exitCode === CommandExecutor.ExitCode(0),
           (exitCode) => new CommandFailed({ command: knip.name, exitCode })
         ),
         Effect.asVoid

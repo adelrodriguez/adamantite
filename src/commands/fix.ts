@@ -1,6 +1,10 @@
-import { Args, Command, Options } from "@effect/cli"
-import { Command as ShellCommand } from "@effect/platform"
-import { Effect, Option } from "effect"
+import * as Args from "@effect/cli/Args"
+import * as Command from "@effect/cli/Command"
+import * as Options from "@effect/cli/Options"
+import * as ShellCommand from "@effect/platform/Command"
+import * as CommandExecutor from "@effect/platform/CommandExecutor"
+import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import { CommandFailed } from "#errors.ts"
 import { oxlint } from "#helpers/packages/oxlint.ts"
 
@@ -47,7 +51,7 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
         ShellCommand.stderr("inherit"),
         ShellCommand.exitCode,
         Effect.filterOrFail(
-          (exitCode) => exitCode === 0,
+          (exitCode) => exitCode === CommandExecutor.ExitCode(0),
           (exitCode) => new CommandFailed({ command: oxlint.name, exitCode })
         ),
         Effect.asVoid

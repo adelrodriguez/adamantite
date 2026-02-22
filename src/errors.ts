@@ -1,5 +1,5 @@
 import type { ParseError } from "jsonc-parser"
-import { Data } from "effect"
+import * as Data from "effect/Data"
 
 export class CliNotFound extends Data.TaggedError("CliNotFound")<{ command: string }> {}
 

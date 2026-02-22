@@ -1,6 +1,8 @@
-import { Command, Options } from "@effect/cli"
-import { Command as ShellCommand } from "@effect/platform"
-import { Effect } from "effect"
+import * as Command from "@effect/cli/Command"
+import * as Options from "@effect/cli/Options"
+import * as ShellCommand from "@effect/platform/Command"
+import * as CommandExecutor from "@effect/platform/CommandExecutor"
+import * as Effect from "effect/Effect"
 import { CommandFailed } from "#errors.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 
@@ -22,7 +24,7 @@ export default Command.make("monorepo", { fix }).pipe(
         ShellCommand.stderr("inherit"),
         ShellCommand.exitCode,
         Effect.filterOrFail(
-          (exitCode) => exitCode === 0,
+          (exitCode) => exitCode === CommandExecutor.ExitCode(0),
           (exitCode) => new CommandFailed({ command: sherif.name, exitCode })
         ),
         Effect.asVoid

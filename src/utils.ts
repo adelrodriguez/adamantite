@@ -1,8 +1,13 @@
 import process from "node:process"
 import type { JsonObject, JsonValue, PackageJson } from "type-fest"
-import { Command as ShellCommand, FileSystem, Path, Terminal } from "@effect/platform"
+import * as ShellCommand from "@effect/platform/Command"
+import * as CommandExecutor from "@effect/platform/CommandExecutor"
+import * as FileSystem from "@effect/platform/FileSystem"
+import * as Path from "@effect/platform/Path"
+import * as Terminal from "@effect/platform/Terminal"
 import { defu } from "defu"
-import { Console, Effect } from "effect"
+import * as Console from "effect/Console"
+import * as Effect from "effect/Effect"
 import { type ParseError, parse } from "jsonc-parser"
 import {
   CliNotFound,
@@ -19,7 +24,9 @@ export const checkCliExists = (command: string) => {
   return ShellCommand.make(executable, command).pipe(
     ShellCommand.exitCode,
     Effect.flatMap((exitCode) =>
-      exitCode === 0 ? Effect.succeed(true) : Effect.fail(new CliNotFound({ command }))
+      exitCode === CommandExecutor.ExitCode(0)
+        ? Effect.succeed(true)
+        : Effect.fail(new CliNotFound({ command }))
     )
   )
 }
@@ -50,7 +57,7 @@ const RANGE_PREFIX_REGEX = /^[\^~]/
 export const normalizeDependencyVersion = (specifier: string) =>
   specifier.trim().replace(WORKSPACE_PREFIX_REGEX, "").replace(RANGE_PREFIX_REGEX, "")
 
-export const mergeConfig = <A extends object, B extends object>(base: A, override: B) =>
+export const mergeConfig = (base: Record<string, unknown>, override: Record<string, unknown>) =>
   Effect.try({
     catch: (cause) => new FailedToMergeConfig({ cause }),
     try: () => defu(base, override),
@@ -83,8 +90,7 @@ export const checkIsMonorepo = () =>
     }
 
     const packageJson = yield* readPackageJson()
-
-    return packageJson?.workspaces !== undefined
+    return packageJson.workspaces !== undefined
   })
 
 export const ensureDirectory = (path: string) =>

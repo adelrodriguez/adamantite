@@ -94,5 +94,5 @@ export const oxlint = {
 
 export const tsgolint = {
   name: "oxlint-tsgolint",
-  version: "0.14.1",
+  version: "0.14.2",
 }

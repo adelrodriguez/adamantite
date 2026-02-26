@@ -16,6 +16,7 @@ import { readPackageJson } from "#utils.ts"
 
 const SEMVER_REGEX = /^\d+\.\d+\.\d+$/
 const SEMVER_RANGE_REGEX = /[\^~><=]/
+const ROOT_DIR = join(import.meta.dir, "..")
 
 describe("helpers", () => {
   describe("packages", () => {
@@ -29,7 +30,7 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+        const packageJson = await readPackageJson(ROOT_DIR).pipe(
           Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
           Effect.runPromise
         )
@@ -68,7 +69,7 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+        const packageJson = await readPackageJson(ROOT_DIR).pipe(
           Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
           Effect.runPromise
         )
@@ -88,7 +89,7 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+        const packageJson = await readPackageJson(ROOT_DIR).pipe(
           Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
           Effect.runPromise
         )
@@ -108,7 +109,7 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+        const packageJson = await readPackageJson(ROOT_DIR).pipe(
           Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
           Effect.runPromise
         )
@@ -128,7 +129,7 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+        const packageJson = await readPackageJson(ROOT_DIR).pipe(
           Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
           Effect.runPromise
         )
@@ -194,7 +195,7 @@ describe("helpers", () => {
       })
 
       test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(join(__dirname, "..")).pipe(
+        const packageJson = await readPackageJson(ROOT_DIR).pipe(
           Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
           Effect.runPromise
         )

@@ -5,9 +5,9 @@
   "bracketSpacing": true,
   "embeddedLanguageFormatting": "auto",
   "endOfLine": "lf",
-  "experimentalSortPackageJson": true,
+  "sortPackageJson": true,
   "htmlWhitespaceSensitivity": "strict",
-  "experimentalSortImports": {
+  "sortImports": {
     "groups": [
       ["value-builtin", "type-import"],
       ["value-external"],

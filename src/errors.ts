@@ -37,6 +37,11 @@ export class FailedToReadFile extends Data.TaggedError("FailedToReadFile")<{
   cause?: unknown
 }> {}
 
+export class FailedToDeleteFile extends Data.TaggedError("FailedToDeleteFile")<{
+  path?: string
+  cause?: unknown
+}> {}
+
 export class FailedToWriteFile extends Data.TaggedError("FailedToWriteFile")<{
   path?: string
   cause?: unknown

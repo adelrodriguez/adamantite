@@ -1,3 +1,4 @@
+import type { ParseError } from "jsonc-parser"
 import process from "node:process"
 import * as Command from "@effect/cli/Command"
 import * as NodeContext from "@effect/platform-node/NodeContext"
@@ -6,6 +7,7 @@ import * as Runtime from "@effect/platform/Runtime"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import { printParseErrorCode } from "jsonc-parser"
 import analyze from "#commands/analyze.ts"
 import check from "#commands/check.ts"
 import fix from "#commands/fix.ts"
@@ -15,8 +17,49 @@ import monorepo from "#commands/monorepo.ts"
 import typecheck from "#commands/typecheck.ts"
 import update from "#commands/update.ts"
 import { CwdLive } from "#services/cwd.ts"
-import { PrompterLive } from "#services/prompter.ts"
+import { Prompter, PrompterLive } from "#services/prompter.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
+
+function formatParseErrors(errors: ParseError[] = []) {
+  if (errors.length === 0) {
+    return "- Unknown JSON/JSONC parsing error"
+  }
+
+  return errors
+    .slice(0, 3)
+    .map((error) => `- ${printParseErrorCode(error.error)} (offset: ${error.offset})`)
+    .join("\n")
+}
+
+const handleParseFileError = (error: { errors?: ParseError[]; path?: string }) =>
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const target = error.path ? `\`${error.path}\`` : "the target file"
+
+    yield* prompter.log.error(
+      [
+        `Failed to parse ${target}.`,
+        "Please fix the JSON/JSONC syntax and run the command again.",
+        "",
+        "Parse details:",
+        formatParseErrors(error.errors),
+      ].join("\n")
+    )
+
+    return 1
+  })
+
+const handleInvalidConfigFormatError = (error: { path?: string }) =>
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const target = error.path ? `\`${error.path}\`` : "the target config file"
+
+    yield* prompter.log.error(
+      `Invalid config format in ${target}. The config must be a JSON object (for example: {}).`
+    )
+
+    return 1
+  })
 
 const main = Command.make("adamantite").pipe(
   Command.withDescription("Opinionated preset package for modern TypeScript applications"),
@@ -43,6 +86,10 @@ const teardown: Runtime.Teardown = (exit, onExit) => {
 const exitCode = program(process.argv).pipe(
   Effect.as(0),
   Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
+  Effect.catchTags({
+    FailedToParseFile: handleParseFileError,
+    InvalidConfigFormat: handleInvalidConfigFormatError,
+  }),
   Effect.tapErrorCause((cause) => Effect.logError(cause)),
   Effect.catchAll(() => Effect.succeed(1))
 )

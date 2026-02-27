@@ -15,6 +15,8 @@ export default Command.make("update").pipe(
     Effect.gen(function* () {
       const prompter = yield* Prompter
       const packageJson = yield* readPackageJson()
+      const oxlintState = yield* oxlint.exists()
+      const shouldMigrateLegacyOxlint = oxlintState.format === "json"
 
       yield* printTitle()
 
@@ -40,55 +42,79 @@ export default Command.make("update").pipe(
         }
       }
 
-      // Early exit if no updates
-      if (updates.length === 0) {
+      // Early exit if no updates are needed and there is nothing to migrate
+      if (updates.length === 0 && !shouldMigrateLegacyOxlint) {
         yield* prompter.log.success("All adamantite dependencies are already up to date!")
         return "no-updates" as const
       }
 
       // Confirm updates using confirm prompt
-      yield* prompter.log.info("The following dependencies will be updated:")
+      if (updates.length > 0) {
+        yield* prompter.log.info("The following dependencies will be updated:")
 
-      for (const dep of updates) {
-        yield* prompter.log.info(`  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`)
+        for (const dep of updates) {
+          yield* prompter.log.info(`  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`)
+        }
+
+        const shouldUpdate = yield* prompter.confirm({
+          message: "Do you want to proceed with these updates?",
+        })
+
+        if (isCancel(shouldUpdate)) {
+          return yield* Effect.fail(new OperationCancelled({ reason: "update-cancelled" }))
+        }
+
+        if (!shouldUpdate) {
+          return "cancelled" as const
+        }
       }
 
-      const shouldUpdate = yield* prompter.confirm({
-        message: "Do you want to proceed with these updates?",
-      })
+      if (updates.length > 0) {
+        // Update dependencies with spinner
+        const spinner = prompter.spinner()
+        spinner.start("Updating dependencies...")
 
-      if (isCancel(shouldUpdate)) {
-        return yield* Effect.fail(new OperationCancelled({ reason: "update-cancelled" }))
-      }
-
-      if (!shouldUpdate) {
-        return "cancelled" as const
-      }
-
-      // Update dependencies with spinner
-      const spinner = prompter.spinner()
-      spinner.start("Updating dependencies...")
-
-      yield* Effect.tryPromise({
-        catch: (cause) =>
-          new FailedToInstallDependency({
-            cause,
-            packages: updates.map((dep) => dep.name),
-          }),
-        try: () =>
-          addDevDependency(
-            updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
-            { silent: true }
-          ),
-      }).pipe(
-        Effect.tapError(() =>
-          Effect.sync(() => {
-            spinner.stop("Failed to update dependencies")
-          })
+        yield* Effect.tryPromise({
+          catch: (cause) =>
+            new FailedToInstallDependency({
+              cause,
+              packages: updates.map((dep) => dep.name),
+            }),
+          try: () =>
+            addDevDependency(
+              updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
+              { silent: true }
+            ),
+        }).pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              spinner.stop("Failed to update dependencies")
+            })
+          )
         )
-      )
 
-      spinner.stop("Dependencies updated successfully")
+        spinner.stop("Dependencies updated successfully")
+      }
+
+      if (oxlintState.hasBoth) {
+        yield* prompter.log.warning(
+          "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`."
+        )
+      }
+
+      if (shouldMigrateLegacyOxlint) {
+        const spinner = prompter.spinner()
+        spinner.start("Migrating `.oxlintrc.json` to `oxlint.config.ts`...")
+
+        yield* oxlint.update()
+
+        spinner.stop("Oxlint config migrated successfully")
+      }
+
+      if (updates.length === 0 && shouldMigrateLegacyOxlint) {
+        return "migrated" as const
+      }
+
       return "updated" as const
     }).pipe(
       Effect.tap((value) =>
@@ -103,6 +129,9 @@ export default Command.make("update").pipe(
               break
             case "updated":
               yield* prompter.outro("✅ Dependencies updated successfully!")
+              break
+            case "migrated":
+              yield* prompter.outro("✅ Oxlint config migrated to `oxlint.config.ts`!")
               break
             default:
               break

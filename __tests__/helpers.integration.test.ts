@@ -62,37 +62,37 @@ describe("helpers integration", () => {
 
   describe("packages", () => {
     describe("oxlint", () => {
-      test("should detect when .oxlintrc.json does not exist", async () => {
-        const { path } = await oxlint
+      test("should detect when no oxlint config exists", async () => {
+        const state = await oxlint
           .exists()
           .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
-        expect(path).toBe(null)
+        expect(state.path).toBe(null)
+        expect(state.format).toBe(null)
+        expect(state.hasBoth).toBe(false)
       })
 
-      test("should create .oxlintrc.json with correct config", async () => {
+      test("should create oxlint.config.ts with correct config", async () => {
         await oxlint.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
-        const { path } = await oxlint
+        const state = await oxlint
           .exists()
           .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
-        expect(path).toBeDefined()
+        expect(state.path).toContain("oxlint.config.ts")
+        expect(state.format).toBe("ts")
 
-        const content = await Bun.file(".oxlintrc.json").text()
-        const config = JSON.parse(content)
-
-        expect(config).toHaveProperty("$schema")
-        expect(config.$schema).toBe("./node_modules/oxlint/configuration_schema.json")
-        expect(config).toHaveProperty("extends")
-        expect(config.extends).toEqual(["./node_modules/adamantite/presets/lint/core.json"])
+        const content = await Bun.file("oxlint.config.ts").text()
+        expect(content).toContain('import { defineConfig } from "oxlint"')
+        expect(content).toContain('import core from "adamantite/lint"')
+        expect(content).toContain("extends: [core]")
       })
 
-      test("should update existing .oxlintrc.json config", async () => {
-        // Create initial config
+      test("should migrate legacy .oxlintrc.json to oxlint.config.ts", async () => {
         await Bun.write(
           ".oxlintrc.json",
           JSON.stringify(
             {
               $schema: "https://oxc.rs/schema.json",
+              extends: ["adamantite/lint/react"],
               rules: {
                 "no-console": "warn",
               },
@@ -102,25 +102,58 @@ describe("helpers integration", () => {
           )
         )
 
-        const existsBefore = await oxlint
+        await oxlint.update(["node"]).pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+
+        const state = await oxlint
           .exists()
           .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
-        expect(existsBefore.path).toBeDefined()
+        expect(state.format).toBe("ts")
+        expect(state.path).toContain("oxlint.config.ts")
+        expect(state.jsonPath).toBe(null)
+
+        const hasLegacyConfig = await Bun.file(".oxlintrc.json").exists()
+        expect(hasLegacyConfig).toBe(false)
+
+        const content = await Bun.file("oxlint.config.ts").text()
+        expect(content).toContain('"no-console": "warn"')
+        expect(content).toContain('import core from "adamantite/lint"')
+        expect(content).toContain('import react from "adamantite/lint/react"')
+        expect(content).toContain('import node from "adamantite/lint/node"')
+      })
+
+      test("should migrate Adamantite preset paths with and without dot prefix", async () => {
+        await Bun.write(
+          ".oxlintrc.json",
+          JSON.stringify(
+            {
+              extends: [
+                "node_modules/adamantite/presets/lint/react.ts",
+                "./node_modules/adamantite/presets/lint/node.json",
+              ],
+            },
+            null,
+            2
+          )
+        )
 
         await oxlint.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
-        const content = await Bun.file(".oxlintrc.json").text()
-        const config = parse(content)
-
-        // Should preserve existing rules and override schema
-        expect(config.rules).toEqual({ "no-console": "warn" })
-        expect(config.$schema).toBe("./node_modules/oxlint/configuration_schema.json")
-        // Check that extends contains the core preset
-        const extendsArray = Array.isArray(config.extends) ? (config.extends as string[]) : []
-        expect(extendsArray).toContain("./node_modules/adamantite/presets/lint/core.json")
+        const content = await Bun.file("oxlint.config.ts").text()
+        expect(content).toContain('import core from "adamantite/lint"')
+        expect(content).toContain('import react from "adamantite/lint/react"')
+        expect(content).toContain('import node from "adamantite/lint/node"')
+        expect(content).not.toContain("node_modules/adamantite/presets/lint/react.ts")
       })
 
-      test("should handle update() failure when reading oxlint config fails", async () => {
+      test("should return FileNotFound when no oxlint config exists during update", async () => {
+        const result = await runEither(oxlint.update())
+        expect(Either.isLeft(result)).toBe(true)
+        if (Either.isLeft(result)) {
+          expect(result.left).toMatchObject({ _tag: "FileNotFound" })
+        }
+      })
+
+      test("should handle update() failure when reading legacy config fails", async () => {
         // Create a directory named .oxlintrc.json to cause read failure
         mkdirSync(".oxlintrc.json", { recursive: true })
 
@@ -131,40 +164,29 @@ describe("helpers integration", () => {
         }
       })
 
-      test("should handle empty config by merging with Adamantite's config", async () => {
-        // Create empty .oxlintrc.json
-        await Bun.write(".oxlintrc.json", "{}")
-
-        await oxlint.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
-
-        const content = await Bun.file(".oxlintrc.json").text()
-        const config = parse(content)
-
-        // Should merge empty config with Adamantite's config
-        expect(config.$schema).toBe("./node_modules/oxlint/configuration_schema.json")
-        // Check that extends contains the core preset
-        const extendsArray = Array.isArray(config.extends) ? (config.extends as string[]) : []
-        expect(extendsArray).toContain("./node_modules/adamantite/presets/lint/core.json")
-      })
-
-      test("should handle update() failure when writing oxlint config fails", async () => {
-        // Create valid .oxlintrc.json
-        await Bun.write(
-          ".oxlintrc.json",
-          JSON.stringify({
-            rules: {
-              "no-console": "warn",
-            },
-          })
-        )
-        // Make it read-only to prevent writing
-        chmodSync(".oxlintrc.json", 0o444)
+      test("should return INVALID_CONFIG_FORMAT when legacy config is not a JSON object", async () => {
+        await Bun.write(".oxlintrc.json", "[]")
 
         const result = await runEither(oxlint.update())
         expect(Either.isLeft(result)).toBe(true)
         if (Either.isLeft(result)) {
-          expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
+          expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
         }
+      })
+
+      test("should report both configs and prefer oxlint.config.ts", async () => {
+        await Bun.write(
+          "oxlint.config.ts",
+          'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
+        )
+        await Bun.write(".oxlintrc.json", "{}")
+
+        const state = await oxlint
+          .exists()
+          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        expect(state.hasBoth).toBe(true)
+        expect(state.format).toBe("ts")
+        expect(state.path).toContain("oxlint.config.ts")
       })
     })
 
@@ -689,6 +711,9 @@ describe("helpers integration", () => {
         expect(content).toContain("name: types")
         expect(content).toContain("command: bun run check")
         expect(content).toContain("command: bun run typecheck")
+        expect(content).toContain("Setup Node.js")
+        expect(content).toContain("actions/setup-node@v6")
+        expect(content).toContain('node-version: "22"')
         expect(content).toContain("Setup Bun")
         expect(content).toContain("Cache dependencies")
         expect(content).toContain("actions/cache@v4")

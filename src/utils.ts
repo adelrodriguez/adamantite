@@ -44,8 +44,9 @@ export const parseJson = (content: string, path?: string) =>
     )
   )
 
-export const isJsonObject = (value: unknown): value is JsonObject =>
-  value !== null && typeof value === "object" && !Array.isArray(value)
+export function isJsonObject(value: unknown): value is JsonObject {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
 const RANGE_PREFIX_REGEX = /^[\^~]/
@@ -54,8 +55,9 @@ const RANGE_PREFIX_REGEX = /^[\^~]/
  * Normalize a dependency version specifier (e.g. `^1.2.3`, `~1.2.3`) to its bare version.
  * This is useful when comparing package.json ranges to pinned versions.
  */
-export const normalizeDependencyVersion = (specifier: string) =>
-  specifier.trim().replace(WORKSPACE_PREFIX_REGEX, "").replace(RANGE_PREFIX_REGEX, "")
+export function normalizeDependencyVersion(specifier: string) {
+  return specifier.trim().replace(WORKSPACE_PREFIX_REGEX, "").replace(RANGE_PREFIX_REGEX, "")
+}
 
 export const mergeConfig = (base: Record<string, unknown>, override: Record<string, unknown>) =>
   Effect.try({

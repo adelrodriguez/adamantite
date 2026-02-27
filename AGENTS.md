@@ -20,7 +20,7 @@ This project was built with [`pastry`](https://github.com/adelrodriguez/pastry) 
 
 Adamantite is an opinionated preset package for modern TypeScript applications that provides:
 
-- **oxlint configuration** (`presets/lint/*.json`) - Modular linting rules (core, React, Next.js)
+- **oxlint configuration** (`presets/lint/*.ts`) - Modular linting rules (core, React, Next.js)
 - **oxfmt configuration** (`presets/format.json`) - Code formatting configuration
 - **TypeScript preset** (`presets/tsconfig.json`) - Strict TypeScript configuration
 - **CLI tool** - Commands to run oxlint linting and oxfmt formatting via `adamantite` command
@@ -57,6 +57,11 @@ This project uses changesets for version management:
 2. **Version locally**: `bun run version` (bumps package.json and updates CHANGELOG)
 3. **Publish**: Push to main → CI passes → auto-publishes to npm
 
+## Code Style
+
+- Prefer function declarations over arrow functions for standalone functions (e.g. `function getImportName(...)` instead of `const getImportName = (...) =>`).
+- Keep arrow functions when returning an Effect chain (e.g. `const foo = (args) => Effect.gen(...)`), or when they are callbacks, object methods, or otherwise more pleasant as arrows.
+
 ## Architecture
 
 ### CLI Structure (`src/`)
@@ -85,6 +90,6 @@ Each package has a version property that is used to determine the version of the
 
 ### Configuration Files
 
-- **`presets/lint/core.json`** - Core linting rules for all TypeScript/JavaScript projects
+- **`presets/lint/core.ts`** - Core linting rules for all TypeScript/JavaScript projects
 - **`presets/format.json`** - Code formatting configuration
 - **`presets/tsconfig.json`** - Reusable TypeScript configuration

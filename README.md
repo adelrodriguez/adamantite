@@ -67,7 +67,7 @@ npx adamantite init
 This interactive command will:
 
 - Install Adamantite, [oxlint](https://oxc.rs/docs/guide/usage/linter.html), and [oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) as dev dependencies
-- Create `.oxlintrc.json` with opinionated presets
+- Create `oxlint.config.ts` with opinionated presets
 - Create `.oxfmtrc.json` with formatting configuration
 - Set up `tsconfig.json` with strict TypeScript rules
 - Add lint/format scripts to your `package.json`
@@ -170,7 +170,7 @@ adamantite update
 
 Adamantite provides comprehensive linting rules for TypeScript and JavaScript:
 
-#### Core ([core.json](./presets/lint/core.json))
+#### Core ([core.ts](./presets/lint/core.ts))
 
 Extensive ruleset covering:
 
@@ -186,12 +186,12 @@ Extensive ruleset covering:
 
 Framework-specific presets are available for:
 
-- **React** ([react.json](./presets/lint/react.json)) - React, React-perf, and JSX-a11y rules
-- **Next.js** ([nextjs.json](./presets/lint/nextjs.json)) - Next.js-specific rules
-- **Vue** ([vue.json](./presets/lint/vue.json)) - Vue.js rules
-- **Node.js** ([node.json](./presets/lint/node.json)) - Node.js-specific rules
-- **Jest** ([jest.json](./presets/lint/jest.json)) - Jest testing rules
-- **Vitest** ([vitest.json](./presets/lint/vitest.json)) - Vitest testing rules
+- **React** ([react.ts](./presets/lint/react.ts)) - React, React-perf, and JSX-a11y rules
+- **Next.js** ([nextjs.ts](./presets/lint/nextjs.ts)) - Next.js-specific rules
+- **Vue** ([vue.ts](./presets/lint/vue.ts)) - Vue.js rules
+- **Node.js** ([node.ts](./presets/lint/node.ts)) - Node.js-specific rules
+- **Jest** ([jest.ts](./presets/lint/jest.ts)) - Jest testing rules
+- **Vitest** ([vitest.ts](./presets/lint/vitest.ts)) - Vitest testing rules
 
 ### Formatting ([presets/format.json](./presets/format.json))
 

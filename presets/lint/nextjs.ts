@@ -1,8 +1,8 @@
-{
-  "$schema": "../../node_modules/oxlint/configuration_schema.json",
-  "plugins": ["nextjs"],
-  "rules": {
-    // ==================== CORRECTNESS ====================
+import { defineConfig } from "oxlint"
+
+export default defineConfig({
+  plugins: ["nextjs"],
+  rules: {
     "nextjs/google-font-display": "error",
     "nextjs/google-font-preconnect": "error",
     "nextjs/inline-script-id": "error",
@@ -23,6 +23,6 @@
     "nextjs/no-sync-scripts": "error",
     "nextjs/no-title-in-document-head": "error",
     "nextjs/no-typos": "error",
-    "nextjs/no-unwanted-polyfillio": "error"
-  }
-}
+    "nextjs/no-unwanted-polyfillio": "error",
+  },
+})

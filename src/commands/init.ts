@@ -52,16 +52,26 @@ const setupOxlintConfig = (presets: string[]) =>
     const spinner = prompter.spinner()
     spinner.start("Setting up oxlint config...")
 
-    const oxlintPath = yield* oxlint.exists()
+    const exists = yield* oxlint.exists()
 
-    if (oxlintPath.path) {
-      spinner.message(`Found \`${oxlintPath.path}\`, updating...`)
+    if (exists.hasBoth) {
+      yield* prompter.log.warning(
+        "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`."
+      )
+    }
+
+    if (exists.format === "json") {
+      spinner.message("Found `.oxlintrc.json`, migrating to `oxlint.config.ts`...")
 
       yield* oxlint.update(presets)
 
-      spinner.stop("oxlint config updated successfully.")
+      spinner.stop("oxlint config migrated successfully.")
+    } else if (exists.format === "ts") {
+      spinner.message("Found `oxlint.config.ts`, keeping existing config.")
+
+      spinner.stop("oxlint config is ready.")
     } else {
-      spinner.message("`.oxlintrc.json` not found, creating...")
+      spinner.message("`oxlint.config.ts` not found, creating...")
 
       yield* oxlint.create(presets)
 

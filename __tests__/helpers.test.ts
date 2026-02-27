@@ -3,7 +3,6 @@ import { join } from "node:path"
 import * as NodeContext from "@effect/platform-node/NodeContext"
 import Bun from "bun"
 import { Effect, Layer } from "effect"
-import { parse } from "jsonc-parser"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { zed } from "#helpers/editors/zed.ts"
 import { knip } from "#helpers/packages/knip.ts"
@@ -39,23 +38,10 @@ describe("helpers", () => {
         expect(oxlintInPackage).toBe(oxlint.version)
       })
 
-      test("should use local schema path from helper config", async () => {
-        const oxlintConfigContent = await Bun.file("presets/lint/core.json").text()
-        const cleanedContent = oxlintConfigContent
-          .split("\n")
-          .filter((line) => !line.trim().startsWith("//"))
-          .join("\n")
-
-        const oxlintConfig = parse(cleanedContent)
-        const presetSchemaPath = oxlintConfig.$schema
-
-        // Preset file is in presets/lint/, so it needs ../../ to reach node_modules
-        expect(presetSchemaPath).toContain("node_modules/oxlint")
-        expect(presetSchemaPath).toContain("configuration_schema.json")
-
-        // Helper config schema path is for root-level .oxlintrc.json files
-        expect(oxlint.config.$schema).toContain("node_modules/oxlint")
-        expect(oxlint.config.$schema).toContain("configuration_schema.json")
+      test("should ship lint presets as TypeScript config modules", async () => {
+        const oxlintPresetContent = await Bun.file("presets/lint/core.ts").text()
+        expect(oxlintPresetContent).toContain('import { defineConfig } from "oxlint"')
+        expect(oxlintPresetContent).toContain("export default defineConfig")
       })
     })
 
@@ -138,10 +124,9 @@ describe("helpers", () => {
         expect(knipInPackage).toBe(knip.version)
       })
 
-      test("should use schema URL from helper config", () => {
-        expect(knip.config.$schema).toBeDefined()
-        expect(knip.config.$schema).toContain("unpkg.com/knip")
-        expect(knip.config.$schema).toContain("schema.json")
+      test("should expose base knip helper config", () => {
+        expect(knip.config).toBeDefined()
+        expect(knip.config.rules.files).toBe("error")
       })
 
       test("should set correct schema URL based on file extension in update()", async () => {

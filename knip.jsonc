@@ -17,5 +17,5 @@
     "duplicates": "warn",
   },
   "ignoreExportsUsedInFile": true,
-  "ignore": ["bunup.config.ts", "src/types.ts"],
+  "ignore": ["bunup.config.ts", "oxlint.config.ts"],
 }

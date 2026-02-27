@@ -12,7 +12,12 @@ interface WorkflowOptions {
 }
 
 const setupSteps: Record<PackageManagerName, string> = {
-  bun: `      - name: Setup Bun
+  bun: `      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
       - name: Cache dependencies
@@ -69,13 +74,11 @@ const setupSteps: Record<PackageManagerName, string> = {
  * Builds the command string for a given script and package manager.
  * Special handling for Bun + format --check to avoid double-dash.
  */
-const buildCommand = (
-  packageManager: PackageManagerName,
-  script: string,
-  args?: string[]
-): string => runScriptCommand(packageManager, script, { args })
+function buildCommand(packageManager: PackageManagerName, script: string, args?: string[]): string {
+  return runScriptCommand(packageManager, script, { args })
+}
 
-const generateWorkflow = ({ packageManager, scripts }: WorkflowOptions): string | null => {
+function generateWorkflow({ packageManager, scripts }: WorkflowOptions): string | null {
   const matrixEntries: Array<{ name: string; command: string }> = []
 
   // Map scripts to matrix entries
@@ -176,8 +179,9 @@ const CI_COMPATIBLE_SCRIPTS = new Set<Script>([
  * Check if any CI-compatible scripts are in the list.
  * CI-compatible scripts are: check, format, typecheck, check:monorepo, analyze
  */
-export const hasCICompatibleScripts = (scripts: Script[]): boolean =>
-  scripts.some((script) => CI_COMPATIBLE_SCRIPTS.has(script))
+export function hasCICompatibleScripts(scripts: Script[]): boolean {
+  return scripts.some((script) => CI_COMPATIBLE_SCRIPTS.has(script))
+}
 
 export const github = {
   create: (options: WorkflowOptions) =>

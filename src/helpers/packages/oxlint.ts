@@ -2,92 +2,177 @@ import * as FileSystem from "@effect/platform/FileSystem"
 import * as Path from "@effect/platform/Path"
 import * as Effect from "effect/Effect"
 import { FailedToReadFile, FailedToWriteFile, FileNotFound, InvalidConfigFormat } from "#errors.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+import { isJsonObject, parseJson } from "#utils.ts"
 
-const CONFIG_FILE = ".oxlintrc.json"
+const CONFIG_FILE = "oxlint.config.ts"
+const LEGACY_CONFIG_FILE = ".oxlintrc.json"
+const ADAMANTITE_NODE_MODULES_PRESET_REGEX =
+  /^\.\/node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/
+const ADAMANTITE_EXPORT_PRESET_REGEX = /^adamantite\/lint(?:\/([a-z0-9-]+))?$/
+
+function getPresetNames(presets: string[] = []) {
+  return presets.includes("core") ? presets : ["core", ...presets]
+}
+
+function getExtendsArray(extendsValue: unknown): string[] {
+  if (Array.isArray(extendsValue)) {
+    return extendsValue.filter((value): value is string => typeof value === "string")
+  }
+
+  if (typeof extendsValue === "string") {
+    return [extendsValue]
+  }
+
+  return []
+}
+
+function getImportName(preset: string) {
+  return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
+}
+
+function getImportPath(preset: string) {
+  return preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`
+}
+
+function getPresetNameFromAdamantiteExtends(extendsItem: string) {
+  const nodeModulesMatch = extendsItem.match(ADAMANTITE_NODE_MODULES_PRESET_REGEX)
+
+  if (nodeModulesMatch?.[1]) {
+    return nodeModulesMatch[1]
+  }
+
+  const exportMatch = extendsItem.match(ADAMANTITE_EXPORT_PRESET_REGEX)
+
+  if (exportMatch) {
+    return exportMatch[1] ?? "core"
+  }
+
+  return null
+}
+
+function formatObjectEntries(entries: Array<[string, string]>, indent: number) {
+  const pad = " ".repeat(indent)
+  return entries.map(([key, value]) => `${pad}${key}: ${value},`).join("\n")
+}
+
+function toTsConfigContent(
+  config: Record<string, unknown>,
+  presetNames: string[],
+  passthroughExtends: string[] = []
+) {
+  const imports = [
+    'import { defineConfig } from "oxlint"',
+    ...presetNames.map(
+      (preset) => `import ${getImportName(preset)} from "${getImportPath(preset)}"`
+    ),
+  ]
+
+  const presetExtendItems = presetNames.map((preset) => getImportName(preset))
+  const allExtends = [
+    ...presetExtendItems,
+    ...passthroughExtends.map((item) => JSON.stringify(item)),
+  ]
+
+  const entries: Array<[string, string]> = [
+    ...Object.entries(config).map(
+      ([key, value]) => [key, JSON.stringify(value, null, 2)] as [string, string]
+    ),
+    ["extends", `[${allExtends.join(", ")}]`],
+  ]
+
+  const body = formatObjectEntries(entries, 2)
+
+  return [...imports, "", `export default defineConfig({`, body, `})`, ""].join("\n")
+}
 
 export const oxlint = {
-  config: {
-    // Ensures that the schema always matches the installed version of oxlint
-    $schema: "./node_modules/oxlint/configuration_schema.json",
-  },
   create: (presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const extendsArray = ["./node_modules/adamantite/presets/lint/core.json"]
-      for (const preset of presets) {
-        extendsArray.push(`./node_modules/adamantite/presets/lint/${preset}.json`)
-      }
-
       const configPath = path.join(process.cwd(), CONFIG_FILE)
-      const payload = JSON.stringify({ ...oxlint.config, extends: extendsArray }, null, 2)
+      const payload = toTsConfigContent({}, getPresetNames(presets))
 
       yield* fs
-        .writeFileString(configPath, `${payload}\n`)
+        .writeFileString(configPath, payload)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   exists: () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(process.cwd(), CONFIG_FILE)
-      const exists = yield* fs.exists(configPath)
+      const tsPath = path.join(process.cwd(), CONFIG_FILE)
+      const jsonPath = path.join(process.cwd(), LEGACY_CONFIG_FILE)
+      const hasTs = yield* fs.exists(tsPath)
+      const hasJson = yield* fs.exists(jsonPath)
 
-      return { path: exists ? configPath : null }
+      const format: "json" | "ts" | null = hasTs ? "ts" : hasJson ? "json" : null
+      const activePath = format === "ts" ? tsPath : format === "json" ? jsonPath : null
+
+      return {
+        format,
+        hasBoth: hasTs && hasJson,
+        jsonPath: hasJson ? jsonPath : null,
+        path: activePath,
+        tsPath: hasTs ? tsPath : null,
+      }
     }),
   name: "oxlint",
   update: (presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
-      const { path: configPath } = yield* oxlint.exists()
+      const path = yield* Path.Path
+      const oxlintState = yield* oxlint.exists()
 
-      if (!configPath) {
+      if (oxlintState.tsPath) {
+        return
+      }
+
+      if (!oxlintState.jsonPath) {
         return yield* Effect.fail(new FileNotFound({ path: CONFIG_FILE }))
       }
 
-      const oxlintFile = yield* fs
-        .readFileString(configPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
+      const legacyConfigPath = oxlintState.jsonPath
+      const configPath = path.join(process.cwd(), CONFIG_FILE)
 
-      const existingConfig = yield* parseJson(oxlintFile, configPath)
+      const legacyConfigContent = yield* fs
+        .readFileString(legacyConfigPath)
+        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: legacyConfigPath })))
 
-      // Empty configs are allowed and will be merged with Adamantite's config
-      // Ensure existingConfig is a JSON object (not null, array, or primitive)
+      const existingConfig = yield* parseJson(legacyConfigContent, legacyConfigPath)
+
       if (!isJsonObject(existingConfig)) {
-        return yield* Effect.fail(new InvalidConfigFormat({ path: configPath }))
+        return yield* Effect.fail(new InvalidConfigFormat({ path: legacyConfigPath }))
       }
 
-      const newConfig: Record<string, unknown> = { ...existingConfig }
+      const { $schema: _schema, ...configWithoutSchema } = existingConfig
 
-      const extendsArray: string[] = Array.isArray(newConfig.extends)
-        ? newConfig.extends
-        : typeof newConfig.extends === "string"
-          ? [newConfig.extends]
-          : []
+      const extendsArray = getExtendsArray(configWithoutSchema.extends)
+      const presetNameSet = new Set(getPresetNames(presets))
+      const passthroughSet = new Set<string>()
 
-      // Ensure core preset is always present
-      const corePath = "./node_modules/adamantite/presets/lint/core.json"
-      if (!extendsArray.includes(corePath)) {
-        extendsArray.unshift(corePath)
-      }
+      for (const extendsItem of extendsArray) {
+        const presetName = getPresetNameFromAdamantiteExtends(extendsItem)
 
-      // Add selected presets, avoiding duplicates
-      for (const preset of presets) {
-        const presetPath = `./node_modules/adamantite/presets/lint/${preset}.json`
-        if (!extendsArray.includes(presetPath)) {
-          extendsArray.push(presetPath)
+        if (presetName) {
+          presetNameSet.add(presetName)
+        } else {
+          passthroughSet.add(extendsItem)
         }
       }
 
-      newConfig.extends = extendsArray
-
-      const mergedConfig = yield* mergeConfig(newConfig, oxlint.config)
-      mergedConfig.$schema = oxlint.config.$schema
+      const { extends: _extends, ...configWithoutExtends } = configWithoutSchema
 
       yield* fs
-        .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
+        .writeFileString(
+          configPath,
+          toTsConfigContent(configWithoutExtends, [...presetNameSet], [...passthroughSet])
+        )
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+
+      yield* fs
+        .remove(legacyConfigPath)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: legacyConfigPath })))
     }),
   version: "1.50.0",
 }

@@ -1,4 +1,0 @@
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "extends": ["presets/lint/core.json", "presets/lint/node.json"]
-}

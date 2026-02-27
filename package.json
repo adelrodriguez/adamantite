@@ -30,7 +30,7 @@
     "presets"
   ],
   "type": "module",
-  "main": "presets/lint/core.json",
+  "main": "presets/lint/core.ts",
   "imports": {
     "#*": "./src/*",
     "#presets/*": "./presets/*"
@@ -38,8 +38,8 @@
   "exports": {
     "./analyze": "./presets/knip.json",
     "./format": "./presets/format.json",
-    "./lint": "./presets/lint/core.json",
-    "./lint/*": "./presets/lint/*.json",
+    "./lint": "./presets/lint/core.ts",
+    "./lint/*": "./presets/lint/*.ts",
     "./typescript": "./presets/tsconfig.json",
     "./presets/*": "./presets/*"
   },

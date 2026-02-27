@@ -89,7 +89,7 @@ export const oxlint = {
         .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  version: "1.49.0",
+  version: "1.50.0",
 }
 
 export const tsgolint = {

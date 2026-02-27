@@ -5,7 +5,7 @@
   "bracketSpacing": true,
   "embeddedLanguageFormatting": "auto",
   "endOfLine": "lf",
-  "experimentalSortImports": {
+  "sortImports": {
     "groups": [
       ["value-builtin", "type-import"],
       ["value-external"],
@@ -24,7 +24,7 @@
     "partitionByComment": true,
     "sortSideEffects": false
   },
-  "experimentalTailwindcss": {
+  "sortTailwindcss": {
     "attributes": ["className", "class"],
     "functions": ["clsx", "cn", "cva", "tw", "twMerge"],
     "preserveDuplicates": false,

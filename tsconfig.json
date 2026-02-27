@@ -8,6 +8,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["src", "oxlint.config.ts", "bunup.config.ts"],
+  "include": ["src", "presets/**/*.ts", "oxlint.config.ts", "bunup.config.ts"],
   "exclude": ["dist", "node_modules"]
 }

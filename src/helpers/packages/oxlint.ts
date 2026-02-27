@@ -1,13 +1,19 @@
 import * as FileSystem from "@effect/platform/FileSystem"
 import * as Path from "@effect/platform/Path"
 import * as Effect from "effect/Effect"
-import { FailedToReadFile, FailedToWriteFile, FileNotFound, InvalidConfigFormat } from "#errors.ts"
+import {
+  FailedToDeleteFile,
+  FailedToReadFile,
+  FailedToWriteFile,
+  FileNotFound,
+  InvalidConfigFormat,
+} from "#errors.ts"
 import { isJsonObject, parseJson } from "#utils.ts"
 
 const CONFIG_FILE = "oxlint.config.ts"
 const LEGACY_CONFIG_FILE = ".oxlintrc.json"
 const ADAMANTITE_NODE_MODULES_PRESET_REGEX =
-  /^\.\/node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/
+  /^(?:\.\/)?node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/
 const ADAMANTITE_EXPORT_PRESET_REGEX = /^adamantite\/lint(?:\/([a-z0-9-]+))?$/
 
 function getPresetNames(presets: string[] = []) {
@@ -129,7 +135,7 @@ export const oxlint = {
       }
 
       if (!oxlintState.jsonPath) {
-        return yield* Effect.fail(new FileNotFound({ path: CONFIG_FILE }))
+        return yield* Effect.fail(new FileNotFound({ path: LEGACY_CONFIG_FILE }))
       }
 
       const legacyConfigPath = oxlintState.jsonPath
@@ -172,7 +178,7 @@ export const oxlint = {
 
       yield* fs
         .remove(legacyConfigPath)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: legacyConfigPath })))
+        .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
     }),
   version: "1.50.0",
 }

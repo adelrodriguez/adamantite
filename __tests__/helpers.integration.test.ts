@@ -121,6 +121,30 @@ describe("helpers integration", () => {
         expect(content).toContain('import node from "adamantite/lint/node"')
       })
 
+      test("should migrate Adamantite preset paths with and without dot prefix", async () => {
+        await Bun.write(
+          ".oxlintrc.json",
+          JSON.stringify(
+            {
+              extends: [
+                "node_modules/adamantite/presets/lint/react.ts",
+                "./node_modules/adamantite/presets/lint/node.json",
+              ],
+            },
+            null,
+            2
+          )
+        )
+
+        await oxlint.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+
+        const content = await Bun.file("oxlint.config.ts").text()
+        expect(content).toContain('import core from "adamantite/lint"')
+        expect(content).toContain('import react from "adamantite/lint/react"')
+        expect(content).toContain('import node from "adamantite/lint/node"')
+        expect(content).not.toContain("node_modules/adamantite/presets/lint/react.ts")
+      })
+
       test("should return FileNotFound when no oxlint config exists during update", async () => {
         const result = await runEither(oxlint.update())
         expect(Either.isLeft(result)).toBe(true)

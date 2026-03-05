@@ -34,7 +34,7 @@ export const checkCliExists = (command: string) => {
 export const parseJson = (content: string, path?: string) =>
   Effect.sync(() => {
     const errors: ParseError[] = []
-    const parsed = parse(content, errors) as JsonValue
+    const parsed = parse(content, errors, { allowTrailingComma: true }) as JsonValue
     return { errors, parsed }
   }).pipe(
     Effect.flatMap(({ errors, parsed }) =>

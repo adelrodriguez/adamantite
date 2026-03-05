@@ -11,6 +11,12 @@ interface WorkflowOptions {
   scripts: Script[]
 }
 
+interface MatrixScriptEntry {
+  script: Script
+  name: string
+  args?: string[]
+}
+
 const setupSteps: Record<PackageManagerName, string> = {
   bun: `      - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -70,50 +76,28 @@ const setupSteps: Record<PackageManagerName, string> = {
         run: yarn install --frozen-lockfile`,
 }
 
-/**
- * Builds the command string for a given script and package manager.
- * Special handling for Bun + format --check to avoid double-dash.
- */
-function buildCommand(packageManager: PackageManagerName, script: string, args?: string[]): string {
-  return runScriptCommand(packageManager, script, { args })
-}
+const MATRIX_SCRIPT_ENTRIES: MatrixScriptEntry[] = [
+  { name: "lint", script: "check" },
+  { args: ["--check"], name: "format", script: "format" },
+  { name: "types", script: "typecheck" },
+  { name: "monorepo", script: "check:monorepo" },
+  { name: "analyze", script: "analyze" },
+]
 
 function generateWorkflow({ packageManager, scripts }: WorkflowOptions): string | null {
   const matrixEntries: Array<{ name: string; command: string }> = []
 
   // Map scripts to matrix entries
-  if (scripts.includes("check")) {
-    matrixEntries.push({
-      command: buildCommand(packageManager, "check"),
-      name: "lint",
-    })
-  }
+  for (const entry of MATRIX_SCRIPT_ENTRIES) {
+    if (!scripts.includes(entry.script)) {
+      continue
+    }
 
-  if (scripts.includes("format")) {
     matrixEntries.push({
-      command: buildCommand(packageManager, "format", ["--check"]),
-      name: "format",
-    })
-  }
-
-  if (scripts.includes("typecheck")) {
-    matrixEntries.push({
-      command: buildCommand(packageManager, "typecheck"),
-      name: "types",
-    })
-  }
-
-  if (scripts.includes("check:monorepo")) {
-    matrixEntries.push({
-      command: buildCommand(packageManager, "check:monorepo"),
-      name: "monorepo",
-    })
-  }
-
-  if (scripts.includes("analyze")) {
-    matrixEntries.push({
-      command: buildCommand(packageManager, "analyze"),
-      name: "analyze",
+      command: runScriptCommand(packageManager, entry.script, {
+        args: entry.args,
+      }),
+      name: entry.name,
     })
   }
 
@@ -167,13 +151,7 @@ ${setupSteps[packageManager]}
 }
 
 /** CI-compatible scripts that can be run in GitHub Actions */
-const CI_COMPATIBLE_SCRIPTS = new Set<Script>([
-  "check",
-  "format",
-  "typecheck",
-  "check:monorepo",
-  "analyze",
-])
+const CI_COMPATIBLE_SCRIPTS = new Set<Script>(MATRIX_SCRIPT_ENTRIES.map((entry) => entry.script))
 
 /**
  * Check if any CI-compatible scripts are in the list.

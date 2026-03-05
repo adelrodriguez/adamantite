@@ -2,7 +2,7 @@ import * as Command from "@effect/cli/Command"
 import * as Options from "@effect/cli/Options"
 import * as ShellCommand from "@effect/platform/Command"
 import * as CommandExecutor from "@effect/platform/CommandExecutor"
-import { Effect } from "effect"
+import * as Effect from "effect/Effect"
 import { CommandFailed } from "#errors.ts"
 import { knip } from "#helpers/packages/knip.ts"
 

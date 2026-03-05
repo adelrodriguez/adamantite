@@ -1,100 +1,60 @@
-import type { ParseError } from "jsonc-parser"
 import process from "node:process"
 import * as Command from "@effect/cli/Command"
 import * as NodeContext from "@effect/platform-node/NodeContext"
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-import * as Runtime from "@effect/platform/Runtime"
+import * as CommandExecutor from "@effect/platform/CommandExecutor"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
-import { printParseErrorCode } from "jsonc-parser"
-import analyze from "#commands/analyze.ts"
-import check from "#commands/check.ts"
-import fix from "#commands/fix.ts"
-import format from "#commands/format.ts"
-import init from "#commands/init.ts"
-import monorepo from "#commands/monorepo.ts"
-import typecheck from "#commands/typecheck.ts"
-import update from "#commands/update.ts"
+import analyzeCommand from "#commands/analyze.ts"
+import checkCommand from "#commands/check.ts"
+import fixCommand from "#commands/fix.ts"
+import formatCommand from "#commands/format.ts"
+import initCommand from "#commands/init.ts"
+import monorepoCommand from "#commands/monorepo.ts"
+import typecheckCommand from "#commands/typecheck.ts"
+import updateCommand from "#commands/update.ts"
 import { CwdLive } from "#services/cwd.ts"
 import { Prompter, PrompterLive } from "#services/prompter.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
-function formatParseErrors(errors: ParseError[] = []) {
-  if (errors.length === 0) {
-    return "- Unknown JSON/JSONC parsing error"
-  }
-
-  return errors
-    .slice(0, 3)
-    .map((error) => `- ${printParseErrorCode(error.error)} (offset: ${error.offset})`)
-    .join("\n")
-}
-
-const handleParseFileError = (error: { errors?: ParseError[]; path?: string }) =>
-  Effect.gen(function* () {
-    const prompter = yield* Prompter
-    const target = error.path ? `\`${error.path}\`` : "the target file"
-
-    yield* prompter.log.error(
-      [
-        `Failed to parse ${target}.`,
-        "Please fix the JSON/JSONC syntax and run the command again.",
-        "",
-        "Parse details:",
-        formatParseErrors(error.errors),
-      ].join("\n")
-    )
-
-    return 1
-  })
-
-const handleInvalidConfigFormatError = (error: { path?: string }) =>
-  Effect.gen(function* () {
-    const prompter = yield* Prompter
-    const target = error.path ? `\`${error.path}\`` : "the target config file"
-
-    yield* prompter.log.error(
-      `Invalid config format in ${target}. The config must be a JSON object (for example: {}).`
-    )
-
-    return 1
-  })
-
 const main = Command.make("adamantite").pipe(
   Command.withDescription("Opinionated preset package for modern TypeScript applications"),
-  Command.withSubcommands([analyze, check, fix, format, init, monorepo, typecheck, update])
+  Command.withSubcommands([
+    analyzeCommand,
+    checkCommand,
+    fixCommand,
+    formatCommand,
+    initCommand,
+    monorepoCommand,
+    typecheckCommand,
+    updateCommand,
+  ])
 )
 
 const version = await getPackageVersion()
 
 const program = Command.run(main, { name: "adamantite", version })
 
-const teardown: Runtime.Teardown = (exit, onExit) => {
-  if (Exit.isSuccess(exit)) {
-    const value = exit.value
-
-    if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 255) {
-      onExit(value)
-      return
-    }
-  }
-
-  Runtime.defaultTeardown(exit, onExit)
-}
-
-const exitCode = program(process.argv).pipe(
-  Effect.as(0),
-  Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
-  Effect.catchTags({
-    FailedToParseFile: handleParseFileError,
-    InvalidConfigFormat: handleInvalidConfigFormatError,
-  }),
-  Effect.tapErrorCause((cause) => Effect.logError(cause)),
-  Effect.catchAll(() => Effect.succeed(1))
-)
-
-exitCode.pipe(
-  Effect.provide(Layer.mergeAll(NodeContext.layer, PrompterLive, CwdLive)),
-  NodeRuntime.runMain({ teardown })
-)
+program(process.argv)
+  .pipe(
+    Effect.as(CommandExecutor.ExitCode(0)),
+    Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
+    Effect.catchAll((error) =>
+      Effect.gen(function* () {
+        const prompter = yield* Prompter
+        const message =
+          "message" in error && error.message ? error.message : "An unexpected error occurred."
+        yield* prompter.log.error(message)
+        return CommandExecutor.ExitCode(1)
+      })
+    )
+  )
+  .pipe(
+    Effect.provide(Layer.mergeAll(NodeContext.layer, PrompterLive, CwdLive)),
+    NodeRuntime.runMain({
+      teardown: (exit, onExit) => {
+        onExit(Exit.isSuccess(exit) ? (exit.value as number) : 1)
+      },
+    })
+  )

@@ -63,7 +63,8 @@ export class FailedToMergeConfig extends Data.TaggedError("FailedToMergeConfig")
   cause?: unknown
 }> {
   override get message() {
-    return "Failed to merge configuration."
+    const detail = this.cause instanceof Error ? ` Cause: ${this.cause.message}` : ""
+    return `Failed to merge configuration.${detail}`
   }
 }
 
@@ -134,7 +135,8 @@ export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
   cause?: unknown
 }> {
   override get message() {
-    return "No package manager detected. Please run this command from a project with a lockfile."
+    const detail = this.cause instanceof Error ? ` Cause: ${this.cause.message}` : ""
+    return `No package manager detected. Please run this command from a project with a lockfile.${detail}`
   }
 }
 
@@ -151,7 +153,8 @@ export class OperationCancelled extends Data.TaggedError("OperationCancelled")<{
   reason?: string
 }> {
   override get message() {
-    return "Operation cancelled."
+    const detail = this.reason ? ` Reason: ${this.reason}` : ""
+    return `Operation cancelled.${detail}`
   }
 }
 
@@ -165,6 +168,7 @@ export class VscodeCliNotFound extends Data.TaggedError("VscodeCliNotFound")<{
   cause?: unknown
 }> {
   override get message() {
-    return "VS Code CLI (`code`) not found. Please install it to manage extensions."
+    const detail = this.cause instanceof Error ? ` Cause: ${this.cause.message}` : ""
+    return `VS Code CLI (\`code\`) not found. Please install it to manage extensions.${detail}`
   }
 }

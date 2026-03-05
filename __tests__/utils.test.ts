@@ -133,6 +133,19 @@ describe("utils", () => {
       })
     })
 
+    test("should parse JSON with trailing commas", async () => {
+      const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
+      const result = await parseJson(jsonWithTrailingComma).pipe(
+        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.runPromise
+      )
+
+      expect(result).toEqual({
+        name: "test",
+        version: "1.0.0",
+      })
+    })
+
     test("should return error for invalid JSON", async () => {
       const invalidJson = '{"name": "test", "version":}'
       const result = await runEither(parseJson(invalidJson))

@@ -2,10 +2,11 @@ import * as p from "@clack/prompts"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import { OperationCancelled } from "#errors.ts"
 
 interface PrompterService {
   readonly cancel: (message: string) => Effect.Effect<void>
-  readonly confirm: (options: p.ConfirmOptions) => Effect.Effect<boolean | symbol>
+  readonly confirm: (options: p.ConfirmOptions) => Effect.Effect<boolean, OperationCancelled>
   readonly intro: (message: string) => Effect.Effect<void>
   readonly log: {
     readonly error: (message: string) => Effect.Effect<void>
@@ -13,7 +14,9 @@ interface PrompterService {
     readonly success: (message: string) => Effect.Effect<void>
     readonly warning: (message: string) => Effect.Effect<void>
   }
-  readonly multiselect: <T>(options: p.MultiSelectOptions<T>) => Effect.Effect<T[] | symbol>
+  readonly multiselect: <T>(
+    options: p.MultiSelectOptions<T>
+  ) => Effect.Effect<T[], OperationCancelled>
   readonly outro: (message: string) => Effect.Effect<void>
   readonly spinner: () => p.SpinnerResult
 }
@@ -25,7 +28,13 @@ export const PrompterLive = Layer.succeed(Prompter, {
     Effect.sync(() => {
       p.cancel(message)
     }),
-  confirm: (options) => Effect.tryPromise(() => p.confirm(options)).pipe(Effect.orDie),
+  confirm: (options) =>
+    Effect.promise(() => p.confirm(options)).pipe(
+      Effect.filterOrFail(
+        (value): value is boolean => !p.isCancel(value),
+        () => new OperationCancelled({})
+      )
+    ),
   intro: (message) =>
     Effect.sync(() => {
       p.intro(message)
@@ -49,7 +58,12 @@ export const PrompterLive = Layer.succeed(Prompter, {
       }),
   },
   multiselect: <T>(options: p.MultiSelectOptions<T>) =>
-    Effect.tryPromise(() => p.multiselect(options)).pipe(Effect.orDie),
+    Effect.promise(() => p.multiselect(options)).pipe(
+      Effect.filterOrFail(
+        (value): value is T[] => !p.isCancel(value),
+        () => new OperationCancelled({})
+      )
+    ),
   outro: (message) =>
     Effect.sync(() => {
       p.outro(message)

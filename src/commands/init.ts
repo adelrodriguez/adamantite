@@ -1,5 +1,4 @@
 import process from "node:process"
-import { isCancel } from "@clack/prompts"
 import * as Command from "@effect/cli/Command"
 import * as FileSystem from "@effect/platform/FileSystem"
 import * as Path from "@effect/platform/Path"
@@ -10,7 +9,6 @@ import {
   FailedToInstallDependency,
   FailedToWriteFile,
   NoPackageManager,
-  OperationCancelled,
   UnknownScript,
 } from "#errors.ts"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
@@ -386,10 +384,6 @@ export default Command.make("init").pipe(
         ],
       })
 
-      if (isCancel(selectedScripts)) {
-        return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
-      }
-
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
 
       let presets: string[] = []
@@ -407,10 +401,6 @@ export default Command.make("init").pipe(
           required: false,
         })
 
-        if (isCancel(selectedPresets)) {
-          return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
-        }
-
         presets = selectedPresets
       }
 
@@ -423,9 +413,6 @@ export default Command.make("init").pipe(
         required: false,
       })
 
-      if (isCancel(selectedEditors)) {
-        return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
-      }
       let installExtensions = false
 
       if (selectedEditors.length > 0) {
@@ -433,10 +420,6 @@ export default Command.make("init").pipe(
           initialValue: true,
           message: "Do you want to install the recommended editor extensions?",
         })
-
-        if (isCancel(installExtensionsResponse)) {
-          return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
-        }
 
         installExtensions = installExtensionsResponse
       }
@@ -448,10 +431,6 @@ export default Command.make("init").pipe(
         const enableGitHubActionsResponse = yield* prompter.confirm({
           message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
         })
-
-        if (isCancel(enableGitHubActionsResponse)) {
-          return yield* Effect.fail(new OperationCancelled({ reason: "init-cancelled" }))
-        }
 
         enableGitHubActions = enableGitHubActionsResponse
       }

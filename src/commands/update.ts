@@ -1,8 +1,7 @@
-import { isCancel } from "@clack/prompts"
 import * as Command from "@effect/cli/Command"
 import * as Effect from "effect/Effect"
 import { addDevDependency } from "nypm"
-import { FailedToInstallDependency, OperationCancelled } from "#errors.ts"
+import { FailedToInstallDependency } from "#errors.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
@@ -59,10 +58,6 @@ export default Command.make("update").pipe(
         const shouldUpdate = yield* prompter.confirm({
           message: "Do you want to proceed with these updates?",
         })
-
-        if (isCancel(shouldUpdate)) {
-          return yield* Effect.fail(new OperationCancelled({ reason: "update-cancelled" }))
-        }
 
         if (!shouldUpdate) {
           return "cancelled" as const

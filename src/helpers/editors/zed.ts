@@ -80,11 +80,11 @@ export const zed = {
       },
     },
   },
-  create: () =>
+  create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const zedPath = path.join(process.cwd(), ".zed")
+      const zedPath = path.join(cwd, ".zed")
       const settingsPath = path.join(zedPath, SETTINGS_FILE)
 
       yield* fs
@@ -95,17 +95,17 @@ export const zed = {
         .writeFileString(settingsPath, `${JSON.stringify(zed.config, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: settingsPath })))
     }),
-  exists: () =>
+  exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      return yield* fs.exists(path.join(process.cwd(), ".zed", SETTINGS_FILE))
+      return yield* fs.exists(path.join(cwd, ".zed", SETTINGS_FILE))
     }),
-  update: () =>
+  update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const zedPath = path.join(process.cwd(), ".zed", SETTINGS_FILE)
+      const zedPath = path.join(cwd, ".zed", SETTINGS_FILE)
 
       const zedFile = yield* fs
         .readFileString(zedPath)

@@ -27,14 +27,14 @@ describe("typecheck", () => {
     test("run tsc with noEmit in the current working directory", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(typecheckCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(typecheckCommand, [], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
         {
           args: ["--noEmit"],
           command: "tsc",
-          cwd: tempDir,
+          cwd: realpathSync(tempDir),
         },
       ])
     })
@@ -48,8 +48,7 @@ describe("typecheck", () => {
       const exit = await runCommandWithRunner(
         typecheckCommand,
         ["--project", "tsconfig.test.json", "--watch"],
-        runner,
-        tempDir
+        runner
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -61,7 +60,7 @@ describe("typecheck", () => {
           "--watch",
         ],
         command: "tsc",
-        cwd: tempDir,
+        cwd: realpathSync(tempDir),
       })
     })
   })
@@ -70,7 +69,7 @@ describe("typecheck", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(typecheckCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(typecheckCommand, [], runner)
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }

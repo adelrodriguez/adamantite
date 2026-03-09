@@ -53,11 +53,11 @@ export const vscode = {
     "oxc.typeAware": true,
     "typescript.tsdk": "node_modules/typescript/lib",
   },
-  create: () =>
+  create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const vscodePath = path.join(process.cwd(), ".vscode")
+      const vscodePath = path.join(cwd, ".vscode")
       const settingsPath = path.join(vscodePath, SETTINGS_FILE)
 
       // Create .vscode directory if it doesn't exist
@@ -69,11 +69,11 @@ export const vscode = {
         .writeFileString(settingsPath, `${JSON.stringify(vscode.config, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: settingsPath })))
     }),
-  exists: () =>
+  exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      return yield* fs.exists(path.join(process.cwd(), ".vscode", SETTINGS_FILE))
+      return yield* fs.exists(path.join(cwd, ".vscode", SETTINGS_FILE))
     }),
 
   extension: (scripts: Script[] = []) =>
@@ -123,11 +123,11 @@ export const vscode = {
         }
       })
     ),
-  update: () =>
+  update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const vscodePath = path.join(process.cwd(), ".vscode", SETTINGS_FILE)
+      const vscodePath = path.join(cwd, ".vscode", SETTINGS_FILE)
 
       const vscodeFile = yield* fs
         .readFileString(vscodePath)

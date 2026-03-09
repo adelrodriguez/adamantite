@@ -27,7 +27,7 @@ describe("fix", () => {
     test("always include type-aware and fix flags", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(fixCommand, [], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
@@ -43,7 +43,7 @@ describe("fix", () => {
     test("add suggested fixes when requested", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["--suggested"], runner, tempDir)
+      const exit = await runCommandWithRunner(fixCommand, ["--suggested"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual(["--type-aware", "--fix", "--fix-suggestions"])
@@ -52,7 +52,7 @@ describe("fix", () => {
     test("add dangerous fixes when requested", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["--dangerous"], runner, tempDir)
+      const exit = await runCommandWithRunner(fixCommand, ["--dangerous"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual(["--type-aware", "--fix", "--fix-dangerously"])
@@ -61,7 +61,7 @@ describe("fix", () => {
     test("add all fix modes when all is requested", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["--all"], runner, tempDir)
+      const exit = await runCommandWithRunner(fixCommand, ["--all"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual([
@@ -78,7 +78,7 @@ describe("fix", () => {
       await writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["index.ts", "index.ts"], runner, tempDir)
+      const exit = await runCommandWithRunner(fixCommand, ["index.ts", "index.ts"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual([
@@ -93,7 +93,7 @@ describe("fix", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(fixCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(fixCommand, [], runner)
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }

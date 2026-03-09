@@ -26,7 +26,7 @@ describe("github", () => {
   describe("exists", () => {
     test("detect when the workflow does not exist", async () => {
       const exists = await github
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
@@ -36,14 +36,14 @@ describe("github", () => {
   describe("create", () => {
     test("create a GitHub Actions workflow with the expected bun structure", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "bun",
           scripts: ["check", "format", "typecheck"],
         })
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await github
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
@@ -69,7 +69,7 @@ describe("github", () => {
 
     test("generate the correct workflow for npm", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "npm",
           scripts: ["check"],
         })
@@ -85,7 +85,7 @@ describe("github", () => {
 
     test("generate the correct workflow for pnpm", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "pnpm",
           scripts: ["check"],
         })
@@ -102,7 +102,7 @@ describe("github", () => {
 
     test("generate the correct workflow for yarn", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "yarn",
           scripts: ["check"],
         })
@@ -118,7 +118,7 @@ describe("github", () => {
 
     test("generate the correct workflow for deno", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "deno",
           scripts: ["check"],
         })
@@ -133,7 +133,7 @@ describe("github", () => {
 
     test("include all CI-compatible scripts as jobs", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "bun",
           scripts: ["check", "format", "typecheck", "check:monorepo"],
         })
@@ -151,21 +151,21 @@ describe("github", () => {
 
     test("not create a workflow when no CI-compatible scripts are selected", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "bun",
           scripts: ["fix", "fix:monorepo"],
         })
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await github
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(false)
     })
 
     test("include concurrency settings", async () => {
       await github
-        .create({
+        .create(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
         })
@@ -182,7 +182,7 @@ describe("github", () => {
       writeFileSync(".github", "not a directory")
 
       const result = await runEither(
-        github.create({
+        github.create(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
         })
@@ -201,7 +201,7 @@ describe("github", () => {
       await Bun.write(".github/workflows/adamantite.yml", "name: Old Workflow")
 
       await github
-        .update({
+        .update(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
         })
@@ -220,7 +220,7 @@ describe("github", () => {
       chmodSync(".github/workflows/adamantite.yml", 0o444)
 
       const result = await runEither(
-        github.update({
+        github.update(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
         })

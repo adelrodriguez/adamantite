@@ -8,7 +8,6 @@ import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { FailedToInstallDependency } from "#errors.ts"
 import { type CommandRunOptions, CommandRunner } from "#services/command-runner.ts"
-import { Cwd } from "#services/cwd.ts"
 import { type DetectedPackageManager, DependencyInstaller } from "#services/dependency-installer.ts"
 import { Prompter } from "#services/prompter.ts"
 
@@ -169,7 +168,7 @@ export function createDependencyInstallerTestContext(options?: {
   return {
     calls,
     layer: Layer.succeed(DependencyInstaller)({
-      addDevDependencies: (packages, installOptions) =>
+      addDevDependencies: (packages, _cwd, installOptions) =>
         Effect.gen(function* () {
           calls.push({
             options: installOptions,
@@ -180,7 +179,7 @@ export function createDependencyInstallerTestContext(options?: {
             return yield* Effect.fail(options.addDevDependenciesError)
           }
         }),
-      detectPackageManager: () =>
+      detectPackageManager: (_cwd) =>
         Effect.succeed(options?.detectedPackageManager ?? { name: "bun" }),
     }),
   }
@@ -224,18 +223,12 @@ function makeQuietConsoleLayer() {
 export async function runCommand(
   command: Command.Command.Any,
   args: string[],
-  cwd: string,
   layers: TestLayer[]
 ) {
-  const cwdLayer = Layer.succeed(Cwd)({
-    get: Effect.succeed(cwd),
-  })
-
   let providedLayer = Layer.mergeAll(
     NodeServices.layer,
     makeQuietConsoleLayer(),
-    makeQuietTerminalLayer(),
-    cwdLayer
+    makeQuietTerminalLayer()
   ) as TestLayer
 
   for (const layer of layers) {
@@ -252,16 +245,11 @@ export async function runCommand(
 export async function runCommandWithRunner(
   command: Command.Command.Any,
   args: string[],
-  runner: RunnerTestContext,
-  cwd: string
+  runner: RunnerTestContext
 ) {
-  const cwdLayer = Layer.succeed(Cwd)({
-    get: Effect.succeed(cwd),
-  })
-
   return Effect.runPromiseExit(
     Command.runWith(command, { version: "test" })(args).pipe(
-      Effect.provide(Layer.mergeAll(NodeServices.layer, cwdLayer, runner.layer))
+      Effect.provide(Layer.mergeAll(NodeServices.layer, runner.layer))
     ) as Effect.Effect<void, unknown>
   )
 }

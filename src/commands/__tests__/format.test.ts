@@ -27,7 +27,7 @@ describe("format", () => {
     test("run oxfmt with no flags by default", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(formatCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(formatCommand, [], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
@@ -43,7 +43,7 @@ describe("format", () => {
     test("add the check flag when requested", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(formatCommand, ["--check"], runner, tempDir)
+      const exit = await runCommandWithRunner(formatCommand, ["--check"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual(["--check"])
@@ -55,7 +55,7 @@ describe("format", () => {
       await writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(formatCommand, ["index.ts"], runner, tempDir)
+      const exit = await runCommandWithRunner(formatCommand, ["index.ts"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual([realpathSync(join(tempDir, "index.ts"))])
@@ -66,7 +66,7 @@ describe("format", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(formatCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(formatCommand, [], runner)
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }

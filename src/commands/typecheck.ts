@@ -1,3 +1,4 @@
+import process from "node:process"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Command from "effect/unstable/cli/Command"
@@ -6,7 +7,6 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import { CommandFailed } from "#errors.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 import { CommandRunner } from "#services/command-runner.ts"
-import { Cwd } from "#services/cwd.ts"
 
 const project = Flag.file("project", { mustExist: true }).pipe(
   Flag.withAlias("p"),
@@ -23,9 +23,8 @@ export default Command.make("typecheck", { project, watch }).pipe(
   Command.withDescription("Run TypeScript type checking"),
   Command.withHandler(({ project, watch }) =>
     Effect.gen(function* () {
-      const cwd = yield* Cwd
       const runner = yield* CommandRunner
-      const currentDir = yield* cwd.get
+      const cwd = process.cwd()
       const args = ["--noEmit"]
 
       if (Option.isSome(project)) {
@@ -39,7 +38,7 @@ export default Command.make("typecheck", { project, watch }).pipe(
       const exitCode = yield* runner.run({
         args,
         command: typescript.command,
-        cwd: currentDir,
+        cwd,
       })
 
       if (exitCode !== ChildProcessSpawner.ExitCode(0)) {

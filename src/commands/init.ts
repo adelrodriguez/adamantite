@@ -1,3 +1,4 @@
+import process from "node:process"
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -13,21 +14,20 @@ import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
-import { Cwd } from "#services/cwd.ts"
 import { DependencyInstaller } from "#services/dependency-installer.ts"
 import { Prompter } from "#services/prompter.ts"
 import { checkIsMonorepo, printTitle, readPackageJson } from "#utils.ts"
 
-const installDependencies = (packages: string[]) =>
+const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
     const dependencyInstaller = yield* DependencyInstaller
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Installing dependencies...")
-    const isMonorepo = yield* checkIsMonorepo()
+    const isMonorepo = yield* checkIsMonorepo(cwd)
 
     yield* dependencyInstaller
-      .addDevDependencies(packages, {
+      .addDevDependencies(packages, cwd, {
         silent: true,
         workspace: isMonorepo,
       })
@@ -42,13 +42,13 @@ const installDependencies = (packages: string[]) =>
     spinner.stop("Dependencies installed.")
   })
 
-const setupOxlintConfig = (presets: string[]) =>
+const setupOxlintConfig = (cwd: string, presets: string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Setting up oxlint config...")
 
-    const exists = yield* oxlint.exists()
+    const exists = yield* oxlint.exists(cwd)
 
     if (exists.hasBoth) {
       yield* prompter.log.warning(
@@ -59,7 +59,7 @@ const setupOxlintConfig = (presets: string[]) =>
     if (exists.format === "json") {
       spinner.message("Found `.oxlintrc.json`, migrating to `oxlint.config.ts`...")
 
-      yield* oxlint.update(presets)
+      yield* oxlint.update(cwd, presets)
 
       spinner.stop("oxlint config migrated successfully.")
     } else if (exists.format === "ts") {
@@ -69,42 +69,41 @@ const setupOxlintConfig = (presets: string[]) =>
     } else {
       spinner.message("`oxlint.config.ts` not found, creating...")
 
-      yield* oxlint.create(presets)
+      yield* oxlint.create(cwd, presets)
 
       spinner.stop("oxlint config created successfully.")
     }
   })
 
-const setupOxfmtConfig = () =>
+const setupOxfmtConfig = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Setting up oxfmt config...")
 
-    const oxfmtPath = yield* oxfmt.exists()
+    const oxfmtPath = yield* oxfmt.exists(cwd)
 
     if (oxfmtPath.path) {
       spinner.message(`Found \`${oxfmtPath.path}\`, updating...`)
 
-      yield* oxfmt.update()
+      yield* oxfmt.update(cwd)
 
       spinner.stop("oxfmt config updated successfully.")
     } else {
       spinner.message("`.oxfmtrc.jsonc` or `.oxfmtrc.json` not found, creating...")
 
-      yield* oxfmt.create()
+      yield* oxfmt.create(cwd)
 
       spinner.stop("oxfmt config created successfully.")
     }
   })
 
-const addScripts = (scripts: Script[]) =>
+const addScripts = (cwd: string, scripts: Script[]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const cwd = yield* Cwd
     const prompter = yield* Prompter
-    const packageJson = yield* readPackageJson()
+    const packageJson = yield* readPackageJson(cwd)
     const spinner = prompter.spinner()
     spinner.start("Adding scripts to your `package.json`...")
 
@@ -138,8 +137,7 @@ const addScripts = (scripts: Script[]) =>
       }
     }
 
-    const currentDir = yield* cwd.get
-    const packagePath = path.join(currentDir, "package.json")
+    const packagePath = path.join(cwd, "package.json")
     yield* fs
       .writeFileString(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
       .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
@@ -147,53 +145,53 @@ const addScripts = (scripts: Script[]) =>
     spinner.stop("Scripts added to your `package.json`")
   })
 
-const setupKnipConfig = () =>
+const setupKnipConfig = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Setting up knip config...")
 
-    const knipPath = yield* knip.exists()
+    const knipPath = yield* knip.exists(cwd)
 
     if (knipPath.path) {
       spinner.message(`Found \`${knipPath.path}\`, updating...`)
 
-      yield* knip.update()
+      yield* knip.update(cwd)
 
       spinner.stop("knip config updated successfully.")
     } else {
       spinner.message("`knip.json` not found, creating...")
 
-      yield* knip.create()
+      yield* knip.create(cwd)
 
       spinner.stop("knip config created successfully.")
     }
   })
 
-const setupTypescript = () =>
+const setupTypescript = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Setting up TypeScript config...")
 
-    const typescriptExists = yield* typescript.exists()
+    const typescriptExists = yield* typescript.exists(cwd)
 
     if (typescriptExists) {
       spinner.message("`tsconfig.json` found, updating...")
 
-      yield* typescript.update()
+      yield* typescript.update(cwd)
 
       spinner.stop("`tsconfig.json` updated successfully")
     } else {
       spinner.message("`tsconfig.json` not found, creating...")
 
-      yield* typescript.create()
+      yield* typescript.create(cwd)
 
       spinner.stop("`tsconfig.json` created successfully")
     }
   })
 
-const setupEditors = (editors: string[]) =>
+const setupEditors = (cwd: string, editors: string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     if (editors.includes("vscode")) {
@@ -201,14 +199,14 @@ const setupEditors = (editors: string[]) =>
 
       spinner.start("Checking for `.vscode/settings.json`...")
 
-      const hasVscodeSettings = yield* vscode.exists()
+      const hasVscodeSettings = yield* vscode.exists(cwd)
       if (hasVscodeSettings) {
         spinner.message("`.vscode/settings.json` found, updating...")
-        yield* vscode.update()
+        yield* vscode.update(cwd)
         spinner.stop("`.vscode/settings.json` updated with Adamantite preset.")
       } else {
         spinner.message("`.vscode/settings.json` not found, creating...")
-        yield* vscode.create()
+        yield* vscode.create(cwd)
         spinner.stop("`.vscode/settings.json` created with Adamantite preset.")
       }
     }
@@ -218,14 +216,14 @@ const setupEditors = (editors: string[]) =>
 
       spinner.start("Checking for `.zed/settings.json`...")
 
-      const hasZedSettings = yield* zed.exists()
+      const hasZedSettings = yield* zed.exists(cwd)
       if (hasZedSettings) {
         spinner.message("`.zed/settings.json` found, updating...")
-        yield* zed.update()
+        yield* zed.update(cwd)
         spinner.stop("`.zed/settings.json` updated with Adamantite preset.")
       } else {
         spinner.message("`.zed/settings.json` not found, creating...")
-        yield* zed.create()
+        yield* zed.create(cwd)
         spinner.stop("`.zed/settings.json` created with Adamantite preset.")
       }
     }
@@ -284,21 +282,21 @@ const installEditorExtensions = (editors: string[], scripts: Script[]) =>
     }
   })
 
-const setupGitHubActions = (packageManager: PackageManagerName, scripts: Script[]) =>
+const setupGitHubActions = (cwd: string, packageManager: PackageManagerName, scripts: Script[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Setting up GitHub Actions workflow...")
 
-    const workflowExists = yield* github.exists()
+    const workflowExists = yield* github.exists(cwd)
 
     if (workflowExists) {
       spinner.message("`.github/workflows/adamantite.yml` found, updating...")
-      yield* github.update({ packageManager, scripts })
+      yield* github.update(cwd, { packageManager, scripts })
       spinner.stop("GitHub Actions workflow updated successfully.")
     } else {
       spinner.message("Creating `.github/workflows/adamantite.yml`...")
-      yield* github.create({ packageManager, scripts })
+      yield* github.create(cwd, { packageManager, scripts })
       spinner.stop("GitHub Actions workflow created successfully.")
     }
   }).pipe(Effect.option)
@@ -307,6 +305,7 @@ export default Command.make("init").pipe(
   Command.withDescription("Initialize Adamantite in the current directory"),
   Command.withHandler(() =>
     Effect.gen(function* () {
+      const cwd = process.cwd()
       const prompter = yield* Prompter
 
       yield* printTitle()
@@ -314,7 +313,7 @@ export default Command.make("init").pipe(
       yield* prompter.intro("💠 adamantite init")
 
       const dependencyInstaller = yield* DependencyInstaller
-      const packageManager = yield* dependencyInstaller.detectPackageManager()
+      const packageManager = yield* dependencyInstaller.detectPackageManager(cwd)
 
       if (!packageManager) {
         return yield* Effect.fail(new NoPackageManager({}))
@@ -328,7 +327,7 @@ export default Command.make("init").pipe(
 
       yield* prompter.log.info(`Detected package manager: ${packageManager.name}`)
 
-      const isMonorepo = yield* checkIsMonorepo()
+      const isMonorepo = yield* checkIsMonorepo(cwd)
 
       if (isMonorepo) {
         yield* prompter.log.info("We've detected a monorepo setup in your project.")
@@ -456,34 +455,34 @@ export default Command.make("init").pipe(
         dependencies.push(`${knip.name}@${knip.version}`)
       }
 
-      yield* installDependencies(dependencies)
+      yield* installDependencies(cwd, dependencies)
 
       if (hasOxfmt) {
-        yield* setupOxfmtConfig()
+        yield* setupOxfmtConfig(cwd)
       }
 
       if (hasOxlint) {
-        yield* setupOxlintConfig(presets)
+        yield* setupOxlintConfig(cwd, presets)
       }
 
       if (hasKnip) {
-        yield* setupKnipConfig()
+        yield* setupKnipConfig(cwd)
       }
 
-      yield* addScripts(selectedScripts)
+      yield* addScripts(cwd, selectedScripts)
 
       if (hasTypecheck) {
-        yield* setupTypescript()
+        yield* setupTypescript(cwd)
       }
 
-      yield* setupEditors(selectedEditors)
+      yield* setupEditors(cwd, selectedEditors)
 
       if (installExtensions) {
         yield* installEditorExtensions(selectedEditors, selectedScripts)
       }
 
       if (enableGitHubActions) {
-        yield* setupGitHubActions(packageManager.name, selectedScripts)
+        yield* setupGitHubActions(cwd, packageManager.name, selectedScripts)
       }
 
       yield* prompter.log.success("Your project is now configured")

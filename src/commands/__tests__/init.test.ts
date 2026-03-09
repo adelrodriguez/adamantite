@@ -56,7 +56,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -128,7 +128,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
@@ -161,7 +161,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -201,7 +201,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
 
@@ -234,7 +234,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -275,7 +275,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({

@@ -56,7 +56,7 @@ describe("update", () => {
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
@@ -92,7 +92,7 @@ describe("update", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -141,7 +141,7 @@ describe("update", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
@@ -185,7 +185,7 @@ describe("update", () => {
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
@@ -233,7 +233,7 @@ describe("update", () => {
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({

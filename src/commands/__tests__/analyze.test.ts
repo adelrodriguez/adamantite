@@ -26,7 +26,7 @@ describe("analyze", () => {
     test("run knip with no flags by default", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(analyzeCommand, [], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
@@ -42,7 +42,7 @@ describe("analyze", () => {
     test("add fix flags when requested", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, ["--fix"], runner, tempDir)
+      const exit = await runCommandWithRunner(analyzeCommand, ["--fix"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual(["--fix", "--allow-remove-files"])
@@ -53,7 +53,7 @@ describe("analyze", () => {
     test("add strict flags when requested", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, ["--strict"], runner, tempDir)
+      const exit = await runCommandWithRunner(analyzeCommand, ["--strict"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual(["--production", "--strict"])
@@ -64,12 +64,7 @@ describe("analyze", () => {
     test("support fix and strict together", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(
-        analyzeCommand,
-        ["--fix", "--strict"],
-        runner,
-        tempDir
-      )
+      const exit = await runCommandWithRunner(analyzeCommand, ["--fix", "--strict"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual([
@@ -85,7 +80,7 @@ describe("analyze", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(analyzeCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(analyzeCommand, [], runner)
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }

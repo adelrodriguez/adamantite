@@ -26,7 +26,7 @@ describe("monorepo", () => {
     test("run sherif by default", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(monorepoCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(monorepoCommand, [], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
@@ -43,7 +43,7 @@ describe("monorepo", () => {
     test("add fix when requested", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(monorepoCommand, ["--fix"], runner, tempDir)
+      const exit = await runCommandWithRunner(monorepoCommand, ["--fix"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]).toEqual({
@@ -58,7 +58,7 @@ describe("monorepo", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(monorepoCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(monorepoCommand, [], runner)
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }

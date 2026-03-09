@@ -30,7 +30,7 @@ describe("oxfmt", () => {
   describe("exists", () => {
     test("detect when .oxfmtrc.jsonc does not exist", async () => {
       const { path } = await oxfmt
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(path).toBe(null)
@@ -40,7 +40,7 @@ describe("oxfmt", () => {
       await Bun.write(".oxfmtrc.json", JSON.stringify({}))
 
       const { path } = await oxfmt
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(path).toBeDefined()
@@ -50,10 +50,10 @@ describe("oxfmt", () => {
 
   describe("create", () => {
     test("create .oxfmtrc.jsonc with the correct config", async () => {
-      await oxfmt.create().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await oxfmt.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const { path } = await oxfmt
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(path).toBeDefined()
 
@@ -80,11 +80,11 @@ describe("oxfmt", () => {
       )
 
       const existsBefore = await oxfmt
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore.path).toBeDefined()
 
-      await oxfmt.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await oxfmt.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".oxfmtrc.jsonc").text()
       const config = parse(content)
@@ -96,7 +96,7 @@ describe("oxfmt", () => {
     test("return a FailedToReadFile error when reading the config fails", async () => {
       mkdirSync(".oxfmtrc.jsonc", { recursive: true })
 
-      const result = await runEither(oxfmt.update())
+      const result = await runEither(oxfmt.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -106,7 +106,7 @@ describe("oxfmt", () => {
     test("merge an empty config with Adamantite's config", async () => {
       await Bun.write(".oxfmtrc.jsonc", "{}")
 
-      await oxfmt.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await oxfmt.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".oxfmtrc.jsonc").text()
       const config = parse(content)
@@ -117,7 +117,7 @@ describe("oxfmt", () => {
     test("return InvalidConfigFormat when the config is not a JSON object", async () => {
       await Bun.write(".oxfmtrc.jsonc", "[]")
 
-      const result = await runEither(oxfmt.update())
+      const result = await runEither(oxfmt.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
@@ -133,7 +133,7 @@ describe("oxfmt", () => {
       )
       chmodSync(".oxfmtrc.jsonc", 0o444)
 
-      const result = await runEither(oxfmt.update())
+      const result = await runEither(oxfmt.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })

@@ -29,7 +29,7 @@ describe("typescript", () => {
   describe("exists", () => {
     test("detect when tsconfig.json does not exist", async () => {
       const exists = await typescript
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
@@ -38,10 +38,10 @@ describe("typescript", () => {
 
   describe("create", () => {
     test("create tsconfig.json with the correct config", async () => {
-      await typescript.create().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await typescript.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await typescript
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
@@ -55,15 +55,12 @@ describe("typescript", () => {
     test("handle write failures when creating tsconfig.json", async () => {
       mkdirSync("readonly-dir", { recursive: true })
       chmodSync("readonly-dir", 0o555)
-      process.chdir("readonly-dir")
 
-      const result = await runEither(typescript.create())
+      const result = await runEither(typescript.create(join(tempDir, "readonly-dir")))
 
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
       }
-
-      process.chdir(tempDir)
     })
   })
 
@@ -85,11 +82,11 @@ describe("typescript", () => {
       )
 
       const existsBefore = await typescript
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore).toBe(true)
 
-      await typescript.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await typescript.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -117,7 +114,7 @@ describe("typescript", () => {
         )
       )
 
-      await typescript.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await typescript.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -129,7 +126,7 @@ describe("typescript", () => {
     test("merge an empty config with Adamantite's config", async () => {
       await Bun.write("tsconfig.json", "{}")
 
-      await typescript.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await typescript.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -140,7 +137,7 @@ describe("typescript", () => {
     test("return InvalidConfigFormat when tsconfig.json is not a JSON object", async () => {
       await Bun.write("tsconfig.json", "true")
 
-      const result = await runEither(typescript.update())
+      const result = await runEither(typescript.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
@@ -148,7 +145,7 @@ describe("typescript", () => {
     })
 
     test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runEither(typescript.update())
+      const result = await runEither(typescript.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -166,7 +163,7 @@ describe("typescript", () => {
       )
       chmodSync("tsconfig.json", 0o444)
 
-      const result = await runEither(typescript.update())
+      const result = await runEither(typescript.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })

@@ -92,23 +92,23 @@ function toTsConfigContent(
 }
 
 export const oxlint = {
-  create: (presets: string[] = []) =>
+  create: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(process.cwd(), CONFIG_FILE)
+      const configPath = path.join(cwd, CONFIG_FILE)
       const payload = toTsConfigContent({}, getPresetNames(presets))
 
       yield* fs
         .writeFileString(configPath, payload)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  exists: () =>
+  exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const tsPath = path.join(process.cwd(), CONFIG_FILE)
-      const jsonPath = path.join(process.cwd(), LEGACY_CONFIG_FILE)
+      const tsPath = path.join(cwd, CONFIG_FILE)
+      const jsonPath = path.join(cwd, LEGACY_CONFIG_FILE)
       const hasTs = yield* fs.exists(tsPath)
       const hasJson = yield* fs.exists(jsonPath)
 
@@ -124,11 +124,11 @@ export const oxlint = {
       }
     }),
   name: "oxlint",
-  update: (presets: string[] = []) =>
+  update: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const oxlintState = yield* oxlint.exists()
+      const oxlintState = yield* oxlint.exists(cwd)
 
       if (oxlintState.tsPath) {
         return
@@ -139,7 +139,7 @@ export const oxlint = {
       }
 
       const legacyConfigPath = oxlintState.jsonPath
-      const configPath = path.join(process.cwd(), CONFIG_FILE)
+      const configPath = path.join(cwd, CONFIG_FILE)
 
       const legacyConfigContent = yield* fs
         .readFileString(legacyConfigPath)

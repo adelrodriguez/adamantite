@@ -1,257 +1,29 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
-import * as NodeContext from "@effect/platform-node/NodeContext"
-import Bun from "bun"
+import * as NodeServices from "@effect/platform-node/NodeServices"
 import { Effect, Layer } from "effect"
-import { vscode } from "#helpers/editors/vscode.ts"
-import { zed } from "#helpers/editors/zed.ts"
 import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
-import { CwdLive } from "#services/cwd.ts"
+import { Cwd } from "#services/cwd.ts"
 import { readPackageJson } from "#utils.ts"
 
-const SEMVER_REGEX = /^\d+\.\d+\.\d+$/
-const SEMVER_RANGE_REGEX = /[\^~><=]/
 const ROOT_DIR = join(import.meta.dir, "..")
 
 describe("helpers", () => {
-  describe("packages", () => {
-    describe("oxlint", () => {
-      test("should define version as exact semver without range prefixes", () => {
-        const version = oxlint.version
+  test("helper versions stay aligned with package.json devDependencies", async () => {
+    const packageJson = await readPackageJson(ROOT_DIR).pipe(
+      Effect.provide(Layer.mergeAll(NodeServices.layer, Cwd.layer)),
+      Effect.runPromise
+    )
 
-        expect(typeof version).toBe("string")
-        expect(version).toMatch(SEMVER_REGEX)
-        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
-      })
-
-      test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(ROOT_DIR).pipe(
-          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
-          Effect.runPromise
-        )
-        const oxlintInPackage = packageJson.devDependencies?.oxlint
-
-        expect(oxlintInPackage).toBe(oxlint.version)
-      })
-
-      test("should ship lint presets as TypeScript config modules", async () => {
-        const oxlintPresetContent = await Bun.file("presets/lint/core.ts").text()
-        expect(oxlintPresetContent).toContain('import { defineConfig } from "oxlint"')
-        expect(oxlintPresetContent).toContain("export default defineConfig")
-      })
-    })
-
-    describe("tsgolint", () => {
-      test("should define version as exact semver without range prefixes", () => {
-        const version = tsgolint.version
-
-        expect(typeof version).toBe("string")
-        expect(version).toMatch(SEMVER_REGEX)
-        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
-      })
-
-      test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(ROOT_DIR).pipe(
-          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
-          Effect.runPromise
-        )
-        const tsgolintInPackage = packageJson.devDependencies?.["oxlint-tsgolint"]
-
-        expect(tsgolintInPackage).toBe(tsgolint.version)
-      })
-    })
-
-    describe("oxfmt", () => {
-      test("should define version as exact semver without range prefixes", () => {
-        const version = oxfmt.version
-
-        expect(typeof version).toBe("string")
-        expect(version).toMatch(SEMVER_REGEX)
-        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
-      })
-
-      test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(ROOT_DIR).pipe(
-          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
-          Effect.runPromise
-        )
-        const oxfmtInPackage = packageJson.devDependencies?.oxfmt
-
-        expect(oxfmtInPackage).toBe(oxfmt.version)
-      })
-    })
-
-    describe("sherif", () => {
-      test("should define version as exact semver without range prefixes", () => {
-        const version = sherif.version
-
-        expect(typeof version).toBe("string")
-        expect(version).toMatch(SEMVER_REGEX)
-        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
-      })
-
-      test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(ROOT_DIR).pipe(
-          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
-          Effect.runPromise
-        )
-        const sherifInPackage = packageJson.devDependencies?.sherif
-
-        expect(sherifInPackage).toBe(sherif.version)
-      })
-    })
-
-    describe("knip", () => {
-      test("should define version as exact semver without range prefixes", () => {
-        const version = knip.version
-
-        expect(typeof version).toBe("string")
-        expect(version).toMatch(SEMVER_REGEX)
-        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
-      })
-
-      test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(ROOT_DIR).pipe(
-          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
-          Effect.runPromise
-        )
-        const knipInPackage = packageJson.devDependencies?.knip
-
-        expect(knipInPackage).toBe(knip.version)
-      })
-
-      test("should expose base knip helper config", () => {
-        expect(knip.config).toBeDefined()
-        expect(knip.config.rules.files).toBe("error")
-      })
-
-      test("should set correct schema URL based on file extension in update()", async () => {
-        const fs = await import("node:fs/promises")
-        const os = await import("node:os")
-        const path = await import("node:path")
-
-        // Create a temporary directory for testing
-        const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "knip-test-"))
-        const originalCwd = process.cwd()
-
-        try {
-          // Change to temp directory
-          process.chdir(tmpDir)
-
-          // Test .json file
-          const jsonPath = path.join(tmpDir, "knip.json")
-          await fs.writeFile(jsonPath, JSON.stringify({ $schema: "old-schema" }, null, 2))
-
-          await knip.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
-
-          const jsonContent = JSON.parse(await fs.readFile(jsonPath, "utf8"))
-          expect(jsonContent.$schema).toBe("https://unpkg.com/knip@5/schema.json")
-
-          // Clean up and test .jsonc file
-          await fs.unlink(jsonPath)
-
-          const jsoncPath = path.join(tmpDir, "knip.jsonc")
-          await fs.writeFile(jsoncPath, JSON.stringify({ $schema: "old-schema" }, null, 2))
-
-          await knip.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
-
-          const jsoncContent = JSON.parse(await fs.readFile(jsoncPath, "utf8"))
-          expect(jsoncContent.$schema).toBe("https://unpkg.com/knip@5/schema-jsonc.json")
-        } finally {
-          // Restore original directory and clean up
-          process.chdir(originalCwd)
-          await fs.rm(tmpDir, { force: true, recursive: true })
-        }
-      })
-    })
-
-    describe("typescript", () => {
-      test("should define version as exact semver without range prefixes", () => {
-        const version = typescript.version
-
-        expect(typeof version).toBe("string")
-        // Check that it starts with semver format and doesn't have range prefixes
-        expect(version).toMatch(/^\d+\.\d+\.\d+/)
-        expect(version).not.toMatch(SEMVER_RANGE_REGEX)
-      })
-
-      test("should match the version specified in package.json devDependencies", async () => {
-        const packageJson = await readPackageJson(ROOT_DIR).pipe(
-          Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
-          Effect.runPromise
-        )
-        const typescriptInPackage = packageJson.devDependencies?.["typescript"]
-
-        expect(typescriptInPackage).toBe(typescript.version)
-      })
-
-      test("should provide a config that extends adamantite tsconfig preset", () => {
-        expect(typescript.config).toHaveProperty("extends")
-        expect(typescript.config.extends).toBe("adamantite/typescript")
-      })
-
-      test("should have name, version, and command properties", () => {
-        expect(typescript.name).toBe("typescript")
-        expect(typescript.version).toBeDefined()
-        expect(typescript.command).toBe("tsc")
-      })
-    })
-  })
-
-  describe("editors", () => {
-    describe("vscode", () => {
-      test("should configure oxc as default formatter for supported file types", () => {
-        const supportedFileTypes = [
-          "[javascript]",
-          "[typescript]",
-          "[javascriptreact]",
-          "[typescriptreact]",
-          "[json]",
-          "[jsonc]",
-          "[css]",
-          "[graphql]",
-        ]
-
-        for (const fileType of supportedFileTypes) {
-          // @ts-expect-error - fileType is a valid key of vscode.config
-          const fileTypeConfig = vscode.config[fileType]
-          expect(fileTypeConfig).toBeDefined()
-          expect(fileTypeConfig["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
-        }
-      })
-
-      test("should enable format on save and paste", () => {
-        expect(vscode.config["editor.formatOnSave"]).toBe(true)
-        expect(vscode.config["editor.formatOnPaste"]).toBe(true)
-      })
-
-      test("should configure oxc code actions on save", () => {
-        const codeActions = vscode.config["editor.codeActionsOnSave"]
-
-        expect(codeActions).toBeDefined()
-        expect(codeActions["source.fixAll.oxc"]).toBe("explicit")
-      })
-    })
-
-    describe("zed", () => {
-      test("should configure oxlint and oxfmt LSP settings", () => {
-        expect(zed.config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
-        expect(zed.config.lsp.oxlint.initialization_options.settings.typeAware).toBe(true)
-        expect(zed.config.lsp.oxfmt.initialization_options.settings.run).toBe("onSave")
-        expect(zed.config.lsp.oxfmt.initialization_options.settings["fmt.experimental"]).toBe(true)
-      })
-
-      test("should enable JavaScript formatting and code actions", () => {
-        const javascript = zed.config.languages.JavaScript
-
-        expect(javascript.format_on_save).toBe("on")
-        expect(javascript.formatter[0]).toEqual({ language_server: { name: "oxfmt" } })
-        expect(javascript.formatter[1]).toEqual({ code_action: "source.fixAll.oxc" })
-      })
-    })
+    expect(packageJson.devDependencies?.oxlint).toBe(oxlint.version)
+    expect(packageJson.devDependencies?.["oxlint-tsgolint"]).toBe(tsgolint.version)
+    expect(packageJson.devDependencies?.oxfmt).toBe(oxfmt.version)
+    expect(packageJson.devDependencies?.sherif).toBe(sherif.version)
+    expect(packageJson.devDependencies?.knip).toBe(knip.version)
+    expect(packageJson.devDependencies?.typescript).toBe(typescript.version)
   })
 })

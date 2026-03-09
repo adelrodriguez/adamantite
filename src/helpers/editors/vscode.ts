@@ -1,7 +1,8 @@
-import * as ShellCommand from "@effect/platform/Command"
-import * as FileSystem from "@effect/platform/FileSystem"
-import * as Path from "@effect/platform/Path"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
+import * as ChildProcess from "effect/unstable/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { Script } from "#types.ts"
 import {
   FailedToCreateDirectory,
@@ -76,31 +77,52 @@ export const vscode = {
     }),
 
   extension: (scripts: Script[] = []) =>
-    Effect.gen(function* () {
-      yield* vscode.cliExists()
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* vscode.cliExists()
 
-      const installExtension = (extension: string) =>
-        ShellCommand.make("code", "--install-extension", extension).pipe(
-          ShellCommand.stdout("inherit"),
-          ShellCommand.stderr("inherit"),
-          ShellCommand.exitCode,
-          Effect.mapError((cause) => new FailedToInstallExtension({ cause, extension }))
+        function installExtension(extension: string) {
+          return Effect.gen(function* () {
+            const handle = yield* ChildProcess.make("code", ["--install-extension", extension], {
+              stderr: "inherit",
+              stdin: "ignore",
+              stdout: "inherit",
+            })
+            return yield* handle.exitCode
+          }).pipe(
+            Effect.mapError((cause) => new FailedToInstallExtension({ cause, extension })),
+            Effect.filterOrFail(
+              (exitCode) => exitCode === ChildProcessSpawner.ExitCode(0),
+              (exitCode) => new FailedToInstallExtension({ cause: exitCode, extension })
+            ),
+            Effect.asVoid
+          )
+        }
+
+        const extensions = [
+          scripts.includes("check") || scripts.includes("fix") || scripts.includes("format")
+            ? installExtension("oxc.oxc-vscode")
+            : Effect.void,
+          scripts.includes("analyze") ? installExtension("webpro.vscode-knip") : Effect.void,
+        ]
+
+        const results = yield* Effect.all(
+          extensions.map((extension) =>
+            extension.pipe(
+              Effect.match({
+                onFailure: (error) => error,
+                onSuccess: () => null,
+              })
+            )
+          )
         )
+        const firstFailure = results.find((result) => result !== null)
 
-      const extensions = [
-        scripts.includes("check") || scripts.includes("fix") || scripts.includes("format")
-          ? installExtension("oxc.oxc-vscode")
-          : Effect.void,
-        scripts.includes("analyze") ? installExtension("webpro.vscode-knip") : Effect.void,
-      ]
-
-      const results = yield* Effect.all(extensions, { mode: "either" })
-      const firstFailure = results.find((r) => r._tag === "Left")
-
-      if (firstFailure) {
-        yield* Effect.fail(firstFailure.left)
-      }
-    }),
+        if (firstFailure) {
+          yield* Effect.fail(firstFailure)
+        }
+      })
+    ),
   update: () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem

@@ -1,16 +1,11 @@
-import process from "node:process"
-import * as Command from "@effect/cli/Command"
-import * as FileSystem from "@effect/platform/FileSystem"
-import * as Path from "@effect/platform/Path"
+import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
-import { addDevDependency, detectPackageManager, type PackageManagerName } from "nypm"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
+import * as Command from "effect/unstable/cli/Command"
+import type { FailedToInstallExtension } from "#errors.ts"
 import type { Script } from "#types.ts"
-import {
-  FailedToInstallDependency,
-  FailedToWriteFile,
-  NoPackageManager,
-  UnknownScript,
-} from "#errors.ts"
+import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#errors.ts"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
 import { zed } from "#helpers/editors/zed.ts"
@@ -20,26 +15,30 @@ import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 import { Cwd } from "#services/cwd.ts"
+import { DependencyInstaller } from "#services/dependency-installer.ts"
 import { Prompter } from "#services/prompter.ts"
 import { checkIsMonorepo, printTitle, readPackageJson } from "#utils.ts"
 
 const installDependencies = (packages: string[]) =>
   Effect.gen(function* () {
+    const dependencyInstaller = yield* DependencyInstaller
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
     spinner.start("Installing dependencies...")
     const isMonorepo = yield* checkIsMonorepo()
 
-    yield* Effect.tryPromise({
-      catch: (cause) => new FailedToInstallDependency({ cause, packages }),
-      try: () => addDevDependency(packages, { silent: true, workspace: isMonorepo }),
-    }).pipe(
-      Effect.tapError(() =>
-        Effect.sync(() => {
-          spinner.stop("Failed to install dependencies.")
-        })
+    yield* dependencyInstaller
+      .addDevDependencies(packages, {
+        silent: true,
+        workspace: isMonorepo,
+      })
+      .pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            spinner.stop("Failed to install dependencies.")
+          })
+        )
       )
-    )
 
     spinner.stop("Dependencies installed.")
   })
@@ -254,27 +253,23 @@ const installEditorExtensions = (editors: string[], scripts: Script[]) =>
           spinner.stop()
         })
       ),
-      Effect.catchTags({
-        FailedToInstallExtension: (error) =>
-          Effect.gen(function* () {
-            yield* prompter.log.warning(
-              `⚠️ Failed to install the \`${error.extension}\` extension.`
-            )
-            yield* prompter.log.warning("Please install it manually after setup completes.")
-            return false as const
-          }),
-        VscodeCliNotFound: () =>
-          Effect.gen(function* () {
-            yield* prompter.log.error("VSCode CLI ('code' command) not found.")
-            yield* prompter.log.info("To install it:")
-            yield* prompter.log.info("  1. Open VS Code")
-            yield* prompter.log.info(
-              "  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)"
-            )
-            yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
-            return false as const
-          }),
-      })
+      Effect.catchTag("FailedToInstallExtension", (error: FailedToInstallExtension) =>
+        Effect.gen(function* () {
+          yield* prompter.log.warning(`⚠️ Failed to install the \`${error.extension}\` extension.`)
+          yield* prompter.log.warning("Please install it manually after setup completes.")
+          return false as const
+        })
+      ),
+      Effect.catchTag("VscodeCliNotFound", () =>
+        Effect.gen(function* () {
+          yield* prompter.log.error("VSCode CLI ('code' command) not found.")
+          yield* prompter.log.info("To install it:")
+          yield* prompter.log.info("  1. Open VS Code")
+          yield* prompter.log.info("  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)")
+          yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
+          return false as const
+        })
+      )
     )
 
     if (result) {
@@ -319,10 +314,8 @@ export default Command.make("init").pipe(
 
       yield* prompter.intro("💠 adamantite init")
 
-      const packageManager = yield* Effect.tryPromise({
-        catch: (cause) => new NoPackageManager({ cause }),
-        try: () => detectPackageManager(process.cwd()),
-      })
+      const dependencyInstaller = yield* DependencyInstaller
+      const packageManager = yield* dependencyInstaller.detectPackageManager()
 
       if (!packageManager) {
         return yield* Effect.fail(new NoPackageManager({}))

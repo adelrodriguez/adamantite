@@ -1,10 +1,9 @@
-import * as Command from "@effect/cli/Command"
 import * as Effect from "effect/Effect"
-import { addDevDependency } from "nypm"
-import { FailedToInstallDependency } from "#errors.ts"
+import * as Command from "effect/unstable/cli/Command"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
+import { DependencyInstaller } from "#services/dependency-installer.ts"
 import { Prompter } from "#services/prompter.ts"
 import { normalizeDependencyVersion, printTitle, readPackageJson } from "#utils.ts"
 
@@ -20,6 +19,7 @@ export default Command.make("update").pipe(
       yield* printTitle()
 
       yield* prompter.intro("💠 adamantite update")
+      const dependencyInstaller = yield* DependencyInstaller
 
       // Detect updates needed
       const updates: Array<{
@@ -39,6 +39,12 @@ export default Command.make("update").pipe(
             targetVersion: pkg.version,
           })
         }
+      }
+
+      if (oxlintState.hasBoth) {
+        yield* prompter.log.warning(
+          "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`."
+        )
       }
 
       // Early exit if no updates are needed and there is nothing to migrate
@@ -69,32 +75,20 @@ export default Command.make("update").pipe(
         const spinner = prompter.spinner()
         spinner.start("Updating dependencies...")
 
-        yield* Effect.tryPromise({
-          catch: (cause) =>
-            new FailedToInstallDependency({
-              cause,
-              packages: updates.map((dep) => dep.name),
-            }),
-          try: () =>
-            addDevDependency(
-              updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
-              { silent: true }
-            ),
-        }).pipe(
-          Effect.tapError(() =>
-            Effect.sync(() => {
-              spinner.stop("Failed to update dependencies")
-            })
+        yield* dependencyInstaller
+          .addDevDependencies(
+            updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
+            { silent: true }
           )
-        )
+          .pipe(
+            Effect.tapError(() =>
+              Effect.sync(() => {
+                spinner.stop("Failed to update dependencies")
+              })
+            )
+          )
 
         spinner.stop("Dependencies updated successfully")
-      }
-
-      if (oxlintState.hasBoth) {
-        yield* prompter.log.warning(
-          "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`."
-        )
       }
 
       if (shouldMigrateLegacyOxlint) {

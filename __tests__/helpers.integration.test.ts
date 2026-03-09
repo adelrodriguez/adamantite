@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as NodeContext from "@effect/platform-node/NodeContext"
+import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
-import { Effect, Either } from "effect"
+import * as Effect from "effect/Effect"
 import { parse } from "jsonc-parser"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
 import { vscode } from "#helpers/editors/vscode.ts"
@@ -13,10 +13,31 @@ import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint } from "#helpers/packages/oxlint.ts"
 import { typescript } from "#helpers/packages/typescript.ts"
 
+const NodeContext = NodeServices
+
+type TestEither<A, E> =
+  | { readonly _tag: "Left"; readonly left: E }
+  | { readonly _tag: "Right"; readonly right: A }
+
+const Either = {
+  isLeft<A, E>(
+    either: TestEither<A, E>
+  ): either is Extract<TestEither<A, E>, { readonly _tag: "Left" }> {
+    return either._tag === "Left"
+  },
+}
+
 // Helper to run Effect and get Either for error testing
-async function runEither<A, E, R>(effect: Effect.Effect<A, E, R>) {
-  const provided = effect.pipe(Effect.provide(NodeContext.layer)) as Effect.Effect<A, E>
-  return await provided.pipe(Effect.either, Effect.runPromise)
+async function runEither<A, E, R>(effect: Effect.Effect<A, E, R>): Promise<TestEither<A, E>> {
+  const provided = effect.pipe(Effect.provide(NodeServices.layer)) as Effect.Effect<A, E>
+  return await Effect.runPromise(
+    provided.pipe(
+      Effect.match({
+        onFailure: (left) => ({ _tag: "Left" as const, left }),
+        onSuccess: (right) => ({ _tag: "Right" as const, right }),
+      })
+    )
+  )
 }
 
 describe("helpers integration", () => {
@@ -65,18 +86,18 @@ describe("helpers integration", () => {
       test("should detect when no oxlint config exists", async () => {
         const state = await oxlint
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(state.path).toBe(null)
         expect(state.format).toBe(null)
         expect(state.hasBoth).toBe(false)
       })
 
       test("should create oxlint.config.ts with correct config", async () => {
-        await oxlint.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        await oxlint.create().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
         const state = await oxlint
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(state.path).toContain("oxlint.config.ts")
         expect(state.format).toBe("ts")
 
@@ -102,11 +123,11 @@ describe("helpers integration", () => {
           )
         )
 
-        await oxlint.update(["node"]).pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        await oxlint.update(["node"]).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
         const state = await oxlint
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(state.format).toBe("ts")
         expect(state.path).toContain("oxlint.config.ts")
         expect(state.jsonPath).toBe(null)
@@ -136,7 +157,7 @@ describe("helpers integration", () => {
           )
         )
 
-        await oxlint.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        await oxlint.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
         const content = await Bun.file("oxlint.config.ts").text()
         expect(content).toContain('import core from "adamantite/lint"')
@@ -183,7 +204,7 @@ describe("helpers integration", () => {
 
         const state = await oxlint
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(state.hasBoth).toBe(true)
         expect(state.format).toBe("ts")
         expect(state.path).toContain("oxlint.config.ts")
@@ -194,7 +215,7 @@ describe("helpers integration", () => {
       test("should detect when .oxfmtrc.jsonc does not exist", async () => {
         const { path } = await oxfmt
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(path).toBe(null)
       })
 
@@ -203,17 +224,17 @@ describe("helpers integration", () => {
 
         const { path } = await oxfmt
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(path).toBeDefined()
         expect(path).toContain(".oxfmtrc.json")
       })
 
       test("should create .oxfmtrc.jsonc with correct config", async () => {
-        await oxfmt.create().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        await oxfmt.create().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
         const { path } = await oxfmt
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(path).toBeDefined()
 
         const content = await Bun.file(".oxfmtrc.jsonc").text()
@@ -239,10 +260,10 @@ describe("helpers integration", () => {
 
         const existsBefore = await oxfmt
           .exists()
-          .pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+          .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
         expect(existsBefore.path).toBeDefined()
 
-        await oxfmt.update().pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
+        await oxfmt.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
         const content = await Bun.file(".oxfmtrc.jsonc").text()
         const config = parse(content)

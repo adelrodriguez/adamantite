@@ -1,11 +1,11 @@
-import process from "node:process"
-import * as Command from "@effect/cli/Command"
-import * as NodeContext from "@effect/platform-node/NodeContext"
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-import * as CommandExecutor from "@effect/platform/CommandExecutor"
+import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as Runtime from "effect/Runtime"
+import * as Command from "effect/unstable/cli/Command"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import analyzeCommand from "#commands/analyze.ts"
 import checkCommand from "#commands/check.ts"
 import fixCommand from "#commands/fix.ts"
@@ -14,8 +14,10 @@ import initCommand from "#commands/init.ts"
 import monorepoCommand from "#commands/monorepo.ts"
 import typecheckCommand from "#commands/typecheck.ts"
 import updateCommand from "#commands/update.ts"
-import { CwdLive } from "#services/cwd.ts"
-import { Prompter, PrompterLive } from "#services/prompter.ts"
+import { CommandRunner } from "#services/command-runner.ts"
+import { Cwd } from "#services/cwd.ts"
+import { DependencyInstaller } from "#services/dependency-installer.ts"
+import { Prompter } from "#services/prompter.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
 const main = Command.make("adamantite").pipe(
@@ -34,27 +36,33 @@ const main = Command.make("adamantite").pipe(
 
 const version = await getPackageVersion()
 
-const program = Command.run(main, { name: "adamantite", version })
-
-program(process.argv)
-  .pipe(
-    Effect.as(CommandExecutor.ExitCode(0)),
-    Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
-    Effect.catchAll((error) =>
-      Effect.gen(function* () {
-        const prompter = yield* Prompter
-        const message =
-          "message" in error && error.message ? error.message : "An unexpected error occurred."
-        yield* prompter.log.error(message)
-        return CommandExecutor.ExitCode(1)
-      })
+const program = Command.run(main, { version }).pipe(
+  Effect.as(0),
+  Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
+  Effect.catch((error) =>
+    Effect.service(Prompter).pipe(
+      Effect.flatMap((prompter) => prompter.log.error(error.message)),
+      Effect.as(ChildProcessSpawner.ExitCode(1))
+    )
+  ),
+  Effect.provide(
+    Layer.mergeAll(
+      NodeServices.layer,
+      Prompter.layer,
+      Cwd.layer,
+      CommandRunner.layer,
+      DependencyInstaller.layer.pipe(Layer.provide(Cwd.layer))
     )
   )
-  .pipe(
-    Effect.provide(Layer.mergeAll(NodeContext.layer, PrompterLive, CwdLive)),
-    NodeRuntime.runMain({
-      teardown: (exit, onExit) => {
-        onExit(Exit.isSuccess(exit) ? (exit.value as number) : 1)
-      },
-    })
-  )
+)
+
+NodeRuntime.runMain(program, {
+  teardown: (exit, onExit) => {
+    if (Exit.isSuccess(exit)) {
+      onExit(Number(exit.value))
+      return
+    }
+
+    Runtime.defaultTeardown(exit, onExit)
+  },
+})

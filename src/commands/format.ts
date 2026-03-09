@@ -1,47 +1,42 @@
-import * as Args from "@effect/cli/Args"
-import * as Command from "@effect/cli/Command"
-import * as Options from "@effect/cli/Options"
-import * as ShellCommand from "@effect/platform/Command"
-import * as CommandExecutor from "@effect/platform/CommandExecutor"
 import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
+import * as Argument from "effect/unstable/cli/Argument"
+import * as Command from "effect/unstable/cli/Command"
+import * as Flag from "effect/unstable/cli/Flag"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { CommandFailed } from "#errors.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
+import { CommandRunner } from "#services/command-runner.ts"
 
-const files = Args.file({ exists: "yes" }).pipe(
-  Args.withDescription("Specific files to format (optional)"),
-  Args.repeated,
-  Args.optional
+const files = Argument.file("files", { mustExist: true }).pipe(
+  Argument.withDescription("Specific files to format (optional)"),
+  Argument.variadic()
 )
 
-const check = Options.boolean("check").pipe(
-  Options.withDescription("Check if files are formatted without writing")
+const check = Flag.boolean("check").pipe(
+  Flag.withDescription("Check if files are formatted without writing")
 )
 
 export default Command.make("format", { check, files }).pipe(
   Command.withDescription("Format files using oxfmt"),
   Command.withHandler(({ check, files }) =>
     Effect.gen(function* () {
+      const runner = yield* CommandRunner
       const args: string[] = []
 
       if (check) {
         args.push("--check")
       }
 
-      if (Option.isSome(files)) {
-        args.push(...files.value)
-      }
+      args.push(...files)
 
-      return yield* ShellCommand.make(oxfmt.name, ...args).pipe(
-        ShellCommand.stdout("inherit"),
-        ShellCommand.stderr("inherit"),
-        ShellCommand.exitCode,
-        Effect.filterOrFail(
-          (exitCode) => exitCode === CommandExecutor.ExitCode(0),
-          (exitCode) => new CommandFailed({ command: oxfmt.name, exitCode })
-        ),
-        Effect.asVoid
-      )
+      const exitCode = yield* runner.run({
+        args,
+        command: oxfmt.name,
+      })
+
+      if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
+        yield* Effect.fail(new CommandFailed({ command: oxfmt.name, exitCode }))
+      }
     })
   )
 )

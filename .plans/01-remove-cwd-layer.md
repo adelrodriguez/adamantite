@@ -199,21 +199,107 @@ Only after all usages are removed:
 - Update tests alongside each slice instead of after the entire refactor
 - Prefer command-by-command or helper-by-helper rollout
 
-## Suggested Execution Order
+## Execution Slices
 
-1. `utils.ts`
-2. `DependencyInstaller`
-3. `init` and `update`
-4. package helpers
-5. editor helpers
-6. CI helpers
-7. test cleanup
-8. `Cwd` deletion
+Each slice is a standalone commit. Run `bun run test && bun run typecheck && bun run check && bun run format` after each.
+
+### Slice 1: Utilities (`src/utils.ts`)
+
+**Files changed:**
+
+- `src/utils.ts` — `readPackageJson(cwd?: string)` and `checkIsMonorepo(cwd?: string)`. Remove `yield* Cwd` calls. Use `cwd ?? process.cwd()` as fallback.
+- `src/__tests__/utils.test.ts` — Pass temp dirs explicitly to `readPackageJson(tempDir)` and `checkIsMonorepo(tempDir)`. Remove `Cwd` layer from `runEither` calls. Keep `process.chdir` for now since helpers still need it.
+
+**Current `Cwd` usage (to remove):**
+
+- `readPackageJson()` — `src/utils.ts:80-81` (`yield* Cwd`, `cwd.get`)
+- `checkIsMonorepo()` — `src/utils.ts:94-95` (`yield* Cwd`, `cwd.get`)
+
+**No downstream breakage:** All callers of `readPackageJson()` and `checkIsMonorepo()` currently pass no arguments, so adding an optional parameter is backward-compatible.
+
+### Slice 2: DependencyInstaller (`src/services/dependency-installer.ts`)
+
+**Files changed:**
+
+- `src/services/dependency-installer.ts` — Remove `Cwd` import and `yield* Cwd`. Accept `cwd: string` in `detectPackageManager(cwd)`. The `addDevDependencies` method does not need cwd (nypm uses process.cwd internally for install).
+- `src/commands/__tests__/command-test-helpers.ts` — Remove mock `Cwd` layer from `createDependencyInstallerTestContext`. Update `runCommand` to stop providing `Cwd` layer.
+
+**Current `Cwd` usage (to remove):**
+
+- `src/services/dependency-installer.ts:36` (`yield* Cwd`)
+- `src/services/dependency-installer.ts:41,50` (`cwd.get`)
+
+**Callers to update:** `init.ts` and `update.ts` must pass `cwd` when calling `detectPackageManager`.
+
+### Slice 3: Package helpers (`src/helpers/packages/`)
+
+**Files changed (4 helpers):**
+
+- `src/helpers/packages/oxlint.ts` — Add `cwd: string` parameter to `create(cwd, presets)`, `exists(cwd)`, `update(cwd)`. Replace `process.cwd()` at lines 99, 110, 111, 142.
+- `src/helpers/packages/oxfmt.ts` — Add `cwd: string` to `create(cwd)`, `exists(cwd)`, `update(cwd)`. Replace `process.cwd()` at lines 20, 31, 32.
+- `src/helpers/packages/typescript.ts` — Add `cwd: string` to `create(cwd)`, `exists(cwd)`, `update(cwd)`. Replace `process.cwd()` at lines 16, 27, 34.
+- `src/helpers/packages/knip.ts` — Add `cwd: string` to `create(cwd)`, `exists(cwd)`, `update(cwd)`. Replace `process.cwd()` at lines 17, 28, 29.
+
+**Test files changed (4 test files):**
+
+- `src/helpers/packages/__tests__/oxlint.test.ts` — Pass `tempDir` to all helper calls. Can remove `process.chdir(tempDir)` from beforeEach.
+- `src/helpers/packages/__tests__/oxfmt.test.ts` — Same.
+- `src/helpers/packages/__tests__/typescript.test.ts` — Same.
+- `src/helpers/packages/__tests__/knip.test.ts` — Same.
+
+**Note:** `sherif.ts` has no file I/O, so no changes needed.
+
+**Internal callers in oxlint.ts:** `oxlint.update()` calls `oxlint.exists()` internally (line 133). After this slice, `update(cwd)` must forward `cwd` to `exists(cwd)`.
+
+### Slice 4: Editor and CI helpers (`src/helpers/editors/`, `src/helpers/ci/`)
+
+**Files changed (3 helpers):**
+
+- `src/helpers/editors/vscode.ts` — Add `cwd: string` to `create(cwd)`, `exists(cwd)`, `update(cwd)`, `installExtensions(cwd)`. Replace `process.cwd()` at lines 60, 76, 130.
+- `src/helpers/editors/zed.ts` — Add `cwd: string` to `create(cwd)`, `exists(cwd)`, `update(cwd)`. Replace `process.cwd()` at lines 87, 102, 108.
+- `src/helpers/ci/github.ts` — Add `cwd: string` to `create(cwd, ...)`, `exists(cwd)`, `update(cwd, ...)`. Replace `process.cwd()` at lines 169, 190, 197.
+
+**Test files changed (3 test files):**
+
+- `src/helpers/editors/__tests__/vscode.test.ts` — Pass `tempDir` directly.
+- `src/helpers/editors/__tests__/zed.test.ts` — Same.
+- `src/helpers/ci/__tests__/github.test.ts` — Same.
+
+### Slice 5: Commands (`src/commands/`)
+
+**Files changed:**
+
+- `src/commands/init.ts` — Read `const cwd = process.cwd()` once at the top of the handler. Pass `cwd` to all helper calls (`oxlint.create(cwd, ...)`, `oxfmt.create(cwd)`, `knip.create(cwd)`, `typescript.create(cwd)`, `vscode.create(cwd)`, `zed.create(cwd)`, `github.create(cwd, ...)`, `readPackageJson(cwd)`, `checkIsMonorepo(cwd)`, `addScripts(cwd, ...)`). Remove `yield* Cwd`.
+- `src/commands/update.ts` — Read `const cwd = process.cwd()` once. Pass to `readPackageJson(cwd)`, `oxlint.exists(cwd)`, `oxlint.update(cwd)`.
+- `src/commands/typecheck.ts` — Already reads cwd for `CommandRunner`. Replace `yield* Cwd` with `const cwd = process.cwd()`.
+
+**Test files updated:**
+
+- `src/commands/__tests__/init.test.ts` — Remove `Cwd` layer from `runCommand`. Keep `process.chdir(tempDir)` since `process.cwd()` is now read directly in commands.
+- `src/commands/__tests__/update.test.ts` — Same.
+- `src/commands/__tests__/typecheck.test.ts` — Same.
+
+**Note:** `check.ts`, `fix.ts`, `format.ts`, `analyze.ts`, `monorepo.ts` do not use `Cwd` and need no changes.
+
+### Slice 6: Cleanup
+
+**Files deleted:**
+
+- `src/services/cwd.ts`
+
+**Files changed:**
+
+- `src/index.ts` — Remove `Cwd` import and `Cwd.layer` from the layer composition (line 52).
+- `src/version.ts` — Remove `Cwd.layer` from the Effect provider (line 16). `readPackageJson()` no longer needs it.
+- `src/commands/__tests__/command-test-helpers.ts` — Remove `Cwd` import and mock `Cwd` layer from `runCommand` / `runCommandWithRunner`.
+- `src/__tests__/utils.test.ts` — Remove any remaining `Cwd` layer usage.
+
+**Final verification:** `grep -r "Cwd" src/` returns zero results.
 
 ## Acceptance Criteria
 
 - No production code depends on `src/services/cwd.ts`
-- Commands read cwd only at the boundary
-- Helpers and utilities accept explicit cwd input
-- Tests no longer rely on a `Cwd` layer except during the transition
-- `bun run format`, `bun run test`, `bun run typecheck`, and `bun run check` all pass
+- Commands read cwd only at the boundary via `process.cwd()`
+- Helpers and utilities accept explicit `cwd` input
+- Tests no longer rely on a `Cwd` layer
+- `bun run test`, `bun run typecheck`, `bun run check`, and `bun run format` all pass

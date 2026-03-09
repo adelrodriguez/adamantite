@@ -114,7 +114,7 @@ export const zed = {
       const existingConfig = yield* parseJson(zedFile, zedPath)
 
       if (!isJsonObject(existingConfig)) {
-        return yield* Effect.fail(new InvalidConfigFormat({ path: zedPath }))
+        return yield* new InvalidConfigFormat({ path: zedPath })
       }
 
       const newConfig = yield* mergeConfig(zed.config, existingConfig)

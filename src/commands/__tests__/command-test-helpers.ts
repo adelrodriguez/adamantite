@@ -6,7 +6,7 @@ import * as Layer from "effect/Layer"
 import * as Terminal from "effect/Terminal"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { FailedToInstallDependency } from "#errors.ts"
+import { OperationCancelled, type FailedToInstallDependency } from "#errors.ts"
 import { type CommandRunOptions, CommandRunner } from "#services/command-runner.ts"
 import { type DetectedPackageManager, DependencyInstaller } from "#services/dependency-installer.ts"
 import { Prompter } from "#services/prompter.ts"
@@ -22,6 +22,7 @@ interface SpinnerEntry {
 }
 
 export interface PrompterTestContext {
+  readonly cancels: string[]
   readonly confirmCalls: prompts.ConfirmOptions[]
   readonly intros: string[]
   readonly layer: Layer.Layer<Prompter>
@@ -84,27 +85,43 @@ export function createRunnerTestContext(exitCodes: number[] = [0]): RunnerTestCo
 }
 
 export function createPrompterTestContext(options?: {
+  readonly cancelAtPromptIndex?: number
   readonly confirmResponses?: boolean[]
   readonly multiselectResponses?: unknown[][]
 }): PrompterTestContext {
+  const cancelAtPromptIndex = options?.cancelAtPromptIndex
   const confirmResponses = [...(options?.confirmResponses ?? [])]
   const multiselectResponses = [...(options?.multiselectResponses ?? [])]
+  const cancels: string[] = []
   const confirmCalls: prompts.ConfirmOptions[] = []
   const intros: string[] = []
   const logs: LogEntry[] = []
   const outros: string[] = []
   const spinnerEntries: SpinnerEntry[] = []
+  let promptIndex = 0
+
+  // CancelAtPromptIndex is 1-based: 1 means cancel the first prompt shown.
+  function shouldCancelPrompt() {
+    promptIndex += 1
+    return cancelAtPromptIndex === promptIndex
+  }
 
   return {
+    cancels,
     confirmCalls,
     intros,
     layer: Layer.succeed(Prompter)({
       cancel: (message) =>
         Effect.sync(() => {
+          cancels.push(message)
           logs.push({ level: "warning", message })
         }),
       confirm: (config) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          if (shouldCancelPrompt()) {
+            return yield* new OperationCancelled({})
+          }
+
           confirmCalls.push(config)
           return shiftResponse(confirmResponses, "confirm")
         }),
@@ -131,7 +148,13 @@ export function createPrompterTestContext(options?: {
           }),
       },
       multiselect: <T>(_config: prompts.MultiSelectOptions<T>) =>
-        Effect.sync(() => shiftResponse(multiselectResponses, "multiselect") as T[]),
+        Effect.gen(function* () {
+          if (shouldCancelPrompt()) {
+            return yield* new OperationCancelled({})
+          }
+
+          return shiftResponse(multiselectResponses, "multiselect") as T[]
+        }),
       outro: (message) =>
         Effect.sync(() => {
           outros.push(message)
@@ -164,6 +187,10 @@ export function createDependencyInstallerTestContext(options?: {
   readonly detectedPackageManager?: DetectedPackageManager | null
 }): DependencyInstallerTestContext {
   const calls: DependencyInstallerCall[] = []
+  const detectedPackageManager: DetectedPackageManager | null =
+    options && "detectedPackageManager" in options
+      ? (options.detectedPackageManager ?? null)
+      : { name: "bun" as const }
 
   return {
     calls,
@@ -179,8 +206,7 @@ export function createDependencyInstallerTestContext(options?: {
             return yield* Effect.fail(options.addDevDependenciesError)
           }
         }),
-      detectPackageManager: (_cwd) =>
-        Effect.succeed(options?.detectedPackageManager ?? { name: "bun" }),
+      detectPackageManager: (_cwd) => Effect.succeed(detectedPackageManager),
     }),
   }
 }

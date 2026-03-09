@@ -135,7 +135,7 @@ export const oxlint = {
       }
 
       if (!oxlintState.jsonPath) {
-        return yield* Effect.fail(new FileNotFound({ path: LEGACY_CONFIG_FILE }))
+        return yield* new FileNotFound({ path: LEGACY_CONFIG_FILE })
       }
 
       const legacyConfigPath = oxlintState.jsonPath
@@ -148,7 +148,7 @@ export const oxlint = {
       const existingConfig = yield* parseJson(legacyConfigContent, legacyConfigPath)
 
       if (!isJsonObject(existingConfig)) {
-        return yield* Effect.fail(new InvalidConfigFormat({ path: legacyConfigPath }))
+        return yield* new InvalidConfigFormat({ path: legacyConfigPath })
       }
 
       const { $schema: _schema, ...configWithoutSchema } = existingConfig

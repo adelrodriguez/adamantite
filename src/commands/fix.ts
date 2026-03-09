@@ -45,7 +45,7 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
       })
 
       if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-        yield* Effect.fail(new CommandFailed({ command: oxlint.name, exitCode }))
+        yield* new CommandFailed({ command: oxlint.name, exitCode })
       }
     })
   )

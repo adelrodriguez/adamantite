@@ -22,7 +22,7 @@ export default Command.make("check", { files }).pipe(
       })
 
       if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-        yield* Effect.fail(new CommandFailed({ command: oxlint.name, exitCode }))
+        yield* new CommandFailed({ command: oxlint.name, exitCode })
       }
     })
   )

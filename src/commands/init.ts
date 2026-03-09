@@ -133,7 +133,7 @@ const addScripts = (cwd: string, scripts: Script[]) =>
           packageJson.scripts.analyze = "adamantite analyze"
           break
         default:
-          return yield* Effect.fail(new UnknownScript({ script }))
+          return yield* new UnknownScript({ script })
       }
     }
 
@@ -316,7 +316,7 @@ export default Command.make("init").pipe(
       const packageManager = yield* dependencyInstaller.detectPackageManager(cwd)
 
       if (!packageManager) {
-        return yield* Effect.fail(new NoPackageManager({}))
+        return yield* new NoPackageManager({})
       }
 
       if (packageManager.warnings?.length) {

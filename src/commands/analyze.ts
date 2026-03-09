@@ -31,7 +31,7 @@ export default Command.make("analyze", { fix, strict }).pipe(
       })
 
       if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-        yield* Effect.fail(new CommandFailed({ command: knip.name, exitCode }))
+        yield* new CommandFailed({ command: knip.name, exitCode })
       }
     })
   )

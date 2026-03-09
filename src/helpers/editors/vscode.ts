@@ -139,7 +139,7 @@ export const vscode = {
       // This ensures Adamantite's settings are always applied
       // Empty configs are allowed and will be merged with Adamantite's config
       if (!isJsonObject(existingConfig)) {
-        return yield* Effect.fail(new InvalidConfigFormat({ path: vscodePath }))
+        return yield* new InvalidConfigFormat({ path: vscodePath })
       }
 
       const newConfig = yield* mergeConfig(vscode.config, existingConfig)

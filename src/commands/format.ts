@@ -35,7 +35,7 @@ export default Command.make("format", { check, files }).pipe(
       })
 
       if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-        yield* Effect.fail(new CommandFailed({ command: oxfmt.name, exitCode }))
+        yield* new CommandFailed({ command: oxfmt.name, exitCode })
       }
     })
   )

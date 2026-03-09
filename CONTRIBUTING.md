@@ -80,12 +80,12 @@ bun test
 bun run test:watch
 
 # Run specific test file
-bun test __tests__/cli.test.ts
+bun test src/__tests__/index.test.ts
 ```
 
 ### Writing Tests
 
-- Place test files in the `__tests__/` directory
+- Place test files in colocated `src/**/__tests__/` directories
 - Use descriptive test names that explain the behavior being tested
 - Follow the existing test patterns in the codebase
 - Test both success and error cases

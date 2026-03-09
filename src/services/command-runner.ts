@@ -17,14 +17,6 @@ export interface CommandRunOptions {
 
 export type CommandFailedLike = CliNotFound | PlatformError.PlatformError
 
-function mapCommandError(command: string, cause: PlatformError.PlatformError): CommandFailedLike {
-  if (cause.reason._tag === "NotFound") {
-    return new CliNotFound({ command })
-  }
-
-  return cause
-}
-
 export class CommandRunner extends ServiceMap.Service<
   CommandRunner,
   {
@@ -39,24 +31,22 @@ export class CommandRunner extends ServiceMap.Service<
 >()("CommandRunner") {
   static readonly layer = Layer.succeed(this)({
     run: ({ args, command, cwd, stderr = "inherit", stdin = "ignore", stdout = "inherit" }) =>
-      Effect.scoped(
-        Effect.gen(function* () {
-          const handle = yield* Effect.mapError(
-            Effect.fromYieldable(
+      Effect.mapError(
+        Effect.scoped(
+          Effect.gen(function* () {
+            const handle = yield* Effect.fromYieldable(
               ChildProcess.make(command, args, {
                 cwd,
                 stderr,
                 stdin,
                 stdout,
               })
-            ),
-            (cause: PlatformError.PlatformError) => mapCommandError(command, cause)
-          )
+            )
 
-          return yield* Effect.mapError(handle.exitCode, (cause: PlatformError.PlatformError) =>
-            mapCommandError(command, cause)
-          )
-        })
+            return yield* handle.exitCode
+          })
+        ),
+        (cause) => (cause.reason._tag === "NotFound" ? new CliNotFound({ command }) : cause)
       ),
   })
 }

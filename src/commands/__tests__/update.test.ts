@@ -6,6 +6,7 @@ import { join } from "node:path"
 import Bun from "bun"
 import * as Exit from "effect/Exit"
 import updateCommand from "#commands/update.ts"
+import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
@@ -37,6 +38,7 @@ describe("update", () => {
         JSON.stringify(
           {
             devDependencies: {
+              knip: knip.version,
               oxfmt: oxfmt.version,
               oxlint: oxlint.version,
               "oxlint-tsgolint": tsgolint.version,
@@ -71,6 +73,7 @@ describe("update", () => {
         JSON.stringify(
           {
             devDependencies: {
+              knip: "5.0.0",
               oxfmt: "^0.34.0",
               oxlint: "~1.49.0",
               "oxlint-tsgolint": "workspace:^0.14.0",
@@ -100,6 +103,7 @@ describe("update", () => {
             `oxlint-tsgolint@${tsgolint.version}`,
             `oxfmt@${oxfmt.version}`,
             `sherif@${sherif.version}`,
+            `knip@${knip.version}`,
           ],
         },
       ])
@@ -152,6 +156,7 @@ describe("update", () => {
         JSON.stringify(
           {
             devDependencies: {
+              knip: knip.version,
               oxfmt: oxfmt.version,
               oxlint: oxlint.version,
               "oxlint-tsgolint": tsgolint.version,

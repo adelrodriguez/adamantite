@@ -223,7 +223,6 @@ function makeQuietConsoleLayer() {
 export async function runCommand(
   command: Command.Command.Any,
   args: string[],
-  _cwd: string,
   layers: TestLayer[]
 ) {
   let providedLayer = Layer.mergeAll(
@@ -246,8 +245,7 @@ export async function runCommand(
 export async function runCommandWithRunner(
   command: Command.Command.Any,
   args: string[],
-  runner: RunnerTestContext,
-  _cwd: string
+  runner: RunnerTestContext
 ) {
   return Effect.runPromiseExit(
     Command.runWith(command, { version: "test" })(args).pipe(

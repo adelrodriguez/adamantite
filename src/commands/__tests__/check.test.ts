@@ -27,7 +27,7 @@ describe("check", () => {
     test("run oxlint with type-aware mode by default", async () => {
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(checkCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(checkCommand, [], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
@@ -44,7 +44,7 @@ describe("check", () => {
       await writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
       const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(checkCommand, ["index.ts"], runner, tempDir)
+      const exit = await runCommandWithRunner(checkCommand, ["index.ts"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
@@ -60,7 +60,7 @@ describe("check", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([2])
 
-      const exit = await runCommandWithRunner(checkCommand, [], runner, tempDir)
+      const exit = await runCommandWithRunner(checkCommand, [], runner)
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }

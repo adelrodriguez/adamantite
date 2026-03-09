@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
+import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
 import { sherif } from "#helpers/packages/sherif.ts"
@@ -29,7 +30,7 @@ export default Command.make("update").pipe(
         isDevDependency: boolean
       }> = []
 
-      for (const pkg of [oxlint, tsgolint, oxfmt, sherif]) {
+      for (const pkg of [oxlint, tsgolint, oxfmt, sherif, knip]) {
         const dependency = packageJson.devDependencies?.[pkg.name]
         if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
           updates.push({

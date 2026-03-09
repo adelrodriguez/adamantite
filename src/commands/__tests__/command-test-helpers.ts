@@ -168,7 +168,7 @@ export function createDependencyInstallerTestContext(options?: {
   return {
     calls,
     layer: Layer.succeed(DependencyInstaller)({
-      addDevDependencies: (packages, installOptions) =>
+      addDevDependencies: (packages, _cwd, installOptions) =>
         Effect.gen(function* () {
           calls.push({
             options: installOptions,

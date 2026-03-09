@@ -81,6 +81,7 @@ export default Command.make("update").pipe(
         yield* dependencyInstaller
           .addDevDependencies(
             updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
+            cwd,
             { silent: true }
           )
           .pipe(

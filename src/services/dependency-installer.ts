@@ -18,6 +18,7 @@ export class DependencyInstaller extends ServiceMap.Service<
   {
     readonly addDevDependencies: (
       packages: string[],
+      cwd: string,
       options?: {
         readonly silent?: boolean
         readonly workspace?: boolean
@@ -29,10 +30,10 @@ export class DependencyInstaller extends ServiceMap.Service<
   }
 >()("DependencyInstaller") {
   static readonly layer = Layer.succeed(this)({
-    addDevDependencies: (packages, options) =>
+    addDevDependencies: (packages, cwd, options) =>
       Effect.tryPromise({
         catch: (cause) => new FailedToInstallDependency({ cause, packages }),
-        try: () => addDevDependency(packages, options),
+        try: () => addDevDependency(packages, { ...options, cwd }),
       }).pipe(Effect.asVoid),
     detectPackageManager: (cwd) =>
       Effect.tryPromise({

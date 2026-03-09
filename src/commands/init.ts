@@ -27,7 +27,7 @@ const installDependencies = (cwd: string, packages: string[]) =>
     const isMonorepo = yield* checkIsMonorepo(cwd)
 
     yield* dependencyInstaller
-      .addDevDependencies(packages, {
+      .addDevDependencies(packages, cwd, {
         silent: true,
         workspace: isMonorepo,
       })
@@ -229,7 +229,7 @@ const setupEditors = (cwd: string, editors: string[]) =>
     }
   })
 
-const installEditorExtensions = (cwd: string, editors: string[], scripts: Script[]) =>
+const installEditorExtensions = (editors: string[], scripts: Script[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
@@ -240,7 +240,7 @@ const installEditorExtensions = (cwd: string, editors: string[], scripts: Script
     const result = yield* Effect.gen(function* () {
       if (editors.includes("vscode")) {
         spinner.message("Installing VS Code extension...")
-        yield* vscode.extension(cwd, scripts)
+        yield* vscode.extension(scripts)
       }
 
       return true as const
@@ -478,7 +478,7 @@ export default Command.make("init").pipe(
       yield* setupEditors(cwd, selectedEditors)
 
       if (installExtensions) {
-        yield* installEditorExtensions(cwd, selectedEditors, selectedScripts)
+        yield* installEditorExtensions(selectedEditors, selectedScripts)
       }
 
       if (enableGitHubActions) {

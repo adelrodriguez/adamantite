@@ -76,7 +76,7 @@ export const vscode = {
       return yield* fs.exists(path.join(cwd, ".vscode", SETTINGS_FILE))
     }),
 
-  extension: (_cwd: string, scripts: Script[] = []) =>
+  extension: (scripts: Script[] = []) =>
     Effect.scoped(
       Effect.gen(function* () {
         yield* vscode.cliExists()

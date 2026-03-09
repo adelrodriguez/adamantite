@@ -295,7 +295,7 @@ describe("init", () => {
         detectedPackageManager: null,
       })
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
@@ -309,7 +309,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -344,7 +344,7 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])

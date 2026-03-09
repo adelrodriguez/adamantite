@@ -274,7 +274,7 @@ describe("update", () => {
         }),
       })
 
-      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
@@ -302,7 +302,7 @@ describe("update", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.cancels).toEqual(["You've cancelled the update process."])

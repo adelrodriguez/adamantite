@@ -73,7 +73,7 @@ describe("errors", () => {
     test("include the command and exit code in the message", () => {
       const error = new CommandFailed({
         command: "oxlint",
-        exitCode: 2 as never,
+        exitCode: 2 as unknown as never,
       })
 
       expect(error.message).toBe("Command `oxlint` failed with exit code 2.")

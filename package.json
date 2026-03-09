@@ -73,7 +73,7 @@
     "knip": "5.85.0",
     "oxfmt": "0.35.0",
     "oxlint": "1.50.0",
-    "oxlint-tsgolint": "0.14.2",
+    "oxlint-tsgolint": "0.16.0",
     "sherif": "1.10.0",
     "type-fest": "5.4.4",
     "typescript": "5.9.3"

@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Command from "effect/unstable/cli/Command"
-import type { FailedToInstallExtension } from "#errors.ts"
 import type { Script } from "#types.ts"
 import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#errors.ts"
 import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
@@ -253,7 +252,7 @@ const installEditorExtensions = (editors: string[], scripts: Script[]) =>
           spinner.stop()
         })
       ),
-      Effect.catchTag("FailedToInstallExtension", (error: FailedToInstallExtension) =>
+      Effect.catchTag("FailedToInstallExtension", (error) =>
         Effect.gen(function* () {
           yield* prompter.log.warning(`⚠️ Failed to install the \`${error.extension}\` extension.`)
           yield* prompter.log.warning("Please install it manually after setup completes.")

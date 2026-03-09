@@ -37,10 +37,14 @@ export class DependencyInstaller extends ServiceMap.Service<
 
       return {
         addDevDependencies: (packages, options) =>
-          Effect.tryPromise({
-            catch: (cause) => new FailedToInstallDependency({ cause, packages }),
-            try: () => addDevDependency(packages, options),
-          }).pipe(Effect.asVoid),
+          Effect.gen(function* () {
+            const currentDir = yield* cwd.get
+
+            return yield* Effect.tryPromise({
+              catch: (cause) => new FailedToInstallDependency({ cause, packages }),
+              try: () => addDevDependency(packages, { ...options, cwd: currentDir }),
+            }).pipe(Effect.asVoid)
+          }),
         detectPackageManager: () =>
           Effect.gen(function* () {
             const currentDir = yield* cwd.get

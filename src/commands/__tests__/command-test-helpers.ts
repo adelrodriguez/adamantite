@@ -1,10 +1,13 @@
 import type * as prompts from "@clack/prompts"
 import * as NodeServices from "@effect/platform-node/NodeServices"
+import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Terminal from "effect/Terminal"
 import * as Command from "effect/unstable/cli/Command"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { FailedToInstallDependency } from "#errors.ts"
+import { type CommandRunOptions, CommandRunner } from "#services/command-runner.ts"
 import { Cwd } from "#services/cwd.ts"
 import { type DetectedPackageManager, DependencyInstaller } from "#services/dependency-installer.ts"
 import { Prompter } from "#services/prompter.ts"
@@ -41,6 +44,17 @@ export interface DependencyInstallerTestContext {
   readonly layer: Layer.Layer<DependencyInstaller>
 }
 
+export interface RunnerTestContext {
+  readonly invocations: CommandRunOptions[]
+  readonly layer: Layer.Layer<CommandRunner>
+}
+
+type TestLayer = Layer.Layer<never, unknown, unknown>
+
+function noop() {
+  return null
+}
+
 function shiftResponse<T>(queue: T[], kind: string): T {
   const response = queue.shift()
 
@@ -49,6 +63,25 @@ function shiftResponse<T>(queue: T[], kind: string): T {
   }
 
   return response
+}
+
+export function createRunnerTestContext(exitCodes: number[] = [0]): RunnerTestContext {
+  const remainingExitCodes = [...exitCodes]
+  const invocations: CommandRunOptions[] = []
+
+  return {
+    invocations,
+    layer: Layer.succeed(CommandRunner)({
+      run: (options) =>
+        Effect.sync(() => {
+          invocations.push({
+            ...options,
+            args: [...options.args],
+          })
+          return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
+        }),
+    }),
+  }
 }
 
 export function createPrompterTestContext(options?: {
@@ -165,25 +198,70 @@ function makeQuietTerminalLayer() {
 }
 
 function makeQuietConsoleLayer() {
-  return Layer.empty
+  return Layer.succeed(Console.Console)({
+    assert: noop,
+    clear: noop,
+    count: noop,
+    countReset: noop,
+    debug: noop,
+    dir: noop,
+    dirxml: noop,
+    error: noop,
+    group: noop,
+    groupCollapsed: noop,
+    groupEnd: noop,
+    info: noop,
+    log: noop,
+    table: noop,
+    time: noop,
+    timeEnd: noop,
+    timeLog: noop,
+    trace: noop,
+    warn: noop,
+  })
 }
 
 export async function runCommand(
   command: Command.Command.Any,
   args: string[],
   cwd: string,
-  layers: Array<Layer.Layer<unknown, unknown, unknown>>
+  layers: TestLayer[]
 ) {
   const cwdLayer = Layer.succeed(Cwd)({
     get: Effect.succeed(cwd),
   })
 
-  const providedLayer = layers.reduce(
-    (accumulator, layer) => Layer.merge(accumulator, layer),
-    Layer.mergeAll(NodeServices.layer, makeQuietConsoleLayer(), makeQuietTerminalLayer(), cwdLayer)
-  )
+  let providedLayer = Layer.mergeAll(
+    NodeServices.layer,
+    makeQuietConsoleLayer(),
+    makeQuietTerminalLayer(),
+    cwdLayer
+  ) as TestLayer
+
+  for (const layer of layers) {
+    providedLayer = Layer.merge(providedLayer, layer) as TestLayer
+  }
 
   return Effect.runPromiseExit(
-    Command.runWith(command, { version: "test" })(args).pipe(Effect.provide(providedLayer))
+    Command.runWith(command, { version: "test" })(args).pipe(
+      Effect.provide(providedLayer)
+    ) as Effect.Effect<void, unknown>
+  )
+}
+
+export async function runCommandWithRunner(
+  command: Command.Command.Any,
+  args: string[],
+  runner: RunnerTestContext,
+  cwd: string
+) {
+  const cwdLayer = Layer.succeed(Cwd)({
+    get: Effect.succeed(cwd),
+  })
+
+  return Effect.runPromiseExit(
+    Command.runWith(command, { version: "test" })(args).pipe(
+      Effect.provide(Layer.mergeAll(NodeServices.layer, cwdLayer, runner.layer))
+    ) as Effect.Effect<void, unknown>
   )
 }

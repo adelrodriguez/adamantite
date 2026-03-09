@@ -5,7 +5,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Bun from "bun"
 import * as Exit from "effect/Exit"
+import * as Option from "effect/Option"
 import updateCommand from "#commands/update.ts"
+import { FailedToInstallDependency } from "#errors.ts"
 import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
 import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
@@ -243,6 +245,69 @@ describe("update", () => {
       })
       expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
       expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
+    })
+  })
+
+  describe("edge cases", () => {
+    test("fail when dependency installation fails", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: "1.49.0",
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true],
+      })
+      const installer = createDependencyInstallerTestContext({
+        addDevDependenciesError: new FailedToInstallDependency({
+          packages: [`oxlint@${oxlint.version}`],
+        }),
+      })
+
+      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
+      expect(error._tag).toBe("FailedToInstallDependency")
+    })
+
+    test("gracefully handle prompt cancellation during confirmation", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: "1.49.0",
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        cancelAtPromptIndex: 1,
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], tempDir, [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.cancels).toEqual(["You've cancelled the update process."])
+      expect(prompter.outros).toEqual([])
+      expect(installer.calls).toEqual([])
     })
   })
 })

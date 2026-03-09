@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Bun from "bun"
 import * as Exit from "effect/Exit"
+import * as Option from "effect/Option"
 import initCommand from "#commands/init.ts"
 import { knip } from "#helpers/packages/knip.ts"
 import { oxfmt } from "#helpers/packages/oxfmt.ts"
@@ -284,6 +285,59 @@ describe("init", () => {
           "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`.",
       })
       expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
+    })
+  })
+
+  describe("edge cases", () => {
+    test("fail when no package manager can be detected", async () => {
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext({
+        detectedPackageManager: null,
+      })
+
+      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
+      expect(error._tag).toBe("NoPackageManager")
+    })
+
+    test("create a GitHub Actions workflow for CI-compatible scripts when requested", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true, true],
+        multiselectResponses: [["check", "format", "typecheck"], ["react"], ["zed"]],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const workflowPath = join(tempDir, ".github", "workflows", "adamantite.yml")
+      expect(await Bun.file(workflowPath).exists()).toBe(true)
+
+      const workflow = await readFile(workflowPath, "utf8")
+      expect(workflow).toContain("oven-sh/setup-bun@v2")
+      expect(workflow).toContain("name: lint")
+      expect(workflow).toContain("name: format")
+      expect(workflow).toContain("name: types")
+      expect(workflow).toContain("command: bun run check")
+      expect(workflow).toContain("command: bun run format --check")
+      expect(workflow).toContain("command: bun run typecheck")
+    })
+
+    test("gracefully handle prompt cancellation", async () => {
+      const prompter = createPrompterTestContext({
+        cancelAtPromptIndex: 1,
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])
+      expect(prompter.outros).toEqual([])
+      expect(installer.calls).toEqual([])
     })
   })
 })

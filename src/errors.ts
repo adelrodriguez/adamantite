@@ -1,4 +1,4 @@
-import type * as CommandExecutor from "@effect/platform/CommandExecutor"
+import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { ParseError } from "jsonc-parser"
 import * as Data from "effect/Data"
 import { printParseErrorCode } from "jsonc-parser"
@@ -22,7 +22,7 @@ export class CliNotFound extends Data.TaggedError("CliNotFound")<{ command: stri
 
 export class CommandFailed extends Data.TaggedError("CommandFailed")<{
   command: string
-  exitCode: CommandExecutor.ExitCode
+  exitCode: ChildProcessSpawner.ExitCode
 }> {
   override get message() {
     return `Command \`${this.command}\` failed with exit code ${this.exitCode}.`

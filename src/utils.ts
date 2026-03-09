@@ -1,13 +1,13 @@
 import process from "node:process"
 import type { JsonObject, JsonValue, PackageJson } from "type-fest"
-import * as ShellCommand from "@effect/platform/Command"
-import * as CommandExecutor from "@effect/platform/CommandExecutor"
-import * as FileSystem from "@effect/platform/FileSystem"
-import * as Path from "@effect/platform/Path"
-import * as Terminal from "@effect/platform/Terminal"
 import { defu } from "defu"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
+import * as Terminal from "effect/Terminal"
+import * as ChildProcess from "effect/unstable/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { type ParseError, parse } from "jsonc-parser"
 import {
   CliNotFound,
@@ -21,10 +21,18 @@ import { Cwd } from "#services/cwd.ts"
 export const checkCliExists = (command: string) => {
   const executable = process.platform === "win32" ? "where" : "which"
 
-  return ShellCommand.make(executable, command).pipe(
-    ShellCommand.exitCode,
+  return Effect.scoped(
+    Effect.gen(function* () {
+      const handle = yield* ChildProcess.make(executable, [command], {
+        stderr: "ignore",
+        stdin: "ignore",
+        stdout: "ignore",
+      })
+      return yield* handle.exitCode
+    })
+  ).pipe(
     Effect.flatMap((exitCode) =>
-      exitCode === CommandExecutor.ExitCode(0)
+      exitCode === ChildProcessSpawner.ExitCode(0)
         ? Effect.succeed(true)
         : Effect.fail(new CliNotFound({ command }))
     )

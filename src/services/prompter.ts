@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts"
-import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as ServiceMap from "effect/ServiceMap"
 import { OperationCancelled } from "#errors.ts"
 
 interface PrompterService {
@@ -21,52 +21,52 @@ interface PrompterService {
   readonly spinner: () => p.SpinnerResult
 }
 
-export class Prompter extends Context.Tag("Prompter")<Prompter, PrompterService>() {}
-
-export const PrompterLive = Layer.succeed(Prompter, {
-  cancel: (message) =>
-    Effect.sync(() => {
-      p.cancel(message)
-    }),
-  confirm: (options) =>
-    Effect.promise(() => p.confirm(options)).pipe(
-      Effect.filterOrFail(
-        (value): value is boolean => !p.isCancel(value),
-        () => new OperationCancelled({})
-      )
-    ),
-  intro: (message) =>
-    Effect.sync(() => {
-      p.intro(message)
-    }),
-  log: {
-    error: (message) =>
+export class Prompter extends ServiceMap.Service<Prompter, PrompterService>()("Prompter") {
+  static readonly layer = Layer.succeed(this)({
+    cancel: (message) =>
       Effect.sync(() => {
-        p.log.error(message)
+        p.cancel(message)
       }),
-    info: (message) =>
+    confirm: (options) =>
+      Effect.promise(() => p.confirm(options)).pipe(
+        Effect.filterOrFail(
+          (value): value is boolean => !p.isCancel(value),
+          () => new OperationCancelled({})
+        )
+      ),
+    intro: (message) =>
       Effect.sync(() => {
-        p.log.info(message)
+        p.intro(message)
       }),
-    success: (message) =>
+    log: {
+      error: (message) =>
+        Effect.sync(() => {
+          p.log.error(message)
+        }),
+      info: (message) =>
+        Effect.sync(() => {
+          p.log.info(message)
+        }),
+      success: (message) =>
+        Effect.sync(() => {
+          p.log.success(message)
+        }),
+      warning: (message) =>
+        Effect.sync(() => {
+          p.log.warning(message)
+        }),
+    },
+    multiselect: <T>(options: p.MultiSelectOptions<T>) =>
+      Effect.promise(() => p.multiselect(options)).pipe(
+        Effect.filterOrFail(
+          (value): value is T[] => !p.isCancel(value),
+          () => new OperationCancelled({})
+        )
+      ),
+    outro: (message) =>
       Effect.sync(() => {
-        p.log.success(message)
+        p.outro(message)
       }),
-    warning: (message) =>
-      Effect.sync(() => {
-        p.log.warning(message)
-      }),
-  },
-  multiselect: <T>(options: p.MultiSelectOptions<T>) =>
-    Effect.promise(() => p.multiselect(options)).pipe(
-      Effect.filterOrFail(
-        (value): value is T[] => !p.isCancel(value),
-        () => new OperationCancelled({})
-      )
-    ),
-  outro: (message) =>
-    Effect.sync(() => {
-      p.outro(message)
-    }),
-  spinner: () => p.spinner(),
-})
+    spinner: () => p.spinner(),
+  })
+}

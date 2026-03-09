@@ -1,6 +1,6 @@
-import * as FileSystem from "@effect/platform/FileSystem"
-import * as Path from "@effect/platform/Path"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
 import { type PackageManagerName, runScriptCommand } from "nypm"
 import type { Script } from "#types.ts"
 import { FailedToWriteFile } from "#errors.ts"

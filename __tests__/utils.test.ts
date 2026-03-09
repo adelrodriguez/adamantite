@@ -4,11 +4,13 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { Terminal } from "@effect/platform"
-import * as NodeContext from "@effect/platform-node/NodeContext"
+import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
-import { Console, Effect, Either, Layer } from "effect"
-import { CwdLive } from "#services/cwd.ts"
+import * as Console from "effect/Console"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import * as Terminal from "effect/Terminal"
+import { Cwd } from "#services/cwd.ts"
 import {
   checkCliExists,
   checkIsMonorepo,
@@ -20,12 +22,35 @@ import {
   readPackageJson,
 } from "#utils.ts"
 
+const NodeContext = NodeServices
+
+const CwdLive = Cwd.layer
+
+type TestEither<A, E> =
+  | { readonly _tag: "Left"; readonly left: E }
+  | { readonly _tag: "Right"; readonly right: A }
+
+const Either = {
+  isLeft<A, E>(
+    either: TestEither<A, E>
+  ): either is Extract<TestEither<A, E>, { readonly _tag: "Left" }> {
+    return either._tag === "Left"
+  },
+}
+
 // Helper to run Effect and get Either for error testing
-async function runEither<A, E, R>(effect: Effect.Effect<A, E, R>) {
+async function runEither<A, E, R>(effect: Effect.Effect<A, E, R>): Promise<TestEither<A, E>> {
   const provided = effect.pipe(
-    Effect.provide(Layer.merge(NodeContext.layer, CwdLive))
+    Effect.provide(Layer.mergeAll(NodeServices.layer, Cwd.layer))
   ) as Effect.Effect<A, E>
-  return await provided.pipe(Effect.either, Effect.runPromise)
+  return await Effect.runPromise(
+    provided.pipe(
+      Effect.match({
+        onFailure: (left) => ({ _tag: "Left" as const, left }),
+        onSuccess: (right) => ({ _tag: "Right" as const, right }),
+      })
+    )
+  )
 }
 
 describe("utils", () => {
@@ -297,21 +322,18 @@ describe("utils", () => {
       capturedLogs = []
     })
 
-    const makeTerminalLayer = (columns?: number, rows?: number, isTTY = false) =>
-      Layer.succeed(Terminal.Terminal, {
-        columns:
-          columns === undefined
-            ? Effect.succeed(undefined as unknown as number)
-            : Effect.succeed(columns),
-        display: () => Effect.void,
-        isTTY: Effect.succeed(isTTY),
-        readInput: Effect.never,
-        readLine: Effect.never,
-        rows:
-          rows === undefined
-            ? Effect.succeed(undefined as unknown as number)
-            : Effect.succeed(rows),
-      })
+    const makeTerminalLayer = (columns?: number) =>
+      Layer.succeed(Terminal.Terminal)(
+        Terminal.make({
+          columns:
+            columns === undefined
+              ? Effect.succeed(undefined as unknown as number)
+              : Effect.succeed(columns),
+          display: () => Effect.void,
+          readInput: Effect.never,
+          readLine: Effect.never,
+        })
+      )
 
     const makeConsoleLayer = () => {
       const mockConsole: Console.Console = {
@@ -340,13 +362,13 @@ describe("utils", () => {
         unsafe: globalThis.console,
         warn: () => Effect.void,
       }
-      return Console.setConsole(mockConsole)
+      return Layer.succeed(Console.Console)(mockConsole)
     }
 
     test("should print title when terminal is wide enough", async () => {
       const testLayer = Layer.merge(makeTerminalLayer(120), makeConsoleLayer())
 
-      await printTitle().pipe(Effect.provide(testLayer), Effect.runPromise)
+      await Effect.runPromise(printTitle().pipe(Effect.provide(testLayer)))
 
       expect(capturedLogs.length).toBe(1)
       expect(capturedLogs[0]).toContain(".ooooo.")
@@ -355,7 +377,7 @@ describe("utils", () => {
     test("should not print title when terminal is too narrow", async () => {
       const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(50), makeConsoleLayer())
 
-      await printTitle().pipe(Effect.provide(testLayer), Effect.runPromise)
+      await Effect.runPromise(printTitle().pipe(Effect.provide(testLayer)))
 
       expect(capturedLogs.length).toBe(0)
     })
@@ -363,7 +385,7 @@ describe("utils", () => {
     test("should not print title when process.stdout.columns is undefined", async () => {
       const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(), makeConsoleLayer())
 
-      await printTitle().pipe(Effect.provide(testLayer), Effect.runPromise)
+      await Effect.runPromise(printTitle().pipe(Effect.provide(testLayer)))
 
       expect(capturedLogs.length).toBe(0)
     })

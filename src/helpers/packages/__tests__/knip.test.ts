@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
+import * as NodePath from "@effect/platform-node/NodePath"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
@@ -157,7 +158,7 @@ describe("knip", () => {
 
       const result = await runEither(
         knip.update(tempDir),
-        Layer.merge(NodeServices.layer, fileSystemLayer)
+        Layer.merge(fileSystemLayer, NodePath.layer)
       )
 
       expect(isLeft(result)).toBe(true)

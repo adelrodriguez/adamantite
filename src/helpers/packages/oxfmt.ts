@@ -48,7 +48,7 @@ export const oxfmt = {
       const { path: configPath } = yield* oxfmt.exists(cwd)
 
       if (!configPath) {
-        return yield* Effect.fail(new FileNotFound({ path: CONFIG_FILE_JSONC }))
+        return yield* new FileNotFound({ path: CONFIG_FILE_JSONC })
       }
 
       const oxfmtFile = yield* fs
@@ -59,7 +59,7 @@ export const oxfmt = {
 
       // Empty configs are allowed and will be merged with Adamantite's config
       if (!isJsonObject(existingConfig)) {
-        return yield* Effect.fail(new InvalidConfigFormat({ path: configPath }))
+        return yield* new InvalidConfigFormat({ path: configPath })
       }
 
       const mergedConfig = yield* mergeConfig(existingConfig, oxfmt.config)

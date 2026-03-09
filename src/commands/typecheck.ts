@@ -42,7 +42,7 @@ export default Command.make("typecheck", { project, watch }).pipe(
       })
 
       if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-        yield* Effect.fail(new CommandFailed({ command: typescript.command, exitCode }))
+        yield* new CommandFailed({ command: typescript.command, exitCode })
       }
     })
   )

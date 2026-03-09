@@ -45,7 +45,7 @@ export const knip = {
       const { path: configPath } = yield* knip.exists(cwd)
 
       if (!configPath) {
-        return yield* Effect.fail(new FileNotFound({ path: CONFIG_FILE_JSON }))
+        return yield* new FileNotFound({ path: CONFIG_FILE_JSON })
       }
 
       const knipFile = yield* fs
@@ -57,7 +57,7 @@ export const knip = {
       // Empty configs are allowed and will be merged with Adamantite's config
       // Ensure existingConfig is a JSON object (not null, array, or primitive)
       if (!isJsonObject(existingConfig)) {
-        return yield* Effect.fail(new InvalidConfigFormat({ path: configPath }))
+        return yield* new InvalidConfigFormat({ path: configPath })
       }
 
       const mergedConfig = yield* mergeConfig(existingConfig, knip.config)

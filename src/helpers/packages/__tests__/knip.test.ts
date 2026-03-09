@@ -11,6 +11,9 @@ import { isLeft, runEither } from "#__tests__/helpers.ts"
 import { knip } from "#helpers/packages/knip.ts"
 
 const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..")
+// Keep these schema URLs in sync with the major-version-pinned values in src/helpers/packages/knip.ts.
+const KNIP_JSON_SCHEMA_URL = "https://unpkg.com/knip@5/schema.json"
+const KNIP_JSONC_SCHEMA_URL = "https://unpkg.com/knip@5/schema-jsonc.json"
 
 describe("knip", () => {
   let originalCwd: string
@@ -99,7 +102,7 @@ describe("knip", () => {
 
       const config = await Bun.file("knip.json").json()
       expect(config.entry).toEqual(["src/main.ts"])
-      expect(config.$schema).toBe("https://unpkg.com/knip@5/schema.json")
+      expect(config.$schema).toBe(KNIP_JSON_SCHEMA_URL)
       expect(config.rules).toEqual(knip.config.rules)
     })
 
@@ -111,7 +114,7 @@ describe("knip", () => {
       const content = await Bun.file("knip.jsonc").text()
       const config = parse(content)
 
-      expect(config.$schema).toBe("https://unpkg.com/knip@5/schema-jsonc.json")
+      expect(config.$schema).toBe(KNIP_JSONC_SCHEMA_URL)
       expect(config.rules).toEqual(knip.config.rules)
     })
 
@@ -121,13 +124,13 @@ describe("knip", () => {
       await knip.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const config = await Bun.file("knip.json").json()
-      expect(config.$schema).toBe("https://unpkg.com/knip@5/schema.json")
+      expect(config.$schema).toBe(KNIP_JSON_SCHEMA_URL)
       expect(config.ignoreFiles).toEqual(knip.config.ignoreFiles)
       expect(config.ignore).toEqual(knip.config.ignore)
     })
 
     test("return FileNotFound when no knip config exists", async () => {
-      const result = await runEither(knip.update())
+      const result = await runEither(knip.update(), NodeServices.layer)
 
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
@@ -138,7 +141,7 @@ describe("knip", () => {
     test("return FailedToReadFile when the config cannot be read", async () => {
       mkdirSync("knip.json", { recursive: true })
 
-      const result = await runEither(knip.update())
+      const result = await runEither(knip.update(), NodeServices.layer)
 
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
@@ -149,7 +152,7 @@ describe("knip", () => {
     test("return InvalidConfigFormat when the config is not a JSON object", async () => {
       await Bun.write("knip.json", "[]")
 
-      const result = await runEither(knip.update())
+      const result = await runEither(knip.update(), NodeServices.layer)
 
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {

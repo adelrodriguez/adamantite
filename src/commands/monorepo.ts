@@ -21,7 +21,7 @@ export default Command.make("monorepo", { fix }).pipe(
       })
 
       if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-        yield* Effect.fail(new CommandFailed({ command: sherif.name, exitCode }))
+        yield* new CommandFailed({ command: sherif.name, exitCode })
       }
     })
   )

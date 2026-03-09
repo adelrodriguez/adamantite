@@ -42,7 +42,7 @@ export const typescript = {
       // This ensures Adamantite's extends is always applied
       // Empty configs are allowed and will be merged with Adamantite's config
       if (!isJsonObject(existingConfig)) {
-        return yield* Effect.fail(new InvalidConfigFormat({ path: configPath }))
+        return yield* new InvalidConfigFormat({ path: configPath })
       }
       const newConfig = yield* mergeConfig(typescript.config, existingConfig)
 

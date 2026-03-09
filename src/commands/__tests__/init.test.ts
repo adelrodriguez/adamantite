@@ -312,6 +312,18 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], tempDir, [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toEqual([
+        {
+          options: { silent: true, workspace: false },
+          packages: [
+            "adamantite",
+            `oxlint@${oxlint.version}`,
+            `oxlint-tsgolint@${tsgolint.version}`,
+            `oxfmt@${oxfmt.version}`,
+            `typescript@${typescript.version}`,
+          ],
+        },
+      ])
 
       const workflowPath = join(tempDir, ".github", "workflows", "adamantite.yml")
       expect(await Bun.file(workflowPath).exists()).toBe(true)

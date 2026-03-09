@@ -34,7 +34,7 @@ describe("typecheck", () => {
         {
           args: ["--noEmit"],
           command: "tsc",
-          cwd: tempDir,
+          cwd: realpathSync(tempDir),
         },
       ])
     })
@@ -61,7 +61,7 @@ describe("typecheck", () => {
           "--watch",
         ],
         command: "tsc",
-        cwd: tempDir,
+        cwd: realpathSync(tempDir),
       })
     })
   })

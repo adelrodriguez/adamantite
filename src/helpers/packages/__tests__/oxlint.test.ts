@@ -29,7 +29,7 @@ describe("oxlint", () => {
   describe("exists", () => {
     test("detect when no oxlint config exists", async () => {
       const state = await oxlint
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(state.path).toBe(null)
@@ -45,7 +45,7 @@ describe("oxlint", () => {
       await Bun.write(".oxlintrc.json", "{}")
 
       const state = await oxlint
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(state.hasBoth).toBe(true)
@@ -56,10 +56,10 @@ describe("oxlint", () => {
 
   describe("create", () => {
     test("create oxlint.config.ts with the correct config", async () => {
-      await oxlint.create().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await oxlint.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const state = await oxlint
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.path).toContain("oxlint.config.ts")
       expect(state.format).toBe("ts")
@@ -88,10 +88,12 @@ describe("oxlint", () => {
         )
       )
 
-      await oxlint.update(["node"]).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await oxlint
+        .update(tempDir, ["node"])
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const state = await oxlint
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.format).toBe("ts")
       expect(state.path).toContain("oxlint.config.ts")
@@ -122,7 +124,7 @@ describe("oxlint", () => {
         )
       )
 
-      await oxlint.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await oxlint.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("oxlint.config.ts").text()
       expect(content).toContain('import core from "adamantite/lint"')
@@ -132,7 +134,7 @@ describe("oxlint", () => {
     })
 
     test("return FileNotFound when no oxlint config exists", async () => {
-      const result = await runEither(oxlint.update())
+      const result = await runEither(oxlint.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FileNotFound" })
@@ -142,7 +144,7 @@ describe("oxlint", () => {
     test("return FailedToReadFile when reading the legacy config fails", async () => {
       mkdirSync(".oxlintrc.json", { recursive: true })
 
-      const result = await runEither(oxlint.update())
+      const result = await runEither(oxlint.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -152,7 +154,7 @@ describe("oxlint", () => {
     test("return InvalidConfigFormat when the legacy config is not a JSON object", async () => {
       await Bun.write(".oxlintrc.json", "[]")
 
-      const result = await runEither(oxlint.update())
+      const result = await runEither(oxlint.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })

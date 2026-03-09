@@ -10,23 +10,23 @@ const CONFIG_FILE_JSONC = "knip.jsonc"
 
 export const knip = {
   config: preset,
-  create: () =>
+  create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(process.cwd(), CONFIG_FILE_JSON)
+      const configPath = path.join(cwd, CONFIG_FILE_JSON)
       const payload = JSON.stringify(knip.config, null, 2)
 
       yield* fs
         .writeFileString(configPath, `${payload}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  exists: () =>
+  exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const jsonPath = path.join(process.cwd(), CONFIG_FILE_JSON)
-      const jsoncPath = path.join(process.cwd(), CONFIG_FILE_JSONC)
+      const jsonPath = path.join(cwd, CONFIG_FILE_JSON)
+      const jsoncPath = path.join(cwd, CONFIG_FILE_JSONC)
 
       if (yield* fs.exists(jsonPath)) {
         return { path: jsonPath }
@@ -39,10 +39,10 @@ export const knip = {
       return { path: null }
     }),
   name: "knip",
-  update: () =>
+  update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
-      const { path: configPath } = yield* knip.exists()
+      const { path: configPath } = yield* knip.exists(cwd)
 
       if (!configPath) {
         return yield* Effect.fail(new FileNotFound({ path: CONFIG_FILE_JSON }))

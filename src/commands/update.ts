@@ -1,3 +1,4 @@
+import process from "node:process"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import { knip } from "#helpers/packages/knip.ts"
@@ -12,9 +13,10 @@ export default Command.make("update").pipe(
   Command.withDescription("Update adamantite dependencies to latest compatible versions"),
   Command.withHandler(() =>
     Effect.gen(function* () {
+      const cwd = process.cwd()
       const prompter = yield* Prompter
-      const packageJson = yield* readPackageJson()
-      const oxlintState = yield* oxlint.exists()
+      const packageJson = yield* readPackageJson(cwd)
+      const oxlintState = yield* oxlint.exists(cwd)
       const shouldMigrateLegacyOxlint = oxlintState.format === "json"
 
       yield* printTitle()
@@ -96,7 +98,7 @@ export default Command.make("update").pipe(
         const spinner = prompter.spinner()
         spinner.start("Migrating `.oxlintrc.json` to `oxlint.config.ts`...")
 
-        yield* oxlint.update()
+        yield* oxlint.update(cwd)
 
         spinner.stop("Oxlint config migrated successfully")
       }

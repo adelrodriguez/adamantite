@@ -9,29 +9,29 @@ const CONFIG_FILE = "tsconfig.json"
 export const typescript = {
   command: "tsc",
   config: { extends: "adamantite/typescript" },
-  create: () =>
+  create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(process.cwd(), CONFIG_FILE)
+      const configPath = path.join(cwd, CONFIG_FILE)
       const payload = JSON.stringify(typescript.config, null, 2)
 
       yield* fs
         .writeFileString(configPath, `${payload}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  exists: () =>
+  exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      return yield* fs.exists(path.join(process.cwd(), CONFIG_FILE))
+      return yield* fs.exists(path.join(cwd, CONFIG_FILE))
     }),
   name: "typescript",
-  update: () =>
+  update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(process.cwd(), CONFIG_FILE)
+      const configPath = path.join(cwd, CONFIG_FILE)
 
       const tsconfigFile = yield* fs
         .readFileString(configPath)

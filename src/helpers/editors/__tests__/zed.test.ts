@@ -25,7 +25,9 @@ describe("zed", () => {
 
   describe("exists", () => {
     test("detect when .zed/settings.json does not exist", async () => {
-      const exists = await zed.exists().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      const exists = await zed
+        .exists(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
     })
@@ -33,9 +35,11 @@ describe("zed", () => {
 
   describe("create", () => {
     test("create .zed/settings.json", async () => {
-      await zed.create().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await zed.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const exists = await zed.exists().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      const exists = await zed
+        .exists(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
       const content = await Bun.file(".zed/settings.json").text()
@@ -61,11 +65,11 @@ describe("zed", () => {
       )
 
       const existsBefore = await zed
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore).toBe(true)
 
-      await zed.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".zed/settings.json").text()
       const config = JSON.parse(content)
@@ -78,7 +82,7 @@ describe("zed", () => {
       mkdirSync(".zed", { recursive: true })
       await Bun.write(".zed/settings.json", "{}")
 
-      await zed.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".zed/settings.json").text()
       const config = JSON.parse(content)
@@ -91,7 +95,7 @@ describe("zed", () => {
       mkdirSync(".zed", { recursive: true })
       await Bun.write(".zed/settings.json", "[]")
 
-      const result = await runEither(zed.update())
+      const result = await runEither(zed.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
@@ -99,7 +103,7 @@ describe("zed", () => {
     })
 
     test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runEither(zed.update())
+      const result = await runEither(zed.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -116,7 +120,7 @@ describe("zed", () => {
       )
       chmodSync(".zed/settings.json", 0o444)
 
-      const result = await runEither(zed.update())
+      const result = await runEither(zed.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })

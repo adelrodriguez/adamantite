@@ -26,7 +26,7 @@ describe("vscode", () => {
   describe("exists", () => {
     test("detect when .vscode/settings.json does not exist", async () => {
       const exists = await vscode
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
@@ -35,10 +35,10 @@ describe("vscode", () => {
 
   describe("create", () => {
     test("create .vscode/settings.json", async () => {
-      await vscode.create().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await vscode.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await vscode
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
@@ -66,11 +66,11 @@ describe("vscode", () => {
       )
 
       const existsBefore = await vscode
-        .exists()
+        .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore).toBe(true)
 
-      await vscode.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".vscode/settings.json").text()
       const config = JSON.parse(content)
@@ -85,7 +85,7 @@ describe("vscode", () => {
       mkdirSync(".vscode", { recursive: true })
       await Bun.write(".vscode/settings.json", "{}")
 
-      await vscode.update().pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".vscode/settings.json").text()
       const config = JSON.parse(content)
@@ -98,7 +98,7 @@ describe("vscode", () => {
       mkdirSync(".vscode", { recursive: true })
       await Bun.write(".vscode/settings.json", "[]")
 
-      const result = await runEither(vscode.update())
+      const result = await runEither(vscode.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
@@ -106,7 +106,7 @@ describe("vscode", () => {
     })
 
     test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runEither(vscode.update())
+      const result = await runEither(vscode.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -123,7 +123,7 @@ describe("vscode", () => {
       )
       chmodSync(".vscode/settings.json", 0o444)
 
-      const result = await runEither(vscode.update())
+      const result = await runEither(vscode.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })

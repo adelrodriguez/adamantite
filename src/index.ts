@@ -15,7 +15,6 @@ import monorepoCommand from "#commands/monorepo.ts"
 import typecheckCommand from "#commands/typecheck.ts"
 import updateCommand from "#commands/update.ts"
 import { CommandRunner } from "#services/command-runner.ts"
-import { Cwd } from "#services/cwd.ts"
 import { DependencyInstaller } from "#services/dependency-installer.ts"
 import { Prompter } from "#services/prompter.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
@@ -49,9 +48,8 @@ const program = Command.run(main, { version }).pipe(
     Layer.mergeAll(
       NodeServices.layer,
       Prompter.layer,
-      Cwd.layer,
       CommandRunner.layer,
-      DependencyInstaller.layer.pipe(Layer.provide(Cwd.layer))
+      DependencyInstaller.layer
     )
   )
 )

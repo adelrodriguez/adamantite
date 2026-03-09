@@ -12,7 +12,6 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Terminal from "effect/Terminal"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { Cwd } from "#services/cwd.ts"
 import {
   checkCliExists,
   checkIsMonorepo,
@@ -25,7 +24,6 @@ import {
 } from "#utils.ts"
 
 const NodeContext = NodeServices
-const CwdLive = Cwd.layer
 const noop = () => null
 
 let testDir: string
@@ -60,7 +58,7 @@ describe("readPackageJson", () => {
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await readPackageJson(testDir).pipe(
-        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.provide(NodeContext.layer),
         Effect.runPromise
       )
 
@@ -68,10 +66,7 @@ describe("readPackageJson", () => {
     })
 
     test("return an error when package.json does not exist", async () => {
-      const result = await runEither(
-        readPackageJson(testDir),
-        Layer.mergeAll(NodeServices.layer, Cwd.layer)
-      )
+      const result = await runEither(readPackageJson(testDir), NodeServices.layer)
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -81,10 +76,7 @@ describe("readPackageJson", () => {
     test("return an error when package.json contains invalid JSON", async () => {
       await Bun.write(join(testDir, "package.json"), "invalid json content")
 
-      const result = await runEither(
-        readPackageJson(testDir),
-        Layer.mergeAll(NodeServices.layer, Cwd.layer)
-      )
+      const result = await runEither(readPackageJson(testDir), NodeServices.layer)
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
@@ -92,7 +84,7 @@ describe("readPackageJson", () => {
     })
   })
 
-  describe("when cwd is injected", () => {
+  describe("when cwd is omitted", () => {
     test("use the current working directory by default", async () => {
       const packageJson: PackageJson = {
         name: "test-package",
@@ -102,17 +94,14 @@ describe("readPackageJson", () => {
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await readPackageJson().pipe(
-        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.provide(NodeContext.layer),
         Effect.runPromise
       )
 
       expect(result).toEqual(packageJson)
     })
 
-    test("respect the injected cwd service", async () => {
-      const cwdLayer = Layer.succeed(Cwd)({
-        get: Effect.succeed("/test/project"),
-      })
+    test("respect the explicit cwd argument", async () => {
       const fileSystemLayer = FileSystem.layerNoop({
         readFileString: () =>
           Effect.succeed(
@@ -123,8 +112,7 @@ describe("readPackageJson", () => {
           ),
       })
 
-      const result = await readPackageJson().pipe(
-        Effect.provide(cwdLayer),
+      const result = await readPackageJson("/test/project").pipe(
         Effect.provide(fileSystemLayer),
         Effect.provide(NodeServices.layer),
         Effect.runPromise
@@ -140,7 +128,7 @@ describe("parseJson", () => {
   test("parse valid JSON", async () => {
     const validJson = '{"name": "test", "version": "1.0.0"}'
     const result = await parseJson(validJson).pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      Effect.provide(NodeContext.layer),
       Effect.runPromise
     )
 
@@ -156,10 +144,7 @@ describe("parseJson", () => {
       "name": "test",
       "version": "1.0.0"
     }`
-    const result = await parseJson(jsonc).pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
-      Effect.runPromise
-    )
+    const result = await parseJson(jsonc).pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
 
     expect(result).toEqual({
       name: "test",
@@ -170,7 +155,7 @@ describe("parseJson", () => {
   test("parse JSON with trailing commas", async () => {
     const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
     const result = await parseJson(jsonWithTrailingComma).pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      Effect.provide(NodeContext.layer),
       Effect.runPromise
     )
 
@@ -182,10 +167,7 @@ describe("parseJson", () => {
 
   test("return an error for invalid JSON", async () => {
     const invalidJson = '{"name": "test", "version":}'
-    const result = await runEither(
-      parseJson(invalidJson),
-      Layer.mergeAll(NodeServices.layer, Cwd.layer)
-    )
+    const result = await runEither(parseJson(invalidJson), NodeServices.layer)
     expect(isLeft(result)).toBe(true)
     if (isLeft(result)) {
       expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
@@ -193,7 +175,7 @@ describe("parseJson", () => {
   })
 
   test("return an error for an empty string", async () => {
-    const result = await runEither(parseJson(""), Layer.mergeAll(NodeServices.layer, Cwd.layer))
+    const result = await runEither(parseJson(""), NodeServices.layer)
     expect(isLeft(result)).toBe(true)
     if (isLeft(result)) {
       expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
@@ -222,7 +204,7 @@ describe("mergeConfig", () => {
     const base = { a: 1, b: 2 }
     const override = { b: 3, c: 4 }
     const result = await mergeConfig(base, override).pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      Effect.provide(NodeContext.layer),
       Effect.runPromise
     )
 
@@ -233,7 +215,7 @@ describe("mergeConfig", () => {
     const first = { a: 1, b: 2 }
     const second = { a: 3, b: 4 }
     const result = await mergeConfig(first, second).pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      Effect.provide(NodeContext.layer),
       Effect.runPromise
     )
 
@@ -244,7 +226,7 @@ describe("mergeConfig", () => {
     const base = { a: { x: 1, y: 2 }, b: 3 }
     const override = { a: { y: 4, z: 5 }, b: 6 }
     const result = await mergeConfig(base, override).pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      Effect.provide(NodeContext.layer),
       Effect.runPromise
     )
 
@@ -264,10 +246,7 @@ describe("mergeConfig", () => {
       }
     )
 
-    const result = await runEither(
-      mergeConfig(throwingBase, { b: 2 }),
-      Layer.mergeAll(NodeServices.layer, Cwd.layer)
-    )
+    const result = await runEither(mergeConfig(throwingBase, { b: 2 }), NodeServices.layer)
     expect(isLeft(result)).toBe(true)
     if (isLeft(result)) {
       expect(result.left).toMatchObject({ _tag: "FailedToMergeConfig" })
@@ -276,11 +255,8 @@ describe("mergeConfig", () => {
 })
 
 describe("checkIsMonorepo", () => {
-  describe("when cwd is injected", () => {
-    test("respect the injected cwd service", async () => {
-      const cwdLayer = Layer.succeed(Cwd)({
-        get: Effect.succeed("/test/project"),
-      })
+  describe("when cwd is explicit", () => {
+    test("respect the explicit cwd argument", async () => {
       const fileSystemLayer = FileSystem.layerNoop({
         exists: () => Effect.succeed(false),
         readFileString: () =>
@@ -293,8 +269,7 @@ describe("checkIsMonorepo", () => {
           ),
       })
 
-      const result = await checkIsMonorepo().pipe(
-        Effect.provide(cwdLayer),
+      const result = await checkIsMonorepo("/test/project").pipe(
         Effect.provide(fileSystemLayer),
         Effect.provide(NodeServices.layer),
         Effect.runPromise
@@ -308,8 +283,8 @@ describe("checkIsMonorepo", () => {
     test("return true when pnpm-workspace.yaml exists", async () => {
       await Bun.write(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
 
-      const result = await checkIsMonorepo().pipe(
-        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      const result = await checkIsMonorepo(testDir).pipe(
+        Effect.provide(NodeContext.layer),
         Effect.runPromise
       )
 
@@ -324,8 +299,8 @@ describe("checkIsMonorepo", () => {
 
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
-      const result = await checkIsMonorepo().pipe(
-        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      const result = await checkIsMonorepo(testDir).pipe(
+        Effect.provide(NodeContext.layer),
         Effect.runPromise
       )
 
@@ -342,8 +317,8 @@ describe("checkIsMonorepo", () => {
 
       await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
-      const result = await checkIsMonorepo().pipe(
-        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      const result = await checkIsMonorepo(testDir).pipe(
+        Effect.provide(NodeContext.layer),
         Effect.runPromise
       )
 
@@ -351,10 +326,7 @@ describe("checkIsMonorepo", () => {
     })
 
     test("return an error when package.json does not exist", async () => {
-      const result = await runEither(
-        checkIsMonorepo(),
-        Layer.mergeAll(NodeServices.layer, Cwd.layer)
-      )
+      const result = await runEither(checkIsMonorepo(testDir), NodeServices.layer)
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -460,7 +432,7 @@ describe("checkCliExists", () => {
     const command = process.platform === "win32" ? "cmd" : "ls"
 
     const result = await checkCliExists(command).pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      Effect.provide(NodeContext.layer),
       Effect.runPromise
     )
 
@@ -470,7 +442,7 @@ describe("checkCliExists", () => {
   test("return a CliNotFound error when the CLI does not exist", async () => {
     const result = await runEither(
       checkCliExists("nonexistent-command-that-definitely-does-not-exist-12345"),
-      Layer.mergeAll(NodeServices.layer, Cwd.layer)
+      NodeServices.layer
     )
     expect(isLeft(result)).toBe(true)
     if (isLeft(result)) {
@@ -480,7 +452,7 @@ describe("checkCliExists", () => {
 
   test.skipIf(process.platform !== "win32")("use the where command on Windows", async () => {
     const result = await checkCliExists("cmd").pipe(
-      Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+      Effect.provide(NodeContext.layer),
       Effect.runPromise
     )
 
@@ -491,7 +463,7 @@ describe("checkCliExists", () => {
     "find the CLI with which on Unix-like systems",
     async () => {
       const result = await checkCliExists("sh").pipe(
-        Effect.provide(Layer.merge(NodeContext.layer, CwdLive)),
+        Effect.provide(NodeContext.layer),
         Effect.runPromise
       )
 

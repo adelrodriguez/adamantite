@@ -162,11 +162,11 @@ export function hasCICompatibleScripts(scripts: Script[]): boolean {
 }
 
 export const github = {
-  create: (options: WorkflowOptions) =>
+  create: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const workflowDir = path.join(process.cwd(), ".github", "workflows")
+      const workflowDir = path.join(cwd, ".github", "workflows")
 
       // Create .github/workflows directory if it doesn't exist
       yield* ensureDirectory(workflowDir)
@@ -183,18 +183,18 @@ export const github = {
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
     }),
 
-  exists: () =>
+  exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      return yield* fs.exists(path.join(process.cwd(), ".github", "workflows", "adamantite.yml"))
+      return yield* fs.exists(path.join(cwd, ".github", "workflows", "adamantite.yml"))
     }),
 
-  update: (options: WorkflowOptions) =>
+  update: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const workflowPath = path.join(process.cwd(), ".github", "workflows", "adamantite.yml")
+      const workflowPath = path.join(cwd, ".github", "workflows", "adamantite.yml")
       const workflowContent = generateWorkflow(options)
 
       if (!workflowContent) {

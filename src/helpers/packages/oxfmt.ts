@@ -13,23 +13,23 @@ export const oxfmt = {
     ...preset,
     $schema: "./node_modules/oxfmt/configuration_schema.json",
   },
-  create: () =>
+  create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(process.cwd(), CONFIG_FILE_JSONC)
+      const configPath = path.join(cwd, CONFIG_FILE_JSONC)
       const payload = JSON.stringify(oxfmt.config, null, 2)
 
       yield* fs
         .writeFileString(configPath, `${payload}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  exists: () =>
+  exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const jsoncPath = path.join(process.cwd(), CONFIG_FILE_JSONC)
-      const jsonPath = path.join(process.cwd(), CONFIG_FILE_JSON)
+      const jsoncPath = path.join(cwd, CONFIG_FILE_JSONC)
+      const jsonPath = path.join(cwd, CONFIG_FILE_JSON)
 
       if (yield* fs.exists(jsoncPath)) {
         return { path: jsoncPath }
@@ -42,10 +42,10 @@ export const oxfmt = {
       return { path: null }
     }),
   name: "oxfmt",
-  update: () =>
+  update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
-      const { path: configPath } = yield* oxfmt.exists()
+      const { path: configPath } = yield* oxfmt.exists(cwd)
 
       if (!configPath) {
         return yield* Effect.fail(new FileNotFound({ path: CONFIG_FILE_JSONC }))

@@ -16,7 +16,6 @@ import {
   FailedToParseFile,
   FailedToReadFile,
 } from "#errors.ts"
-import { Cwd } from "#services/cwd.ts"
 
 export const checkCliExists = (command: string) => {
   const executable = process.platform === "win32" ? "where" : "which"
@@ -73,13 +72,11 @@ export const mergeConfig = (base: Record<string, unknown>, override: Record<stri
     try: () => defu(base, override),
   })
 
-export const readPackageJson = (cwd?: string) =>
+export const readPackageJson = (cwd: string = process.cwd()) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const cwdService = yield* Cwd
-    const workingDir = cwd ?? (yield* cwdService.get)
-    const packagePath = path.join(workingDir, "package.json")
+    const packagePath = path.join(cwd, "package.json")
     const content = yield* fs
       .readFileString(packagePath)
       .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: packagePath })))
@@ -87,19 +84,17 @@ export const readPackageJson = (cwd?: string) =>
     return parsed as PackageJson
   })
 
-export const checkIsMonorepo = () =>
+export const checkIsMonorepo = (cwd: string = process.cwd()) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const cwd = yield* Cwd
-    const currentDir = yield* cwd.get
-    const pnpmWorkspace = yield* fs.exists(path.join(currentDir, "pnpm-workspace.yaml"))
+    const pnpmWorkspace = yield* fs.exists(path.join(cwd, "pnpm-workspace.yaml"))
 
     if (pnpmWorkspace) {
       return true
     }
 
-    const packageJson = yield* readPackageJson()
+    const packageJson = yield* readPackageJson(cwd)
     return packageJson.workspaces !== undefined
   })
 

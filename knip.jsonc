@@ -1,5 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema-jsonc.json",
+  "entry": ["presets/lint/*.ts"],
   "rules": {
     "files": "error",
     "dependencies": "error",

@@ -13,8 +13,14 @@ describe("package metadata", () => {
     expect(packageJson.exports).toMatchObject({
       "./analyze": "./dist/presets/knip.json",
       "./format": "./dist/presets/format.json",
-      "./lint": "./dist/presets/lint/core.js",
-      "./lint/*": "./dist/presets/lint/*.js",
+      "./lint": {
+        default: "./dist/presets/lint/core.js",
+        types: "./dist/presets/lint/core.d.ts",
+      },
+      "./lint/*": {
+        default: "./dist/presets/lint/*.js",
+        types: "./dist/presets/lint/*.d.ts",
+      },
       "./typescript": "./dist/presets/tsconfig.json",
     })
   })

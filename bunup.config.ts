@@ -13,7 +13,10 @@ export default defineConfig([
   },
   {
     clean: false,
-    dts: false,
+    dts: {
+      inferTypes: true,
+      tsgo: true,
+    },
     entry: [
       "presets/lint/core.ts",
       "presets/lint/jest.ts",

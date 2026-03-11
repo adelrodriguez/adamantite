@@ -1,5 +1,14 @@
 # adamantite
 
+## 0.30.2
+
+### Patch Changes
+
+- fa763e4: Update `@clack/prompts` to 1.1.0
+- fa763e4: Fix package exports to point to built artifacts instead of raw TypeScript source
+
+  Package exports were incorrectly pointing to raw `.ts` source files, which required consumers to have a TypeScript-aware bundler. Exports now correctly resolve to compiled `.js` and copied `.json` files in `dist/`.
+
 ## 0.30.1
 
 ### Patch Changes

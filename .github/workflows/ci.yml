@@ -1,9 +1,6 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -33,6 +30,8 @@ jobs:
             command: bun run test
           - name: analyze
             command: bun run analyze
+          - name: build
+            command: bun run build
 
     steps:
       - name: Checkout

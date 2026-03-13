@@ -13,7 +13,6 @@ import { knip } from "#lib/integrations/tooling/knip.ts"
 import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
 import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
 import { sherif } from "#lib/integrations/tooling/sherif.ts"
-import { typescript } from "#lib/integrations/tooling/typescript.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
@@ -56,8 +55,8 @@ describe("init", () => {
   describe("fresh project setup", () => {
     test("set up the selected files, scripts, and dependencies", async () => {
       const prompter = createPrompterTestContext({
-        confirmResponses: [false, false],
-        multiselectResponses: [["check", "format", "typecheck", "analyze"], ["react"], ["vscode"]],
+        confirmResponses: [true, false, false],
+        multiselectResponses: [["check", "format", "analyze"], ["react"], ["vscode"]],
       })
       const installer = createDependencyInstallerTestContext()
 
@@ -72,7 +71,6 @@ describe("init", () => {
             `oxlint@${oxlint.version}`,
             `oxlint-tsgolint@${tsgolint.version}`,
             `oxfmt@${oxfmt.version}`,
-            `typescript@${typescript.version}`,
             `knip@${knip.version}`,
           ],
         },
@@ -83,11 +81,12 @@ describe("init", () => {
         analyze: "adamantite analyze",
         check: "adamantite check",
         format: "adamantite format",
-        typecheck: "adamantite typecheck",
       })
 
       const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
       expect(oxlintConfig).toContain('import react from "adamantite/lint/react"')
+      expect(oxlintConfig).toContain('"typeAware": true')
+      expect(oxlintConfig).toContain('"typeCheck": true')
 
       const oxfmtConfig = await readJson(join(tempDir, ".oxfmtrc.jsonc"))
       expect(oxfmtConfig.$schema).toBe("./node_modules/oxfmt/configuration_schema.json")
@@ -128,7 +127,7 @@ describe("init", () => {
       )
 
       const prompter = createPrompterTestContext({
-        confirmResponses: [false],
+        confirmResponses: [true, false],
         multiselectResponses: [["check"], ["react"], []],
       })
       const installer = createDependencyInstallerTestContext()
@@ -201,8 +200,8 @@ describe("init", () => {
       )
 
       const prompter = createPrompterTestContext({
-        confirmResponses: [false, false],
-        multiselectResponses: [["format", "typecheck"], ["vscode"]],
+        confirmResponses: [true, false, false],
+        multiselectResponses: [["check", "format"], [], ["vscode"]],
       })
       const installer = createDependencyInstallerTestContext()
 
@@ -228,6 +227,7 @@ describe("init", () => {
       const vscodeSettings = await readJson(join(tempDir, ".vscode", "settings.json"))
       expect(vscodeSettings["editor.tabSize"]).toBe(4)
       expect(vscodeSettings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
+      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
     })
   })
 
@@ -275,7 +275,7 @@ describe("init", () => {
       )
 
       const prompter = createPrompterTestContext({
-        confirmResponses: [false],
+        confirmResponses: [true, false],
         multiselectResponses: [["check"], [], []],
       })
       const installer = createDependencyInstallerTestContext()
@@ -308,8 +308,8 @@ describe("init", () => {
 
     test("create a GitHub Actions workflow for CI-compatible scripts when requested", async () => {
       const prompter = createPrompterTestContext({
-        confirmResponses: [true, true],
-        multiselectResponses: [["check", "format", "typecheck"], ["react"], ["zed"]],
+        confirmResponses: [true, true, true],
+        multiselectResponses: [["check", "format"], ["react"], ["zed"]],
       })
       const installer = createDependencyInstallerTestContext()
 
@@ -324,7 +324,6 @@ describe("init", () => {
             `oxlint@${oxlint.version}`,
             `oxlint-tsgolint@${tsgolint.version}`,
             `oxfmt@${oxfmt.version}`,
-            `typescript@${typescript.version}`,
           ],
         },
       ])
@@ -336,10 +335,32 @@ describe("init", () => {
       expect(workflow).toContain("oven-sh/setup-bun@v2")
       expect(workflow).toContain("name: lint")
       expect(workflow).toContain("name: format")
-      expect(workflow).toContain("name: types")
       expect(workflow).toContain("command: bun run check")
       expect(workflow).toContain("command: bun run format --check")
-      expect(workflow).toContain("command: bun run typecheck")
+    })
+
+    test("skip tsconfig setup when the user declines the TypeScript preset prompt", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        multiselectResponses: [["check"], [], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toEqual([
+        {
+          options: { silent: true, workspace: false },
+          packages: [
+            "adamantite",
+            `oxlint@${oxlint.version}`,
+            `oxlint-tsgolint@${tsgolint.version}`,
+          ],
+        },
+      ])
+      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
     })
 
     test("gracefully handle prompt cancellation", async () => {

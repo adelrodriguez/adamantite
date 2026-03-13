@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -195,7 +195,259 @@ describe("update", () => {
 
       const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
       expect(oxlintConfig).toContain('"semi": "error"')
-      expect(prompter.outros).toEqual(["✅ Oxlint config migrated to `oxlint.config.ts`!"])
+      expect(prompter.outros).toEqual(["✅ Adamantite configuration migrated successfully!"])
+    })
+  })
+
+  describe("typecheck migration", () => {
+    test("migrate the legacy typecheck script to check and install required dependencies", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              typescript: "5.0.0",
+            },
+            name: "test-project",
+            scripts: {
+              typecheck: "adamantite typecheck",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toEqual([
+        {
+          options: { silent: true },
+          packages: [`oxlint@${oxlint.version}`, `oxlint-tsgolint@${tsgolint.version}`],
+        },
+      ])
+
+      const packageJson = JSON.parse(await readFile(join(tempDir, "package.json"), "utf8")) as {
+        scripts: Record<string, string>
+      }
+      expect(packageJson.scripts).toEqual({
+        check: "adamantite check",
+      })
+
+      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(true)
+      expect(prompter.outros).toEqual(["✅ Adamantite configuration migrated successfully!"])
+    })
+
+    test("enable type-checked linting in an existing oxlint.config.ts during typecheck migration", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+              typescript: "5.0.0",
+            },
+            name: "test-project",
+            scripts: {
+              typecheck: "adamantite typecheck",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(
+        join(tempDir, "oxlint.config.ts"),
+        [
+          'import { defineConfig } from "oxlint"',
+          'import core from "adamantite/lint"',
+          "",
+          "export default defineConfig({",
+          "  extends: [core],",
+          "})",
+          "",
+        ].join("\n")
+      )
+      await writeFile(
+        join(tempDir, "tsconfig.json"),
+        JSON.stringify({ extends: "adamantite/typescript" })
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
+      expect(oxlintConfig).toContain("typeAware")
+      expect(oxlintConfig).toContain("typeCheck")
+
+      const packageJson = JSON.parse(await readFile(join(tempDir, "package.json"), "utf8")) as {
+        scripts: Record<string, string>
+      }
+      expect(packageJson.scripts.check).toBe("adamantite check")
+      expect(packageJson.scripts.typecheck).toBeUndefined()
+      expect(prompter.outros).toEqual(["✅ Adamantite configuration migrated successfully!"])
+    })
+  })
+
+  describe("oxlint type-check options", () => {
+    test("ensure typeAware and typeCheck in an existing oxlint.config.ts that lacks them", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+            },
+            name: "test-project",
+            scripts: {
+              check: "adamantite check",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(
+        join(tempDir, "oxlint.config.ts"),
+        [
+          'import { defineConfig } from "oxlint"',
+          'import core from "adamantite/lint"',
+          "",
+          "export default defineConfig({",
+          "  extends: [core],",
+          "})",
+          "",
+        ].join("\n")
+      )
+      await writeFile(
+        join(tempDir, "tsconfig.json"),
+        JSON.stringify({ extends: "adamantite/typescript" })
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
+      expect(oxlintConfig).toContain("typeAware")
+      expect(oxlintConfig).toContain("typeCheck")
+    })
+
+    test("skip update when oxlint.config.ts already has typeAware and typeCheck", async () => {
+      const originalConfig = [
+        'import { defineConfig } from "oxlint"',
+        'import core from "adamantite/lint"',
+        "",
+        "export default defineConfig({",
+        '  options: { "typeAware": true, "typeCheck": true },',
+        "  extends: [core],",
+        "})",
+        "",
+      ].join("\n")
+
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+            },
+            name: "test-project",
+            scripts: {
+              check: "adamantite check",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(join(tempDir, "oxlint.config.ts"), originalConfig)
+      await writeFile(
+        join(tempDir, "tsconfig.json"),
+        JSON.stringify({ extends: "adamantite/typescript" })
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
+      expect(oxlintConfig).toBe(originalConfig)
+    })
+  })
+
+  describe("workflow migration", () => {
+    test("update an existing GitHub Actions workflow even when dependencies are already current", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxfmt: oxfmt.version,
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+            },
+            name: "test-project",
+            scripts: {
+              check: "adamantite check",
+              format: "adamantite format",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(join(tempDir, "oxlint.config.ts"), "export default {}\n")
+      await writeFile(
+        join(tempDir, "tsconfig.json"),
+        JSON.stringify({ extends: "adamantite/typescript" })
+      )
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true })
+      await writeFile(
+        join(tempDir, ".github", "workflows", "adamantite.yml"),
+        "name: adamantite\njobs:\n  verify:\n    strategy:\n      matrix:\n        include:\n          - name: lint\n            command: bun run check\n          - name: types\n            command: bun run typecheck\n"
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toEqual([])
+
+      const workflow = await readFile(
+        join(tempDir, ".github", "workflows", "adamantite.yml"),
+        "utf8"
+      )
+      expect(workflow).toContain("name: lint")
+      expect(workflow).toContain("name: format")
+      expect(workflow).not.toContain("name: types")
     })
   })
 
@@ -258,6 +510,9 @@ describe("update", () => {
               oxlint: "1.49.0",
             },
             name: "test-project",
+            scripts: {
+              check: "adamantite check",
+            },
             version: "1.0.0",
           },
           null,
@@ -270,7 +525,7 @@ describe("update", () => {
       })
       const installer = createDependencyInstallerTestContext({
         addDevDependenciesError: new FailedToInstallDependency({
-          packages: [`oxlint@${oxlint.version}`],
+          packages: [`oxlint@${oxlint.version}`, `oxlint-tsgolint@${tsgolint.version}`],
         }),
       })
 
@@ -290,6 +545,9 @@ describe("update", () => {
               oxlint: "1.49.0",
             },
             name: "test-project",
+            scripts: {
+              check: "adamantite check",
+            },
             version: "1.0.0",
           },
           null,

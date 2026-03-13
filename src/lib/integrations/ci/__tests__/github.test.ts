@@ -38,7 +38,7 @@ describe("github", () => {
       await github
         .create(tempDir, {
           packageManager: "bun",
-          scripts: ["check", "format", "typecheck"],
+          scripts: ["check", "format"],
         })
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
@@ -54,9 +54,7 @@ describe("github", () => {
       expect(content).toContain("matrix:")
       expect(content).toContain("include:")
       expect(content).toContain("name: lint")
-      expect(content).toContain("name: types")
       expect(content).toContain("command: bun run check")
-      expect(content).toContain("command: bun run typecheck")
       expect(content).toContain("Setup Node.js")
       expect(content).toContain("actions/setup-node@v6")
       expect(content).toContain('node-version: "22"')
@@ -135,14 +133,13 @@ describe("github", () => {
       await github
         .create(tempDir, {
           packageManager: "bun",
-          scripts: ["check", "format", "typecheck", "check:monorepo"],
+          scripts: ["check", "format", "check:monorepo"],
         })
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("name: lint")
       expect(content).toContain("name: format")
-      expect(content).toContain("name: types")
       expect(content).toContain("name: monorepo")
       expect(content).toContain("command:")
       expect(content).toContain("format")
@@ -241,10 +238,6 @@ describe("hasCICompatibleScripts", () => {
 
   test("return true when the format script is present", () => {
     expect(hasCICompatibleScripts(["format"])).toBe(true)
-  })
-
-  test("return true when the typecheck script is present", () => {
-    expect(hasCICompatibleScripts(["typecheck"])).toBe(true)
   })
 
   test("return true when the check:monorepo script is present", () => {

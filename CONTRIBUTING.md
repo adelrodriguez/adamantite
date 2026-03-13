@@ -39,10 +39,9 @@ Thanks for your interest in contributing to Adamantite! This guide will help you
 - `bun run dev` - Build in watch mode for development
 - `bun test` - Run all tests
 - `bun run test:watch` - Run tests in watch mode
-- `bun run check` - Check for code issues using oxlint
+- `bun run check` - Check for code issues and type errors using oxlint
 - `bun run fix` - Auto-fix code issues using oxlint
 - `bun run format` - Format code using oxfmt
-- `bun run typecheck` - Run TypeScript type checking using tsc
 
 ### Making Changes
 
@@ -64,7 +63,6 @@ Thanks for your interest in contributing to Adamantite! This guide will help you
    bun run check
    bun run fix
    bun run format
-   bun run typecheck
    bun test
    ```
 
@@ -137,10 +135,9 @@ Use conventional commit format:
 2. Check for issues: `bun run check`
 3. Auto-fix issues: `bun run fix`
 4. Format code: `bun run format`
-5. Run type checking: `bun run typecheck`
-6. **Add a changeset**: Run `bunx changeset` to document your changes
-7. Update documentation if needed
-8. Add tests for new features
+5. **Add a changeset**: Run `bunx changeset` to document your changes
+6. Update documentation if needed
+7. Add tests for new features
 
 ### Submitting Your PR
 
@@ -155,7 +152,7 @@ Use conventional commit format:
 ### PR Review Process
 
 - All PRs require at least one review
-- CI checks must pass (linting, type checking, tests)
+- CI checks must pass (linting, formatting, tests)
 - Maintainers may request changes or ask questions
 - Once approved, maintainers will merge your PR
 

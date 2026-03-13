@@ -24,7 +24,7 @@ describe("fix", () => {
   })
 
   describe("default invocation", () => {
-    test("always include type-aware and fix flags", async () => {
+    test("always include the fix flag", async () => {
       const runner = createRunnerTestContext()
 
       const exit = await runCommandWithRunner(fixCommand, [], runner)
@@ -32,7 +32,7 @@ describe("fix", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
         {
-          args: ["--type-aware", "--fix"],
+          args: ["--fix"],
           command: "oxlint",
         },
       ])
@@ -46,7 +46,7 @@ describe("fix", () => {
       const exit = await runCommandWithRunner(fixCommand, ["--suggested"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--type-aware", "--fix", "--fix-suggestions"])
+      expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-suggestions"])
     })
 
     test("add dangerous fixes when requested", async () => {
@@ -55,7 +55,7 @@ describe("fix", () => {
       const exit = await runCommandWithRunner(fixCommand, ["--dangerous"], runner)
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--type-aware", "--fix", "--fix-dangerously"])
+      expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-dangerously"])
     })
 
     test("add all fix modes when all is requested", async () => {
@@ -65,7 +65,6 @@ describe("fix", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual([
-        "--type-aware",
         "--fix",
         "--fix-suggestions",
         "--fix-dangerously",
@@ -82,7 +81,6 @@ describe("fix", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations[0]?.args).toEqual([
-        "--type-aware",
         "--fix",
         realpathSync(join(tempDir, "index.ts")),
       ])

@@ -49,7 +49,6 @@ export const vscode = {
     "editor.formatOnPaste": true,
     "editor.formatOnSave": true,
     "oxc.typeAware": true,
-    "typescript.tsdk": "node_modules/typescript/lib",
   },
   create: (cwd: string) =>
     Effect.gen(function* () {

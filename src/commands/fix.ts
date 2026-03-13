@@ -25,7 +25,7 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
   Command.withHandler(({ all, dangerous, files, suggested }) =>
     Effect.gen(function* () {
       const runner = yield* CommandRunner
-      const args = new Set<string>(["--type-aware", "--fix"])
+      const args = new Set<string>(["--fix"])
 
       if (suggested || all) {
         args.add("--fix-suggestions")

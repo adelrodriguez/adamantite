@@ -12,13 +12,13 @@ import { knip } from "#lib/integrations/tooling/knip.ts"
 import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
 import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
 import { sherif } from "#lib/integrations/tooling/sherif.ts"
-import { typescript } from "#lib/integrations/tooling/typescript.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#lib/shared/errors.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { typescriptConfig } from "#lib/workspace/typescript-config.ts"
 
 const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
@@ -122,9 +122,6 @@ const addScripts = (cwd: string, scripts: Script[]) =>
         case "format":
           packageJson.scripts.format = "adamantite format"
           break
-        case "typecheck":
-          packageJson.scripts.typecheck = "adamantite typecheck"
-          break
         case "check:monorepo":
           packageJson.scripts["check:monorepo"] = "adamantite monorepo"
           break
@@ -176,18 +173,18 @@ const setupTypescript = (cwd: string) =>
     const spinner = prompter.spinner()
     spinner.start("Setting up TypeScript config...")
 
-    const typescriptExists = yield* typescript.exists(cwd)
+    const typescriptExists = yield* typescriptConfig.exists(cwd)
 
     if (typescriptExists) {
       spinner.message("`tsconfig.json` found, updating...")
 
-      yield* typescript.update(cwd)
+      yield* typescriptConfig.update(cwd)
 
       spinner.stop("`tsconfig.json` updated successfully")
     } else {
       spinner.message("`tsconfig.json` not found, creating...")
 
-      yield* typescript.create(cwd)
+      yield* typescriptConfig.create(cwd)
 
       spinner.stop("`tsconfig.json` created successfully")
     }
@@ -340,7 +337,7 @@ export default Command.make("init").pipe(
         options: [
           {
             hint: "recommended",
-            label: "check - find issues in code using oxlint",
+            label: "check - find issues and type errors using oxlint",
             value: "check",
           },
           {
@@ -352,11 +349,6 @@ export default Command.make("init").pipe(
             hint: "recommended",
             label: "format - code formatting using oxfmt",
             value: "format",
-          },
-          {
-            hint: "extends the `adamantite/typescript` preset in your `tsconfig.json`",
-            label: "typecheck - type-check your code using tsc",
-            value: "typecheck",
           },
           {
             disabled: !isMonorepo,
@@ -397,6 +389,16 @@ export default Command.make("init").pipe(
         presets = selectedPresets
       }
 
+      let shouldSetupTypescript = false
+
+      if (hasOxlint) {
+        shouldSetupTypescript = yield* prompter.confirm({
+          initialValue: true,
+          message:
+            "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
+        })
+      }
+
       const selectedEditors = yield* prompter.multiselect({
         message: "Which editors do you want to configure? (optional)",
         options: [
@@ -431,7 +433,6 @@ export default Command.make("init").pipe(
       const hasOxfmt = selectedScripts.includes("format")
       const hasSherif =
         selectedScripts.includes("check:monorepo") || selectedScripts.includes("fix:monorepo")
-      const hasTypecheck = selectedScripts.includes("typecheck")
       const hasKnip = selectedScripts.includes("analyze")
 
       const dependencies = ["adamantite"]
@@ -447,10 +448,6 @@ export default Command.make("init").pipe(
 
       if (hasSherif) {
         dependencies.push(`${sherif.name}@${sherif.version}`)
-      }
-
-      if (hasTypecheck) {
-        dependencies.push(`${typescript.name}@${typescript.version}`)
       }
 
       if (hasKnip) {
@@ -473,7 +470,7 @@ export default Command.make("init").pipe(
 
       yield* addScripts(cwd, selectedScripts)
 
-      if (hasTypecheck) {
+      if (shouldSetupTypescript) {
         yield* setupTypescript(cwd)
       }
 

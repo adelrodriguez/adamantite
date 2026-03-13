@@ -24,8 +24,6 @@ jobs:
             command: bun run check
           - name: format
             command: bun run format --check
-          - name: types
-            command: bun run typecheck
           - name: test
             command: bun run test
           - name: analyze

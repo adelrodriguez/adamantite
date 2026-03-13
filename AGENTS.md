@@ -6,7 +6,7 @@ This project was built with [`pastry`](https://github.com/adelrodriguez/pastry) 
 
 - We use `adamantite` for linting, formatting and type checking.
 - Always run `bun run format` after editing files.
-- After making changes, run `bun run check`, `bun run typecheck` and `bun run test` to ensure the code is still valid.
+- After making changes, run `bun run check` and `bun run test` to ensure the code is still valid.
 - After installing or removing dependencies, run `bun run analyze` to ensure we are not using any dependencies that are not needed.
 
 ## Changesets
@@ -32,8 +32,7 @@ Use Bun for all package management and script execution:
 - **Install dependencies**: `bun install`
 - **Build CLI**: `bun run build` (uses bunup to bundle `src/index.ts` → `dist/`)
 - **Run tests**: `bun test` or `bun run test:watch` for watch mode
-- **Type checking**: `bun run typecheck` (uses tsc)
-- **Code checking**: `bun run check` (checks for issues)
+- **Code checking**: `bun run check` (checks for issues and type errors)
 - **Code fixing**: `bun run fix` (auto-fixes issues and formats code)
 - **Code formatting**: `bun run format` (formats code with oxfmt)
 
@@ -42,10 +41,9 @@ Use Bun for all package management and script execution:
 After editing files, always run:
 
 1. `bun run test` - Run tests to ensure everything works
-2. `bun run typecheck` - Verify TypeScript types using tsc
-3. `bun run check` - Check for linting issues
-4. `bun run fix` - Auto-fix issues and format code
-5. `bun run format` - Format code explicitly (run after editing various files)
+2. `bun run check` - Check for linting issues and type errors
+3. `bun run fix` - Auto-fix issues and format code
+4. `bun run format` - Format code explicitly (run after editing various files)
 
 Make sure to always run format after editing files, including creating documentation like changesets and README.md.
 

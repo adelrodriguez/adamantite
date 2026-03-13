@@ -63,6 +63,7 @@
     "version": "changeset version"
   },
   "dependencies": {
+    "@babel/parser": "^7.29.0",
     "@clack/prompts": "1.1.0",
     "@effect/platform-node": "4.0.0-beta.29",
     "defu": "6.1.4",

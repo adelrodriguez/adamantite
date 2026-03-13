@@ -144,10 +144,10 @@ Automatically detects and fixes:
 
 ### `adamantite update`
 
-Keep your dependencies current:
+Run applicable migrations and update Adamantite-managed dependencies:
 
 ```shell
-# Update to latest compatible versions
+# Run migrations and update managed dependencies
 adamantite update
 ```
 

@@ -1,4 +1,6 @@
-export const sherif = {
+import { defineTooling } from "#lib/integrations/tooling/base.ts"
+
+export const sherif = defineTooling({
   name: "sherif",
   version: "1.10.0",
-}
+})

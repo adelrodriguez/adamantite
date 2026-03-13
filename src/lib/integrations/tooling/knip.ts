@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import { defineTooling } from "#lib/integrations/tooling/base.ts"
 import {
   FailedToReadFile,
   FailedToWriteFile,
@@ -13,14 +14,14 @@ import preset from "#presets/knip.json" with { type: "json" }
 const CONFIG_FILE_JSON = "knip.json"
 const CONFIG_FILE_JSONC = "knip.jsonc"
 
-export const knip = {
+export const knip = defineTooling({
   config: preset,
   create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const configPath = path.join(cwd, CONFIG_FILE_JSON)
-      const payload = JSON.stringify(knip.config, null, 2)
+      const payload = JSON.stringify(preset, null, 2)
 
       yield* fs
         .writeFileString(configPath, `${payload}\n`)
@@ -47,7 +48,14 @@ export const knip = {
   update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
-      const { path: configPath } = yield* knip.exists(cwd)
+      const path = yield* Path.Path
+      const jsonPath = path.join(cwd, CONFIG_FILE_JSON)
+      const jsoncPath = path.join(cwd, CONFIG_FILE_JSONC)
+      const configPath = (yield* fs.exists(jsonPath))
+        ? jsonPath
+        : (yield* fs.exists(jsoncPath))
+          ? jsoncPath
+          : null
 
       if (!configPath) {
         return yield* new FileNotFound({ path: CONFIG_FILE_JSON })
@@ -65,7 +73,7 @@ export const knip = {
         return yield* new InvalidConfigFormat({ path: configPath })
       }
 
-      const mergedConfig = yield* mergeConfig(existingConfig, knip.config)
+      const mergedConfig = yield* mergeConfig(existingConfig, preset)
 
       // Set schema based on file extension
       const isJsonc = configPath.endsWith(".jsonc")
@@ -78,4 +86,4 @@ export const knip = {
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   version: "5.86.0",
-}
+})

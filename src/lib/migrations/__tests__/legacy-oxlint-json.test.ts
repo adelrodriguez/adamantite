@@ -1,0 +1,79 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import * as NodeServices from "@effect/platform-node/NodeServices"
+import Bun from "bun"
+import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
+import { createPrompterTestContext } from "#commands/__tests__/command-test-helpers.ts"
+import { legacyOxlintJson } from "#lib/migrations/legacy-oxlint-json.ts"
+
+function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  const prompterContext = createPrompterTestContext()
+  const provided = effect.pipe(
+    Effect.provide(Layer.merge(NodeServices.layer, prompterContext.layer))
+  ) as Effect.Effect<A, E>
+  return Effect.runPromise(provided)
+}
+
+describe("legacyOxlintJson", () => {
+  let originalCwd: string
+  let tempDir: string
+
+  beforeEach(() => {
+    originalCwd = process.cwd()
+    tempDir = mkdtempSync(join(tmpdir(), "adamantite-legacy-oxlint-migration-test-"))
+    process.chdir(tempDir)
+  })
+
+  afterEach(() => {
+    process.chdir(originalCwd)
+    rmSync(tempDir, { force: true, recursive: true })
+  })
+
+  test("check warns when both config formats exist and keeps the TS config active", async () => {
+    await Bun.write("oxlint.config.ts", "export default {}\n")
+    await Bun.write(".oxlintrc.json", "{}\n")
+
+    const result = await runTestEffect(legacyOxlintJson.check({ cwd: tempDir }))
+
+    expect(result.status).toBe("valid")
+    expect(result.warnings).toEqual([
+      "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`.",
+    ])
+  })
+
+  test("migrate converts a legacy JSON config into the current TS config format", async () => {
+    await Bun.write(
+      ".oxlintrc.json",
+      JSON.stringify(
+        {
+          rules: {
+            semi: "error",
+          },
+        },
+        null,
+        2
+      )
+    )
+
+    const checkResult = await runTestEffect(legacyOxlintJson.check({ cwd: tempDir }))
+    expect(checkResult.status).toBe("needs_migration")
+    expect(checkResult.summary).toBe(
+      "Migrating legacy `.oxlintrc.json` configuration to `oxlint.config.ts`."
+    )
+
+    await runTestEffect(legacyOxlintJson.migrate({ cwd: tempDir }))
+
+    expect(await Bun.file("oxlint.config.ts").exists()).toBe(true)
+    expect(await Bun.file(".oxlintrc.json").exists()).toBe(false)
+
+    const content = await Bun.file("oxlint.config.ts").text()
+    expect(content).toContain('"semi": "error"')
+    expect(content).toContain('"typeAware": true')
+    expect(content).toContain('"typeCheck": true')
+
+    await runTestEffect(legacyOxlintJson.validate({ cwd: tempDir }))
+  })
+})

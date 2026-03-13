@@ -149,6 +149,15 @@ export class MissingPackageVersion extends Data.TaggedError("MissingPackageVersi
   }
 }
 
+export class MigrationValidationFailed extends Data.TaggedError("MigrationValidationFailed")<{
+  migrationId: string
+  reason: string
+}> {
+  override get message() {
+    return `Migration \`${this.migrationId}\` validation failed. ${this.reason}`
+  }
+}
+
 export class OperationCancelled extends Data.TaggedError("OperationCancelled")<{
   reason?: string
 }> {

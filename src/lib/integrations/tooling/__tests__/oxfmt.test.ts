@@ -8,9 +8,9 @@ import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { parse } from "jsonc-parser"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { oxfmt } from "#helpers/packages/oxfmt.ts"
+import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
 
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..")
+const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("oxfmt", () => {
   let originalCwd: string

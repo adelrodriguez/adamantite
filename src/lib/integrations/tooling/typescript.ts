@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { FailedToReadFile, FailedToWriteFile, InvalidConfigFormat } from "#errors.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+import { FailedToReadFile, FailedToWriteFile, InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const CONFIG_FILE = "tsconfig.json"
 

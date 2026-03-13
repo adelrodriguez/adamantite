@@ -6,8 +6,8 @@ import {
   FailedToReadFile,
   FailedToWriteFile,
   InvalidConfigFormat,
-} from "#errors.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+} from "#lib/shared/errors.ts"
+import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const SETTINGS_FILE = "settings.json"
 
@@ -44,11 +44,11 @@ export const zed = {
       },
       TSX: {
         format_on_save: "on",
-        formatter: [{ language_server: { name: "oxfmt" } }],
+        formatter: [{ language_server: { name: "oxfmt" } }, { code_action: "source.fixAll.oxc" }],
       },
       TypeScript: {
         format_on_save: "on",
-        formatter: [{ language_server: { name: "oxfmt" } }],
+        formatter: [{ language_server: { name: "oxfmt" } }, { code_action: "source.fixAll.oxc" }],
       },
       YAML: {
         format_on_save: "on",

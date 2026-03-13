@@ -2,7 +2,7 @@ import * as p from "@clack/prompts"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as ServiceMap from "effect/ServiceMap"
-import { OperationCancelled } from "#errors.ts"
+import { OperationCancelled } from "#lib/shared/errors.ts"
 
 interface PrompterService {
   readonly cancel: (message: string) => Effect.Effect<void>

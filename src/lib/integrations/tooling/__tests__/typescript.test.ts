@@ -7,9 +7,9 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { typescript } from "#helpers/packages/typescript.ts"
+import { typescript } from "#lib/integrations/tooling/typescript.ts"
 
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..")
+const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("typescript", () => {
   let originalCwd: string

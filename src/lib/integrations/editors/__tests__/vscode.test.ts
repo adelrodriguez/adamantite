@@ -6,7 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { vscode } from "#helpers/editors/vscode.ts"
+import { vscode } from "#lib/integrations/editors/vscode.ts"
 
 describe("vscode", () => {
   let originalCwd: string

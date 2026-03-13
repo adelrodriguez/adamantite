@@ -4,16 +4,20 @@ import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Bun from "bun"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import initCommand from "#commands/init.ts"
-import { knip } from "#helpers/packages/knip.ts"
-import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
-import { sherif } from "#helpers/packages/sherif.ts"
-import { typescript } from "#helpers/packages/typescript.ts"
+import { knip } from "#lib/integrations/tooling/knip.ts"
+import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
+import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
+import { sherif } from "#lib/integrations/tooling/sherif.ts"
+import { typescript } from "#lib/integrations/tooling/typescript.ts"
+import { CliNotFound } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
+  createRunnerTestContext,
   createPrompterTestContext,
   runCommand,
 } from "./command-test-helpers.ts"
@@ -350,6 +354,44 @@ describe("init", () => {
       expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])
       expect(prompter.outros).toEqual([])
       expect(installer.calls).toEqual([])
+    })
+
+    test("continue successfully and show guidance when the VS Code CLI is unavailable", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true, false],
+        multiselectResponses: [["format"], ["vscode"]],
+      })
+      const installer = createDependencyInstallerTestContext()
+      const runner = createRunnerTestContext({
+        implementation: (options) =>
+          options.command === "code"
+            ? Effect.fail(new CliNotFound({ command: "code" }))
+            : Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+      })
+
+      const exit = await runCommand(
+        initCommand,
+        [],
+        [prompter.layer, installer.layer, runner.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      expect(prompter.logs).toContainEqual({
+        level: "error",
+        message: "VSCode CLI ('code' command) not found.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message: "To install it:",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "Your project is now configured",
+      })
+      expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
+
+      expect(await Bun.file(join(tempDir, ".vscode", "settings.json")).exists()).toBe(true)
     })
   })
 })

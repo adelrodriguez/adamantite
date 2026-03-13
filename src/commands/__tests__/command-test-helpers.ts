@@ -6,10 +6,17 @@ import * as Layer from "effect/Layer"
 import * as Terminal from "effect/Terminal"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import { OperationCancelled, type FailedToInstallDependency } from "#errors.ts"
-import { type CommandRunOptions, CommandRunner } from "#services/command-runner.ts"
-import { type DetectedPackageManager, DependencyInstaller } from "#services/dependency-installer.ts"
-import { Prompter } from "#services/prompter.ts"
+import {
+  type CommandFailedLike,
+  type CommandRunOptions,
+  CommandRunner,
+} from "#lib/services/command-runner.ts"
+import {
+  type DetectedPackageManager,
+  DependencyInstaller,
+} from "#lib/services/dependency-installer.ts"
+import { Prompter } from "#lib/services/prompter.ts"
+import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
 
 interface LogEntry {
   readonly level: "error" | "info" | "success" | "warning"
@@ -65,19 +72,32 @@ function shiftResponse<T>(queue: T[], kind: string): T {
   return response
 }
 
-export function createRunnerTestContext(exitCodes: number[] = [0]): RunnerTestContext {
-  const remainingExitCodes = [...exitCodes]
+export function createRunnerTestContext(
+  options:
+    | number[]
+    | {
+        readonly exitCodes?: number[]
+        readonly implementation?: (
+          options: CommandRunOptions
+        ) => Effect.Effect<ChildProcessSpawner.ExitCode, CommandFailedLike>
+      } = [0]
+): RunnerTestContext {
+  const remainingExitCodes = [...(Array.isArray(options) ? options : (options.exitCodes ?? [0]))]
   const invocations: CommandRunOptions[] = []
+  const implementation = Array.isArray(options) ? undefined : options.implementation
 
   return {
     invocations,
     layer: Layer.succeed(CommandRunner)({
       run: (options) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           invocations.push({
             ...options,
             args: [...options.args],
           })
+          if (implementation) {
+            return yield* implementation(options)
+          }
           return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
         }),
     }),
@@ -203,7 +223,7 @@ export function createDependencyInstallerTestContext(options?: {
           })
 
           if (options?.addDevDependenciesError) {
-            return yield* Effect.fail(options.addDevDependenciesError)
+            return yield* options.addDevDependenciesError
           }
         }),
       detectPackageManager: (_cwd) => Effect.succeed(detectedPackageManager),

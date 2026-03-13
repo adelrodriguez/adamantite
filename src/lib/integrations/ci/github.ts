@@ -2,9 +2,9 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { type PackageManagerName, runScriptCommand } from "nypm"
-import type { Script } from "#types.ts"
-import { FailedToWriteFile } from "#errors.ts"
-import { ensureDirectory } from "#utils.ts"
+import type { Script } from "#lib/workspace/scripts.ts"
+import { FailedToWriteFile } from "#lib/shared/errors.ts"
+import { ensureDirectory } from "#lib/shared/filesystem.ts"
 
 interface WorkflowOptions {
   packageManager: PackageManagerName

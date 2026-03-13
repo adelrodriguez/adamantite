@@ -6,7 +6,7 @@ import {
   detectPackageManager as detectNypmPackageManager,
   type PackageManagerName,
 } from "nypm"
-import { FailedToInstallDependency, NoPackageManager } from "#errors.ts"
+import { FailedToInstallDependency, NoPackageManager } from "#lib/shared/errors.ts"
 
 export interface DetectedPackageManager {
   readonly name: PackageManagerName

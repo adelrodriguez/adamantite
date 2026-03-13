@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises"
 import type { PackageJson } from "type-fest"
-import { MissingPackageVersion } from "#errors.ts"
+import { MissingPackageVersion } from "#lib/shared/errors.ts"
 
 export async function getPackageVersion() {
   const packageJson = JSON.parse(

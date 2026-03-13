@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as ServiceMap from "effect/ServiceMap"
 import * as ChildProcess from "effect/unstable/process/ChildProcess"
-import { CliNotFound } from "#errors.ts"
+import { CliNotFound } from "#lib/shared/errors.ts"
 
 export interface CommandRunOptions {
   readonly args: string[]

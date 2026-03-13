@@ -1,9 +1,9 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import * as ChildProcess from "effect/unstable/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { Script } from "#types.ts"
+import type { Script } from "#lib/workspace/scripts.ts"
+import { type CommandFailedLike, CommandRunner } from "#lib/services/command-runner.ts"
 import {
   FailedToCreateDirectory,
   FailedToInstallExtension,
@@ -11,14 +11,12 @@ import {
   FailedToWriteFile,
   InvalidConfigFormat,
   VscodeCliNotFound,
-} from "#errors.ts"
-import { checkCliExists, isJsonObject, mergeConfig, parseJson } from "#utils.ts"
+} from "#lib/shared/errors.ts"
+import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const SETTINGS_FILE = "settings.json"
 
 export const vscode = {
-  cliExists: () =>
-    checkCliExists("code").pipe(Effect.mapError((cause) => new VscodeCliNotFound({ cause }))),
   config: {
     "[css]": {
       "editor.defaultFormatter": "oxc.oxc-vscode",
@@ -77,52 +75,43 @@ export const vscode = {
     }),
 
   extension: (scripts: Script[] = []) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        yield* vscode.cliExists()
-
-        function installExtension(extension: string) {
-          return Effect.gen(function* () {
-            const handle = yield* ChildProcess.make("code", ["--install-extension", extension], {
-              stderr: "inherit",
-              stdin: "ignore",
-              stdout: "inherit",
+    Effect.gen(function* () {
+      function installExtension(extension: string) {
+        return Effect.gen(function* () {
+          const runner = yield* CommandRunner
+          const exitCode = yield* runner
+            .run({
+              args: ["--install-extension", extension],
+              command: "code",
             })
-            return yield* handle.exitCode
-          }).pipe(
-            Effect.mapError((cause) => new FailedToInstallExtension({ cause, extension })),
-            Effect.filterOrFail(
-              (exitCode) => exitCode === ChildProcessSpawner.ExitCode(0),
-              (exitCode) => new FailedToInstallExtension({ cause: exitCode, extension })
-            ),
-            Effect.asVoid
-          )
-        }
-
-        const extensions = [
-          scripts.includes("check") || scripts.includes("fix") || scripts.includes("format")
-            ? installExtension("oxc.oxc-vscode")
-            : Effect.void,
-          scripts.includes("analyze") ? installExtension("webpro.vscode-knip") : Effect.void,
-        ]
-
-        const results = yield* Effect.all(
-          extensions.map((extension) =>
-            extension.pipe(
-              Effect.match({
-                onFailure: (error) => error,
-                onSuccess: () => null,
-              })
+            .pipe(
+              Effect.mapError((cause: CommandFailedLike) =>
+                cause._tag === "CliNotFound" && cause.command === "code"
+                  ? new VscodeCliNotFound({ cause })
+                  : new FailedToInstallExtension({ cause, extension })
+              )
             )
-          )
-        )
-        const firstFailure = results.find((result) => result !== null)
 
-        if (firstFailure) {
-          yield* Effect.fail(firstFailure)
-        }
-      })
-    ),
+          if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
+            return yield* new FailedToInstallExtension({ cause: exitCode, extension })
+          }
+        })
+      }
+
+      const extensions: string[] = []
+
+      if (scripts.includes("check") || scripts.includes("fix") || scripts.includes("format")) {
+        extensions.push("oxc.oxc-vscode")
+      }
+
+      if (scripts.includes("analyze")) {
+        extensions.push("webpro.vscode-knip")
+      }
+
+      for (const extension of extensions) {
+        yield* installExtension(extension)
+      }
+    }),
   update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem

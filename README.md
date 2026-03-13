@@ -97,7 +97,7 @@ Fix issues in your code with automatic formatting and safe fixes:
 adamantite fix
 
 # Fix specific files
-adamantite fix src/utils.ts
+adamantite fix src/index.ts
 
 # Apply suggested fixes
 adamantite fix --suggested
@@ -118,7 +118,7 @@ Format your code using oxfmt:
 adamantite format
 
 # Format specific files
-adamantite format src/utils.ts
+adamantite format src/index.ts
 
 # Check if files are formatted without writing
 adamantite format --check

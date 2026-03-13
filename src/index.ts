@@ -14,9 +14,9 @@ import initCommand from "#commands/init.ts"
 import monorepoCommand from "#commands/monorepo.ts"
 import typecheckCommand from "#commands/typecheck.ts"
 import updateCommand from "#commands/update.ts"
-import { CommandRunner } from "#services/command-runner.ts"
-import { DependencyInstaller } from "#services/dependency-installer.ts"
-import { Prompter } from "#services/prompter.ts"
+import { CommandRunner } from "#lib/services/command-runner.ts"
+import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
+import { Prompter } from "#lib/services/prompter.ts"
 import { getPackageVersion } from "#version.ts" with { type: "macro" }
 
 const main = Command.make("adamantite").pipe(

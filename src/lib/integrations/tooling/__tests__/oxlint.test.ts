@@ -7,9 +7,9 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
+import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
 
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..")
+const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("oxlint", () => {
   let originalCwd: string

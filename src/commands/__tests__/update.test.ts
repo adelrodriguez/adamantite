@@ -7,11 +7,11 @@ import Bun from "bun"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import updateCommand from "#commands/update.ts"
-import { FailedToInstallDependency } from "#errors.ts"
-import { knip } from "#helpers/packages/knip.ts"
-import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
-import { sherif } from "#helpers/packages/sherif.ts"
+import { knip } from "#lib/integrations/tooling/knip.ts"
+import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
+import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
+import { sherif } from "#lib/integrations/tooling/sherif.ts"
+import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,

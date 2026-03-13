@@ -11,10 +11,10 @@ import * as Layer from "effect/Layer"
 import * as PlatformError from "effect/PlatformError"
 import { parse } from "jsonc-parser"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { knip } from "#helpers/packages/knip.ts"
+import { knip } from "#lib/integrations/tooling/knip.ts"
 
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..")
-// Keep these schema URLs in sync with the major-version-pinned values in src/helpers/packages/knip.ts.
+const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
+// Keep these schema URLs in sync with the major-version-pinned values in src/lib/integrations/tooling/knip.ts.
 const KNIP_JSON_SCHEMA_URL = "https://unpkg.com/knip@5/schema.json"
 const KNIP_JSONC_SCHEMA_URL = "https://unpkg.com/knip@5/schema-jsonc.json"
 

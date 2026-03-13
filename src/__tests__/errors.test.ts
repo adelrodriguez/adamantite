@@ -7,7 +7,7 @@ import {
   FailedToInstallDependency,
   FailedToParseFile,
   FileNotFound,
-} from "#errors.ts"
+} from "#lib/shared/errors.ts"
 
 function createParseErrors(count: number): ParseError[] {
   const errors: ParseError[] = []

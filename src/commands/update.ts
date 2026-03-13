@@ -1,13 +1,14 @@
 import process from "node:process"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
-import { knip } from "#helpers/packages/knip.ts"
-import { oxfmt } from "#helpers/packages/oxfmt.ts"
-import { oxlint, tsgolint } from "#helpers/packages/oxlint.ts"
-import { sherif } from "#helpers/packages/sherif.ts"
-import { DependencyInstaller } from "#services/dependency-installer.ts"
-import { Prompter } from "#services/prompter.ts"
-import { normalizeDependencyVersion, printTitle, readPackageJson } from "#utils.ts"
+import { knip } from "#lib/integrations/tooling/knip.ts"
+import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
+import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
+import { sherif } from "#lib/integrations/tooling/sherif.ts"
+import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
+import { Prompter } from "#lib/services/prompter.ts"
+import { printTitle } from "#lib/shared/terminal.ts"
+import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 
 export default Command.make("update").pipe(
   Command.withDescription("Update adamantite dependencies to latest compatible versions"),

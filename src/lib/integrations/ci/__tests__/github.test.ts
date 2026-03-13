@@ -6,7 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { github, hasCICompatibleScripts } from "#helpers/ci/github.ts"
+import { github, hasCICompatibleScripts } from "#lib/integrations/ci/github.ts"
 
 describe("github", () => {
   let originalCwd: string

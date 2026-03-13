@@ -74,14 +74,18 @@ This project uses changesets for version management:
   - `init.ts` - Initializes Adamantite configuration
   - `monorepo.ts` - Runs monorepo-specific checks (use `--fix` to auto-fix issues)
   - `update.ts` - Updates Adamantite configuration
-- **`utils.ts`** - Shared utilities (package manager detection, error handling)
+- **`lib/`** - Internal library code grouped by concern:
+  - `services/` - Effect services used by commands
+  - `integrations/` - Adapters for tooling, editors, and CI
+  - `workspace/` - Logic that operates on the target project on disk
+  - `shared/` - Cross-cutting utilities and error types
 - **`version.ts`** - Package version detection
 
 ### Dependency Management
 
-Adamantite depends on multiple packages to perform its tasks. These dependencies are defined inside the `src/helpers/packages/` directory.
+Adamantite depends on multiple packages to perform its tasks. These dependencies are defined inside the `src/lib/integrations/tooling/` directory.
 
-Each package has a version property that is used to determine the version of the package to install, and it should match the version of the package in the `package.json` file. If the version in the `package.json` file is higher, we should update the version in its respective helper object.
+Each package has a version property that is used to determine the version of the package to install, and it should match the version of the package in the `package.json` file. If the version in the `package.json` file is higher, we should update the version in its respective integration object.
 
 ### Build Process
 

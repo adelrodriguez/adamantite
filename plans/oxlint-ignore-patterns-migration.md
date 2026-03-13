@@ -43,7 +43,7 @@ No extra patterns for `react`, `vue`, or `node` in v1 of this change.
    - Remove `ignorePatterns` from `presets/lint/core.ts`.
 
 2. **Ignore recommendation helper**
-   - Add helper in `src/helpers/packages/oxlint.ts` to compute recommended patterns from selected presets.
+   - Add helper in `src/lib/integrations/tooling/oxlint.ts` to compute recommended patterns from selected presets.
    - Ensure helper deduplicates and keeps stable ordering.
 
 3. **Config generation support**

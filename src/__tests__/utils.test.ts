@@ -12,16 +12,11 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Terminal from "effect/Terminal"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import {
-  checkCliExists,
-  checkIsMonorepo,
-  isJsonObject,
-  mergeConfig,
-  normalizeDependencyVersion,
-  parseJson,
-  printTitle,
-  readPackageJson,
-} from "#utils.ts"
+import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { checkCliExists } from "#lib/shared/process.ts"
+import { printTitle } from "#lib/shared/terminal.ts"
+import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
+import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 
 const NodeContext = NodeServices
 const noop = () => null

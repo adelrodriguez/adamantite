@@ -2,9 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import Bun from "bun"
-import { sherif } from "#helpers/packages/sherif.ts"
+import { sherif } from "#lib/integrations/tooling/sherif.ts"
 
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..")
+const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("sherif", () => {
   describe("version", () => {

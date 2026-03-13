@@ -67,6 +67,8 @@ describe("oxlint", () => {
       const content = await Bun.file("oxlint.config.ts").text()
       expect(content).toContain('import { defineConfig } from "oxlint"')
       expect(content).toContain('import core from "adamantite/lint"')
+      expect(content).toContain('"typeAware": true')
+      expect(content).toContain('"typeCheck": true')
       expect(content).toContain("extends: [core]")
     })
   })
@@ -107,6 +109,8 @@ describe("oxlint", () => {
       expect(content).toContain('import core from "adamantite/lint"')
       expect(content).toContain('import react from "adamantite/lint/react"')
       expect(content).toContain('import node from "adamantite/lint/node"')
+      expect(content).toContain('"typeAware": true')
+      expect(content).toContain('"typeCheck": true')
     })
 
     test("migrate Adamantite preset paths with and without a dot prefix", async () => {
@@ -130,6 +134,8 @@ describe("oxlint", () => {
       expect(content).toContain('import core from "adamantite/lint"')
       expect(content).toContain('import react from "adamantite/lint/react"')
       expect(content).toContain('import node from "adamantite/lint/node"')
+      expect(content).toContain('"typeAware": true')
+      expect(content).toContain('"typeCheck": true')
       expect(content).not.toContain("node_modules/adamantite/presets/lint/react.ts")
     })
 

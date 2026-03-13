@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, realpathSync, rmSync } from "node:fs"
-import { writeFile } from "node:fs/promises"
+import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import typecheckCommand from "#commands/typecheck.ts"
-import { createRunnerTestContext, runCommandWithRunner } from "./command-test-helpers.ts"
+import {
+  createPrompterTestContext,
+  createRunnerTestContext,
+  runCommand,
+} from "./command-test-helpers.ts"
 
 describe("typecheck", () => {
   let originalCwd: string
@@ -23,57 +26,33 @@ describe("typecheck", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("default invocation", () => {
-    test("run tsc with noEmit in the current working directory", async () => {
-      const runner = createRunnerTestContext()
+  test("run oxlint with config-driven checks and log deprecation warning", async () => {
+    const prompter = createPrompterTestContext()
+    const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(typecheckCommand, [], runner)
+    const exit = await runCommand(typecheckCommand, [], [prompter.layer, runner.layer])
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
-        {
-          args: ["--noEmit"],
-          command: "tsc",
-          cwd: realpathSync(tempDir),
-        },
-      ])
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(prompter.logs).toContainEqual({
+      level: "warning",
+      message: "Deprecated. Use `adamantite check` for typechecking.",
     })
+    expect(runner.invocations).toEqual([
+      {
+        args: [],
+        command: "oxlint",
+      },
+    ])
   })
 
-  describe("project and watch options", () => {
-    test("add project and watch options when requested", async () => {
-      await writeFile(join(tempDir, "tsconfig.test.json"), '{"compilerOptions":{"noEmit":true}}\n')
-      const runner = createRunnerTestContext()
+  test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
+    const prompter = createPrompterTestContext()
+    const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(
-        typecheckCommand,
-        ["--project", "tsconfig.test.json", "--watch"],
-        runner
-      )
+    const exit = await runCommand(typecheckCommand, [], [prompter.layer, runner.layer])
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]).toEqual({
-        args: [
-          "--noEmit",
-          "--project",
-          realpathSync(join(tempDir, "tsconfig.test.json")),
-          "--watch",
-        ],
-        command: "tsc",
-        cwd: realpathSync(tempDir),
-      })
-    })
-  })
-
-  describe("error handling", () => {
-    test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
-      const runner = createRunnerTestContext([1])
-
-      const exit = await runCommandWithRunner(typecheckCommand, [], runner)
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
-      expect(error._tag).toBe("CommandFailed")
-    })
+    expect(Exit.isFailure(exit)).toBe(true)
+    const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
+    expect(error._tag).toBe("CommandFailed")
   })
 })

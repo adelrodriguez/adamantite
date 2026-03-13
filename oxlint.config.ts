@@ -4,4 +4,8 @@ import node from "./presets/lint/node.ts"
 
 export default defineConfig({
   extends: [core, node],
+  options: {
+    typeAware: true,
+    typeCheck: true,
+  },
 })

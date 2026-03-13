@@ -20,45 +20,8 @@ function getPresetNames(presets: string[] = []) {
   return presets.includes("core") ? presets : ["core", ...presets]
 }
 
-function getExtendsArray(extendsValue: unknown): string[] {
-  if (Array.isArray(extendsValue)) {
-    return extendsValue.filter((value): value is string => typeof value === "string")
-  }
-
-  if (typeof extendsValue === "string") {
-    return [extendsValue]
-  }
-
-  return []
-}
-
 function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
-}
-
-function getImportPath(preset: string) {
-  return preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`
-}
-
-function getPresetNameFromAdamantiteExtends(extendsItem: string) {
-  const nodeModulesMatch = extendsItem.match(ADAMANTITE_NODE_MODULES_PRESET_REGEX)
-
-  if (nodeModulesMatch?.[1]) {
-    return nodeModulesMatch[1]
-  }
-
-  const exportMatch = extendsItem.match(ADAMANTITE_EXPORT_PRESET_REGEX)
-
-  if (exportMatch) {
-    return exportMatch[1] ?? "core"
-  }
-
-  return null
-}
-
-function formatObjectEntries(entries: Array<[string, string]>, indent: number) {
-  const pad = " ".repeat(indent)
-  return entries.map(([key, value]) => `${pad}${key}: ${value},`).join("\n")
 }
 
 function toTsConfigContent(
@@ -66,10 +29,12 @@ function toTsConfigContent(
   presetNames: string[],
   passthroughExtends: string[] = []
 ) {
+  const { options, ...configWithoutOptions } = config
   const imports = [
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
-      (preset) => `import ${getImportName(preset)} from "${getImportPath(preset)}"`
+      (preset) =>
+        `import ${getImportName(preset)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
     ),
   ]
 
@@ -79,14 +44,31 @@ function toTsConfigContent(
     ...passthroughExtends.map((item) => JSON.stringify(item)),
   ]
 
-  const entries: Array<[string, string]> = [
-    ...Object.entries(config).map(
-      ([key, value]) => [key, JSON.stringify(value, null, 2)] as [string, string]
-    ),
-    ["extends", `[${allExtends.join(", ")}]`],
+  const serializedOptions = JSON.stringify(
+    isJsonObject(options)
+      ? {
+          ...options,
+          typeAware: true,
+          typeCheck: true,
+        }
+      : {
+          typeAware: true,
+          typeCheck: true,
+        },
+    null,
+    2
+  )
+  const serializedConfigEntries = Object.entries(configWithoutOptions).map(
+    ([key, value]) => [key, JSON.stringify(value, null, 2)] as [string, string]
+  )
+  const serializedExtends = `[${allExtends.join(", ")}]`
+  const body = [
+    ["options", serializedOptions],
+    ...serializedConfigEntries,
+    ["extends", serializedExtends],
   ]
-
-  const body = formatObjectEntries(entries, 2)
+    .map(([key, value]) => `  ${key}: ${value},`)
+    .join("\n")
 
   return [...imports, "", `export default defineConfig({`, body, `})`, ""].join("\n")
 }
@@ -101,6 +83,32 @@ export const oxlint = {
 
       yield* fs
         .writeFileString(configPath, payload)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+    }),
+  // TODO: Move this into the migration system once it exists. This is a
+  // stop-gap that patches an existing oxlint.config.ts in-place because
+  // neither `create` (writes from scratch) nor `update` (migrates JSON → TS)
+  // can handle an existing TS config without overwriting user customizations.
+  ensureTypeCheck: (cwd: string) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const configPath = path.join(cwd, CONFIG_FILE)
+      const content = yield* fs
+        .readFileString(configPath)
+        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
+
+      if (content.includes("typeAware") && content.includes("typeCheck")) {
+        return
+      }
+
+      const optionsBlock = '  options: {\n    "typeAware": true,\n    "typeCheck": true\n  },'
+      const updated = content.includes("defineConfig({")
+        ? content.replace("defineConfig({", `defineConfig({\n${optionsBlock}`)
+        : `// Added by adamantite update\n${optionsBlock}\n${content}`
+
+      yield* fs
+        .writeFileString(configPath, updated)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   exists: (cwd: string) =>
@@ -153,12 +161,19 @@ export const oxlint = {
 
       const { $schema: _schema, ...configWithoutSchema } = existingConfig
 
-      const extendsArray = getExtendsArray(configWithoutSchema.extends)
+      const extendsArray = Array.isArray(configWithoutSchema.extends)
+        ? configWithoutSchema.extends.filter((value): value is string => typeof value === "string")
+        : typeof configWithoutSchema.extends === "string"
+          ? [configWithoutSchema.extends]
+          : []
       const presetNameSet = new Set(getPresetNames(presets))
       const passthroughSet = new Set<string>()
 
       for (const extendsItem of extendsArray) {
-        const presetName = getPresetNameFromAdamantiteExtends(extendsItem)
+        const nodeModulesMatch = extendsItem.match(ADAMANTITE_NODE_MODULES_PRESET_REGEX)
+        const exportMatch = extendsItem.match(ADAMANTITE_EXPORT_PRESET_REGEX)
+        const presetName =
+          nodeModulesMatch?.[1] ?? (exportMatch ? (exportMatch[1] ?? "core") : null)
 
         if (presetName) {
           presetNameSet.add(presetName)
@@ -180,10 +195,10 @@ export const oxlint = {
         .remove(legacyConfigPath)
         .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
     }),
-  version: "1.50.0",
+  version: "1.55.0",
 }
 
 export const tsgolint = {
   name: "oxlint-tsgolint",
-  version: "0.14.2",
+  version: "0.16.0",
 }

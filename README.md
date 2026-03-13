@@ -37,10 +37,9 @@ npx adamantite init
 Adamantite will automatically configure your project with linting, formatting, and type-safety rules.
 
 ```shell
-adamantite check          # Check code for issues without fixing using oxlint
+adamantite check          # Check code for issues and type errors using oxlint
 adamantite fix            # Fix code issues using oxlint
 adamantite format         # Format code using oxfmt
-adamantite typecheck      # Run TypeScript type checking using the strict preset
 adamantite monorepo       # Check monorepo for dependency issues using Sherif
 adamantite update         # Update Adamantite's dependencies to the latest compatible versions
 ```
@@ -78,7 +77,7 @@ This interactive command will:
 
 ### `adamantite check`
 
-Check your code for issues without automatically fixing them using oxlint:
+Check your code for issues and type errors without automatically fixing them using oxlint:
 
 ```shell
 # Check all files
@@ -143,18 +142,6 @@ Automatically detects and fixes:
 - Unused dependencies
 - Package.json formatting issues
 
-### `adamantite typecheck`
-
-Run TypeScript type checking using tsc and the strict preset:
-
-```shell
-# Type check all files
-adamantite typecheck
-
-# Type check a specific project
-adamantite typecheck --project tsconfig.json
-```
-
 ### `adamantite update`
 
 Keep your dependencies current:
@@ -215,8 +202,8 @@ bun test
 # Build CLI
 bun run build
 
-# Type checking
-bun run typecheck
+# Linting and type checking
+bun run check
 ```
 
 ## 🤝 Contributing

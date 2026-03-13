@@ -24,7 +24,7 @@ describe("check", () => {
   })
 
   describe("default invocation", () => {
-    test("run oxlint with type-aware mode by default", async () => {
+    test("run oxlint with config-driven linting and type checking by default", async () => {
       const runner = createRunnerTestContext()
 
       const exit = await runCommandWithRunner(checkCommand, [], runner)
@@ -32,7 +32,7 @@ describe("check", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
         {
-          args: ["--type-aware"],
+          args: [],
           command: "oxlint",
         },
       ])
@@ -49,7 +49,7 @@ describe("check", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([
         {
-          args: ["--type-aware", realpathSync(join(tempDir, "index.ts"))],
+          args: [realpathSync(join(tempDir, "index.ts"))],
           command: "oxlint",
         },
       ])

@@ -6,15 +6,14 @@ import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const CONFIG_FILE = "tsconfig.json"
 
-export const typescript = {
-  command: "tsc",
+export const typescriptConfig = {
   config: { extends: "adamantite/typescript" },
   create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const configPath = path.join(cwd, CONFIG_FILE)
-      const payload = JSON.stringify(typescript.config, null, 2)
+      const payload = JSON.stringify(typescriptConfig.config, null, 2)
 
       yield* fs
         .writeFileString(configPath, `${payload}\n`)
@@ -26,7 +25,6 @@ export const typescript = {
       const path = yield* Path.Path
       return yield* fs.exists(path.join(cwd, CONFIG_FILE))
     }),
-  name: "typescript",
   update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
@@ -38,18 +36,14 @@ export const typescript = {
         .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
       const existingConfig = yield* parseJson(tsconfigFile, configPath)
 
-      // Merge config: Adamantite's config takes precedence (first argument in defu)
-      // This ensures Adamantite's extends is always applied
-      // Empty configs are allowed and will be merged with Adamantite's config
       if (!isJsonObject(existingConfig)) {
         return yield* new InvalidConfigFormat({ path: configPath })
       }
-      const newConfig = yield* mergeConfig(typescript.config, existingConfig)
+
+      const newConfig = yield* mergeConfig(typescriptConfig.config, existingConfig)
 
       yield* fs
         .writeFileString(configPath, `${JSON.stringify(newConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-
-  version: "5.9.3",
 }

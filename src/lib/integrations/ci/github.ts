@@ -79,7 +79,6 @@ const setupSteps: Record<PackageManagerName, string> = {
 const MATRIX_SCRIPT_ENTRIES: MatrixScriptEntry[] = [
   { name: "lint", script: "check" },
   { args: ["--check"], name: "format", script: "format" },
-  { name: "types", script: "typecheck" },
   { name: "monorepo", script: "check:monorepo" },
   { name: "analyze", script: "analyze" },
 ]
@@ -155,7 +154,7 @@ const CI_COMPATIBLE_SCRIPTS = new Set<Script>(MATRIX_SCRIPT_ENTRIES.map((entry) 
 
 /**
  * Check if any CI-compatible scripts are in the list.
- * CI-compatible scripts are: check, format, typecheck, check:monorepo, analyze
+ * CI-compatible scripts are: check, format, check:monorepo, analyze
  */
 export function hasCICompatibleScripts(scripts: Script[]): boolean {
   return scripts.some((script) => CI_COMPATIBLE_SCRIPTS.has(script))

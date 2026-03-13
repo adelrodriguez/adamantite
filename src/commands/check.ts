@@ -12,12 +12,12 @@ const files = Argument.file("files", { mustExist: true }).pipe(
 )
 
 export default Command.make("check", { files }).pipe(
-  Command.withDescription("Find issues in code using oxlint"),
+  Command.withDescription("Find issues and type errors in code using oxlint"),
   Command.withHandler(({ files }) =>
     Effect.gen(function* () {
       const runner = yield* CommandRunner
       const exitCode = yield* runner.run({
-        args: ["--type-aware", ...files],
+        args: [...files],
         command: oxlint.name,
       })
 

@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import { defineTooling } from "#lib/integrations/tooling/base.ts"
 import {
   FailedToDeleteFile,
   FailedToReadFile,
@@ -73,7 +74,7 @@ function toTsConfigContent(
   return [...imports, "", `export default defineConfig({`, body, `})`, ""].join("\n")
 }
 
-export const oxlint = {
+export const oxlint = defineTooling({
   create: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
@@ -83,32 +84,6 @@ export const oxlint = {
 
       yield* fs
         .writeFileString(configPath, payload)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
-    }),
-  // TODO: Move this into the migration system once it exists. This is a
-  // stop-gap that patches an existing oxlint.config.ts in-place because
-  // neither `create` (writes from scratch) nor `update` (migrates JSON → TS)
-  // can handle an existing TS config without overwriting user customizations.
-  ensureTypeCheck: (cwd: string) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE)
-      const content = yield* fs
-        .readFileString(configPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
-
-      if (content.includes("typeAware") && content.includes("typeCheck")) {
-        return
-      }
-
-      const optionsBlock = '  options: {\n    "typeAware": true,\n    "typeCheck": true\n  },'
-      const updated = content.includes("defineConfig({")
-        ? content.replace("defineConfig({", `defineConfig({\n${optionsBlock}`)
-        : `// Added by adamantite update\n${optionsBlock}\n${content}`
-
-      yield* fs
-        .writeFileString(configPath, updated)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   exists: (cwd: string) =>
@@ -136,17 +111,20 @@ export const oxlint = {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const oxlintState = yield* oxlint.exists(cwd)
+      const tsPath = path.join(cwd, CONFIG_FILE)
+      const jsonPath = path.join(cwd, LEGACY_CONFIG_FILE)
+      const hasTs = yield* fs.exists(tsPath)
+      const hasJson = yield* fs.exists(jsonPath)
 
-      if (oxlintState.tsPath) {
+      if (hasTs) {
         return
       }
 
-      if (!oxlintState.jsonPath) {
+      if (!hasJson) {
         return yield* new FileNotFound({ path: LEGACY_CONFIG_FILE })
       }
 
-      const legacyConfigPath = oxlintState.jsonPath
+      const legacyConfigPath = jsonPath
       const configPath = path.join(cwd, CONFIG_FILE)
 
       const legacyConfigContent = yield* fs
@@ -196,9 +174,9 @@ export const oxlint = {
         .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
     }),
   version: "1.55.0",
-}
+})
 
-export const tsgolint = {
+export const tsgolint = defineTooling({
   name: "oxlint-tsgolint",
   version: "0.16.0",
-}
+})

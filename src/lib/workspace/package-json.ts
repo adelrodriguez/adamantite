@@ -3,7 +3,7 @@ import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { FailedToReadFile } from "#lib/shared/errors.ts"
+import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 import { parseJson } from "#lib/shared/json.ts"
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
@@ -23,4 +23,15 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
       .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: packagePath })))
     const parsed = yield* parseJson(content, packagePath)
     return parsed as PackageJson
+  })
+
+export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const packagePath = path.join(cwd, "package.json")
+
+    yield* fs
+      .writeFileString(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
+      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
   })

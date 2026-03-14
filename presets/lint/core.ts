@@ -1,7 +1,6 @@
 import { defineConfig } from "oxlint"
 
 export default defineConfig({
-  ignorePatterns: ["**/node_modules", "**/.git", "**/build", "**/dist", "**/.next", "**/.vercel"],
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   rules: {
     "accessor-pairs": "error",

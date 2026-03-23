@@ -82,7 +82,7 @@
     "oxfmt": "0.40.0",
     "oxlint": "1.55.0",
     "oxlint-tsgolint": "0.17.0",
-    "sherif": "1.10.0",
+    "sherif": "1.11.0",
     "type-fest": "5.4.4"
   },
   "engines": {

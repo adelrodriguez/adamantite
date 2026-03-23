@@ -333,7 +333,7 @@ describe("init", () => {
 
       const workflow = await readFile(workflowPath, "utf8")
       expect(workflow).toContain("oven-sh/setup-bun@v2")
-      expect(workflow).toContain("name: lint")
+      expect(workflow).toContain("name: check")
       expect(workflow).toContain("name: format")
       expect(workflow).toContain("command: bun run check")
       expect(workflow).toContain("command: bun run format --check")

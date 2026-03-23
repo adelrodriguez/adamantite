@@ -77,7 +77,7 @@ const setupSteps: Record<PackageManagerName, string> = {
 }
 
 const MATRIX_SCRIPT_ENTRIES: MatrixScriptEntry[] = [
-  { name: "lint", script: "check" },
+  { name: "check", script: "check" },
   { args: ["--check"], name: "format", script: "format" },
   { name: "monorepo", script: "check:monorepo" },
   { name: "analyze", script: "analyze" },

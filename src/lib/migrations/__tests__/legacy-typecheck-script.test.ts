@@ -210,13 +210,13 @@ describe("legacyTypecheckScript", () => {
     mkdirSync(".github/workflows", { recursive: true })
     await Bun.write(
       ".github/workflows/adamantite.yml",
-      "name: adamantite\njobs:\n  verify:\n    strategy:\n      matrix:\n        include:\n          - name: lint\n            command: bun run check\n          - name: types\n            command: bun run typecheck\n"
+      "name: adamantite\njobs:\n  verify:\n    strategy:\n      matrix:\n        include:\n          - name: check\n            command: bun run check\n          - name: types\n            command: bun run typecheck\n"
     )
 
     await runTestEffect(legacyTypecheckScript.migrate({ cwd: tempDir }))
 
     const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
-    expect(workflow).toContain("name: lint")
+    expect(workflow).toContain("name: check")
     expect(workflow).toContain("name: format")
     expect(workflow).not.toContain("name: types")
   })

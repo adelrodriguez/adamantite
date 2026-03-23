@@ -53,7 +53,7 @@ describe("github", () => {
       expect(content).toContain("strategy:")
       expect(content).toContain("matrix:")
       expect(content).toContain("include:")
-      expect(content).toContain("name: lint")
+      expect(content).toContain("name: check")
       expect(content).toContain("command: bun run check")
       expect(content).toContain("Setup Node.js")
       expect(content).toContain("actions/setup-node@v6")
@@ -138,7 +138,7 @@ describe("github", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
-      expect(content).toContain("name: lint")
+      expect(content).toContain("name: check")
       expect(content).toContain("name: format")
       expect(content).toContain("name: monorepo")
       expect(content).toContain("command:")
@@ -206,7 +206,7 @@ describe("github", () => {
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("name: adamantite")
-      expect(content).toContain("name: lint")
+      expect(content).toContain("name: check")
       expect(content).toContain("verify:")
       expect(content).not.toContain("Old Workflow")
     })

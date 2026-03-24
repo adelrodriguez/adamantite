@@ -88,8 +88,10 @@ describe("init", () => {
       expect(oxlintConfig).toContain('"typeAware": true')
       expect(oxlintConfig).toContain('"typeCheck": true')
 
-      const oxfmtConfig = await readJson(join(tempDir, ".oxfmtrc.jsonc"))
-      expect(oxfmtConfig.$schema).toBe("./node_modules/oxfmt/configuration_schema.json")
+      const oxfmtConfig = await readFile(join(tempDir, "oxfmt.config.ts"), "utf8")
+      expect(oxfmtConfig).toContain('import { defineConfig } from "oxfmt"')
+      expect(oxfmtConfig).toContain('import format from "adamantite/format"')
+      expect(oxfmtConfig).toContain("export default defineConfig(format)")
 
       const tsconfig = await readJson<{ extends: string }>(join(tempDir, "tsconfig.json"))
       expect(tsconfig.extends).toBe("adamantite/typescript")
@@ -144,6 +146,37 @@ describe("init", () => {
     })
   })
 
+  describe("oxfmt config handling", () => {
+    test("migrate a legacy oxfmt config into oxfmt.config.ts", async () => {
+      await writeFile(
+        join(tempDir, ".oxfmtrc.json"),
+        JSON.stringify(
+          {
+            semi: true,
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(false)
+
+      const oxfmtConfig = await readFile(join(tempDir, "oxfmt.config.ts"), "utf8")
+      expect(oxfmtConfig).toContain('import format from "adamantite/format"')
+      expect(oxfmtConfig).toContain("  ...format,")
+      expect(oxfmtConfig).toContain("semi: true")
+    })
+  })
+
   describe("workspace installation", () => {
     test("use workspace installation when the project is a monorepo", async () => {
       await writeFile(
@@ -179,7 +212,18 @@ describe("init", () => {
 
   describe("existing config updates", () => {
     test("update existing configs without dropping preserved user settings", async () => {
-      await writeFile(join(tempDir, ".oxfmtrc.json"), JSON.stringify({ semi: false }, null, 2))
+      const originalOxfmtConfig = [
+        'import { defineConfig } from "oxfmt"',
+        'import format from "adamantite/format"',
+        "",
+        "export default defineConfig({",
+        "  ...format,",
+        "  semi: false,",
+        "})",
+        "",
+      ].join("\n")
+
+      await writeFile(join(tempDir, "oxfmt.config.ts"), originalOxfmtConfig)
       await writeFile(
         join(tempDir, "tsconfig.json"),
         JSON.stringify(
@@ -209,9 +253,8 @@ describe("init", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
 
-      const oxfmtConfig = await readJson(join(tempDir, ".oxfmtrc.json"))
-      expect(oxfmtConfig.semi).toBe(false)
-      expect(oxfmtConfig.$schema).toBe("./node_modules/oxfmt/configuration_schema.json")
+      const oxfmtConfig = await readFile(join(tempDir, "oxfmt.config.ts"), "utf8")
+      expect(oxfmtConfig).toBe(originalOxfmtConfig)
 
       const tsconfig = await readJson<{
         compilerOptions: {
@@ -254,7 +297,7 @@ describe("init", () => {
         format: "adamantite format",
       })
 
-      expect(await Bun.file(join(tempDir, ".oxfmtrc.jsonc")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
       expect(await Bun.file(join(tempDir, ".zed", "settings.json")).exists()).toBe(true)
       expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
       expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
@@ -264,6 +307,30 @@ describe("init", () => {
   })
 
   describe("dual-config warnings", () => {
+    test("warn when both legacy and modern oxfmt configs exist", async () => {
+      await writeFile(
+        join(tempDir, "oxfmt.config.ts"),
+        'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({ semi: false })\n'
+      )
+      await writeFile(join(tempDir, ".oxfmtrc.json"), JSON.stringify({ semi: true }, null, 2))
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
+      })
+      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
+    })
+
     test("warn when both legacy and modern oxlint configs exist", async () => {
       await writeFile(
         join(tempDir, "oxlint.config.ts"),

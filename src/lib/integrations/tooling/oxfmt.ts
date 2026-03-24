@@ -2,95 +2,107 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineTooling } from "#lib/integrations/tooling/base.ts"
-import {
-  FailedToReadFile,
-  FailedToWriteFile,
-  FileNotFound,
-  InvalidConfigFormat,
-} from "#lib/shared/errors.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
-import preset from "#presets/format.json" with { type: "json" }
+import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
+import { isJsonObject } from "#lib/shared/json.ts"
+import preset from "#presets/format.ts"
 
-const CONFIG_FILE_JSONC = ".oxfmtrc.jsonc"
-const CONFIG_FILE_JSON = ".oxfmtrc.json"
+export const CONFIG_FILE = "oxfmt.config.ts"
+
+/** Top-level keys whose values are merged with Adamantite preset objects at runtime. */
+const NESTED_MERGE_KEYS = new Set(["sortImports", "sortPackageJson", "sortTailwindcss"])
+
+function serializeTsLiteralValue(value: unknown, continuationIndent: string): string {
+  const serialized = JSON.stringify(value, null, 2)
+    .replaceAll(/"([A-Za-z_$][\w$]*)":/g, "$1:")
+    .replaceAll("\n", `\n${continuationIndent}`)
+
+  return serialized
+}
+
+function serializeNestedMergeEntry(key: string, value: Record<string, unknown>): string {
+  const raw = JSON.stringify(value, null, 2).replaceAll(/"([A-Za-z_$][\w$]*)":/g, "$1:")
+  const lines = raw.split("\n")
+
+  if (lines.length <= 2) {
+    return [`  ${key}: {`, `    ...format.${key},`, `  },`].join("\n")
+  }
+
+  const body = lines
+    .slice(1, -1)
+    .map((line) => `    ${line.trimStart()}`)
+    .join("\n")
+
+  return [`  ${key}: {`, `    ...format.${key},`, body, `  },`].join("\n")
+}
+
+export function toTsConfigContent(config: Record<string, unknown> = {}) {
+  const configEntries = Object.entries(config).map(([key, value]) => {
+    if (NESTED_MERGE_KEYS.has(key) && isJsonObject(value)) {
+      return serializeNestedMergeEntry(key, value)
+    }
+
+    const serialized = serializeTsLiteralValue(value, "  ")
+
+    return `  ${key}: ${serialized},`
+  })
+
+  if (configEntries.length === 0) {
+    return [
+      'import { defineConfig } from "oxfmt"',
+      'import format from "adamantite/format"',
+      "",
+      "export default defineConfig(format)",
+      "",
+    ].join("\n")
+  }
+
+  return [
+    'import { defineConfig } from "oxfmt"',
+    'import format from "adamantite/format"',
+    "",
+    "export default defineConfig({",
+    "  ...format,",
+    ...configEntries,
+    "})",
+    "",
+  ].join("\n")
+}
 
 export const oxfmt = defineTooling({
-  config: {
-    ...preset,
-    $schema: "./node_modules/oxfmt/configuration_schema.json",
-  },
+  config: preset,
   create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE_JSONC)
-      const payload = JSON.stringify(
-        {
-          ...preset,
-          $schema: "./node_modules/oxfmt/configuration_schema.json",
-        },
-        null,
-        2
-      )
+      const configPath = path.join(cwd, CONFIG_FILE)
 
       yield* fs
-        .writeFileString(configPath, `${payload}\n`)
+        .writeFileString(configPath, toTsConfigContent())
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const jsoncPath = path.join(cwd, CONFIG_FILE_JSONC)
-      const jsonPath = path.join(cwd, CONFIG_FILE_JSON)
+      const tsPath = path.join(cwd, CONFIG_FILE)
+      const hasTs = yield* fs.exists(tsPath)
 
-      if (yield* fs.exists(jsoncPath)) {
-        return { path: jsoncPath }
+      return {
+        format: hasTs ? "ts" : null,
+        path: hasTs ? tsPath : null,
+        tsPath: hasTs ? tsPath : null,
       }
-
-      if (yield* fs.exists(jsonPath)) {
-        return { path: jsonPath }
-      }
-
-      return { path: null }
     }),
   name: "oxfmt",
   update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const jsoncPath = path.join(cwd, CONFIG_FILE_JSONC)
-      const jsonPath = path.join(cwd, CONFIG_FILE_JSON)
-      const configPath = (yield* fs.exists(jsoncPath))
-        ? jsoncPath
-        : (yield* fs.exists(jsonPath))
-          ? jsonPath
-          : null
+      const configPath = path.join(cwd, CONFIG_FILE)
 
-      if (!configPath) {
-        return yield* new FileNotFound({ path: CONFIG_FILE_JSONC })
+      if (!(yield* fs.exists(configPath))) {
+        return yield* new FileNotFound({ path: CONFIG_FILE })
       }
-
-      const oxfmtFile = yield* fs
-        .readFileString(configPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
-
-      const existingConfig = yield* parseJson(oxfmtFile, configPath)
-
-      // Empty configs are allowed and will be merged with Adamantite's config
-      if (!isJsonObject(existingConfig)) {
-        return yield* new InvalidConfigFormat({ path: configPath })
-      }
-
-      const mergedConfig = yield* mergeConfig(existingConfig, {
-        ...preset,
-        $schema: "./node_modules/oxfmt/configuration_schema.json",
-      })
-      mergedConfig.$schema = "./node_modules/oxfmt/configuration_schema.json"
-
-      yield* fs
-        .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   version: "0.41.0",
 })

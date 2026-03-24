@@ -67,7 +67,7 @@ This interactive command will:
 
 - Install Adamantite, [oxlint](https://oxc.rs/docs/guide/usage/linter.html), and [oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) as dev dependencies
 - Create `oxlint.config.ts` with opinionated presets
-- Create `.oxfmtrc.json` with formatting configuration
+- Create `oxfmt.config.ts` with formatting configuration
 - Set up `tsconfig.json` with strict TypeScript rules
 - Add lint/format scripts to your `package.json`
   - Also adds monorepo-specific scripts if running a monorepo
@@ -151,6 +151,8 @@ Run applicable migrations and update Adamantite-managed dependencies:
 adamantite update
 ```
 
+This also migrates legacy `.oxfmtrc.json` and `.oxfmtrc.jsonc` configs to `oxfmt.config.ts`.
+
 ## Presets
 
 ### Linting ([presets/lint/](./presets/lint/))
@@ -180,9 +182,9 @@ Framework-specific presets are available for:
 - **Jest** ([jest.ts](./presets/lint/jest.ts)) - Jest testing rules
 - **Vitest** ([vitest.ts](./presets/lint/vitest.ts)) - Vitest testing rules
 
-### Formatting ([presets/format.json](./presets/format.json))
+### Formatting ([format.ts](./presets/format.ts))
 
-Opinionated code formatting with oxfmt, configured for consistency and readability. Includes automatic import sorting and organization.
+Opinionated code formatting with oxfmt, configured for consistency and readability. The published formatter preset is available as `adamantite/format` and is designed to be used from `oxfmt.config.ts`.
 
 ### TypeScript ([presets/tsconfig.json](./presets/tsconfig.json))
 

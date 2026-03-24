@@ -4,6 +4,7 @@ import { migrations } from "#lib/migrations/index.ts"
 describe("migrations", () => {
   test("exports the active migration registry in the correct order", () => {
     expect(migrations.map((m) => m.id)).toEqual([
+      "legacy-oxfmt-json",
       "legacy-oxlint-json",
       "oxlint-typecheck",
       "legacy-typecheck-script",

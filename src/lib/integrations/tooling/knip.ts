@@ -78,12 +78,12 @@ export const knip = defineTooling({
       // Set schema based on file extension
       const isJsonc = configPath.endsWith(".jsonc")
       mergedConfig.$schema = isJsonc
-        ? "https://unpkg.com/knip@5/schema-jsonc.json"
-        : "https://unpkg.com/knip@5/schema.json"
+        ? "https://unpkg.com/knip@6/schema-jsonc.json"
+        : "https://unpkg.com/knip@6/schema.json"
 
       yield* fs
         .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  version: "5.86.0",
+  version: "6.0.4",
 })

@@ -15,8 +15,8 @@ import { knip } from "#lib/integrations/tooling/knip.ts"
 
 const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 // Keep these schema URLs in sync with the major-version-pinned values in src/lib/integrations/tooling/knip.ts.
-const KNIP_JSON_SCHEMA_URL = "https://unpkg.com/knip@5/schema.json"
-const KNIP_JSONC_SCHEMA_URL = "https://unpkg.com/knip@5/schema-jsonc.json"
+const KNIP_JSON_SCHEMA_URL = "https://unpkg.com/knip@6/schema.json"
+const KNIP_JSONC_SCHEMA_URL = "https://unpkg.com/knip@6/schema-jsonc.json"
 
 describe("knip", () => {
   let originalCwd: string

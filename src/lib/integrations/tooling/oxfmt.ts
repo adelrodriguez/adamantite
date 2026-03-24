@@ -92,5 +92,5 @@ export const oxfmt = defineTooling({
         .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  version: "0.40.0",
+  version: "0.41.0",
 })

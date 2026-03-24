@@ -173,10 +173,10 @@ export const oxlint = defineTooling({
         .remove(legacyConfigPath)
         .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
     }),
-  version: "1.55.0",
+  version: "1.56.0",
 })
 
 export const tsgolint = defineTooling({
   name: "oxlint-tsgolint",
-  version: "0.17.0",
+  version: "0.17.2",
 })

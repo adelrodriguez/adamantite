@@ -1,5 +1,5 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "rules": {
     "files": "error",
     "dependencies": "error",
@@ -13,7 +13,6 @@
     "types": "warn",
     "nsTypes": "warn",
     "enumMembers": "off",
-    "classMembers": "off",
     "duplicates": "warn"
   },
   "ignoreExportsUsedInFile": true,

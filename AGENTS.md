@@ -59,6 +59,8 @@ This project uses changesets for version management:
 
 - Prefer function declarations over arrow functions for standalone functions (e.g. `function getImportName(...)` instead of `const getImportName = (...) =>`).
 - Keep arrow functions when returning an Effect chain (e.g. `const foo = (args) => Effect.gen(...)`), or when they are callbacks, object methods, or otherwise more pleasant as arrows.
+- Format TypeScript suppression comments as `@ts-expect-error - reason` so they fail loudly if the underlying type issue is fixed.
+- Prefer `@ts-expect-error - reason` over casts like `as never` when suppressing known third-party type mismatches, so upstream type fixes become visible.
 
 ## Architecture
 

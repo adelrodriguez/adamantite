@@ -63,13 +63,14 @@
     "version": "changeset version"
   },
   "dependencies": {
-    "@babel/parser": "^7.29.0",
     "@clack/prompts": "1.1.0",
-    "@effect/platform-node": "4.0.0-beta.33",
+    "@effect/platform-node": "4.0.0-beta.38",
     "defu": "6.1.4",
-    "effect": "4.0.0-beta.33",
+    "effect": "4.0.0-beta.38",
+    "esrap": "2.2.4",
     "jsonc-parser": "3.3.1",
-    "nypm": "0.6.5"
+    "nypm": "0.6.5",
+    "oxc-parser": "^0.121.0"
   },
   "devDependencies": {
     "@changesets/cli": "2.30.0",

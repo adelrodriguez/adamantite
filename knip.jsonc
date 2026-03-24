@@ -1,5 +1,5 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema-jsonc.json",
+  "$schema": "https://unpkg.com/knip@6/schema-jsonc.json",
   "entry": ["presets/lint/*.ts"],
   "rules": {
     "files": "error",
@@ -14,9 +14,8 @@
     "types": "warn",
     "nsTypes": "warn",
     "enumMembers": "off",
-    "classMembers": "off",
     "duplicates": "warn",
   },
   "ignoreExportsUsedInFile": true,
-  "ignore": ["bunup.config.ts", "oxlint.config.ts"],
+  "ignore": ["bunup.config.ts"],
 }

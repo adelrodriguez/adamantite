@@ -1,8 +1,18 @@
 import type { PackageJson } from "type-fest"
-import { parse } from "@babel/parser"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import { print as printAst } from "esrap"
+import ts from "esrap/languages/ts"
+import {
+  parseSync,
+  type ExportDefaultDeclaration,
+  type ObjectExpression,
+  type ObjectProperty,
+  type Program,
+  type PropertyKey,
+} from "oxc-parser"
 import { oxlint } from "#lib/integrations/tooling/oxlint.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import { migrateLegacyTypecheckScriptPackageJson } from "#lib/migrations/legacy-typecheck-script.ts"
@@ -27,53 +37,15 @@ const UNSUPPORTED_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can patch safely."
 const NON_BOOLEAN_OPTIONS_REASON =
   "`oxlint.config.ts` already defines `typeAware` or `typeCheck`, but not as a boolean literal Adamantite can safely patch."
+const GENERATED_PATCH_FAILURE_REASON =
+  "Adamantite could not generate the required `options.typeAware` and `options.typeCheck` patch."
 
 type RequiredBooleanOption = (typeof REQUIRED_BOOLEAN_OPTIONS)[number]
 
-interface NodeLike {
-  readonly end?: number | null
-  readonly start?: number | null
-  readonly type: string
-}
-
-interface ObjectPropertyLike extends NodeLike {
-  readonly computed?: boolean
-  readonly key: unknown
-  readonly type: "ObjectProperty"
-  readonly value: unknown
-}
-
-interface ObjectMethodLike extends NodeLike {
-  readonly computed?: boolean
-  readonly key: unknown
-  readonly type: "ObjectMethod"
-}
-
-interface ObjectExpressionLike extends NodeLike {
-  readonly properties: readonly unknown[]
-  readonly type: "ObjectExpression"
-}
-
-interface ObjectRange {
-  readonly bodyEnd: number
-  readonly bodyStart: number
-  readonly closeIndent: string
-  readonly newline: string
-  readonly propertyIndent: string
-}
-
 type NamedObjectPropertyResult =
-  | { readonly status: "found"; readonly property: ObjectPropertyLike }
+  | { readonly status: "found"; readonly property: ObjectProperty }
   | { readonly status: "manual" }
   | { readonly status: "missing" }
-
-type OxlintTypecheckState =
-  | { readonly status: "not_applicable" }
-  | {
-      readonly configPath: string
-      readonly content: string
-      readonly status: "applicable"
-    }
 
 type PatchResult =
   | { readonly kind: "configured" }
@@ -87,321 +59,129 @@ function shouldManageTypecheckedOxlint(packageJson: PackageJson) {
   return managedScripts.includes("check") || managedScripts.includes("fix")
 }
 
-function hasRange<T extends { readonly end?: number | null; readonly start?: number | null }>(
-  node: T
-): node is T & { readonly end: number; readonly start: number } {
-  return typeof node.start === "number" && typeof node.end === "number"
-}
-
-function detectNewline(content: string) {
-  return content.includes("\r\n") ? "\r\n" : "\n"
-}
-
-function detectLineIndentation(content: string, index: number) {
-  const lineStart = content.lastIndexOf("\n", index - 1) + 1
-  let cursor = lineStart
-
-  while (cursor < index) {
-    const character = content[cursor]
-
-    if (character !== " " && character !== "\t") {
-      break
-    }
-
-    cursor += 1
-  }
-
-  return content.slice(lineStart, cursor)
-}
-
-function detectPropertyIndent(
-  content: string,
-  bodyStart: number,
-  bodyEnd: number,
-  closeIndent: string,
-  newline: string
-) {
-  const body = content.slice(bodyStart, bodyEnd)
-
-  if (!body.includes(newline)) {
-    return `${closeIndent}  `
-  }
-
-  for (const line of body.split(newline)) {
-    if (line.trim().length === 0) {
-      continue
-    }
-
-    return line.match(/^[ \t]*/)?.[0] ?? `${closeIndent}  `
-  }
-
-  return `${closeIndent}  `
-}
-
-function getObjectRange(content: string, objectExpression: ObjectExpressionLike) {
-  if (!hasRange(objectExpression)) {
-    return null
-  }
-
-  const closeBraceIndex = objectExpression.end - 1
-
-  if (content[objectExpression.start] !== "{" || content[closeBraceIndex] !== "}") {
-    return null
-  }
-
-  const newline = detectNewline(content)
-  const closeIndent = detectLineIndentation(content, closeBraceIndex)
-
-  return {
-    bodyEnd: closeBraceIndex,
-    bodyStart: objectExpression.start + 1,
-    closeIndent,
-    newline,
-    propertyIndent: detectPropertyIndent(
-      content,
-      objectExpression.start + 1,
-      closeBraceIndex,
-      closeIndent,
-      newline
-    ),
-  }
-}
-
-function prependEntries(
-  existingBody: string,
-  entries: readonly string[],
-  objectRange: ObjectRange
-) {
-  if (entries.length === 0) {
-    return existingBody
-  }
-
-  const bodyWithoutLeadingNewline = existingBody.startsWith(objectRange.newline)
-    ? existingBody.slice(objectRange.newline.length)
-    : existingBody.trim()
-
-  if (bodyWithoutLeadingNewline.trim().length === 0) {
-    return `${objectRange.newline}${entries.join(objectRange.newline)}${objectRange.newline}${objectRange.closeIndent}`
-  }
-
-  if (existingBody.startsWith(objectRange.newline)) {
-    return `${objectRange.newline}${entries.join(objectRange.newline)}${objectRange.newline}${bodyWithoutLeadingNewline}`
-  }
-
-  return `${objectRange.newline}${entries.join(objectRange.newline)}${objectRange.newline}${objectRange.propertyIndent}${existingBody.trim()}${objectRange.newline}${objectRange.closeIndent}`
-}
-
-function createOptionsBlock(configRange: ObjectRange) {
-  const nestedIndent = `${configRange.propertyIndent}  `
-
-  return [
-    `${configRange.propertyIndent}options: {`,
-    ...REQUIRED_BOOLEAN_OPTIONS.map((option) => `${nestedIndent}${option}: true,`),
-    `${configRange.propertyIndent}},`,
-  ].join(configRange.newline)
-}
-
-function applyReplacements(
-  content: string,
-  replacements: ReadonlyArray<{
-    readonly end: number
-    readonly start: number
-    readonly text: string
-  }>
-) {
-  let updatedContent = content
-
-  for (const replacement of replacements) {
-    updatedContent =
-      updatedContent.slice(0, replacement.start) +
-      replacement.text +
-      updatedContent.slice(replacement.end)
-  }
-
-  return updatedContent
-}
-
-function insertReplacement(
-  replacements: Array<{ end: number; start: number; text: string }>,
-  replacement: { end: number; start: number; text: string }
-) {
-  const insertionIndex = replacements.findIndex(
-    (currentReplacement) => replacement.start > currentReplacement.start
+function isObjectExpression(value: unknown): value is ObjectExpression {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "type" in value &&
+    value.type === "ObjectExpression" &&
+    "properties" in value &&
+    Array.isArray(value.properties)
   )
-
-  if (insertionIndex === -1) {
-    replacements.push(replacement)
-    return
-  }
-
-  replacements.splice(insertionIndex, 0, replacement)
 }
 
-function parseOxlintConfig(content: string) {
-  try {
-    return parse(content, {
-      plugins: ["typescript"],
-      sourceType: "module",
+function isObjectProperty(value: unknown): value is ObjectProperty {
+  return typeof value === "object" && value !== null && "type" in value && value.type === "Property"
+}
+
+function parse(content: string) {
+  return Effect.try({
+    catch: () => null,
+    try: () =>
+      parseSync(CONFIG_FILE, content, {
+        astType: "ts",
+        lang: "ts",
+        sourceType: "module",
+      }),
+  }).pipe(
+    Effect.match({
+      onFailure: () => Option.none<Program>(),
+      onSuccess: (result) =>
+        result.errors.length === 0 ? Option.fromNullishOr(result.program) : Option.none<Program>(),
     })
-  } catch {
-    return null
-  }
+  )
 }
 
-function getStaticPropertyName(key: unknown) {
-  if (
-    typeof key === "object" &&
-    key !== null &&
-    "type" in key &&
-    key.type === "Identifier" &&
-    "name" in key &&
-    typeof key.name === "string"
-  ) {
+function print(program: Program) {
+  // @ts-expect-error - esrap's printer types do not yet accept oxc-parser's TS-ESTree program
+  const { code } = printAst(program, ts({ quotes: "double" }))
+
+  return code.endsWith("\n") ? code : `${code}\n`
+}
+
+function getStaticPropertyName(key: PropertyKey) {
+  if (key.type === "Identifier") {
     return key.name
   }
 
-  if (
-    typeof key === "object" &&
-    key !== null &&
-    "type" in key &&
-    key.type === "StringLiteral" &&
-    "value" in key &&
-    typeof key.value === "string"
-  ) {
+  if (key.type === "Literal" && typeof key.value === "string") {
     return key.value
   }
 
   return null
 }
 
-function getExportedConfigObject(ast: ReturnType<typeof parse>) {
-  const exportDefaultDeclarations: Array<{ readonly declaration: unknown }> = []
-
-  for (const statement of ast.program.body) {
-    if (
-      typeof statement === "object" &&
-      "type" in statement &&
-      statement.type === "ExportDefaultDeclaration" &&
-      "declaration" in statement
-    ) {
-      exportDefaultDeclarations.push(statement)
-    }
-  }
+function getExportedConfigObject(ast: Program) {
+  const exportDefaultDeclarations = ast.body.filter(
+    (statement): statement is ExportDefaultDeclaration =>
+      statement.type === "ExportDefaultDeclaration"
+  )
 
   if (exportDefaultDeclarations.length !== 1) {
-    return null
+    return Option.none()
   }
 
-  const declaration = exportDefaultDeclarations[0]?.declaration
+  const [exportDefaultDeclaration] = exportDefaultDeclarations
 
-  if (
-    typeof declaration === "object" &&
-    declaration !== null &&
-    "type" in declaration &&
-    declaration.type === "ObjectExpression" &&
-    "properties" in declaration &&
-    Array.isArray(declaration.properties)
-  ) {
-    return declaration as ObjectExpressionLike
+  if (!exportDefaultDeclaration) {
+    return Option.none()
   }
 
-  if (
-    typeof declaration !== "object" ||
-    declaration === null ||
-    !("type" in declaration) ||
-    declaration.type !== "CallExpression" ||
-    !("callee" in declaration) ||
-    !("arguments" in declaration) ||
-    !Array.isArray(declaration.arguments)
-  ) {
-    return null
+  const declaration = exportDefaultDeclaration.declaration
+
+  if (isObjectExpression(declaration)) {
+    return Option.fromNullishOr(declaration)
   }
 
-  if (
-    typeof declaration.callee !== "object" ||
-    declaration.callee === null ||
-    !("type" in declaration.callee) ||
-    declaration.callee.type !== "Identifier" ||
-    !("name" in declaration.callee) ||
-    declaration.callee.name !== "defineConfig"
-  ) {
-    return null
+  if (declaration.type !== "CallExpression") {
+    return Option.none()
+  }
+
+  if (declaration.callee.type !== "Identifier" || declaration.callee.name !== "defineConfig") {
+    return Option.none()
   }
 
   if (declaration.arguments.length !== 1) {
-    return null
+    return Option.none()
   }
 
   const [firstArgument] = declaration.arguments
 
-  if (
-    typeof firstArgument === "object" &&
-    firstArgument !== null &&
-    "type" in firstArgument &&
-    firstArgument.type === "ObjectExpression" &&
-    "properties" in firstArgument &&
-    Array.isArray(firstArgument.properties)
-  ) {
-    return firstArgument as ObjectExpressionLike
+  if (isObjectExpression(firstArgument)) {
+    return Option.fromNullishOr(firstArgument)
   }
 
-  return null
+  return Option.none()
 }
 
 function getNamedObjectProperty(
-  objectExpression: ObjectExpressionLike,
+  objectExpression: ObjectExpression,
   propertyName: string
 ): NamedObjectPropertyResult {
-  let matchedProperty: ObjectPropertyLike | null = null
+  let matchedProperty: ObjectProperty | null = null
 
   for (const property of objectExpression.properties) {
-    if (
-      typeof property === "object" &&
-      property !== null &&
-      "type" in property &&
-      property.type === "SpreadElement"
-    ) {
+    if (property.type === "SpreadElement") {
       return { status: "manual" }
     }
 
-    if (
-      typeof property === "object" &&
-      property !== null &&
-      "type" in property &&
-      property.type === "ObjectMethod" &&
-      "key" in property
-    ) {
-      const objectMethod = property as ObjectMethodLike
+    if (!isObjectProperty(property)) {
+      return { status: "manual" }
+    }
 
-      if (objectMethod.computed) {
-        return { status: "manual" }
-      }
+    if (property.computed) {
+      return { status: "manual" }
+    }
 
-      if (getStaticPropertyName(objectMethod.key) === propertyName) {
+    if (property.method || property.kind !== "init") {
+      if (getStaticPropertyName(property.key) === propertyName) {
         return { status: "manual" }
       }
 
       continue
     }
 
-    if (
-      typeof property !== "object" ||
-      property === null ||
-      !("type" in property) ||
-      property.type !== "ObjectProperty" ||
-      !("key" in property) ||
-      !("value" in property)
-    ) {
-      return { status: "manual" }
-    }
-
-    const objectProperty = property as ObjectPropertyLike
-
-    if (objectProperty.computed) {
-      return { status: "manual" }
-    }
-
-    if (getStaticPropertyName(objectProperty.key) !== propertyName) {
+    if (getStaticPropertyName(property.key) !== propertyName) {
       continue
     }
 
@@ -409,7 +189,7 @@ function getNamedObjectProperty(
       return { status: "manual" }
     }
 
-    matchedProperty = objectProperty
+    matchedProperty = property
   }
 
   if (!matchedProperty) {
@@ -422,182 +202,208 @@ function getNamedObjectProperty(
   }
 }
 
-function patchOptionsObject(
-  content: string,
-  optionsObjectExpression: ObjectExpressionLike
-): PatchResult {
-  const optionsRange = getObjectRange(content, optionsObjectExpression)
+function createRequiredOptionProperties(options: readonly RequiredBooleanOption[]) {
+  const content = `export default { options: { ${options.map((option) => `${option}: true`).join(", ")} } }\n`
 
-  if (!optionsRange) {
-    return {
-      kind: "manual",
-      reason: UNSUPPORTED_OPTIONS_REASON,
-    }
-  }
-
-  const optionsBody = content.slice(optionsRange.bodyStart, optionsRange.bodyEnd)
-  const missingOptions: RequiredBooleanOption[] = []
-  const replacements: Array<{ end: number; start: number; text: string }> = []
-
-  for (const option of REQUIRED_BOOLEAN_OPTIONS) {
-    const propertyResult = getNamedObjectProperty(optionsObjectExpression, option)
-
-    if (propertyResult.status === "manual") {
-      return {
-        kind: "manual",
-        reason: NON_BOOLEAN_OPTIONS_REASON,
+  return parse(content).pipe(
+    Effect.map((parsed) => {
+      if (Option.isNone(parsed)) {
+        return Option.none()
       }
-    }
 
-    if (propertyResult.status === "missing") {
-      missingOptions.push(option)
-      continue
-    }
+      const configObjectExpression = getExportedConfigObject(parsed.value)
 
-    const value = propertyResult.property.value
-
-    if (
-      typeof value !== "object" ||
-      value === null ||
-      !("type" in value) ||
-      value.type !== "BooleanLiteral" ||
-      !("value" in value) ||
-      typeof value.value !== "boolean" ||
-      !("start" in value) ||
-      !("end" in value) ||
-      !hasRange(value as NodeLike)
-    ) {
-      return {
-        kind: "manual",
-        reason: NON_BOOLEAN_OPTIONS_REASON,
+      if (Option.isNone(configObjectExpression)) {
+        return Option.none()
       }
-    }
 
-    const booleanLiteral = value as {
-      readonly end: number
-      readonly start: number
-      readonly value: boolean
-    }
+      const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
 
-    if (booleanLiteral.value) {
-      continue
-    }
+      if (optionsPropertyResult.status !== "found") {
+        return Option.none()
+      }
 
-    insertReplacement(replacements, {
-      end: booleanLiteral.end - optionsRange.bodyStart,
-      start: booleanLiteral.start - optionsRange.bodyStart,
-      text: "true",
+      if (!isObjectExpression(optionsPropertyResult.property.value)) {
+        return Option.none()
+      }
+
+      const properties = optionsPropertyResult.property.value.properties.filter(isObjectProperty)
+
+      return properties.length === optionsPropertyResult.property.value.properties.length
+        ? Option.fromNullishOr(properties)
+        : Option.none()
     })
-  }
-
-  let updatedOptionsBody = applyReplacements(optionsBody, replacements)
-
-  if (missingOptions.length > 0) {
-    updatedOptionsBody = prependEntries(
-      updatedOptionsBody,
-      missingOptions.map((option) => `${optionsRange.propertyIndent}${option}: true,`),
-      optionsRange
-    )
-  }
-
-  if (updatedOptionsBody === optionsBody) {
-    return { kind: "configured" }
-  }
-
-  return {
-    kind: "patchable",
-    updatedContent: `${content.slice(0, optionsRange.bodyStart)}${updatedOptionsBody}${content.slice(optionsRange.bodyEnd)}`,
-  }
-}
-
-function insertOptionsObject(
-  content: string,
-  configObjectExpression: ObjectExpressionLike
-): PatchResult {
-  const configRange = getObjectRange(content, configObjectExpression)
-
-  if (!configRange) {
-    return {
-      kind: "manual",
-      reason: UNSUPPORTED_CONFIG_REASON,
-    }
-  }
-
-  const updatedBody = prependEntries(
-    content.slice(configRange.bodyStart, configRange.bodyEnd),
-    [createOptionsBlock(configRange)],
-    configRange
   )
-
-  return {
-    kind: "patchable",
-    updatedContent: `${content.slice(0, configRange.bodyStart)}${updatedBody}${content.slice(configRange.bodyEnd)}`,
-  }
 }
 
-function inspectAndPatchOxlintTypecheck(content: string): PatchResult {
-  const ast = parseOxlintConfig(content)
+function createRequiredOptionsProperty() {
+  const content = `export default { options: { ${REQUIRED_BOOLEAN_OPTIONS.map((option) => `${option}: true`).join(", ")} } }\n`
 
-  if (!ast) {
-    return {
-      kind: "manual",
-      reason: UNSUPPORTED_CONFIG_REASON,
-    }
-  }
+  return parse(content).pipe(
+    Effect.map((parsed) => {
+      if (Option.isNone(parsed)) {
+        return Option.none()
+      }
 
-  const configObjectExpression = getExportedConfigObject(ast)
+      const configObjectExpression = getExportedConfigObject(parsed.value)
 
-  if (!configObjectExpression) {
-    return {
-      kind: "manual",
-      reason: UNSUPPORTED_CONFIG_REASON,
-    }
-  }
+      if (
+        Option.isNone(configObjectExpression) ||
+        configObjectExpression.value.properties.length !== 1
+      ) {
+        return Option.none()
+      }
 
-  const optionsPropertyResult = getNamedObjectProperty(configObjectExpression, "options")
+      const [property] = configObjectExpression.value.properties
 
-  if (optionsPropertyResult.status === "manual") {
-    return {
-      kind: "manual",
-      reason: UNSUPPORTED_OPTIONS_REASON,
-    }
-  }
+      if (
+        !property ||
+        !isObjectProperty(property) ||
+        property.computed ||
+        property.method ||
+        property.kind !== "init"
+      ) {
+        return Option.none()
+      }
 
-  if (optionsPropertyResult.status === "missing") {
-    return insertOptionsObject(content, configObjectExpression)
-  }
-
-  if (
-    typeof optionsPropertyResult.property.value !== "object" ||
-    optionsPropertyResult.property.value === null ||
-    !("type" in optionsPropertyResult.property.value) ||
-    optionsPropertyResult.property.value.type !== "ObjectExpression" ||
-    !("properties" in optionsPropertyResult.property.value) ||
-    !Array.isArray(optionsPropertyResult.property.value.properties)
-  ) {
-    return {
-      kind: "manual",
-      reason: UNSUPPORTED_OPTIONS_REASON,
-    }
-  }
-
-  const optionsObjectExpression = optionsPropertyResult.property.value as ObjectExpressionLike
-
-  return patchOptionsObject(content, optionsObjectExpression)
+      return Option.fromNullishOr(property)
+    })
+  )
 }
 
-function loadOxlintTypecheckState(cwd: string) {
+function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpression) {
+  return Effect.gen(function* () {
+    const missingOptions: RequiredBooleanOption[] = []
+    let changed = false
+
+    for (const option of REQUIRED_BOOLEAN_OPTIONS) {
+      const propertyResult = getNamedObjectProperty(optionsObjectExpression, option)
+
+      if (propertyResult.status === "manual") {
+        return {
+          kind: "manual",
+          reason: NON_BOOLEAN_OPTIONS_REASON,
+        } satisfies PatchResult
+      }
+
+      if (propertyResult.status === "missing") {
+        missingOptions.push(option)
+        continue
+      }
+
+      const value = propertyResult.property.value
+
+      if (value.type !== "Literal" || typeof value.value !== "boolean") {
+        return {
+          kind: "manual",
+          reason: NON_BOOLEAN_OPTIONS_REASON,
+        } satisfies PatchResult
+      }
+
+      if (value.value) {
+        continue
+      }
+
+      value.raw = "true"
+      value.value = true
+      changed = true
+    }
+
+    if (missingOptions.length > 0) {
+      const generatedOptionProperties = yield* createRequiredOptionProperties(missingOptions)
+
+      if (Option.isNone(generatedOptionProperties)) {
+        return {
+          kind: "manual",
+          reason: GENERATED_PATCH_FAILURE_REASON,
+        } satisfies PatchResult
+      }
+
+      optionsObjectExpression.properties.unshift(...generatedOptionProperties.value)
+      changed = true
+    }
+
+    if (!changed) {
+      return { kind: "configured" } satisfies PatchResult
+    }
+
+    return {
+      kind: "patchable",
+      updatedContent: print(ast),
+    } satisfies PatchResult
+  })
+}
+
+function inspect(content: string) {
+  return Effect.gen(function* () {
+    const parsed = yield* parse(content)
+
+    if (Option.isNone(parsed)) {
+      return {
+        kind: "manual",
+        reason: UNSUPPORTED_CONFIG_REASON,
+      } satisfies PatchResult
+    }
+
+    const configObjectExpression = getExportedConfigObject(parsed.value)
+
+    if (Option.isNone(configObjectExpression)) {
+      return {
+        kind: "manual",
+        reason: UNSUPPORTED_CONFIG_REASON,
+      } satisfies PatchResult
+    }
+
+    const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
+
+    if (optionsPropertyResult.status === "manual") {
+      return {
+        kind: "manual",
+        reason: UNSUPPORTED_OPTIONS_REASON,
+      } satisfies PatchResult
+    }
+
+    if (optionsPropertyResult.status === "missing") {
+      const optionsProperty = yield* createRequiredOptionsProperty()
+
+      if (Option.isNone(optionsProperty)) {
+        return {
+          kind: "manual",
+          reason: GENERATED_PATCH_FAILURE_REASON,
+        } satisfies PatchResult
+      }
+
+      configObjectExpression.value.properties.unshift(optionsProperty.value)
+
+      return {
+        kind: "patchable",
+        updatedContent: print(parsed.value),
+      } satisfies PatchResult
+    }
+
+    if (!isObjectExpression(optionsPropertyResult.property.value)) {
+      return {
+        kind: "manual",
+        reason: UNSUPPORTED_OPTIONS_REASON,
+      } satisfies PatchResult
+    }
+
+    return yield* patchOptionsObject(parsed.value, optionsPropertyResult.property.value)
+  })
+}
+
+function evaluate(cwd: string) {
   return Effect.gen(function* () {
     const packageJson = yield* readPackageJson(cwd)
 
     if (!shouldManageTypecheckedOxlint(packageJson)) {
-      return { status: "not_applicable" } satisfies OxlintTypecheckState
+      return { status: "not_applicable" } as const
     }
 
     const oxlintState = yield* oxlint.exists(cwd)
 
     if (oxlintState.format !== "ts") {
-      return { status: "not_applicable" } satisfies OxlintTypecheckState
+      return { status: "not_applicable" } as const
     }
 
     const fs = yield* FileSystem.FileSystem
@@ -609,22 +415,22 @@ function loadOxlintTypecheckState(cwd: string) {
 
     return {
       configPath,
-      content,
+      patch: yield* inspect(content),
       status: "applicable",
-    } satisfies OxlintTypecheckState
+    } as const
   })
 }
 
 export const oxlintTypecheck = defineMigration({
   check: (context) =>
     Effect.gen(function* () {
-      const state = yield* loadOxlintTypecheckState(context.cwd)
+      const evaluation = yield* evaluate(context.cwd)
 
-      if (state.status === "not_applicable") {
+      if (evaluation.status === "not_applicable") {
         return { status: "not_applicable", warnings: [] }
       }
 
-      const patch = inspectAndPatchOxlintTypecheck(state.content)
+      const { patch } = evaluation
 
       if (patch.kind === "configured") {
         return { status: "valid", warnings: [] }
@@ -645,14 +451,14 @@ export const oxlintTypecheck = defineMigration({
 
       spinner.start("Updating `oxlint.config.ts` for type-aware linting...")
 
-      const state = yield* loadOxlintTypecheckState(context.cwd)
+      const evaluation = yield* evaluate(context.cwd)
 
-      if (state.status === "not_applicable") {
+      if (evaluation.status === "not_applicable") {
         spinner.stop("No migration needed.")
         return
       }
 
-      const patch = inspectAndPatchOxlintTypecheck(state.content)
+      const { patch } = evaluation
 
       if (patch.kind === "configured") {
         spinner.stop("`oxlint.config.ts` already enables type-aware linting.")
@@ -669,8 +475,10 @@ export const oxlintTypecheck = defineMigration({
       const fs = yield* FileSystem.FileSystem
 
       yield* fs
-        .writeFileString(state.configPath, patch.updatedContent)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: state.configPath })))
+        .writeFileString(evaluation.configPath, patch.updatedContent)
+        .pipe(
+          Effect.mapError((cause) => new FailedToWriteFile({ cause, path: evaluation.configPath }))
+        )
 
       spinner.stop("`oxlint.config.ts` updated for type-aware linting.")
     }),
@@ -678,13 +486,13 @@ export const oxlintTypecheck = defineMigration({
   title: "Oxlint type-aware config",
   validate: (context) =>
     Effect.gen(function* () {
-      const state = yield* loadOxlintTypecheckState(context.cwd)
+      const evaluation = yield* evaluate(context.cwd)
 
-      if (state.status === "not_applicable") {
+      if (evaluation.status === "not_applicable") {
         return
       }
 
-      const patch = inspectAndPatchOxlintTypecheck(state.content)
+      const { patch } = evaluation
 
       if (patch.kind === "configured") {
         return

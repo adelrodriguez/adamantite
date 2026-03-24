@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: lint
+          - name: check
             command: bun run check
           - name: format
             command: bun run format --check

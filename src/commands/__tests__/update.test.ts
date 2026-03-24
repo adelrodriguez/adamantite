@@ -488,7 +488,7 @@ describe("update", () => {
       mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true })
       await writeFile(
         join(tempDir, ".github", "workflows", "adamantite.yml"),
-        "name: adamantite\njobs:\n  verify:\n    strategy:\n      matrix:\n        include:\n          - name: lint\n            command: bun run check\n          - name: types\n            command: bun run typecheck\n"
+        "name: adamantite\njobs:\n  verify:\n    strategy:\n      matrix:\n        include:\n          - name: check\n            command: bun run check\n          - name: types\n            command: bun run typecheck\n"
       )
 
       const prompter = createPrompterTestContext()
@@ -503,7 +503,7 @@ describe("update", () => {
         join(tempDir, ".github", "workflows", "adamantite.yml"),
         "utf8"
       )
-      expect(workflow).toContain("name: lint")
+      expect(workflow).toContain("name: check")
       expect(workflow).toContain("name: format")
       expect(workflow).not.toContain("name: types")
       expect(prompter.logs).toContainEqual({

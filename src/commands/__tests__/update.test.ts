@@ -197,6 +197,57 @@ describe("update", () => {
   })
 
   describe("migrations", () => {
+    test("migrate a legacy oxfmt config even when no dependency updates are needed", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              knip: knip.version,
+              oxfmt: oxfmt.version,
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+              sherif: sherif.version,
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(
+        join(tempDir, ".oxfmtrc.jsonc"),
+        [
+          "{",
+          "  // keep semantic override",
+          '  "semi": true,',
+          '  "singleQuote": true,',
+          "}",
+          "",
+        ].join("\n")
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toEqual([])
+      expect(await Bun.file(join(tempDir, ".oxfmtrc.jsonc")).exists()).toBe(false)
+
+      const oxfmtConfig = await readFile(join(tempDir, "oxfmt.config.ts"), "utf8")
+      expect(oxfmtConfig).toContain('import format from "adamantite/format"')
+      expect(oxfmtConfig).toContain("semi: true")
+      expect(oxfmtConfig).toContain("singleQuote: true")
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "Migrations ran successfully.",
+      })
+      expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
+    })
+
     test("migrate a legacy oxlint config even when no dependency updates are needed", async () => {
       await writeFile(
         join(tempDir, "package.json"),
@@ -515,6 +566,46 @@ describe("update", () => {
   })
 
   describe("warnings and errors", () => {
+    test("warn when both oxfmt config formats are present and prefer oxfmt.config.ts", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxfmt: oxfmt.version,
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(
+        join(tempDir, "oxfmt.config.ts"),
+        'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({ semi: false })\n'
+      )
+      await writeFile(join(tempDir, ".oxfmtrc.json"), JSON.stringify({ semi: true }, null, 2))
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "No changes needed.",
+      })
+      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
+    })
+
     test("warn when both oxlint config formats are present and prefer oxlint.config.ts", async () => {
       await writeFile(
         join(tempDir, "package.json"),

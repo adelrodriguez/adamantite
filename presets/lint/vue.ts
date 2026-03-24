@@ -1,6 +1,6 @@
-import { defineConfig } from "oxlint"
+import type { OxlintConfig } from "oxlint"
 
-export default defineConfig({
+export default {
   plugins: ["vue"],
   rules: {
     "vue/define-emits-declaration": "error",
@@ -20,4 +20,4 @@ export default defineConfig({
     "vue/valid-define-emits": "error",
     "vue/valid-define-props": "error",
   },
-})
+} as const satisfies OxlintConfig

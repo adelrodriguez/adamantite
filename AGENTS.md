@@ -21,7 +21,7 @@ This project was built with [`pastry`](https://github.com/adelrodriguez/pastry) 
 Adamantite is an opinionated preset package for modern TypeScript applications that provides:
 
 - **oxlint configuration** (`presets/lint/*.ts`) - Modular linting rules (core, React, Next.js)
-- **oxfmt configuration** (`presets/format.json`) - Code formatting configuration
+- **oxfmt configuration** (`presets/format.ts`) - Code formatting configuration
 - **TypeScript preset** (`presets/tsconfig.json`) - Strict TypeScript configuration
 - **CLI tool** - Commands to run oxlint linting and oxfmt formatting via `adamantite` command
 
@@ -95,5 +95,5 @@ Each package has a version property that is used to determine the version of the
 ### Configuration Files
 
 - **`presets/lint/core.ts`** - Core linting rules for all TypeScript/JavaScript projects
-- **`presets/format.json`** - Code formatting configuration
+- **`presets/format.ts`** - Code formatting configuration
 - **`presets/tsconfig.json`** - Reusable TypeScript configuration

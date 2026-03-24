@@ -22,6 +22,7 @@ import {
   FailedToWriteFile,
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
+import { isJsonObject } from "#lib/shared/json.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { getManagedScripts } from "#lib/workspace/scripts.ts"
 
@@ -60,18 +61,11 @@ function shouldManageTypecheckedOxlint(packageJson: PackageJson) {
 }
 
 function isObjectExpression(value: unknown): value is ObjectExpression {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "type" in value &&
-    value.type === "ObjectExpression" &&
-    "properties" in value &&
-    Array.isArray(value.properties)
-  )
+  return isJsonObject(value) && value.type === "ObjectExpression" && Array.isArray(value.properties)
 }
 
 function isObjectProperty(value: unknown): value is ObjectProperty {
-  return typeof value === "object" && value !== null && "type" in value && value.type === "Property"
+  return isJsonObject(value) && value.type === "Property"
 }
 
 function parse(content: string) {

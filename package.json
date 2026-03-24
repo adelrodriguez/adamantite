@@ -37,7 +37,10 @@
   },
   "exports": {
     "./analyze": "./dist/presets/knip.json",
-    "./format": "./dist/presets/format.json",
+    "./format": {
+      "types": "./dist/presets/format.d.ts",
+      "default": "./dist/presets/format.js"
+    },
     "./lint": {
       "types": "./dist/presets/lint/core.d.ts",
       "default": "./dist/presets/lint/core.js"

@@ -12,6 +12,11 @@ import { knip } from "#lib/integrations/tooling/knip.ts"
 import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
 import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
 import { sherif } from "#lib/integrations/tooling/sherif.ts"
+import {
+  DUAL_LEGACY_OXFMT_JSON_FILES_WARNING,
+  inspectLegacyOxfmtConfig,
+  migrateLegacyOxfmtConfig,
+} from "#lib/migrations/legacy-oxfmt-json.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#lib/shared/errors.ts"
@@ -83,16 +88,32 @@ const setupOxfmtConfig = (cwd: string) =>
     const spinner = prompter.spinner()
     spinner.start("Setting up oxfmt config...")
 
-    const oxfmtPath = yield* oxfmt.exists(cwd)
+    const exists = yield* inspectLegacyOxfmtConfig(cwd)
 
-    if (oxfmtPath.path) {
-      spinner.message(`Found \`${oxfmtPath.path}\`, updating...`)
+    if (exists.hasBoth) {
+      yield* prompter.log.warning(
+        "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`."
+      )
+    }
 
-      yield* oxfmt.update(cwd)
+    if (exists.hasBothLegacyJsonFiles) {
+      yield* prompter.log.warning(DUAL_LEGACY_OXFMT_JSON_FILES_WARNING)
+    }
 
-      spinner.stop("oxfmt config updated successfully.")
+    if (exists.format === "json" || exists.format === "jsonc") {
+      const legacyConfigFile = exists.format === "json" ? ".oxfmtrc.json" : ".oxfmtrc.jsonc"
+
+      spinner.message(`Found \`${legacyConfigFile}\`, migrating to \`oxfmt.config.ts\`...`)
+
+      yield* migrateLegacyOxfmtConfig(cwd)
+
+      spinner.stop("oxfmt config migrated successfully.")
+    } else if (exists.format === "ts") {
+      spinner.message("Found `oxfmt.config.ts`, keeping existing config.")
+
+      spinner.stop("oxfmt config is ready.")
     } else {
-      spinner.message("`.oxfmtrc.jsonc` or `.oxfmtrc.json` not found, creating...")
+      spinner.message("`oxfmt.config.ts` not found, creating...")
 
       yield* oxfmt.create(cwd)
 

@@ -3,7 +3,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineTooling } from "#lib/integrations/tooling/base.ts"
 import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
-import { isJsonObject } from "#lib/shared/json.ts"
+import { isJsonObject, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 import preset from "#presets/format.ts"
 
 export const CONFIG_FILE = "oxfmt.config.ts"
@@ -11,16 +11,8 @@ export const CONFIG_FILE = "oxfmt.config.ts"
 /** Top-level keys whose values are merged with Adamantite preset objects at runtime. */
 const NESTED_MERGE_KEYS = new Set(["sortImports", "sortPackageJson", "sortTailwindcss"])
 
-function serializeTsLiteralValue(value: unknown, continuationIndent: string): string {
-  const serialized = JSON.stringify(value, null, 2)
-    .replaceAll(/"([A-Za-z_$][\w$]*)":/g, "$1:")
-    .replaceAll("\n", `\n${continuationIndent}`)
-
-  return serialized
-}
-
 function serializeNestedMergeEntry(key: string, value: Record<string, unknown>): string {
-  const raw = JSON.stringify(value, null, 2).replaceAll(/"([A-Za-z_$][\w$]*)":/g, "$1:")
+  const raw = serializeTsObjectLiteral(value)
   const lines = raw.split("\n")
 
   if (lines.length <= 2) {
@@ -41,7 +33,7 @@ export function toTsConfigContent(config: Record<string, unknown> = {}) {
       return serializeNestedMergeEntry(key, value)
     }
 
-    const serialized = serializeTsLiteralValue(value, "  ")
+    const serialized = serializeTsObjectLiteral(value, { continuationIndent: "  " })
 
     return `  ${key}: ${serialized},`
   })

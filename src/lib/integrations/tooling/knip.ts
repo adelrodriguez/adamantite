@@ -2,17 +2,51 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineTooling } from "#lib/integrations/tooling/base.ts"
-import {
-  FailedToReadFile,
-  FailedToWriteFile,
-  FileNotFound,
-  InvalidConfigFormat,
-} from "#lib/shared/errors.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
-import preset from "#presets/knip.json" with { type: "json" }
+import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
+import { serializeTsObjectLiteral } from "#lib/shared/json.ts"
+import preset from "#presets/analyze.ts"
 
-const CONFIG_FILE_JSON = "knip.json"
-const CONFIG_FILE_JSONC = "knip.jsonc"
+export const CONFIG_FILE = "knip.config.ts"
+
+export function toTsConfigContent(config: Record<string, unknown> = {}) {
+  const configEntries = Object.entries(config).map(([key, value]) => {
+    if (key === "rules" && typeof value === "object" && value !== null && !Array.isArray(value)) {
+      const rulesEntries = Object.entries(value).map(
+        ([ruleName, ruleValue]) =>
+          `    ${ruleName}: ${serializeTsObjectLiteral(ruleValue, { indentation: "    " })},`
+      )
+
+      return ["  rules: {", "    ...analyze.rules,", ...rulesEntries, "  },"].join("\n")
+    }
+
+    return `  ${key}: ${serializeTsObjectLiteral(value)},`
+  })
+
+  if (configEntries.length === 0) {
+    return [
+      'import type { KnipConfig } from "knip"',
+      'import analyze from "adamantite/analyze"',
+      "",
+      "const config: KnipConfig = analyze",
+      "",
+      "export default config",
+      "",
+    ].join("\n")
+  }
+
+  return [
+    'import type { KnipConfig } from "knip"',
+    'import analyze from "adamantite/analyze"',
+    "",
+    "const config: KnipConfig = {",
+    "  ...analyze,",
+    ...configEntries,
+    "}",
+    "",
+    "export default config",
+    "",
+  ].join("\n")
+}
 
 export const knip = defineTooling({
   config: preset,
@@ -20,70 +54,35 @@ export const knip = defineTooling({
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE_JSON)
-      const payload = JSON.stringify(preset, null, 2)
+      const configPath = path.join(cwd, CONFIG_FILE)
 
       yield* fs
-        .writeFileString(configPath, `${payload}\n`)
+        .writeFileString(configPath, toTsConfigContent())
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const jsonPath = path.join(cwd, CONFIG_FILE_JSON)
-      const jsoncPath = path.join(cwd, CONFIG_FILE_JSONC)
+      const tsPath = path.join(cwd, CONFIG_FILE)
+      const hasTs = yield* fs.exists(tsPath)
 
-      if (yield* fs.exists(jsonPath)) {
-        return { path: jsonPath }
+      return {
+        format: hasTs ? "ts" : null,
+        path: hasTs ? tsPath : null,
+        tsPath: hasTs ? tsPath : null,
       }
-
-      if (yield* fs.exists(jsoncPath)) {
-        return { path: jsoncPath }
-      }
-
-      return { path: null }
     }),
   name: "knip",
   update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const jsonPath = path.join(cwd, CONFIG_FILE_JSON)
-      const jsoncPath = path.join(cwd, CONFIG_FILE_JSONC)
-      const configPath = (yield* fs.exists(jsonPath))
-        ? jsonPath
-        : (yield* fs.exists(jsoncPath))
-          ? jsoncPath
-          : null
+      const configPath = path.join(cwd, CONFIG_FILE)
 
-      if (!configPath) {
-        return yield* new FileNotFound({ path: CONFIG_FILE_JSON })
+      if (!(yield* fs.exists(configPath))) {
+        return yield* new FileNotFound({ path: CONFIG_FILE })
       }
-
-      const knipFile = yield* fs
-        .readFileString(configPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
-
-      const existingConfig = yield* parseJson(knipFile, configPath)
-
-      // Empty configs are allowed and will be merged with Adamantite's config
-      // Ensure existingConfig is a JSON object (not null, array, or primitive)
-      if (!isJsonObject(existingConfig)) {
-        return yield* new InvalidConfigFormat({ path: configPath })
-      }
-
-      const mergedConfig = yield* mergeConfig(existingConfig, preset)
-
-      // Set schema based on file extension
-      const isJsonc = configPath.endsWith(".jsonc")
-      mergedConfig.$schema = isJsonc
-        ? "https://unpkg.com/knip@6/schema-jsonc.json"
-        : "https://unpkg.com/knip@6/schema.json"
-
-      yield* fs
-        .writeFileString(configPath, `${JSON.stringify(mergedConfig, null, 2)}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   version: "6.0.4",
 })

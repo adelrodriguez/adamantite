@@ -21,6 +21,26 @@ export function isJsonObject(value: unknown): value is JsonObject {
   return value !== null && typeof value === "object" && !Array.isArray(value)
 }
 
+export function serializeTsObjectLiteral(
+  value: unknown,
+  options: {
+    continuationIndent?: string
+    indentation?: number | string
+  } = {}
+) {
+  const { continuationIndent, indentation = 2 } = options
+  const serialized = JSON.stringify(value, null, indentation).replaceAll(
+    /"([A-Za-z_$][\w$]*)":/g,
+    "$1:"
+  )
+
+  if (!continuationIndent) {
+    return serialized
+  }
+
+  return serialized.replaceAll("\n", `\n${continuationIndent}`)
+}
+
 export const mergeConfig = (base: Record<string, unknown>, override: Record<string, unknown>) =>
   Effect.try({
     catch: (cause) => new FailedToMergeConfig({ cause }),

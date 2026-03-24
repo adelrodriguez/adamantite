@@ -151,7 +151,7 @@ Run applicable migrations and update Adamantite-managed dependencies:
 adamantite update
 ```
 
-This also migrates legacy `.oxfmtrc.json` and `.oxfmtrc.jsonc` configs to `oxfmt.config.ts`.
+This also migrates legacy `.oxfmtrc.json(c)` configs to `oxfmt.config.ts` and `knip.json(c)` configs to `knip.config.ts`.
 
 ## Presets
 
@@ -185,6 +185,10 @@ Framework-specific presets are available for:
 ### Formatting ([format.ts](./presets/format.ts))
 
 Opinionated code formatting with oxfmt, configured for consistency and readability. The published formatter preset is available as `adamantite/format` and is designed to be used from `oxfmt.config.ts`.
+
+### Analyze ([analyze.ts](./presets/analyze.ts))
+
+Opinionated Knip configuration for dependency and unused-file analysis. The published analyze preset is available as `adamantite/analyze` and is designed to be used from `knip.config.ts`.
 
 ### TypeScript ([presets/tsconfig.json](./presets/tsconfig.json))
 

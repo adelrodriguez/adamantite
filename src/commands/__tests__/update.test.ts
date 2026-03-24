@@ -3,7 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import updateCommand from "#commands/update.ts"
@@ -11,12 +13,19 @@ import { knip } from "#lib/integrations/tooling/knip.ts"
 import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
 import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
 import { sherif } from "#lib/integrations/tooling/sherif.ts"
+import { inspectLegacyKnipConfig } from "#lib/migrations/legacy-knip-json.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,
   runCommand,
 } from "./command-test-helpers.ts"
+
+async function knipWarningsForCwd(cwd: string) {
+  return Effect.runPromise(
+    inspectLegacyKnipConfig(cwd).pipe(Effect.provide(NodeServices.layer))
+  ).then((r) => r.warnings)
+}
 
 describe("update", () => {
   let originalCwd: string
@@ -197,6 +206,52 @@ describe("update", () => {
   })
 
   describe("migrations", () => {
+    test("migrate a legacy knip config even when no dependency updates are needed", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              knip: knip.version,
+              oxfmt: oxfmt.version,
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+              sherif: sherif.version,
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(
+        join(tempDir, "knip.jsonc"),
+        ["{", '  "entry": ["src/index.ts"],', '  "ignore": ["bunup.config.ts"],', "}", ""].join(
+          "\n"
+        )
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toEqual([])
+      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(false)
+
+      const knipConfig = await readFile(join(tempDir, "knip.config.ts"), "utf8")
+      expect(knipConfig).toContain('import analyze from "adamantite/analyze"')
+      expect(knipConfig).toContain('"src/index.ts"')
+      expect(knipConfig).toContain('"bunup.config.ts"')
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "Migrations ran successfully.",
+      })
+      expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
+    })
+
     test("migrate a legacy oxfmt config even when no dependency updates are needed", async () => {
       await writeFile(
         join(tempDir, "package.json"),
@@ -566,6 +621,52 @@ describe("update", () => {
   })
 
   describe("warnings and errors", () => {
+    test("warn when both knip config formats are present and prefer knip.config.ts", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              knip: knip.version,
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(
+        join(tempDir, "knip.config.ts"),
+        'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = { entry: ["src/index.ts"] }\n\nexport default config\n'
+      )
+      await writeFile(
+        join(tempDir, "knip.json"),
+        JSON.stringify({ entry: ["src/main.ts"] }, null, 2)
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const expectedKnipWarnings = await knipWarningsForCwd(tempDir)
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      for (const message of expectedKnipWarnings) {
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message,
+        })
+      }
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "No changes needed.",
+      })
+      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
+    })
+
     test("warn when both oxfmt config formats are present and prefer oxfmt.config.ts", async () => {
       await writeFile(
         join(tempDir, "package.json"),

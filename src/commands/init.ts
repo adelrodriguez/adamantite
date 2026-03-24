@@ -13,7 +13,10 @@ import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
 import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
 import { sherif } from "#lib/integrations/tooling/sherif.ts"
 import {
-  DUAL_LEGACY_OXFMT_JSON_FILES_WARNING,
+  inspectLegacyKnipConfig,
+  migrateLegacyKnipConfig,
+} from "#lib/migrations/legacy-knip-json.ts"
+import {
   inspectLegacyOxfmtConfig,
   migrateLegacyOxfmtConfig,
 } from "#lib/migrations/legacy-oxfmt-json.ts"
@@ -90,14 +93,8 @@ const setupOxfmtConfig = (cwd: string) =>
 
     const exists = yield* inspectLegacyOxfmtConfig(cwd)
 
-    if (exists.hasBoth) {
-      yield* prompter.log.warning(
-        "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`."
-      )
-    }
-
-    if (exists.hasBothLegacyJsonFiles) {
-      yield* prompter.log.warning(DUAL_LEGACY_OXFMT_JSON_FILES_WARNING)
+    for (const warning of exists.warnings) {
+      yield* prompter.log.warning(warning)
     }
 
     if (exists.format === "json" || exists.format === "jsonc") {
@@ -171,16 +168,26 @@ const setupKnipConfig = (cwd: string) =>
     const spinner = prompter.spinner()
     spinner.start("Setting up knip config...")
 
-    const knipPath = yield* knip.exists(cwd)
+    const exists = yield* inspectLegacyKnipConfig(cwd)
 
-    if (knipPath.path) {
-      spinner.message(`Found \`${knipPath.path}\`, updating...`)
+    for (const warning of exists.warnings) {
+      yield* prompter.log.warning(warning)
+    }
 
-      yield* knip.update(cwd)
+    if (exists.format === "json" || exists.format === "jsonc") {
+      const legacyConfigFile = exists.format === "json" ? "knip.json" : "knip.jsonc"
 
-      spinner.stop("knip config updated successfully.")
+      spinner.message(`Found \`${legacyConfigFile}\`, migrating to \`knip.config.ts\`...`)
+
+      yield* migrateLegacyKnipConfig(cwd)
+
+      spinner.stop("knip config migrated successfully.")
+    } else if (exists.format === "ts") {
+      spinner.message("Found `knip.config.ts`, keeping existing config.")
+
+      spinner.stop("knip config is ready.")
     } else {
-      spinner.message("`knip.json` not found, creating...")
+      spinner.message("`knip.config.ts` not found, creating...")
 
       yield* knip.create(cwd)
 

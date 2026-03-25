@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
@@ -75,5 +75,53 @@ describe("legacyOxlintJson", () => {
     expect(content).toContain('"typeCheck": true')
 
     await runTestEffect(legacyOxlintJson.validate({ cwd: tempDir }))
+  })
+
+  test("migrate converts Adamantite preset paths with and without a dot prefix", async () => {
+    await Bun.write(
+      ".oxlintrc.json",
+      JSON.stringify(
+        {
+          extends: [
+            "node_modules/adamantite/presets/lint/react.ts",
+            "./node_modules/adamantite/presets/lint/node.json",
+          ],
+        },
+        null,
+        2
+      )
+    )
+
+    await runTestEffect(legacyOxlintJson.migrate({ cwd: tempDir }))
+
+    const content = await Bun.file("oxlint.config.ts").text()
+    expect(content).toContain('import core from "adamantite/lint"')
+    expect(content).toContain('import react from "adamantite/lint/react"')
+    expect(content).toContain('import node from "adamantite/lint/node"')
+    expect(content).toContain('"typeAware": true')
+    expect(content).toContain('"typeCheck": true')
+    expect(content).not.toContain("node_modules/adamantite/presets/lint/react.ts")
+  })
+
+  test("migrate fails when reading the legacy config fails", async () => {
+    mkdirSync(".oxlintrc.json", { recursive: true })
+
+    try {
+      await runTestEffect(legacyOxlintJson.migrate({ cwd: tempDir }))
+      throw new Error("Expected migration to fail")
+    } catch (error) {
+      expect(error).toMatchObject({ _tag: "FailedToReadFile" })
+    }
+  })
+
+  test("migrate fails when the legacy config is not a JSON object", async () => {
+    await Bun.write(".oxlintrc.json", "[]")
+
+    try {
+      await runTestEffect(legacyOxlintJson.migrate({ cwd: tempDir }))
+      throw new Error("Expected migration to fail")
+    } catch (error) {
+      expect(error).toMatchObject({ _tag: "InvalidConfigFormat" })
+    }
   })
 })

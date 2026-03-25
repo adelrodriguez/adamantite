@@ -66,19 +66,18 @@ const setupOxlintConfig = (cwd: string, presets: string[]) =>
     const exists = yield* oxlint.exists(cwd)
     const oxlintLegacyConfig = oxlint.files[1].path
 
-    if (exists.hasBoth) {
+    if (exists.active?.format === "ts" && exists.legacy.length > 0) {
       yield* prompter.log.warning(
         `Found both \`${oxlint.config}\` and \`${oxlintLegacyConfig}\`. Adamantite will use \`${oxlint.config}\`.`
       )
     }
 
-    if (exists.format === "json") {
-      spinner.message(`Found \`${oxlintLegacyConfig}\`, migrating to \`${oxlint.config}\`...`)
+    if (exists.active?.format === "json") {
+      spinner.message(`Found \`${oxlintLegacyConfig}\`, keeping existing config.`)
 
-      yield* oxlint.update(cwd, presets)
-
-      spinner.stop("oxlint config migrated successfully.")
-    } else if (exists.format === "ts") {
+      spinner.stop("oxlint config is ready.")
+      yield* logLegacyConfigPreservedMessage("oxlint", oxlintLegacyConfig)
+    } else if (exists.active?.format === "ts") {
       spinner.message(`Found \`${oxlint.config}\`, keeping existing config.`)
 
       spinner.stop("oxlint config is ready.")
@@ -99,18 +98,28 @@ const setupOxfmtConfig = (cwd: string) =>
 
     const exists = yield* oxfmt.exists(cwd)
 
-    for (const warning of exists.warnings) {
-      yield* prompter.log.warning(warning)
+    if (exists.active?.format === "ts" && exists.legacy.length > 0) {
+      yield* prompter.log.warning(
+        `Found both \`${oxfmt.config}\` and \`.oxfmtrc.json(c)\`. Adamantite will use \`${oxfmt.config}\`.`
+      )
     }
 
-    if (exists.format === "json" || exists.format === "jsonc") {
-      const legacyConfigFile = exists.format === "json" ? oxfmt.files[1].path : oxfmt.files[2].path
+    if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
+      yield* prompter.log.warning(
+        "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
+      )
+    }
+
+    if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
+      const legacyConfigFile = exists.active.path.endsWith(oxfmt.files[1].path)
+        ? oxfmt.files[1].path
+        : oxfmt.files[2].path
 
       spinner.message(`Found \`${legacyConfigFile}\`, keeping existing config.`)
 
       spinner.stop("oxfmt config is ready.")
       yield* logLegacyConfigPreservedMessage("oxfmt", legacyConfigFile)
-    } else if (exists.format === "ts") {
+    } else if (exists.active?.format === "ts") {
       spinner.message(`Found \`${oxfmt.config}\`, keeping existing config.`)
 
       spinner.stop("oxfmt config is ready.")
@@ -175,18 +184,28 @@ const setupKnipConfig = (cwd: string) =>
 
     const exists = yield* knip.exists(cwd)
 
-    for (const warning of exists.warnings) {
-      yield* prompter.log.warning(warning)
+    if (exists.active?.format === "ts" && exists.legacy.length > 0) {
+      yield* prompter.log.warning(
+        `Found both \`${knip.config}\` and \`knip.json(c)\`. Adamantite will use \`${knip.config}\`.`
+      )
     }
 
-    if (exists.format === "json" || exists.format === "jsonc") {
-      const legacyConfigFile = exists.format === "json" ? knip.files[1].path : knip.files[2].path
+    if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
+      yield* prompter.log.warning(
+        "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed."
+      )
+    }
+
+    if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
+      const legacyConfigFile = exists.active.path.endsWith(knip.files[1].path)
+        ? knip.files[1].path
+        : knip.files[2].path
 
       spinner.message(`Found \`${legacyConfigFile}\`, keeping existing config.`)
 
       spinner.stop("knip config is ready.")
       yield* logLegacyConfigPreservedMessage("knip", legacyConfigFile)
-    } else if (exists.format === "ts") {
+    } else if (exists.active?.format === "ts") {
       spinner.message(`Found \`${knip.config}\`, keeping existing config.`)
 
       spinner.stop("knip config is ready.")

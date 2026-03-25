@@ -8,6 +8,7 @@ import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import analyzeCommand from "#commands/analyze.ts"
 import checkCommand from "#commands/check.ts"
+import doctorCommand from "#commands/doctor.ts"
 import fixCommand from "#commands/fix.ts"
 import formatCommand from "#commands/format.ts"
 import initCommand from "#commands/init.ts"
@@ -24,6 +25,7 @@ const main = Command.make("adamantite").pipe(
   Command.withSubcommands([
     analyzeCommand,
     checkCommand,
+    doctorCommand,
     fixCommand,
     formatCommand,
     initCommand,

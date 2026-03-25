@@ -1,9 +1,14 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { defineIntegration } from "#lib/integrations/base.ts"
+import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
 import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
 import { toOxfmtTsConfigContent } from "#lib/workspace/oxfmt-config.ts"
+import {
+  getManagedScripts,
+  normalizeDependencyVersion,
+  readPackageJson,
+} from "#lib/workspace/package-json.ts"
 
 const files = [
   { path: "oxfmt.config.ts", type: "config" },
@@ -11,13 +16,85 @@ const files = [
   { path: ".oxfmtrc.jsonc", type: "legacy_config" },
 ] as const
 
-const DUAL_OXFMT_CONFIG_WARNING =
-  "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`."
-
-const DUAL_LEGACY_OXFMT_JSON_FILES_WARNING =
-  "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
+const VERSION = "0.41.0"
 
 export default defineIntegration({
+  assess: (cwd: string) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const packageJson = yield* readPackageJson(cwd)
+      const managedScripts = getManagedScripts(packageJson)
+
+      if (!managedScripts.includes("format")) {
+        return {
+          actions: [],
+          status: "not_applicable",
+          warnings: [],
+        }
+      }
+
+      const packageSpecifier = packageJson.devDependencies?.oxfmt ?? packageJson.dependencies?.oxfmt
+
+      const configPath = path.join(cwd, files[0].path)
+      const legacyJsonPath = path.join(cwd, files[1].path)
+      const legacyJsoncPath = path.join(cwd, files[2].path)
+      const hasConfig = yield* fs.exists(configPath)
+      const hasLegacyJson = yield* fs.exists(legacyJsonPath)
+      const hasLegacyJsonc = yield* fs.exists(legacyJsoncPath)
+      const format = hasConfig ? "ts" : hasLegacyJsonc ? "jsonc" : hasLegacyJson ? "json" : null
+      const actions: AssessmentAction[] = []
+      const warnings: string[] = []
+      if (hasConfig && (hasLegacyJson || hasLegacyJsonc)) {
+        warnings.push(
+          "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`."
+        )
+      }
+      if (!hasConfig && hasLegacyJson && hasLegacyJsonc) {
+        warnings.push(
+          "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
+        )
+      }
+
+      if (!packageSpecifier) {
+        actions.push({
+          description: `Install \`oxfmt@${VERSION}\` for the managed \`format\` script.`,
+          package: "oxfmt",
+          targetVersion: VERSION,
+          type: "install_package",
+        })
+      } else if (normalizeDependencyVersion(packageSpecifier) !== VERSION) {
+        actions.push({
+          currentVersion: packageSpecifier,
+          description: `Update \`oxfmt\` from \`${packageSpecifier}\` to \`${VERSION}\`.`,
+          package: "oxfmt",
+          targetVersion: VERSION,
+          type: "update_package",
+        })
+      }
+
+      if (format === null) {
+        actions.push({
+          description: `Create \`${files[0].path}\` for \`oxfmt\`.`,
+          path: files[0].path,
+          type: "create_config",
+        })
+      }
+
+      if (format === "json" || format === "jsonc") {
+        actions.push({
+          description: `Migrate legacy \`${format === "json" ? files[1].path : files[2].path}\` to \`${files[0].path}\`.`,
+          migrationId: "legacy-oxfmt-json",
+          type: "run_migration",
+        })
+      }
+
+      return {
+        actions,
+        status: actions.length === 0 ? "healthy" : "needs_action",
+        warnings,
+      }
+    }),
   config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {
@@ -40,37 +117,27 @@ export default defineIntegration({
       const hasJson = yield* fs.exists(jsonPath)
       const hasJsonc = yield* fs.exists(jsoncPath)
 
-      const format: "json" | "jsonc" | "ts" | null = hasTs
-        ? "ts"
-        : hasJsonc
-          ? "jsonc"
-          : hasJson
-            ? "json"
-            : null
-
-      const hasBoth = hasTs && (hasJson || hasJsonc)
-      const hasBothLegacyJsonFiles = !hasTs && hasJson && hasJsonc
-      const warnings = [
-        ...(hasBoth ? [DUAL_OXFMT_CONFIG_WARNING] : []),
-        ...(hasBothLegacyJsonFiles ? [DUAL_LEGACY_OXFMT_JSON_FILES_WARNING] : []),
-      ]
+      const format = hasTs ? "ts" : hasJsonc ? "jsonc" : hasJson ? "json" : null
+      const legacy = []
+      if (hasTs && hasJson) {
+        legacy.push({ format: "json", path: jsonPath })
+      }
+      if (hasTs && hasJsonc) {
+        legacy.push({ format: "jsonc", path: jsoncPath })
+      }
+      if (!hasTs && hasJson && hasJsonc) {
+        legacy.push({ format: "json", path: jsonPath })
+      }
 
       return {
-        format,
-        hasBoth,
-        hasBothLegacyJsonFiles,
-        jsonPath: hasJson ? jsonPath : null,
-        jsoncPath: hasJsonc ? jsoncPath : null,
-        path:
-          format === "ts"
-            ? tsPath
-            : format === "jsonc"
-              ? jsoncPath
-              : format === "json"
-                ? jsonPath
-                : null,
-        tsPath: hasTs ? tsPath : null,
-        warnings,
+        active:
+          format === null
+            ? null
+            : {
+                format,
+                path: format === "ts" ? tsPath : format === "jsonc" ? jsoncPath : jsonPath,
+              },
+        legacy,
       }
     }),
   files,
@@ -86,5 +153,5 @@ export default defineIntegration({
         return yield* new FileNotFound({ path: files[0].path })
       }
     }),
-  version: "0.41.0",
+  version: VERSION,
 })

@@ -3,9 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
-import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import updateCommand from "#commands/update.ts"
@@ -20,12 +18,6 @@ import {
   createPrompterTestContext,
   runCommand,
 } from "./command-test-helpers.ts"
-
-async function knipWarningsForCwd(cwd: string) {
-  return Effect.runPromise(knip.exists(cwd).pipe(Effect.provide(NodeServices.layer))).then(
-    (r) => r.warnings
-  )
-}
 
 describe("update", () => {
   let originalCwd: string
@@ -648,17 +640,14 @@ describe("update", () => {
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
-      const expectedKnipWarnings = await knipWarningsForCwd(tempDir)
-
       const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      for (const message of expectedKnipWarnings) {
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message,
-        })
-      }
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
+      })
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: "No changes needed.",

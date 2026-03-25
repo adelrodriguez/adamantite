@@ -31,15 +31,11 @@ function migrateLegacyOxfmtConfig(cwd: string) {
     const path = yield* Path.Path
     const state = yield* oxfmt.exists(cwd)
 
-    if (state.format !== "json" && state.format !== "jsonc") {
+    if (state.active?.format !== "json" && state.active?.format !== "jsonc") {
       return
     }
 
-    const legacyConfigPath = state.path
-
-    if (!legacyConfigPath) {
-      return
-    }
+    const legacyConfigPath = state.active.path
 
     const configPath = path.join(cwd, oxfmt.config)
     const legacyConfigContent = yield* fs
@@ -62,22 +58,14 @@ function migrateLegacyOxfmtConfig(cwd: string) {
       .remove(legacyConfigPath)
       .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
 
-    if (state.hasBothLegacyJsonFiles) {
-      const legacyConfigPaths = getLegacyConfigPaths()
-      const otherLegacyConfigPath =
-        state.format === "jsonc"
-          ? path.join(cwd, legacyConfigPaths[0])
-          : path.join(cwd, legacyConfigPaths[1])
+    const otherLegacyConfigPath = state.legacy[0]?.path ?? null
 
-      if (otherLegacyConfigPath !== legacyConfigPath) {
-        yield* fs
-          .remove(otherLegacyConfigPath)
-          .pipe(
-            Effect.mapError(
-              (cause) => new FailedToDeleteFile({ cause, path: otherLegacyConfigPath })
-            )
-          )
-      }
+    if (otherLegacyConfigPath && otherLegacyConfigPath !== legacyConfigPath) {
+      yield* fs
+        .remove(otherLegacyConfigPath)
+        .pipe(
+          Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: otherLegacyConfigPath }))
+        )
     }
   })
 }
@@ -86,17 +74,27 @@ export const legacyOxfmtJson = defineMigration({
   check: (context) =>
     Effect.gen(function* () {
       const state = yield* oxfmt.exists(context.cwd)
-      const warnings = state.warnings
+      const warnings: string[] = []
+      if (state.active?.format === "ts" && state.legacy.length > 0) {
+        warnings.push(
+          "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`."
+        )
+      }
+      if (state.active && state.active.format !== "ts" && state.legacy.length > 0) {
+        warnings.push(
+          "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
+        )
+      }
 
-      if (state.format === "json" || state.format === "jsonc") {
+      if (state.active?.format === "json" || state.active?.format === "jsonc") {
         return {
           status: "needs_migration",
-          summary: getLegacyOxfmtSummary(state.format),
+          summary: getLegacyOxfmtSummary(state.active.format),
           warnings,
         }
       }
 
-      if (state.format === "ts") {
+      if (state.active?.format === "ts") {
         return { status: "valid", warnings }
       }
 
@@ -109,9 +107,9 @@ export const legacyOxfmtJson = defineMigration({
       const prompter = yield* Prompter
       const spinner = prompter.spinner()
       const state = yield* oxfmt.exists(context.cwd)
-      const legacyConfigPaths = getLegacyConfigPaths()
-      const legacyConfigFile =
-        state.format === "jsonc" ? legacyConfigPaths[1] : legacyConfigPaths[0]
+      const legacyConfigFile = state.active?.path.endsWith(oxfmt.files[2].path)
+        ? oxfmt.files[2].path
+        : oxfmt.files[1].path
 
       spinner.start(`Migrating \`${legacyConfigFile}\` to \`${oxfmt.config}\`...`)
       yield* migrateLegacyOxfmtConfig(context.cwd)
@@ -123,7 +121,7 @@ export const legacyOxfmtJson = defineMigration({
     Effect.gen(function* () {
       const state = yield* oxfmt.exists(context.cwd)
 
-      if (state.format !== "ts") {
+      if (state.active?.format !== "ts") {
         return yield* new MigrationValidationFailed({
           migrationId: "legacy-oxfmt-json",
           reason: `\`${oxfmt.config}\` is not the active oxfmt config.`,

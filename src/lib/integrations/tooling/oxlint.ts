@@ -1,90 +1,106 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { defineIntegration } from "#lib/integrations/base.ts"
+import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
+import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
+import { getOxlintPresetNames, toOxlintTsConfigContent } from "#lib/workspace/oxlint-config.ts"
 import {
-  FailedToDeleteFile,
-  FailedToReadFile,
-  FailedToWriteFile,
-  FileNotFound,
-  InvalidConfigFormat,
-} from "#lib/shared/errors.ts"
-import { isJsonObject, parseJson } from "#lib/shared/json.ts"
+  getManagedScripts,
+  normalizeDependencyVersion,
+  readPackageJson,
+} from "#lib/workspace/package-json.ts"
 
 const files = [
   { path: "oxlint.config.ts", type: "config" },
   { path: ".oxlintrc.json", type: "legacy_config" },
 ] as const
 
-const ADAMANTITE_NODE_MODULES_PRESET_REGEX =
-  /^(?:\.\/)?node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/
-const ADAMANTITE_EXPORT_PRESET_REGEX = /^adamantite\/lint(?:\/([a-z0-9-]+))?$/
-
-function getPresetNames(presets: string[] = []) {
-  return presets.includes("core") ? presets : ["core", ...presets]
-}
-
-function getImportName(preset: string) {
-  return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
-}
-
-function toTsConfigContent(
-  config: Record<string, unknown>,
-  presetNames: string[],
-  passthroughExtends: string[] = []
-) {
-  const { options, ...configWithoutOptions } = config
-  const imports = [
-    'import { defineConfig } from "oxlint"',
-    ...presetNames.map(
-      (preset) =>
-        `import ${getImportName(preset)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
-    ),
-  ]
-
-  const presetExtendItems = presetNames.map((preset) => getImportName(preset))
-  const allExtends = [
-    ...presetExtendItems,
-    ...passthroughExtends.map((item) => JSON.stringify(item)),
-  ]
-
-  const serializedOptions = JSON.stringify(
-    isJsonObject(options)
-      ? {
-          ...options,
-          typeAware: true,
-          typeCheck: true,
-        }
-      : {
-          typeAware: true,
-          typeCheck: true,
-        },
-    null,
-    2
-  )
-  const serializedConfigEntries = Object.entries(configWithoutOptions).map(
-    ([key, value]) => [key, JSON.stringify(value, null, 2)] as [string, string]
-  )
-  const serializedExtends = `[${allExtends.join(", ")}]`
-  const body = [
-    ["options", serializedOptions],
-    ...serializedConfigEntries,
-    ["extends", serializedExtends],
-  ]
-    .map(([key, value]) => `  ${key}: ${value},`)
-    .join("\n")
-
-  return [...imports, "", "export default defineConfig({", body, "})", ""].join("\n")
-}
+const VERSION = "1.56.0"
 
 export default defineIntegration({
+  assess: (cwd: string) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const packageJson = yield* readPackageJson(cwd)
+      const managedScripts = getManagedScripts(packageJson)
+
+      if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
+        return {
+          actions: [],
+          status: "not_applicable",
+          warnings: [],
+        }
+      }
+
+      const packageSpecifier =
+        packageJson.devDependencies?.oxlint ?? packageJson.dependencies?.oxlint
+      const tsPath = path.join(cwd, files[0].path)
+      const jsonPath = path.join(cwd, files[1].path)
+      const hasTs = yield* fs.exists(tsPath)
+      const hasJson = yield* fs.exists(jsonPath)
+      const state = {
+        active: hasTs
+          ? { format: "ts", path: tsPath }
+          : hasJson
+            ? { format: "json", path: jsonPath }
+            : null,
+        legacy: hasTs && hasJson ? [{ format: "json", path: jsonPath }] : [],
+      }
+      const actions: AssessmentAction[] = []
+      const warnings: string[] = []
+      if (state.active?.format === "ts" && state.legacy.length > 0) {
+        warnings.push(
+          "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`."
+        )
+      }
+
+      if (!packageSpecifier) {
+        actions.push({
+          description: `Install \`oxlint@${VERSION}\` for the managed lint scripts.`,
+          package: "oxlint",
+          targetVersion: VERSION,
+          type: "install_package",
+        })
+      } else if (normalizeDependencyVersion(packageSpecifier) !== VERSION) {
+        actions.push({
+          currentVersion: packageSpecifier,
+          description: `Update \`oxlint\` from \`${packageSpecifier}\` to \`${VERSION}\`.`,
+          package: "oxlint",
+          targetVersion: VERSION,
+          type: "update_package",
+        })
+      }
+
+      if (state.active === null) {
+        actions.push({
+          description: `Create \`${files[0].path}\` for \`oxlint\`.`,
+          path: files[0].path,
+          type: "create_config",
+        })
+      }
+
+      if (state.active?.format === "json") {
+        actions.push({
+          description: `Migrate legacy \`${files[1].path}\` to \`${files[0].path}\`.`,
+          migrationId: "legacy-oxlint-json",
+          type: "run_migration",
+        })
+      }
+
+      return {
+        actions,
+        status: actions.length === 0 ? "healthy" : "needs_action",
+        warnings,
+      }
+    }),
   config: files[0].path,
   create: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const configPath = path.join(cwd, files[0].path)
-      const payload = toTsConfigContent({}, getPresetNames(presets))
+      const payload = toOxlintTsConfigContent({}, getOxlintPresetNames(presets))
 
       yield* fs
         .writeFileString(configPath, payload)
@@ -99,85 +115,38 @@ export default defineIntegration({
       const hasTs = yield* fs.exists(tsPath)
       const hasJson = yield* fs.exists(jsonPath)
 
-      const format: "json" | "ts" | null = hasTs ? "ts" : hasJson ? "json" : null
-      const activePath = format === "ts" ? tsPath : format === "json" ? jsonPath : null
+      const format = hasTs ? "ts" : hasJson ? "json" : null
+      const legacy = []
+      if (hasTs && hasJson) {
+        legacy.push({ format: "json", path: jsonPath })
+      }
 
       return {
-        format,
-        hasBoth: hasTs && hasJson,
-        jsonPath: hasJson ? jsonPath : null,
-        path: activePath,
-        tsPath: hasTs ? tsPath : null,
+        active:
+          format === null
+            ? null
+            : {
+                format,
+                path: format === "ts" ? tsPath : jsonPath,
+              },
+        legacy,
       }
     }),
   files,
   kind: "tooling",
   name: "oxlint",
-  update: (cwd: string, presets: string[] = []) =>
+  update: (cwd: string, _presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const tsPath = path.join(cwd, files[0].path)
-      const jsonPath = path.join(cwd, files[1].path)
       const hasTs = yield* fs.exists(tsPath)
-      const hasJson = yield* fs.exists(jsonPath)
 
       if (hasTs) {
         return
       }
 
-      if (!hasJson) {
-        return yield* new FileNotFound({ path: files[1].path })
-      }
-
-      const legacyConfigPath = jsonPath
-      const configPath = path.join(cwd, files[0].path)
-
-      const legacyConfigContent = yield* fs
-        .readFileString(legacyConfigPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: legacyConfigPath })))
-
-      const existingConfig = yield* parseJson(legacyConfigContent, legacyConfigPath)
-
-      if (!isJsonObject(existingConfig)) {
-        return yield* new InvalidConfigFormat({ path: legacyConfigPath })
-      }
-
-      const { $schema: _schema, ...configWithoutSchema } = existingConfig
-
-      const extendsArray = Array.isArray(configWithoutSchema.extends)
-        ? configWithoutSchema.extends.filter((value): value is string => typeof value === "string")
-        : typeof configWithoutSchema.extends === "string"
-          ? [configWithoutSchema.extends]
-          : []
-      const presetNameSet = new Set(getPresetNames(presets))
-      const passthroughSet = new Set<string>()
-
-      for (const extendsItem of extendsArray) {
-        const nodeModulesMatch = extendsItem.match(ADAMANTITE_NODE_MODULES_PRESET_REGEX)
-        const exportMatch = extendsItem.match(ADAMANTITE_EXPORT_PRESET_REGEX)
-        const presetName =
-          nodeModulesMatch?.[1] ?? (exportMatch ? (exportMatch[1] ?? "core") : null)
-
-        if (presetName) {
-          presetNameSet.add(presetName)
-        } else {
-          passthroughSet.add(extendsItem)
-        }
-      }
-
-      const { extends: _extends, ...configWithoutExtends } = configWithoutSchema
-
-      yield* fs
-        .writeFileString(
-          configPath,
-          toTsConfigContent(configWithoutExtends, [...presetNameSet], [...passthroughSet])
-        )
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
-
-      yield* fs
-        .remove(legacyConfigPath)
-        .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
+      return yield* new FileNotFound({ path: files[0].path })
     }),
-  version: "1.56.0",
+  version: VERSION,
 })

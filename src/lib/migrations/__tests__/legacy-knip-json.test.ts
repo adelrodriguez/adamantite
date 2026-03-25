@@ -7,7 +7,6 @@ import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { createPrompterTestContext } from "#commands/__tests__/command-test-helpers.ts"
-import knip from "#lib/integrations/tooling/knip.ts"
 import { legacyKnipJson } from "#lib/migrations/legacy-knip-json.ts"
 
 function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
@@ -38,22 +37,24 @@ describe("legacyKnipJson", () => {
     await Bun.write("knip.config.ts", "export default {}\n")
     await Bun.write("knip.json", "{}\n")
 
-    const layout = await runTestEffect(knip.exists(tempDir))
     const result = await runTestEffect(legacyKnipJson.check({ cwd: tempDir }))
 
     expect(result.status).toBe("valid")
-    expect(result.warnings).toEqual(layout.warnings)
+    expect(result.warnings).toEqual([
+      "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
+    ])
   })
 
   test("check warns when both legacy JSON and JSONC exist without a TS config", async () => {
     await Bun.write("knip.json", "{}\n")
     await Bun.write("knip.jsonc", '{ "entry": ["src/index.ts"] }\n')
 
-    const layout = await runTestEffect(knip.exists(tempDir))
     const result = await runTestEffect(legacyKnipJson.check({ cwd: tempDir }))
 
     expect(result.status).toBe("needs_migration")
-    expect(result.warnings).toEqual(layout.warnings)
+    expect(result.warnings).toEqual([
+      "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed.",
+    ])
   })
 
   test("migrate removes both legacy files when JSON and JSONC exist without knip.config.ts", async () => {

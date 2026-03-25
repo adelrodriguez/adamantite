@@ -31,15 +31,11 @@ function migrateLegacyKnipConfig(cwd: string) {
     const path = yield* Path.Path
     const state = yield* knip.exists(cwd)
 
-    if (state.format !== "json" && state.format !== "jsonc") {
+    if (state.active?.format !== "json" && state.active?.format !== "jsonc") {
       return
     }
 
-    const legacyConfigPath = state.path
-
-    if (!legacyConfigPath) {
-      return
-    }
+    const legacyConfigPath = state.active.path
 
     const configPath = path.join(cwd, knip.config)
     const legacyConfigContent = yield* fs
@@ -62,18 +58,14 @@ function migrateLegacyKnipConfig(cwd: string) {
       .remove(legacyConfigPath)
       .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
 
-    if (state.hasBothLegacyJsonFiles) {
-      const otherLegacyConfigPath = state.format === "jsonc" ? state.jsonPath : state.jsoncPath
+    const otherLegacyConfigPath = state.legacy[0]?.path ?? null
 
-      if (otherLegacyConfigPath && otherLegacyConfigPath !== legacyConfigPath) {
-        yield* fs
-          .remove(otherLegacyConfigPath)
-          .pipe(
-            Effect.mapError(
-              (cause) => new FailedToDeleteFile({ cause, path: otherLegacyConfigPath })
-            )
-          )
-      }
+    if (otherLegacyConfigPath && otherLegacyConfigPath !== legacyConfigPath) {
+      yield* fs
+        .remove(otherLegacyConfigPath)
+        .pipe(
+          Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: otherLegacyConfigPath }))
+        )
     }
   })
 }
@@ -82,17 +74,27 @@ export const legacyKnipJson = defineMigration({
   check: (context) =>
     Effect.gen(function* () {
       const state = yield* knip.exists(context.cwd)
-      const warnings = state.warnings
+      const warnings: string[] = []
+      if (state.active?.format === "ts" && state.legacy.length > 0) {
+        warnings.push(
+          "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`."
+        )
+      }
+      if (state.active && state.active.format !== "ts" && state.legacy.length > 0) {
+        warnings.push(
+          "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed."
+        )
+      }
 
-      if (state.format === "json" || state.format === "jsonc") {
+      if (state.active?.format === "json" || state.active?.format === "jsonc") {
         return {
           status: "needs_migration",
-          summary: getLegacyKnipSummary(state.format),
+          summary: getLegacyKnipSummary(state.active.format),
           warnings,
         }
       }
 
-      if (state.format === "ts") {
+      if (state.active?.format === "ts") {
         return { status: "valid", warnings }
       }
 
@@ -105,9 +107,9 @@ export const legacyKnipJson = defineMigration({
       const prompter = yield* Prompter
       const spinner = prompter.spinner()
       const state = yield* knip.exists(context.cwd)
-      const legacyConfigPaths = getLegacyConfigPaths()
-      const legacyConfigFile =
-        state.format === "jsonc" ? legacyConfigPaths[1] : legacyConfigPaths[0]
+      const legacyConfigFile = state.active?.path.endsWith(knip.files[2].path)
+        ? knip.files[2].path
+        : knip.files[1].path
 
       spinner.start(`Migrating \`${legacyConfigFile}\` to \`${knip.config}\`...`)
       yield* migrateLegacyKnipConfig(context.cwd)
@@ -119,7 +121,7 @@ export const legacyKnipJson = defineMigration({
     Effect.gen(function* () {
       const state = yield* knip.exists(context.cwd)
 
-      if (state.format !== "ts") {
+      if (state.active?.format !== "ts") {
         return yield* new MigrationValidationFailed({
           migrationId: "legacy-knip-json",
           reason: `\`${knip.config}\` is not the active Knip config.`,

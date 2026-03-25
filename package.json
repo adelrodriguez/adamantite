@@ -36,7 +36,10 @@
     "#presets/*": "./presets/*"
   },
   "exports": {
-    "./analyze": "./dist/presets/knip.json",
+    "./analyze": {
+      "types": "./dist/presets/analyze.d.ts",
+      "default": "./dist/presets/analyze.js"
+    },
     "./format": {
       "types": "./dist/presets/format.d.ts",
       "default": "./dist/presets/format.js"
@@ -53,7 +56,7 @@
   },
   "scripts": {
     "analyze": "bun run src/index.ts analyze",
-    "build": "bunup && cp presets/*.json dist/presets/",
+    "build": "bunup && cp presets/tsconfig.json dist/presets/",
     "bump:deps": "bun update --interactive",
     "check": "bun run src/index.ts check",
     "dev": "bunup --watch",

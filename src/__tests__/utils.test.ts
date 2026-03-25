@@ -12,7 +12,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Terminal from "effect/Terminal"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { isJsonObject, mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 import { checkCliExists } from "#lib/shared/process.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
@@ -246,6 +246,70 @@ describe("mergeConfig", () => {
     if (isLeft(result)) {
       expect(result.left).toMatchObject({ _tag: "FailedToMergeConfig" })
     }
+  })
+})
+
+describe("serializeTsObjectLiteral", () => {
+  test("serialize objects as TypeScript object literals", () => {
+    const result = serializeTsObjectLiteral({
+      enabled: true,
+      nested: {
+        count: 2,
+      },
+    })
+
+    expect(result).toBe(`{
+  enabled: true,
+  nested: {
+    count: 2
+  }
+}`)
+  })
+
+  test("keep non-identifier keys quoted", () => {
+    const result = serializeTsObjectLiteral({
+      "foo-bar": true,
+      validKey: false,
+    })
+
+    expect(result).toBe(`{
+  "foo-bar": true,
+  validKey: false
+}`)
+  })
+
+  test("indent continuation lines when embedding multiline values", () => {
+    const result = serializeTsObjectLiteral(
+      {
+        nested: {
+          flag: true,
+        },
+      },
+      { continuationIndent: "  " }
+    )
+
+    expect(result).toBe(`{
+    nested: {
+      flag: true
+    }
+  }`)
+  })
+
+  test("support custom indentation strings", () => {
+    const result = serializeTsObjectLiteral(
+      {
+        nested: {
+          flag: true,
+        },
+      },
+      { indentation: "    " }
+    )
+
+    expect(result).toBe(`{
+    nested: {
+        flag: true
+    }
+}`)
   })
 })
 

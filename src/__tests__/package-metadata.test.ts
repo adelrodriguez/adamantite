@@ -11,7 +11,10 @@ describe("package metadata", () => {
 
     expect(packageJson.main).toBe("dist/presets/lint/core.js")
     expect(packageJson.exports).toMatchObject({
-      "./analyze": "./dist/presets/knip.json",
+      "./analyze": {
+        default: "./dist/presets/analyze.js",
+        types: "./dist/presets/analyze.d.ts",
+      },
       "./format": {
         default: "./dist/presets/format.js",
         types: "./dist/presets/format.d.ts",

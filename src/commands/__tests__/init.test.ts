@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -13,6 +14,7 @@ import { knip } from "#lib/integrations/tooling/knip.ts"
 import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
 import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
 import { sherif } from "#lib/integrations/tooling/sherif.ts"
+import { inspectLegacyKnipConfig } from "#lib/migrations/legacy-knip-json.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
@@ -23,6 +25,12 @@ import {
 
 async function readJson<T = Record<string, unknown>>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T
+}
+
+async function knipWarningsForCwd(cwd: string) {
+  return Effect.runPromise(
+    inspectLegacyKnipConfig(cwd).pipe(Effect.provide(NodeServices.layer))
+  ).then((r) => r.warnings)
 }
 
 describe("init", () => {
@@ -99,8 +107,10 @@ describe("init", () => {
       const vscodeSettings = await readJson(join(tempDir, ".vscode", "settings.json"))
       expect(vscodeSettings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
 
-      const knipConfig = await readJson(join(tempDir, "knip.json"))
-      expect(knipConfig.$schema).toContain("knip")
+      const knipConfig = await readFile(join(tempDir, "knip.config.ts"), "utf8")
+      expect(knipConfig).toContain('import type { KnipConfig } from "knip"')
+      expect(knipConfig).toContain('import analyze from "adamantite/analyze"')
+      expect(knipConfig).toContain("const config: KnipConfig = analyze")
 
       expect(prompter.logs).toContainEqual({
         level: "info",
@@ -174,6 +184,71 @@ describe("init", () => {
       expect(oxfmtConfig).toContain('import format from "adamantite/format"')
       expect(oxfmtConfig).toContain("  ...format,")
       expect(oxfmtConfig).toContain("semi: true")
+    })
+  })
+
+  describe("knip config handling", () => {
+    test("migrate a legacy knip config into knip.config.ts", async () => {
+      await writeFile(
+        join(tempDir, "knip.jsonc"),
+        ["{", '  "entry": ["src/index.ts"],', '  "ignore": ["bunup.config.ts"],', "}", ""].join(
+          "\n"
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        multiselectResponses: [["analyze"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(false)
+
+      const knipConfig = await readFile(join(tempDir, "knip.config.ts"), "utf8")
+      expect(knipConfig).toContain('import analyze from "adamantite/analyze"')
+      expect(knipConfig).toContain("  ...analyze,")
+      expect(knipConfig).toContain('"src/index.ts"')
+      expect(knipConfig).toContain('"bunup.config.ts"')
+    })
+
+    test("migrate from knip.jsonc when both knip.json and knip.jsonc exist", async () => {
+      await writeFile(
+        join(tempDir, "knip.json"),
+        JSON.stringify({ entry: ["src/other.ts"] }, null, 2)
+      )
+      await writeFile(
+        join(tempDir, "knip.jsonc"),
+        ["{", '  "entry": ["src/index.ts"],', '  "ignore": ["bunup.config.ts"],', "}", ""].join(
+          "\n"
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        multiselectResponses: [["analyze"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const expectedKnipWarnings = await knipWarningsForCwd(tempDir)
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      for (const message of expectedKnipWarnings) {
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message,
+        })
+      }
+      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(false)
+      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(false)
+
+      const knipConfig = await readFile(join(tempDir, "knip.config.ts"), "utf8")
+      expect(knipConfig).toContain('"src/index.ts"')
+      expect(knipConfig).not.toContain("src/other.ts")
     })
   })
 
@@ -301,12 +376,42 @@ describe("init", () => {
       expect(await Bun.file(join(tempDir, ".zed", "settings.json")).exists()).toBe(true)
       expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
       expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(false)
+      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(false)
       expect(await Bun.file(join(tempDir, ".vscode", "settings.json")).exists()).toBe(false)
     })
   })
 
   describe("dual-config warnings", () => {
+    test("warn when both legacy and modern knip configs exist", async () => {
+      await writeFile(
+        join(tempDir, "knip.config.ts"),
+        'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = { entry: ["src/index.ts"] }\n\nexport default config\n'
+      )
+      await writeFile(
+        join(tempDir, "knip.json"),
+        JSON.stringify({ entry: ["src/main.ts"] }, null, 2)
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        multiselectResponses: [["analyze"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const expectedKnipWarnings = await knipWarningsForCwd(tempDir)
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      for (const message of expectedKnipWarnings) {
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message,
+        })
+      }
+      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
+    })
+
     test("warn when both legacy and modern oxfmt configs exist", async () => {
       await writeFile(
         join(tempDir, "oxfmt.config.ts"),

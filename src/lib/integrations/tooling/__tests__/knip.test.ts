@@ -6,17 +6,10 @@ import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
-import * as Layer from "effect/Layer"
-import * as PlatformError from "effect/PlatformError"
-import { parse } from "jsonc-parser"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
 import { knip } from "#lib/integrations/tooling/knip.ts"
 
 const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
-// Keep these schema URLs in sync with the major-version-pinned values in src/lib/integrations/tooling/knip.ts.
-const KNIP_JSON_SCHEMA_URL = "https://unpkg.com/knip@6/schema.json"
-const KNIP_JSONC_SCHEMA_URL = "https://unpkg.com/knip@6/schema-jsonc.json"
 
 describe("knip", () => {
   let originalCwd: string
@@ -35,101 +28,55 @@ describe("knip", () => {
 
   describe("exists", () => {
     test("return null when no knip config is present", async () => {
-      const { path } = await knip
+      const result = await knip
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      expect(path).toBe(null)
+      expect(result).toEqual({
+        format: null,
+        path: null,
+        tsPath: null,
+      })
     })
 
-    test("detect knip.json when present", async () => {
-      await Bun.write("knip.json", JSON.stringify({}))
+    test("detect knip.config.ts when present", async () => {
+      await Bun.write("knip.config.ts", "export default {}\n")
 
-      const { path } = await knip
+      const result = await knip
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      expect(path).toEndWith("knip.json")
-    })
-
-    test("detect knip.jsonc when present", async () => {
-      await Bun.write("knip.jsonc", "{}")
-
-      const { path } = await knip
-        .exists(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-
-      expect(path).toContain("knip.jsonc")
-    })
-
-    test("prefer knip.json when both config formats exist", async () => {
-      await Bun.write("knip.json", JSON.stringify({ entry: ["src/index.ts"] }, null, 2))
-      await Bun.write("knip.jsonc", "{}")
-
-      const { path } = await knip
-        .exists(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-
-      expect(path).toEndWith("knip.json")
+      expect(result.format).toBe("ts")
+      expect(result.path).toContain("knip.config.ts")
+      expect(result.tsPath).toContain("knip.config.ts")
     })
   })
 
   describe("create", () => {
-    test("create knip.json with the preset config", async () => {
+    test("create knip.config.ts with the preset config", async () => {
       await knip.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const { path } = await knip
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      expect(path).toContain("knip.json")
+      expect(path).toContain("knip.config.ts")
 
-      const config = await Bun.file("knip.json").json()
-      expect(config).toEqual(knip.config)
+      const content = await Bun.file("knip.config.ts").text()
+      expect(content).toContain('import type { KnipConfig } from "knip"')
+      expect(content).toContain('import analyze from "adamantite/analyze"')
+      expect(content).toContain("const config: KnipConfig = analyze")
+      expect(content).toContain("export default config")
     })
   })
 
   describe("update", () => {
-    test("merge an existing knip.json config without dropping user entries", async () => {
-      await Bun.write(
-        "knip.json",
-        JSON.stringify(
-          {
-            entry: ["src/main.ts"],
-          },
-          null,
-          2
-        )
-      )
+    test("do nothing when knip.config.ts already exists", async () => {
+      const originalContent = "export default { entry: ['src/index.ts'] }\n"
+      await Bun.write("knip.config.ts", originalContent)
 
       await knip.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const config = await Bun.file("knip.json").json()
-      expect(config.entry).toEqual(["src/main.ts"])
-      expect(config.$schema).toBe(KNIP_JSON_SCHEMA_URL)
-      expect(config.rules).toEqual(knip.config.rules)
-    })
-
-    test("write the jsonc schema when updating knip.jsonc", async () => {
-      await Bun.write("knip.jsonc", "{}")
-
-      await knip.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-
-      const content = await Bun.file("knip.jsonc").text()
-      const config = parse(content)
-
-      expect(config.$schema).toBe(KNIP_JSONC_SCHEMA_URL)
-      expect(config.rules).toEqual(knip.config.rules)
-    })
-
-    test("merge an empty knip config with the preset", async () => {
-      await Bun.write("knip.json", "{}")
-
-      await knip.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-
-      const config = await Bun.file("knip.json").json()
-      expect(config.$schema).toBe(KNIP_JSON_SCHEMA_URL)
-      expect(config.ignoreFiles).toEqual(knip.config.ignoreFiles)
-      expect(config.ignore).toEqual(knip.config.ignore)
+      expect(await Bun.file("knip.config.ts").text()).toBe(originalContent)
     })
 
     test("return FileNotFound when no knip config exists", async () => {
@@ -138,42 +85,6 @@ describe("knip", () => {
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FileNotFound" })
-      }
-    })
-
-    test("return FailedToReadFile when the config cannot be read", async () => {
-      const fileSystemLayer = FileSystem.layerNoop({
-        exists: (path) => Effect.succeed(path.endsWith("knip.json")),
-        readFileString: () =>
-          Effect.fail(
-            PlatformError.systemError({
-              _tag: "Unknown",
-              cause: new Error("Simulated read failure"),
-              method: "readFileString",
-              module: "FileSystem",
-            })
-          ),
-      })
-
-      const result = await runEither(
-        knip.update(tempDir),
-        fileSystemLayer.pipe(Layer.provideMerge(NodeServices.layer))
-      )
-
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
-      }
-    })
-
-    test("return InvalidConfigFormat when the config is not a JSON object", async () => {
-      await Bun.write("knip.json", "[]")
-
-      const result = await runEither(knip.update(tempDir), NodeServices.layer)
-
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
       }
     })
   })

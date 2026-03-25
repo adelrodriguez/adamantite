@@ -7,10 +7,7 @@ import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { createPrompterTestContext } from "#commands/__tests__/command-test-helpers.ts"
-import {
-  DUAL_LEGACY_OXFMT_JSON_FILES_WARNING,
-  legacyOxfmtJson,
-} from "#lib/migrations/legacy-oxfmt-json.ts"
+import { legacyOxfmtJson } from "#lib/migrations/legacy-oxfmt-json.ts"
 
 function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
   const prompterContext = createPrompterTestContext()
@@ -91,7 +88,9 @@ describe("legacyOxfmtJson", () => {
     const result = await runTestEffect(legacyOxfmtJson.check({ cwd: tempDir }))
 
     expect(result.status).toBe("needs_migration")
-    expect(result.warnings).toEqual([DUAL_LEGACY_OXFMT_JSON_FILES_WARNING])
+    expect(result.warnings).toEqual([
+      "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Adamantite migrates from `.oxfmtrc.jsonc` and removes the other file.",
+    ])
   })
 
   test("migrate removes both legacy files when JSON and JSONC exist without oxfmt.config.ts", async () => {

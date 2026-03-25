@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import { knip } from "#lib/integrations/tooling/knip.ts"
+import knip from "#lib/integrations/tooling/knip.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 

@@ -7,7 +7,8 @@ import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { createPrompterTestContext } from "#commands/__tests__/command-test-helpers.ts"
-import { inspectLegacyKnipConfig, legacyKnipJson } from "#lib/migrations/legacy-knip-json.ts"
+import knip from "#lib/integrations/tooling/knip.ts"
+import { legacyKnipJson } from "#lib/migrations/legacy-knip-json.ts"
 
 function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
   const prompterContext = createPrompterTestContext()
@@ -37,7 +38,7 @@ describe("legacyKnipJson", () => {
     await Bun.write("knip.config.ts", "export default {}\n")
     await Bun.write("knip.json", "{}\n")
 
-    const layout = await runTestEffect(inspectLegacyKnipConfig(tempDir))
+    const layout = await runTestEffect(knip.exists(tempDir))
     const result = await runTestEffect(legacyKnipJson.check({ cwd: tempDir }))
 
     expect(result.status).toBe("valid")
@@ -48,7 +49,7 @@ describe("legacyKnipJson", () => {
     await Bun.write("knip.json", "{}\n")
     await Bun.write("knip.jsonc", '{ "entry": ["src/index.ts"] }\n')
 
-    const layout = await runTestEffect(inspectLegacyKnipConfig(tempDir))
+    const layout = await runTestEffect(knip.exists(tempDir))
     const result = await runTestEffect(legacyKnipJson.check({ cwd: tempDir }))
 
     expect(result.status).toBe("needs_migration")

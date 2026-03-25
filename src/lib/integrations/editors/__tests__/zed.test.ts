@@ -6,7 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { zed } from "#lib/integrations/editors/zed.ts"
+import zed from "#lib/integrations/editors/zed.ts"
 
 describe("zed", () => {
   let tempDir: string

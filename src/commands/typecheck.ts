@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import { oxlint } from "#lib/integrations/tooling/oxlint.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"

@@ -1,20 +1,16 @@
+import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { type PackageManagerName, runScriptCommand } from "nypm"
-import type { Script } from "#lib/workspace/scripts.ts"
+import type { Script } from "#lib/workspace/package-json.ts"
+import { defineIntegration } from "#lib/integrations/base.ts"
 import { FailedToWriteFile } from "#lib/shared/errors.ts"
 import { ensureDirectory } from "#lib/shared/filesystem.ts"
+import { getCIWorkflowEntries } from "#lib/workspace/ci-scripts.ts"
 
 interface WorkflowOptions {
   packageManager: PackageManagerName
   scripts: Script[]
-}
-
-interface MatrixScriptEntry {
-  script: Script
-  name: string
-  args?: string[]
 }
 
 const setupSteps: Record<PackageManagerName, string> = {
@@ -38,13 +34,11 @@ const setupSteps: Record<PackageManagerName, string> = {
 
       - name: Install dependencies
         run: bun install --frozen-lockfile`,
-
   deno: `      - name: Setup Deno
         uses: denoland/setup-deno@v2
 
       - name: Install dependencies
         run: deno install --frozen`,
-
   npm: `      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -53,7 +47,6 @@ const setupSteps: Record<PackageManagerName, string> = {
 
       - name: Install dependencies
         run: npm ci`,
-
   pnpm: `      - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -65,7 +58,6 @@ const setupSteps: Record<PackageManagerName, string> = {
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile`,
-
   yarn: `      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
@@ -76,36 +68,13 @@ const setupSteps: Record<PackageManagerName, string> = {
         run: yarn install --frozen-lockfile`,
 }
 
-const MATRIX_SCRIPT_ENTRIES: MatrixScriptEntry[] = [
-  { name: "check", script: "check" },
-  { args: ["--check"], name: "format", script: "format" },
-  { name: "monorepo", script: "check:monorepo" },
-  { name: "analyze", script: "analyze" },
-]
-
 function generateWorkflow({ packageManager, scripts }: WorkflowOptions): string | null {
-  const matrixEntries: Array<{ name: string; command: string }> = []
+  const matrixEntries = getCIWorkflowEntries(packageManager, scripts)
 
-  // Map scripts to matrix entries
-  for (const entry of MATRIX_SCRIPT_ENTRIES) {
-    if (!scripts.includes(entry.script)) {
-      continue
-    }
-
-    matrixEntries.push({
-      command: runScriptCommand(packageManager, entry.script, {
-        args: entry.args,
-      }),
-      name: entry.name,
-    })
-  }
-
-  // Return null if no CI-compatible scripts were selected
   if (matrixEntries.length === 0) {
     return null
   }
 
-  // Format matrix entries as YAML
   const matrixInclude = matrixEntries
     .map((entry) => `          - name: ${entry.name}\n            command: ${entry.command}`)
     .join("\n")
@@ -149,26 +118,16 @@ ${setupSteps[packageManager]}
   return `${workflow}\n`
 }
 
-/** CI-compatible scripts that can be run in GitHub Actions */
-const CI_COMPATIBLE_SCRIPTS = new Set<Script>(MATRIX_SCRIPT_ENTRIES.map((entry) => entry.script))
+const files = [{ path: ".github/workflows/adamantite.yml", type: "ci" }] as const
 
-/**
- * Check if any CI-compatible scripts are in the list.
- * CI-compatible scripts are: check, format, check:monorepo, analyze
- */
-export function hasCICompatibleScripts(scripts: Script[]): boolean {
-  return scripts.some((script) => CI_COMPATIBLE_SCRIPTS.has(script))
-}
-
-export const github = {
+export default defineIntegration({
   create: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const workflowDir = path.join(cwd, ".github", "workflows")
+      const workflowPath = path.join(cwd, files[0].path)
 
-      // Create .github/workflows directory if it doesn't exist
-      yield* ensureDirectory(workflowDir)
+      yield* ensureDirectory(path.dirname(workflowPath))
 
       const workflowContent = generateWorkflow(options)
 
@@ -176,24 +135,24 @@ export const github = {
         return
       }
 
-      const workflowPath = path.join(workflowDir, "adamantite.yml")
       yield* fs
         .writeFileString(workflowPath, workflowContent)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
     }),
-
   exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      return yield* fs.exists(path.join(cwd, ".github", "workflows", "adamantite.yml"))
+      return yield* fs.exists(path.join(cwd, files[0].path))
     }),
-
+  files,
+  kind: "ci",
+  name: "github",
   update: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const workflowPath = path.join(cwd, ".github", "workflows", "adamantite.yml")
+      const workflowPath = path.join(cwd, files[0].path)
       const workflowContent = generateWorkflow(options)
 
       if (!workflowContent) {
@@ -204,6 +163,4 @@ export const github = {
         .writeFileString(workflowPath, workflowContent)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
     }),
-
-  workflowPath: ".github/workflows/adamantite.yml",
-}
+})

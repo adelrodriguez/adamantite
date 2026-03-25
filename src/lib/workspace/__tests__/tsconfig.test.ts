@@ -6,9 +6,9 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { typescriptConfig } from "#lib/workspace/typescript-config.ts"
+import tsconfig from "#lib/workspace/tsconfig.ts"
 
-describe("typescriptConfig", () => {
+describe("tsconfig", () => {
   let originalCwd: string
   let tempDir: string
 
@@ -25,7 +25,7 @@ describe("typescriptConfig", () => {
 
   describe("exists", () => {
     test("detect when tsconfig.json does not exist", async () => {
-      const exists = await typescriptConfig
+      const exists = await tsconfig
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
@@ -35,11 +35,9 @@ describe("typescriptConfig", () => {
 
   describe("create", () => {
     test("create tsconfig.json with the correct config", async () => {
-      await typescriptConfig
-        .create(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await tsconfig.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const exists = await typescriptConfig
+      const exists = await tsconfig
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
@@ -55,7 +53,7 @@ describe("typescriptConfig", () => {
       mkdirSync("readonly-dir", { recursive: true })
       chmodSync("readonly-dir", 0o555)
 
-      const result = await runEither(typescriptConfig.create(join(tempDir, "readonly-dir")))
+      const result = await runEither(tsconfig.create(join(tempDir, "readonly-dir")))
 
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
@@ -80,14 +78,12 @@ describe("typescriptConfig", () => {
         )
       )
 
-      const existsBefore = await typescriptConfig
+      const existsBefore = await tsconfig
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore).toBe(true)
 
-      await typescriptConfig
-        .update(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -115,9 +111,7 @@ describe("typescriptConfig", () => {
         )
       )
 
-      await typescriptConfig
-        .update(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -129,9 +123,7 @@ describe("typescriptConfig", () => {
     test("merge an empty config with Adamantite's config", async () => {
       await Bun.write("tsconfig.json", "{}")
 
-      await typescriptConfig
-        .update(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
@@ -142,7 +134,7 @@ describe("typescriptConfig", () => {
     test("return InvalidConfigFormat when tsconfig.json is not a JSON object", async () => {
       await Bun.write("tsconfig.json", "true")
 
-      const result = await runEither(typescriptConfig.update(tempDir))
+      const result = await runEither(tsconfig.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
@@ -150,7 +142,7 @@ describe("typescriptConfig", () => {
     })
 
     test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runEither(typescriptConfig.update(tempDir))
+      const result = await runEither(tsconfig.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
@@ -168,7 +160,7 @@ describe("typescriptConfig", () => {
       )
       chmodSync("tsconfig.json", 0o444)
 
-      const result = await runEither(typescriptConfig.update(tempDir))
+      const result = await runEither(tsconfig.update(tempDir))
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })

@@ -10,11 +10,11 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import initCommand from "#commands/init.ts"
-import { knip } from "#lib/integrations/tooling/knip.ts"
-import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
-import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
-import { sherif } from "#lib/integrations/tooling/sherif.ts"
-import { inspectLegacyKnipConfig } from "#lib/migrations/legacy-knip-json.ts"
+import knip from "#lib/integrations/tooling/knip.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import sherif from "#lib/integrations/tooling/sherif.ts"
+import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
@@ -28,9 +28,9 @@ async function readJson<T = Record<string, unknown>>(path: string): Promise<T> {
 }
 
 async function knipWarningsForCwd(cwd: string) {
-  return Effect.runPromise(
-    inspectLegacyKnipConfig(cwd).pipe(Effect.provide(NodeServices.layer))
-  ).then((r) => r.warnings)
+  return Effect.runPromise(knip.exists(cwd).pipe(Effect.provide(NodeServices.layer))).then(
+    (r) => r.warnings
+  )
 }
 
 describe("init", () => {
@@ -157,7 +157,7 @@ describe("init", () => {
   })
 
   describe("oxfmt config handling", () => {
-    test("migrate a legacy oxfmt config into oxfmt.config.ts", async () => {
+    test("keep a legacy oxfmt config in place during init", async () => {
       await writeFile(
         join(tempDir, ".oxfmtrc.json"),
         JSON.stringify(
@@ -178,17 +178,21 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(false)
+      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(false)
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message:
+          "Legacy `.oxfmtrc.json` was preserved during `adamantite init`. `adamantite init` does not migrate legacy oxfmt configs yet.",
+      })
 
-      const oxfmtConfig = await readFile(join(tempDir, "oxfmt.config.ts"), "utf8")
-      expect(oxfmtConfig).toContain('import format from "adamantite/format"')
-      expect(oxfmtConfig).toContain("  ...format,")
-      expect(oxfmtConfig).toContain("semi: true")
+      const oxfmtConfig = await readFile(join(tempDir, ".oxfmtrc.json"), "utf8")
+      expect(oxfmtConfig).toContain('"semi": true')
     })
   })
 
   describe("knip config handling", () => {
-    test("migrate a legacy knip config into knip.config.ts", async () => {
+    test("keep a legacy knip config in place during init", async () => {
       await writeFile(
         join(tempDir, "knip.jsonc"),
         ["{", '  "entry": ["src/index.ts"],', '  "ignore": ["bunup.config.ts"],', "}", ""].join(
@@ -205,16 +209,20 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(false)
+      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(false)
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message:
+          "Legacy `knip.jsonc` was preserved during `adamantite init`. `adamantite init` does not migrate legacy knip configs yet.",
+      })
 
-      const knipConfig = await readFile(join(tempDir, "knip.config.ts"), "utf8")
-      expect(knipConfig).toContain('import analyze from "adamantite/analyze"')
-      expect(knipConfig).toContain("  ...analyze,")
+      const knipConfig = await readFile(join(tempDir, "knip.jsonc"), "utf8")
       expect(knipConfig).toContain('"src/index.ts"')
       expect(knipConfig).toContain('"bunup.config.ts"')
     })
 
-    test("migrate from knip.jsonc when both knip.json and knip.jsonc exist", async () => {
+    test("keep legacy knip configs in place when both knip.json and knip.jsonc exist", async () => {
       await writeFile(
         join(tempDir, "knip.json"),
         JSON.stringify({ entry: ["src/other.ts"] }, null, 2)
@@ -243,12 +251,14 @@ describe("init", () => {
           message,
         })
       }
-      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(false)
-
-      const knipConfig = await readFile(join(tempDir, "knip.config.ts"), "utf8")
-      expect(knipConfig).toContain('"src/index.ts"')
-      expect(knipConfig).not.toContain("src/other.ts")
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message:
+          "Legacy `knip.jsonc` was preserved during `adamantite init`. `adamantite init` does not migrate legacy knip configs yet.",
+      })
+      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(false)
     })
   })
 

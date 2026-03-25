@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { defineTooling } from "#lib/integrations/tooling/base.ts"
+import { defineIntegration } from "#lib/integrations/base.ts"
 import {
   FailedToDeleteFile,
   FailedToReadFile,
@@ -11,8 +11,11 @@ import {
 } from "#lib/shared/errors.ts"
 import { isJsonObject, parseJson } from "#lib/shared/json.ts"
 
-const CONFIG_FILE = "oxlint.config.ts"
-const LEGACY_CONFIG_FILE = ".oxlintrc.json"
+const files = [
+  { path: "oxlint.config.ts", type: "config" },
+  { path: ".oxlintrc.json", type: "legacy_config" },
+] as const
+
 const ADAMANTITE_NODE_MODULES_PRESET_REGEX =
   /^(?:\.\/)?node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/
 const ADAMANTITE_EXPORT_PRESET_REGEX = /^adamantite\/lint(?:\/([a-z0-9-]+))?$/
@@ -71,15 +74,16 @@ function toTsConfigContent(
     .map(([key, value]) => `  ${key}: ${value},`)
     .join("\n")
 
-  return [...imports, "", `export default defineConfig({`, body, `})`, ""].join("\n")
+  return [...imports, "", "export default defineConfig({", body, "})", ""].join("\n")
 }
 
-export const oxlint = defineTooling({
+export default defineIntegration({
+  config: files[0].path,
   create: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE)
+      const configPath = path.join(cwd, files[0].path)
       const payload = toTsConfigContent({}, getPresetNames(presets))
 
       yield* fs
@@ -90,8 +94,8 @@ export const oxlint = defineTooling({
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const tsPath = path.join(cwd, CONFIG_FILE)
-      const jsonPath = path.join(cwd, LEGACY_CONFIG_FILE)
+      const tsPath = path.join(cwd, files[0].path)
+      const jsonPath = path.join(cwd, files[1].path)
       const hasTs = yield* fs.exists(tsPath)
       const hasJson = yield* fs.exists(jsonPath)
 
@@ -106,13 +110,15 @@ export const oxlint = defineTooling({
         tsPath: hasTs ? tsPath : null,
       }
     }),
+  files,
+  kind: "tooling",
   name: "oxlint",
   update: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const tsPath = path.join(cwd, CONFIG_FILE)
-      const jsonPath = path.join(cwd, LEGACY_CONFIG_FILE)
+      const tsPath = path.join(cwd, files[0].path)
+      const jsonPath = path.join(cwd, files[1].path)
       const hasTs = yield* fs.exists(tsPath)
       const hasJson = yield* fs.exists(jsonPath)
 
@@ -121,11 +127,11 @@ export const oxlint = defineTooling({
       }
 
       if (!hasJson) {
-        return yield* new FileNotFound({ path: LEGACY_CONFIG_FILE })
+        return yield* new FileNotFound({ path: files[1].path })
       }
 
       const legacyConfigPath = jsonPath
-      const configPath = path.join(cwd, CONFIG_FILE)
+      const configPath = path.join(cwd, files[0].path)
 
       const legacyConfigContent = yield* fs
         .readFileString(legacyConfigPath)
@@ -174,9 +180,4 @@ export const oxlint = defineTooling({
         .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
     }),
   version: "1.56.0",
-})
-
-export const tsgolint = defineTooling({
-  name: "oxlint-tsgolint",
-  version: "0.17.2",
 })

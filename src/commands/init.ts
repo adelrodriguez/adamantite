@@ -4,29 +4,23 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Command from "effect/unstable/cli/Command"
-import type { Script } from "#lib/workspace/scripts.ts"
-import { github, hasCICompatibleScripts } from "#lib/integrations/ci/github.ts"
-import { vscode } from "#lib/integrations/editors/vscode.ts"
-import { zed } from "#lib/integrations/editors/zed.ts"
-import { knip } from "#lib/integrations/tooling/knip.ts"
-import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
-import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
-import { sherif } from "#lib/integrations/tooling/sherif.ts"
-import {
-  inspectLegacyKnipConfig,
-  migrateLegacyKnipConfig,
-} from "#lib/migrations/legacy-knip-json.ts"
-import {
-  inspectLegacyOxfmtConfig,
-  migrateLegacyOxfmtConfig,
-} from "#lib/migrations/legacy-oxfmt-json.ts"
+import type { Script } from "#lib/workspace/package-json.ts"
+import github from "#lib/integrations/ci/github.ts"
+import vscode from "#lib/integrations/editors/vscode.ts"
+import zed from "#lib/integrations/editors/zed.ts"
+import knip from "#lib/integrations/tooling/knip.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import sherif from "#lib/integrations/tooling/sherif.ts"
+import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#lib/shared/errors.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
+import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { typescriptConfig } from "#lib/workspace/typescript-config.ts"
+import tsconfig from "#lib/workspace/tsconfig.ts"
 
 const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
@@ -52,6 +46,17 @@ const installDependencies = (cwd: string, packages: string[]) =>
     spinner.stop("Dependencies installed.")
   })
 
+function logLegacyConfigPreservedMessage(tool: string, configPath: string) {
+  return Effect.gen(function* () {
+    const prompter = yield* Prompter
+
+    // TODO: Point users to `adamantite doctor` / `adamantite doctor --fix` once doctor lands.
+    yield* prompter.log.info(
+      `Legacy \`${configPath}\` was preserved during \`adamantite init\`. \`adamantite init\` does not migrate legacy ${tool} configs yet.`
+    )
+  })
+}
+
 const setupOxlintConfig = (cwd: string, presets: string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
@@ -59,25 +64,26 @@ const setupOxlintConfig = (cwd: string, presets: string[]) =>
     spinner.start("Setting up oxlint config...")
 
     const exists = yield* oxlint.exists(cwd)
+    const oxlintLegacyConfig = oxlint.files[1].path
 
     if (exists.hasBoth) {
       yield* prompter.log.warning(
-        "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`."
+        `Found both \`${oxlint.config}\` and \`${oxlintLegacyConfig}\`. Adamantite will use \`${oxlint.config}\`.`
       )
     }
 
     if (exists.format === "json") {
-      spinner.message("Found `.oxlintrc.json`, migrating to `oxlint.config.ts`...")
+      spinner.message(`Found \`${oxlintLegacyConfig}\`, migrating to \`${oxlint.config}\`...`)
 
       yield* oxlint.update(cwd, presets)
 
       spinner.stop("oxlint config migrated successfully.")
     } else if (exists.format === "ts") {
-      spinner.message("Found `oxlint.config.ts`, keeping existing config.")
+      spinner.message(`Found \`${oxlint.config}\`, keeping existing config.`)
 
       spinner.stop("oxlint config is ready.")
     } else {
-      spinner.message("`oxlint.config.ts` not found, creating...")
+      spinner.message(`\`${oxlint.config}\` not found, creating...`)
 
       yield* oxlint.create(cwd, presets)
 
@@ -91,26 +97,25 @@ const setupOxfmtConfig = (cwd: string) =>
     const spinner = prompter.spinner()
     spinner.start("Setting up oxfmt config...")
 
-    const exists = yield* inspectLegacyOxfmtConfig(cwd)
+    const exists = yield* oxfmt.exists(cwd)
 
     for (const warning of exists.warnings) {
       yield* prompter.log.warning(warning)
     }
 
     if (exists.format === "json" || exists.format === "jsonc") {
-      const legacyConfigFile = exists.format === "json" ? ".oxfmtrc.json" : ".oxfmtrc.jsonc"
+      const legacyConfigFile = exists.format === "json" ? oxfmt.files[1].path : oxfmt.files[2].path
 
-      spinner.message(`Found \`${legacyConfigFile}\`, migrating to \`oxfmt.config.ts\`...`)
+      spinner.message(`Found \`${legacyConfigFile}\`, keeping existing config.`)
 
-      yield* migrateLegacyOxfmtConfig(cwd)
-
-      spinner.stop("oxfmt config migrated successfully.")
+      spinner.stop("oxfmt config is ready.")
+      yield* logLegacyConfigPreservedMessage("oxfmt", legacyConfigFile)
     } else if (exists.format === "ts") {
-      spinner.message("Found `oxfmt.config.ts`, keeping existing config.")
+      spinner.message(`Found \`${oxfmt.config}\`, keeping existing config.`)
 
       spinner.stop("oxfmt config is ready.")
     } else {
-      spinner.message("`oxfmt.config.ts` not found, creating...")
+      spinner.message(`\`${oxfmt.config}\` not found, creating...`)
 
       yield* oxfmt.create(cwd)
 
@@ -168,26 +173,25 @@ const setupKnipConfig = (cwd: string) =>
     const spinner = prompter.spinner()
     spinner.start("Setting up knip config...")
 
-    const exists = yield* inspectLegacyKnipConfig(cwd)
+    const exists = yield* knip.exists(cwd)
 
     for (const warning of exists.warnings) {
       yield* prompter.log.warning(warning)
     }
 
     if (exists.format === "json" || exists.format === "jsonc") {
-      const legacyConfigFile = exists.format === "json" ? "knip.json" : "knip.jsonc"
+      const legacyConfigFile = exists.format === "json" ? knip.files[1].path : knip.files[2].path
 
-      spinner.message(`Found \`${legacyConfigFile}\`, migrating to \`knip.config.ts\`...`)
+      spinner.message(`Found \`${legacyConfigFile}\`, keeping existing config.`)
 
-      yield* migrateLegacyKnipConfig(cwd)
-
-      spinner.stop("knip config migrated successfully.")
+      spinner.stop("knip config is ready.")
+      yield* logLegacyConfigPreservedMessage("knip", legacyConfigFile)
     } else if (exists.format === "ts") {
-      spinner.message("Found `knip.config.ts`, keeping existing config.")
+      spinner.message(`Found \`${knip.config}\`, keeping existing config.`)
 
       spinner.stop("knip config is ready.")
     } else {
-      spinner.message("`knip.config.ts` not found, creating...")
+      spinner.message(`\`${knip.config}\` not found, creating...`)
 
       yield* knip.create(cwd)
 
@@ -201,20 +205,20 @@ const setupTypescript = (cwd: string) =>
     const spinner = prompter.spinner()
     spinner.start("Setting up TypeScript config...")
 
-    const typescriptExists = yield* typescriptConfig.exists(cwd)
+    const typescriptExists = yield* tsconfig.exists(cwd)
 
     if (typescriptExists) {
-      spinner.message("`tsconfig.json` found, updating...")
+      spinner.message(`\`${tsconfig.config}\` found, updating...`)
 
-      yield* typescriptConfig.update(cwd)
+      yield* tsconfig.update(cwd)
 
-      spinner.stop("`tsconfig.json` updated successfully")
+      spinner.stop(`\`${tsconfig.config}\` updated successfully`)
     } else {
-      spinner.message("`tsconfig.json` not found, creating...")
+      spinner.message(`\`${tsconfig.config}\` not found, creating...`)
 
-      yield* typescriptConfig.create(cwd)
+      yield* tsconfig.create(cwd)
 
-      spinner.stop("`tsconfig.json` created successfully")
+      spinner.stop(`\`${tsconfig.config}\` created successfully`)
     }
   })
 
@@ -224,34 +228,34 @@ const setupEditors = (cwd: string, editors: string[]) =>
     if (editors.includes("vscode")) {
       const spinner = prompter.spinner()
 
-      spinner.start("Checking for `.vscode/settings.json`...")
+      spinner.start(`Checking for \`${vscode.config}\`...`)
 
       const hasVscodeSettings = yield* vscode.exists(cwd)
       if (hasVscodeSettings) {
-        spinner.message("`.vscode/settings.json` found, updating...")
+        spinner.message(`\`${vscode.config}\` found, updating...`)
         yield* vscode.update(cwd)
-        spinner.stop("`.vscode/settings.json` updated with Adamantite preset.")
+        spinner.stop(`\`${vscode.config}\` updated with Adamantite preset.`)
       } else {
-        spinner.message("`.vscode/settings.json` not found, creating...")
+        spinner.message(`\`${vscode.config}\` not found, creating...`)
         yield* vscode.create(cwd)
-        spinner.stop("`.vscode/settings.json` created with Adamantite preset.")
+        spinner.stop(`\`${vscode.config}\` created with Adamantite preset.`)
       }
     }
 
     if (editors.includes("zed")) {
       const spinner = prompter.spinner()
 
-      spinner.start("Checking for `.zed/settings.json`...")
+      spinner.start(`Checking for \`${zed.config}\`...`)
 
       const hasZedSettings = yield* zed.exists(cwd)
       if (hasZedSettings) {
-        spinner.message("`.zed/settings.json` found, updating...")
+        spinner.message(`\`${zed.config}\` found, updating...`)
         yield* zed.update(cwd)
-        spinner.stop("`.zed/settings.json` updated with Adamantite preset.")
+        spinner.stop(`\`${zed.config}\` updated with Adamantite preset.`)
       } else {
-        spinner.message("`.zed/settings.json` not found, creating...")
+        spinner.message(`\`${zed.config}\` not found, creating...`)
         yield* zed.create(cwd)
-        spinner.stop("`.zed/settings.json` created with Adamantite preset.")
+        spinner.stop(`\`${zed.config}\` created with Adamantite preset.`)
       }
     }
   })
@@ -316,13 +320,14 @@ const setupGitHubActions = (cwd: string, packageManager: PackageManagerName, scr
     spinner.start("Setting up GitHub Actions workflow...")
 
     const workflowExists = yield* github.exists(cwd)
+    const workflowPath = github.files[0].path
 
     if (workflowExists) {
-      spinner.message("`.github/workflows/adamantite.yml` found, updating...")
+      spinner.message(`\`${workflowPath}\` found, updating...`)
       yield* github.update(cwd, { packageManager, scripts })
       spinner.stop("GitHub Actions workflow updated successfully.")
     } else {
-      spinner.message("Creating `.github/workflows/adamantite.yml`...")
+      spinner.message(`Creating \`${workflowPath}\`...`)
       yield* github.create(cwd, { packageManager, scripts })
       spinner.stop("GitHub Actions workflow created successfully.")
     }

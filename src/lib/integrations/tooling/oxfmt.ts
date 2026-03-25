@@ -1,99 +1,89 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { defineTooling } from "#lib/integrations/tooling/base.ts"
+import { defineIntegration } from "#lib/integrations/base.ts"
 import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
-import { isJsonObject, serializeTsObjectLiteral } from "#lib/shared/json.ts"
-import preset from "#presets/format.ts"
+import { toOxfmtTsConfigContent } from "#lib/workspace/oxfmt-config.ts"
 
-export const CONFIG_FILE = "oxfmt.config.ts"
+const files = [
+  { path: "oxfmt.config.ts", type: "config" },
+  { path: ".oxfmtrc.json", type: "legacy_config" },
+  { path: ".oxfmtrc.jsonc", type: "legacy_config" },
+] as const
 
-/** Top-level keys whose values are merged with Adamantite preset objects at runtime. */
-const NESTED_MERGE_KEYS = new Set(["sortImports", "sortPackageJson", "sortTailwindcss"])
+const DUAL_OXFMT_CONFIG_WARNING =
+  "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`."
 
-function serializeNestedMergeEntry(key: string, value: Record<string, unknown>): string {
-  const raw = serializeTsObjectLiteral(value)
-  const lines = raw.split("\n")
+const DUAL_LEGACY_OXFMT_JSON_FILES_WARNING =
+  "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
 
-  if (lines.length <= 2) {
-    return [`  ${key}: {`, `    ...format.${key},`, `  },`].join("\n")
-  }
-
-  const body = lines
-    .slice(1, -1)
-    .map((line) => `    ${line.trimStart()}`)
-    .join("\n")
-
-  return [`  ${key}: {`, `    ...format.${key},`, body, `  },`].join("\n")
-}
-
-export function toTsConfigContent(config: Record<string, unknown> = {}) {
-  const configEntries = Object.entries(config).map(([key, value]) => {
-    if (NESTED_MERGE_KEYS.has(key) && isJsonObject(value)) {
-      return serializeNestedMergeEntry(key, value)
-    }
-
-    const serialized = serializeTsObjectLiteral(value, { continuationIndent: "  " })
-
-    return `  ${key}: ${serialized},`
-  })
-
-  if (configEntries.length === 0) {
-    return [
-      'import { defineConfig } from "oxfmt"',
-      'import format from "adamantite/format"',
-      "",
-      "export default defineConfig(format)",
-      "",
-    ].join("\n")
-  }
-
-  return [
-    'import { defineConfig } from "oxfmt"',
-    'import format from "adamantite/format"',
-    "",
-    "export default defineConfig({",
-    "  ...format,",
-    ...configEntries,
-    "})",
-    "",
-  ].join("\n")
-}
-
-export const oxfmt = defineTooling({
-  config: preset,
+export default defineIntegration({
+  config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE)
+      const configPath = path.join(cwd, files[0].path)
 
       yield* fs
-        .writeFileString(configPath, toTsConfigContent())
+        .writeFileString(configPath, toOxfmtTsConfigContent())
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const tsPath = path.join(cwd, CONFIG_FILE)
+      const tsPath = path.join(cwd, files[0].path)
+      const jsonPath = path.join(cwd, files[1].path)
+      const jsoncPath = path.join(cwd, files[2].path)
       const hasTs = yield* fs.exists(tsPath)
+      const hasJson = yield* fs.exists(jsonPath)
+      const hasJsonc = yield* fs.exists(jsoncPath)
+
+      const format: "json" | "jsonc" | "ts" | null = hasTs
+        ? "ts"
+        : hasJsonc
+          ? "jsonc"
+          : hasJson
+            ? "json"
+            : null
+
+      const hasBoth = hasTs && (hasJson || hasJsonc)
+      const hasBothLegacyJsonFiles = !hasTs && hasJson && hasJsonc
+      const warnings = [
+        ...(hasBoth ? [DUAL_OXFMT_CONFIG_WARNING] : []),
+        ...(hasBothLegacyJsonFiles ? [DUAL_LEGACY_OXFMT_JSON_FILES_WARNING] : []),
+      ]
 
       return {
-        format: hasTs ? "ts" : null,
-        path: hasTs ? tsPath : null,
+        format,
+        hasBoth,
+        hasBothLegacyJsonFiles,
+        jsonPath: hasJson ? jsonPath : null,
+        jsoncPath: hasJsonc ? jsoncPath : null,
+        path:
+          format === "ts"
+            ? tsPath
+            : format === "jsonc"
+              ? jsoncPath
+              : format === "json"
+                ? jsonPath
+                : null,
         tsPath: hasTs ? tsPath : null,
+        warnings,
       }
     }),
+  files,
+  kind: "tooling",
   name: "oxfmt",
   update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE)
+      const configPath = path.join(cwd, files[0].path)
 
       if (!(yield* fs.exists(configPath))) {
-        return yield* new FileNotFound({ path: CONFIG_FILE })
+        return yield* new FileNotFound({ path: files[0].path })
       }
     }),
   version: "0.41.0",

@@ -1,17 +1,30 @@
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
-import { github, hasCICompatibleScripts } from "#lib/integrations/ci/github.ts"
-import { oxlint } from "#lib/integrations/tooling/oxlint.ts"
+import github from "#lib/integrations/ci/github.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { MigrationValidationFailed } from "#lib/shared/errors.ts"
-import { readPackageJson, writePackageJson } from "#lib/workspace/package-json.ts"
-import { getManagedScripts, MANAGED_SCRIPT_COMMANDS } from "#lib/workspace/scripts.ts"
-import { typescriptConfig } from "#lib/workspace/typescript-config.ts"
+import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import {
+  getManagedScripts,
+  MANAGED_SCRIPT_COMMANDS,
+  readPackageJson,
+  writePackageJson,
+} from "#lib/workspace/package-json.ts"
+import tsconfig from "#lib/workspace/tsconfig.ts"
 
 const LEGACY_TYPECHECK_COMMAND = "adamantite typecheck"
+
+function getLegacyOxlintConfigPath() {
+  return oxlint.files[1].path
+}
+
+function getGitHubWorkflowPath() {
+  return github.files[0].path
+}
 
 export function migrateLegacyTypecheckScriptPackageJson(packageJson: PackageJson) {
   const scripts = { ...packageJson.scripts }
@@ -55,10 +68,10 @@ export const legacyTypecheckScript = defineMigration({
     }),
   files: [
     "package.json",
-    "oxlint.config.ts",
-    ".oxlintrc.json",
-    "tsconfig.json",
-    github.workflowPath,
+    oxlint.config,
+    getLegacyOxlintConfigPath(),
+    tsconfig.config,
+    getGitHubWorkflowPath(),
   ],
   id: "legacy-typecheck-script",
   migrate: (context) =>
@@ -83,10 +96,8 @@ export const legacyTypecheckScript = defineMigration({
           yield* oxlint.create(context.cwd)
         }
 
-        const hasTypescriptConfig = yield* typescriptConfig.exists(context.cwd)
-        yield* hasTypescriptConfig
-          ? typescriptConfig.update(context.cwd)
-          : typescriptConfig.create(context.cwd)
+        const hasTypescriptConfig = yield* tsconfig.exists(context.cwd)
+        yield* hasTypescriptConfig ? tsconfig.update(context.cwd) : tsconfig.create(context.cwd)
 
         const workflowExists = yield* github.exists(context.cwd)
         const managedScripts = getManagedScripts(migratedPackageJson.packageJson)
@@ -163,16 +174,16 @@ export const legacyTypecheckScript = defineMigration({
       if (oxlintState.format !== "ts") {
         return yield* new MigrationValidationFailed({
           migrationId: "legacy-typecheck-script",
-          reason: "`oxlint.config.ts` is not the active oxlint config.",
+          reason: `\`${oxlint.config}\` is not the active oxlint config.`,
         })
       }
 
-      const hasTypescriptConfig = yield* typescriptConfig.exists(context.cwd)
+      const hasTypescriptConfig = yield* tsconfig.exists(context.cwd)
 
       if (!hasTypescriptConfig) {
         return yield* new MigrationValidationFailed({
           migrationId: "legacy-typecheck-script",
-          reason: "`tsconfig.json` is missing after the migration.",
+          reason: `\`${tsconfig.config}\` is missing after the migration.`,
         })
       }
     }),

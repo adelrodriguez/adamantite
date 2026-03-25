@@ -9,11 +9,11 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import updateCommand from "#commands/update.ts"
-import { knip } from "#lib/integrations/tooling/knip.ts"
-import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
-import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
-import { sherif } from "#lib/integrations/tooling/sherif.ts"
-import { inspectLegacyKnipConfig } from "#lib/migrations/legacy-knip-json.ts"
+import knip from "#lib/integrations/tooling/knip.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import sherif from "#lib/integrations/tooling/sherif.ts"
+import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
@@ -22,9 +22,9 @@ import {
 } from "./command-test-helpers.ts"
 
 async function knipWarningsForCwd(cwd: string) {
-  return Effect.runPromise(
-    inspectLegacyKnipConfig(cwd).pipe(Effect.provide(NodeServices.layer))
-  ).then((r) => r.warnings)
+  return Effect.runPromise(knip.exists(cwd).pipe(Effect.provide(NodeServices.layer))).then(
+    (r) => r.warnings
+  )
 }
 
 describe("update", () => {

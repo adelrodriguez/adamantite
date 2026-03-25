@@ -1,20 +1,24 @@
 import process from "node:process"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
-import type { ToolingPackage } from "#lib/integrations/tooling/base.ts"
+import type { ToolingPackage } from "#lib/integrations/base.ts"
 import type { Migration, MigrationCheckResult } from "#lib/migrations/base.ts"
-import type { Script } from "#lib/workspace/scripts.ts"
-import { knip } from "#lib/integrations/tooling/knip.ts"
-import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
-import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
-import { sherif } from "#lib/integrations/tooling/sherif.ts"
+import type { Script } from "#lib/workspace/package-json.ts"
+import knip from "#lib/integrations/tooling/knip.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import sherif from "#lib/integrations/tooling/sherif.ts"
+import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { restoreFiles, snapshotFiles } from "#lib/migrations/base.ts"
 import { migrations } from "#lib/migrations/index.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
-import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
-import { getManagedScripts } from "#lib/workspace/scripts.ts"
+import {
+  getManagedScripts,
+  normalizeDependencyVersion,
+  readPackageJson,
+} from "#lib/workspace/package-json.ts"
 
 function getRequiredPackages(scripts: Script[]) {
   const requiredPackages = new Map<string, ToolingPackage>()
@@ -112,7 +116,6 @@ export default Command.make("update").pipe(
         name: string
         currentVersion: string
         targetVersion: string
-        isDevDependency: boolean
       }> = []
 
       for (const pkg of [oxlint, tsgolint, oxfmt, sherif, knip]) {
@@ -121,7 +124,6 @@ export default Command.make("update").pipe(
         if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
           updates.push({
             currentVersion: dependency,
-            isDevDependency: true,
             name: pkg.name,
             targetVersion: pkg.version,
           })
@@ -134,7 +136,6 @@ export default Command.make("update").pipe(
         if (!dependency) {
           updates.push({
             currentVersion: "not installed",
-            isDevDependency: true,
             name: pkg.name,
             targetVersion: pkg.version,
           })

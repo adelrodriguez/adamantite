@@ -7,7 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { oxfmt } from "#lib/integrations/tooling/oxfmt.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 
 const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
@@ -34,8 +34,13 @@ describe("oxfmt", () => {
 
       expect(result).toEqual({
         format: null,
+        hasBoth: false,
+        hasBothLegacyJsonFiles: false,
+        jsonPath: null,
+        jsoncPath: null,
         path: null,
         tsPath: null,
+        warnings: [],
       })
     })
 

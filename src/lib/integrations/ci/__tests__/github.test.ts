@@ -6,7 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { github, hasCICompatibleScripts } from "#lib/integrations/ci/github.ts"
+import github from "#lib/integrations/ci/github.ts"
 
 describe("github", () => {
   let originalCwd: string
@@ -228,31 +228,5 @@ describe("github", () => {
         expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
       }
     })
-  })
-})
-
-describe("hasCICompatibleScripts", () => {
-  test("return true when the check script is present", () => {
-    expect(hasCICompatibleScripts(["check"])).toBe(true)
-  })
-
-  test("return true when the format script is present", () => {
-    expect(hasCICompatibleScripts(["format"])).toBe(true)
-  })
-
-  test("return true when the check:monorepo script is present", () => {
-    expect(hasCICompatibleScripts(["check:monorepo"])).toBe(true)
-  })
-
-  test("return false when only fix scripts are present", () => {
-    expect(hasCICompatibleScripts(["fix", "fix:monorepo"])).toBe(false)
-  })
-
-  test("return false for an empty array", () => {
-    expect(hasCICompatibleScripts([])).toBe(false)
-  })
-
-  test("return true when CI and non-CI scripts are mixed", () => {
-    expect(hasCICompatibleScripts(["fix", "check", "fix:monorepo"])).toBe(true)
   })
 })

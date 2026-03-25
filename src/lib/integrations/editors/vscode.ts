@@ -2,7 +2,8 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { Script } from "#lib/workspace/scripts.ts"
+import type { Script } from "#lib/workspace/package-json.ts"
+import { defineIntegration } from "#lib/integrations/base.ts"
 import { type CommandFailedLike, CommandRunner } from "#lib/services/command-runner.ts"
 import {
   FailedToCreateDirectory,
@@ -14,65 +15,64 @@ import {
 } from "#lib/shared/errors.ts"
 import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
 
-const SETTINGS_FILE = "settings.json"
-
-export const vscode = {
-  config: {
-    "[css]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "[graphql]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "[javascript]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "[javascriptreact]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "[json]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "[jsonc]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "[typescript]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "[typescriptreact]": {
-      "editor.defaultFormatter": "oxc.oxc-vscode",
-    },
-    "editor.codeActionsOnSave": {
-      "source.fixAll.oxc": "explicit",
-    },
+const files = [{ path: ".vscode/settings.json", type: "config" }] as const
+const CONFIG = {
+  "[css]": {
     "editor.defaultFormatter": "oxc.oxc-vscode",
-    "editor.formatOnPaste": true,
-    "editor.formatOnSave": true,
-    "oxc.typeAware": true,
   },
+  "[graphql]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "[json]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit",
+  },
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
+  "oxc.typeAware": true,
+} as const
+
+export default defineIntegration({
+  config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const vscodePath = path.join(cwd, ".vscode")
-      const settingsPath = path.join(vscodePath, SETTINGS_FILE)
-
-      // Create .vscode directory if it doesn't exist
-      yield* fs
-        .makeDirectory(vscodePath, { recursive: true })
-        .pipe(Effect.mapError((cause) => new FailedToCreateDirectory({ cause, path: vscodePath })))
+      const settingsPath = path.join(cwd, files[0].path)
+      const settingsDir = path.dirname(settingsPath)
 
       yield* fs
-        .writeFileString(settingsPath, `${JSON.stringify(vscode.config, null, 2)}\n`)
+        .makeDirectory(settingsDir, { recursive: true })
+        .pipe(Effect.mapError((cause) => new FailedToCreateDirectory({ cause, path: settingsDir })))
+
+      yield* fs
+        .writeFileString(settingsPath, `${JSON.stringify(CONFIG, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: settingsPath })))
     }),
   exists: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      return yield* fs.exists(path.join(cwd, ".vscode", SETTINGS_FILE))
+      return yield* fs.exists(path.join(cwd, files[0].path))
     }),
-
   extension: (scripts: Script[] = []) =>
     Effect.gen(function* () {
       function installExtension(extension: string) {
@@ -111,29 +111,29 @@ export const vscode = {
         yield* installExtension(extension)
       }
     }),
+  files,
+  kind: "editor",
+  name: "vscode",
   update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const vscodePath = path.join(cwd, ".vscode", SETTINGS_FILE)
+      const settingsPath = path.join(cwd, files[0].path)
 
       const vscodeFile = yield* fs
-        .readFileString(vscodePath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: vscodePath })))
+        .readFileString(settingsPath)
+        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: settingsPath })))
 
-      const existingConfig = yield* parseJson(vscodeFile, vscodePath)
+      const existingConfig = yield* parseJson(vscodeFile, settingsPath)
 
-      // Merge config: Adamantite's config takes precedence (first argument in defu)
-      // This ensures Adamantite's settings are always applied
-      // Empty configs are allowed and will be merged with Adamantite's config
       if (!isJsonObject(existingConfig)) {
-        return yield* new InvalidConfigFormat({ path: vscodePath })
+        return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      const newConfig = yield* mergeConfig(vscode.config, existingConfig)
+      const newConfig = yield* mergeConfig(CONFIG, existingConfig)
 
       yield* fs
-        .writeFileString(vscodePath, `${JSON.stringify(newConfig, null, 2)}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: vscodePath })))
+        .writeFileString(settingsPath, `${JSON.stringify(newConfig, null, 2)}\n`)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: settingsPath })))
     }),
-}
+})

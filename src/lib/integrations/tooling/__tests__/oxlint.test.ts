@@ -7,7 +7,8 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
-import { oxlint, tsgolint } from "#lib/integrations/tooling/oxlint.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 
 const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 

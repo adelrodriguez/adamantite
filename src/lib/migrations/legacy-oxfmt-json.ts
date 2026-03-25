@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { CONFIG_FILE, toTsConfigContent } from "#lib/integrations/tooling/oxfmt.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import {
@@ -12,73 +12,24 @@ import {
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
 import { isJsonObject, parseJson } from "#lib/shared/json.ts"
+import { toOxfmtTsConfigContent } from "#lib/workspace/oxfmt-config.ts"
 
-const LEGACY_CONFIG_FILE_JSON = ".oxfmtrc.json"
-const LEGACY_CONFIG_FILE_JSONC = ".oxfmtrc.jsonc"
-
-const DUAL_OXFMT_CONFIG_WARNING =
-  "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`."
-
-const DUAL_LEGACY_OXFMT_JSON_FILES_WARNING =
-  "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Adamantite migrates from `.oxfmtrc.jsonc` and removes the other file."
+function getLegacyConfigPaths() {
+  return [oxfmt.files[1].path, oxfmt.files[2].path] as const
+}
 
 function getLegacyOxfmtSummary(format: "json" | "jsonc") {
-  const legacyConfigFile = format === "json" ? LEGACY_CONFIG_FILE_JSON : LEGACY_CONFIG_FILE_JSONC
+  const legacyConfigPaths = getLegacyConfigPaths()
+  const legacyConfigFile = format === "json" ? legacyConfigPaths[0] : legacyConfigPaths[1]
 
-  return `Migrating legacy \`${legacyConfigFile}\` configuration to \`${CONFIG_FILE}\`.`
+  return `Migrating legacy \`${legacyConfigFile}\` configuration to \`${oxfmt.config}\`.`
 }
 
-export function inspectLegacyOxfmtConfig(cwd: string) {
+function migrateLegacyOxfmtConfig(cwd: string) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const tsPath = path.join(cwd, CONFIG_FILE)
-    const jsonPath = path.join(cwd, LEGACY_CONFIG_FILE_JSON)
-    const jsoncPath = path.join(cwd, LEGACY_CONFIG_FILE_JSONC)
-    const hasTs = yield* fs.exists(tsPath)
-    const hasJson = yield* fs.exists(jsonPath)
-    const hasJsonc = yield* fs.exists(jsoncPath)
-
-    const format: "json" | "jsonc" | "ts" | null = hasTs
-      ? "ts"
-      : hasJsonc
-        ? "jsonc"
-        : hasJson
-          ? "json"
-          : null
-
-    const hasBoth = hasTs && (hasJson || hasJsonc)
-    const hasBothLegacyJsonFiles = !hasTs && hasJson && hasJsonc
-    const warnings = [
-      ...(hasBoth ? [DUAL_OXFMT_CONFIG_WARNING] : []),
-      ...(hasBothLegacyJsonFiles ? [DUAL_LEGACY_OXFMT_JSON_FILES_WARNING] : []),
-    ]
-
-    return {
-      format,
-      hasBoth,
-      hasBothLegacyJsonFiles,
-      jsonPath: hasJson ? jsonPath : null,
-      jsoncPath: hasJsonc ? jsoncPath : null,
-      path:
-        format === "ts"
-          ? tsPath
-          : format === "jsonc"
-            ? jsoncPath
-            : format === "json"
-              ? jsonPath
-              : null,
-      tsPath: hasTs ? tsPath : null,
-      warnings,
-    }
-  })
-}
-
-export function migrateLegacyOxfmtConfig(cwd: string) {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    const state = yield* inspectLegacyOxfmtConfig(cwd)
+    const state = yield* oxfmt.exists(cwd)
 
     if (state.format !== "json" && state.format !== "jsonc") {
       return
@@ -90,7 +41,7 @@ export function migrateLegacyOxfmtConfig(cwd: string) {
       return
     }
 
-    const configPath = path.join(cwd, CONFIG_FILE)
+    const configPath = path.join(cwd, oxfmt.config)
     const legacyConfigContent = yield* fs
       .readFileString(legacyConfigPath)
       .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: legacyConfigPath })))
@@ -104,7 +55,7 @@ export function migrateLegacyOxfmtConfig(cwd: string) {
     const { $schema: _schema, ...configWithoutSchema } = existingConfig
 
     yield* fs
-      .writeFileString(configPath, toTsConfigContent(configWithoutSchema))
+      .writeFileString(configPath, toOxfmtTsConfigContent(configWithoutSchema))
       .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
 
     yield* fs
@@ -112,10 +63,11 @@ export function migrateLegacyOxfmtConfig(cwd: string) {
       .pipe(Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfigPath })))
 
     if (state.hasBothLegacyJsonFiles) {
+      const legacyConfigPaths = getLegacyConfigPaths()
       const otherLegacyConfigPath =
         state.format === "jsonc"
-          ? path.join(cwd, LEGACY_CONFIG_FILE_JSON)
-          : path.join(cwd, LEGACY_CONFIG_FILE_JSONC)
+          ? path.join(cwd, legacyConfigPaths[0])
+          : path.join(cwd, legacyConfigPaths[1])
 
       if (otherLegacyConfigPath !== legacyConfigPath) {
         yield* fs
@@ -133,7 +85,7 @@ export function migrateLegacyOxfmtConfig(cwd: string) {
 export const legacyOxfmtJson = defineMigration({
   check: (context) =>
     Effect.gen(function* () {
-      const state = yield* inspectLegacyOxfmtConfig(context.cwd)
+      const state = yield* oxfmt.exists(context.cwd)
       const warnings = state.warnings
 
       if (state.format === "json" || state.format === "jsonc") {
@@ -150,30 +102,31 @@ export const legacyOxfmtJson = defineMigration({
 
       return { status: "not_applicable", warnings }
     }),
-  files: [CONFIG_FILE, LEGACY_CONFIG_FILE_JSON, LEGACY_CONFIG_FILE_JSONC],
+  files: [oxfmt.config, ...getLegacyConfigPaths()],
   id: "legacy-oxfmt-json",
   migrate: (context) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
       const spinner = prompter.spinner()
-      const state = yield* inspectLegacyOxfmtConfig(context.cwd)
+      const state = yield* oxfmt.exists(context.cwd)
+      const legacyConfigPaths = getLegacyConfigPaths()
       const legacyConfigFile =
-        state.format === "jsonc" ? LEGACY_CONFIG_FILE_JSONC : LEGACY_CONFIG_FILE_JSON
+        state.format === "jsonc" ? legacyConfigPaths[1] : legacyConfigPaths[0]
 
-      spinner.start(`Migrating \`${legacyConfigFile}\` to \`${CONFIG_FILE}\`...`)
+      spinner.start(`Migrating \`${legacyConfigFile}\` to \`${oxfmt.config}\`...`)
       yield* migrateLegacyOxfmtConfig(context.cwd)
-      spinner.stop(`Oxfmt config migrated to \`${CONFIG_FILE}\` successfully.`)
+      spinner.stop(`Oxfmt config migrated to \`${oxfmt.config}\` successfully.`)
     }),
   tags: ["update"],
   title: "Legacy oxfmt JSON config",
   validate: (context) =>
     Effect.gen(function* () {
-      const state = yield* inspectLegacyOxfmtConfig(context.cwd)
+      const state = yield* oxfmt.exists(context.cwd)
 
       if (state.format !== "ts") {
         return yield* new MigrationValidationFailed({
           migrationId: "legacy-oxfmt-json",
-          reason: `\`${CONFIG_FILE}\` is not the active oxfmt config.`,
+          reason: `\`${oxfmt.config}\` is not the active oxfmt config.`,
         })
       }
     }),

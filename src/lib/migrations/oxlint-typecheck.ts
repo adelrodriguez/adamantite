@@ -13,7 +13,7 @@ import {
   type Program,
   type PropertyKey,
 } from "oxc-parser"
-import { oxlint } from "#lib/integrations/tooling/oxlint.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import { migrateLegacyTypecheckScriptPackageJson } from "#lib/migrations/legacy-typecheck-script.ts"
 import { Prompter } from "#lib/services/prompter.ts"
@@ -23,10 +23,8 @@ import {
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
 import { isJsonObject } from "#lib/shared/json.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { getManagedScripts } from "#lib/workspace/scripts.ts"
+import { getManagedScripts, readPackageJson } from "#lib/workspace/package-json.ts"
 
-const CONFIG_FILE = "oxlint.config.ts"
 const MISSING_OPTIONS_SUMMARY =
   "Updating `oxlint.config.ts` so `options.typeAware` and `options.typeCheck` are enabled for managed lint scripts."
 const MANUAL_PATCH_WARNING =
@@ -72,7 +70,7 @@ function parse(content: string) {
   return Effect.try({
     catch: () => null,
     try: () =>
-      parseSync(CONFIG_FILE, content, {
+      parseSync(oxlint.config, content, {
         astType: "ts",
         lang: "ts",
         sourceType: "module",
@@ -402,7 +400,7 @@ function evaluate(cwd: string) {
 
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const configPath = path.join(cwd, CONFIG_FILE)
+    const configPath = path.join(cwd, oxlint.config)
     const content = yield* fs
       .readFileString(configPath)
       .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
@@ -436,7 +434,7 @@ export const oxlintTypecheck = defineMigration({
         warnings: patch.kind === "manual" ? [MANUAL_PATCH_WARNING] : [],
       }
     }),
-  files: ["oxlint.config.ts"],
+  files: [oxlint.config],
   id: "oxlint-typecheck",
   migrate: (context) =>
     Effect.gen(function* () {

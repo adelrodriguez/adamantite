@@ -89,7 +89,7 @@ describe("legacyOxfmtJson", () => {
 
     expect(result.status).toBe("needs_migration")
     expect(result.warnings).toEqual([
-      "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Adamantite migrates from `.oxfmtrc.jsonc` and removes the other file.",
+      "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed.",
     ])
   })
 

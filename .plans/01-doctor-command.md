@@ -37,6 +37,7 @@ The current setup logic for managed resources is still scattered across command-
 - Modeling steady-state setup as per-resource migrations is the wrong abstraction. Those cases are not one-off transitions.
 - Each installed Adamantite-managed dependency should be able to report whether its package, version, and config are correct.
 - Commands should share one source of truth for what needs to happen, instead of duplicating migration, install, and config-drift checks.
+- `init` should stay lightweight, but when it notices existing setup that needs follow-up attention, it should tell the user to run `adamantite doctor` rather than trying to absorb doctor behavior itself.
 
 ## Non-Goals
 
@@ -148,6 +149,18 @@ This keeps migrations reusable without duplicating their logic inside integratio
 
 ## Command Behavior
 
+### Init Interaction
+
+`init` should not take on doctor responsibilities, but it should surface follow-up guidance when it detects issues outside its narrow setup flow.
+
+Examples:
+
+- a legacy config file that `init` intentionally leaves in place
+- a conflicting managed/unmanaged config state
+- a config shape that appears suspicious but is not something `init` should rewrite
+
+In those cases, `init` should print a compact message telling the user to run `adamantite doctor` for verification and `adamantite doctor --fix` when safe local fixes are available.
+
 ### High-Level Flow (`doctor`)
 
 1. read `cwd`
@@ -218,6 +231,13 @@ Failed:
 Run `adamantite doctor --fix` for safe config fixes, or `adamantite update` for dependency and migration work.
 ```
 
+Representative `init` follow-up messaging when issues are detected:
+
+```text
+Found an existing legacy Knip config that Adamantite did not modify during init.
+Run `adamantite doctor` to verify your setup, or `adamantite doctor --fix` for safe local fixes.
+```
+
 ## Integration Rollout
 
 Start with the simplest existing setup flows and the integrations that already have clear create/update primitives:
@@ -258,6 +278,8 @@ Potential shared helper location if needed:
 Add command coverage in:
 
 - `src/commands/__tests__/doctor.test.ts`
+
+Add or update `init` coverage so it verifies that when `init` encounters issues it intentionally leaves alone, it points users to `adamantite doctor` instead of silently proceeding.
 
 Scenarios:
 

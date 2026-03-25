@@ -64,6 +64,18 @@ This project uses changesets for version management:
 
 ## Architecture
 
+### Integration Boundaries
+
+- Integration modules under `src/lib/integrations/**` should only export the integration itself (default export). Keep extra helpers out of those files. `src/lib/integrations/base.ts` is the shared infrastructure exception.
+- If integration-related logic needs to be reused, move it to a nearby non-integration module such as `src/lib/workspace/**` or `src/lib/shared/**` instead of adding named exports to an integration file.
+- Keep one-off transition logic in `src/lib/migrations/**`. Do not move migration behavior into integration files just to simplify command wiring.
+- Keep `init` simple. It should not import migration helpers or perform migration-specific orchestration.
+- When `init` finds existing setup that it intentionally leaves alone, prefer warning and follow-up guidance over mutation. Point users to `adamantite doctor` / `adamantite doctor --fix` for verification and safe local fixes.
+
+### Workspace Conventions
+
+- Managed script types and helpers live in `src/lib/workspace/package-json.ts`. Import `Script`, `MANAGED_SCRIPT_COMMANDS`, and `getManagedScripts` from there.
+
 ### CLI Structure (`src/`)
 
 - **`index.ts`** - Main CLI entry point using yargs

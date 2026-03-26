@@ -33,14 +33,8 @@ describe("oxfmt", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
-        format: null,
-        hasBoth: false,
-        hasBothLegacyJsonFiles: false,
-        jsonPath: null,
-        jsoncPath: null,
-        path: null,
-        tsPath: null,
-        warnings: [],
+        active: null,
+        legacy: [],
       })
     })
 
@@ -51,9 +45,11 @@ describe("oxfmt", () => {
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      expect(result.format).toBe("ts")
-      expect(result.path).toContain("oxfmt.config.ts")
-      expect(result.tsPath).toContain("oxfmt.config.ts")
+      expect(result.active).toEqual({
+        format: "ts",
+        path: join(tempDir, "oxfmt.config.ts"),
+      })
+      expect(result.legacy).toEqual([])
     })
   })
 
@@ -61,10 +57,13 @@ describe("oxfmt", () => {
     test("create oxfmt.config.ts with the correct config", async () => {
       await oxfmt.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const { path } = await oxfmt
+      const state = await oxfmt
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      expect(path).toBeDefined()
+      expect(state.active).toEqual({
+        format: "ts",
+        path: join(tempDir, "oxfmt.config.ts"),
+      })
 
       const content = await Bun.file("oxfmt.config.ts").text()
 
@@ -99,6 +98,138 @@ describe("oxfmt", () => {
       const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
 
       expect(packageJson.devDependencies?.oxfmt).toBe(oxfmt.version)
+    })
+  })
+
+  describe("assess", () => {
+    test("report not applicable when the managed format script is absent", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxfmt: oxfmt.version,
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const result = await oxfmt
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [],
+        status: "not_applicable",
+        warnings: [],
+      })
+    })
+
+    test("report missing managed config when the managed format script exists", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxfmt: oxfmt.version,
+            },
+            name: "test-project",
+            scripts: {
+              format: "adamantite format",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const result = await oxfmt
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result.status).toBe("needs_action")
+      expect(result.actions).toEqual([
+        {
+          description: "Create `oxfmt.config.ts` for `oxfmt`.",
+          path: "oxfmt.config.ts",
+          type: "create_config",
+        },
+      ])
+    })
+
+    test("report healthy when managed format script and config exist", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxfmt: oxfmt.version,
+            },
+            name: "test-project",
+            scripts: {
+              format: "adamantite format",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await Bun.write(
+        "oxfmt.config.ts",
+        'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n'
+      )
+
+      const result = await oxfmt
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [],
+        status: "healthy",
+        warnings: [],
+      })
+    })
+
+    test("report missing package when managed format script exists", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            name: "test-project",
+            scripts: {
+              format: "adamantite format",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const result = await oxfmt
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result.actions).toEqual([
+        {
+          description: "Install `oxfmt@0.41.0` for the managed `format` script.",
+          package: "oxfmt",
+          targetVersion: oxfmt.version,
+          type: "install_package",
+        },
+        {
+          description: "Create `oxfmt.config.ts` for `oxfmt`.",
+          path: "oxfmt.config.ts",
+          type: "create_config",
+        },
+      ])
+      expect(result.status).toBe("needs_action")
     })
   })
 })

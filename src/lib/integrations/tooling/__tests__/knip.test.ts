@@ -33,14 +33,8 @@ describe("knip", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
-        format: null,
-        hasBoth: false,
-        hasBothLegacyJsonFiles: false,
-        jsonPath: null,
-        jsoncPath: null,
-        path: null,
-        tsPath: null,
-        warnings: [],
+        active: null,
+        legacy: [],
       })
     })
 
@@ -51,9 +45,11 @@ describe("knip", () => {
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      expect(result.format).toBe("ts")
-      expect(result.path).toContain("knip.config.ts")
-      expect(result.tsPath).toContain("knip.config.ts")
+      expect(result.active).toEqual({
+        format: "ts",
+        path: join(tempDir, "knip.config.ts"),
+      })
+      expect(result.legacy).toEqual([])
     })
   })
 
@@ -61,10 +57,13 @@ describe("knip", () => {
     test("create knip.config.ts with the preset config", async () => {
       await knip.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const { path } = await knip
+      const state = await knip
         .exists(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      expect(path).toContain("knip.config.ts")
+      expect(state.active).toEqual({
+        format: "ts",
+        path: join(tempDir, "knip.config.ts"),
+      })
 
       const content = await Bun.file("knip.config.ts").text()
       expect(content).toContain('import type { KnipConfig } from "knip"')
@@ -99,6 +98,142 @@ describe("knip", () => {
       const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
 
       expect(packageJson.devDependencies?.knip).toBe(knip.version)
+    })
+  })
+
+  describe("assess", () => {
+    test("report not applicable when the managed analyze script is absent", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              knip: knip.version,
+            },
+            name: "test-project",
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const result = await knip
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [],
+        status: "not_applicable",
+        warnings: [],
+      })
+    })
+
+    test("report missing managed config when the managed analyze script exists", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              knip: knip.version,
+            },
+            name: "test-project",
+            scripts: {
+              analyze: "adamantite analyze",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const result = await knip
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [
+          {
+            description: "Create `knip.config.ts` for `knip`.",
+            path: "knip.config.ts",
+            type: "create_config",
+          },
+        ],
+        status: "needs_action",
+        warnings: [],
+      })
+    })
+
+    test("report a migration when a legacy config is active", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              knip: knip.version,
+            },
+            name: "test-project",
+            scripts: {
+              analyze: "adamantite analyze",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await Bun.write("knip.json", JSON.stringify({ entry: ["src/index.ts"] }, null, 2))
+
+      const result = await knip
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [
+          {
+            description: "Migrate legacy `knip.json` to `knip.config.ts`.",
+            migrationId: "legacy-knip-json",
+            type: "run_migration",
+          },
+        ],
+        status: "needs_action",
+        warnings: [],
+      })
+    })
+
+    test("report healthy when package and managed config are present", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              knip: knip.version,
+            },
+            name: "test-project",
+            scripts: {
+              analyze: "adamantite analyze",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await Bun.write(
+        "knip.config.ts",
+        'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = {}\n\nexport default config\n'
+      )
+
+      const result = await knip
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [],
+        status: "healthy",
+        warnings: [],
+      })
     })
   })
 })

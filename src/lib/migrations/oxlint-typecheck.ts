@@ -394,7 +394,7 @@ function evaluate(cwd: string) {
 
     const oxlintState = yield* oxlint.exists(cwd)
 
-    if (oxlintState.format !== "ts") {
+    if (oxlintState.active?.format !== "ts") {
       return { status: "not_applicable" } as const
     }
 

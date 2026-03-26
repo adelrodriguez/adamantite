@@ -92,7 +92,7 @@ export const legacyTypecheckScript = defineMigration({
 
         const oxlintState = yield* oxlint.exists(context.cwd)
 
-        if (oxlintState.format === null) {
+        if (oxlintState.active === null) {
           yield* oxlint.create(context.cwd)
         }
 
@@ -171,7 +171,7 @@ export const legacyTypecheckScript = defineMigration({
 
       const oxlintState = yield* oxlint.exists(context.cwd)
 
-      if (oxlintState.format !== "ts") {
+      if (oxlintState.active?.format !== "ts") {
         return yield* new MigrationValidationFailed({
           migrationId: "legacy-typecheck-script",
           reason: `\`${oxlint.config}\` is not the active oxlint config.`,

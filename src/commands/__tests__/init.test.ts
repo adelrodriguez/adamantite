@@ -3,7 +3,6 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -25,12 +24,6 @@ import {
 
 async function readJson<T = Record<string, unknown>>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T
-}
-
-async function knipWarningsForCwd(cwd: string) {
-  return Effect.runPromise(knip.exists(cwd).pipe(Effect.provide(NodeServices.layer))).then(
-    (r) => r.warnings
-  )
 }
 
 describe("init", () => {
@@ -125,7 +118,7 @@ describe("init", () => {
   })
 
   describe("oxlint config handling", () => {
-    test("migrate a legacy oxlint config into oxlint.config.ts", async () => {
+    test("keep a legacy oxlint config in place during init", async () => {
       await writeFile(
         join(tempDir, ".oxlintrc.json"),
         JSON.stringify(
@@ -147,11 +140,15 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
+      expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message:
+          "Legacy `.oxlintrc.json` was preserved during `adamantite init`. `adamantite init` does not migrate legacy oxlint configs yet.",
+      })
 
-      const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
-      expect(oxlintConfig).toContain('import react from "adamantite/lint/react"')
-      expect(oxlintConfig).toContain('import node from "adamantite/lint/node"')
+      const oxlintConfig = await readFile(join(tempDir, ".oxlintrc.json"), "utf8")
       expect(oxlintConfig).toContain('"semi": "error"')
     })
   })
@@ -240,17 +237,14 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const expectedKnipWarnings = await knipWarningsForCwd(tempDir)
-
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      for (const message of expectedKnipWarnings) {
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message,
-        })
-      }
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed.",
+      })
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
@@ -408,17 +402,14 @@ describe("init", () => {
       })
       const installer = createDependencyInstallerTestContext()
 
-      const expectedKnipWarnings = await knipWarningsForCwd(tempDir)
-
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      for (const message of expectedKnipWarnings) {
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message,
-        })
-      }
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
+      })
       expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
     })
 

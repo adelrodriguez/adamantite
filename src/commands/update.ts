@@ -1,46 +1,74 @@
 import process from "node:process"
+import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
-import type { ToolingPackage } from "#lib/integrations/base.ts"
+import type {
+  AssessmentAction,
+  IntegrationAssessment,
+  ToolingPackage,
+} from "#lib/integrations/base.ts"
 import type { Migration, MigrationCheckResult } from "#lib/migrations/base.ts"
-import type { Script } from "#lib/workspace/package-json.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { restoreFiles, snapshotFiles } from "#lib/migrations/base.ts"
-import { migrations } from "#lib/migrations/index.ts"
+import { runMigration } from "#lib/migrations/base.ts"
+import { assessmentDrivenMigrationIntegrationById, migrations } from "#lib/migrations/index.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
-import {
-  getManagedScripts,
-  normalizeDependencyVersion,
-  readPackageJson,
-} from "#lib/workspace/package-json.ts"
+import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 
-function getRequiredPackages(scripts: Script[]) {
-  const requiredPackages = new Map<string, ToolingPackage>()
+const integrations = [oxlint, tsgolint, oxfmt, sherif, knip] as const
+const knownPackages = [
+  oxlint,
+  tsgolint,
+  oxfmt,
+  sherif,
+  knip,
+] as const satisfies readonly ToolingPackage[]
 
-  if (scripts.includes("check") || scripts.includes("fix")) {
-    requiredPackages.set(oxlint.name, oxlint)
-    requiredPackages.set(tsgolint.name, tsgolint)
+type ApplicableAssessment = {
+  readonly assessment: Extract<IntegrationAssessment, { readonly applicable: true }>
+  readonly integration: (typeof integrations)[number]
+}
+
+function isApplicableAssessment(assessment: {
+  readonly applicable: boolean
+  readonly warnings: readonly string[]
+  readonly actions?: readonly AssessmentAction[]
+}): assessment is Extract<IntegrationAssessment, { readonly applicable: true }> {
+  return assessment.applicable && Array.isArray(assessment.actions)
+}
+
+type PackageUpdate = {
+  readonly currentVersion: string
+  readonly name: string
+  readonly targetVersion: string
+}
+
+function getFallbackPackageUpdates(packageJson: PackageJson, coveredPackages: ReadonlySet<string>) {
+  const updates: PackageUpdate[] = []
+
+  for (const pkg of knownPackages) {
+    if (coveredPackages.has(pkg.name)) {
+      continue
+    }
+
+    const dependency =
+      packageJson.devDependencies?.[pkg.name] ?? packageJson.dependencies?.[pkg.name]
+
+    if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
+      updates.push({
+        currentVersion: dependency,
+        name: pkg.name,
+        targetVersion: pkg.version,
+      })
+    }
   }
 
-  if (scripts.includes("format")) {
-    requiredPackages.set(oxfmt.name, oxfmt)
-  }
-
-  if (scripts.includes("check:monorepo") || scripts.includes("fix:monorepo")) {
-    requiredPackages.set(sherif.name, sherif)
-  }
-
-  if (scripts.includes("analyze")) {
-    requiredPackages.set(knip.name, knip)
-  }
-
-  return [...requiredPackages.values()]
+  return updates
 }
 
 export default Command.make("update").pipe(
@@ -56,52 +84,93 @@ export default Command.make("update").pipe(
 
       yield* prompter.intro("💠 adamantite update")
 
-      const migrationAssessments: Array<{
+      const collectAssessments = () =>
+        Effect.gen(function* () {
+          const assessments: ApplicableAssessment[] = []
+
+          for (const integration of integrations) {
+            const assessment = yield* integration.assess(cwd)
+
+            if (isApplicableAssessment(assessment)) {
+              assessments.push({ assessment, integration })
+            }
+          }
+
+          return assessments
+        })
+
+      const assessments = yield* collectAssessments()
+
+      for (const { assessment } of assessments) {
+        for (const warning of assessment.warnings) {
+          yield* prompter.log.warning(warning)
+        }
+      }
+
+      const applicableIntegrationNames = new Set(
+        assessments.map(({ integration }) => integration.name)
+      )
+      const assessmentActions = assessments.flatMap(({ assessment }) => assessment.actions)
+      const assessmentMigrationIds = new Set(
+        assessmentActions
+          .filter((action) => action.type === "run_migration")
+          .map((action) => action.migrationId)
+      )
+
+      const fallbackMigrationAssessments: Array<{
         migration: Migration
         result: MigrationCheckResult
       }> = []
 
-      for (const migration of migrations.filter((m) => m.tags.includes("update"))) {
+      for (const migration of migrations.filter((candidate) => candidate.tags.includes("update"))) {
+        const assessmentDrivenIntegrationName =
+          assessmentDrivenMigrationIntegrationById[
+            migration.id as keyof typeof assessmentDrivenMigrationIntegrationById
+          ]
+        if (applicableIntegrationNames.has(assessmentDrivenIntegrationName)) {
+          continue
+        }
+
         const result = yield* migration.check(migrationContext)
-        migrationAssessments.push({ migration, result })
+        fallbackMigrationAssessments.push({ migration, result })
       }
 
-      for (const assessment of migrationAssessments) {
+      for (const assessment of fallbackMigrationAssessments) {
         for (const warning of assessment.result.warnings) {
           yield* prompter.log.warning(warning)
         }
 
-        if (assessment.result.status === "needs_migration" && assessment.result.summary) {
+        if (assessment.result.applicable && assessment.result.summary) {
           yield* prompter.log.info(assessment.result.summary)
         }
       }
 
       const migratedIds: string[] = []
 
-      for (const { migration, result } of migrationAssessments) {
-        if (result.status !== "needs_migration") continue
+      for (const migration of migrations) {
+        if (!assessmentMigrationIds.has(migration.id)) {
+          continue
+        }
 
-        const filePaths = migration.files ?? []
-        const snapshot = yield* snapshotFiles(cwd, filePaths)
+        yield* runMigration(migration, migrationContext, {
+          onRestore: prompter.log.warning(
+            `Migration "${migration.title}" failed, restoring files...`
+          ),
+        })
+        migratedIds.push(migration.id)
+      }
 
-        yield* Effect.gen(function* () {
-          yield* migration.migrate(migrationContext)
+      for (const { migration, result } of fallbackMigrationAssessments) {
+        if (!result.applicable || !result.summary) {
+          continue
+        }
 
-          if (migration.validate) {
-            yield* migration.validate(migrationContext)
-          }
-
-          migratedIds.push(migration.id)
-        }).pipe(
-          Effect.tapError(() =>
-            Effect.gen(function* () {
-              yield* prompter.log.warning(
-                `Migration "${migration.title}" failed, restoring files...`
-              )
-              yield* restoreFiles(snapshot).pipe(Effect.ignore)
-            })
-          )
-        )
+        yield* runMigration(migration, migrationContext, {
+          onRestore: prompter.log.warning(
+            `Migration "${migration.title}" failed, restoring files...`
+          ),
+        })
+        migratedIds.push(migration.id)
       }
 
       if (migratedIds.length > 0) {
@@ -109,38 +178,36 @@ export default Command.make("update").pipe(
       }
 
       const packageJson = yield* readPackageJson(cwd)
-      const managedScripts = getManagedScripts(packageJson)
-      const requiredPackages = getRequiredPackages(managedScripts)
-
-      const updates: Array<{
-        name: string
-        currentVersion: string
-        targetVersion: string
-      }> = []
-
-      for (const pkg of [oxlint, tsgolint, oxfmt, sherif, knip]) {
-        const dependency = packageJson.devDependencies?.[pkg.name]
-
-        if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
-          updates.push({
-            currentVersion: dependency,
-            name: pkg.name,
-            targetVersion: pkg.version,
-          })
-        }
-      }
-
-      for (const pkg of requiredPackages) {
-        const dependency = packageJson.devDependencies?.[pkg.name]
-
-        if (!dependency) {
-          updates.push({
-            currentVersion: "not installed",
-            name: pkg.name,
-            targetVersion: pkg.version,
-          })
-        }
-      }
+      const postMigrationAssessments = yield* collectAssessments()
+      const doctorFollowUpActions = postMigrationAssessments
+        .flatMap(({ assessment }) => assessment.actions)
+        .filter(
+          (action) =>
+            action.type === "create_config" ||
+            action.type === "update_config" ||
+            action.type === "manual_fix"
+        )
+      const packageUpdates = postMigrationAssessments
+        .flatMap(({ assessment }) => assessment.actions)
+        .filter((action) => action.type === "install_package" || action.type === "update_package")
+        .map((action) =>
+          action.type === "install_package"
+            ? {
+                currentVersion: "not installed",
+                name: action.package,
+                targetVersion: action.targetVersion,
+              }
+            : {
+                currentVersion: action.currentVersion,
+                name: action.package,
+                targetVersion: action.targetVersion,
+              }
+        )
+      const coveredPackages = new Set(packageUpdates.map((update) => update.name))
+      const updates = [
+        ...packageUpdates,
+        ...getFallbackPackageUpdates(packageJson, coveredPackages),
+      ]
 
       if (updates.length > 0) {
         yield* prompter.log.info("The following dependencies will be updated:")
@@ -170,7 +237,17 @@ export default Command.make("update").pipe(
         yield* prompter.log.success("Dependencies updated successfully.")
       }
 
-      if (migratedIds.length === 0 && updates.length === 0) {
+      if (doctorFollowUpActions.length > 0) {
+        yield* prompter.log.warning(
+          "Some configuration follow-up belongs to `adamantite doctor --fix`."
+        )
+
+        for (const action of doctorFollowUpActions) {
+          yield* prompter.log.warning(`Doctor follow-up: ${action.description}`)
+        }
+      }
+
+      if (migratedIds.length === 0 && updates.length === 0 && doctorFollowUpActions.length === 0) {
         yield* prompter.log.success("No changes needed.")
         return "no-changes" as const
       }

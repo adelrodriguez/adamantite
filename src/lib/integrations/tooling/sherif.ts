@@ -16,8 +16,7 @@ export default defineIntegration({
 
       if (!managedScripts.includes("check:monorepo") && !managedScripts.includes("fix:monorepo")) {
         return {
-          actions: [],
-          status: "not_applicable",
+          applicable: false,
           warnings: [],
         }
       }
@@ -45,7 +44,7 @@ export default defineIntegration({
 
       return {
         actions,
-        status: actions.length === 0 ? "healthy" : "needs_action",
+        applicable: true,
         warnings: [],
       }
     }),

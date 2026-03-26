@@ -6,7 +6,6 @@ import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import { isLeft, runEither } from "#__tests__/helpers.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 
 const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
@@ -73,26 +72,6 @@ describe("oxfmt", () => {
     })
   })
 
-  describe("update", () => {
-    test("do nothing when oxfmt.config.ts already exists", async () => {
-      const originalContent = "export default { semi: false }\n"
-      await Bun.write("oxfmt.config.ts", originalContent)
-
-      await oxfmt.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-
-      expect(await Bun.file("oxfmt.config.ts").text()).toBe(originalContent)
-    })
-
-    test("return FileNotFound when oxfmt.config.ts does not exist", async () => {
-      const result = await runEither(oxfmt.update(tempDir))
-
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FileNotFound" })
-      }
-    })
-  })
-
   describe("version", () => {
     test("match the package.json devDependency", async () => {
       const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
@@ -123,8 +102,7 @@ describe("oxfmt", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
-        actions: [],
-        status: "not_applicable",
+        applicable: false,
         warnings: [],
       })
     })
@@ -152,14 +130,17 @@ describe("oxfmt", () => {
         .assess(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      expect(result.status).toBe("needs_action")
-      expect(result.actions).toEqual([
-        {
-          description: "Create `oxfmt.config.ts` for `oxfmt`.",
-          path: "oxfmt.config.ts",
-          type: "create_config",
-        },
-      ])
+      expect(result).toEqual({
+        actions: [
+          {
+            description: "Create `oxfmt.config.ts` for `oxfmt`.",
+            path: "oxfmt.config.ts",
+            type: "create_config",
+          },
+        ],
+        applicable: true,
+        warnings: [],
+      })
     })
 
     test("report healthy when managed format script and config exist", async () => {
@@ -191,7 +172,7 @@ describe("oxfmt", () => {
 
       expect(result).toEqual({
         actions: [],
-        status: "healthy",
+        applicable: true,
         warnings: [],
       })
     })
@@ -216,20 +197,23 @@ describe("oxfmt", () => {
         .assess(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      expect(result.actions).toEqual([
-        {
-          description: "Install `oxfmt@0.41.0` for the managed `format` script.",
-          package: "oxfmt",
-          targetVersion: oxfmt.version,
-          type: "install_package",
-        },
-        {
-          description: "Create `oxfmt.config.ts` for `oxfmt`.",
-          path: "oxfmt.config.ts",
-          type: "create_config",
-        },
-      ])
-      expect(result.status).toBe("needs_action")
+      expect(result).toEqual({
+        actions: [
+          {
+            description: "Install `oxfmt@0.41.0` for the managed `format` script.",
+            package: "oxfmt",
+            targetVersion: oxfmt.version,
+            type: "install_package",
+          },
+          {
+            description: "Create `oxfmt.config.ts` for `oxfmt`.",
+            path: "oxfmt.config.ts",
+            type: "create_config",
+          },
+        ],
+        applicable: true,
+        warnings: [],
+      })
     })
   })
 })

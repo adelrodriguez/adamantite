@@ -2,8 +2,17 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
-import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
-import { getOxlintPresetNames, toOxlintTsConfigContent } from "#lib/workspace/oxlint-config.ts"
+import {
+  FailedToReadFile,
+  FailedToWriteFile,
+  FileNotFound,
+  UnsupportedConfigState,
+} from "#lib/shared/errors.ts"
+import {
+  getOxlintPresetNames,
+  inspectTypeAwareOxlintConfig,
+  toOxlintTsConfigContent,
+} from "#lib/workspace/oxlint-config.ts"
 import {
   getManagedScripts,
   normalizeDependencyVersion,
@@ -27,8 +36,7 @@ export default defineIntegration({
 
       if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
         return {
-          actions: [],
-          status: "not_applicable",
+          applicable: false,
           warnings: [],
         }
       }
@@ -88,9 +96,34 @@ export default defineIntegration({
         })
       }
 
+      if (state.active?.format === "ts") {
+        const content = yield* fs
+          .readFileString(tsPath)
+          .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: tsPath })))
+        const patch = yield* inspectTypeAwareOxlintConfig(content)
+
+        if (patch.kind === "patchable") {
+          actions.push({
+            description:
+              "Update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`.",
+            path: files[0].path,
+            type: "update_config",
+          })
+        }
+
+        if (patch.kind === "manual") {
+          actions.push({
+            description:
+              "Manually update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`; Adamantite cannot patch the current file shape safely.",
+            path: files[0].path,
+            type: "manual_fix",
+          })
+        }
+      }
+
       return {
         actions,
-        status: actions.length === 0 ? "healthy" : "needs_action",
+        applicable: true,
         warnings,
       }
     }),
@@ -135,18 +168,32 @@ export default defineIntegration({
   files,
   kind: "tooling",
   name: "oxlint",
-  update: (cwd: string, _presets: string[] = []) =>
+  update: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const tsPath = path.join(cwd, files[0].path)
-      const hasTs = yield* fs.exists(tsPath)
+      const configPath = path.join(cwd, files[0].path)
 
-      if (hasTs) {
+      if (!(yield* fs.exists(configPath))) {
+        return yield* new FileNotFound({ path: files[0].path })
+      }
+
+      const content = yield* fs
+        .readFileString(configPath)
+        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
+      const patch = yield* inspectTypeAwareOxlintConfig(content)
+
+      if (patch.kind === "configured") {
         return
       }
 
-      return yield* new FileNotFound({ path: files[0].path })
+      if (patch.kind === "manual") {
+        return yield* new UnsupportedConfigState({ path: files[0].path, reason: patch.reason })
+      }
+
+      yield* fs
+        .writeFileString(configPath, patch.updatedContent)
+        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
   version: VERSION,
 })

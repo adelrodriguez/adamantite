@@ -14,10 +14,6 @@ import {
 import { isJsonObject, parseJson } from "#lib/shared/json.ts"
 import { getOxlintPresetNames, toOxlintTsConfigContent } from "#lib/workspace/oxlint-config.ts"
 
-const ADAMANTITE_NODE_MODULES_PRESET_REGEX =
-  /^(?:\.\/)?node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/
-const ADAMANTITE_EXPORT_PRESET_REGEX = /^adamantite\/lint(?:\/([a-z0-9-]+))?$/
-
 function migrateLegacyOxlintConfig(cwd: string) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
@@ -51,8 +47,10 @@ function migrateLegacyOxlintConfig(cwd: string) {
     const passthroughSet = new Set<string>()
 
     for (const extendsItem of extendsArray) {
-      const nodeModulesMatch = extendsItem.match(ADAMANTITE_NODE_MODULES_PRESET_REGEX)
-      const exportMatch = extendsItem.match(ADAMANTITE_EXPORT_PRESET_REGEX)
+      const nodeModulesMatch = extendsItem.match(
+        /^(?:\.\/)?node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/
+      )
+      const exportMatch = extendsItem.match(/^adamantite\/lint(?:\/([a-z0-9-]+))?$/)
       const presetName = nodeModulesMatch?.[1] ?? (exportMatch ? (exportMatch[1] ?? "core") : null)
 
       if (presetName) {
@@ -77,7 +75,7 @@ function migrateLegacyOxlintConfig(cwd: string) {
   })
 }
 
-export const legacyOxlintJson = defineMigration({
+export default defineMigration({
   id: "legacy-oxlint-json",
 
   files: [oxlint.config, oxlint.files[1].path],
@@ -96,17 +94,17 @@ export const legacyOxlintJson = defineMigration({
 
       if (oxlintState.active?.format === "json") {
         return {
-          status: "needs_migration",
+          applicable: true,
           summary: `Migrating legacy \`${oxlint.files[1].path}\` configuration to \`${oxlint.config}\`.`,
           warnings,
         }
       }
 
       if (oxlintState.active?.format === "ts") {
-        return { status: "valid", warnings }
+        return { applicable: true, warnings }
       }
 
-      return { status: "not_applicable", warnings }
+      return { applicable: false, warnings }
     }),
   migrate: (context) =>
     Effect.gen(function* () {

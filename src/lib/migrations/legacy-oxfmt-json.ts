@@ -70,7 +70,7 @@ function migrateLegacyOxfmtConfig(cwd: string) {
   })
 }
 
-export const legacyOxfmtJson = defineMigration({
+export default defineMigration({
   check: (context) =>
     Effect.gen(function* () {
       const state = yield* oxfmt.exists(context.cwd)
@@ -88,17 +88,17 @@ export const legacyOxfmtJson = defineMigration({
 
       if (state.active?.format === "json" || state.active?.format === "jsonc") {
         return {
-          status: "needs_migration",
+          applicable: true,
           summary: getLegacyOxfmtSummary(state.active.format),
           warnings,
         }
       }
 
       if (state.active?.format === "ts") {
-        return { status: "valid", warnings }
+        return { applicable: true, warnings }
       }
 
-      return { status: "not_applicable", warnings }
+      return { applicable: false, warnings }
     }),
   files: [oxfmt.config, ...getLegacyConfigPaths()],
   id: "legacy-oxfmt-json",

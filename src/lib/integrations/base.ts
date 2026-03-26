@@ -1,5 +1,3 @@
-import type * as Effect from "effect/Effect"
-
 type IntegrationKind = "tooling" | "workspace" | "editor" | "ci"
 
 type IntegrationFileType = "config" | "legacy_config" | "ci"
@@ -35,24 +33,56 @@ export type AssessmentAction =
     }
   | {
       readonly description: string
+      readonly path?: string
+      readonly type: "manual_fix"
+    }
+  | {
+      readonly description: string
       readonly migrationId: string
       readonly type: "run_migration"
     }
 
-interface IntegrationAssessment {
-  readonly actions: readonly AssessmentAction[]
-  readonly status: "not_applicable" | "healthy" | "needs_action"
-  readonly warnings: readonly string[]
-}
+export type IntegrationAssessment =
+  | {
+      readonly applicable: false
+      readonly warnings: readonly string[]
+    }
+  | {
+      readonly actions: readonly AssessmentAction[]
+      readonly applicable: true
+      readonly warnings: readonly string[]
+    }
 
 interface Integration {
-  readonly assess?: (
-    ...args: readonly never[]
-  ) => Effect.Effect<IntegrationAssessment, unknown, unknown>
+  /**
+   * Read-only diagnosis for the current project state.
+   *
+   * `assess` may classify package drift, missing config, supported config updates,
+   * manual follow-up work, and known migrations. It must not mutate files or call migrations.
+   */
+  readonly assess?: unknown
+
+  /**
+   * Write the latest supported config from scratch.
+   * Used to satisfy `create_config` assessment actions.
+   */
+  readonly create?: unknown
+
   readonly config?: string
+
+  /**
+   * Check whether the latest supported config is present and active.
+   */
+  readonly exists?: unknown
   readonly files?: readonly IntegrationFile[]
   readonly kind: IntegrationKind
   readonly name: string
+
+  /**
+   * Safely rewrite an existing latest-format config into the latest supported shape.
+   * Used to satisfy `update_config` assessment actions.
+   */
+  readonly update?: unknown
 }
 
 export function defineIntegration<const T extends Integration>(integration: T): T {

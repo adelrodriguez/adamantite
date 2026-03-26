@@ -47,8 +47,7 @@ describe("sherif", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
-        actions: [],
-        status: "not_applicable",
+        applicable: false,
         warnings: [],
       })
     })
@@ -82,7 +81,7 @@ describe("sherif", () => {
             type: "install_package",
           },
         ],
-        status: "needs_action",
+        applicable: true,
         warnings: [],
       })
     })
@@ -112,7 +111,7 @@ describe("sherif", () => {
 
       expect(result).toEqual({
         actions: [],
-        status: "healthy",
+        applicable: true,
         warnings: [],
       })
     })

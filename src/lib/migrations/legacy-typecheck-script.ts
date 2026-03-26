@@ -10,13 +10,13 @@ import { MigrationValidationFailed } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   getManagedScripts,
-  MANAGED_SCRIPT_COMMANDS,
   readPackageJson,
   writePackageJson,
+  MANAGED_SCRIPT_COMMANDS,
 } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
-const LEGACY_TYPECHECK_COMMAND = "adamantite typecheck"
+const LEGACY_TYPECHECK_SCRIPT_COMMAND = "adamantite typecheck"
 
 function getLegacyOxlintConfigPath() {
   return oxlint.files[1].path
@@ -26,11 +26,11 @@ function getGitHubWorkflowPath() {
   return github.files[0].path
 }
 
-export function migrateLegacyTypecheckScriptPackageJson(packageJson: PackageJson) {
+function migrateLegacyTypecheckScriptPackageJson(packageJson: PackageJson) {
   const scripts = { ...packageJson.scripts }
   const typecheckScript = scripts.typecheck
 
-  if (typecheckScript !== LEGACY_TYPECHECK_COMMAND) {
+  if (typecheckScript !== LEGACY_TYPECHECK_SCRIPT_COMMAND) {
     return {
       migrated: false,
       packageJson,
@@ -49,18 +49,18 @@ export function migrateLegacyTypecheckScriptPackageJson(packageJson: PackageJson
   }
 }
 
-export const legacyTypecheckScript = defineMigration({
+export default defineMigration({
   check: (context) =>
     Effect.gen(function* () {
       const packageJson = yield* readPackageJson(context.cwd)
       const { migrated } = migrateLegacyTypecheckScriptPackageJson(packageJson)
 
       if (!migrated) {
-        return { status: "not_applicable", warnings: [] }
+        return { applicable: false, warnings: [] }
       }
 
       return {
-        status: "needs_migration",
+        applicable: true,
         summary:
           "Migrating `typecheck` to `check` so oxlint handles linting and type diagnostics together.",
         warnings: [],
@@ -94,6 +94,8 @@ export const legacyTypecheckScript = defineMigration({
 
         if (oxlintState.active === null) {
           yield* oxlint.create(context.cwd)
+        } else if (oxlintState.active.format === "ts") {
+          yield* oxlint.update(context.cwd)
         }
 
         const hasTypescriptConfig = yield* tsconfig.exists(context.cwd)
@@ -162,7 +164,7 @@ export const legacyTypecheckScript = defineMigration({
     Effect.gen(function* () {
       const packageJson = yield* readPackageJson(context.cwd)
 
-      if (packageJson.scripts?.typecheck === LEGACY_TYPECHECK_COMMAND) {
+      if (packageJson.scripts?.typecheck === LEGACY_TYPECHECK_SCRIPT_COMMAND) {
         return yield* new MigrationValidationFailed({
           migrationId: "legacy-typecheck-script",
           reason: "The legacy `typecheck` script is still present in `package.json`.",

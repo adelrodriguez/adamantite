@@ -3,15 +3,14 @@ import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { AssessmentAction } from "#lib/integrations/base.ts"
+import type { AssessmentAction, IntegrationAssessment } from "#lib/integrations/base.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { legacyKnipJson } from "#lib/migrations/legacy-knip-json.ts"
-import { legacyOxfmtJson } from "#lib/migrations/legacy-oxfmt-json.ts"
-import { legacyOxlintJson } from "#lib/migrations/legacy-oxlint-json.ts"
+import { runMigration } from "#lib/migrations/base.ts"
+import { migrationsById } from "#lib/migrations/index.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
@@ -24,17 +23,35 @@ const fix = Flag.boolean("fix").pipe(
 
 const integrations = [knip, oxfmt, oxlint, sherif, tsgolint] as const
 
+type ApplicableAssessment = {
+  readonly assessment: Extract<IntegrationAssessment, { readonly applicable: true }>
+  readonly integration: (typeof integrations)[number]
+}
+
+function isApplicableAssessment(assessment: {
+  readonly applicable: boolean
+  readonly warnings: readonly string[]
+  readonly actions?: readonly AssessmentAction[]
+}): assessment is Extract<IntegrationAssessment, { readonly applicable: true }> {
+  return assessment.applicable && Array.isArray(assessment.actions)
+}
+
 const createFixersByIntegration = {
   [knip.name]: knip,
   [oxfmt.name]: oxfmt,
   [oxlint.name]: oxlint,
 } as const
 
-const migrationFixersById = {
-  [legacyKnipJson.id]: legacyKnipJson,
-  [legacyOxfmtJson.id]: legacyOxfmtJson,
-  [legacyOxlintJson.id]: legacyOxlintJson,
+const updateFixersByIntegration = {
+  [oxlint.name]: oxlint,
 } as const
+
+function checkHasIntegrationFixer<const T extends Record<string, unknown>>(
+  fixers: T,
+  integrationName: string
+): integrationName is Extract<keyof T, string> {
+  return Object.hasOwn(fixers, integrationName)
+}
 
 function getActionKey(integrationName: string, action: AssessmentAction) {
   switch (action.type) {
@@ -45,6 +62,8 @@ function getActionKey(integrationName: string, action: AssessmentAction) {
     case "create_config":
     case "update_config":
       return `${integrationName}:${action.type}:${action.path}`
+    case "manual_fix":
+      return `${integrationName}:${action.type}:${action.path ?? action.description}`
     case "run_migration":
       return `${integrationName}:${action.type}:${action.migrationId}`
   }
@@ -74,11 +93,14 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       // 1. Assess integrations.
-      const assessments = []
+      const assessments: ApplicableAssessment[] = []
       for (const integration of integrations) {
         const assessment = yield* integration.assess(cwd)
-        if (assessment.status !== "not_applicable") {
-          assessments.push({ assessment, integration })
+        if (isApplicableAssessment(assessment)) {
+          assessments.push({
+            assessment,
+            integration,
+          })
         }
       }
 
@@ -109,64 +131,91 @@ export default Command.make("doctor", { fix }).pipe(
       const appliedActions = new Set<string>()
 
       if (fix) {
-        const packageActions = actions.filter(
-          ({ action }) => action.type === "install_package" || action.type === "update_package"
-        )
+        yield* Effect.gen(function* () {
+          const packageActions = actions.filter(
+            ({ action }) => action.type === "install_package" || action.type === "update_package"
+          )
 
-        if (packageActions.length > 0) {
-          const dependencyInstaller = yield* DependencyInstaller
-          const packages: string[] = []
+          if (packageActions.length > 0) {
+            const dependencyInstaller = yield* DependencyInstaller
+            const packages: string[] = []
 
-          for (const { action } of packageActions) {
-            if (action.type === "install_package" || action.type === "update_package") {
-              packages.push(`${action.package}@${action.targetVersion}`)
+            for (const { action } of packageActions) {
+              if (action.type === "install_package" || action.type === "update_package") {
+                packages.push(`${action.package}@${action.targetVersion}`)
+              }
+            }
+
+            yield* dependencyInstaller.addDevDependencies(packages, cwd, { silent: true })
+
+            for (const { action, integration } of packageActions) {
+              if (action.type === "install_package") {
+                yield* prompter.log.success(
+                  `Fixed: installed \`${action.package}@${action.targetVersion}\`.`
+                )
+              }
+
+              if (action.type === "update_package") {
+                yield* prompter.log.success(
+                  `Fixed: updated \`${action.package}\` from \`${action.currentVersion}\` to \`${action.targetVersion}\`.`
+                )
+              }
+
+              appliedActions.add(getActionKey(integration.name, action))
             }
           }
 
-          yield* dependencyInstaller.addDevDependencies(packages, cwd, { silent: true })
-
-          for (const { action, integration } of packageActions) {
-            if (action.type === "install_package") {
-              yield* prompter.log.success(
-                `Fixed: installed \`${action.package}@${action.targetVersion}\`.`
-              )
+          for (const { action, integration } of actions) {
+            if (action.type !== "create_config") {
+              continue
             }
 
-            if (action.type === "update_package") {
-              yield* prompter.log.success(
-                `Fixed: updated \`${action.package}\` from \`${action.currentVersion}\` to \`${action.targetVersion}\`.`
-              )
+            if (!checkHasIntegrationFixer(createFixersByIntegration, integration.name)) {
+              continue
             }
 
+            const fixer = createFixersByIntegration[integration.name]
+            yield* fixer.create(cwd)
+            yield* prompter.log.success(`Fixed: created \`${action.path}\`.`)
             appliedActions.add(getActionKey(integration.name, action))
           }
-        }
 
-        for (const { action, integration } of actions) {
-          if (action.type !== "create_config") {
-            continue
+          for (const { action, integration } of actions) {
+            if (action.type !== "update_config") {
+              continue
+            }
+
+            if (!checkHasIntegrationFixer(updateFixersByIntegration, integration.name)) {
+              continue
+            }
+
+            const fixer = updateFixersByIntegration[integration.name]
+            yield* fixer.update(cwd)
+
+            yield* prompter.log.success(`Fixed: updated \`${action.path}\`.`)
+            appliedActions.add(getActionKey(integration.name, action))
           }
 
-          const fixer =
-            createFixersByIntegration[integration.name as keyof typeof createFixersByIntegration]
+          for (const { action, integration } of actions) {
+            if (action.type !== "run_migration") {
+              continue
+            }
 
-          yield* fixer.create(cwd)
-          yield* prompter.log.success(`Fixed: created \`${action.path}\`.`)
-          appliedActions.add(getActionKey(integration.name, action))
-        }
+            const migration = migrationsById[action.migrationId]
+            if (!migration) {
+              continue
+            }
 
-        for (const { action, integration } of actions) {
-          if (action.type !== "run_migration") {
-            continue
+            yield* runMigration(migration, { cwd })
+            appliedActions.add(getActionKey(integration.name, action))
           }
-
-          const migration =
-            migrationFixersById[action.migrationId as keyof typeof migrationFixersById]
-
-          yield* migration.migrate({ cwd })
-          yield* migration.validate({ cwd })
-          appliedActions.add(getActionKey(integration.name, action))
-        }
+        }).pipe(
+          Effect.tapError(() =>
+            Effect.gen(function* () {
+              yield* prompter.outro("❌ Doctor failed")
+            })
+          )
+        )
       }
 
       // 4. Report remaining issues or success.
@@ -188,13 +237,6 @@ export default Command.make("doctor", { fix }).pipe(
         command: "doctor",
         exitCode: ChildProcessSpawner.ExitCode(1),
       })
-    }).pipe(
-      Effect.tapErrorTag("FailedToInstallDependency", () =>
-        Effect.gen(function* () {
-          const prompter = yield* Prompter
-          yield* prompter.outro("❌ Doctor failed")
-        })
-      )
-    )
+    })
   )
 )

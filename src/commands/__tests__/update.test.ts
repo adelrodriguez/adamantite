@@ -120,7 +120,7 @@ describe("update", () => {
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })
 
-    test("ignore missing managed configs when dependencies are already current", async () => {
+    test("leave missing managed configs for doctor when dependencies are already current", async () => {
       await writeFile(
         join(tempDir, "package.json"),
         JSON.stringify(
@@ -150,10 +150,14 @@ describe("update", () => {
       expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
       expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
       expect(prompter.logs).toContainEqual({
-        level: "success",
-        message: "No changes needed.",
+        level: "warning",
+        message: "Some configuration follow-up belongs to `adamantite doctor --fix`.",
       })
-      expect(prompter.outros).toEqual(["✅ Adamantite is already up to date."])
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "Doctor follow-up: Create `oxlint.config.ts` for `oxlint`.",
+      })
+      expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })
 
     test("update dependencies without creating missing managed configs", async () => {
@@ -192,6 +196,14 @@ describe("update", () => {
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: "Dependencies updated successfully.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "Some configuration follow-up belongs to `adamantite doctor --fix`.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "Doctor follow-up: Create `oxlint.config.ts` for `oxlint`.",
       })
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })
@@ -452,7 +464,7 @@ describe("update", () => {
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })
 
-    test("ensure typeAware and typeCheck in an existing oxlint.config.ts that lacks them", async () => {
+    test("leave current-format oxlint config updates to doctor", async () => {
       await writeFile(
         join(tempDir, "package.json"),
         JSON.stringify(
@@ -496,11 +508,16 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
 
       const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
-      expect(oxlintConfig).toContain("typeAware")
-      expect(oxlintConfig).toContain("typeCheck")
+      expect(oxlintConfig).not.toContain("typeAware")
+      expect(oxlintConfig).not.toContain("typeCheck")
       expect(prompter.logs).toContainEqual({
-        level: "success",
-        message: "Migrations ran successfully.",
+        level: "warning",
+        message: "Some configuration follow-up belongs to `adamantite doctor --fix`.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Doctor follow-up: Update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`.",
       })
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })

@@ -72,6 +72,16 @@ This project uses changesets for version management:
 - Keep `init` simple. It should not import migration helpers or perform migration-specific orchestration.
 - When `init` finds existing setup that it intentionally leaves alone, prefer warning and follow-up guidance over mutation. Point users to `adamantite doctor` / `adamantite doctor --fix` for verification and safe local fixes.
 
+### Integration Lifecycle
+
+- `exists` answers whether the latest supported config is present and active.
+- `create` writes the latest supported config from scratch.
+- `update` safely rewrites an existing latest-format config into the latest supported shape.
+- `migrations` handle transitions that fall outside `exists` / `create` / `update`, such as legacy formats, legacy scripts, or one-off upgrades.
+- `assess` is read-only. It may classify package drift, missing config, supported config updates, manual follow-up work, and known migrations, but it must not mutate files or call migrations.
+- `doctor --fix` dispatches `create_config` through `create`, `update_config` through `update`, and `run_migration` through the migration system. `manual_fix` is report-only.
+- Migrations may call integrations to get the project into the latest supported shape. Integrations must not call migrations.
+
 ### Workspace Conventions
 
 - Managed script types and helpers live in `src/lib/workspace/package-json.ts`. Import `Script`, `MANAGED_SCRIPT_COMMANDS`, and `getManagedScripts` from there.

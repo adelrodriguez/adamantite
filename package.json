@@ -69,7 +69,7 @@
     "version": "changeset version"
   },
   "dependencies": {
-    "@clack/prompts": "1.1.0",
+    "@clack/prompts": "1.2.0",
     "@effect/platform-node": "4.0.0-beta.38",
     "defu": "6.1.4",
     "effect": "4.0.0-beta.38",

@@ -3,8 +3,6 @@ import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import Bun, { spawn } from "bun"
 
-const LOG_PREFIX_REGEX = /^\[log\]\s*/
-
 describe("adamantite", () => {
   const cliPath = join(import.meta.dir, "..", "index.ts")
 
@@ -22,7 +20,7 @@ describe("adamantite", () => {
       const packageJson = (await Bun.file("package.json").json()) as PackageJson
       const version = output
         .trim()
-        .replace(LOG_PREFIX_REGEX, "")
+        .replace(/^\[log\]\s*/, "")
         .replace(/^adamantite v/, "")
 
       expect(version).toBe(packageJson.version ?? "")

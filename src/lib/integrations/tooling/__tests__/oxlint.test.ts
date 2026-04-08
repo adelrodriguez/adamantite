@@ -86,9 +86,39 @@ describe("oxlint", () => {
   })
 
   describe("update", () => {
-    test("do nothing when oxlint.config.ts already exists", async () => {
-      const originalContent =
-        'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
+    test("patch oxlint.config.ts when type-aware options are missing", async () => {
+      await Bun.write(
+        "oxlint.config.ts",
+        [
+          'import { defineConfig } from "oxlint"',
+          'import core from "adamantite/lint"',
+          "",
+          "export default defineConfig({",
+          "  extends: [core],",
+          "})",
+          "",
+        ].join("\n")
+      )
+
+      await oxlint.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file("oxlint.config.ts").text()
+      expect(content).toContain("typeAware: true")
+      expect(content).toContain("typeCheck: true")
+      expect(content).toContain("extends: [core]")
+    })
+
+    test("leave oxlint.config.ts unchanged when type-aware options are already configured", async () => {
+      const originalContent = [
+        'import { defineConfig } from "oxlint"',
+        'import core from "adamantite/lint"',
+        "",
+        "export default defineConfig({",
+        '  options: { "typeAware": true, "typeCheck": true },',
+        "  extends: [core],",
+        "})",
+        "",
+      ].join("\n")
       await Bun.write("oxlint.config.ts", originalContent)
 
       await oxlint.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
@@ -104,13 +134,23 @@ describe("oxlint", () => {
       }
     })
 
-    test("return FileNotFound when only the legacy config exists", async () => {
-      await Bun.write(".oxlintrc.json", JSON.stringify({ rules: { semi: "error" } }, null, 2))
+    test("fail when oxlint.config.ts cannot be patched safely", async () => {
+      await Bun.write(
+        "oxlint.config.ts",
+        [
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({",
+          "  options: getOptions(),",
+          "})",
+          "",
+        ].join("\n")
+      )
 
-      const result = await runEither(oxlint.update(tempDir))
+      const result = await runEither(oxlint.update(tempDir), NodeServices.layer)
       expect(isLeft(result)).toBe(true)
       if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FileNotFound" })
+        expect(result.left).toMatchObject({ _tag: "UnsupportedConfigState" })
       }
     })
   })
@@ -145,8 +185,7 @@ describe("oxlint", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
-        actions: [],
-        status: "not_applicable",
+        applicable: false,
         warnings: [],
       })
     })
@@ -182,7 +221,7 @@ describe("oxlint", () => {
             type: "create_config",
           },
         ],
-        status: "needs_action",
+        applicable: true,
         warnings: [],
       })
     })
@@ -219,7 +258,7 @@ describe("oxlint", () => {
             type: "run_migration",
           },
         ],
-        status: "needs_action",
+        applicable: true,
         warnings: [],
       })
     })
@@ -244,7 +283,16 @@ describe("oxlint", () => {
       )
       await Bun.write(
         "oxlint.config.ts",
-        'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
+        [
+          'import { defineConfig } from "oxlint"',
+          'import core from "adamantite/lint"',
+          "",
+          "export default defineConfig({",
+          '  options: { "typeAware": true, "typeCheck": true },',
+          "  extends: [core],",
+          "})",
+          "",
+        ].join("\n")
       )
 
       const result = await oxlint
@@ -253,7 +301,104 @@ describe("oxlint", () => {
 
       expect(result).toEqual({
         actions: [],
-        status: "healthy",
+        applicable: true,
+        warnings: [],
+      })
+    })
+
+    test("report a config update when managed check config lacks type-aware options", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+            },
+            name: "test-project",
+            scripts: {
+              check: "adamantite check",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await Bun.write(
+        "oxlint.config.ts",
+        [
+          'import { defineConfig } from "oxlint"',
+          'import core from "adamantite/lint"',
+          "",
+          "export default defineConfig({",
+          "  extends: [core],",
+          "})",
+          "",
+        ].join("\n")
+      )
+
+      const result = await oxlint
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [
+          {
+            description:
+              "Update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`.",
+            path: "oxlint.config.ts",
+            type: "update_config",
+          },
+        ],
+        applicable: true,
+        warnings: [],
+      })
+    })
+
+    test("report a manual fix when managed check config cannot be patched safely", async () => {
+      await Bun.write(
+        "package.json",
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+            },
+            name: "test-project",
+            scripts: {
+              check: "adamantite check",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await Bun.write(
+        "oxlint.config.ts",
+        [
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({",
+          "  options: getOptions(),",
+          "})",
+          "",
+        ].join("\n")
+      )
+
+      const result = await oxlint
+        .assess(tempDir)
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      expect(result).toEqual({
+        actions: [
+          {
+            description:
+              "Manually update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`; Adamantite cannot patch the current file shape safely.",
+            path: "oxlint.config.ts",
+            type: "manual_fix",
+          },
+        ],
+        applicable: true,
         warnings: [],
       })
     })
@@ -297,8 +442,7 @@ describe("tsgolint", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
-        actions: [],
-        status: "not_applicable",
+        applicable: false,
         warnings: [],
       })
     })
@@ -332,7 +476,7 @@ describe("tsgolint", () => {
             type: "install_package",
           },
         ],
-        status: "needs_action",
+        applicable: true,
         warnings: [],
       })
     })
@@ -362,7 +506,7 @@ describe("tsgolint", () => {
 
       expect(result).toEqual({
         actions: [],
-        status: "healthy",
+        applicable: true,
         warnings: [],
       })
     })

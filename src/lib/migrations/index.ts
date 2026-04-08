@@ -1,14 +1,25 @@
 import type { Migration } from "#lib/migrations/base.ts"
-import { legacyKnipJson } from "#lib/migrations/legacy-knip-json.ts"
-import { legacyOxfmtJson } from "#lib/migrations/legacy-oxfmt-json.ts"
-import { legacyOxlintJson } from "#lib/migrations/legacy-oxlint-json.ts"
-import { legacyTypecheckScript } from "#lib/migrations/legacy-typecheck-script.ts"
-import { oxlintTypecheck } from "#lib/migrations/oxlint-typecheck.ts"
+import knip from "#lib/integrations/tooling/knip.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import migrationLegacyKnipJson from "#lib/migrations/legacy-knip-json.ts"
+import migrationLegacyOxfmtJson from "#lib/migrations/legacy-oxfmt-json.ts"
+import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
+import migrationLegacyTypecheckScript from "#lib/migrations/legacy-typecheck-script.ts"
 
 export const migrations: readonly Migration[] = [
-  legacyOxfmtJson,
-  legacyKnipJson,
-  legacyOxlintJson,
-  oxlintTypecheck,
-  legacyTypecheckScript,
+  migrationLegacyOxfmtJson,
+  migrationLegacyKnipJson,
+  migrationLegacyOxlintJson,
+  migrationLegacyTypecheckScript,
 ]
+
+export const migrationsById: Readonly<Record<string, Migration>> = Object.fromEntries(
+  migrations.map((migration) => [migration.id, migration])
+)
+
+export const assessmentDrivenMigrationIntegrationById = {
+  [migrationLegacyKnipJson.id]: knip.name,
+  [migrationLegacyOxfmtJson.id]: oxfmt.name,
+  [migrationLegacyOxlintJson.id]: oxlint.name,
+} as const

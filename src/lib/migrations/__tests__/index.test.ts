@@ -7,7 +7,6 @@ describe("migrations", () => {
       "legacy-oxfmt-json",
       "legacy-knip-json",
       "legacy-oxlint-json",
-      "oxlint-typecheck",
       "legacy-typecheck-script",
     ])
   })

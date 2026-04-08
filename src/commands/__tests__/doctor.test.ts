@@ -241,7 +241,16 @@ describe("doctor", () => {
     )
     await writeFile(
       join(tempDir, "oxlint.config.ts"),
-      'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
+      [
+        'import { defineConfig } from "oxlint"',
+        'import core from "adamantite/lint"',
+        "",
+        "export default defineConfig({",
+        '  options: { "typeAware": true, "typeCheck": true },',
+        "  extends: [core],",
+        "})",
+        "",
+      ].join("\n")
     )
 
     const prompter = createPrompterTestContext()
@@ -346,7 +355,16 @@ describe("doctor", () => {
     )
     await writeFile(
       join(tempDir, "oxlint.config.ts"),
-      'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
+      [
+        'import { defineConfig } from "oxlint"',
+        'import core from "adamantite/lint"',
+        "",
+        "export default defineConfig({",
+        '  options: { "typeAware": true, "typeCheck": true },',
+        "  extends: [core],",
+        "})",
+        "",
+      ].join("\n")
     )
 
     const installer = createDependencyInstallerTestContext()
@@ -390,7 +408,16 @@ describe("doctor", () => {
     )
     await writeFile(
       join(tempDir, "oxlint.config.ts"),
-      'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
+      [
+        'import { defineConfig } from "oxlint"',
+        'import core from "adamantite/lint"',
+        "",
+        "export default defineConfig({",
+        '  options: { "typeAware": true, "typeCheck": true },',
+        "  extends: [core],",
+        "})",
+        "",
+      ].join("\n")
     )
 
     const installer = createDependencyInstallerTestContext()
@@ -565,6 +592,46 @@ describe("doctor", () => {
       type: "stop",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+  })
+
+  test("fail cleanly when a migration fix fails", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify(
+        {
+          devDependencies: {
+            adamantite: "1.0.0",
+            oxfmt: oxfmt.version,
+          },
+          name: "test-project",
+          scripts: {
+            format: "adamantite format",
+          },
+          version: "1.0.0",
+        },
+        null,
+        2
+      )
+    )
+    await writeFile(join(tempDir, ".oxfmtrc.json"), JSON.stringify([], null, 2))
+
+    const installer = createDependencyInstallerTestContext()
+    const prompter = createPrompterTestContext()
+
+    const exit = await runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+    const error = Option.getOrThrow(Exit.findErrorOption(exit))
+    const errorPath =
+      typeof error === "object" &&
+      error !== null &&
+      "path" in error &&
+      typeof error.path === "string"
+        ? error.path
+        : ""
+
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(error).toMatchObject({ _tag: "InvalidConfigFormat" })
+    expect(errorPath).toEndWith("/.oxfmtrc.json")
+    expect(prompter.outros).toEqual(["❌ Doctor failed"])
   })
 
   test("install oxfmt and migrate its legacy config with --fix when both are missing", async () => {
@@ -946,5 +1013,100 @@ describe("doctor", () => {
       type: "stop",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+  })
+
+  test("patch oxlint config with --fix when type-aware options are missing", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify(
+        {
+          devDependencies: {
+            adamantite: "1.0.0",
+            oxlint: oxlint.version,
+            [tsgolint.name]: tsgolint.version,
+          },
+          name: "test-project",
+          scripts: {
+            check: "adamantite check",
+          },
+          version: "1.0.0",
+        },
+        null,
+        2
+      )
+    )
+    await writeFile(
+      join(tempDir, "oxlint.config.ts"),
+      [
+        'import { defineConfig } from "oxlint"',
+        'import core from "adamantite/lint"',
+        "",
+        "export default defineConfig({",
+        "  extends: [core],",
+        "})",
+        "",
+      ].join("\n")
+    )
+
+    const installer = createDependencyInstallerTestContext()
+    const prompter = createPrompterTestContext()
+
+    const exit = await runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(installer.calls).toEqual([])
+    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).text()).toContain("typeAware: true")
+    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).text()).toContain("typeCheck: true")
+    expect(prompter.logs).toContainEqual({
+      level: "success",
+      message: "Fixed: updated `oxlint.config.ts`.",
+    })
+    expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+  })
+
+  test("report manual oxlint config drift with --fix when the file cannot be patched safely", async () => {
+    await writeFile(
+      join(tempDir, "package.json"),
+      JSON.stringify(
+        {
+          devDependencies: {
+            adamantite: "1.0.0",
+            oxlint: oxlint.version,
+            [tsgolint.name]: tsgolint.version,
+          },
+          name: "test-project",
+          scripts: {
+            check: "adamantite check",
+          },
+          version: "1.0.0",
+        },
+        null,
+        2
+      )
+    )
+    const originalConfig = [
+      'import { defineConfig } from "oxlint"',
+      "",
+      "export default defineConfig({",
+      "  options: getOptions(),",
+      "})",
+      "",
+    ].join("\n")
+    await writeFile(join(tempDir, "oxlint.config.ts"), originalConfig)
+
+    const installer = createDependencyInstallerTestContext()
+    const prompter = createPrompterTestContext()
+
+    const exit = await runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+
+    expect(Exit.isFailure(exit)).toBe(true)
+    expect(installer.calls).toEqual([])
+    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).text()).toBe(originalConfig)
+    expect(prompter.logs).toContainEqual({
+      level: "warning",
+      message:
+        "Needs attention: Manually update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`; Adamantite cannot patch the current file shape safely.",
+    })
+    expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
   })
 })

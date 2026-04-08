@@ -1,5 +1,6 @@
 import type * as PlatformError from "effect/PlatformError"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { DependencyInstaller } from "#lib/services/dependency-installer.ts"
@@ -14,19 +15,23 @@ import type {
   InvalidConfigFormat,
   MigrationValidationFailed,
   NoPackageManager,
+  UnsupportedConfigState,
 } from "#lib/shared/errors.ts"
-
-export type MigrationTag = "update" | (string & {})
 
 export interface MigrationContext {
   readonly cwd: string
 }
 
-export interface MigrationCheckResult {
-  readonly status: "not_applicable" | "valid" | "needs_migration"
-  readonly summary?: string
-  readonly warnings: readonly string[]
-}
+export type MigrationCheckResult =
+  | {
+      readonly applicable: false
+      readonly warnings: readonly string[]
+    }
+  | {
+      readonly applicable: true
+      readonly summary?: string
+      readonly warnings: readonly string[]
+    }
 
 export type MigrationError =
   | FailedToDeleteFile
@@ -38,6 +43,7 @@ export type MigrationError =
   | InvalidConfigFormat
   | MigrationValidationFailed
   | NoPackageManager
+  | UnsupportedConfigState
   | PlatformError.PlatformError
 
 export type MigrationRequirements =
@@ -48,7 +54,7 @@ export type MigrationRequirements =
 
 export interface Migration {
   readonly id: string
-  readonly tags: readonly MigrationTag[]
+  readonly tags: readonly ["update"]
   readonly title: string
   readonly files?: readonly string[]
   check(
@@ -62,14 +68,21 @@ export function defineMigration<const T extends Migration>(migration: T): T {
   return migration
 }
 
-export function snapshotFiles(cwd: string, relativePaths: readonly string[]) {
+export function runMigration(
+  migration: Migration,
+  context: MigrationContext,
+  options?: {
+    readonly onRestore?: Effect.Effect<void>
+  }
+) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
+    const filePaths = migration.files ?? []
     const snapshot = new Map<string, string | null>()
 
-    for (const relativePath of relativePaths) {
-      const fullPath = path.join(cwd, relativePath)
+    for (const relativePath of filePaths) {
+      const fullPath = path.join(context.cwd, relativePath)
       const exists = yield* fs.exists(fullPath)
 
       if (exists) {
@@ -80,24 +93,35 @@ export function snapshotFiles(cwd: string, relativePaths: readonly string[]) {
       }
     }
 
-    return snapshot
-  })
-}
+    const exit = yield* Effect.exit(
+      migration
+        .migrate(context)
+        .pipe(Effect.andThen(() => migration.validate?.(context) ?? Effect.void))
+    )
 
-export function restoreFiles(snapshot: Map<string, string | null>) {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
+    if (Exit.isSuccess(exit)) {
+      return
+    }
+
+    if (options?.onRestore) {
+      yield* options.onRestore
+    }
 
     for (const [fullPath, content] of snapshot) {
-      if (content === null) {
-        const exists = yield* fs.exists(fullPath)
-
-        if (exists) {
-          yield* fs.remove(fullPath)
-        }
-      } else {
-        yield* fs.writeFileString(fullPath, content)
+      if (content !== null) {
+        yield* fs.writeFileString(fullPath, content).pipe(Effect.ignore)
+        continue
       }
+
+      const exists = yield* fs.exists(fullPath).pipe(Effect.orElseSucceed(() => false))
+
+      if (!exists) {
+        continue
+      }
+
+      yield* fs.remove(fullPath).pipe(Effect.ignore)
     }
+
+    return yield* Effect.failCause(exit.cause)
   })
 }

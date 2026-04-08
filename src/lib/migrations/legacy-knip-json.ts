@@ -70,7 +70,7 @@ function migrateLegacyKnipConfig(cwd: string) {
   })
 }
 
-export const legacyKnipJson = defineMigration({
+export default defineMigration({
   check: (context) =>
     Effect.gen(function* () {
       const state = yield* knip.exists(context.cwd)
@@ -88,17 +88,17 @@ export const legacyKnipJson = defineMigration({
 
       if (state.active?.format === "json" || state.active?.format === "jsonc") {
         return {
-          status: "needs_migration",
+          applicable: true,
           summary: getLegacyKnipSummary(state.active.format),
           warnings,
         }
       }
 
       if (state.active?.format === "ts") {
-        return { status: "valid", warnings }
+        return { applicable: true, warnings }
       }
 
-      return { status: "not_applicable", warnings }
+      return { applicable: false, warnings }
     }),
   files: [knip.config, ...getLegacyConfigPaths()],
   id: "legacy-knip-json",

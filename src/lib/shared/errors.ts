@@ -131,6 +131,18 @@ export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")
   }
 }
 
+export class UnsupportedConfigState extends Data.TaggedError("UnsupportedConfigState")<{
+  path?: string
+  reason?: string
+}> {
+  override get message() {
+    const target = this.path ? `\`${this.path}\`` : "the target config file"
+    const detail = this.reason ? ` ${this.reason}` : ""
+
+    return `Unsupported config state in ${target}.${detail}`
+  }
+}
+
 export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
   cause?: unknown
 }> {

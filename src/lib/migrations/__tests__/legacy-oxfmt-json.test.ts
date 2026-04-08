@@ -7,7 +7,7 @@ import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import { createPrompterTestContext } from "#commands/__tests__/command-test-helpers.ts"
-import { legacyOxfmtJson } from "#lib/migrations/legacy-oxfmt-json.ts"
+import migrationLegacyOxfmtJson from "#lib/migrations/legacy-oxfmt-json.ts"
 
 function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
   const prompterContext = createPrompterTestContext()
@@ -37,12 +37,14 @@ describe("legacyOxfmtJson", () => {
     await Bun.write("oxfmt.config.ts", "export default { semi: false }\n")
     await Bun.write(".oxfmtrc.json", "{}\n")
 
-    const result = await runTestEffect(legacyOxfmtJson.check({ cwd: tempDir }))
+    const result = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
 
-    expect(result.status).toBe("valid")
-    expect(result.warnings).toEqual([
-      "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
-    ])
+    expect(result).toEqual({
+      applicable: true,
+      warnings: [
+        "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
+      ],
+    })
   })
 
   test("migrate converts a legacy JSON config into the current TS config format", async () => {
@@ -60,13 +62,14 @@ describe("legacyOxfmtJson", () => {
       )
     )
 
-    const checkResult = await runTestEffect(legacyOxfmtJson.check({ cwd: tempDir }))
-    expect(checkResult.status).toBe("needs_migration")
-    expect(checkResult.summary).toBe(
-      "Migrating legacy `.oxfmtrc.json` configuration to `oxfmt.config.ts`."
-    )
+    const checkResult = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
+    expect(checkResult).toEqual({
+      applicable: true,
+      summary: "Migrating legacy `.oxfmtrc.json` configuration to `oxfmt.config.ts`.",
+      warnings: [],
+    })
 
-    await runTestEffect(legacyOxfmtJson.migrate({ cwd: tempDir }))
+    await runTestEffect(migrationLegacyOxfmtJson.migrate({ cwd: tempDir }))
 
     expect(await Bun.file("oxfmt.config.ts").exists()).toBe(true)
     expect(await Bun.file(".oxfmtrc.json").exists()).toBe(false)
@@ -78,19 +81,22 @@ describe("legacyOxfmtJson", () => {
     expect(content).toContain("...format.sortImports")
     expect(content).toContain('order: "desc"')
 
-    await runTestEffect(legacyOxfmtJson.validate({ cwd: tempDir }))
+    await runTestEffect(migrationLegacyOxfmtJson.validate({ cwd: tempDir }))
   })
 
   test("check warns when both legacy JSON and JSONC exist without a TS config", async () => {
     await Bun.write(".oxfmtrc.json", "{}\n")
     await Bun.write(".oxfmtrc.jsonc", '{ "semi": true }\n')
 
-    const result = await runTestEffect(legacyOxfmtJson.check({ cwd: tempDir }))
+    const result = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
 
-    expect(result.status).toBe("needs_migration")
-    expect(result.warnings).toEqual([
-      "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed.",
-    ])
+    expect(result).toEqual({
+      applicable: true,
+      summary: "Migrating legacy `.oxfmtrc.jsonc` configuration to `oxfmt.config.ts`.",
+      warnings: [
+        "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed.",
+      ],
+    })
   })
 
   test("migrate removes both legacy files when JSON and JSONC exist without oxfmt.config.ts", async () => {
@@ -106,7 +112,7 @@ describe("legacyOxfmtJson", () => {
       )
     )
 
-    await runTestEffect(legacyOxfmtJson.migrate({ cwd: tempDir }))
+    await runTestEffect(migrationLegacyOxfmtJson.migrate({ cwd: tempDir }))
 
     expect(await Bun.file("oxfmt.config.ts").exists()).toBe(true)
     expect(await Bun.file(".oxfmtrc.json").exists()).toBe(false)
@@ -129,13 +135,14 @@ describe("legacyOxfmtJson", () => {
       ].join("\n")
     )
 
-    const checkResult = await runTestEffect(legacyOxfmtJson.check({ cwd: tempDir }))
-    expect(checkResult.status).toBe("needs_migration")
-    expect(checkResult.summary).toBe(
-      "Migrating legacy `.oxfmtrc.jsonc` configuration to `oxfmt.config.ts`."
-    )
+    const checkResult = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
+    expect(checkResult).toEqual({
+      applicable: true,
+      summary: "Migrating legacy `.oxfmtrc.jsonc` configuration to `oxfmt.config.ts`.",
+      warnings: [],
+    })
 
-    await runTestEffect(legacyOxfmtJson.migrate({ cwd: tempDir }))
+    await runTestEffect(migrationLegacyOxfmtJson.migrate({ cwd: tempDir }))
 
     expect(await Bun.file("oxfmt.config.ts").exists()).toBe(true)
     expect(await Bun.file(".oxfmtrc.jsonc").exists()).toBe(false)

@@ -2,7 +2,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
-import { FailedToWriteFile, FileNotFound } from "#lib/shared/errors.ts"
+import { FailedToWriteFile } from "#lib/shared/errors.ts"
 import { toKnipTsConfigContent } from "#lib/workspace/knip-config.ts"
 import {
   getManagedScripts,
@@ -28,8 +28,7 @@ export default defineIntegration({
 
       if (!managedScripts.includes("analyze")) {
         return {
-          actions: [],
-          status: "not_applicable",
+          applicable: false,
           warnings: [],
         }
       }
@@ -91,7 +90,7 @@ export default defineIntegration({
 
       return {
         actions,
-        status: actions.length === 0 ? "healthy" : "needs_action",
+        applicable: true,
         warnings,
       }
     }),
@@ -143,15 +142,5 @@ export default defineIntegration({
   files,
   kind: "tooling",
   name: "knip",
-  update: (cwd: string) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      const configPath = path.join(cwd, files[0].path)
-
-      if (!(yield* fs.exists(configPath))) {
-        return yield* new FileNotFound({ path: files[0].path })
-      }
-    }),
   version: VERSION,
 })

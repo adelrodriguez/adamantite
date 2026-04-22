@@ -21,7 +21,10 @@ describe("defineIntegration", () => {
 
   test("preserve metadata for tooling and workspace integrations", () => {
     const toolingIntegration = defineIntegration({ kind: "tooling", name: "tooling-example" })
-    const workspaceIntegration = defineIntegration({ kind: "workspace", name: "workspace-example" })
+    const workspaceIntegration = defineIntegration({
+      kind: "workspace",
+      name: "workspace-example",
+    })
 
     expect(toolingIntegration.kind).toBe("tooling")
     expect(workspaceIntegration.kind).toBe("workspace")

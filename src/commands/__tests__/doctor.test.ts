@@ -329,7 +329,7 @@ describe("doctor", () => {
     expect(prompter.logs.filter((entry) => entry.level === "success")).toEqual([])
     expect(prompter.logs).toContainEqual({
       level: "warning",
-      message: "Needs attention: Install `knip@6.0.4` for the managed `analyze` script.",
+      message: `Needs attention: Install \`knip@${knip.version}\` for the managed \`analyze\` script.`,
     })
     expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
   })

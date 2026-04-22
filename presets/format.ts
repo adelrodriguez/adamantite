@@ -1,6 +1,6 @@
 import type { FormatConfig } from "oxfmt"
 
-export default {
+const config: FormatConfig = {
   arrowParens: "always",
   bracketSameLine: false,
   bracketSpacing: true,
@@ -58,4 +58,6 @@ export default {
   tabWidth: 2,
   trailingComma: "es5",
   useTabs: false,
-} as const satisfies FormatConfig
+}
+
+export default config

@@ -1,6 +1,6 @@
 import type { OxlintConfig } from "oxlint"
 
-export default {
+const config: OxlintConfig = {
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   rules: {
     "accessor-pairs": "error",
@@ -462,4 +462,6 @@ export default {
     "vars-on-top": "error",
     yoda: "error",
   },
-} as const satisfies OxlintConfig
+}
+
+export default config

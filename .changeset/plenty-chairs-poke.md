@@ -17,3 +17,7 @@ The lint presets also enable these new rules added in recent oxlint releases:
 - React: `react/hook-use-state` and `react/prefer-function-component`
 - Jest: `jest/padding-around-after-all-blocks`, `jest/prefer-ending-with-an-expect`, and `jest/valid-expect-in-promise`
 - Vitest: `vitest/prefer-called-exactly-once-with`, `vitest/prefer-strict-boolean-matchers`, `vitest/require-awaited-expect-poll`, and `vitest/require-mock-type-parameters`
+
+Upgrade the bundled `knip` version to `6.6.1`. This release range improves framework plugin coverage, config hints, workspace handling, and analysis performance.
+
+The analyze preset now explicitly reports unused catalog entries with `catalog: "error"` and unused namespace members with `namespaceMembers: "warn"`.

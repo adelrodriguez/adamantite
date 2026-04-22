@@ -70,7 +70,9 @@ interface Integration {
 
   readonly config?: string
 
-  /** Check whether the latest supported config is present and active. */
+  /**
+   * Check whether the latest supported config is present and active.
+   */
   readonly exists?: unknown
   readonly files?: readonly IntegrationFile[]
   readonly kind: IntegrationKind

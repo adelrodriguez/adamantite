@@ -1,8 +1,8 @@
 import type * as PlatformError from "effect/PlatformError"
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as ServiceMap from "effect/ServiceMap"
 import * as ChildProcess from "effect/unstable/process/ChildProcess"
 import { CliNotFound } from "#lib/shared/errors.ts"
 
@@ -17,7 +17,7 @@ export interface CommandRunOptions {
 
 export type CommandFailedLike = CliNotFound | PlatformError.PlatformError
 
-export class CommandRunner extends ServiceMap.Service<
+export class CommandRunner extends Context.Service<
   CommandRunner,
   {
     readonly run: (

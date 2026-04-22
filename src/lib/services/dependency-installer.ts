@@ -1,6 +1,6 @@
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as ServiceMap from "effect/ServiceMap"
 import {
   addDevDependency,
   detectPackageManager as detectNypmPackageManager,
@@ -13,7 +13,7 @@ export interface DetectedPackageManager {
   readonly warnings?: string[]
 }
 
-export class DependencyInstaller extends ServiceMap.Service<
+export class DependencyInstaller extends Context.Service<
   DependencyInstaller,
   {
     readonly addDevDependencies: (

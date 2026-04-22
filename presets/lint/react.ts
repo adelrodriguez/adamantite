@@ -35,6 +35,7 @@ export default {
     "react/checked-requires-onchange-or-readonly": "error",
     "react/display-name": "off",
     "react/exhaustive-deps": "error",
+    "react/hook-use-state": "error",
     "react/iframe-missing-sandbox": "error",
     "react/jsx-boolean-value": "error",
     "react/jsx-curly-brace-presence": [
@@ -72,6 +73,7 @@ export default {
     "react/no-unknown-property": "error",
     "react/no-unsafe": "error",
     "react/prefer-es6-class": ["error", "always"],
+    "react/prefer-function-component": "error",
     "react/rules-of-hooks": "error",
     "react/self-closing-comp": "error",
     "react/state-in-constructor": ["error", "never"],

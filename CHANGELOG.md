@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.32.1
+
+### Patch Changes
+
+- ed4c2ac: Fix preset declaration types so lint, format, and analyze presets can be extended without leaking readonly literal arrays into consumer configs.
+
 ## 0.32.0
 
 ### Minor Changes

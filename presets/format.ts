@@ -8,6 +8,7 @@ export default {
   endOfLine: "lf",
   htmlWhitespaceSensitivity: "css",
   insertFinalNewline: true,
+  jsdoc: true,
   jsxSingleQuote: false,
   objectWrap: "preserve",
   printWidth: 100,

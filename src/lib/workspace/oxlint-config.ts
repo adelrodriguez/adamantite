@@ -118,7 +118,6 @@ function parse(content: string) {
 }
 
 function print(program: Program) {
-  // @ts-expect-error - esrap's printer types do not yet accept oxc-parser's TS-ESTree program
   const { code } = printAst(program, ts({ quotes: "double" }))
 
   return code.endsWith("\n") ? code : `${code}\n`

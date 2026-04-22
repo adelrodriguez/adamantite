@@ -1,7 +1,7 @@
 import * as p from "@clack/prompts"
+import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as ServiceMap from "effect/ServiceMap"
 import { OperationCancelled } from "#lib/shared/errors.ts"
 
 interface PrompterService {
@@ -21,7 +21,7 @@ interface PrompterService {
   readonly spinner: () => p.SpinnerResult
 }
 
-export class Prompter extends ServiceMap.Service<Prompter, PrompterService>()("Prompter") {
+export class Prompter extends Context.Service<Prompter, PrompterService>()("Prompter") {
   static readonly layer = Layer.succeed(this)({
     cancel: (message) =>
       Effect.sync(() => {

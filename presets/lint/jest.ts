@@ -1,6 +1,6 @@
 import type { OxlintConfig } from "oxlint"
 
-export default {
+const config: OxlintConfig = {
   plugins: ["jest"],
   rules: {
     "jest/consistent-test-it": "error",
@@ -59,4 +59,6 @@ export default {
     "jest/valid-expect-in-promise": "error",
     "jest/valid-title": "error",
   },
-} as const satisfies OxlintConfig
+}
+
+export default config

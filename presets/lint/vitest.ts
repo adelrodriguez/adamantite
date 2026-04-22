@@ -1,6 +1,6 @@
 import type { OxlintConfig } from "oxlint"
 
-export default {
+const config: OxlintConfig = {
   plugins: ["vitest"],
   rules: {
     "vitest/consistent-each-for": "error",
@@ -21,4 +21,6 @@ export default {
     "vitest/require-local-test-context-for-concurrent-snapshots": "error",
     "vitest/require-mock-type-parameters": "error",
   },
-} as const satisfies OxlintConfig
+}
+
+export default config

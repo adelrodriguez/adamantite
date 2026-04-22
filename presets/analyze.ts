@@ -1,6 +1,6 @@
-import type { KnipConfig } from "knip"
+import type { KnipConfiguration } from "knip"
 
-export default {
+const config: KnipConfiguration = {
   ignore: ["**/*.d.ts"],
   ignoreExportsUsedInFile: true,
   ignoreFiles: [
@@ -28,4 +28,6 @@ export default {
     unlisted: "error",
     unresolved: "error",
   },
-} as const satisfies KnipConfig
+}
+
+export default config

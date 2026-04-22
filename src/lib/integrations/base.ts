@@ -57,30 +57,28 @@ interface Integration {
   /**
    * Read-only diagnosis for the current project state.
    *
-   * `assess` may classify package drift, missing config, supported config updates,
-   * manual follow-up work, and known migrations. It must not mutate files or call migrations.
+   * `assess` may classify package drift, missing config, supported config updates, manual follow-up
+   * work, and known migrations. It must not mutate files or call migrations.
    */
   readonly assess?: unknown
 
   /**
-   * Write the latest supported config from scratch.
-   * Used to satisfy `create_config` assessment actions.
+   * Write the latest supported config from scratch. Used to satisfy `create_config` assessment
+   * actions.
    */
   readonly create?: unknown
 
   readonly config?: string
 
-  /**
-   * Check whether the latest supported config is present and active.
-   */
+  /** Check whether the latest supported config is present and active. */
   readonly exists?: unknown
   readonly files?: readonly IntegrationFile[]
   readonly kind: IntegrationKind
   readonly name: string
 
   /**
-   * Safely rewrite an existing latest-format config into the latest supported shape.
-   * Used to satisfy `update_config` assessment actions.
+   * Safely rewrite an existing latest-format config into the latest supported shape. Used to
+   * satisfy `update_config` assessment actions.
    */
   readonly update?: unknown
 }

@@ -36,9 +36,7 @@ export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
       .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
   })
 
-/**
- * Available scripts that can be added to package.json during initialization.
- */
+/** Available scripts that can be added to package.json during initialization. */
 export type Script = "check" | "fix" | "format" | "check:monorepo" | "fix:monorepo" | "analyze"
 
 export const MANAGED_SCRIPT_COMMANDS = {

@@ -87,7 +87,7 @@
     "figlet": "1.11.0",
     "knip": "6.6.1",
     "oxfmt": "0.46.0",
-    "oxlint": "1.61.0",
+    "oxlint": "1.62.0",
     "oxlint-tsgolint": "0.21.1",
     "sherif": "1.11.1",
     "type-fest": "5.6.0"

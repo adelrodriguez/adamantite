@@ -21,7 +21,7 @@ const config: OxlintConfig = {
     "jsx-a11y/media-has-caption": "error",
     "jsx-a11y/mouse-events-have-key-events": "error",
     "jsx-a11y/no-access-key": "error",
-    "jsx-a11y/no-ambiguous-text": "error",
+    "jsx-a11y/anchor-ambiguous-text": "error",
     "jsx-a11y/no-aria-hidden-on-focusable": "error",
     "jsx-a11y/no-autofocus": "error",
     "jsx-a11y/no-distracting-elements": "error",

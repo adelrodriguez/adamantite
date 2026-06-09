@@ -12,7 +12,8 @@ This project was built with [`pastry`](https://github.com/adelrodriguez/pastry) 
 ## Changesets
 
 - We use `changesets` for versioning and changelog management.
-- Run `bun changeset --empty` to create a new empty changeset file.
+- Create a changeset only for changes that affect users of the published package, such as CLI behavior, presets, package exports, dependencies used at runtime, or documentation shipped to users.
+- Do not add a changeset for internal-only changes, such as tests, CI, release tooling, contributor docs, or repository maintenance that does not affect package users.
 - Never make a major version bump unless the user requests it.
 - If a breaking change is being made, and we are on v1.0.0 or higher, alert the user.
 
@@ -51,7 +52,7 @@ Make sure to always run format after editing files, including creating documenta
 
 This project uses changesets for version management:
 
-1. **Create changeset**: `bunx changeset` (interactive prompt for version bump)
+1. **Create changeset when user-facing**: `bunx changeset` (interactive prompt for version bump)
 2. **Version locally**: `bun run version` (bumps package.json and updates CHANGELOG)
 3. **Publish**: Push to main → CI passes → auto-publishes to npm
 

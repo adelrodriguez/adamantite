@@ -135,7 +135,7 @@ Use conventional commit format:
 2. Check for issues: `bun run check`
 3. Auto-fix issues: `bun run fix`
 4. Format code: `bun run format`
-5. **Add a changeset**: Run `bunx changeset` to document your changes
+5. **Add a changeset if user-facing**: Run `bunx changeset` when your change affects users of the published package
 6. Update documentation if needed
 7. Add tests for new features
 
@@ -182,7 +182,7 @@ For new features:
 
 Adamantite uses [changesets](https://github.com/changesets/changesets) for version management:
 
-1. **Adding a changeset**: Run `bunx changeset` after making changes
+1. **Adding a changeset**: Run `bunx changeset` when a change affects users of the published package, such as CLI behavior, presets, package exports, runtime dependencies, or user-facing documentation
 2. **Version bumping**: Maintainers run `bun run version`
 3. **Publishing**: Automated via GitHub Actions on merge to main
 

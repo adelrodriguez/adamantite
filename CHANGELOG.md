@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.32.2
+
+### Patch Changes
+
+- [#282](https://github.com/adelrodriguez/adamantite/pull/282) [`87362fc`](https://github.com/adelrodriguez/adamantite/commit/87362fcafdbdb12fc9aa108eb5b95a18340d3fa9) Thanks [@wling-art](https://github.com/wling-art)! - Fix the React lint preset to use Oxlint's supported `jsx-a11y/anchor-ambiguous-text` rule.
+
 ## 0.32.1
 
 ### Patch Changes

@@ -34,14 +34,12 @@ export class CommandRunner extends Context.Service<
       Effect.mapError(
         Effect.scoped(
           Effect.gen(function* () {
-            const handle = yield* Effect.fromYieldable(
-              ChildProcess.make(command, args, {
-                cwd,
-                stderr,
-                stdin,
-                stdout,
-              })
-            )
+            const handle = yield* ChildProcess.make(command, args, {
+              cwd,
+              stderr,
+              stdin,
+              stdout,
+            })
 
             return yield* handle.exitCode
           })

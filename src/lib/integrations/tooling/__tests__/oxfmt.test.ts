@@ -200,7 +200,7 @@ describe("oxfmt", () => {
       expect(result).toEqual({
         actions: [
           {
-            description: "Install `oxfmt@0.46.0` for the managed `format` script.",
+            description: `Install \`oxfmt@${oxfmt.version}\` for the managed \`format\` script.`,
             package: "oxfmt",
             targetVersion: oxfmt.version,
             type: "install_package",

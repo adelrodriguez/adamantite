@@ -16,7 +16,7 @@ const files = [
   { path: ".oxfmtrc.jsonc", type: "legacy_config" },
 ] as const
 
-const VERSION = "0.46.0"
+const VERSION = "0.54.0"
 
 export default defineIntegration({
   assess: (cwd: string) =>

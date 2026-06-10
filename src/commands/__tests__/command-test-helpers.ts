@@ -238,6 +238,7 @@ function makeQuietTerminalLayer() {
       display: () => Effect.void,
       readInput: Effect.never,
       readLine: Effect.never,
+      rows: Effect.succeed(24),
     })
   )
 }

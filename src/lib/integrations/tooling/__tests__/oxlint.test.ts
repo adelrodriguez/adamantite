@@ -79,6 +79,7 @@ describe("oxlint", () => {
       const content = await Bun.file("oxlint.config.ts").text()
       expect(content).toContain('import { defineConfig } from "oxlint"')
       expect(content).toContain('import core from "adamantite/lint"')
+      expect(content).toContain('"respectEslintDisableDirectives": true')
       expect(content).toContain('"typeAware": true')
       expect(content).toContain('"typeCheck": true')
       expect(content).toContain("extends: [core]")
@@ -103,6 +104,7 @@ describe("oxlint", () => {
       await oxlint.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const content = await Bun.file("oxlint.config.ts").text()
+      expect(content).toContain("respectEslintDisableDirectives: true")
       expect(content).toContain("typeAware: true")
       expect(content).toContain("typeCheck: true")
       expect(content).toContain("extends: [core]")
@@ -114,7 +116,7 @@ describe("oxlint", () => {
         'import core from "adamantite/lint"',
         "",
         "export default defineConfig({",
-        '  options: { "typeAware": true, "typeCheck": true },',
+        '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
         "  extends: [core],",
         "})",
         "",
@@ -288,7 +290,7 @@ describe("oxlint", () => {
           'import core from "adamantite/lint"',
           "",
           "export default defineConfig({",
-          '  options: { "typeAware": true, "typeCheck": true },',
+          '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
           "  extends: [core],",
           "})",
           "",
@@ -344,8 +346,7 @@ describe("oxlint", () => {
       expect(result).toEqual({
         actions: [
           {
-            description:
-              "Update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`.",
+            description: "Update `oxlint.config.ts` with Adamantite's required options.",
             path: "oxlint.config.ts",
             type: "update_config",
           },
@@ -393,7 +394,7 @@ describe("oxlint", () => {
         actions: [
           {
             description:
-              "Manually update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`; Adamantite cannot patch the current file shape safely.",
+              "Manually update `oxlint.config.ts` with Adamantite's required options; Adamantite cannot patch the current file shape safely.",
             path: "oxlint.config.ts",
             type: "manual_fix",
           },

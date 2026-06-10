@@ -10,7 +10,7 @@ import {
 } from "#lib/shared/errors.ts"
 import {
   getOxlintPresetNames,
-  inspectTypeAwareOxlintConfig,
+  inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/workspace/oxlint-config.ts"
 import {
@@ -24,7 +24,7 @@ const files = [
   { path: ".oxlintrc.json", type: "legacy_config" },
 ] as const
 
-const VERSION = "1.61.0"
+const VERSION = "1.69.0"
 
 export default defineIntegration({
   assess: (cwd: string) =>
@@ -100,12 +100,11 @@ export default defineIntegration({
         const content = yield* fs
           .readFileString(tsPath)
           .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: tsPath })))
-        const patch = yield* inspectTypeAwareOxlintConfig(content)
+        const patch = yield* inspectRequiredOxlintConfig(content)
 
         if (patch.kind === "patchable") {
           actions.push({
-            description:
-              "Update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`.",
+            description: "Update `oxlint.config.ts` with Adamantite's required options.",
             path: files[0].path,
             type: "update_config",
           })
@@ -114,7 +113,7 @@ export default defineIntegration({
         if (patch.kind === "manual") {
           actions.push({
             description:
-              "Manually update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`; Adamantite cannot patch the current file shape safely.",
+              "Manually update `oxlint.config.ts` with Adamantite's required options; Adamantite cannot patch the current file shape safely.",
             path: files[0].path,
             type: "manual_fix",
           })
@@ -181,7 +180,7 @@ export default defineIntegration({
       const content = yield* fs
         .readFileString(configPath)
         .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
-      const patch = yield* inspectTypeAwareOxlintConfig(content)
+      const patch = yield* inspectRequiredOxlintConfig(content)
 
       if (patch.kind === "configured") {
         return

@@ -75,28 +75,6 @@ export default defineIntegration({
     }),
   extension: (scripts: Script[] = []) =>
     Effect.gen(function* () {
-      function installExtension(extension: string) {
-        return Effect.gen(function* () {
-          const runner = yield* CommandRunner
-          const exitCode = yield* runner
-            .run({
-              args: ["--install-extension", extension],
-              command: "code",
-            })
-            .pipe(
-              Effect.mapError((cause: CommandFailedLike) =>
-                cause._tag === "CliNotFound" && cause.command === "code"
-                  ? new VscodeCliNotFound({ cause })
-                  : new FailedToInstallExtension({ cause, extension })
-              )
-            )
-
-          if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-            return yield* new FailedToInstallExtension({ cause: exitCode, extension })
-          }
-        })
-      }
-
       const extensions: string[] = []
 
       if (scripts.includes("check") || scripts.includes("fix") || scripts.includes("format")) {
@@ -108,7 +86,23 @@ export default defineIntegration({
       }
 
       for (const extension of extensions) {
-        yield* installExtension(extension)
+        const runner = yield* CommandRunner
+        const exitCode = yield* runner
+          .run({
+            args: ["--install-extension", extension],
+            command: "code",
+          })
+          .pipe(
+            Effect.mapError((cause: CommandFailedLike) =>
+              cause._tag === "CliNotFound" && cause.command === "code"
+                ? new VscodeCliNotFound({ cause })
+                : new FailedToInstallExtension({ cause, extension })
+            )
+          )
+
+        if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
+          return yield* new FailedToInstallExtension({ cause: exitCode, extension })
+        }
       }
     }),
   files,

@@ -6,7 +6,7 @@ import {
   readPackageJson,
 } from "#lib/workspace/package-json.ts"
 
-const VERSION = "0.21.1"
+const VERSION = "0.23.0"
 
 export default defineIntegration({
   assess: (cwd: string) =>

@@ -449,6 +449,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
 
       const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
+      expect(oxlintConfig).toContain("respectEslintDisableDirectives")
       expect(oxlintConfig).toContain("typeAware")
       expect(oxlintConfig).toContain("typeCheck")
 
@@ -508,6 +509,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
 
       const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
+      expect(oxlintConfig).not.toContain("respectEslintDisableDirectives")
       expect(oxlintConfig).not.toContain("typeAware")
       expect(oxlintConfig).not.toContain("typeCheck")
       expect(prompter.logs).toContainEqual({
@@ -516,8 +518,7 @@ describe("update", () => {
       })
       expect(prompter.logs).toContainEqual({
         level: "warning",
-        message:
-          "Doctor follow-up: Update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`.",
+        message: "Doctor follow-up: Update `oxlint.config.ts` with Adamantite's required options.",
       })
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })
@@ -528,7 +529,7 @@ describe("update", () => {
         'import core from "adamantite/lint"',
         "",
         "export default defineConfig({",
-        '  options: { "typeAware": true, "typeCheck": true },',
+        '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
         "  extends: [core],",
         "})",
         "",

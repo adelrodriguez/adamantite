@@ -142,6 +142,7 @@ describe("legacyTypecheckScript", () => {
       extends?: string
     }
 
+    expect(oxlintConfig).toContain("respectEslintDisableDirectives")
     expect(oxlintConfig).toContain("typeAware")
     expect(oxlintConfig).toContain("typeCheck")
     expect(tsconfig.compilerOptions).toEqual({ strict: true })

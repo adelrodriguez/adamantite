@@ -86,6 +86,7 @@ describe("init", () => {
 
       const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
       expect(oxlintConfig).toContain('import react from "adamantite/lint/react"')
+      expect(oxlintConfig).toContain('"respectEslintDisableDirectives": true')
       expect(oxlintConfig).toContain('"typeAware": true')
       expect(oxlintConfig).toContain('"typeCheck": true')
 

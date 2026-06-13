@@ -12,15 +12,18 @@ import {
 } from "oxc-parser"
 import { isJsonObject } from "#lib/shared/json.ts"
 
-const REQUIRED_BOOLEAN_OPTIONS = ["typeAware", "typeCheck"] as const
+const REQUIRED_BOOLEAN_OPTIONS = [
+  "respectEslintDisableDirectives",
+  "typeAware",
+  "typeCheck",
+] as const
 const UNSUPPORTED_CONFIG_REASON =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to patch `options` safely."
 const UNSUPPORTED_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can patch safely."
 const NON_BOOLEAN_OPTIONS_REASON =
-  "`oxlint.config.ts` already defines `typeAware` or `typeCheck`, but not as a boolean literal Adamantite can safely patch."
-const GENERATED_PATCH_FAILURE_REASON =
-  "Adamantite could not generate the required `options.typeAware` and `options.typeCheck` patch."
+  "`oxlint.config.ts` has an `options` object Adamantite cannot patch safely. Make sure each required option is a plain `key: true | false` property—avoid spreads (`...rest`), computed keys (`[name]: ...`), duplicate keys, methods/getters/setters, and non-boolean-literal values."
+const GENERATED_PATCH_FAILURE_REASON = "Adamantite could not generate the required `options` patch."
 
 type RequiredBooleanOption = (typeof REQUIRED_BOOLEAN_OPTIONS)[number]
 
@@ -29,7 +32,7 @@ type NamedObjectPropertyResult =
   | { readonly status: "manual" }
   | { readonly status: "missing" }
 
-export type OxlintTypeAwarePatchResult =
+export type OxlintRequiredOptionsPatchResult =
   | { readonly kind: "configured" }
   | { readonly kind: "manual"; readonly reason: string }
   | { readonly kind: "patchable"; readonly updatedContent: string }
@@ -66,10 +69,12 @@ export function toOxlintTsConfigContent(
     isJsonObject(options)
       ? {
           ...options,
+          respectEslintDisableDirectives: true,
           typeAware: true,
           typeCheck: true,
         }
       : {
+          respectEslintDisableDirectives: true,
           typeAware: true,
           typeCheck: true,
         },
@@ -307,7 +312,7 @@ function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpress
         return {
           kind: "manual",
           reason: NON_BOOLEAN_OPTIONS_REASON,
-        } satisfies OxlintTypeAwarePatchResult
+        } satisfies OxlintRequiredOptionsPatchResult
       }
 
       if (propertyResult.status === "missing") {
@@ -321,7 +326,7 @@ function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpress
         return {
           kind: "manual",
           reason: NON_BOOLEAN_OPTIONS_REASON,
-        } satisfies OxlintTypeAwarePatchResult
+        } satisfies OxlintRequiredOptionsPatchResult
       }
 
       if (value.value) {
@@ -340,7 +345,7 @@ function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpress
         return {
           kind: "manual",
           reason: GENERATED_PATCH_FAILURE_REASON,
-        } satisfies OxlintTypeAwarePatchResult
+        } satisfies OxlintRequiredOptionsPatchResult
       }
 
       optionsObjectExpression.properties.unshift(...generatedOptionProperties.value)
@@ -348,17 +353,17 @@ function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpress
     }
 
     if (!changed) {
-      return { kind: "configured" } satisfies OxlintTypeAwarePatchResult
+      return { kind: "configured" } satisfies OxlintRequiredOptionsPatchResult
     }
 
     return {
       kind: "patchable",
       updatedContent: print(ast),
-    } satisfies OxlintTypeAwarePatchResult
+    } satisfies OxlintRequiredOptionsPatchResult
   })
 }
 
-export function inspectTypeAwareOxlintConfig(content: string) {
+export function inspectRequiredOxlintConfig(content: string) {
   return Effect.gen(function* () {
     const parsed = yield* parse(content)
 
@@ -366,7 +371,7 @@ export function inspectTypeAwareOxlintConfig(content: string) {
       return {
         kind: "manual",
         reason: UNSUPPORTED_CONFIG_REASON,
-      } satisfies OxlintTypeAwarePatchResult
+      } satisfies OxlintRequiredOptionsPatchResult
     }
 
     const configObjectExpression = getExportedConfigObject(parsed.value)
@@ -375,7 +380,7 @@ export function inspectTypeAwareOxlintConfig(content: string) {
       return {
         kind: "manual",
         reason: UNSUPPORTED_CONFIG_REASON,
-      } satisfies OxlintTypeAwarePatchResult
+      } satisfies OxlintRequiredOptionsPatchResult
     }
 
     const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
@@ -384,7 +389,7 @@ export function inspectTypeAwareOxlintConfig(content: string) {
       return {
         kind: "manual",
         reason: UNSUPPORTED_OPTIONS_REASON,
-      } satisfies OxlintTypeAwarePatchResult
+      } satisfies OxlintRequiredOptionsPatchResult
     }
 
     if (optionsPropertyResult.status === "missing") {
@@ -394,7 +399,7 @@ export function inspectTypeAwareOxlintConfig(content: string) {
         return {
           kind: "manual",
           reason: GENERATED_PATCH_FAILURE_REASON,
-        } satisfies OxlintTypeAwarePatchResult
+        } satisfies OxlintRequiredOptionsPatchResult
       }
 
       configObjectExpression.value.properties.unshift(optionsProperty.value)
@@ -402,14 +407,14 @@ export function inspectTypeAwareOxlintConfig(content: string) {
       return {
         kind: "patchable",
         updatedContent: print(parsed.value),
-      } satisfies OxlintTypeAwarePatchResult
+      } satisfies OxlintRequiredOptionsPatchResult
     }
 
     if (!isObjectExpression(optionsPropertyResult.property.value)) {
       return {
         kind: "manual",
         reason: UNSUPPORTED_OPTIONS_REASON,
-      } satisfies OxlintTypeAwarePatchResult
+      } satisfies OxlintRequiredOptionsPatchResult
     }
 
     return yield* patchOptionsObject(parsed.value, optionsPropertyResult.property.value)

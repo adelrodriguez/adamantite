@@ -246,7 +246,7 @@ describe("doctor", () => {
         'import core from "adamantite/lint"',
         "",
         "export default defineConfig({",
-        '  options: { "typeAware": true, "typeCheck": true },',
+        '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
         "  extends: [core],",
         "})",
         "",
@@ -360,7 +360,7 @@ describe("doctor", () => {
         'import core from "adamantite/lint"',
         "",
         "export default defineConfig({",
-        '  options: { "typeAware": true, "typeCheck": true },',
+        '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
         "  extends: [core],",
         "})",
         "",
@@ -413,7 +413,7 @@ describe("doctor", () => {
         'import core from "adamantite/lint"',
         "",
         "export default defineConfig({",
-        '  options: { "typeAware": true, "typeCheck": true },',
+        '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
         "  extends: [core],",
         "})",
         "",
@@ -1055,8 +1055,10 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).text()).toContain("typeAware: true")
-    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).text()).toContain("typeCheck: true")
+    const oxlintConfig = await Bun.file(join(tempDir, "oxlint.config.ts")).text()
+    expect(oxlintConfig).toContain("respectEslintDisableDirectives: true")
+    expect(oxlintConfig).toContain("typeAware: true")
+    expect(oxlintConfig).toContain("typeCheck: true")
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: "Fixed: updated `oxlint.config.ts`.",
@@ -1105,7 +1107,7 @@ describe("doctor", () => {
     expect(prompter.logs).toContainEqual({
       level: "warning",
       message:
-        "Needs attention: Manually update `oxlint.config.ts` to enable `options.typeAware` and `options.typeCheck`; Adamantite cannot patch the current file shape safely.",
+        "Needs attention: Manually update `oxlint.config.ts` with Adamantite's required options; Adamantite cannot patch the current file shape safely.",
     })
     expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
   })

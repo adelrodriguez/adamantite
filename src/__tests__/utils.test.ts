@@ -24,6 +24,21 @@ const noop = () => null
 let testDir: string
 let originalCwd: string
 
+function makeTerminalLayer(columns?: number) {
+  return Layer.succeed(Terminal.Terminal)(
+    Terminal.make({
+      columns:
+        columns === undefined
+          ? Effect.succeed(undefined as unknown as number)
+          : Effect.succeed(columns),
+      display: () => Effect.void,
+      readInput: Effect.never,
+      readLine: Effect.never,
+      rows: Effect.succeed(24),
+    })
+  )
+}
+
 beforeEach(() => {
   testDir = join(tmpdir(), `adamantite-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   mkdirSync(testDir, { recursive: true })
@@ -400,21 +415,6 @@ describe("printTitle", () => {
   beforeEach(() => {
     capturedLogs = []
   })
-
-  function makeTerminalLayer(columns?: number) {
-    return Layer.succeed(Terminal.Terminal)(
-      Terminal.make({
-        columns:
-          columns === undefined
-            ? Effect.succeed(undefined as unknown as number)
-            : Effect.succeed(columns),
-        display: () => Effect.void,
-        readInput: Effect.never,
-        readLine: Effect.never,
-        rows: Effect.succeed(24),
-      })
-    )
-  }
 
   function makeConsoleLayer() {
     const mockConsole: Console.Console = {

@@ -16,7 +16,7 @@ const files = [
   { path: "knip.jsonc", type: "legacy_config" },
 ] as const
 
-const VERSION = "6.6.1"
+const VERSION = "6.23.0"
 
 export default defineIntegration({
   assess: (cwd: string) =>

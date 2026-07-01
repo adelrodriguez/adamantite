@@ -1,19 +1,18 @@
-import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import type { Script } from "#lib/workspace/package-json.ts"
+import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import { defineIntegration } from "#lib/integrations/base.ts"
 import { FailedToWriteFile } from "#lib/shared/errors.ts"
 import { ensureDirectory } from "#lib/shared/filesystem.ts"
 import { getCIWorkflowEntries } from "#lib/workspace/ci-scripts.ts"
 
 interface WorkflowOptions {
-  packageManager: PackageManagerName
+  packageManager: SupportedPackageManager
   scripts: Script[]
 }
 
-const setupSteps: Record<PackageManagerName, string> = {
+const setupSteps: Record<SupportedPackageManager, string> = {
   bun: `      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:

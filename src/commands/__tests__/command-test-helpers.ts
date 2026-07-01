@@ -179,22 +179,21 @@ export function createPrompterTestContext(options?: {
         Effect.sync(() => {
           outros.push(message)
         }),
-      spinner: () =>
-        ({
-          cancel: () => false,
-          clear: () => null,
-          error: () => false,
-          isCancelled: false,
-          message: (message: string) => {
-            spinnerEntries.push({ message, type: "message" })
-          },
-          start: (message?: string) => {
-            spinnerEntries.push({ message, type: "start" })
-          },
-          stop: (message?: string) => {
-            spinnerEntries.push({ message, type: "stop" })
-          },
-        }) as ReturnType<typeof prompts.spinner>,
+      spinner: () => ({
+        cancel: () => false,
+        clear: () => null,
+        error: () => false,
+        isCancelled: false,
+        message: (message: string) => {
+          spinnerEntries.push({ message, type: "message" })
+        },
+        start: (message?: string) => {
+          spinnerEntries.push({ message, type: "start" })
+        },
+        stop: (message?: string) => {
+          spinnerEntries.push({ message, type: "stop" })
+        },
+      }),
     }),
     logs,
     outros,
@@ -279,7 +278,7 @@ export async function runCommand(
   ) as TestLayer
 
   for (const layer of layers) {
-    providedLayer = Layer.merge(providedLayer, layer) as TestLayer
+    providedLayer = Layer.merge(providedLayer, layer)
   }
 
   return Effect.runPromiseExit(

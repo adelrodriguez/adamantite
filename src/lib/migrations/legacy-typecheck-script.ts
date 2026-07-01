@@ -9,6 +9,7 @@ import { Prompter } from "#lib/services/prompter.ts"
 import { MigrationValidationFailed } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
+  checkIsSupportedPackageManager,
   getManagedScripts,
   readPackageJson,
   writePackageJson,
@@ -109,12 +110,16 @@ export default defineMigration({
             context.cwd
           )
 
-          if (detectedPackageManager) {
+          if (
+            detectedPackageManager &&
+            checkIsSupportedPackageManager(detectedPackageManager.name)
+          ) {
+            const packageManagerName = detectedPackageManager.name
             const workflowSpinner = prompter.spinner()
             workflowSpinner.start("Updating GitHub Actions workflow...")
             yield* github
               .update(context.cwd, {
-                packageManager: detectedPackageManager.name,
+                packageManager: packageManagerName,
                 scripts: managedScripts,
               })
               .pipe(
@@ -129,6 +134,10 @@ export default defineMigration({
                   })
                 )
               )
+          } else if (detectedPackageManager) {
+            yield* prompter.log.warning(
+              `\`${detectedPackageManager.name}\` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow was not updated.`
+            )
           } else {
             yield* prompter.log.warning(
               "Could not detect a package manager, so the GitHub Actions workflow was not updated."

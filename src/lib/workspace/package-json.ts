@@ -1,4 +1,5 @@
 import process from "node:process"
+import type { PackageManagerName } from "nypm"
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -40,6 +41,22 @@ export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
  * Available scripts that can be added to package.json during initialization.
  */
 export type Script = "check" | "fix" | "format" | "check:monorepo" | "fix:monorepo" | "analyze"
+
+/**
+ * Package managers Adamantite supports for CI workflow generation. A subset of nypm's
+ * `PackageManagerName`; niche managers (e.g. `aube`, `nub`) are out of scope because they lack
+ * established GitHub Actions setup steps.
+ */
+export type SupportedPackageManager = Extract<
+  PackageManagerName,
+  "bun" | "deno" | "npm" | "pnpm" | "yarn"
+>
+
+export function checkIsSupportedPackageManager(
+  name: PackageManagerName
+): name is SupportedPackageManager {
+  return name === "bun" || name === "deno" || name === "npm" || name === "pnpm" || name === "yarn"
+}
 
 export const MANAGED_SCRIPT_COMMANDS = {
   analyze: "adamantite analyze",

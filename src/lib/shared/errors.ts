@@ -154,9 +154,15 @@ export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
 
 export class MissingPackageVersion extends Data.TaggedError("MissingPackageVersion")<{
   path?: string
+  dependency?: string
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "package.json"
+
+    if (this.dependency) {
+      return `Missing \`${this.dependency}\` in ${target} dependencies or devDependencies.`
+    }
+
     return `Missing version field in ${target}.`
   }
 }

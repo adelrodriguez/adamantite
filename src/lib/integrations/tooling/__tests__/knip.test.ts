@@ -2,13 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import knip from "#lib/integrations/tooling/knip.ts"
-
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("knip", () => {
   let originalCwd: string
@@ -69,14 +66,6 @@ describe("knip", () => {
       expect(content).toContain('import analyze from "adamantite/analyze"')
       expect(content).toContain("const config: KnipConfig = analyze")
       expect(content).toContain("export default config")
-    })
-  })
-
-  describe("version", () => {
-    test("match the package.json devDependency", async () => {
-      const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
-
-      expect(packageJson.devDependencies?.knip).toBe(knip.version)
     })
   })
 

@@ -18,7 +18,7 @@ import updateCommand from "#commands/update.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
-import { getPackageVersion } from "#version.macro.ts" with { type: "macro" }
+import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const main = Command.make("adamantite").pipe(
   Command.withDescription("Opinionated preset package for modern TypeScript applications"),
@@ -35,7 +35,7 @@ const main = Command.make("adamantite").pipe(
   ])
 )
 
-const version = await getPackageVersion()
+const version = getPackageVersion()
 
 const program = Command.run(main, { version }).pipe(
   Effect.as(0),

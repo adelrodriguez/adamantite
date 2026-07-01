@@ -1,12 +1,13 @@
 import * as Effect from "effect/Effect"
 import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
+import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
   getManagedScripts,
   normalizeDependencyVersion,
   readPackageJson,
 } from "#lib/workspace/package-json.ts"
 
-const VERSION = "0.24.0"
+const VERSION = getDependencyVersion("oxlint-tsgolint")
 
 export default defineIntegration({
   assess: (cwd: string) =>

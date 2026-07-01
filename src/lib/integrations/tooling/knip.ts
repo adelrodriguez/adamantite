@@ -3,6 +3,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
 import { FailedToWriteFile } from "#lib/shared/errors.ts"
+import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { toKnipTsConfigContent } from "#lib/workspace/knip-config.ts"
 import {
   getManagedScripts,
@@ -16,7 +17,7 @@ const files = [
   { path: "knip.jsonc", type: "legacy_config" },
 ] as const
 
-const VERSION = "6.23.0"
+const VERSION = getDependencyVersion("knip")
 
 export default defineIntegration({
   assess: (cwd: string) =>

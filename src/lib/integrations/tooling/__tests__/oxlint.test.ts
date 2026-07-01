@@ -2,15 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import { isLeft, runEither } from "#__tests__/helpers.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("oxlint", () => {
   let originalCwd: string
@@ -154,14 +151,6 @@ describe("oxlint", () => {
       if (isLeft(result)) {
         expect(result.left).toMatchObject({ _tag: "UnsupportedConfigState" })
       }
-    })
-  })
-
-  describe("version", () => {
-    test("match the package.json devDependency", async () => {
-      const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
-
-      expect(packageJson.devDependencies?.oxlint).toBe(oxlint.version)
     })
   })
 
@@ -510,14 +499,6 @@ describe("tsgolint", () => {
         applicable: true,
         warnings: [],
       })
-    })
-  })
-
-  describe("version", () => {
-    test("match the package.json devDependency", async () => {
-      const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
-
-      expect(packageJson.devDependencies?.["oxlint-tsgolint"]).toBe(tsgolint.version)
     })
   })
 })

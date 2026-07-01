@@ -2,13 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
-
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("oxfmt", () => {
   let originalCwd: string
@@ -69,14 +66,6 @@ describe("oxfmt", () => {
       expect(content).toContain('import { defineConfig } from "oxfmt"')
       expect(content).toContain('import format from "adamantite/format"')
       expect(content).toContain("export default defineConfig(format)")
-    })
-  })
-
-  describe("version", () => {
-    test("match the package.json devDependency", async () => {
-      const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
-
-      expect(packageJson.devDependencies?.oxfmt).toBe(oxfmt.version)
     })
   })
 

@@ -3,6 +3,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
 import { FailedToWriteFile } from "#lib/shared/errors.ts"
+import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { toOxfmtTsConfigContent } from "#lib/workspace/oxfmt-config.ts"
 import {
   getManagedScripts,
@@ -16,7 +17,7 @@ const files = [
   { path: ".oxfmtrc.jsonc", type: "legacy_config" },
 ] as const
 
-const VERSION = "0.57.0"
+const VERSION = getDependencyVersion("oxfmt")
 
 export default defineIntegration({
   assess: (cwd: string) =>

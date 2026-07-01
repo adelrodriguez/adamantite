@@ -2,13 +2,10 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import sherif from "#lib/integrations/tooling/sherif.ts"
-
-const ROOT_DIR = join(import.meta.dir, "..", "..", "..", "..", "..")
 
 describe("sherif", () => {
   let originalCwd: string
@@ -114,14 +111,6 @@ describe("sherif", () => {
         applicable: true,
         warnings: [],
       })
-    })
-  })
-
-  describe("version", () => {
-    test("match the package.json devDependency", async () => {
-      const packageJson = (await Bun.file(join(ROOT_DIR, "package.json")).json()) as PackageJson
-
-      expect(packageJson.devDependencies?.sherif).toBe(sherif.version)
     })
   })
 })

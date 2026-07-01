@@ -8,6 +8,7 @@ import {
   FileNotFound,
   UnsupportedConfigState,
 } from "#lib/shared/errors.ts"
+import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
   getOxlintPresetNames,
   inspectRequiredOxlintConfig,
@@ -24,7 +25,7 @@ const files = [
   { path: ".oxlintrc.json", type: "legacy_config" },
 ] as const
 
-const VERSION = "1.72.0"
+const VERSION = getDependencyVersion("oxlint")
 
 export default defineIntegration({
   assess: (cwd: string) =>

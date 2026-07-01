@@ -91,6 +91,7 @@ const config: OxlintConfig = {
     "react/no-unstable-nested-components": "error",
     "react/prefer-es6-class": ["error", "always"],
     "react/prefer-function-component": "error",
+    "react/react-compiler": "error",
     "react/require-render-return": "error",
     "react/rules-of-hooks": "error",
     "react/self-closing-comp": "error",

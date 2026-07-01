@@ -1,5 +1,5 @@
-import { type PackageManagerName, runScriptCommand } from "nypm"
-import type { Script } from "#lib/workspace/package-json.ts"
+import { runScriptCommand } from "nypm"
+import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 
 interface CIScriptEntry {
   readonly script: Script
@@ -14,7 +14,7 @@ const ciScriptEntries: readonly CIScriptEntry[] = [
   { name: "analyze", script: "analyze" },
 ]
 
-export function getCIWorkflowEntries(packageManager: PackageManagerName, scripts: Script[]) {
+export function getCIWorkflowEntries(packageManager: SupportedPackageManager, scripts: Script[]) {
   const workflowEntries: Array<{ name: string; command: string }> = []
 
   for (const entry of ciScriptEntries) {

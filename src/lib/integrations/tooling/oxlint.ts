@@ -24,7 +24,7 @@ const files = [
   { path: ".oxlintrc.json", type: "legacy_config" },
 ] as const
 
-const VERSION = "1.69.0"
+const VERSION = "1.72.0"
 
 export default defineIntegration({
   assess: (cwd: string) =>

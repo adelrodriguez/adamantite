@@ -1,10 +1,8 @@
 import process from "node:process"
-import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Command from "effect/unstable/cli/Command"
-import type { Script } from "#lib/workspace/package-json.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
@@ -19,7 +17,12 @@ import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#lib/shared/
 import { printTitle } from "#lib/shared/terminal.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
+import {
+  checkIsSupportedPackageManager,
+  readPackageJson,
+  type Script,
+  type SupportedPackageManager,
+} from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
 const installDependencies = (cwd: string, packages: string[]) =>
@@ -332,7 +335,11 @@ const installEditorExtensions = (editors: string[], scripts: Script[]) =>
     }
   })
 
-const setupGitHubActions = (cwd: string, packageManager: PackageManagerName, scripts: Script[]) =>
+const setupGitHubActions = (
+  cwd: string,
+  packageManager: SupportedPackageManager,
+  scripts: Script[]
+) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const spinner = prompter.spinner()
@@ -490,8 +497,10 @@ export default Command.make("init").pipe(
       const dependencies = ["adamantite"]
 
       if (hasOxlint) {
-        dependencies.push(`${oxlint.name}@${oxlint.version}`)
-        dependencies.push(`${tsgolint.name}@${tsgolint.version}`)
+        dependencies.push(
+          `${oxlint.name}@${oxlint.version}`,
+          `${tsgolint.name}@${tsgolint.version}`
+        )
       }
 
       if (hasOxfmt) {
@@ -533,7 +542,15 @@ export default Command.make("init").pipe(
       }
 
       if (enableGitHubActions) {
-        yield* setupGitHubActions(cwd, packageManager.name, selectedScripts)
+        const packageManagerName = packageManager.name
+
+        if (checkIsSupportedPackageManager(packageManagerName)) {
+          yield* setupGitHubActions(cwd, packageManagerName, selectedScripts)
+        } else {
+          yield* prompter.log.warning(
+            `Skipping GitHub Actions setup: \`${packageManagerName}\` is not a supported package manager for CI workflow generation.`
+          )
+        }
       }
 
       yield* prompter.log.success("Your project is now configured")

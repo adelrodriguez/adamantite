@@ -86,7 +86,7 @@
     "@typescript/native-preview": "7.0.0-dev.20260701.1",
     "bunup": "0.16.32",
     "figlet": "1.11.0",
-    "knip": "6.23.0",
+    "knip": "6.24.0",
     "oxfmt": "0.57.0",
     "oxlint": "1.72.0",
     "oxlint-tsgolint": "0.24.0",

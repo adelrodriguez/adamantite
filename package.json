@@ -85,7 +85,7 @@
     "@types/figlet": "1.7.0",
     "@typescript/native-preview": "7.0.0-dev.20260703.1",
     "bunup": "0.16.32",
-    "figlet": "1.11.0",
+    "figlet": "1.11.2",
     "knip": "6.24.0",
     "oxfmt": "0.57.0",
     "oxlint": "1.72.0",

@@ -1,4 +1,5 @@
 import process from "node:process"
+import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
@@ -15,6 +16,7 @@ import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#lib/shared/errors.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
+import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
@@ -359,6 +361,37 @@ const setupGitHubActions = (
     }
   }).pipe(Effect.option)
 
+const setupAgentsGuidance = (cwd: string, packageManager: PackageManagerName, scripts: Script[]) =>
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const spinner = prompter.spinner()
+    spinner.start("Updating AGENTS.md...")
+
+    const result = yield* writeAgentsGuidance(cwd, { packageManager, scripts }).pipe(
+      Effect.catchTag(["FailedToReadFile", "FailedToWriteFile"], (error) =>
+        Effect.gen(function* () {
+          spinner.stop("Failed to update AGENTS.md.")
+          yield* prompter.log.warning(
+            `Could not update AGENTS.md. ${error.message} Adamantite will continue initialization.`
+          )
+          return "failed" as const
+        })
+      )
+    )
+
+    if (result === "failed") {
+      return
+    }
+
+    spinner.stop("AGENTS.md check complete.")
+
+    if (result === "malformed") {
+      yield* prompter.log.warning(
+        "Could not update AGENTS.md because Adamantite markers are incomplete. Remove the stale ADAMANTITE marker and run adamantite init again."
+      )
+    }
+  })
+
 export default Command.make("init").pipe(
   Command.withDescription("Initialize Adamantite in the current directory"),
   Command.withHandler(() =>
@@ -489,6 +522,12 @@ export default Command.make("init").pipe(
         enableGitHubActions = enableGitHubActionsResponse
       }
 
+      const shouldAddAgentsGuidance = yield* prompter.confirm({
+        initialValue: true,
+        message:
+          "Add Adamantite guidance to AGENTS.md so coding agents know how to run project checks?",
+      })
+
       const hasOxfmt = selectedScripts.includes("format")
       const hasSherif =
         selectedScripts.includes("check:monorepo") || selectedScripts.includes("fix:monorepo")
@@ -530,6 +569,10 @@ export default Command.make("init").pipe(
       }
 
       yield* addScripts(cwd, selectedScripts)
+
+      if (shouldAddAgentsGuidance) {
+        yield* setupAgentsGuidance(cwd, packageManager.name, selectedScripts)
+      }
 
       if (shouldSetupTypescript) {
         yield* setupTypescript(cwd)

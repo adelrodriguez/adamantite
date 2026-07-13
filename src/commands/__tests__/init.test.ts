@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
-import { readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Bun from "bun"
@@ -16,6 +16,10 @@ import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import {
+  ADAMANTITE_AGENTS_END_MARKER,
+  ADAMANTITE_AGENTS_START_MARKER,
+} from "#lib/workspace/agents.ts"
+import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
   createPrompterTestContext,
@@ -24,6 +28,10 @@ import {
 
 async function readJson<T = Record<string, unknown>>(path: string): Promise<T> {
   return JSON.parse(await readFile(path, "utf8")) as T
+}
+
+function countOccurrences(content: string, search: string) {
+  return content.split(search).length - 1
 }
 
 describe("init", () => {
@@ -56,7 +64,7 @@ describe("init", () => {
   describe("fresh project setup", () => {
     test("set up the selected files, scripts, and dependencies", async () => {
       const prompter = createPrompterTestContext({
-        confirmResponses: [true, false, false],
+        confirmResponses: [true, false, false, false],
         multiselectResponses: [["check", "format", "analyze"], ["react"], ["vscode"]],
       })
       const installer = createDependencyInstallerTestContext()
@@ -133,7 +141,7 @@ describe("init", () => {
       )
 
       const prompter = createPrompterTestContext({
-        confirmResponses: [true, false],
+        confirmResponses: [true, false, false],
         multiselectResponses: [["check"], ["react"], []],
       })
       const installer = createDependencyInstallerTestContext()
@@ -273,7 +281,7 @@ describe("init", () => {
       )
 
       const prompter = createPrompterTestContext({
-        confirmResponses: [false],
+        confirmResponses: [false, false],
         multiselectResponses: [["check:monorepo"], []],
       })
       const installer = createDependencyInstallerTestContext()
@@ -324,7 +332,7 @@ describe("init", () => {
       )
 
       const prompter = createPrompterTestContext({
-        confirmResponses: [true, false, false],
+        confirmResponses: [true, false, false, false],
         multiselectResponses: [["check", "format"], [], ["vscode"]],
       })
       const installer = createDependencyInstallerTestContext()
@@ -357,7 +365,7 @@ describe("init", () => {
   describe("selective setup", () => {
     test("apply only the requested scripts and editor setup", async () => {
       const prompter = createPrompterTestContext({
-        confirmResponses: [false, false],
+        confirmResponses: [false, false, false],
         multiselectResponses: [["format"], ["zed"]],
       })
       const installer = createDependencyInstallerTestContext()
@@ -383,6 +391,193 @@ describe("init", () => {
       expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
       expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(false)
       expect(await Bun.file(join(tempDir, ".vscode", "settings.json")).exists()).toBe(false)
+    })
+  })
+
+  describe("agents guidance", () => {
+    test("adds script-specific Adamantite guidance to AGENTS.md when confirmed", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false, true],
+        multiselectResponses: [["check", "format", "analyze"], [], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const agents = await readFile(join(tempDir, "AGENTS.md"), "utf8")
+      expect(agents).toContain(ADAMANTITE_AGENTS_START_MARKER)
+      expect(agents).toContain("## Adamantite")
+      expect(agents).toContain("Run `bun run format` after editing files")
+      expect(agents).toContain("Run `bun run check` to catch lint and type issues")
+      expect(agents).toContain("Run `bun run analyze` after changing dependencies")
+      expect(agents).toContain("adamantite doctor --fix")
+      expect(agents).not.toContain("adamantite fix")
+      expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
+      expect(agents.endsWith("\n")).toBe(true)
+    })
+
+    test("uses the detected package manager in AGENTS.md guidance", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, true],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext({
+        detectedPackageManager: { name: "npm" },
+      })
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const agents = await readFile(join(tempDir, "AGENTS.md"), "utf8")
+      expect(agents).toContain("Run `npm run format` after editing files")
+    })
+
+    test("appends Adamantite guidance to an existing AGENTS.md without markers", async () => {
+      const existingAgents = "# Existing Instructions\n\nKeep project guidance here.\n"
+      await writeFile(join(tempDir, "AGENTS.md"), existingAgents)
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, true],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const agents = await readFile(join(tempDir, "AGENTS.md"), "utf8")
+      expect(agents.startsWith(`${existingAgents}\n${ADAMANTITE_AGENTS_START_MARKER}\n`)).toBe(true)
+      expect(agents).toContain("## Adamantite")
+      expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
+    })
+
+    test("replaces existing Adamantite guidance without duplicating markers", async () => {
+      await writeFile(
+        join(tempDir, "AGENTS.md"),
+        `# Existing Instructions\n\n${ADAMANTITE_AGENTS_START_MARKER}\nold content\n${ADAMANTITE_AGENTS_END_MARKER}\n`
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, true],
+        multiselectResponses: [["analyze"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const agents = await readFile(join(tempDir, "AGENTS.md"), "utf8")
+      expect(agents).toContain("# Existing Instructions")
+      expect(agents).toContain("Run `bun run analyze` after changing dependencies")
+      expect(agents).not.toContain("old content")
+      expect(countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER)).toBe(1)
+      expect(countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER)).toBe(1)
+    })
+
+    test("leaves AGENTS.md unchanged when Adamantite start marker is missing its end marker", async () => {
+      const existingAgents = `# Existing Instructions\n\n${ADAMANTITE_AGENTS_START_MARKER}\nmanual content\n`
+      await writeFile(join(tempDir, "AGENTS.md"), existingAgents)
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, true],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Could not update AGENTS.md because Adamantite markers are incomplete. Remove the stale ADAMANTITE marker and run adamantite init again.",
+      })
+      expect(await readFile(join(tempDir, "AGENTS.md"), "utf8")).toBe(existingAgents)
+    })
+
+    test("leaves AGENTS.md unchanged when Adamantite end marker is missing its start marker", async () => {
+      const existingAgents = `# Existing Instructions\n\nmanual content\n${ADAMANTITE_AGENTS_END_MARKER}\n`
+      await writeFile(join(tempDir, "AGENTS.md"), existingAgents)
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, true],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Could not update AGENTS.md because Adamantite markers are incomplete. Remove the stale ADAMANTITE marker and run adamantite init again.",
+      })
+      expect(await readFile(join(tempDir, "AGENTS.md"), "utf8")).toBe(existingAgents)
+    })
+
+    test("leaves AGENTS.md unchanged when guidance is declined", async () => {
+      const existingAgents = "# Existing Instructions\n"
+      await writeFile(join(tempDir, "AGENTS.md"), existingAgents)
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await readFile(join(tempDir, "AGENTS.md"), "utf8")).toBe(existingAgents)
+    })
+
+    test("continues initialization when AGENTS.md cannot be read", async () => {
+      const agentsPath = join(tempDir, "AGENTS.md")
+      await mkdir(agentsPath)
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, true],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: expect.stringMatching(
+          /Could not update AGENTS\.md\. Failed to read `.*\/AGENTS\.md`\. Adamantite will continue initialization\./
+        ),
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "Your project is now configured",
+      })
+      expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
+    })
+
+    test("gracefully handles AGENTS.md prompt cancellation", async () => {
+      const prompter = createPrompterTestContext({
+        cancelAtPromptIndex: 4,
+        confirmResponses: [false],
+        multiselectResponses: [["format"], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])
+      expect(prompter.outros).toEqual([])
+      expect(installer.calls).toEqual([])
+      expect(await Bun.file(join(tempDir, "AGENTS.md")).exists()).toBe(false)
     })
   })
 
@@ -449,7 +644,7 @@ describe("init", () => {
       )
 
       const prompter = createPrompterTestContext({
-        confirmResponses: [true, false],
+        confirmResponses: [true, false, false],
         multiselectResponses: [["check"], [], []],
       })
       const installer = createDependencyInstallerTestContext()
@@ -482,7 +677,7 @@ describe("init", () => {
 
     test("create a GitHub Actions workflow for CI-compatible scripts when requested", async () => {
       const prompter = createPrompterTestContext({
-        confirmResponses: [true, true, true],
+        confirmResponses: [true, true, true, false],
         multiselectResponses: [["check", "format"], ["react"], ["zed"]],
       })
       const installer = createDependencyInstallerTestContext()
@@ -515,7 +710,7 @@ describe("init", () => {
 
     test("skip tsconfig setup when the user declines the TypeScript preset prompt", async () => {
       const prompter = createPrompterTestContext({
-        confirmResponses: [false, false],
+        confirmResponses: [false, false, false],
         multiselectResponses: [["check"], [], []],
       })
       const installer = createDependencyInstallerTestContext()
@@ -553,7 +748,7 @@ describe("init", () => {
 
     test("continue successfully and show guidance when the VS Code CLI is unavailable", async () => {
       const prompter = createPrompterTestContext({
-        confirmResponses: [true, false],
+        confirmResponses: [true, false, false],
         multiselectResponses: [["format"], ["vscode"]],
       })
       const installer = createDependencyInstallerTestContext()

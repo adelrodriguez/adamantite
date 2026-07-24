@@ -73,7 +73,7 @@
     "@effect/platform-node": "4.0.0-beta.99",
     "defu": "6.1.7",
     "effect": "4.0.0-beta.99",
-    "esrap": "2.2.13",
+    "esrap": "2.3.0",
     "jsonc-parser": "3.3.1",
     "nypm": "0.6.8",
     "oxc-parser": "^0.140.0"

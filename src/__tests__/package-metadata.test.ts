@@ -4,12 +4,14 @@ import type { PackageJson } from "type-fest"
 import Bun from "bun"
 
 describe("package metadata", () => {
-  test("export built preset artifacts", async () => {
+  test("publish expected package metadata", async () => {
     const packageJson = (await Bun.file(
       join(import.meta.dir, "..", "..", "package.json")
     ).json()) as PackageJson
 
     expect(packageJson.main).toBe("dist/presets/lint/core.js")
+    expect(packageJson.devDependencies?.typescript).toBe("7.0.2")
+    expect(packageJson.peerDependencies?.typescript).toBe(">=7")
     expect(packageJson.exports).toMatchObject({
       "./analyze": {
         default: "./dist/presets/analyze.js",

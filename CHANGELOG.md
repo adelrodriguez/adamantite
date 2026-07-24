@@ -1,5 +1,21 @@
 # adamantite
 
+## 0.33.0
+
+### Minor Changes
+
+- [#320](https://github.com/adelrodriguez/adamantite/pull/320) [`10ba5dc`](https://github.com/adelrodriguez/adamantite/commit/10ba5dc184140fef11bbbb718f02175bd37effbc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Enable five new Oxlint rules across the core, React, and Vitest presets: `no-unreachable-loop`, `unicorn/explicit-timer-delay`, `unicorn/no-confusing-array-with`, `react/function-component-definition`, and `vitest/padding-around-test-blocks`. The existing `no-constant-binary-expression` rule also gains Oxlint's new relational-comparison diagnostics.
+
+- [#321](https://github.com/adelrodriguez/adamantite/pull/321) [`bed194e`](https://github.com/adelrodriguez/adamantite/commit/bed194ecfa9a7435a57b809b0d57bd9d27cfb08f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Require Node.js 24 or later to run the CLI.
+
+- [#319](https://github.com/adelrodriguez/adamantite/pull/319) [`6f1fd10`](https://github.com/adelrodriguez/adamantite/commit/6f1fd10332ae5b9b4db94059dec2d4930a972cef) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Upgrade consumer type-aware linting to TypeScript 7.0.2 semantics, including hard errors for TypeScript 6 deprecations and TypeScript 7 compiler defaults. Ambient `@types/*` packages are no longer discovered automatically and must be listed explicitly when needed. Require TypeScript `>=7` as a peer dependency, replace the native preview with `typescript@7.0.2`, and update Oxlint to 1.75.0, oxlint-tsgolint to 7.0.2001, and Oxfmt to 0.60.0.
+
+### Patch Changes
+
+- [#292](https://github.com/adelrodriguez/adamantite/pull/292) [`d1bd939`](https://github.com/adelrodriguez/adamantite/commit/d1bd9390f24e371a41d00b00c3667aa41180403a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update dependency versions for prompts and development tooling.
+
+- [#308](https://github.com/adelrodriguez/adamantite/pull/308) [`b4bcd6c`](https://github.com/adelrodriguez/adamantite/commit/b4bcd6c946683066b3248362b996264635bb5c41) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add optional `AGENTS.md` guidance during `adamantite init` with idempotent Adamantite marker updates.
+
 ## 0.32.3
 
 ### Patch Changes
@@ -807,6 +823,7 @@
 - a6a1853: Add `ci` command for continuous integration workflows with enhanced reporter options.
 
   ## CLI Enhancements
+
   - **Added**: `ci` command for running Biome CI checks in continuous integration environments
   - **Added**: `--github` flag to the `ci` command for GitHub Actions reporter output
   - **Added**: `--monorepo` flag to the `ci` command for additional monorepo-specific checks using Sherif
@@ -823,12 +840,14 @@
   ## Rule Changes
 
   ### A11y Section
+
   - **Added**: `noAutofocus` - error (previously off)
   - **Added**: `noNoninteractiveElementInteractions` - error
   - **Reorganized**: Better organization with JavaScript and CSS subsections
   - **Removed**: Verbose rule comments for cleaner configuration
 
   ### Complexity Section
+
   - **Added 25+ new rules** including:
     - `noExtraBooleanCast` - error
     - `noStaticOnlyClass` - error
@@ -858,6 +877,7 @@
   - **Changed**: `maxAllowedComplexity` increased from 18 to 20
 
   ### Correctness Section
+
   - **Added**: `noGlobalDirnameFilename` - error
   - **Added**: `noNestedComponentDefinitions` - error
   - **Added**: `noProcessGlobal` - off
@@ -871,6 +891,7 @@
   - **Removed**: `useImportExtensions` - off
 
   ### Nursery Section
+
   - **Enabled previously disabled rules**:
     - `noFloatingPromises` - error (was off)
     - `noMisusedPromises` - error (was off)
@@ -883,12 +904,14 @@
   - **Removed**: `noImportCycles` - off
 
   ### Performance Section
+
   - **Removed**: `noBarrelFile` - off
   - **Removed**: `noImgElement` - error
   - **Removed**: `noNamespaceImport` - off
   - **Removed**: `noReExportAll` - off
 
   ### Style Section
+
   - **Added**: `useConsistentObjectDefinitions` - error
   - **Added**: `useExportsLast` - error (was off)
   - **Added**: `useGroupedAccessorPairs` - error
@@ -904,6 +927,7 @@
   - **Removed**: `useComponentExportOnlyModules` - off
 
   ### Suspicious Section
+
   - **Added**: `noBitwiseOperators` - error
   - **Added**: `noConstantBinaryExpressions` - error
   - **Added**: `noTsIgnore` - error
@@ -915,6 +939,7 @@
   - **Added**: `noQuickfixBiome` - error
 
   ## CLI Enhancements
+
   - **Added**: `--summary` flag to the `lint` command for concise lint result reporting using Biome's summary reporter
 
   This update significantly strengthens the linting rules with a focus on code quality, consistency, and best practices while maintaining TypeScript and React compatibility.

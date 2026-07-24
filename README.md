@@ -192,7 +192,9 @@ Opinionated Knip configuration for dependency and unused-file analysis. The publ
 
 ### TypeScript ([presets/tsconfig.json](./presets/tsconfig.json))
 
-Strict TypeScript configuration for maximum type safety. Catches errors at compile-time that would otherwise cause runtime failures.
+Strict TypeScript configuration for maximum type safety. Catches errors at compile-time that would otherwise cause runtime failures. The preset requires TypeScript 7 or newer.
+
+````
 
 ## 🛠️ Development
 
@@ -210,7 +212,7 @@ bun run build
 
 # Linting and type checking
 bun run check
-```
+````
 
 ## 🤝 Contributing
 

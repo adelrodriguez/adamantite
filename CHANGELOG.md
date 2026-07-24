@@ -1,5 +1,21 @@
 # adamantite
 
+## 0.33.0
+
+### Minor Changes
+
+- [#320](https://github.com/adelrodriguez/adamantite/pull/320) [`10ba5dc`](https://github.com/adelrodriguez/adamantite/commit/10ba5dc184140fef11bbbb718f02175bd37effbc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Enable five new Oxlint rules across the core, React, and Vitest presets: `no-unreachable-loop`, `unicorn/explicit-timer-delay`, `unicorn/no-confusing-array-with`, `react/function-component-definition`, and `vitest/padding-around-test-blocks`. The existing `no-constant-binary-expression` rule also gains Oxlint's new relational-comparison diagnostics.
+
+- [#321](https://github.com/adelrodriguez/adamantite/pull/321) [`bed194e`](https://github.com/adelrodriguez/adamantite/commit/bed194ecfa9a7435a57b809b0d57bd9d27cfb08f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Require Node.js 24 or later to run the CLI.
+
+- [#319](https://github.com/adelrodriguez/adamantite/pull/319) [`6f1fd10`](https://github.com/adelrodriguez/adamantite/commit/6f1fd10332ae5b9b4db94059dec2d4930a972cef) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Upgrade consumer type-aware linting to TypeScript 7.0.2 semantics, including hard errors for TypeScript 6 deprecations and TypeScript 7 compiler defaults. Ambient `@types/*` packages are no longer discovered automatically and must be listed explicitly when needed. Require TypeScript `>=7` as a peer dependency, replace the native preview with `typescript@7.0.2`, and update Oxlint to 1.75.0, oxlint-tsgolint to 7.0.2001, and Oxfmt to 0.60.0.
+
+### Patch Changes
+
+- [#292](https://github.com/adelrodriguez/adamantite/pull/292) [`d1bd939`](https://github.com/adelrodriguez/adamantite/commit/d1bd9390f24e371a41d00b00c3667aa41180403a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update dependency versions for prompts and development tooling.
+
+- [#308](https://github.com/adelrodriguez/adamantite/pull/308) [`b4bcd6c`](https://github.com/adelrodriguez/adamantite/commit/b4bcd6c946683066b3248362b996264635bb5c41) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add optional `AGENTS.md` guidance during `adamantite init` with idempotent Adamantite marker updates.
+
 ## 0.32.3
 
 ### Patch Changes

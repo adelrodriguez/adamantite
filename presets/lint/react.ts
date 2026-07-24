@@ -47,6 +47,13 @@ const config: OxlintConfig = {
     "react/display-name": "off",
     "react/exhaustive-deps": "error",
     "react/forward-ref-uses-ref": "error",
+    "react/function-component-definition": [
+      "error",
+      {
+        namedComponents: "function-declaration",
+        unnamedComponents: "arrow-function",
+      },
+    ],
     "react/hook-use-state": "error",
     "react/iframe-missing-sandbox": "error",
     "react/jsx-boolean-value": "error",

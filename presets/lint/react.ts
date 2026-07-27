@@ -38,7 +38,6 @@ const config: OxlintConfig = {
     "jsx-a11y/role-supports-aria-props": "error",
     "jsx-a11y/scope": "error",
     "jsx-a11y/tabindex-no-positive": "error",
-    "react-perf/jsx-no-jsx-as-prop": "error",
     "react/button-has-type": "error",
     "react/checked-requires-onchange-or-readonly": "error",
     "react/display-name": "off",

@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.33.2
+
+### Patch Changes
+
+- [#324](https://github.com/adelrodriguez/adamantite/pull/324) [`8f7da4b`](https://github.com/adelrodriguez/adamantite/commit/8f7da4bbaee8a7e14af2bfaba9a1fd28591b9805) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove `react-perf/jsx-no-jsx-as-prop` from the React lint preset to allow common composition and slot patterns.
+
 ## 0.33.1
 
 ### Patch Changes

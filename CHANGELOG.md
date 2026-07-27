@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.33.1
+
+### Patch Changes
+
+- [#322](https://github.com/adelrodriguez/adamantite/pull/322) [`262452e`](https://github.com/adelrodriguez/adamantite/commit/262452e66111a92d32a34a83d5fff529be021e99) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove several overly strict performance and style rules from the React lint preset, including the rules that reject newly created prop values, enforce handler naming, and prohibit class component state.
+
 ## 0.33.0
 
 ### Minor Changes

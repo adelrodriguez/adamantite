@@ -76,7 +76,7 @@
     "esrap": "2.3.0",
     "jsonc-parser": "3.3.1",
     "nypm": "0.6.8",
-    "oxc-parser": "^0.140.0"
+    "oxc-parser": "^0.141.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "0.7.0",

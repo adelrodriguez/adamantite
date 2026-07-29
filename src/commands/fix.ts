@@ -5,6 +5,7 @@ import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
+import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
 const files = Argument.file("files", { mustExist: true }).pipe(
@@ -24,6 +25,7 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
   Command.withDescription("Fix issues in code using oxlint"),
   Command.withHandler(({ all, dangerous, files, suggested }) =>
     Effect.gen(function* () {
+      const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
       const args = new Set<string>(["--fix"])
 
@@ -40,7 +42,7 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
       }
 
       const exitCode = yield* runner.run({
-        args: [...args],
+        args: [...args, ...forwardedArguments],
         command: oxlint.name,
       })
 

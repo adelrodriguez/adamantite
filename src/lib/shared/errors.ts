@@ -185,6 +185,14 @@ export class OperationCancelled extends Data.TaggedError("OperationCancelled")<{
   }
 }
 
+export class PassthroughNotSupported extends Data.TaggedError("PassthroughNotSupported")<{
+  command: string
+}> {
+  override get message() {
+    return `Command \`adamantite ${this.command}\` does not invoke a single underlying CLI and cannot accept passthrough arguments.`
+  }
+}
+
 export class UnknownScript extends Data.TaggedError("UnknownScript")<{ script: string }> {
   override get message() {
     return `Unknown script: \`${this.script}\`.`

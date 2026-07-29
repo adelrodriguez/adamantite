@@ -45,6 +45,21 @@ describe("typecheck", () => {
     ])
   })
 
+  test("forward arguments to oxlint", async () => {
+    const prompter = createPrompterTestContext()
+    const runner = createRunnerTestContext()
+
+    const exit = await runCommand(
+      typecheckCommand,
+      [],
+      [prompter.layer, runner.layer],
+      ["--deny-warnings"]
+    )
+
+    expect(Exit.isSuccess(exit)).toBe(true)
+    expect(runner.invocations[0]?.args).toEqual(["--deny-warnings"])
+  })
+
   test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
     const prompter = createPrompterTestContext()
     const runner = createRunnerTestContext([1])

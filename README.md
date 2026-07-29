@@ -75,6 +75,24 @@ This interactive command will:
 
 ## 📋 Commands
 
+### `adamantite analyze`
+
+Find unused dependencies, exports, and files using Knip:
+
+```shell
+# Analyze the current project
+adamantite analyze
+
+# Automatically fix issues, including removing unused files
+adamantite analyze --fix
+
+# Enable production and strict analysis
+adamantite analyze --strict
+
+# Forward additional arguments to Knip
+adamantite analyze -- --directory packages/app
+```
+
 ### `adamantite check`
 
 Check your code for issues and type errors without automatically fixing them using oxlint:
@@ -141,6 +159,30 @@ Automatically detects and fixes:
 - Missing dependencies in package.json
 - Unused dependencies
 - Package.json formatting issues
+
+### Passing arguments to underlying tools
+
+Commands that invoke Knip, Oxlint, Oxfmt, or Sherif can forward additional arguments to
+the underlying CLI. Place Adamantite arguments before `--` and underlying CLI arguments
+after it:
+
+```shell
+adamantite analyze --strict -- --directory packages/app
+adamantite check src -- --deny-warnings
+adamantite format -- --ignore-path .formatignore
+adamantite monorepo -- --ignore-package package-a
+```
+
+When invoking a package script, the package manager consumes its own `--`, so add a
+second separator for Adamantite:
+
+```shell
+bun run analyze -- -- --directory packages/app
+npm run analyze -- -- --directory packages/app
+```
+
+Passthrough arguments are not supported by `init`, `doctor`, or `update`, because those
+commands do not invoke a single underlying CLI.
 
 ### `adamantite update`
 

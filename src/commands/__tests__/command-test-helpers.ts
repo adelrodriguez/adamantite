@@ -15,6 +15,7 @@ import {
   type DetectedPackageManager,
   DependencyInstaller,
 } from "#lib/services/dependency-installer.ts"
+import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
 
@@ -269,7 +270,8 @@ function makeQuietConsoleLayer() {
 export async function runCommand(
   command: Command.Command.Any,
   args: string[],
-  layers: TestLayer[]
+  layers: TestLayer[],
+  forwardedArguments: readonly string[] = []
 ) {
   let providedLayer = Layer.mergeAll(
     NodeServices.layer,
@@ -283,6 +285,7 @@ export async function runCommand(
 
   return Effect.runPromiseExit(
     Command.runWith(command, { version: "test" })(args).pipe(
+      Effect.provideService(ForwardedArguments, forwardedArguments),
       Effect.provide(providedLayer)
     ) as Effect.Effect<void, unknown>
   )
@@ -291,10 +294,12 @@ export async function runCommand(
 export async function runCommandWithRunner(
   command: Command.Command.Any,
   args: string[],
-  runner: RunnerTestContext
+  runner: RunnerTestContext,
+  forwardedArguments: readonly string[] = []
 ) {
   return Effect.runPromiseExit(
     Command.runWith(command, { version: "test" })(args).pipe(
+      Effect.provideService(ForwardedArguments, forwardedArguments),
       Effect.provide(Layer.mergeAll(NodeServices.layer, runner.layer))
     ) as Effect.Effect<void, unknown>
   )

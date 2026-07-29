@@ -4,40 +4,22 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Runtime from "effect/Runtime"
-import * as Command from "effect/unstable/cli/Command"
+import * as Stdio from "effect/Stdio"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import analyzeCommand from "#commands/analyze.ts"
-import checkCommand from "#commands/check.ts"
-import doctorCommand from "#commands/doctor.ts"
-import fixCommand from "#commands/fix.ts"
-import formatCommand from "#commands/format.ts"
-import initCommand from "#commands/init.ts"
-import monorepoCommand from "#commands/monorepo.ts"
-import typecheckCommand from "#commands/typecheck.ts"
-import updateCommand from "#commands/update.ts"
+import { runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
-const main = Command.make("adamantite").pipe(
-  Command.withDescription("Opinionated preset package for modern TypeScript applications"),
-  Command.withSubcommands([
-    analyzeCommand,
-    checkCommand,
-    doctorCommand,
-    fixCommand,
-    formatCommand,
-    initCommand,
-    monorepoCommand,
-    typecheckCommand,
-    updateCommand,
-  ])
-)
-
 const version = getPackageVersion()
 
-const program = Command.run(main, { version }).pipe(
+const program = Effect.gen(function* () {
+  const stdio = yield* Stdio.Stdio
+  const args = yield* stdio.args
+
+  yield* runCli(args, version)
+}).pipe(
   Effect.as(0),
   Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
   Effect.catch((error) =>

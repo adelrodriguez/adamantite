@@ -56,6 +56,23 @@ describe("check", () => {
     })
   })
 
+  describe("passthrough arguments", () => {
+    test("append arguments after file arguments", async () => {
+      await writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
+      const runner = createRunnerTestContext()
+
+      const exit = await runCommandWithRunner(checkCommand, ["index.ts"], runner, [
+        "--deny-warnings",
+      ])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations[0]?.args).toEqual([
+        realpathSync(join(tempDir, "index.ts")),
+        "--deny-warnings",
+      ])
+    })
+  })
+
   describe("error handling", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([2])

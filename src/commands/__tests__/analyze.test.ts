@@ -76,6 +76,25 @@ describe("analyze", () => {
     })
   })
 
+  describe("passthrough arguments", () => {
+    test("append arguments after Adamantite-managed flags", async () => {
+      const runner = createRunnerTestContext()
+
+      const exit = await runCommandWithRunner(analyzeCommand, ["--strict"], runner, [
+        "--directory",
+        "packages/app",
+      ])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations[0]?.args).toEqual([
+        "--production",
+        "--strict",
+        "--directory",
+        "packages/app",
+      ])
+    })
+  })
+
   describe("error handling", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])

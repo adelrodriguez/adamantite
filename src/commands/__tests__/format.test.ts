@@ -62,6 +62,20 @@ describe("format", () => {
     })
   })
 
+  describe("passthrough arguments", () => {
+    test("append arguments after managed formatter arguments", async () => {
+      const runner = createRunnerTestContext()
+
+      const exit = await runCommandWithRunner(formatCommand, ["--check"], runner, [
+        "--ignore-path",
+        ".formatignore",
+      ])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations[0]?.args).toEqual(["--check", "--ignore-path", ".formatignore"])
+    })
+  })
+
   describe("error handling", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])

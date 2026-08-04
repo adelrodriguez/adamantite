@@ -5,7 +5,8 @@ import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import { isLeft, runEither } from "#__tests__/helpers.ts"
+import * as Result from "effect/Result"
+import { runResult } from "#__tests__/helpers.ts"
 import github from "#lib/integrations/ci/github.ts"
 
 describe("github", () => {
@@ -178,16 +179,16 @@ describe("github", () => {
     test("return FailedToCreateDirectory when the workflow directory cannot be created", async () => {
       writeFileSync(".github", "not a directory")
 
-      const result = await runEither(
+      const result = await runResult(
         github.create(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
         })
       )
 
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToCreateDirectory" })
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToCreateDirectory" })
       }
     })
   })
@@ -216,16 +217,16 @@ describe("github", () => {
       writeFileSync(".github/workflows/adamantite.yml", "name: Old")
       chmodSync(".github/workflows/adamantite.yml", 0o444)
 
-      const result = await runEither(
+      const result = await runResult(
         github.update(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
         })
       )
 
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
       }
     })
   })

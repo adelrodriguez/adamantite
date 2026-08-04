@@ -2,6 +2,7 @@ import type * as prompts from "@clack/prompts"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Terminal from "effect/Terminal"
 import * as Command from "effect/unstable/cli/Command"
@@ -183,21 +184,32 @@ export function createPrompterTestContext(options?: {
         Effect.sync(() => {
           outros.push(message)
         }),
-      spinner: () => ({
-        cancel: () => false,
-        clear: () => null,
-        error: () => false,
-        isCancelled: false,
-        message: (message: string) => {
-          spinnerEntries.push({ message, type: "message" })
-        },
-        start: (message?: string) => {
-          spinnerEntries.push({ message, type: "start" })
-        },
-        stop: (message?: string) => {
-          spinnerEntries.push({ message, type: "stop" })
-        },
-      }),
+      withSpinner: (run, spinnerOptions) =>
+        Effect.acquireUseRelease(
+          Effect.sync(() => {
+            spinnerEntries.push({ message: spinnerOptions.start, type: "start" })
+          }),
+          () =>
+            run({
+              message: (message) =>
+                Effect.sync(() => {
+                  spinnerEntries.push({ message, type: "message" })
+                }),
+            }),
+          (_, exit) =>
+            Effect.sync(() => {
+              spinnerEntries.push({
+                message: Exit.match(exit, {
+                  onFailure: () => spinnerOptions.failure,
+                  onSuccess: (value) =>
+                    typeof spinnerOptions.success === "function"
+                      ? spinnerOptions.success(value)
+                      : spinnerOptions.success,
+                }),
+                type: "stop",
+              })
+            })
+        ),
     }),
     logs,
     multiselectCalls,

@@ -53,6 +53,14 @@ export type IntegrationAssessment =
       readonly warnings: readonly string[]
     }
 
+export function isApplicableAssessment(assessment: {
+  readonly actions?: readonly AssessmentAction[]
+  readonly applicable: boolean
+  readonly warnings: readonly string[]
+}): assessment is Extract<IntegrationAssessment, { readonly applicable: true }> {
+  return assessment.applicable && Array.isArray(assessment.actions)
+}
+
 interface Integration {
   /**
    * Read-only diagnosis for the current project state.

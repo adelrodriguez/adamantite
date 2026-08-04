@@ -39,24 +39,22 @@ const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
     const dependencyInstaller = yield* DependencyInstaller
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Installing dependencies...")
-    const isMonorepo = yield* checkIsMonorepo(cwd)
+    yield* prompter.withSpinner(
+      () =>
+        Effect.gen(function* () {
+          const isMonorepo = yield* checkIsMonorepo(cwd)
 
-    yield* dependencyInstaller
-      .addDevDependencies(packages, cwd, {
-        silent: true,
-        workspace: isMonorepo,
-      })
-      .pipe(
-        Effect.tapError(() =>
-          Effect.sync(() => {
-            spinner.stop("Failed to install dependencies.")
+          yield* dependencyInstaller.addDevDependencies(packages, cwd, {
+            silent: true,
+            workspace: isMonorepo,
           })
-        )
-      )
-
-    spinner.stop("Dependencies installed.")
+        }),
+      {
+        failure: "Failed to install dependencies.",
+        start: "Installing dependencies...",
+        success: "Dependencies installed.",
+      }
+    )
   })
 
 function logLegacyConfigPreservedMessage(tool: string, configPath: string) {
@@ -73,75 +71,93 @@ function logLegacyConfigPreservedMessage(tool: string, configPath: string) {
 const setupOxlintConfig = (cwd: string, presets: string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Setting up oxlint config...")
+    const legacyConfig = yield* prompter.withSpinner(
+      (spinner) =>
+        Effect.gen(function* () {
+          const exists = yield* oxlint.exists(cwd)
+          const oxlintLegacyConfig = oxlint.files[1].path
 
-    const exists = yield* oxlint.exists(cwd)
-    const oxlintLegacyConfig = oxlint.files[1].path
+          if (exists.active?.format === "ts" && exists.legacy.length > 0) {
+            yield* prompter.log.warning(
+              `Found both \`${oxlint.config}\` and \`${oxlintLegacyConfig}\`. Adamantite will use \`${oxlint.config}\`.`
+            )
+          }
 
-    if (exists.active?.format === "ts" && exists.legacy.length > 0) {
-      yield* prompter.log.warning(
-        `Found both \`${oxlint.config}\` and \`${oxlintLegacyConfig}\`. Adamantite will use \`${oxlint.config}\`.`
-      )
-    }
+          if (exists.active?.format === "json") {
+            yield* spinner.message(`Found \`${oxlintLegacyConfig}\`, keeping existing config.`)
+            return { created: false, legacyConfig: oxlintLegacyConfig }
+          }
 
-    if (exists.active?.format === "json") {
-      spinner.message(`Found \`${oxlintLegacyConfig}\`, keeping existing config.`)
+          if (exists.active?.format === "ts") {
+            yield* spinner.message(`Found \`${oxlint.config}\`, keeping existing config.`)
+            return { created: false, legacyConfig: null }
+          }
 
-      spinner.stop("oxlint config is ready.")
-      yield* logLegacyConfigPreservedMessage("oxlint", oxlintLegacyConfig)
-    } else if (exists.active?.format === "ts") {
-      spinner.message(`Found \`${oxlint.config}\`, keeping existing config.`)
+          yield* spinner.message(`\`${oxlint.config}\` not found, creating...`)
+          yield* oxlint.create(cwd, presets)
+          return { created: true, legacyConfig: null }
+        }),
+      {
+        failure: "Failed to set up oxlint config.",
+        start: "Setting up oxlint config...",
+        success: (result) =>
+          result.created ? "oxlint config created successfully." : "oxlint config is ready.",
+      }
+    )
 
-      spinner.stop("oxlint config is ready.")
-    } else {
-      spinner.message(`\`${oxlint.config}\` not found, creating...`)
-
-      yield* oxlint.create(cwd, presets)
-
-      spinner.stop("oxlint config created successfully.")
+    if (legacyConfig.legacyConfig) {
+      yield* logLegacyConfigPreservedMessage("oxlint", legacyConfig.legacyConfig)
     }
   })
 
 const setupOxfmtConfig = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Setting up oxfmt config...")
+    const outcome = yield* prompter.withSpinner(
+      (spinner) =>
+        Effect.gen(function* () {
+          const exists = yield* oxfmt.exists(cwd)
 
-    const exists = yield* oxfmt.exists(cwd)
+          if (exists.active?.format === "ts" && exists.legacy.length > 0) {
+            yield* prompter.log.warning(
+              `Found both \`${oxfmt.config}\` and \`.oxfmtrc.json(c)\`. Adamantite will use \`${oxfmt.config}\`.`
+            )
+          }
 
-    if (exists.active?.format === "ts" && exists.legacy.length > 0) {
-      yield* prompter.log.warning(
-        `Found both \`${oxfmt.config}\` and \`.oxfmtrc.json(c)\`. Adamantite will use \`${oxfmt.config}\`.`
-      )
-    }
+          if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
+            yield* prompter.log.warning(
+              "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
+            )
+          }
 
-    if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
-      yield* prompter.log.warning(
-        "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
-      )
-    }
+          if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
+            const legacyConfig = exists.active.path.endsWith(oxfmt.files[1].path)
+              ? oxfmt.files[1].path
+              : oxfmt.files[2].path
 
-    if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
-      const legacyConfigFile = exists.active.path.endsWith(oxfmt.files[1].path)
-        ? oxfmt.files[1].path
-        : oxfmt.files[2].path
+            yield* spinner.message(`Found \`${legacyConfig}\`, keeping existing config.`)
+            return { created: false, legacyConfig }
+          }
 
-      spinner.message(`Found \`${legacyConfigFile}\`, keeping existing config.`)
+          if (exists.active?.format === "ts") {
+            yield* spinner.message(`Found \`${oxfmt.config}\`, keeping existing config.`)
+            return { created: false, legacyConfig: null }
+          }
 
-      spinner.stop("oxfmt config is ready.")
-      yield* logLegacyConfigPreservedMessage("oxfmt", legacyConfigFile)
-    } else if (exists.active?.format === "ts") {
-      spinner.message(`Found \`${oxfmt.config}\`, keeping existing config.`)
+          yield* spinner.message(`\`${oxfmt.config}\` not found, creating...`)
+          yield* oxfmt.create(cwd)
+          return { created: true, legacyConfig: null }
+        }),
+      {
+        failure: "Failed to set up oxfmt config.",
+        start: "Setting up oxfmt config...",
+        success: (result) =>
+          result.created ? "oxfmt config created successfully." : "oxfmt config is ready.",
+      }
+    )
 
-      spinner.stop("oxfmt config is ready.")
-    } else {
-      spinner.message(`\`${oxfmt.config}\` not found, creating...`)
-
-      yield* oxfmt.create(cwd)
-
-      spinner.stop("oxfmt config created successfully.")
+    if (outcome.legacyConfig) {
+      yield* logLegacyConfigPreservedMessage("oxfmt", outcome.legacyConfig)
     }
   })
 
@@ -151,194 +167,221 @@ const addScripts = (cwd: string, scripts: Script[]) =>
     const path = yield* Path.Path
     const prompter = yield* Prompter
     const packageJson = yield* readPackageJson(cwd)
-    const spinner = prompter.spinner()
-    spinner.start("Adding scripts to your `package.json`...")
+    yield* prompter.withSpinner(
+      () =>
+        Effect.gen(function* () {
+          packageJson.scripts ??= {}
 
-    packageJson.scripts ??= {}
+          for (const script of scripts) {
+            switch (script) {
+              case "check":
+                packageJson.scripts.check = "adamantite check"
+                break
+              case "fix":
+                packageJson.scripts.fix = "adamantite fix"
+                break
+              case "format":
+                packageJson.scripts.format = "adamantite format"
+                break
+              case "check:monorepo":
+                packageJson.scripts["check:monorepo"] = "adamantite monorepo"
+                break
+              case "fix:monorepo":
+                packageJson.scripts["fix:monorepo"] = "adamantite monorepo --fix"
+                break
+              case "analyze":
+                packageJson.scripts.analyze = "adamantite analyze"
+                break
+              default:
+                return yield* new UnknownScript({ script })
+            }
+          }
 
-    for (const script of scripts) {
-      switch (script) {
-        case "check":
-          packageJson.scripts.check = "adamantite check"
-          break
-        case "fix":
-          packageJson.scripts.fix = "adamantite fix"
-          break
-        case "format":
-          packageJson.scripts.format = "adamantite format"
-          break
-        case "check:monorepo":
-          packageJson.scripts["check:monorepo"] = "adamantite monorepo"
-          break
-        case "fix:monorepo":
-          packageJson.scripts["fix:monorepo"] = "adamantite monorepo --fix"
-          break
-        case "analyze":
-          packageJson.scripts.analyze = "adamantite analyze"
-          break
-        default:
-          return yield* new UnknownScript({ script })
+          const packagePath = path.join(cwd, "package.json")
+          yield* fs
+            .writeFileString(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
+            .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
+        }),
+      {
+        failure: "Failed to add scripts to `package.json`.",
+        start: "Adding scripts to your `package.json`...",
+        success: "Scripts added to your `package.json`",
       }
-    }
-
-    const packagePath = path.join(cwd, "package.json")
-    yield* fs
-      .writeFileString(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
-      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
-
-    spinner.stop("Scripts added to your `package.json`")
+    )
   })
 
 const setupKnipConfig = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Setting up knip config...")
+    const outcome = yield* prompter.withSpinner(
+      (spinner) =>
+        Effect.gen(function* () {
+          const exists = yield* knip.exists(cwd)
 
-    const exists = yield* knip.exists(cwd)
+          if (exists.active?.format === "ts" && exists.legacy.length > 0) {
+            yield* prompter.log.warning(
+              `Found both \`${knip.config}\` and \`knip.json(c)\`. Adamantite will use \`${knip.config}\`.`
+            )
+          }
 
-    if (exists.active?.format === "ts" && exists.legacy.length > 0) {
-      yield* prompter.log.warning(
-        `Found both \`${knip.config}\` and \`knip.json(c)\`. Adamantite will use \`${knip.config}\`.`
-      )
-    }
+          if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
+            yield* prompter.log.warning(
+              "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed."
+            )
+          }
 
-    if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
-      yield* prompter.log.warning(
-        "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed."
-      )
-    }
+          if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
+            const legacyConfig = exists.active.path.endsWith(knip.files[1].path)
+              ? knip.files[1].path
+              : knip.files[2].path
 
-    if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
-      const legacyConfigFile = exists.active.path.endsWith(knip.files[1].path)
-        ? knip.files[1].path
-        : knip.files[2].path
+            yield* spinner.message(`Found \`${legacyConfig}\`, keeping existing config.`)
+            return { created: false, legacyConfig }
+          }
 
-      spinner.message(`Found \`${legacyConfigFile}\`, keeping existing config.`)
+          if (exists.active?.format === "ts") {
+            yield* spinner.message(`Found \`${knip.config}\`, keeping existing config.`)
+            return { created: false, legacyConfig: null }
+          }
 
-      spinner.stop("knip config is ready.")
-      yield* logLegacyConfigPreservedMessage("knip", legacyConfigFile)
-    } else if (exists.active?.format === "ts") {
-      spinner.message(`Found \`${knip.config}\`, keeping existing config.`)
+          yield* spinner.message(`\`${knip.config}\` not found, creating...`)
+          yield* knip.create(cwd)
+          return { created: true, legacyConfig: null }
+        }),
+      {
+        failure: "Failed to set up knip config.",
+        start: "Setting up knip config...",
+        success: (result) =>
+          result.created ? "knip config created successfully." : "knip config is ready.",
+      }
+    )
 
-      spinner.stop("knip config is ready.")
-    } else {
-      spinner.message(`\`${knip.config}\` not found, creating...`)
-
-      yield* knip.create(cwd)
-
-      spinner.stop("knip config created successfully.")
+    if (outcome.legacyConfig) {
+      yield* logLegacyConfigPreservedMessage("knip", outcome.legacyConfig)
     }
   })
 
 const setupTypescript = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Setting up TypeScript config...")
+    yield* prompter.withSpinner(
+      (spinner) =>
+        Effect.gen(function* () {
+          const typescriptExists = yield* tsconfig.exists(cwd)
 
-    const typescriptExists = yield* tsconfig.exists(cwd)
+          if (typescriptExists) {
+            yield* spinner.message(`\`${tsconfig.config}\` found, updating...`)
+            yield* tsconfig.update(cwd)
+            return false
+          }
 
-    if (typescriptExists) {
-      spinner.message(`\`${tsconfig.config}\` found, updating...`)
-
-      yield* tsconfig.update(cwd)
-
-      spinner.stop(`\`${tsconfig.config}\` updated successfully`)
-    } else {
-      spinner.message(`\`${tsconfig.config}\` not found, creating...`)
-
-      yield* tsconfig.create(cwd)
-
-      spinner.stop(`\`${tsconfig.config}\` created successfully`)
-    }
+          yield* spinner.message(`\`${tsconfig.config}\` not found, creating...`)
+          yield* tsconfig.create(cwd)
+          return true
+        }),
+      {
+        failure: "Failed to set up TypeScript config.",
+        start: "Setting up TypeScript config...",
+        success: (created) =>
+          created
+            ? `\`${tsconfig.config}\` created successfully`
+            : `\`${tsconfig.config}\` updated successfully`,
+      }
+    )
   })
 
 const setupEditors = (cwd: string, editors: string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     if (editors.includes("vscode")) {
-      const spinner = prompter.spinner()
-
-      spinner.start(`Checking for \`${vscode.config}\`...`)
-
-      const hasVscodeSettings = yield* vscode.exists(cwd)
-      if (hasVscodeSettings) {
-        spinner.message(`\`${vscode.config}\` found, updating...`)
-        yield* vscode.update(cwd)
-        spinner.stop(`\`${vscode.config}\` updated with Adamantite preset.`)
-      } else {
-        spinner.message(`\`${vscode.config}\` not found, creating...`)
-        yield* vscode.create(cwd)
-        spinner.stop(`\`${vscode.config}\` created with Adamantite preset.`)
-      }
+      yield* prompter.withSpinner(
+        (spinner) =>
+          Effect.gen(function* () {
+            const exists = yield* vscode.exists(cwd)
+            yield* spinner.message(
+              `\`${vscode.config}\` ${exists ? "found, updating" : "not found, creating"}...`
+            )
+            yield* exists ? vscode.update(cwd) : vscode.create(cwd)
+            return !exists
+          }),
+        {
+          failure: "Failed to set up VS Code config.",
+          start: `Checking for \`${vscode.config}\`...`,
+          success: (created) =>
+            `\`${vscode.config}\` ${created ? "created" : "updated"} with Adamantite preset.`,
+        }
+      )
     }
 
     if (editors.includes("zed")) {
-      const spinner = prompter.spinner()
-
-      spinner.start(`Checking for \`${zed.config}\`...`)
-
-      const hasZedSettings = yield* zed.exists(cwd)
-      if (hasZedSettings) {
-        spinner.message(`\`${zed.config}\` found, updating...`)
-        yield* zed.update(cwd)
-        spinner.stop(`\`${zed.config}\` updated with Adamantite preset.`)
-      } else {
-        spinner.message(`\`${zed.config}\` not found, creating...`)
-        yield* zed.create(cwd)
-        spinner.stop(`\`${zed.config}\` created with Adamantite preset.`)
-      }
+      yield* prompter.withSpinner(
+        (spinner) =>
+          Effect.gen(function* () {
+            const exists = yield* zed.exists(cwd)
+            yield* spinner.message(
+              `\`${zed.config}\` ${exists ? "found, updating" : "not found, creating"}...`
+            )
+            yield* exists ? zed.update(cwd) : zed.create(cwd)
+            return !exists
+          }),
+        {
+          failure: "Failed to set up Zed config.",
+          start: `Checking for \`${zed.config}\`...`,
+          success: (created) =>
+            `\`${zed.config}\` ${created ? "created" : "updated"} with Adamantite preset.`,
+        }
+      )
     }
   })
 
 const installEditorExtensions = (editors: string[], scripts: Script[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Installing editor extensions...")
     const hasZed = editors.includes("zed")
     const hasVscode = editors.includes("vscode")
 
-    const result = yield* Effect.gen(function* () {
-      if (editors.includes("vscode")) {
-        spinner.message("Installing VS Code extension...")
-        yield* vscode.extension(scripts)
-      }
+    yield* prompter
+      .withSpinner(
+        (spinner) =>
+          Effect.gen(function* () {
+            if (hasVscode) {
+              yield* spinner.message("Installing VS Code extension...")
+              yield* vscode.extension(scripts)
+            }
 
-      return true as const
-    }).pipe(
-      Effect.tapError(() =>
-        Effect.sync(() => {
-          spinner.stop()
-        })
-      ),
-      Effect.catchTag("FailedToInstallExtension", (error) =>
-        Effect.gen(function* () {
-          yield* prompter.log.warning(`⚠️ Failed to install the \`${error.extension}\` extension.`)
-          yield* prompter.log.warning("Please install it manually after setup completes.")
-          return false as const
-        })
-      ),
-      Effect.catchTag("VscodeCliNotFound", () =>
-        Effect.gen(function* () {
-          yield* prompter.log.error("VSCode CLI ('code' command) not found.")
-          yield* prompter.log.info("To install it:")
-          yield* prompter.log.info("  1. Open VS Code")
-          yield* prompter.log.info("  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)")
-          yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
-          return false as const
-        })
+            return true as const
+          }),
+        {
+          start: "Installing editor extensions...",
+          success:
+            hasZed && !hasVscode
+              ? "Zed extensions require manual install."
+              : "Editor extensions installed successfully.",
+        }
       )
-    )
-
-    if (result) {
-      if (hasZed && !hasVscode) {
-        spinner.stop("Zed extensions require manual install.")
-      } else {
-        spinner.stop("Editor extensions installed successfully.")
-      }
-    }
+      .pipe(
+        Effect.catchTag("FailedToInstallExtension", (error) =>
+          Effect.gen(function* () {
+            yield* prompter.log.warning(
+              `⚠️ Failed to install the \`${error.extension}\` extension.`
+            )
+            yield* prompter.log.warning("Please install it manually after setup completes.")
+            return false as const
+          })
+        ),
+        Effect.catchTag("VscodeCliNotFound", () =>
+          Effect.gen(function* () {
+            yield* prompter.log.error("VSCode CLI ('code' command) not found.")
+            yield* prompter.log.info("To install it:")
+            yield* prompter.log.info("  1. Open VS Code")
+            yield* prompter.log.info(
+              "  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)"
+            )
+            yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
+            return false as const
+          })
+        )
+      )
 
     if (hasZed) {
       yield* prompter.log.info("Install the Zed `oxc` extension: zed://extension/oxc")
@@ -352,46 +395,51 @@ const setupGitHubActions = (
 ) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Setting up GitHub Actions workflow...")
-
-    const workflowExists = yield* github.exists(cwd)
     const workflowPath = github.files[0].path
-
-    if (workflowExists) {
-      spinner.message(`\`${workflowPath}\` found, updating...`)
-      yield* github.update(cwd, { packageManager, scripts })
-      spinner.stop("GitHub Actions workflow updated successfully.")
-    } else {
-      spinner.message(`Creating \`${workflowPath}\`...`)
-      yield* github.create(cwd, { packageManager, scripts })
-      spinner.stop("GitHub Actions workflow created successfully.")
-    }
+    yield* prompter.withSpinner(
+      (spinner) =>
+        Effect.gen(function* () {
+          const exists = yield* github.exists(cwd)
+          yield* spinner.message(
+            exists ? `\`${workflowPath}\` found, updating...` : `Creating \`${workflowPath}\`...`
+          )
+          yield* exists
+            ? github.update(cwd, { packageManager, scripts })
+            : github.create(cwd, { packageManager, scripts })
+          return !exists
+        }),
+      {
+        failure: "Failed to set up GitHub Actions workflow.",
+        start: "Setting up GitHub Actions workflow...",
+        success: (created) =>
+          `GitHub Actions workflow ${created ? "created" : "updated"} successfully.`,
+      }
+    )
   }).pipe(Effect.option)
 
 const setupAgentsGuidance = (cwd: string, packageManager: PackageManagerName, scripts: Script[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const spinner = prompter.spinner()
-    spinner.start("Updating AGENTS.md...")
-
-    const result = yield* writeAgentsGuidance(cwd, { packageManager, scripts }).pipe(
-      Effect.catchTag(["FailedToReadFile", "FailedToWriteFile"], (error) =>
-        Effect.gen(function* () {
-          spinner.stop("Failed to update AGENTS.md.")
-          yield* prompter.log.warning(
-            `Could not update AGENTS.md. ${error.message} Adamantite will continue initialization.`
-          )
-          return "failed" as const
-        })
+    const result = yield* prompter
+      .withSpinner(() => writeAgentsGuidance(cwd, { packageManager, scripts }), {
+        failure: "Failed to update AGENTS.md.",
+        start: "Updating AGENTS.md...",
+        success: "AGENTS.md check complete.",
+      })
+      .pipe(
+        Effect.catchTag(["FailedToReadFile", "FailedToWriteFile"], (error) =>
+          Effect.gen(function* () {
+            yield* prompter.log.warning(
+              `Could not update AGENTS.md. ${error.message} Adamantite will continue initialization.`
+            )
+            return "failed" as const
+          })
+        )
       )
-    )
 
     if (result === "failed") {
       return
     }
-
-    spinner.stop("AGENTS.md check complete.")
 
     if (result === "malformed") {
       yield* prompter.log.warning(

@@ -105,15 +105,16 @@ export default defineMigration({
   migrate: (context) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
-      const spinner = prompter.spinner()
       const state = yield* knip.exists(context.cwd)
       const legacyConfigFile = state.active?.path.endsWith(knip.files[2].path)
         ? knip.files[2].path
         : knip.files[1].path
 
-      spinner.start(`Migrating \`${legacyConfigFile}\` to \`${knip.config}\`...`)
-      yield* migrateLegacyKnipConfig(context.cwd)
-      spinner.stop(`Knip config migrated to \`${knip.config}\` successfully.`)
+      yield* prompter.withSpinner(() => migrateLegacyKnipConfig(context.cwd), {
+        failure: `Failed to migrate ${legacyConfigFile}.`,
+        start: `Migrating \`${legacyConfigFile}\` to \`${knip.config}\`...`,
+        success: `Knip config migrated to \`${knip.config}\` successfully.`,
+      })
     }),
   tags: ["update"],
   title: "Legacy Knip JSON config",

@@ -1,6 +1,7 @@
-import type { JsonObject, JsonValue } from "type-fest"
+import type { JsonValue } from "type-fest"
 import { defu } from "defu"
 import * as Effect from "effect/Effect"
+import * as Predicate from "effect/Predicate"
 import { type ParseError, parse } from "jsonc-parser"
 import { FailedToMergeConfig, FailedToParseFile } from "#lib/shared/errors.ts"
 
@@ -17,9 +18,7 @@ export const parseJson = (content: string, path?: string) =>
     )
   )
 
-export function isJsonObject(value: unknown): value is JsonObject {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-}
+export const isJsonObject = Predicate.isObject
 
 export function serializeTsObjectLiteral(
   value: unknown,

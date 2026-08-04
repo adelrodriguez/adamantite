@@ -105,15 +105,16 @@ export default defineMigration({
   migrate: (context) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
-      const spinner = prompter.spinner()
       const state = yield* oxfmt.exists(context.cwd)
       const legacyConfigFile = state.active?.path.endsWith(oxfmt.files[2].path)
         ? oxfmt.files[2].path
         : oxfmt.files[1].path
 
-      spinner.start(`Migrating \`${legacyConfigFile}\` to \`${oxfmt.config}\`...`)
-      yield* migrateLegacyOxfmtConfig(context.cwd)
-      spinner.stop(`Oxfmt config migrated to \`${oxfmt.config}\` successfully.`)
+      yield* prompter.withSpinner(() => migrateLegacyOxfmtConfig(context.cwd), {
+        failure: `Failed to migrate ${legacyConfigFile}.`,
+        start: `Migrating \`${legacyConfigFile}\` to \`${oxfmt.config}\`...`,
+        success: `Oxfmt config migrated to \`${oxfmt.config}\` successfully.`,
+      })
     }),
   tags: ["update"],
   title: "Legacy oxfmt JSON config",

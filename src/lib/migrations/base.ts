@@ -1,6 +1,5 @@
 import type * as PlatformError from "effect/PlatformError"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { DependencyInstaller } from "#lib/services/dependency-installer.ts"
@@ -93,35 +92,30 @@ export function runMigration(
       }
     }
 
-    const exit = yield* Effect.exit(
-      migration
-        .migrate(context)
-        .pipe(Effect.andThen(() => migration.validate?.(context) ?? Effect.void))
+    yield* migration.migrate(context).pipe(
+      Effect.andThen(() => migration.validate?.(context) ?? Effect.void),
+      Effect.onError(() =>
+        Effect.gen(function* () {
+          if (options?.onRestore) {
+            yield* options.onRestore
+          }
+
+          for (const [fullPath, content] of snapshot) {
+            if (content !== null) {
+              yield* fs.writeFileString(fullPath, content).pipe(Effect.ignore)
+              continue
+            }
+
+            const exists = yield* fs.exists(fullPath).pipe(Effect.orElseSucceed(() => false))
+
+            if (!exists) {
+              continue
+            }
+
+            yield* fs.remove(fullPath).pipe(Effect.ignore)
+          }
+        })
+      )
     )
-
-    if (Exit.isSuccess(exit)) {
-      return
-    }
-
-    if (options?.onRestore) {
-      yield* options.onRestore
-    }
-
-    for (const [fullPath, content] of snapshot) {
-      if (content !== null) {
-        yield* fs.writeFileString(fullPath, content).pipe(Effect.ignore)
-        continue
-      }
-
-      const exists = yield* fs.exists(fullPath).pipe(Effect.orElseSucceed(() => false))
-
-      if (!exists) {
-        continue
-      }
-
-      yield* fs.remove(fullPath).pipe(Effect.ignore)
-    }
-
-    return yield* Effect.failCause(exit.cause)
   })
 }

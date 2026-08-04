@@ -39,9 +39,14 @@ export default defineIntegration({
       const configPath = path.join(cwd, files[0].path)
       const legacyJsonPath = path.join(cwd, files[1].path)
       const legacyJsoncPath = path.join(cwd, files[2].path)
-      const hasConfig = yield* fs.exists(configPath)
-      const hasLegacyJson = yield* fs.exists(legacyJsonPath)
-      const hasLegacyJsonc = yield* fs.exists(legacyJsoncPath)
+      const { hasConfig, hasLegacyJson, hasLegacyJsonc } = yield* Effect.all(
+        {
+          hasConfig: fs.exists(configPath),
+          hasLegacyJson: fs.exists(legacyJsonPath),
+          hasLegacyJsonc: fs.exists(legacyJsoncPath),
+        },
+        { concurrency: "unbounded" }
+      )
       const format = hasConfig ? "ts" : hasLegacyJsonc ? "jsonc" : hasLegacyJson ? "json" : null
       const actions: AssessmentAction[] = []
       const warnings: string[] = []
@@ -113,9 +118,14 @@ export default defineIntegration({
       const tsPath = path.join(cwd, files[0].path)
       const jsonPath = path.join(cwd, files[1].path)
       const jsoncPath = path.join(cwd, files[2].path)
-      const hasTs = yield* fs.exists(tsPath)
-      const hasJson = yield* fs.exists(jsonPath)
-      const hasJsonc = yield* fs.exists(jsoncPath)
+      const { hasJson, hasJsonc, hasTs } = yield* Effect.all(
+        {
+          hasJson: fs.exists(jsonPath),
+          hasJsonc: fs.exists(jsoncPath),
+          hasTs: fs.exists(tsPath),
+        },
+        { concurrency: "unbounded" }
+      )
 
       const format = hasTs ? "ts" : hasJsonc ? "jsonc" : hasJson ? "json" : null
       const legacy = []

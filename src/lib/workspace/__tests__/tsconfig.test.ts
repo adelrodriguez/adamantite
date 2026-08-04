@@ -5,7 +5,8 @@ import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import { isLeft, runEither } from "#__tests__/helpers.ts"
+import * as Result from "effect/Result"
+import { runResult } from "#__tests__/helpers.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
 describe("tsconfig", () => {
@@ -53,10 +54,10 @@ describe("tsconfig", () => {
       mkdirSync("readonly-dir", { recursive: true })
       chmodSync("readonly-dir", 0o555)
 
-      const result = await runEither(tsconfig.create(join(tempDir, "readonly-dir")))
+      const result = await runResult(tsconfig.create(join(tempDir, "readonly-dir")))
 
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
       }
     })
   })
@@ -134,18 +135,18 @@ describe("tsconfig", () => {
     test("return InvalidConfigFormat when tsconfig.json is not a JSON object", async () => {
       await Bun.write("tsconfig.json", "true")
 
-      const result = await runEither(tsconfig.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
+      const result = await runResult(tsconfig.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
       }
     })
 
     test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runEither(tsconfig.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+      const result = await runResult(tsconfig.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
       }
     })
 
@@ -160,10 +161,10 @@ describe("tsconfig", () => {
       )
       chmodSync("tsconfig.json", 0o444)
 
-      const result = await runEither(tsconfig.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
+      const result = await runResult(tsconfig.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
       }
     })
   })

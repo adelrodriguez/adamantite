@@ -5,7 +5,8 @@ import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import { isLeft, runEither } from "#__tests__/helpers.ts"
+import * as Result from "effect/Result"
+import { runResult } from "#__tests__/helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 
 describe("vscode", () => {
@@ -98,18 +99,18 @@ describe("vscode", () => {
       mkdirSync(".vscode", { recursive: true })
       await Bun.write(".vscode/settings.json", "[]")
 
-      const result = await runEither(vscode.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
+      const result = await runResult(vscode.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
       }
     })
 
     test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runEither(vscode.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+      const result = await runResult(vscode.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
       }
     })
 
@@ -123,10 +124,10 @@ describe("vscode", () => {
       )
       chmodSync(".vscode/settings.json", 0o444)
 
-      const result = await runEither(vscode.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
+      const result = await runResult(vscode.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
       }
     })
   })

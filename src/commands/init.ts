@@ -1,9 +1,12 @@
 import process from "node:process"
 import type { PackageManagerName } from "nypm"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import * as Command from "effect/unstable/cli/Command"
+import * as Flag from "effect/unstable/cli/Flag"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
@@ -14,7 +17,12 @@ import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
-import { FailedToWriteFile, NoPackageManager, UnknownScript } from "#lib/shared/errors.ts"
+import {
+  FailedToWriteFile,
+  InvalidInitOptions,
+  NoPackageManager,
+  UnknownScript,
+} from "#lib/shared/errors.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
@@ -392,9 +400,291 @@ const setupAgentsGuidance = (cwd: string, packageManager: PackageManagerName, sc
     }
   })
 
-export default Command.make("init").pipe(
-  Command.withDescription("Initialize Adamantite in the current directory"),
-  Command.withHandler(() =>
+const INIT_SCRIPTS = [
+  "check",
+  "fix",
+  "format",
+  "check:monorepo",
+  "fix:monorepo",
+  "analyze",
+] as const satisfies readonly Script[]
+
+const INIT_PRESETS = ["react", "nextjs", "vue", "jest", "vitest", "node"] as const
+
+const INIT_EDITORS = ["vscode", "zed"] as const
+
+type InitEditor = (typeof INIT_EDITORS)[number]
+type InitPreset = (typeof INIT_PRESETS)[number]
+
+interface InitOptions {
+  readonly agents: boolean
+  readonly editors: InitEditor[]
+  readonly githubActions: boolean
+  readonly installExtensions: boolean
+  readonly presets: InitPreset[]
+  readonly scripts: Script[]
+  readonly typescript: boolean
+}
+
+interface InitOptionsInput {
+  readonly agents: boolean
+  readonly editors: readonly InitEditor[]
+  readonly githubActions: boolean
+  readonly installExtensions: boolean
+  readonly presets: readonly InitPreset[]
+  readonly scripts: readonly Script[]
+  readonly typescript: boolean
+}
+
+interface ValidateInitOptionsContext {
+  readonly isMonorepo: boolean
+  readonly nonInteractive: boolean
+  readonly packageManager: PackageManagerName
+}
+
+const validateInitOptions = Effect.fn("validateInitOptions")(function* (
+  input: InitOptionsInput,
+  context: ValidateInitOptionsContext
+) {
+  const options: InitOptions = {
+    agents: input.agents,
+    editors: Array.dedupe(input.editors),
+    githubActions: input.githubActions,
+    installExtensions: input.installExtensions,
+    presets: Array.dedupe(input.presets),
+    scripts: Array.dedupe(input.scripts),
+    typescript: input.typescript,
+  }
+
+  if (options.scripts.length === 0) {
+    return yield* new InvalidInitOptions({
+      reason: "Select at least one script with `--script <name>`.",
+    })
+  }
+
+  const hasOxlint = options.scripts.includes("check") || options.scripts.includes("fix")
+  const hasMonorepoScript =
+    options.scripts.includes("check:monorepo") || options.scripts.includes("fix:monorepo")
+
+  if (hasMonorepoScript && !context.isMonorepo) {
+    return yield* new InvalidInitOptions({
+      reason: "Monorepo scripts can only be selected in a detected monorepo.",
+    })
+  }
+
+  if (options.presets.length > 0 && !hasOxlint) {
+    return yield* new InvalidInitOptions({
+      reason: "`--preset` requires the `check` or `fix` script.",
+    })
+  }
+
+  if (options.typescript && !hasOxlint) {
+    return yield* new InvalidInitOptions({
+      reason: "`--typescript` requires the `check` or `fix` script.",
+    })
+  }
+
+  if (options.installExtensions && options.editors.length === 0) {
+    return yield* new InvalidInitOptions({
+      reason: "`--install-extensions` requires at least one `--editor`.",
+    })
+  }
+
+  if (options.githubActions && !hasCICompatibleScripts(options.scripts)) {
+    return yield* new InvalidInitOptions({
+      reason: "`--github-actions` requires a CI-compatible script.",
+    })
+  }
+
+  if (
+    options.githubActions &&
+    context.nonInteractive &&
+    !checkIsSupportedPackageManager(context.packageManager)
+  ) {
+    return yield* new InvalidInitOptions({
+      reason: `\`--github-actions\` does not support the detected package manager \`${context.packageManager}\`. Use bun, deno, npm, pnpm, or yarn.`,
+    })
+  }
+
+  return options
+})
+
+const nonInteractive = Flag.boolean("non-interactive").pipe(
+  Flag.withDescription("Configure without prompts; requires at least one --script")
+)
+
+const scripts = Flag.choice("script", INIT_SCRIPTS).pipe(
+  Flag.atMost(INIT_SCRIPTS.length),
+  Flag.withDescription(
+    "Package script to configure; repeatable and required in non-interactive mode. Monorepo scripts require a detected monorepo"
+  )
+)
+
+const presets = Flag.choice("preset", INIT_PRESETS).pipe(
+  Flag.atMost(INIT_PRESETS.length),
+  Flag.withDescription("Oxlint preset to configure; repeatable and requires --script check or fix")
+)
+
+const editors = Flag.choice("editor", INIT_EDITORS).pipe(
+  Flag.atMost(INIT_EDITORS.length),
+  Flag.withDescription("Editor to configure; may be specified multiple times")
+)
+
+const typescript = Flag.boolean("typescript").pipe(
+  Flag.withDescription("Configure the TypeScript preset; requires --script check or fix")
+)
+
+const installExtensions = Flag.boolean("install-extensions").pipe(
+  Flag.withDescription("Install recommended extensions; requires at least one --editor")
+)
+
+const githubActions = Flag.boolean("github-actions").pipe(
+  Flag.withDescription(
+    "Configure CI; requires a compatible script and bun, deno, npm, pnpm, or yarn"
+  )
+)
+
+const agents = Flag.boolean("agents").pipe(
+  Flag.withDescription("Add Adamantite guidance to AGENTS.md")
+)
+
+const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
+  isMonorepo: boolean
+) {
+  const prompter = yield* Prompter
+
+  const selectedScripts = yield* prompter.multiselect({
+    message: "Which scripts do you want to add to your `package.json`?",
+    options: [
+      {
+        hint: "recommended",
+        label: "check - find issues and type errors using oxlint",
+        value: "check",
+      },
+      {
+        hint: "recommended",
+        label: "fix - fix code issues using oxlint",
+        value: "fix",
+      },
+      {
+        hint: "recommended",
+        label: "format - code formatting using oxfmt",
+        value: "format",
+      },
+      {
+        disabled: !isMonorepo,
+        hint: isMonorepo ? undefined : "available for monorepo projects",
+        label: "check:monorepo - check for monorepo-specific issues using Sherif",
+        value: "check:monorepo",
+      },
+      {
+        disabled: !isMonorepo,
+        hint: isMonorepo ? undefined : "available for monorepo projects",
+        label: "fix:monorepo - fix monorepo-specific issues using Sherif",
+        value: "fix:monorepo",
+      },
+      {
+        label: "analyze - find unused dependencies, exports, and files using knip",
+        value: "analyze",
+      },
+    ],
+  })
+
+  const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
+  let selectedPresets: InitOptions["presets"] = []
+
+  if (hasOxlint) {
+    selectedPresets = yield* prompter.multiselect({
+      message: "Which presets do you want to install? (core is always included)",
+      options: [
+        { label: "React", value: "react" },
+        { label: "Next.js", value: "nextjs" },
+        { label: "Vue", value: "vue" },
+        { label: "Jest", value: "jest" },
+        { label: "Vitest", value: "vitest" },
+        { label: "Node", value: "node" },
+      ],
+      required: false,
+    })
+  }
+
+  const shouldSetupTypescript = hasOxlint
+    ? yield* prompter.confirm({
+        initialValue: true,
+        message:
+          "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
+      })
+    : false
+
+  const selectedEditors = yield* prompter.multiselect({
+    message: "Which editors do you want to configure? (optional)",
+    options: [
+      { label: "VSCode / Cursor / Windsurf", value: "vscode" },
+      { label: "Zed", value: "zed" },
+    ],
+    required: false,
+  })
+
+  const shouldInstallExtensions =
+    selectedEditors.length > 0
+      ? yield* prompter.confirm({
+          initialValue: true,
+          message: "Do you want to install the recommended editor extensions?",
+        })
+      : false
+
+  const shouldEnableGitHubActions = hasCICompatibleScripts(selectedScripts)
+    ? yield* prompter.confirm({
+        message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
+      })
+    : false
+
+  const shouldAddAgentsGuidance = yield* prompter.confirm({
+    initialValue: true,
+    message:
+      "Add Adamantite guidance to AGENTS.md so coding agents know how to run project checks?",
+  })
+
+  return {
+    agents: shouldAddAgentsGuidance,
+    editors: selectedEditors,
+    githubActions: shouldEnableGitHubActions,
+    installExtensions: shouldInstallExtensions,
+    presets: selectedPresets,
+    scripts: selectedScripts,
+    typescript: shouldSetupTypescript,
+  } satisfies InitOptionsInput
+})
+
+export default Command.make("init", {
+  agents,
+  editors,
+  githubActions,
+  installExtensions,
+  nonInteractive,
+  presets,
+  scripts,
+  typescript,
+}).pipe(
+  Command.withDescription(
+    "Initialize Adamantite in the current directory. Setup flags require --non-interactive; omitted boolean setup flags are disabled"
+  ),
+  Command.withExamples([
+    {
+      command: "adamantite init --non-interactive --script check",
+      description: "Configure linting without prompts",
+    },
+    {
+      command:
+        "adamantite init --non-interactive --script check --script format --preset react --editor vscode --typescript --install-extensions --github-actions --agents",
+      description: "Configure a React project with VS Code, TypeScript, CI, and agent guidance",
+    },
+    {
+      command: "adamantite init --non-interactive --script check:monorepo",
+      description: "Configure monorepo checks in a detected monorepo",
+    },
+  ]),
+  Command.withHandler((options) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
       const prompter = yield* Prompter
@@ -424,109 +714,43 @@ export default Command.make("init").pipe(
         yield* prompter.log.info("We've detected a monorepo setup in your project.")
       }
 
-      const selectedScripts = yield* prompter.multiselect({
-        message: "Which scripts do you want to add to your `package.json`?",
-        options: [
-          {
-            hint: "recommended",
-            label: "check - find issues and type errors using oxlint",
-            value: "check",
-          },
-          {
-            hint: "recommended",
-            label: "fix - fix code issues using oxlint",
-            value: "fix",
-          },
-          {
-            hint: "recommended",
-            label: "format - code formatting using oxfmt",
-            value: "format",
-          },
-          {
-            disabled: !isMonorepo,
-            hint: isMonorepo ? undefined : "available for monorepo projects",
-            label: "check:monorepo - check for monorepo-specific issues using Sherif",
-            value: "check:monorepo",
-          },
-          {
-            disabled: !isMonorepo,
-            hint: isMonorepo ? undefined : "available for monorepo projects",
-            label: "fix:monorepo - fix monorepo-specific issues using Sherif",
-            value: "fix:monorepo",
-          },
-          {
-            label: "analyze - find unused dependencies, exports, and files using knip",
-            value: "analyze",
-          },
-        ],
+      if (
+        !options.nonInteractive &&
+        Array.some(
+          [
+            options.scripts.length > 0,
+            options.presets.length > 0,
+            options.editors.length > 0,
+            options.typescript,
+            options.installExtensions,
+            options.githubActions,
+            options.agents,
+          ],
+          Predicate.isTruthy
+        )
+      ) {
+        return yield* new InvalidInitOptions({
+          reason: "Setup flags require `--non-interactive`.",
+        })
+      }
+
+      const input = options.nonInteractive
+        ? options
+        : yield* collectInteractiveInitOptions(isMonorepo)
+      const initOptions = yield* validateInitOptions(input, {
+        isMonorepo,
+        nonInteractive: options.nonInteractive,
+        packageManager: packageManager.name,
       })
+      const selectedScripts = initOptions.scripts
+      const presets = initOptions.presets
+      const selectedEditors = initOptions.editors
+      const shouldSetupTypescript = initOptions.typescript
+      const installExtensions = initOptions.installExtensions
+      const enableGitHubActions = initOptions.githubActions
+      const shouldAddAgentsGuidance = initOptions.agents
 
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
-
-      let presets: string[] = []
-      if (hasOxlint) {
-        const selectedPresets = yield* prompter.multiselect({
-          message: "Which presets do you want to install? (core is always included)",
-          options: [
-            { label: "React", value: "react" },
-            { label: "Next.js", value: "nextjs" },
-            { label: "Vue", value: "vue" },
-            { label: "Jest", value: "jest" },
-            { label: "Vitest", value: "vitest" },
-            { label: "Node", value: "node" },
-          ],
-          required: false,
-        })
-
-        presets = selectedPresets
-      }
-
-      let shouldSetupTypescript = false
-
-      if (hasOxlint) {
-        shouldSetupTypescript = yield* prompter.confirm({
-          initialValue: true,
-          message:
-            "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
-        })
-      }
-
-      const selectedEditors = yield* prompter.multiselect({
-        message: "Which editors do you want to configure? (optional)",
-        options: [
-          { label: "VSCode / Cursor / Windsurf", value: "vscode" },
-          { label: "Zed", value: "zed" },
-        ],
-        required: false,
-      })
-
-      let installExtensions = false
-
-      if (selectedEditors.length > 0) {
-        const installExtensionsResponse = yield* prompter.confirm({
-          initialValue: true,
-          message: "Do you want to install the recommended editor extensions?",
-        })
-
-        installExtensions = installExtensionsResponse
-      }
-
-      const hasCIScripts = hasCICompatibleScripts(selectedScripts)
-      let enableGitHubActions = false
-
-      if (hasCIScripts) {
-        const enableGitHubActionsResponse = yield* prompter.confirm({
-          message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
-        })
-
-        enableGitHubActions = enableGitHubActionsResponse
-      }
-
-      const shouldAddAgentsGuidance = yield* prompter.confirm({
-        initialValue: true,
-        message:
-          "Add Adamantite guidance to AGENTS.md so coding agents know how to run project checks?",
-      })
 
       const hasOxfmt = selectedScripts.includes("format")
       const hasSherif =

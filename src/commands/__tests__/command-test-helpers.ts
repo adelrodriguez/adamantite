@@ -35,6 +35,7 @@ export interface PrompterTestContext {
   readonly intros: string[]
   readonly layer: Layer.Layer<Prompter>
   readonly logs: LogEntry[]
+  readonly multiselectCalls: unknown[]
   readonly outros: string[]
   readonly spinnerEntries: SpinnerEntry[]
 }
@@ -117,6 +118,7 @@ export function createPrompterTestContext(options?: {
   const confirmCalls: prompts.ConfirmOptions[] = []
   const intros: string[] = []
   const logs: LogEntry[] = []
+  const multiselectCalls: unknown[] = []
   const outros: string[] = []
   const spinnerEntries: SpinnerEntry[] = []
   let promptIndex = 0
@@ -168,12 +170,13 @@ export function createPrompterTestContext(options?: {
             logs.push({ level: "warning", message })
           }),
       },
-      multiselect: <T>(_config: prompts.MultiSelectOptions<T>) =>
+      multiselect: <T>(config: prompts.MultiSelectOptions<T>) =>
         Effect.gen(function* () {
           if (shouldCancelPrompt()) {
             return yield* new OperationCancelled({})
           }
 
+          multiselectCalls.push(config)
           return shiftResponse(multiselectResponses, "multiselect") as T[]
         }),
       outro: (message) =>
@@ -197,6 +200,7 @@ export function createPrompterTestContext(options?: {
       }),
     }),
     logs,
+    multiselectCalls,
     outros,
     spinnerEntries,
   }
@@ -269,7 +273,7 @@ function makeQuietConsoleLayer() {
 
 export async function runCommand(
   command: Command.Command.Any,
-  args: string[],
+  args: readonly string[],
   layers: TestLayer[],
   forwardedArguments: readonly string[] = []
 ) {
@@ -293,7 +297,7 @@ export async function runCommand(
 
 export async function runCommandWithRunner(
   command: Command.Command.Any,
-  args: string[],
+  args: readonly string[],
   runner: RunnerTestContext,
   forwardedArguments: readonly string[] = []
 ) {

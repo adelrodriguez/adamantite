@@ -73,6 +73,41 @@ This interactive command will:
   - Also adds monorepo-specific scripts if running a monorepo
 - Configure editor settings
 
+### Non-interactive setup for agents
+
+Use `--non-interactive` to configure a project entirely from flags. At least one
+`--script` is required, repeat `--script`, `--preset`, and `--editor` to select multiple
+values, and add boolean flags only when that setup should be enabled.
+
+```shell
+# Minimal unattended setup
+npx adamantite init --non-interactive --script check
+
+# Fully specified unattended setup
+npx adamantite init \
+  --non-interactive \
+  --script check \
+  --script fix \
+  --script format \
+  --script analyze \
+  --preset react \
+  --preset node \
+  --editor vscode \
+  --typescript \
+  --install-extensions \
+  --github-actions \
+  --agents
+```
+
+The available values are:
+
+- Scripts: `check`, `fix`, `format`, `analyze`, `check:monorepo`, and `fix:monorepo`
+- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, and `node`
+- Editors: `vscode` and `zed`
+
+Omitted boolean flags are disabled. Setup flags require `--non-interactive`; without it,
+`adamantite init` keeps the interactive setup flow.
+
 ## 📋 Commands
 
 ### `adamantite analyze`

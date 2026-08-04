@@ -138,7 +138,7 @@ export default defineIntegration({
         .writeFileString(workflowPath, workflowContent)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
     }),
-  exists: (cwd: string) =>
+  detect: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path

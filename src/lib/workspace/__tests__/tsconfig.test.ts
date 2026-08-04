@@ -24,10 +24,10 @@ describe("tsconfig", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("exists", () => {
+  describe("detect", () => {
     test("detect when tsconfig.json does not exist", async () => {
       const exists = await tsconfig
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
@@ -39,7 +39,7 @@ describe("tsconfig", () => {
       await tsconfig.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await tsconfig
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
@@ -80,7 +80,7 @@ describe("tsconfig", () => {
       )
 
       const existsBefore = await tsconfig
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore).toBe(true)
 

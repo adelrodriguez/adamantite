@@ -29,7 +29,7 @@ function migrateLegacyOxfmtConfig(cwd: string) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const state = yield* oxfmt.exists(cwd)
+    const state = yield* oxfmt.detect(cwd)
 
     if (state.active?.format !== "json" && state.active?.format !== "jsonc") {
       return
@@ -73,7 +73,7 @@ function migrateLegacyOxfmtConfig(cwd: string) {
 export default defineMigration({
   check: (context) =>
     Effect.gen(function* () {
-      const state = yield* oxfmt.exists(context.cwd)
+      const state = yield* oxfmt.detect(context.cwd)
       const warnings: string[] = []
       if (state.active?.format === "ts" && state.legacy.length > 0) {
         warnings.push(
@@ -105,7 +105,7 @@ export default defineMigration({
   migrate: (context) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
-      const state = yield* oxfmt.exists(context.cwd)
+      const state = yield* oxfmt.detect(context.cwd)
       const legacyConfigFile = state.active?.path.endsWith(oxfmt.files[2].path)
         ? oxfmt.files[2].path
         : oxfmt.files[1].path
@@ -120,7 +120,7 @@ export default defineMigration({
   title: "Legacy oxfmt JSON config",
   validate: (context) =>
     Effect.gen(function* () {
-      const state = yield* oxfmt.exists(context.cwd)
+      const state = yield* oxfmt.detect(context.cwd)
 
       if (state.active?.format !== "ts") {
         return yield* new MigrationValidationFailed({

@@ -1,12 +1,10 @@
 import process from "node:process"
 import type { PackageJson } from "type-fest"
-import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
 import * as Command from "effect/unstable/cli/Command"
-import type { IntegrationAssessment, ToolingPackage } from "#lib/integrations/base.ts"
+import type { ToolingPackage } from "#lib/integrations/base.ts"
 import type { Migration, MigrationCheckResult } from "#lib/migrations/base.ts"
-import { isApplicableAssessment } from "#lib/integrations/base.ts"
+import { collectApplicableAssessments } from "#lib/integrations/assessment.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
@@ -27,11 +25,6 @@ const knownPackages = [
   sherif,
   knip,
 ] as const satisfies readonly ToolingPackage[]
-
-type ApplicableAssessment = {
-  readonly assessment: Extract<IntegrationAssessment, { readonly applicable: true }>
-  readonly integration: (typeof integrations)[number]
-}
 
 type PackageUpdate = {
   readonly currentVersion: string
@@ -75,20 +68,7 @@ export default Command.make("update").pipe(
 
       yield* prompter.intro("💠 adamantite update")
 
-      const collectAssessments = () =>
-        Effect.forEach((integration: (typeof integrations)[number]) =>
-          integration
-            .assess(cwd)
-            .pipe(
-              Effect.map((assessment) =>
-                isApplicableAssessment(assessment)
-                  ? Option.some({ assessment, integration } satisfies ApplicableAssessment)
-                  : Option.none<ApplicableAssessment>()
-              )
-            )
-        )(integrations).pipe(
-          Effect.map((optionalAssessments) => Array.getSomes(optionalAssessments))
-        )
+      const collectAssessments = () => collectApplicableAssessments(integrations, cwd)
 
       const assessments = yield* collectAssessments()
 

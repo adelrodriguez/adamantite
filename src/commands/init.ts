@@ -74,7 +74,7 @@ const setupOxlintConfig = (cwd: string, presets: string[]) =>
     const legacyConfig = yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
-          const exists = yield* oxlint.exists(cwd)
+          const exists = yield* oxlint.detect(cwd)
           const oxlintLegacyConfig = oxlint.files[1].path
 
           if (exists.active?.format === "ts" && exists.legacy.length > 0) {
@@ -116,7 +116,7 @@ const setupOxfmtConfig = (cwd: string) =>
     const outcome = yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
-          const exists = yield* oxfmt.exists(cwd)
+          const exists = yield* oxfmt.detect(cwd)
 
           if (exists.active?.format === "ts" && exists.legacy.length > 0) {
             yield* prompter.log.warning(
@@ -216,7 +216,7 @@ const setupKnipConfig = (cwd: string) =>
     const outcome = yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
-          const exists = yield* knip.exists(cwd)
+          const exists = yield* knip.detect(cwd)
 
           if (exists.active?.format === "ts" && exists.legacy.length > 0) {
             yield* prompter.log.warning(
@@ -267,7 +267,7 @@ const setupTypescript = (cwd: string) =>
     yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
-          const typescriptExists = yield* tsconfig.exists(cwd)
+          const typescriptExists = yield* tsconfig.detect(cwd)
 
           if (typescriptExists) {
             yield* spinner.message(`\`${tsconfig.config}\` found, updating...`)
@@ -297,7 +297,7 @@ const setupEditors = (cwd: string, editors: string[]) =>
       yield* prompter.withSpinner(
         (spinner) =>
           Effect.gen(function* () {
-            const exists = yield* vscode.exists(cwd)
+            const exists = yield* vscode.detect(cwd)
             yield* spinner.message(
               `\`${vscode.config}\` ${exists ? "found, updating" : "not found, creating"}...`
             )
@@ -317,7 +317,7 @@ const setupEditors = (cwd: string, editors: string[]) =>
       yield* prompter.withSpinner(
         (spinner) =>
           Effect.gen(function* () {
-            const exists = yield* zed.exists(cwd)
+            const exists = yield* zed.detect(cwd)
             yield* spinner.message(
               `\`${zed.config}\` ${exists ? "found, updating" : "not found, creating"}...`
             )
@@ -399,7 +399,7 @@ const setupGitHubActions = (
     yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
-          const exists = yield* github.exists(cwd)
+          const exists = yield* github.detect(cwd)
           yield* spinner.message(
             exists ? `\`${workflowPath}\` found, updating...` : `Creating \`${workflowPath}\`...`
           )

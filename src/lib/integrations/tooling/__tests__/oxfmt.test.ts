@@ -22,10 +22,10 @@ describe("oxfmt", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("exists", () => {
+  describe("detect", () => {
     test("detect when oxfmt.config.ts does not exist", async () => {
       const result = await oxfmt
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
@@ -38,7 +38,7 @@ describe("oxfmt", () => {
       await Bun.write("oxfmt.config.ts", "export default {}\n")
 
       const result = await oxfmt
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result.active).toEqual({
@@ -54,7 +54,7 @@ describe("oxfmt", () => {
       await oxfmt.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const state = await oxfmt
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.active).toEqual({
         format: "ts",

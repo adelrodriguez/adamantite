@@ -22,10 +22,10 @@ describe("knip", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("exists", () => {
+  describe("detect", () => {
     test("return null when no knip config is present", async () => {
       const result = await knip
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result).toEqual({
@@ -38,7 +38,7 @@ describe("knip", () => {
       await Bun.write("knip.config.ts", "export default {}\n")
 
       const result = await knip
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result.active).toEqual({
@@ -54,7 +54,7 @@ describe("knip", () => {
       await knip.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const state = await knip
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.active).toEqual({
         format: "ts",

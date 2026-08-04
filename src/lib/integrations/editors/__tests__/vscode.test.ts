@@ -24,10 +24,10 @@ describe("vscode", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("exists", () => {
+  describe("detect", () => {
     test("detect when .vscode/settings.json does not exist", async () => {
       const exists = await vscode
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
@@ -39,7 +39,7 @@ describe("vscode", () => {
       await vscode.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await vscode
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
@@ -67,7 +67,7 @@ describe("vscode", () => {
       )
 
       const existsBefore = await vscode
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore).toBe(true)
 

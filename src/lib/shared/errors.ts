@@ -131,6 +131,14 @@ export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")
   }
 }
 
+export class InvalidInitOptions extends Data.TaggedError("InvalidInitOptions")<{
+  reason: string
+}> {
+  override get message() {
+    return `Invalid init options. ${this.reason}`
+  }
+}
+
 export class UnsupportedConfigState extends Data.TaggedError("UnsupportedConfigState")<{
   path?: string
   reason?: string

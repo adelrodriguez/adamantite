@@ -394,6 +394,248 @@ describe("init", () => {
     })
   })
 
+  describe("non-interactive setup", () => {
+    test("configure the project entirely from flags without showing prompts", async () => {
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        [
+          "--non-interactive",
+          "--script",
+          "check",
+          "--script",
+          "format",
+          "--script",
+          "analyze",
+          "--preset",
+          "react",
+          "--editor",
+          "zed",
+          "--typescript",
+          "--install-extensions",
+          "--github-actions",
+          "--agents",
+        ],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.confirmCalls).toEqual([])
+      expect(prompter.multiselectCalls).toEqual([])
+      expect(installer.calls).toEqual([
+        {
+          options: { silent: true, workspace: false },
+          packages: [
+            "adamantite",
+            `oxlint@${oxlint.version}`,
+            `oxlint-tsgolint@${tsgolint.version}`,
+            `oxfmt@${oxfmt.version}`,
+            `knip@${knip.version}`,
+          ],
+        },
+      ])
+
+      const packageJson = await readJson(join(tempDir, "package.json"))
+      expect(packageJson.scripts).toEqual({
+        analyze: "adamantite analyze",
+        check: "adamantite check",
+        format: "adamantite format",
+      })
+      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, ".zed", "settings.json")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, "AGENTS.md")).exists()).toBe(true)
+      expect(await Bun.file(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
+        true
+      )
+    })
+
+    test("treat omitted boolean flags as false and deduplicate repeated selections", async () => {
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "format", "--script", "format"],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.confirmCalls).toEqual([])
+      expect(prompter.multiselectCalls).toEqual([])
+      expect(installer.calls).toEqual([
+        {
+          options: { silent: true, workspace: false },
+          packages: ["adamantite", `oxfmt@${oxfmt.version}`],
+        },
+      ])
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await Bun.file(join(tempDir, "AGENTS.md")).exists()).toBe(false)
+      expect(await Bun.file(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
+        false
+      )
+    })
+
+    test("configure every available script in a monorepo", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "test-project",
+            version: "1.0.0",
+            workspaces: ["packages/*"],
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        [
+          "--non-interactive",
+          "--script",
+          "check",
+          "--script",
+          "fix",
+          "--script",
+          "format",
+          "--script",
+          "check:monorepo",
+          "--script",
+          "fix:monorepo",
+          "--script",
+          "analyze",
+        ],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toEqual([
+        {
+          options: { silent: true, workspace: true },
+          packages: [
+            "adamantite",
+            `oxlint@${oxlint.version}`,
+            `oxlint-tsgolint@${tsgolint.version}`,
+            `oxfmt@${oxfmt.version}`,
+            `sherif@${sherif.version}`,
+            `knip@${knip.version}`,
+          ],
+        },
+      ])
+
+      const packageJson = await readJson(join(tempDir, "package.json"))
+      expect(packageJson.scripts).toEqual({
+        analyze: "adamantite analyze",
+        check: "adamantite check",
+        "check:monorepo": "adamantite monorepo",
+        fix: "adamantite fix",
+        "fix:monorepo": "adamantite monorepo --fix",
+        format: "adamantite format",
+      })
+    })
+
+    test.each([
+      {
+        args: ["--non-interactive"],
+        name: "a missing script",
+        reason: "Select at least one script with `--script <name>`.",
+      },
+      {
+        args: ["--non-interactive", "--script", "format", "--preset", "react"],
+        name: "a preset without linting",
+        reason: "`--preset` requires the `check` or `fix` script.",
+      },
+      {
+        args: ["--non-interactive", "--script", "format", "--typescript"],
+        name: "TypeScript without linting",
+        reason: "`--typescript` requires the `check` or `fix` script.",
+      },
+      {
+        args: ["--non-interactive", "--script", "format", "--install-extensions"],
+        name: "extension installation without an editor",
+        reason: "`--install-extensions` requires at least one `--editor`.",
+      },
+      {
+        args: ["--non-interactive", "--script", "fix", "--github-actions"],
+        name: "GitHub Actions without a CI-compatible script",
+        reason: "`--github-actions` requires a CI-compatible script.",
+      },
+      {
+        args: ["--non-interactive", "--script", "check:monorepo"],
+        name: "a monorepo script outside a monorepo",
+        reason: "Monorepo scripts can only be selected in a detected monorepo.",
+      },
+      {
+        args: ["--script", "format"],
+        name: "setup flags without non-interactive mode",
+        reason: "Setup flags require `--non-interactive`.",
+      },
+    ])("reject $name before changing the project", async ({ args, reason }) => {
+      const originalPackageJson = await readFile(join(tempDir, "package.json"), "utf8")
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, args, [prompter.layer, installer.layer])
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
+        _tag: "InvalidInitOptions",
+        reason,
+      })
+      expect(installer.calls).toEqual([])
+      expect(await readFile(join(tempDir, "package.json"), "utf8")).toBe(originalPackageJson)
+    })
+
+    test("reject GitHub Actions with an unsupported package manager before changing the project", async () => {
+      const originalPackageJson = await readFile(join(tempDir, "package.json"), "utf8")
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext({
+        detectedPackageManager: { name: "aube" },
+      })
+
+      const exit = await runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "check", "--github-actions"],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
+        _tag: "InvalidInitOptions",
+        reason:
+          "`--github-actions` does not support the detected package manager `aube`. Use bun, deno, npm, pnpm, or yarn.",
+      })
+      expect(installer.calls).toEqual([])
+      expect(await readFile(join(tempDir, "package.json"), "utf8")).toBe(originalPackageJson)
+      expect(await Bun.file(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
+        false
+      )
+    })
+
+    test("reject unknown selection values during CLI parsing", async () => {
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "unknown"],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(installer.calls).toEqual([])
+    })
+  })
+
   describe("agents guidance", () => {
     test("adds script-specific Adamantite guidance to AGENTS.md when confirmed", async () => {
       const prompter = createPrompterTestContext({

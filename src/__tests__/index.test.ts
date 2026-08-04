@@ -68,6 +68,38 @@ describe("adamantite", () => {
       expect(output).toContain("update")
       expect(proc.exitCode).toBe(0)
     })
+
+    test("print non-interactive setup flags for init", async () => {
+      const proc = spawn(["bun", cliPath, "init", "--help"], {
+        env: { ...process.env, NODE_ENV: undefined },
+        stderr: "pipe",
+        stdout: "pipe",
+      })
+
+      const output = await new Response(proc.stdout).text()
+      await proc.exited
+
+      expect(output).toContain("adamantite init [flags]")
+      expect(output).toContain("--non-interactive")
+      expect(output).toContain("--script choice")
+      expect(output).toContain("--preset choice")
+      expect(output).toContain("--editor choice")
+      expect(output).toContain("--typescript")
+      expect(output).toContain("--install-extensions")
+      expect(output).toContain("--github-actions")
+      expect(output).toContain("--agents")
+      expect(output).toContain("Setup flags require --non-interactive")
+      expect(output).toContain("omitted boolean setup flags are disabled")
+      expect(output).toContain("requires at least one --script")
+      expect(output).toContain("Monorepo scripts require a detected monorepo")
+      expect(output).toContain("requires --script check or fix")
+      expect(output).toContain("requires at least one --editor")
+      expect(output).toContain("requires a compatible script")
+      expect(output).toContain("bun, deno, npm, pnpm, or yarn")
+      expect(output).toContain("EXAMPLES")
+      expect(output).toContain("adamantite init --non-interactive --script check")
+      expect(proc.exitCode).toBe(0)
+    })
   })
 
   describe("unknown subcommands", () => {

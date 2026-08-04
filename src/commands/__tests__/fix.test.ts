@@ -87,6 +87,19 @@ describe("fix", () => {
     })
   })
 
+  describe("passthrough arguments", () => {
+    test("append arguments after managed fix flags", async () => {
+      const runner = createRunnerTestContext()
+
+      const exit = await runCommandWithRunner(fixCommand, ["--dangerous"], runner, [
+        "--deny-warnings",
+      ])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-dangerously", "--deny-warnings"])
+    })
+  })
+
   describe("error handling", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])

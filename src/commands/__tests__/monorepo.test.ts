@@ -54,6 +54,24 @@ describe("monorepo", () => {
     })
   })
 
+  describe("passthrough arguments", () => {
+    test("append arguments after managed Sherif flags", async () => {
+      const runner = createRunnerTestContext()
+
+      const exit = await runCommandWithRunner(monorepoCommand, ["--fix"], runner, [
+        "--ignore-package",
+        "package-a",
+      ])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations[0]).toEqual({
+        args: ["--fix", "--ignore-package", "package-a"],
+        command: "sherif",
+        stdin: "inherit",
+      })
+    })
+  })
+
   describe("error handling", () => {
     test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
       const runner = createRunnerTestContext([1])

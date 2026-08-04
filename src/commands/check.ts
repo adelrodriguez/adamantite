@@ -4,6 +4,7 @@ import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
+import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
 const files = Argument.file("files", { mustExist: true }).pipe(
@@ -15,9 +16,10 @@ export default Command.make("check", { files }).pipe(
   Command.withDescription("Find issues and type errors in code using oxlint"),
   Command.withHandler(({ files }) =>
     Effect.gen(function* () {
+      const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
       const exitCode = yield* runner.run({
-        args: [...files],
+        args: [...files, ...forwardedArguments],
         command: oxlint.name,
       })
 

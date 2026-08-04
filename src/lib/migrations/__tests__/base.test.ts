@@ -79,4 +79,27 @@ describe("runMigration", () => {
       expect(await Bun.file("existing.txt").text()).toBe("before\n")
     }
   })
+
+  test("restore tracked files when migrate defects", async () => {
+    await Bun.write("existing.txt", "before\n")
+
+    const migration = defineMigration({
+      check: () => Effect.succeed({ applicable: false, warnings: [] }),
+      files: ["existing.txt"],
+      id: "defective-migration",
+      migrate: () =>
+        Effect.promise(() => Bun.write("existing.txt", "after\n")).pipe(
+          Effect.andThen(Effect.die("migration defect"))
+        ),
+      tags: ["update"],
+      title: "Defective migration",
+    })
+
+    try {
+      await runTestEffect(runMigration(migration, { cwd: tempDir }))
+      throw new Error("Expected migration to defect")
+    } catch {
+      expect(await Bun.file("existing.txt").text()).toBe("before\n")
+    }
+  })
 })

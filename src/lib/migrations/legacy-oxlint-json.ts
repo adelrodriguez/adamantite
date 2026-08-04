@@ -109,11 +109,11 @@ export default defineMigration({
   migrate: (context) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
-      const spinner = prompter.spinner()
-
-      spinner.start(`Migrating \`${oxlint.files[1].path}\` to \`${oxlint.config}\`...`)
-      yield* migrateLegacyOxlintConfig(context.cwd)
-      spinner.stop(`Oxlint config migrated to \`${oxlint.config}\` successfully.`)
+      yield* prompter.withSpinner(() => migrateLegacyOxlintConfig(context.cwd), {
+        failure: `Failed to migrate ${oxlint.files[1].path}.`,
+        start: `Migrating \`${oxlint.files[1].path}\` to \`${oxlint.config}\`...`,
+        success: `Oxlint config migrated to \`${oxlint.config}\` successfully.`,
+      })
     }),
   validate: (context) =>
     Effect.gen(function* () {

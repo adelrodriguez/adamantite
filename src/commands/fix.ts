@@ -1,3 +1,4 @@
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
@@ -27,19 +28,12 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
-      const args = new Set<string>(["--fix"])
-
-      if (suggested || all) {
-        args.add("--fix-suggestions")
-      }
-
-      if (dangerous || all) {
-        args.add("--fix-dangerously")
-      }
-
-      for (const file of files) {
-        args.add(file)
-      }
+      const args = Array.dedupe([
+        "--fix",
+        ...(suggested || all ? ["--fix-suggestions"] : []),
+        ...(dangerous || all ? ["--fix-dangerously"] : []),
+        ...files,
+      ])
 
       const exitCode = yield* runner.run({
         args: [...args, ...forwardedArguments],

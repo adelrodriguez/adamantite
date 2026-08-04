@@ -5,7 +5,8 @@ import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import { isLeft, runEither } from "#__tests__/helpers.ts"
+import * as Result from "effect/Result"
+import { runResult } from "#__tests__/helpers.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 
@@ -126,10 +127,10 @@ describe("oxlint", () => {
     })
 
     test("return FileNotFound when no oxlint config exists", async () => {
-      const result = await runEither(oxlint.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FileNotFound" })
+      const result = await runResult(oxlint.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FileNotFound" })
       }
     })
 
@@ -146,10 +147,10 @@ describe("oxlint", () => {
         ].join("\n")
       )
 
-      const result = await runEither(oxlint.update(tempDir), NodeServices.layer)
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "UnsupportedConfigState" })
+      const result = await runResult(oxlint.update(tempDir), NodeServices.layer)
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "UnsupportedConfigState" })
       }
     })
   })

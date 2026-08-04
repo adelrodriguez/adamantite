@@ -1,3 +1,4 @@
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import analyzeCommand from "#commands/analyze.ts"
@@ -42,40 +43,23 @@ const main = Command.make("adamantite").pipe(
   Command.withSubcommands(commands)
 )
 
-interface SplitArguments {
-  readonly command: readonly string[]
-  readonly forwarded: readonly string[]
-}
-
-function splitArguments(args: readonly string[]): SplitArguments {
-  const separatorIndex = args.indexOf("--")
-
-  if (separatorIndex === -1) {
-    return {
-      command: args,
-      forwarded: [],
-    }
-  }
-
-  return {
-    command: args.slice(0, separatorIndex),
-    forwarded: args.slice(separatorIndex + 1),
-  }
-}
-
 export const runCli = Effect.fn("runCli")(function* (args: readonly string[], version: string) {
-  const split = splitArguments(args)
-  const activeCommand = split.command.find((argument) => commandNames.has(argument))
+  const [commandArguments, forwardedWithSeparator] = Array.splitWhere(
+    args,
+    (argument) => argument === "--"
+  )
+  const forwardedArguments = Array.drop(forwardedWithSeparator, 1)
+  const activeCommand = commandArguments.find((argument) => commandNames.has(argument))
 
   if (
-    split.forwarded.length > 0 &&
+    forwardedArguments.length > 0 &&
     activeCommand !== undefined &&
     !passthroughCommandNames.has(activeCommand)
   ) {
     return yield* new PassthroughNotSupported({ command: activeCommand })
   }
 
-  yield* Command.runWith(main, { version })(split.command).pipe(
-    Effect.provideService(ForwardedArguments, split.forwarded)
+  yield* Command.runWith(main, { version })(commandArguments).pipe(
+    Effect.provideService(ForwardedArguments, forwardedArguments)
   )
 })

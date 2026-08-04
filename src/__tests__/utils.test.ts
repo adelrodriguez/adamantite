@@ -10,8 +10,9 @@ import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
+import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
-import { isLeft, runEither } from "#__tests__/helpers.ts"
+import { runResult } from "#__tests__/helpers.ts"
 import { isJsonObject, mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 import { checkCliExists } from "#lib/shared/process.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
@@ -76,20 +77,20 @@ describe("readPackageJson", () => {
     })
 
     test("return an error when package.json does not exist", async () => {
-      const result = await runEither(readPackageJson(testDir), NodeServices.layer)
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+      const result = await runResult(readPackageJson(testDir), NodeServices.layer)
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
       }
     })
 
     test("return an error when package.json contains invalid JSON", async () => {
       await Bun.write(join(testDir, "package.json"), "invalid json content")
 
-      const result = await runEither(readPackageJson(testDir), NodeServices.layer)
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
+      const result = await runResult(readPackageJson(testDir), NodeServices.layer)
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
       }
     })
   })
@@ -177,18 +178,18 @@ describe("parseJson", () => {
 
   test("return an error for invalid JSON", async () => {
     const invalidJson = '{"name": "test", "version":}'
-    const result = await runEither(parseJson(invalidJson), NodeServices.layer)
-    expect(isLeft(result)).toBe(true)
-    if (isLeft(result)) {
-      expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
+    const result = await runResult(parseJson(invalidJson), NodeServices.layer)
+    expect(Result.isFailure(result)).toBe(true)
+    if (Result.isFailure(result)) {
+      expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
     }
   })
 
   test("return an error for an empty string", async () => {
-    const result = await runEither(parseJson(""), NodeServices.layer)
-    expect(isLeft(result)).toBe(true)
-    if (isLeft(result)) {
-      expect(result.left).toMatchObject({ _tag: "FailedToParseFile" })
+    const result = await runResult(parseJson(""), NodeServices.layer)
+    expect(Result.isFailure(result)).toBe(true)
+    if (Result.isFailure(result)) {
+      expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
     }
   })
 })
@@ -256,10 +257,10 @@ describe("mergeConfig", () => {
       }
     )
 
-    const result = await runEither(mergeConfig(throwingBase, { b: 2 }), NodeServices.layer)
-    expect(isLeft(result)).toBe(true)
-    if (isLeft(result)) {
-      expect(result.left).toMatchObject({ _tag: "FailedToMergeConfig" })
+    const result = await runResult(mergeConfig(throwingBase, { b: 2 }), NodeServices.layer)
+    expect(Result.isFailure(result)).toBe(true)
+    if (Result.isFailure(result)) {
+      expect(result.failure).toMatchObject({ _tag: "FailedToMergeConfig" })
     }
   })
 })
@@ -400,10 +401,10 @@ describe("checkIsMonorepo", () => {
     })
 
     test("return an error when package.json does not exist", async () => {
-      const result = await runEither(checkIsMonorepo(testDir), NodeServices.layer)
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+      const result = await runResult(checkIsMonorepo(testDir), NodeServices.layer)
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
       }
     })
   })
@@ -500,13 +501,13 @@ describe("checkCliExists", () => {
   })
 
   test("return a CliNotFound error when the CLI does not exist", async () => {
-    const result = await runEither(
+    const result = await runResult(
       checkCliExists("nonexistent-command-that-definitely-does-not-exist-12345"),
       NodeServices.layer
     )
-    expect(isLeft(result)).toBe(true)
-    if (isLeft(result)) {
-      expect(result.left).toMatchObject({ _tag: "CliNotFound" })
+    expect(Result.isFailure(result)).toBe(true)
+    if (Result.isFailure(result)) {
+      expect(result.failure).toMatchObject({ _tag: "CliNotFound" })
     }
   })
 

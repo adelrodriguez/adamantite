@@ -46,8 +46,13 @@ export default defineIntegration({
         packageJson.devDependencies?.oxlint ?? packageJson.dependencies?.oxlint
       const tsPath = path.join(cwd, files[0].path)
       const jsonPath = path.join(cwd, files[1].path)
-      const hasTs = yield* fs.exists(tsPath)
-      const hasJson = yield* fs.exists(jsonPath)
+      const { hasJson, hasTs } = yield* Effect.all(
+        {
+          hasJson: fs.exists(jsonPath),
+          hasTs: fs.exists(tsPath),
+        },
+        { concurrency: "unbounded" }
+      )
       const state = {
         active: hasTs
           ? { format: "ts", path: tsPath }
@@ -101,7 +106,7 @@ export default defineIntegration({
         const content = yield* fs
           .readFileString(tsPath)
           .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: tsPath })))
-        const patch = yield* inspectRequiredOxlintConfig(content)
+        const patch = inspectRequiredOxlintConfig(content)
 
         if (patch.kind === "patchable") {
           actions.push({
@@ -145,8 +150,13 @@ export default defineIntegration({
       const path = yield* Path.Path
       const tsPath = path.join(cwd, files[0].path)
       const jsonPath = path.join(cwd, files[1].path)
-      const hasTs = yield* fs.exists(tsPath)
-      const hasJson = yield* fs.exists(jsonPath)
+      const { hasJson, hasTs } = yield* Effect.all(
+        {
+          hasJson: fs.exists(jsonPath),
+          hasTs: fs.exists(tsPath),
+        },
+        { concurrency: "unbounded" }
+      )
 
       const format = hasTs ? "ts" : hasJson ? "json" : null
       const legacy = []
@@ -181,7 +191,7 @@ export default defineIntegration({
       const content = yield* fs
         .readFileString(configPath)
         .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
-      const patch = yield* inspectRequiredOxlintConfig(content)
+      const patch = inspectRequiredOxlintConfig(content)
 
       if (patch.kind === "configured") {
         return

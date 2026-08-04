@@ -1,13 +1,12 @@
 import process from "node:process"
 import type { PackageJson } from "type-fest"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Command from "effect/unstable/cli/Command"
-import type {
-  AssessmentAction,
-  IntegrationAssessment,
-  ToolingPackage,
-} from "#lib/integrations/base.ts"
+import type { IntegrationAssessment, ToolingPackage } from "#lib/integrations/base.ts"
 import type { Migration, MigrationCheckResult } from "#lib/migrations/base.ts"
+import { isApplicableAssessment } from "#lib/integrations/base.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
@@ -32,14 +31,6 @@ const knownPackages = [
 type ApplicableAssessment = {
   readonly assessment: Extract<IntegrationAssessment, { readonly applicable: true }>
   readonly integration: (typeof integrations)[number]
-}
-
-function isApplicableAssessment(assessment: {
-  readonly applicable: boolean
-  readonly warnings: readonly string[]
-  readonly actions?: readonly AssessmentAction[]
-}): assessment is Extract<IntegrationAssessment, { readonly applicable: true }> {
-  return assessment.applicable && Array.isArray(assessment.actions)
 }
 
 type PackageUpdate = {
@@ -85,19 +76,19 @@ export default Command.make("update").pipe(
       yield* prompter.intro("💠 adamantite update")
 
       const collectAssessments = () =>
-        Effect.gen(function* () {
-          const assessments: ApplicableAssessment[] = []
-
-          for (const integration of integrations) {
-            const assessment = yield* integration.assess(cwd)
-
-            if (isApplicableAssessment(assessment)) {
-              assessments.push({ assessment, integration })
-            }
-          }
-
-          return assessments
-        })
+        Effect.forEach((integration: (typeof integrations)[number]) =>
+          integration
+            .assess(cwd)
+            .pipe(
+              Effect.map((assessment) =>
+                isApplicableAssessment(assessment)
+                  ? Option.some({ assessment, integration } satisfies ApplicableAssessment)
+                  : Option.none<ApplicableAssessment>()
+              )
+            )
+        )(integrations).pipe(
+          Effect.map((optionalAssessments) => Array.getSomes(optionalAssessments))
+        )
 
       const assessments = yield* collectAssessments()
 
@@ -216,24 +207,19 @@ export default Command.make("update").pipe(
           yield* prompter.log.info(`  ${dep.name}: ${dep.currentVersion} → ${dep.targetVersion}`)
         }
 
-        const spinner = prompter.spinner()
-        spinner.start("Updating dependencies...")
-
-        yield* dependencyInstaller
-          .addDevDependencies(
-            updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
-            cwd,
-            { silent: true }
-          )
-          .pipe(
-            Effect.tapError(() =>
-              Effect.sync(() => {
-                spinner.stop("Failed to update dependencies")
-              })
-            )
-          )
-
-        spinner.stop("Dependencies updated successfully")
+        yield* prompter.withSpinner(
+          () =>
+            dependencyInstaller.addDevDependencies(
+              updates.map((dep) => `${dep.name}@${dep.targetVersion}`),
+              cwd,
+              { silent: true }
+            ),
+          {
+            failure: "Failed to update dependencies",
+            start: "Updating dependencies...",
+            success: "Dependencies updated successfully",
+          }
+        )
         yield* prompter.log.success("Dependencies updated successfully.")
       }
 

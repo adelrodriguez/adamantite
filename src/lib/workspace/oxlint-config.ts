@@ -1,4 +1,3 @@
-import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { print as printAst } from "esrap"
 import ts from "esrap/languages/ts"
@@ -104,21 +103,19 @@ function isObjectProperty(value: unknown): value is ObjectProperty {
   return isJsonObject(value) && value.type === "Property"
 }
 
+const parseThrowable = Option.liftThrowable((content: string) =>
+  parseSync("oxlint.config.ts", content, {
+    astType: "ts",
+    lang: "ts",
+    sourceType: "module",
+  })
+)
+
 function parse(content: string) {
-  return Effect.try({
-    catch: () => null,
-    try: () =>
-      parseSync("oxlint.config.ts", content, {
-        astType: "ts",
-        lang: "ts",
-        sourceType: "module",
-      }),
-  }).pipe(
-    Effect.match({
-      onFailure: () => Option.none<Program>(),
-      onSuccess: (result) =>
-        result.errors.length === 0 ? Option.fromNullishOr(result.program) : Option.none<Program>(),
-    })
+  return parseThrowable(content).pipe(
+    Option.flatMap((result) =>
+      result.errors.length === 0 ? Option.fromNullishOr(result.program) : Option.none<Program>()
+    )
   )
 }
 
@@ -233,190 +230,180 @@ function getNamedObjectProperty(
 
 function createRequiredOptionProperties(options: readonly RequiredBooleanOption[]) {
   const content = `export default { options: { ${options.map((option) => `${option}: true`).join(", ")} } }\n`
+  const parsed = parse(content)
 
-  return parse(content).pipe(
-    Effect.map((parsed) => {
-      if (Option.isNone(parsed)) {
-        return Option.none()
-      }
+  if (Option.isNone(parsed)) {
+    return Option.none()
+  }
 
-      const configObjectExpression = getExportedConfigObject(parsed.value)
+  const configObjectExpression = getExportedConfigObject(parsed.value)
 
-      if (Option.isNone(configObjectExpression)) {
-        return Option.none()
-      }
+  if (Option.isNone(configObjectExpression)) {
+    return Option.none()
+  }
 
-      const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
+  const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
 
-      if (optionsPropertyResult.status !== "found") {
-        return Option.none()
-      }
+  if (optionsPropertyResult.status !== "found") {
+    return Option.none()
+  }
 
-      if (!isObjectExpression(optionsPropertyResult.property.value)) {
-        return Option.none()
-      }
+  if (!isObjectExpression(optionsPropertyResult.property.value)) {
+    return Option.none()
+  }
 
-      const properties = optionsPropertyResult.property.value.properties.filter(isObjectProperty)
+  const properties = optionsPropertyResult.property.value.properties.filter(isObjectProperty)
 
-      return properties.length === optionsPropertyResult.property.value.properties.length
-        ? Option.fromNullishOr(properties)
-        : Option.none()
-    })
-  )
+  return properties.length === optionsPropertyResult.property.value.properties.length
+    ? Option.fromNullishOr(properties)
+    : Option.none()
 }
 
 function createRequiredOptionsProperty() {
   const content = `export default { options: { ${REQUIRED_BOOLEAN_OPTIONS.map((option) => `${option}: true`).join(", ")} } }\n`
+  const parsed = parse(content)
 
-  return parse(content).pipe(
-    Effect.map((parsed) => {
-      if (Option.isNone(parsed)) {
-        return Option.none()
-      }
+  if (Option.isNone(parsed)) {
+    return Option.none()
+  }
 
-      const configObjectExpression = getExportedConfigObject(parsed.value)
+  const configObjectExpression = getExportedConfigObject(parsed.value)
 
-      if (
-        Option.isNone(configObjectExpression) ||
-        configObjectExpression.value.properties.length !== 1
-      ) {
-        return Option.none()
-      }
+  if (
+    Option.isNone(configObjectExpression) ||
+    configObjectExpression.value.properties.length !== 1
+  ) {
+    return Option.none()
+  }
 
-      const [property] = configObjectExpression.value.properties
+  const [property] = configObjectExpression.value.properties
 
-      if (
-        !property ||
-        !isObjectProperty(property) ||
-        property.computed ||
-        property.method ||
-        property.kind !== "init"
-      ) {
-        return Option.none()
-      }
+  if (
+    !property ||
+    !isObjectProperty(property) ||
+    property.computed ||
+    property.method ||
+    property.kind !== "init"
+  ) {
+    return Option.none()
+  }
 
-      return Option.fromNullishOr(property)
-    })
-  )
+  return Option.fromNullishOr(property)
 }
 
 function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpression) {
-  return Effect.gen(function* () {
-    const missingOptions: RequiredBooleanOption[] = []
-    let changed = false
+  const missingOptions: RequiredBooleanOption[] = []
+  let changed = false
 
-    for (const option of REQUIRED_BOOLEAN_OPTIONS) {
-      const propertyResult = getNamedObjectProperty(optionsObjectExpression, option)
+  for (const option of REQUIRED_BOOLEAN_OPTIONS) {
+    const propertyResult = getNamedObjectProperty(optionsObjectExpression, option)
 
-      if (propertyResult.status === "manual") {
-        return {
-          kind: "manual",
-          reason: NON_BOOLEAN_OPTIONS_REASON,
-        } satisfies OxlintRequiredOptionsPatchResult
-      }
-
-      if (propertyResult.status === "missing") {
-        missingOptions.push(option)
-        continue
-      }
-
-      const value = propertyResult.property.value
-
-      if (value.type !== "Literal" || typeof value.value !== "boolean") {
-        return {
-          kind: "manual",
-          reason: NON_BOOLEAN_OPTIONS_REASON,
-        } satisfies OxlintRequiredOptionsPatchResult
-      }
-
-      if (value.value) {
-        continue
-      }
-
-      value.raw = "true"
-      value.value = true
-      changed = true
+    if (propertyResult.status === "manual") {
+      return {
+        kind: "manual",
+        reason: NON_BOOLEAN_OPTIONS_REASON,
+      } satisfies OxlintRequiredOptionsPatchResult
     }
 
-    if (missingOptions.length > 0) {
-      const generatedOptionProperties = yield* createRequiredOptionProperties(missingOptions)
-
-      if (Option.isNone(generatedOptionProperties)) {
-        return {
-          kind: "manual",
-          reason: GENERATED_PATCH_FAILURE_REASON,
-        } satisfies OxlintRequiredOptionsPatchResult
-      }
-
-      optionsObjectExpression.properties.unshift(...generatedOptionProperties.value)
-      changed = true
+    if (propertyResult.status === "missing") {
+      missingOptions.push(option)
+      continue
     }
 
-    if (!changed) {
-      return { kind: "configured" } satisfies OxlintRequiredOptionsPatchResult
+    const value = propertyResult.property.value
+
+    if (value.type !== "Literal" || typeof value.value !== "boolean") {
+      return {
+        kind: "manual",
+        reason: NON_BOOLEAN_OPTIONS_REASON,
+      } satisfies OxlintRequiredOptionsPatchResult
     }
 
-    return {
-      kind: "patchable",
-      updatedContent: print(ast),
-    } satisfies OxlintRequiredOptionsPatchResult
-  })
+    if (value.value) {
+      continue
+    }
+
+    value.raw = "true"
+    value.value = true
+    changed = true
+  }
+
+  if (missingOptions.length > 0) {
+    const generatedOptionProperties = createRequiredOptionProperties(missingOptions)
+
+    if (Option.isNone(generatedOptionProperties)) {
+      return {
+        kind: "manual",
+        reason: GENERATED_PATCH_FAILURE_REASON,
+      } satisfies OxlintRequiredOptionsPatchResult
+    }
+
+    optionsObjectExpression.properties.unshift(...generatedOptionProperties.value)
+    changed = true
+  }
+
+  if (!changed) {
+    return { kind: "configured" } satisfies OxlintRequiredOptionsPatchResult
+  }
+
+  return {
+    kind: "patchable",
+    updatedContent: print(ast),
+  } satisfies OxlintRequiredOptionsPatchResult
 }
 
 export function inspectRequiredOxlintConfig(content: string) {
-  return Effect.gen(function* () {
-    const parsed = yield* parse(content)
+  const parsed = parse(content)
 
-    if (Option.isNone(parsed)) {
+  if (Option.isNone(parsed)) {
+    return {
+      kind: "manual",
+      reason: UNSUPPORTED_CONFIG_REASON,
+    } satisfies OxlintRequiredOptionsPatchResult
+  }
+
+  const configObjectExpression = getExportedConfigObject(parsed.value)
+
+  if (Option.isNone(configObjectExpression)) {
+    return {
+      kind: "manual",
+      reason: UNSUPPORTED_CONFIG_REASON,
+    } satisfies OxlintRequiredOptionsPatchResult
+  }
+
+  const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
+
+  if (optionsPropertyResult.status === "manual") {
+    return {
+      kind: "manual",
+      reason: UNSUPPORTED_OPTIONS_REASON,
+    } satisfies OxlintRequiredOptionsPatchResult
+  }
+
+  if (optionsPropertyResult.status === "missing") {
+    const optionsProperty = createRequiredOptionsProperty()
+
+    if (Option.isNone(optionsProperty)) {
       return {
         kind: "manual",
-        reason: UNSUPPORTED_CONFIG_REASON,
+        reason: GENERATED_PATCH_FAILURE_REASON,
       } satisfies OxlintRequiredOptionsPatchResult
     }
 
-    const configObjectExpression = getExportedConfigObject(parsed.value)
+    configObjectExpression.value.properties.unshift(optionsProperty.value)
 
-    if (Option.isNone(configObjectExpression)) {
-      return {
-        kind: "manual",
-        reason: UNSUPPORTED_CONFIG_REASON,
-      } satisfies OxlintRequiredOptionsPatchResult
-    }
+    return {
+      kind: "patchable",
+      updatedContent: print(parsed.value),
+    } satisfies OxlintRequiredOptionsPatchResult
+  }
 
-    const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
+  if (!isObjectExpression(optionsPropertyResult.property.value)) {
+    return {
+      kind: "manual",
+      reason: UNSUPPORTED_OPTIONS_REASON,
+    } satisfies OxlintRequiredOptionsPatchResult
+  }
 
-    if (optionsPropertyResult.status === "manual") {
-      return {
-        kind: "manual",
-        reason: UNSUPPORTED_OPTIONS_REASON,
-      } satisfies OxlintRequiredOptionsPatchResult
-    }
-
-    if (optionsPropertyResult.status === "missing") {
-      const optionsProperty = yield* createRequiredOptionsProperty()
-
-      if (Option.isNone(optionsProperty)) {
-        return {
-          kind: "manual",
-          reason: GENERATED_PATCH_FAILURE_REASON,
-        } satisfies OxlintRequiredOptionsPatchResult
-      }
-
-      configObjectExpression.value.properties.unshift(optionsProperty.value)
-
-      return {
-        kind: "patchable",
-        updatedContent: print(parsed.value),
-      } satisfies OxlintRequiredOptionsPatchResult
-    }
-
-    if (!isObjectExpression(optionsPropertyResult.property.value)) {
-      return {
-        kind: "manual",
-        reason: UNSUPPORTED_OPTIONS_REASON,
-      } satisfies OxlintRequiredOptionsPatchResult
-    }
-
-    return yield* patchOptionsObject(parsed.value, optionsPropertyResult.property.value)
-  })
+  return patchOptionsObject(parsed.value, optionsPropertyResult.property.value)
 }

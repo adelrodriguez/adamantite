@@ -5,7 +5,8 @@ import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import { isLeft, runEither } from "#__tests__/helpers.ts"
+import * as Result from "effect/Result"
+import { runResult } from "#__tests__/helpers.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 
 describe("zed", () => {
@@ -91,18 +92,18 @@ describe("zed", () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
       await Bun.write(join(tempDir, ".zed", "settings.json"), "[]")
 
-      const result = await runEither(zed.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "InvalidConfigFormat" })
+      const result = await runResult(zed.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
       }
     })
 
     test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runEither(zed.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToReadFile" })
+      const result = await runResult(zed.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
       }
     })
 
@@ -116,10 +117,10 @@ describe("zed", () => {
       )
       chmodSync(join(tempDir, ".zed", "settings.json"), 0o444)
 
-      const result = await runEither(zed.update(tempDir))
-      expect(isLeft(result)).toBe(true)
-      if (isLeft(result)) {
-        expect(result.left).toMatchObject({ _tag: "FailedToWriteFile" })
+      const result = await runResult(zed.update(tempDir))
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
       }
     })
   })

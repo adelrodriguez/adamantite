@@ -1,6 +1,5 @@
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import github from "#lib/integrations/ci/github.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
@@ -79,7 +78,6 @@ export default defineMigration({
     Effect.gen(function* () {
       const prompter = yield* Prompter
       const dependencyInstaller = yield* DependencyInstaller
-      const spinner = prompter.spinner()
 
       const runMigration = Effect.gen(function* () {
         const packageJson = yield* readPackageJson(context.cwd)
@@ -115,25 +113,18 @@ export default defineMigration({
             checkIsSupportedPackageManager(detectedPackageManager.name)
           ) {
             const packageManagerName = detectedPackageManager.name
-            const workflowSpinner = prompter.spinner()
-            workflowSpinner.start("Updating GitHub Actions workflow...")
-            yield* github
-              .update(context.cwd, {
-                packageManager: packageManagerName,
-                scripts: managedScripts,
-              })
-              .pipe(
-                Effect.onExit((exit) =>
-                  Effect.sync(() => {
-                    workflowSpinner.stop(
-                      Exit.match(exit, {
-                        onFailure: () => "Failed to update GitHub Actions workflow.",
-                        onSuccess: () => "GitHub Actions workflow updated successfully",
-                      })
-                    )
-                  })
-                )
-              )
+            yield* prompter.withSpinner(
+              () =>
+                github.update(context.cwd, {
+                  packageManager: packageManagerName,
+                  scripts: managedScripts,
+                }),
+              {
+                failure: "Failed to update GitHub Actions workflow.",
+                start: "Updating GitHub Actions workflow...",
+                success: "GitHub Actions workflow updated successfully",
+              }
+            )
           } else if (detectedPackageManager) {
             yield* prompter.log.warning(
               `\`${detectedPackageManager.name}\` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow was not updated.`
@@ -148,24 +139,16 @@ export default defineMigration({
         return "migrated" as const
       })
 
-      spinner.start("Migrating `typecheck` script to unified `check` command...")
-
-      yield* runMigration.pipe(
-        Effect.onExit((exit) =>
-          Effect.sync(() => {
-            spinner.stop(
-              Exit.match(exit, {
-                onFailure: () => "Legacy `typecheck` script migration failed.",
-                onSuccess: (status) =>
-                  status === "noop"
-                    ? "No migration needed."
-                    : "Legacy `typecheck` script migrated to `check` successfully.",
-              })
-            )
-          })
-        ),
-        Effect.asVoid
-      )
+      yield* prompter
+        .withSpinner(() => runMigration, {
+          failure: "Legacy `typecheck` script migration failed.",
+          start: "Migrating `typecheck` script to unified `check` command...",
+          success: (status) =>
+            status === "noop"
+              ? "No migration needed."
+              : "Legacy `typecheck` script migrated to `check` successfully.",
+        })
+        .pipe(Effect.asVoid)
     }),
   tags: ["update"],
   title: "Legacy typecheck script",

@@ -796,6 +796,10 @@ describe("update", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
       expect(error._tag).toBe("FailedToInstallDependency")
+      expect(prompter.spinnerEntries).toContainEqual({
+        message: "Failed to update dependencies",
+        type: "stop",
+      })
       expect(prompter.outros).toEqual(["❌ Update failed"])
     })
   })

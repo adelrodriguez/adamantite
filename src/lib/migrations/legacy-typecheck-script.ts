@@ -89,7 +89,7 @@ export default defineMigration({
 
         yield* writePackageJson(context.cwd, migratedPackageJson.packageJson)
 
-        const oxlintState = yield* oxlint.exists(context.cwd)
+        const oxlintState = yield* oxlint.detect(context.cwd)
 
         if (oxlintState.active === null) {
           yield* oxlint.create(context.cwd)
@@ -97,10 +97,10 @@ export default defineMigration({
           yield* oxlint.update(context.cwd)
         }
 
-        const hasTypescriptConfig = yield* tsconfig.exists(context.cwd)
+        const hasTypescriptConfig = yield* tsconfig.detect(context.cwd)
         yield* hasTypescriptConfig ? tsconfig.update(context.cwd) : tsconfig.create(context.cwd)
 
-        const workflowExists = yield* github.exists(context.cwd)
+        const workflowExists = yield* github.detect(context.cwd)
         const managedScripts = getManagedScripts(migratedPackageJson.packageJson)
 
         if (workflowExists && hasCICompatibleScripts(managedScripts)) {
@@ -163,7 +163,7 @@ export default defineMigration({
         })
       }
 
-      const oxlintState = yield* oxlint.exists(context.cwd)
+      const oxlintState = yield* oxlint.detect(context.cwd)
 
       if (oxlintState.active?.format !== "ts") {
         return yield* new MigrationValidationFailed({
@@ -172,7 +172,7 @@ export default defineMigration({
         })
       }
 
-      const hasTypescriptConfig = yield* tsconfig.exists(context.cwd)
+      const hasTypescriptConfig = yield* tsconfig.detect(context.cwd)
 
       if (!hasTypescriptConfig) {
         return yield* new MigrationValidationFailed({

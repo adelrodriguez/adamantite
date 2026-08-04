@@ -1,7 +1,11 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type AssessmentAction,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
 import {
   FailedToReadFile,
   FailedToWriteFile,
@@ -39,7 +43,7 @@ export default defineIntegration({
         return {
           applicable: false,
           warnings: [],
-        }
+        } satisfies IntegrationAssessment
       }
 
       const packageSpecifier =
@@ -130,7 +134,7 @@ export default defineIntegration({
         actions,
         applicable: true,
         warnings,
-      }
+      } satisfies IntegrationAssessment
     }),
   config: files[0].path,
   create: (cwd: string, presets: string[] = []) =>
@@ -144,7 +148,7 @@ export default defineIntegration({
         .writeFileString(configPath, payload)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  exists: (cwd: string) =>
+  detect: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path

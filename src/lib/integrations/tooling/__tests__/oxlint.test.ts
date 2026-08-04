@@ -25,10 +25,10 @@ describe("oxlint", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("exists", () => {
+  describe("detect", () => {
     test("detect when no oxlint config exists", async () => {
       const state = await oxlint
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(state).toEqual({
@@ -45,7 +45,7 @@ describe("oxlint", () => {
       await Bun.write(".oxlintrc.json", "{}")
 
       const state = await oxlint
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(state.active).toEqual({
@@ -66,7 +66,7 @@ describe("oxlint", () => {
       await oxlint.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const state = await oxlint
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.active).toEqual({
         format: "ts",

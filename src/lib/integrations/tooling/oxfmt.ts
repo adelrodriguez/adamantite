@@ -1,7 +1,11 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type AssessmentAction,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
 import { FailedToWriteFile } from "#lib/shared/errors.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { toOxfmtTsConfigContent } from "#lib/workspace/oxfmt-config.ts"
@@ -31,7 +35,7 @@ export default defineIntegration({
         return {
           applicable: false,
           warnings: [],
-        }
+        } satisfies IntegrationAssessment
       }
 
       const packageSpecifier = packageJson.devDependencies?.oxfmt ?? packageJson.dependencies?.oxfmt
@@ -98,7 +102,7 @@ export default defineIntegration({
         actions,
         applicable: true,
         warnings,
-      }
+      } satisfies IntegrationAssessment
     }),
   config: files[0].path,
   create: (cwd: string) =>
@@ -111,7 +115,7 @@ export default defineIntegration({
         .writeFileString(configPath, toOxfmtTsConfigContent())
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
     }),
-  exists: (cwd: string) =>
+  detect: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path

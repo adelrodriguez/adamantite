@@ -1,12 +1,9 @@
 import process from "node:process"
-import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { AssessmentAction, IntegrationAssessment } from "#lib/integrations/base.ts"
-import { isApplicableAssessment } from "#lib/integrations/base.ts"
+import type { AssessmentAction } from "#lib/integrations/base.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
@@ -16,6 +13,7 @@ import { runMigration } from "#lib/migrations/base.ts"
 import { migrationsById } from "#lib/migrations/index.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
+import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -25,11 +23,6 @@ const fix = Flag.boolean("fix").pipe(
 )
 
 const integrations = [knip, oxfmt, oxlint, sherif, tsgolint] as const
-
-type ApplicableAssessment = {
-  readonly assessment: Extract<IntegrationAssessment, { readonly applicable: true }>
-  readonly integration: (typeof integrations)[number]
-}
 
 const createFixersByIntegration = {
   [knip.name]: knip,
@@ -88,17 +81,7 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       // 1. Assess integrations.
-      const assessments = yield* Effect.forEach((integration: (typeof integrations)[number]) =>
-        integration
-          .assess(cwd)
-          .pipe(
-            Effect.map((assessment) =>
-              isApplicableAssessment(assessment)
-                ? Option.some({ assessment, integration } satisfies ApplicableAssessment)
-                : Option.none<ApplicableAssessment>()
-            )
-          )
-      )(integrations).pipe(Effect.map((optionalAssessments) => Array.getSomes(optionalAssessments)))
+      const assessments = yield* collectApplicableAssessments(integrations, cwd)
 
       // 2. Print warnings.
       for (const { assessment } of assessments) {

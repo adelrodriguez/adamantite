@@ -18,7 +18,7 @@ function migrateLegacyOxlintConfig(cwd: string) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const state = yield* oxlint.exists(cwd)
+    const state = yield* oxlint.detect(cwd)
 
     if (state.active?.format !== "json") {
       return
@@ -84,7 +84,7 @@ export default defineMigration({
 
   check: (context) =>
     Effect.gen(function* () {
-      const oxlintState = yield* oxlint.exists(context.cwd)
+      const oxlintState = yield* oxlint.detect(context.cwd)
       const warnings =
         oxlintState.active?.format === "ts" && oxlintState.legacy.length > 0
           ? [
@@ -117,7 +117,7 @@ export default defineMigration({
     }),
   validate: (context) =>
     Effect.gen(function* () {
-      const oxlintState = yield* oxlint.exists(context.cwd)
+      const oxlintState = yield* oxlint.detect(context.cwd)
 
       if (oxlintState.active?.format !== "ts") {
         return yield* new MigrationValidationFailed({

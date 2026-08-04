@@ -20,10 +20,10 @@ describe("zed", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("exists", () => {
+  describe("detect", () => {
     test("detect when .zed/settings.json does not exist", async () => {
       const exists = await zed
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
@@ -35,7 +35,7 @@ describe("zed", () => {
       await zed.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await zed
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
@@ -62,7 +62,7 @@ describe("zed", () => {
       )
 
       const existsBefore = await zed
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(existsBefore).toBe(true)
 

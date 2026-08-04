@@ -35,11 +35,12 @@ project. It provides:
 
 Every integration is described by these operations:
 
-- **`exists`** — answers whether the latest supported config is present and active.
+- **`detect`** — inspects whether the integration is present and, for tooling integrations,
+  which config format is active and which legacy configs coexist with it.
 - **`create`** — writes the latest supported config from scratch.
 - **`update`** — safely rewrites an existing latest-format config into the latest
   supported shape.
-- **`migrations`** — handle transitions that fall outside `exists` / `create` /
+- **`migrations`** — handle transitions that fall outside `detect` / `create` /
   `update`, such as legacy formats, legacy scripts, or one-off upgrades.
 - **`assess`** — read-only. Classifies package drift, missing config, supported config
   updates, manual follow-up work, and known migrations. It does not mutate files or call
@@ -47,6 +48,12 @@ Every integration is described by these operations:
 - **`doctor` / `doctor --fix`** — `doctor --fix` dispatches `create_config` through
   `create`, `update_config` through `update`, and `run_migration` through the migration
   system. `manual_fix` is report-only.
+
+Integrations are defined through a single `defineIntegration` boundary. Its `kind`
+discriminant establishes the required capabilities: tooling integrations provide a package
+version and read-only assessment, while editor, workspace, and CI integrations provide
+`detect` / `create` / `update`. Additional capabilities remain available on the exact inferred
+integration type.
 
 ## Codebase map
 

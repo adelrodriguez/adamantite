@@ -29,7 +29,7 @@ function migrateLegacyKnipConfig(cwd: string) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const state = yield* knip.exists(cwd)
+    const state = yield* knip.detect(cwd)
 
     if (state.active?.format !== "json" && state.active?.format !== "jsonc") {
       return
@@ -73,7 +73,7 @@ function migrateLegacyKnipConfig(cwd: string) {
 export default defineMigration({
   check: (context) =>
     Effect.gen(function* () {
-      const state = yield* knip.exists(context.cwd)
+      const state = yield* knip.detect(context.cwd)
       const warnings: string[] = []
       if (state.active?.format === "ts" && state.legacy.length > 0) {
         warnings.push(
@@ -105,7 +105,7 @@ export default defineMigration({
   migrate: (context) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
-      const state = yield* knip.exists(context.cwd)
+      const state = yield* knip.detect(context.cwd)
       const legacyConfigFile = state.active?.path.endsWith(knip.files[2].path)
         ? knip.files[2].path
         : knip.files[1].path
@@ -120,7 +120,7 @@ export default defineMigration({
   title: "Legacy Knip JSON config",
   validate: (context) =>
     Effect.gen(function* () {
-      const state = yield* knip.exists(context.cwd)
+      const state = yield* knip.detect(context.cwd)
 
       if (state.active?.format !== "ts") {
         return yield* new MigrationValidationFailed({

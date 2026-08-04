@@ -1,5 +1,9 @@
 import * as Effect from "effect/Effect"
-import { defineIntegration, type AssessmentAction } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type AssessmentAction,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
   getManagedScripts,
@@ -19,7 +23,7 @@ export default defineIntegration({
         return {
           applicable: false,
           warnings: [],
-        }
+        } satisfies IntegrationAssessment
       }
 
       const packageSpecifier =
@@ -47,7 +51,7 @@ export default defineIntegration({
         actions,
         applicable: true,
         warnings: [],
-      }
+      } satisfies IntegrationAssessment
     }),
   kind: "tooling",
   name: "sherif",

@@ -24,10 +24,10 @@ describe("github", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe("exists", () => {
+  describe("detect", () => {
     test("detect when the workflow does not exist", async () => {
       const exists = await github
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(exists).toBe(false)
@@ -44,7 +44,7 @@ describe("github", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await github
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
@@ -156,7 +156,7 @@ describe("github", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       const exists = await github
-        .exists(tempDir)
+        .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(false)
     })

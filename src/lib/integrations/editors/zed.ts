@@ -76,7 +76,7 @@ export default defineIntegration({
         .writeFileString(settingsPath, `${JSON.stringify(CONFIG, null, 2)}\n`)
         .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: settingsPath })))
     }),
-  exists: (cwd: string) =>
+  detect: (cwd: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path

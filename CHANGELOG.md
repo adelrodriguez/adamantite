@@ -1,5 +1,17 @@
 # adamantite
 
+## 0.34.0
+
+### Minor Changes
+
+- [#330](https://github.com/adelrodriguez/adamantite/pull/330) [`7da419f`](https://github.com/adelrodriguez/adamantite/commit/7da419f20b939b74ff62ae027961049f32fb8086) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Allow commands that wrap Knip, Oxlint, Oxfmt, or Sherif to forward arguments after `--`.
+
+- [#337](https://github.com/adelrodriguez/adamantite/pull/337) [`0c182ef`](https://github.com/adelrodriguez/adamantite/commit/0c182ef7df49b2fa4db60d281c0c410b338924ef) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add a non-interactive `adamantite init` mode so agents and scripts can configure projects entirely through validated CLI flags.
+
+### Patch Changes
+
+- [#339](https://github.com/adelrodriguez/adamantite/pull/339) [`65d738b`](https://github.com/adelrodriguez/adamantite/commit/65d738ba12163ff28e8ca360a3e1f522b3adef57) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Ensure CLI progress spinners stop when setup, updates, or migrations fail or are interrupted.
+
 ## 0.33.2
 
 ### Patch Changes

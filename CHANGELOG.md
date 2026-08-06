@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.34.1
+
+### Patch Changes
+
+- [#342](https://github.com/adelrodriguez/adamantite/pull/342) [`b305053`](https://github.com/adelrodriguez/adamantite/commit/b3050538525d51f9c72e60beed5f72bc5390e1bd) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Ship an `adamantite` agent skill (`skills/adamantite/SKILL.md`) in the npm package. The skill teaches coding agents how to initialize, check, repair, and update Adamantite in a project, and is discoverable through TanStack Intent (`intent list` / `intent load`).
+
 ## 0.34.0
 
 ### Minor Changes

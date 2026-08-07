@@ -1,5 +1,13 @@
 # adamantite
 
+## 0.34.2
+
+### Patch Changes
+
+- [#344](https://github.com/adelrodriguez/adamantite/pull/344) [`69d8dde`](https://github.com/adelrodriguez/adamantite/commit/69d8dde5c234f386d991e1ff9cabda9863682543) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Restructure and update the product documentation for the current CLI, presets, setup lifecycle, and supported runtime requirements.
+
+- [#344](https://github.com/adelrodriguez/adamantite/pull/344) [`69d8dde`](https://github.com/adelrodriguez/adamantite/commit/69d8dde5c234f386d991e1ff9cabda9863682543) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Keep generated GitHub Actions workflows aligned with the repository's current action versions and make repeated Zed editor setup idempotent.
+
 ## 0.34.1
 
 ### Patch Changes
@@ -853,6 +861,7 @@
 - a6a1853: Add `ci` command for continuous integration workflows with enhanced reporter options.
 
   ## CLI Enhancements
+
   - **Added**: `ci` command for running Biome CI checks in continuous integration environments
   - **Added**: `--github` flag to the `ci` command for GitHub Actions reporter output
   - **Added**: `--monorepo` flag to the `ci` command for additional monorepo-specific checks using Sherif
@@ -869,12 +878,14 @@
   ## Rule Changes
 
   ### A11y Section
+
   - **Added**: `noAutofocus` - error (previously off)
   - **Added**: `noNoninteractiveElementInteractions` - error
   - **Reorganized**: Better organization with JavaScript and CSS subsections
   - **Removed**: Verbose rule comments for cleaner configuration
 
   ### Complexity Section
+
   - **Added 25+ new rules** including:
     - `noExtraBooleanCast` - error
     - `noStaticOnlyClass` - error
@@ -904,6 +915,7 @@
   - **Changed**: `maxAllowedComplexity` increased from 18 to 20
 
   ### Correctness Section
+
   - **Added**: `noGlobalDirnameFilename` - error
   - **Added**: `noNestedComponentDefinitions` - error
   - **Added**: `noProcessGlobal` - off
@@ -917,6 +929,7 @@
   - **Removed**: `useImportExtensions` - off
 
   ### Nursery Section
+
   - **Enabled previously disabled rules**:
     - `noFloatingPromises` - error (was off)
     - `noMisusedPromises` - error (was off)
@@ -929,12 +942,14 @@
   - **Removed**: `noImportCycles` - off
 
   ### Performance Section
+
   - **Removed**: `noBarrelFile` - off
   - **Removed**: `noImgElement` - error
   - **Removed**: `noNamespaceImport` - off
   - **Removed**: `noReExportAll` - off
 
   ### Style Section
+
   - **Added**: `useConsistentObjectDefinitions` - error
   - **Added**: `useExportsLast` - error (was off)
   - **Added**: `useGroupedAccessorPairs` - error
@@ -950,6 +965,7 @@
   - **Removed**: `useComponentExportOnlyModules` - off
 
   ### Suspicious Section
+
   - **Added**: `noBitwiseOperators` - error
   - **Added**: `noConstantBinaryExpressions` - error
   - **Added**: `noTsIgnore` - error
@@ -961,6 +977,7 @@
   - **Added**: `noQuickfixBiome` - error
 
   ## CLI Enhancements
+
   - **Added**: `--summary` flag to the `lint` command for concise lint result reporting using Biome's summary reporter
 
   This update significantly strengthens the linting rules with a focus on code quality, consistency, and best practices while maintaining TypeScript and React compatibility.

@@ -1,6 +1,7 @@
 # dependencies (bun install)
 node_modules
-.repos/effect
+.packref/packages/
+.packref/.packref-lock-*.tmp
 
 # output
 out

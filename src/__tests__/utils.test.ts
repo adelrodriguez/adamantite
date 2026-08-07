@@ -13,7 +13,7 @@ import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
 import { runResult } from "#__tests__/helpers.ts"
-import { isJsonObject, mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
+import { mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 import { checkCliExists } from "#lib/shared/process.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
@@ -191,22 +191,6 @@ describe("parseJson", () => {
     if (Result.isFailure(result)) {
       expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
     }
-  })
-})
-
-describe("isJsonObject", () => {
-  test("return true for plain JSON objects", () => {
-    expect(isJsonObject({})).toBe(true)
-    expect(isJsonObject({ a: 1, b: "x", c: null, d: [1, 2, 3] })).toBe(true)
-  })
-
-  test("return false for null, arrays, and primitives", () => {
-    expect(isJsonObject(null)).toBe(false)
-    expect(isJsonObject([])).toBe(false)
-    expect(isJsonObject([1, 2, 3])).toBe(false)
-    expect(isJsonObject("x")).toBe(false)
-    expect(isJsonObject(123)).toBe(false)
-    expect(isJsonObject(true)).toBe(false)
   })
 })
 

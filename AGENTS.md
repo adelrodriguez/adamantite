@@ -1,100 +1,75 @@
 # AGENTS.md
 
-This project was built with [`pastry`](https://github.com/adelrodriguez/pastry) template.
+Use ASD-STE100 Simplified Technical English for all communication.
+
+Before you explore or change code, read `CONTEXT.md` and the relevant parts of
+`docs/architecture.md`. Use the project's domain language.
 
 ## Agent skills
 
+### Source references
+
+When a skill requires a local dependency source checkout, use Packref. Add the package
+with `bunx packref add <package>` and read its version-locked source under
+`.packref/packages/`.
+
 ### Issue tracker
 
-Issues and PRDs are tracked as GitHub issues at `adelrodriguez/adamantite` (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues and PRDs are GitHub issues at `adelrodriguez/adamantite`. See
+`docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Default triage vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+Use the default five-role triage vocabulary. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Use the single-context domain-doc layout. See `docs/agents/domain.md`.
 
-## Quality Control
+### Changesets
 
-- We use `adamantite` for linting, formatting and type checking.
-- Always run `bun run format` after editing files.
-- After making changes, run `bun run check` and `bun run test` to ensure the code is still valid.
-- After installing or removing dependencies, run `bun run analyze` to ensure we are not using any dependencies that are not needed.
+Use Changesets for versioning and changelog management. See
+`docs/agents/changesets.md`.
 
-## Changesets
+## Repository rules
 
-- We use `changesets` for versioning and changelog management.
-- Create a changeset only for changes that affect users of the published package, such as CLI behavior, presets, package exports, dependencies used at runtime, or documentation shipped to users.
-- Do not add a changeset for internal-only changes, such as tests, CI, release tooling, contributor docs, or repository maintenance that does not affect package users.
-- Never make a major version bump unless the user requests it.
-- If a breaking change is being made, and we are on v1.0.0 or higher, alert the user.
+- Use Bun for package management and scripts.
+- Run `bun run test`, `bun run check`, `bun run fix`, and `bun run format` after edits.
+- Run `bun run analyze` after dependency, import, or export changes.
+- Prefer function declarations for standalone functions. Keep arrow functions for
+  callbacks, object methods, and functions that directly return an Effect chain.
+- Format suppressions as `@ts-expect-error - reason`. Prefer this form to casts that hide
+  known third-party type mismatches.
+- Keep integration modules limited to their default integration export.
+  `src/lib/integrations/base.ts` is the shared infrastructure exception.
+- Keep reusable integration behavior in `src/lib/workspace` or `src/lib/shared`.
+- Keep one-time transition behavior in `src/lib/migrations`.
+- Keep `init` independent from migration orchestration.
+- Keep `assess` read-only. `doctor --fix` is the mutating assessment dispatcher, and
+  manual fixes are report-only.
+- Migrations may call integrations. Integrations must not call migrations.
+- Keep tooling integration versions aligned with the corresponding versions in
+  `package.json`.
 
-## Project Overview
+<!-- PACKREF:START -->
 
-For what Adamantite is, its domain vocabulary, the integration lifecycle verbs, and the
-codebase map, see `CONTEXT.md`.
+## Packref
 
-## Development Commands
+Packref provides local copies of dependency source code so you can inspect the exact implementation used by this project.
 
-Use Bun for all package management and script execution:
+- Source references are stored in `.packref/packages/<registry>/<package>/<version>/` for unscoped packages and `.packref/packages/<registry>/<scope>/<package>/<version>/` for scoped packages — browse these directories to read dependency internals
+- `.packref/packref-lock.json` is shared and should be committed; `.packref/packages/` is developer-local and git-ignored
+- Run `packref install` after cloning when locked references are missing; install restores locked references exactly and does not install runtime dependencies
+- Available commands:
+  - `packref add [package]` — select manifest dependencies or fetch a named package (e.g. `packref add react`, `packref add hono@4.2.0`, `packref add @effect/cli`)
+  - `packref remove [package]` — select or name package references to remove
+  - `packref install` — materialize every reference already recorded in the committed lockfile
+  - `packref sync` — update dependency-tracked lock entries to match current `package.json` dependency versions
+  - `packref list` — show all referenced packages
+  - `packref prune` — remove unused entries from the global store
+  - `packref clean` — remove all project-local references
+  - `packref clean --global` — wipe all global store entries
+- Use Packref when you need to understand how a dependency works internally — read the source in `.packref/` instead of guessing or searching the web
+- Multiple versions of the same package can coexist; check `.packref/packref-lock.json` for the full list
 
-- **Install dependencies**: `bun install`
-- **Build CLI**: `bun run build` (uses bunup to bundle `src/index.ts` → `dist/`)
-- **Run tests**: `bun test` or `bun run test:watch` for watch mode
-- **Code checking**: `bun run check` (checks for issues and type errors)
-- **Code fixing**: `bun run fix` (auto-fixes issues and formats code)
-- **Code formatting**: `bun run format` (formats code with oxfmt)
-
-## Code Quality Workflow
-
-After editing files, always run:
-
-1. `bun run test` - Run tests to ensure everything works
-2. `bun run check` - Check for linting issues and type errors
-3. `bun run fix` - Auto-fix issues and format code
-4. `bun run format` - Format code explicitly (run after editing various files)
-
-Make sure to always run format after editing files, including creating documentation like changesets and README.md.
-
-## Release Workflow
-
-This project uses changesets for version management:
-
-1. **Create changeset when user-facing**: `bunx changeset` (interactive prompt for version bump)
-2. **Version locally**: `bun run version` (bumps package.json and updates CHANGELOG)
-3. **Publish**: Push to main → CI passes → auto-publishes to npm
-
-## Code Style
-
-- Prefer function declarations over arrow functions for standalone functions (e.g. `function getImportName(...)` instead of `const getImportName = (...) =>`).
-- Keep arrow functions when returning an Effect chain (e.g. `const foo = (args) => Effect.gen(...)`), or when they are callbacks, object methods, or otherwise more pleasant as arrows.
-- Format TypeScript suppression comments as `@ts-expect-error - reason` so they fail loudly if the underlying type issue is fixed.
-- Prefer `@ts-expect-error - reason` over casts like `as never` when suppressing known third-party type mismatches, so upstream type fixes become visible.
-
-## Architecture
-
-For domain definitions (integration, migration, lifecycle verbs, managed script), the
-codebase map, the build pipeline, and the preset files, see `CONTEXT.md`. The rules below
-are the guardrails to follow when working in those areas.
-
-### Integration Boundaries
-
-- Integration modules should only export the integration itself (default export). Keep extra helpers out of those files. `src/lib/integrations/base.ts` is the shared infrastructure exception.
-- If integration-related logic needs to be reused, move it to a nearby non-integration module such as `src/lib/workspace/**` or `src/lib/shared/**` instead of adding named exports to an integration file.
-- Keep one-off transition logic in `src/lib/migrations/**`. Do not move migration behavior into integration files just to simplify command wiring.
-- Keep `init` simple. It should not import migration helpers or perform migration-specific orchestration.
-- When `init` finds existing setup that it intentionally leaves alone, prefer warning and follow-up guidance over mutation. Point users to `adamantite doctor` / `adamantite doctor --fix` for verification and safe local fixes.
-
-### Integration Lifecycle Invariants
-
-- `assess` is read-only: it must not mutate files or call migrations.
-- `doctor --fix` is the only mutating dispatcher; `manual_fix` is report-only.
-- Migrations may call integrations to reach the latest supported shape. Integrations must not call migrations.
-
-### Dependency Management
-
-When a tooling dependency's version in `package.json` is higher than the version recorded
-in its `src/lib/integrations/tooling/` integration object, update the integration object
-to match.
+<!-- PACKREF:END -->

@@ -1,247 +1,100 @@
 # Contributing to Adamantite
 
-Thanks for your interest in contributing to Adamantite! This guide will help you get started with contributing to the project.
+Thank you for contributing to Adamantite.
 
-## 🚀 Getting Started
+## Requirements
 
-### Prerequisites
+- [Bun](https://bun.sh) 1.3.14 or later.
+- [Node.js](https://nodejs.org) 24 or later for Node.js compatibility checks.
+- [Git](https://git-scm.com).
 
-- [Bun](https://bun.sh/) 1.2.20 or later
-- [Git](https://git-scm.com/)
-- [Node.js](https://nodejs.org/) 18+ (for compatibility testing)
+## Set up the repository
 
-### Setting Up Your Development Environment
+1. Fork and clone the repository.
+2. Install dependencies:
 
-1. Fork the repository on GitHub
-2. Clone your fork locally:
-
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/adamantite.git
-   cd adamantite
-   ```
-
-3. Install dependencies:
-
-   ```bash
+   ```sh
    bun install
    ```
 
-4. Create a new branch for your feature or fix:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+3. Create a branch for the change.
 
-## 🛠️ Development Workflow
+Read [CONTEXT.md](CONTEXT.md) before you change domain behavior. Use
+[docs/architecture.md](docs/architecture.md) to find the relevant module boundary.
 
-### Available Scripts
+## Development commands
 
-- `bun run build` - Build the CLI tool
-- `bun run dev` - Build in watch mode for development
-- `bun test` - Run all tests
-- `bun run test:watch` - Run tests in watch mode
-- `bun run check` - Check for code issues and type errors using oxlint
-- `bun run fix` - Auto-fix code issues using oxlint
-- `bun run format` - Format code using oxfmt
-
-### Making Changes
-
-1. **Before coding**: Run tests to ensure everything works:
-
-   ```bash
-   bun test
-   ```
-
-2. **During development**: Use watch mode for continuous feedback:
-
-   ```bash
-   bun run dev        # For building
-   bun run test:watch # For testing
-   ```
-
-3. **Before committing**: Ensure code quality:
-   ```bash
-   bun run check
-   bun run fix
-   bun run format
-   bun test
-   ```
-
-## 🧪 Testing
-
-### Running Tests
-
-```bash
-# Run all tests
-bun test
-
-# Run tests in watch mode
-bun run test:watch
-
-# Run specific test file
-bun test src/__tests__/index.test.ts
+```sh
+bun run build       # Bundle the CLI and published presets into dist.
+bun run dev         # Rebuild when source files change.
+bun run test        # Run the Bun test suite.
+bun run test:watch  # Run tests when files change.
+bun run check       # Check lint rules and TypeScript types.
+bun run fix         # Apply safe lint fixes.
+bun run format      # Format repository files.
+bun run analyze     # Find unused files, exports, and dependencies.
 ```
 
-### Writing Tests
+Run the CLI from source while developing:
 
-- Place test files in colocated `src/**/__tests__/` directories
-- Use descriptive test names that explain the behavior being tested
-- Follow the existing test patterns in the codebase
-- Test both success and error cases
-
-Example test structure:
-
-```typescript
-import { test, expect, describe } from "bun:test"
-
-describe("feature name", () => {
-  test("should do something specific", () => {
-    // Arrange
-    const input = "test input"
-
-    // Act
-    const result = yourFunction(input)
-
-    // Assert
-    expect(result).toBe("expected output")
-  })
-})
+```sh
+bun run src/index.ts --help
+bun run src/index.ts doctor
 ```
 
-## 📝 Code Standards
+Build before testing the packaged executable:
 
-### Code Style
-
-- We use [oxc](https://oxc.rs/) (oxlint and oxfmt) for linting and formatting
-- Code is automatically formatted on commit
-- Follow TypeScript strict mode requirements
-- Use meaningful variable and function names
-- Add JSDoc comments for public APIs
-
-### Commit Messages
-
-Use conventional commit format:
-
-- `feat: add new CLI command for updating dependencies`
-- `fix: resolve issue with monorepo detection`
-- `docs: update README with new configuration options`
-- `refactor: simplify command parsing logic`
-- `test: add tests for init command`
-
-## 🔄 Pull Request Process
-
-### Before Submitting
-
-1. Ensure all tests pass: `bun test`
-2. Check for issues: `bun run check`
-3. Auto-fix issues: `bun run fix`
-4. Format code: `bun run format`
-5. **Add a changeset if user-facing**: Run `bunx changeset` when your change affects users of the published package
-6. Update documentation if needed
-7. Add tests for new features
-
-### Submitting Your PR
-
-1. Push your branch to your fork
-2. Create a pull request against the `main` branch
-3. Fill out the PR template with:
-   - Description of changes
-   - Why the change is needed
-   - How to test the changes
-   - Any breaking changes
-
-### PR Review Process
-
-- All PRs require at least one review
-- CI checks must pass (linting, formatting, tests)
-- Maintainers may request changes or ask questions
-- Once approved, maintainers will merge your PR
-
-## 🐛 Reporting Issues
-
-### Bug Reports
-
-When reporting bugs, please include:
-
-- Adamantite version (`npx adamantite --version`)
-- Operating system and version
-- Node.js/Bun version
-- Minimal reproduction steps
-- Expected vs actual behavior
-- Error messages or logs
-
-### Feature Requests
-
-For new features:
-
-- Describe the problem you're solving
-- Explain your proposed solution
-- Consider how it fits with existing functionality
-- Provide examples of usage
-
-## 📦 Release Process
-
-Adamantite uses [changesets](https://github.com/changesets/changesets) for version management:
-
-1. **Adding a changeset**: Run `bunx changeset` when a change affects users of the published package, such as CLI behavior, presets, package exports, runtime dependencies, or user-facing documentation
-2. **Version bumping**: Maintainers run `bun run version`
-3. **Publishing**: Automated via GitHub Actions on merge to main
-
-### Types of Changes
-
-- **patch**: Bug fixes, minor improvements
-- **minor**: New features, backwards compatible
-- **major**: Breaking changes
-
-## 💡 Development Tips
-
-### Working with the CLI
-
-Test your CLI changes locally:
-
-```bash
-# Build the CLI
+```sh
 bun run build
-
-# Test commands locally
 ./bin/adamantite --help
-./bin/adamantite init --help
 ```
 
-### Debugging
+## Make a change
 
-- Use `console.log` for quick debugging
-- Bun has built-in debugging support
-- Add `debugger` statements for breakpoints
+- Keep command modules thin and put reusable behavior in `src/lib`.
+- Keep integration modules limited to their default integration export. Put shared logic in
+  `src/lib/workspace` or `src/lib/shared`.
+- Keep one-time legacy transitions in `src/lib/migrations`.
+- Do not make `assess` mutate files. `doctor --fix` is the mutating assessment dispatcher.
+- Add or update tests for behavior changes. Tests are colocated in `__tests__` directories.
+- Update user documentation when CLI behavior, presets, exports, or requirements change.
 
-### Project Structure
+## Validate a change
 
+Run the full repository workflow before you open a pull request:
+
+```sh
+bun run test
+bun run check
+bun run fix
+bun run format
 ```
-src/
-├── commands/          # CLI command implementations
-├── helpers/           # Helper modules (packages, editors, CI)
-├── index.ts          # Main CLI entry point
-├── types.ts          # TypeScript type definitions
-├── utils.ts          # Shared utilities
-└── version.ts        # Version information
-presets/
-├── oxlint/           # oxlint configuration presets
-├── oxfmt.json        # oxfmt configuration preset
-└── tsconfig.json     # TypeScript configuration preset
+
+Run `bun run analyze` after you add or remove dependencies or change imports and exports.
+Review all automatic fixes before you commit them.
+
+## Changesets
+
+Add a changeset for a change that affects users of the published package. Examples include
+CLI behavior, presets, package exports, runtime dependencies, and documentation included
+with the package.
+
+```sh
+bunx changeset
 ```
 
-## 📞 Getting Help
+Do not add a changeset for tests, CI, contributor documentation, release tooling, or other
+internal maintenance. Do not create a major changeset unless the breaking change is
+intentional and approved.
 
-- **Discussions**: Use GitHub Discussions for questions
-- **Issues**: Report bugs or request features via GitHub Issues
-- **Email**: Contact the maintainer at hello@adelrodriguez.com
+## Pull requests
 
-## 🤝 Code of Conduct
+A pull request should explain:
 
-- Be respectful and inclusive
-- Focus on constructive feedback
-- Help others learn and grow
-- Follow the Golden Rule
+- What changed.
+- Why the change is needed.
+- How the change was validated.
+- Whether it changes public behavior or requires migration.
 
----
-
-Thank you for contributing to Adamantite! Your contributions help make TypeScript development better for everyone. 🚀
+All CI checks must pass before merge. Report bugs and request features through
+[GitHub Issues](https://github.com/adelrodriguez/adamantite/issues).

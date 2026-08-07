@@ -1,0 +1,26 @@
+{
+  "packages": [
+    {
+      "name": "effect",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/effect",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/effect"
+      },
+      "tracking": "dependency",
+      "version": "4.0.0-beta.102"
+    },
+    {
+      "name": "oxc-parser",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.143.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "0.143.0"
+    }
+  ]
+}

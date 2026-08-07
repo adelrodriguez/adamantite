@@ -14,15 +14,15 @@ interface WorkflowOptions {
 
 const setupSteps: Record<SupportedPackageManager, string> = {
   bun: `      - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.bun/install/cache
@@ -39,9 +39,9 @@ const setupSteps: Record<SupportedPackageManager, string> = {
       - name: Install dependencies
         run: deno install --frozen`,
   npm: `      - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "npm"
 
       - name: Install dependencies
@@ -50,17 +50,17 @@ const setupSteps: Record<SupportedPackageManager, string> = {
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile`,
   yarn: `      - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: "22"
+          node-version: "24"
           cache: "yarn"
 
       - name: Install dependencies
@@ -107,7 +107,7 @@ ${matrixInclude}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
 ${setupSteps[packageManager]}
 

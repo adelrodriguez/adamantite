@@ -1,7 +1,9 @@
 import type { JsonValue } from "type-fest"
 import { defu } from "defu"
+
 import * as Effect from "effect/Effect"
-import * as Predicate from "effect/Predicate"
+
+import type * as Schema from "effect/Schema"
 import { type ParseError, parse } from "jsonc-parser"
 import { FailedToMergeConfig, FailedToParseFile } from "#lib/shared/errors.ts"
 
@@ -17,8 +19,6 @@ export const parseJson = (content: string, path?: string) =>
         : Effect.succeed(parsed)
     )
   )
-
-export const isJsonObject = Predicate.isObject
 
 export function serializeTsObjectLiteral(
   value: unknown,
@@ -40,7 +40,7 @@ export function serializeTsObjectLiteral(
   return serialized.replaceAll("\n", `\n${continuationIndent}`)
 }
 
-export const mergeConfig = (base: Record<string, unknown>, override: Record<string, unknown>) =>
+export const mergeConfig = (base: Schema.JsonObject, override: Schema.JsonObject) =>
   Effect.try({
     catch: (cause) => new FailedToMergeConfig({ cause }),
     try: () => defu(base, override),

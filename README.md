@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">💠 Adamantite</h1>
   <p align="center">
-    <strong>Opinionated linting, formatting, type-safety and code quality presets for modern TypeScript applications.</strong>
+    <strong>Opinionated code-quality tooling for modern TypeScript projects.</strong>
   </p>
 </p>
 
@@ -17,73 +17,61 @@
   </a>
 </p>
 
-Adamantite is a collection of presets for
-[oxlint](https://oxc.rs/docs/guide/usage/linter.html),
-[oxfmt](https://oxc.rs/docs/guide/usage/formatter.html),
-[TypeScript](https://www.typescriptlang.org/) and
-[sherif](https://github.com/QuiiBz/sherif) that are designed to help humans and agents write
-maintainable and scalable type-safe code, both for individual projects and monorepos.
+Adamantite provides one CLI and a set of presets for linting, formatting, type checking,
+dependency analysis, and monorepo checks. It configures Oxlint, Oxfmt, TypeScript, Knip,
+and Sherif so humans and coding agents can use the same project workflow.
 
 ---
 
-## Quick Start
-
-Run the following command on your project to get started:
-
-```shell
-npx adamantite init
-```
-
-Adamantite will automatically configure your project with linting, formatting, and type-safety rules.
-
-```shell
-adamantite check          # Check code for issues and type errors using oxlint
-adamantite fix            # Fix code issues using oxlint
-adamantite format         # Format code using oxfmt
-adamantite monorepo       # Check monorepo for dependency issues using Sherif
-adamantite update         # Update Adamantite's dependencies to the latest compatible versions
-```
-
 ## Features
 
-- **⚡ Fast performance**: Built on oxc's Rust-based architecture for 10-40x faster linting than ESLint
-- **🔍 Extensive linting**: 500+ rules covering correctness, performance, security, and accessibility
-- **🎯 Zero configuration**: Works out of the box with sensible defaults, no setup required
-- **🔧 Single tool solution**: Leverages the oxc ecosystem for linting and formatting
-- **🛡️ Strict type safety**: Comes with a strict TypeScript preset to improve type safety across your codebase
-- **🏗️ Monorepo support**: Unified configuration and dependency management across workspace packages
-- **⚙️ CI-friendly**: Automatically configures GitHub Actions workflows to run checks in CI
-- **🤖 AI-friendly patterns**: Consistent code style designed for effective AI collaboration
+- **Fast checks**: Run Oxlint and Oxfmt on the Oxc toolchain.
+- **Strict defaults**: Use opinionated lint and TypeScript presets without assembling a
+  configuration from scratch.
+- **Framework presets**: Add rules for React, Next.js, Vue, Node.js, Jest, or Vitest.
+- **Project setup**: Create package scripts, configuration files, editor settings, and CI
+  through an interactive or non-interactive initializer.
+- **Setup maintenance**: Assess managed integrations with `doctor`, apply safe fixes, and
+  migrate older Adamantite configurations.
+- **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
+  Sherif.
+- **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`.
 
-## Installation
+## Quick start
 
-### Automatic Setup (Recommended)
+Run the initializer from the root of a TypeScript project:
 
-```shell
+```sh
 npx adamantite init
 ```
 
-This interactive command will:
+The interactive setup lets you choose package scripts, presets, TypeScript, editors, CI,
+and agent guidance. After setup, use the scripts written to `package.json`:
 
-- Install Adamantite, [oxlint](https://oxc.rs/docs/guide/usage/linter.html), and [oxfmt](https://oxc.rs/docs/guide/usage/formatter.html) as dev dependencies
-- Create `oxlint.config.ts` with opinionated presets
-- Create `oxfmt.config.ts` with formatting configuration
-- Set up `tsconfig.json` with strict TypeScript rules
-- Add lint/format scripts to your `package.json`
-  - Also adds monorepo-specific scripts if running a monorepo
-- Configure editor settings
+```sh
+bun run check
+bun run fix
+bun run format
+bun run analyze
+```
 
-### Non-interactive setup for agents
+Use the equivalent `adamantite` commands directly when the project does not have managed
+scripts:
 
-Use `--non-interactive` to configure a project entirely from flags. At least one
-`--script` is required, repeat `--script`, `--preset`, and `--editor` to select multiple
-values, and add boolean flags only when that setup should be enabled.
+```sh
+adamantite check
+adamantite fix
+adamantite format
+adamantite analyze
+adamantite monorepo
+```
 
-```shell
-# Minimal unattended setup
-npx adamantite init --non-interactive --script check
+## Non-interactive setup
 
-# Fully specified unattended setup
+Use `--non-interactive` to configure a project entirely from flags. Specify at least one
+`--script`. Repeat `--script`, `--preset`, and `--editor` to select multiple values.
+
+```sh
 npx adamantite init \
   --non-interactive \
   --script check \
@@ -91,7 +79,6 @@ npx adamantite init \
   --script format \
   --script analyze \
   --preset react \
-  --preset node \
   --editor vscode \
   --typescript \
   --install-extensions \
@@ -99,202 +86,163 @@ npx adamantite init \
   --agents
 ```
 
-The available values are:
+Available setup values:
 
-- Scripts: `check`, `fix`, `format`, `analyze`, `check:monorepo`, and `fix:monorepo`
-- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, and `node`
-- Editors: `vscode` and `zed`
+- Scripts: `check`, `fix`, `format`, `analyze`, `check:monorepo`, and `fix:monorepo`.
+- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, and `node`.
+- Editors: `vscode` and `zed`.
 
-Omitted boolean flags are disabled. Setup flags require `--non-interactive`; without it,
-`adamantite init` keeps the interactive setup flow.
+Presets and TypeScript require the `check` or `fix` script. Editor extension installation
+requires an editor. Monorepo scripts require a detected monorepo. GitHub Actions requires a
+compatible script and a supported package manager. Omitted boolean flags are disabled.
 
-## 📋 Commands
+## Commands
 
-### `adamantite analyze`
-
-Find unused dependencies, exports, and files using Knip:
-
-```shell
-# Analyze the current project
-adamantite analyze
-
-# Automatically fix issues, including removing unused files
-adamantite analyze --fix
-
-# Enable production and strict analysis
-adamantite analyze --strict
-
-# Forward additional arguments to Knip
-adamantite analyze -- --directory packages/app
-```
+Run `adamantite --help` or `adamantite <command> --help` for the complete CLI reference.
 
 ### `adamantite check`
 
-Check your code for issues and type errors without automatically fixing them using oxlint:
+Find lint and type errors without changing files:
 
-```shell
-# Check all files
+```sh
 adamantite check
-
-# Check specific files
-adamantite check src/components/**/*.ts
+adamantite check src
 ```
 
 ### `adamantite fix`
 
-Fix issues in your code with automatic formatting and safe fixes:
+Apply safe Oxlint fixes. Suggested and dangerous fixes require explicit flags:
 
-```shell
-# Fix all files
+```sh
 adamantite fix
-
-# Fix specific files
-adamantite fix src/index.ts
-
-# Apply suggested fixes
 adamantite fix --suggested
-
-# Apply dangerous fixes
 adamantite fix --dangerous
-
-# Apply all fixes
 adamantite fix --all
 ```
 
 ### `adamantite format`
 
-Format your code using oxfmt:
+Format files with Oxfmt, or check formatting without writing:
 
-```shell
-# Format all files
+```sh
 adamantite format
-
-# Format specific files
 adamantite format src/index.ts
-
-# Check if files are formatted without writing
 adamantite format --check
+```
+
+### `adamantite analyze`
+
+Find unused dependencies, exports, and files with Knip. The `--fix` option can remove
+unused files, so review its effect before use.
+
+```sh
+adamantite analyze
+adamantite analyze --strict
+adamantite analyze --fix
 ```
 
 ### `adamantite monorepo`
 
-Special tooling for monorepo projects using [Sherif](https://github.com/QuiiBz/sherif):
+Find dependency consistency problems in a monorepo with Sherif:
 
-```shell
-# Check for monorepo-specific issues
+```sh
 adamantite monorepo
-
-# Fix monorepo-specific issues
 adamantite monorepo --fix
 ```
 
-Automatically detects and fixes:
+### `adamantite doctor`
 
-- Inconsistent dependency versions across packages
-- Missing dependencies in package.json
-- Unused dependencies
-- Package.json formatting issues
+Assess every Adamantite-managed integration. The default command is read-only. Use
+`--fix` to install or update managed packages, create missing supported configurations,
+update supported configurations, and run known migrations.
 
-### Passing arguments to underlying tools
+```sh
+adamantite doctor
+adamantite doctor --fix
+adamantite doctor
+```
 
-Commands that invoke Knip, Oxlint, Oxfmt, or Sherif can forward additional arguments to
-the underlying CLI. Place Adamantite arguments before `--` and underlying CLI arguments
-after it:
+Manual-fix findings remain report-only.
 
-```shell
+### `adamantite update`
+
+Run applicable migrations and update Adamantite-managed dependencies:
+
+```sh
+adamantite update
+adamantite doctor --fix
+adamantite doctor
+```
+
+`update` handles known legacy transitions, including JSON Oxlint, Oxfmt, and Knip
+configurations and the legacy type-check script. Use `doctor --fix` afterward to complete
+safe setup repairs.
+
+### Pass arguments to underlying tools
+
+Commands that invoke Knip, Oxlint, Oxfmt, or Sherif forward arguments after `--`:
+
+```sh
 adamantite analyze --strict -- --directory packages/app
 adamantite check src -- --deny-warnings
 adamantite format -- --ignore-path .formatignore
 adamantite monorepo -- --ignore-package package-a
 ```
 
-When invoking a package script, the package manager consumes its own `--`, so add a
-second separator for Adamantite:
+Package managers consume one separator, so package scripts need a second one:
 
-```shell
+```sh
 bun run analyze -- -- --directory packages/app
 npm run analyze -- -- --directory packages/app
 ```
 
-Passthrough arguments are not supported by `init`, `doctor`, or `update`, because those
-commands do not invoke a single underlying CLI.
-
-### `adamantite update`
-
-Run applicable migrations and update Adamantite-managed dependencies:
-
-```shell
-# Run migrations and update managed dependencies
-adamantite update
-```
-
-This also migrates legacy `.oxfmtrc.json(c)` configs to `oxfmt.config.ts` and `knip.json(c)` configs to `knip.config.ts`.
+`init`, `doctor`, and `update` do not forward arguments because they do not invoke one
+underlying CLI.
 
 ## Presets
 
-### Linting ([presets/lint/](./presets/lint/))
+Adamantite publishes configuration that can also be consumed directly:
 
-Adamantite provides comprehensive linting rules for TypeScript and JavaScript:
+| Export                   | Purpose                                    |
+| ------------------------ | ------------------------------------------ |
+| `adamantite/lint`        | Core Oxlint rules.                         |
+| `adamantite/lint/react`  | React, JSX accessibility, and performance. |
+| `adamantite/lint/nextjs` | Next.js rules.                             |
+| `adamantite/lint/vue`    | Vue rules.                                 |
+| `adamantite/lint/node`   | Node.js rules.                             |
+| `adamantite/lint/jest`   | Jest rules.                                |
+| `adamantite/lint/vitest` | Vitest rules.                              |
+| `adamantite/format`      | Oxfmt configuration.                       |
+| `adamantite/analyze`     | Knip configuration.                        |
+| `adamantite/typescript`  | Strict TypeScript configuration for TS 7+. |
 
-#### Core ([core.ts](./presets/lint/core.ts))
+## Requirements and boundaries
 
-Extensive ruleset covering:
+- Adamantite requires Node.js 24 or later when run with Node.js.
+- This repository uses Bun, but the CLI can configure projects that use Bun, Deno, npm,
+  pnpm, or Yarn where the selected integration supports them.
+- Adamantite manages recognized package scripts and supported configuration shapes. It
+  reports custom configurations that require manual work instead of overwriting them.
+- `fix`, `format`, `analyze --fix`, `monorepo --fix`, `doctor --fix`, `init`, and `update`
+  can change project files. Review the resulting diff.
 
-- **Correctness**: Bug prevention and code correctness enforcement
-- **Performance**: Optimization patterns and performance best practices
-- **Restriction**: Enforcing coding standards and preventing problematic patterns
-- **Suspicious**: Detecting code smells and potential bugs
-- **Pedantic**: Strict code quality and consistency enforcement
-- **Style**: Consistent code formatting and naming conventions
-- **Nursery**: Experimental rules under active development
+## Agent skill
 
-#### Framework Presets
+Install the first-party Adamantite skill to teach coding agents how to initialize, assess,
+repair, and update a project:
 
-Framework-specific presets are available for:
+```sh
+npx skills add adelrodriguez/adamantite --list
+npx skills add adelrodriguez/adamantite --skill adamantite
+```
 
-- **React** ([react.ts](./presets/lint/react.ts)) - React, React-perf, and JSX-a11y rules
-- **Next.js** ([nextjs.ts](./presets/lint/nextjs.ts)) - Next.js-specific rules
-- **Vue** ([vue.ts](./presets/lint/vue.ts)) - Vue.js rules
-- **Node.js** ([node.ts](./presets/lint/node.ts)) - Node.js-specific rules
-- **Jest** ([jest.ts](./presets/lint/jest.ts)) - Jest testing rules
-- **Vitest** ([vitest.ts](./presets/lint/vitest.ts)) - Vitest testing rules
+## Contributing
 
-### Formatting ([format.ts](./presets/format.ts))
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository workflow. Contributors should
+also read the [domain glossary](CONTEXT.md) and [architecture reference](docs/architecture.md).
 
-Opinionated code formatting with oxfmt, configured for consistency and readability. The published formatter preset is available as `adamantite/format` and is designed to be used from `oxfmt.config.ts`.
+## License
 
-### Analyze ([analyze.ts](./presets/analyze.ts))
+Adamantite uses the [MIT License](LICENSE).
 
-Opinionated Knip configuration for dependency and unused-file analysis. The published analyze preset is available as `adamantite/analyze` and is designed to be used from `knip.config.ts`.
-
-### TypeScript ([presets/tsconfig.json](./presets/tsconfig.json))
-
-Strict TypeScript configuration for maximum type safety. Catches errors at compile-time that would otherwise cause runtime failures. The preset requires TypeScript 7 or newer.
-
-````
-
-## 🛠️ Development
-
-This project uses Bun for all development tasks:
-
-```shell
-# Install dependencies
-bun install
-
-# Run tests
-bun test
-
-# Build CLI
-bun run build
-
-# Linting and type checking
-bun run check
-````
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) first.
-
-## 📄 License
-
-MIT © [Adel Rodriguez](https://github.com/adelrodriguez)
+Made with [🥐 `pastry`](https://github.com/adelrodriguez/pastry)

@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import { Prompter } from "#lib/services/prompter.ts"
@@ -11,7 +12,7 @@ import {
   InvalidConfigFormat,
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
-import { isJsonObject, parseJson } from "#lib/shared/json.ts"
+import { parseJson } from "#lib/shared/json.ts"
 import { toOxfmtTsConfigContent } from "#lib/workspace/oxfmt-config.ts"
 
 function getLegacyConfigPaths() {
@@ -44,7 +45,7 @@ function migrateLegacyOxfmtConfig(cwd: string) {
 
     const existingConfig = yield* parseJson(legacyConfigContent, legacyConfigPath)
 
-    if (!isJsonObject(existingConfig)) {
+    if (!Predicate.isObject(existingConfig)) {
       return yield* new InvalidConfigFormat({ path: legacyConfigPath })
     }
 

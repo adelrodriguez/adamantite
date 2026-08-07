@@ -9,6 +9,13 @@ import * as Result from "effect/Result"
 import { runResult } from "#__tests__/helpers.ts"
 import github from "#lib/integrations/ci/github.ts"
 
+function getActionReference(content: string, action: string): string | undefined {
+  return content
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith(`uses: ${action}@`))
+}
+
 describe("github", () => {
   let originalCwd: string
   let tempDir: string
@@ -57,13 +64,36 @@ describe("github", () => {
       expect(content).toContain("name: check")
       expect(content).toContain("command: bun run check")
       expect(content).toContain("Setup Node.js")
-      expect(content).toContain("actions/setup-node@v6")
-      expect(content).toContain('node-version: "22"')
+      expect(content).toContain("actions/setup-node@v7")
+      expect(content).toContain('node-version: "24"')
       expect(content).toContain("Setup Bun")
       expect(content).toContain("Cache dependencies")
-      expect(content).toContain("actions/cache@v4")
+      expect(content).toContain("actions/cache@v6")
       expect(content).toContain("~/.bun/install/cache")
       expect(content).toContain("bun install --frozen-lockfile")
+    })
+
+    test("keep shared action versions aligned with this repository's CI workflow", async () => {
+      await github
+        .create(tempDir, {
+          packageManager: "bun",
+          scripts: ["check"],
+        })
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const generatedWorkflow = await Bun.file(".github/workflows/adamantite.yml").text()
+      const referenceWorkflow = await Bun.file(join(originalCwd, ".github/workflows/ci.yml")).text()
+
+      for (const action of [
+        "actions/checkout",
+        "actions/setup-node",
+        "oven-sh/setup-bun",
+        "actions/cache",
+      ]) {
+        expect(getActionReference(generatedWorkflow, action)).toBe(
+          getActionReference(referenceWorkflow, action)
+        )
+      }
     })
 
     test("generate the correct workflow for npm", async () => {
@@ -76,7 +106,7 @@ describe("github", () => {
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
-      expect(content).toContain("actions/setup-node@v6")
+      expect(content).toContain("actions/setup-node@v7")
       expect(content).toContain('cache: "npm"')
       expect(content).toContain("npm ci")
       expect(content).toContain("command: npm run check")
@@ -93,7 +123,7 @@ describe("github", () => {
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup pnpm")
       expect(content).toContain("pnpm/action-setup@v4")
-      expect(content).toContain("actions/setup-node@v6")
+      expect(content).toContain("actions/setup-node@v7")
       expect(content).toContain('cache: "pnpm"')
       expect(content).toContain("pnpm install --frozen-lockfile")
       expect(content).toContain("command: pnpm run check")
@@ -109,7 +139,7 @@ describe("github", () => {
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
-      expect(content).toContain("actions/setup-node@v6")
+      expect(content).toContain("actions/setup-node@v7")
       expect(content).toContain('cache: "yarn"')
       expect(content).toContain("yarn install --frozen-lockfile")
       expect(content).toContain("command: yarn run check")

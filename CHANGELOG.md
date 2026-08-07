@@ -1,5 +1,13 @@
 # adamantite
 
+## 0.34.2
+
+### Patch Changes
+
+- [#344](https://github.com/adelrodriguez/adamantite/pull/344) [`69d8dde`](https://github.com/adelrodriguez/adamantite/commit/69d8dde5c234f386d991e1ff9cabda9863682543) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Restructure and update the product documentation for the current CLI, presets, setup lifecycle, and supported runtime requirements.
+
+- [#344](https://github.com/adelrodriguez/adamantite/pull/344) [`69d8dde`](https://github.com/adelrodriguez/adamantite/commit/69d8dde5c234f386d991e1ff9cabda9863682543) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Keep generated GitHub Actions workflows aligned with the repository's current action versions and make repeated Zed editor setup idempotent.
+
 ## 0.34.1
 
 ### Patch Changes

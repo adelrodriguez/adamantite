@@ -75,6 +75,119 @@ describe("zed", () => {
       expect(config.lsp.oxfmt.initialization_options.settings.run).toBe("onSave")
     })
 
+    test("deduplicate formatter entries for managed languages", async () => {
+      mkdirSync(join(tempDir, ".zed"), { recursive: true })
+      await Bun.write(
+        join(tempDir, ".zed", "settings.json"),
+        JSON.stringify({
+          languages: {
+            JavaScript: {
+              formatter: [
+                { language_server: { name: "oxfmt" } },
+                { language_server: { name: "oxfmt" } },
+              ],
+            },
+          },
+        })
+      )
+
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const config = JSON.parse(content)
+
+      expect(config.languages.JavaScript.formatter).toEqual([
+        { language_server: { name: "oxfmt" } },
+        { code_action: "source.fixAll.oxc" },
+      ])
+    })
+
+    test("preserve repeated values in user-owned arrays", async () => {
+      mkdirSync(join(tempDir, ".zed"), { recursive: true })
+      await Bun.write(
+        join(tempDir, ".zed", "settings.json"),
+        JSON.stringify({
+          languages: {
+            JavaScript: {
+              formatter: [{ language_server: { name: "oxfmt" } }],
+            },
+          },
+          lsp: {
+            custom: {
+              initialization_options: {
+                arguments: ["--flag", "--flag"],
+              },
+            },
+          },
+        })
+      )
+
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const config = JSON.parse(content)
+
+      expect(config.lsp.custom.initialization_options.arguments).toEqual(["--flag", "--flag"])
+      expect(config.languages.JavaScript.formatter).toHaveLength(2)
+    })
+
+    test("preserve formatter entries for unmanaged languages", async () => {
+      const formatter = [{ external: "custom" }, { external: "custom" }]
+      mkdirSync(join(tempDir, ".zed"), { recursive: true })
+      await Bun.write(
+        join(tempDir, ".zed", "settings.json"),
+        JSON.stringify({ languages: { Astro: { formatter } } })
+      )
+
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const config = JSON.parse(content)
+
+      expect(config.languages.Astro.formatter).toEqual(formatter)
+    })
+
+    test("preserve repeated values nested in managed formatter entries", async () => {
+      const formatter = {
+        language_server: {
+          arguments: ["--flag", "--flag"],
+          name: "custom",
+        },
+      }
+      mkdirSync(join(tempDir, ".zed"), { recursive: true })
+      await Bun.write(
+        join(tempDir, ".zed", "settings.json"),
+        JSON.stringify({ languages: { JavaScript: { formatter: [formatter, formatter] } } })
+      )
+
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const config = JSON.parse(content)
+
+      expect(config.languages.JavaScript.formatter).toContainEqual(formatter)
+      expect(config.languages.JavaScript.formatter).toHaveLength(3)
+    })
+
+    test("remain idempotent across repeated updates", async () => {
+      mkdirSync(join(tempDir, ".zed"), { recursive: true })
+      await Bun.write(
+        join(tempDir, ".zed", "settings.json"),
+        JSON.stringify({ ui_font_size: 14 }, null, 2)
+      )
+
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      const firstUpdate = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+
+      await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      const secondUpdate = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const config = JSON.parse(secondUpdate)
+
+      expect(secondUpdate).toBe(firstUpdate)
+      expect(config.languages.JavaScript.formatter).toHaveLength(2)
+      expect(config.languages.JSON.formatter).toHaveLength(1)
+    })
+
     test("merge an empty config with Adamantite's config", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
       await Bun.write(join(tempDir, ".zed", "settings.json"), "{}")

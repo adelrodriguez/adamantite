@@ -1,6 +1,9 @@
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import { defineIntegration } from "#lib/integrations/base.ts"
 import {
   FailedToCreateDirectory,
@@ -8,7 +11,7 @@ import {
   FailedToWriteFile,
   InvalidConfigFormat,
 } from "#lib/shared/errors.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
 const CONFIG = {
@@ -59,6 +62,36 @@ const CONFIG = {
   },
 } as const
 
+function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObject {
+  const languageSettings = config.languages
+
+  if (!Schema.is(Schema.Record(Schema.String, Schema.Json))(languageSettings)) {
+    return config
+  }
+
+  const languages = Object.fromEntries(
+    Object.entries(languageSettings).map(([language, languageConfig]) => {
+      if (
+        language in CONFIG.languages &&
+        Schema.is(Schema.Record(Schema.String, Schema.Json))(languageConfig) &&
+        Schema.is(Schema.Array(Schema.Json))(languageConfig.formatter)
+      ) {
+        return [
+          language,
+          Object.fromEntries([
+            ...Object.entries(languageConfig),
+            ["formatter", Array.dedupe(languageConfig.formatter)],
+          ]),
+        ]
+      }
+
+      return [language, languageConfig]
+    })
+  )
+
+  return { ...config, languages }
+}
+
 export default defineIntegration({
   config: files[0].path,
   create: (cwd: string) =>
@@ -97,11 +130,12 @@ export default defineIntegration({
 
       const existingConfig = yield* parseJson(zedFile, settingsPath)
 
-      if (!isJsonObject(existingConfig)) {
+      if (!Predicate.isObject(existingConfig)) {
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      const newConfig = yield* mergeConfig(CONFIG, existingConfig)
+      const mergedConfig = yield* mergeConfig(CONFIG, existingConfig)
+      const newConfig = deduplicateManagedFormatters(mergedConfig)
 
       yield* fs
         .writeFileString(settingsPath, `${JSON.stringify(newConfig, null, 2)}\n`)

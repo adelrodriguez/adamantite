@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { Script } from "#lib/workspace/package-json.ts"
 import { defineIntegration } from "#lib/integrations/base.ts"
@@ -13,7 +14,7 @@ import {
   InvalidConfigFormat,
   VscodeCliNotFound,
 } from "#lib/shared/errors.ts"
-import { isJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 const CONFIG = {
@@ -120,7 +121,7 @@ export default defineIntegration({
 
       const existingConfig = yield* parseJson(vscodeFile, settingsPath)
 
-      if (!isJsonObject(existingConfig)) {
+      if (!Predicate.isObject(existingConfig)) {
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 

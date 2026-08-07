@@ -82,6 +82,19 @@ describe("vscode", () => {
       expect(config["editor.formatOnPaste"]).toBe(true)
     })
 
+    test("remain idempotent across repeated updates", async () => {
+      mkdirSync(".vscode", { recursive: true })
+      await Bun.write(".vscode/settings.json", JSON.stringify({ "editor.tabSize": 4 }, null, 2))
+
+      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      const firstUpdate = await Bun.file(".vscode/settings.json").text()
+
+      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+      const secondUpdate = await Bun.file(".vscode/settings.json").text()
+
+      expect(secondUpdate).toBe(firstUpdate)
+    })
+
     test("merge an empty config with Adamantite's config", async () => {
       mkdirSync(".vscode", { recursive: true })
       await Bun.write(".vscode/settings.json", "{}")

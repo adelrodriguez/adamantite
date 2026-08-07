@@ -1,4 +1,5 @@
 import * as Option from "effect/Option"
+import * as Predicate from "effect/Predicate"
 import { print as printAst } from "esrap"
 import ts from "esrap/languages/ts"
 import {
@@ -9,7 +10,6 @@ import {
   type Program,
   type PropertyKey,
 } from "oxc-parser"
-import { isJsonObject } from "#lib/shared/json.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",
@@ -65,7 +65,7 @@ export function toOxlintTsConfigContent(
   ]
 
   const serializedOptions = JSON.stringify(
-    isJsonObject(options)
+    Predicate.isObject(options)
       ? {
           ...options,
           respectEslintDisableDirectives: true,
@@ -93,14 +93,6 @@ export function toOxlintTsConfigContent(
     .join("\n")
 
   return [...imports, "", "export default defineConfig({", body, "})", ""].join("\n")
-}
-
-function isObjectExpression(value: unknown): value is ObjectExpression {
-  return isJsonObject(value) && value.type === "ObjectExpression" && Array.isArray(value.properties)
-}
-
-function isObjectProperty(value: unknown): value is ObjectProperty {
-  return isJsonObject(value) && value.type === "Property"
 }
 
 const parseThrowable = Option.liftThrowable((content: string) =>
@@ -155,7 +147,7 @@ function getExportedConfigObject(ast: Program) {
 
   const declaration = exportDefaultDeclaration.declaration
 
-  if (isObjectExpression(declaration)) {
+  if (declaration.type === "ObjectExpression") {
     return Option.fromNullishOr(declaration)
   }
 
@@ -173,7 +165,7 @@ function getExportedConfigObject(ast: Program) {
 
   const [firstArgument] = declaration.arguments
 
-  if (isObjectExpression(firstArgument)) {
+  if (firstArgument?.type === "ObjectExpression") {
     return Option.fromNullishOr(firstArgument)
   }
 
@@ -188,10 +180,6 @@ function getNamedObjectProperty(
 
   for (const property of objectExpression.properties) {
     if (property.type === "SpreadElement") {
-      return { status: "manual" }
-    }
-
-    if (!isObjectProperty(property)) {
       return { status: "manual" }
     }
 
@@ -248,11 +236,13 @@ function createRequiredOptionProperties(options: readonly RequiredBooleanOption[
     return Option.none()
   }
 
-  if (!isObjectExpression(optionsPropertyResult.property.value)) {
+  if (optionsPropertyResult.property.value.type !== "ObjectExpression") {
     return Option.none()
   }
 
-  const properties = optionsPropertyResult.property.value.properties.filter(isObjectProperty)
+  const properties = optionsPropertyResult.property.value.properties.filter(
+    (property): property is ObjectProperty => property.type === "Property"
+  )
 
   return properties.length === optionsPropertyResult.property.value.properties.length
     ? Option.fromNullishOr(properties)
@@ -279,8 +269,7 @@ function createRequiredOptionsProperty() {
   const [property] = configObjectExpression.value.properties
 
   if (
-    !property ||
-    !isObjectProperty(property) ||
+    property?.type !== "Property" ||
     property.computed ||
     property.method ||
     property.kind !== "init"
@@ -398,7 +387,7 @@ export function inspectRequiredOxlintConfig(content: string) {
     } satisfies OxlintRequiredOptionsPatchResult
   }
 
-  if (!isObjectExpression(optionsPropertyResult.property.value)) {
+  if (optionsPropertyResult.property.value.type !== "ObjectExpression") {
     return {
       kind: "manual",
       reason: UNSUPPORTED_OPTIONS_REASON,

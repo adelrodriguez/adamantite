@@ -31,6 +31,11 @@ Use the single-context domain-doc layout. See `docs/agents/domain.md`.
 Use Changesets for versioning and changelog management. See
 `docs/agents/changesets.md`.
 
+### Implementation plans
+
+Store active implementation plans in `docs/plans/`. Delete each plan when its work is
+complete. See `docs/plans/README.md`.
+
 ## Repository rules
 
 - Use Bun for package management and scripts.

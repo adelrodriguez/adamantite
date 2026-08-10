@@ -6,7 +6,7 @@
       "name": "adamantite",
       "dependencies": {
         "@clack/prompts": "1.7.0",
-        "@effect/platform-node": "4.0.0-beta.102",
+        "@effect/platform-node": "4.0.0-beta.105",
         "defu": "6.1.7",
         "effect": "4.0.0-beta.102",
         "esrap": "2.3.1",
@@ -92,9 +92,9 @@
 
     "@clack/prompts": ["@clack/prompts@1.7.0", "", { "dependencies": { "@clack/core": "1.4.3", "fast-string-width": "^3.0.2", "fast-wrap-ansi": "^0.2.0", "sisteransi": "^1.0.5" } }, "sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A=="],
 
-    "@effect/platform-node": ["@effect/platform-node@4.0.0-beta.102", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0-beta.102", "mime": "^4.1.0", "undici": "^8.7.0" }, "peerDependencies": { "effect": "^4.0.0-beta.102", "ioredis": "^5.7.0" } }, "sha512-wYVAU9jAePT+gouMr/EVz1CaW6yDLjPAgXYeEFLz7wugT5iZhFRag6mqajV/wwN3bzWP2fzZHokLuPmqD/rqeA=="],
+    "@effect/platform-node": ["@effect/platform-node@4.0.0-beta.105", "", { "dependencies": { "@effect/platform-node-shared": "^4.0.0-beta.105", "mime": "^4.1.0", "undici": "^8.7.0" }, "peerDependencies": { "effect": "^4.0.0-beta.105", "ioredis": ">=5.7.0 <6.0.0" } }, "sha512-gOHtgE9PqCT8aiiM0W7ZSbu4M2/jPGfJOKWuyBCxofNV5Np36fFY55FSa1MtyG+vjOjlD5btNY2i6i/SPtRqTA=="],
 
-    "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.102", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.21.0" }, "peerDependencies": { "effect": "^4.0.0-beta.102" } }, "sha512-gVd793I72MrkX4dXo7eYtRKfNj0RW4eMRfVEKEJI16h2+mBDCzQ+gqMrog2hSTHQnaIbvbYShNQ4TVGuRCYZeQ=="],
+    "@effect/platform-node-shared": ["@effect/platform-node-shared@4.0.0-beta.107", "", { "dependencies": { "@types/ws": "^8.18.1", "ws": "^8.21.0" }, "peerDependencies": { "effect": "^4.0.0-beta.107" } }, "sha512-y6BqcRi86BfTJv+tvDrob4ozYVHxxlHYcn/zIQqZjXI9CvKnkgD6ng+38G1o45c4f2ucU+6HRI9POCmFdMoVGA=="],
 
     "@emnapi/core": ["@emnapi/core@1.11.2", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.2", "tslib": "^2.4.0" } }, "sha512-TC8MkTuZUtcTSiFeuC0ksCh9QIJ5+F21MvZ4Wn4ORfYaFJ/0dsiudv5tVkejgwZlwQ39jL9WWDe2lz8x0WglOA=="],
 

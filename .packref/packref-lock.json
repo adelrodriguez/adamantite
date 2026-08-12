@@ -10,17 +10,17 @@
         "url": "https://github.com/Effect-TS/effect"
       },
       "tracking": "dependency",
-      "version": "4.0.0-beta.102"
+      "version": "4.0.0-rc.108"
     },
     {
       "name": "oxc-parser",
       "registry": "npm",
       "source": {
         "type": "tarball",
-        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.143.0.tgz"
+        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.144.0.tgz"
       },
       "tracking": "dependency",
-      "version": "0.143.0"
+      "version": "0.144.0"
     }
   ]
 }

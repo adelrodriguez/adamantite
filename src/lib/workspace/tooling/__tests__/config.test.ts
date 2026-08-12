@@ -157,15 +157,15 @@ describe("getPackageActions", () => {
   })
 })
 
+function state(active: ToolingConfigState["active"]): ToolingConfigState {
+  return { active, legacy: [], warnings: [] }
+}
+
 describe("getConfigActions", () => {
   const options = {
     configFile: "tool.config.ts",
     migrationId: "legacy-tool-json",
     toolName: "tool",
-  }
-
-  function state(active: ToolingConfigState["active"]): ToolingConfigState {
-    return { active, legacy: [], warnings: [] }
   }
 
   test("request a config creation when no config exists", () => {

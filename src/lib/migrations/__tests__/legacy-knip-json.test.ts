@@ -40,7 +40,7 @@ describe("legacyKnipJson", () => {
     const result = await runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      status: "already-migrated",
+      status: "not-applicable",
       warnings: [
         "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
       ],

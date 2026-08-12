@@ -40,7 +40,7 @@ describe("legacyOxfmtJson", () => {
     const result = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      status: "already-migrated",
+      status: "not-applicable",
       warnings: [
         "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
       ],

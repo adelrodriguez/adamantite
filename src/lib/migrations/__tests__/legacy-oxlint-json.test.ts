@@ -39,7 +39,7 @@ describe("legacyOxlintJson", () => {
     const result = await runTestEffect(migrationLegacyOxlintJson.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      status: "already-migrated",
+      status: "not-applicable",
       warnings: [
         "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`.",
       ],

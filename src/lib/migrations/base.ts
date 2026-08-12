@@ -31,7 +31,7 @@ export type MigrationCheckResult =
       readonly warnings: readonly string[]
     }
   | {
-      readonly status: "already-migrated" | "not-applicable"
+      readonly status: "not-applicable"
       readonly warnings: readonly string[]
     }
 

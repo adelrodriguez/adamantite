@@ -89,12 +89,8 @@ export function defineLegacyJsonConfigMigration(options: LegacyJsonConfigMigrati
       Effect.gen(function* () {
         const state = yield* options.integration.detect(context.cwd)
 
-        if (state.active === null) {
+        if (state.active === null || state.active.format === "ts") {
           return { status: "not-applicable", warnings: state.warnings } as const
-        }
-
-        if (state.active.format === "ts") {
-          return { status: "already-migrated", warnings: state.warnings } as const
         }
 
         return {

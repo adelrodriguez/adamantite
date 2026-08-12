@@ -60,9 +60,8 @@ function logLegacyConfigPreservedMessage(tool: string, configPath: string) {
   return Effect.gen(function* () {
     const prompter = yield* Prompter
 
-    // TODO: Point users to `adamantite doctor` / `adamantite doctor --fix` once doctor lands.
     yield* prompter.log.info(
-      `Legacy \`${configPath}\` was preserved during \`adamantite init\`. \`adamantite init\` does not migrate legacy ${tool} configs yet.`
+      `Legacy \`${configPath}\` was preserved during \`adamantite init\`. Run \`adamantite doctor --fix\` to migrate it to the latest ${tool} config.`
     )
   })
 }

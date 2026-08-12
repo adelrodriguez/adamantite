@@ -1,16 +1,7 @@
 import type { KnipConfiguration } from "knip"
 
 const config: KnipConfiguration = {
-  ignore: ["**/*.d.ts"],
   ignoreExportsUsedInFile: true,
-  ignoreFiles: [
-    "**/dist/**",
-    "**/build/**",
-    "**/coverage/**",
-    "**/.next/**",
-    "**/.vercel/**",
-    "**/.turbo/**",
-  ],
   rules: {
     binaries: "error",
     catalog: "error",

@@ -56,16 +56,6 @@ const installDependencies = (cwd: string, packages: string[]) =>
     )
   })
 
-function logLegacyConfigPreservedMessage(tool: string, configPath: string) {
-  return Effect.gen(function* () {
-    const prompter = yield* Prompter
-
-    yield* prompter.log.info(
-      `Legacy \`${configPath}\` was preserved during \`adamantite init\`. Run \`adamantite doctor --fix\` to migrate it to the latest ${tool} config.`
-    )
-  })
-}
-
 function setupToolConfig<E, R>(
   cwd: string,
   tool: {
@@ -117,7 +107,9 @@ function setupToolConfig<E, R>(
     )
 
     if (outcome.legacyConfig) {
-      yield* logLegacyConfigPreservedMessage(tool.name, outcome.legacyConfig)
+      yield* prompter.log.info(
+        `Legacy \`${outcome.legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor --fix\` to migrate it to the latest ${tool.name} config.`
+      )
     }
   })
 }

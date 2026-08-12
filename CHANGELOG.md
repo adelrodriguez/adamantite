@@ -1,5 +1,13 @@
 # adamantite
 
+## 0.34.3
+
+### Patch Changes
+
+- [#352](https://github.com/adelrodriguez/adamantite/pull/352) [`9e45aa1`](https://github.com/adelrodriguez/adamantite/commit/9e45aa179cce677ccf14e81451a17b30d1eb214c) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Derive tooling config state, legacy-config warnings, and migration checks from a single detection pass so `init`, `doctor`, and `update` report consistent messages, run `update` migrations from migration checks directly, and point `adamantite init` users to `adamantite doctor --fix` when a legacy config is preserved.
+
+- [#354](https://github.com/adelrodriguez/adamantite/pull/354) [`49dee7a`](https://github.com/adelrodriguez/adamantite/commit/49dee7af416bb8a92a6e3fdd9bc235efb59defc6) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update Effect and its Node.js platform packages to 4.0.0-rc.108. Also update Changesets, Esrap, Knip, Oxc Parser, Oxfmt, and Oxlint to their latest configured versions.
+
 ## 0.34.2
 
 ### Patch Changes

@@ -5,7 +5,6 @@ export default {
   ...analyze,
   entry: ["presets/**/*.ts"],
   ignore: ["bunup.config.ts"],
-  ignoreFiles: [],
   rules: {
     ...analyze.rules,
     devDependencies: "off",

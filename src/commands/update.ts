@@ -10,7 +10,7 @@ import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { runMigration } from "#lib/migrations/base.ts"
-import { assessmentDrivenMigrationIntegrationById, migrations } from "#lib/migrations/index.ts"
+import { migrations } from "#lib/migrations/index.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
@@ -72,69 +72,35 @@ export default Command.make("update").pipe(
 
       const assessments = yield* collectAssessments()
 
-      for (const { assessment } of assessments) {
-        for (const warning of assessment.warnings) {
-          yield* prompter.log.warning(warning)
-        }
-      }
-
-      const applicableIntegrationNames = new Set(
-        assessments.map(({ integration }) => integration.name)
-      )
-      const assessmentActions = assessments.flatMap(({ assessment }) => assessment.actions)
-      const assessmentMigrationIds = new Set(
-        assessmentActions
-          .filter((action) => action.type === "run_migration")
-          .map((action) => action.migrationId)
-      )
-
-      const fallbackMigrationAssessments: Array<{
+      const migrationChecks: Array<{
         migration: Migration
         result: MigrationCheckResult
       }> = []
 
       for (const migration of migrations.filter((candidate) => candidate.tags.includes("update"))) {
-        const assessmentDrivenIntegrationName =
-          assessmentDrivenMigrationIntegrationById[
-            migration.id as keyof typeof assessmentDrivenMigrationIntegrationById
-          ]
-        if (applicableIntegrationNames.has(assessmentDrivenIntegrationName)) {
-          continue
-        }
-
         const result = yield* migration.check(migrationContext)
-        fallbackMigrationAssessments.push({ migration, result })
+        migrationChecks.push({ migration, result })
       }
 
-      for (const assessment of fallbackMigrationAssessments) {
-        for (const warning of assessment.result.warnings) {
-          yield* prompter.log.warning(warning)
-        }
+      // Assessments and migration checks derive warnings from the same detected state, so a Set
+      // collapses the overlap.
+      const warnings = new Set([
+        ...assessments.flatMap(({ assessment }) => assessment.warnings),
+        ...migrationChecks.flatMap(({ result }) => result.warnings),
+      ])
 
-        if (assessment.result.applicable && assessment.result.summary) {
-          yield* prompter.log.info(assessment.result.summary)
-        }
+      for (const warning of warnings) {
+        yield* prompter.log.warning(warning)
       }
 
       const migratedIds: string[] = []
 
-      for (const migration of migrations) {
-        if (!assessmentMigrationIds.has(migration.id)) {
+      for (const { migration, result } of migrationChecks) {
+        if (result.status !== "needed") {
           continue
         }
 
-        yield* runMigration(migration, migrationContext, {
-          onRestore: prompter.log.warning(
-            `Migration "${migration.title}" failed, restoring files...`
-          ),
-        })
-        migratedIds.push(migration.id)
-      }
-
-      for (const { migration, result } of fallbackMigrationAssessments) {
-        if (!result.applicable || !result.summary) {
-          continue
-        }
+        yield* prompter.log.info(result.summary)
 
         yield* runMigration(migration, migrationContext, {
           onRestore: prompter.log.warning(

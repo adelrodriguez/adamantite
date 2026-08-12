@@ -14,7 +14,6 @@ import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
 import { runResult } from "#__tests__/helpers.ts"
 import { mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
-import { checkCliExists } from "#lib/shared/process.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
@@ -470,49 +469,4 @@ describe("normalizeDependencyVersion", () => {
   test("trim whitespace and strip the workspace prefix", () => {
     expect(normalizeDependencyVersion("  workspace:^0.20.0  ")).toBe("0.20.0")
   })
-})
-
-describe("checkCliExists", () => {
-  test("return ok(true) when the CLI exists", async () => {
-    const command = process.platform === "win32" ? "cmd" : "ls"
-
-    const result = await checkCliExists(command).pipe(
-      Effect.provide(NodeContext.layer),
-      Effect.runPromise
-    )
-
-    expect(result).toBe(true)
-  })
-
-  test("return a CliNotFound error when the CLI does not exist", async () => {
-    const result = await runResult(
-      checkCliExists("nonexistent-command-that-definitely-does-not-exist-12345"),
-      NodeServices.layer
-    )
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toMatchObject({ _tag: "CliNotFound" })
-    }
-  })
-
-  test.skipIf(process.platform !== "win32")("use the where command on Windows", async () => {
-    const result = await checkCliExists("cmd").pipe(
-      Effect.provide(NodeContext.layer),
-      Effect.runPromise
-    )
-
-    expect(result).toBe(true)
-  })
-
-  test.skipIf(process.platform === "win32")(
-    "find the CLI with which on Unix-like systems",
-    async () => {
-      const result = await checkCliExists("sh").pipe(
-        Effect.provide(NodeContext.layer),
-        Effect.runPromise
-      )
-
-      expect(result).toBe(true)
-    }
-  )
 })

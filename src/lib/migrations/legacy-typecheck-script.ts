@@ -56,15 +56,15 @@ export default defineMigration({
       const { migrated } = migrateLegacyTypecheckScriptPackageJson(packageJson)
 
       if (!migrated) {
-        return { applicable: false, warnings: [] }
+        return { status: "not-applicable", warnings: [] } as const
       }
 
       return {
-        applicable: true,
+        status: "needed",
         summary:
           "Migrating `typecheck` to `check` so oxlint handles linting and type diagnostics together.",
         warnings: [],
-      }
+      } as const
     }),
   files: [
     "package.json",

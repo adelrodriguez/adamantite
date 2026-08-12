@@ -61,7 +61,7 @@ describe("legacyTypecheckScript", () => {
     const result = await runTestEffect(migrationLegacyTypecheckScript.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      applicable: true,
+      status: "needed",
       summary:
         "Migrating `typecheck` to `check` so oxlint handles linting and type diagnostics together.",
       warnings: [],
@@ -86,7 +86,7 @@ describe("legacyTypecheckScript", () => {
 
     const checkResult = await runTestEffect(migrationLegacyTypecheckScript.check({ cwd: tempDir }))
     expect(checkResult).toMatchObject({
-      applicable: true,
+      status: "needed",
       summary:
         "Migrating `typecheck` to `check` so oxlint handles linting and type diagnostics together.",
     })

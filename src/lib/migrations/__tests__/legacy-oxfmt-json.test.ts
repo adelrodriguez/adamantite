@@ -40,7 +40,7 @@ describe("legacyOxfmtJson", () => {
     const result = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      applicable: true,
+      status: "not-applicable",
       warnings: [
         "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
       ],
@@ -64,7 +64,7 @@ describe("legacyOxfmtJson", () => {
 
     const checkResult = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
     expect(checkResult).toEqual({
-      applicable: true,
+      status: "needed",
       summary: "Migrating legacy `.oxfmtrc.json` configuration to `oxfmt.config.ts`.",
       warnings: [],
     })
@@ -91,7 +91,7 @@ describe("legacyOxfmtJson", () => {
     const result = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      applicable: true,
+      status: "needed",
       summary: "Migrating legacy `.oxfmtrc.jsonc` configuration to `oxfmt.config.ts`.",
       warnings: [
         "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed.",
@@ -137,7 +137,7 @@ describe("legacyOxfmtJson", () => {
 
     const checkResult = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
     expect(checkResult).toEqual({
-      applicable: true,
+      status: "needed",
       summary: "Migrating legacy `.oxfmtrc.jsonc` configuration to `oxfmt.config.ts`.",
       warnings: [],
     })

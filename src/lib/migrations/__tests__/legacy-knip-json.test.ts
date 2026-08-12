@@ -40,7 +40,7 @@ describe("legacyKnipJson", () => {
     const result = await runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      applicable: true,
+      status: "not-applicable",
       warnings: [
         "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
       ],
@@ -54,7 +54,7 @@ describe("legacyKnipJson", () => {
     const result = await runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
 
     expect(result).toEqual({
-      applicable: true,
+      status: "needed",
       summary: "Migrating legacy `knip.jsonc` configuration to `knip.config.ts`.",
       warnings: [
         "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed.",
@@ -105,7 +105,7 @@ describe("legacyKnipJson", () => {
 
     const checkResult = await runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
     expect(checkResult).toEqual({
-      applicable: true,
+      status: "needed",
       summary: "Migrating legacy `knip.json` configuration to `knip.config.ts`.",
       warnings: [],
     })
@@ -142,7 +142,7 @@ describe("legacyKnipJson", () => {
 
     const checkResult = await runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
     expect(checkResult).toEqual({
-      applicable: true,
+      status: "needed",
       summary: "Migrating legacy `knip.jsonc` configuration to `knip.config.ts`.",
       warnings: [],
     })

@@ -31,6 +31,7 @@ describe("oxfmt", () => {
       expect(result).toEqual({
         active: null,
         legacy: [],
+        warnings: [],
       })
     })
 
@@ -42,6 +43,7 @@ describe("oxfmt", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result.active).toEqual({
+        file: "oxfmt.config.ts",
         format: "ts",
         path: join(tempDir, "oxfmt.config.ts"),
       })
@@ -57,6 +59,7 @@ describe("oxfmt", () => {
         .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.active).toEqual({
+        file: "oxfmt.config.ts",
         format: "ts",
         path: join(tempDir, "oxfmt.config.ts"),
       })

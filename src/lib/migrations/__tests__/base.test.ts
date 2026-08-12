@@ -31,7 +31,7 @@ describe("runMigration", () => {
     await Bun.write("existing.txt", "before\n")
 
     const migration = defineMigration({
-      check: () => Effect.succeed({ applicable: false, warnings: [] }),
+      check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
       files: ["existing.txt", "created.txt"],
       id: "failing-migration",
       migrate: () =>
@@ -57,7 +57,7 @@ describe("runMigration", () => {
     await Bun.write("existing.txt", "before\n")
 
     const migration = defineMigration({
-      check: () => Effect.succeed({ applicable: false, warnings: [] }),
+      check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
       files: ["existing.txt"],
       id: "invalid-migration",
       migrate: () => Effect.promise(() => Bun.write("existing.txt", "after\n")),
@@ -84,7 +84,7 @@ describe("runMigration", () => {
     await Bun.write("existing.txt", "before\n")
 
     const migration = defineMigration({
-      check: () => Effect.succeed({ applicable: false, warnings: [] }),
+      check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
       files: ["existing.txt"],
       id: "defective-migration",
       migrate: () =>

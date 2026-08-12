@@ -154,7 +154,7 @@ describe("init", () => {
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
-          "Legacy `.oxlintrc.json` was preserved during `adamantite init`. `adamantite init` does not migrate legacy oxlint configs yet.",
+          "Legacy `.oxlintrc.json` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest oxlint config.",
       })
 
       const oxlintConfig = await readFile(join(tempDir, ".oxlintrc.json"), "utf8")
@@ -189,7 +189,7 @@ describe("init", () => {
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
-          "Legacy `.oxfmtrc.json` was preserved during `adamantite init`. `adamantite init` does not migrate legacy oxfmt configs yet.",
+          "Legacy `.oxfmtrc.json` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest oxfmt config.",
       })
 
       const oxfmtConfig = await readFile(join(tempDir, ".oxfmtrc.json"), "utf8")
@@ -220,7 +220,7 @@ describe("init", () => {
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
-          "Legacy `knip.jsonc` was preserved during `adamantite init`. `adamantite init` does not migrate legacy knip configs yet.",
+          "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest knip config.",
       })
 
       const knipConfig = await readFile(join(tempDir, "knip.jsonc"), "utf8")
@@ -257,7 +257,7 @@ describe("init", () => {
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
-          "Legacy `knip.jsonc` was preserved during `adamantite init`. `adamantite init` does not migrate legacy knip configs yet.",
+          "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest knip config.",
       })
       expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
       expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(true)

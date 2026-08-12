@@ -23,12 +23,15 @@ export interface MigrationContext {
 
 export type MigrationCheckResult =
   | {
-      readonly applicable: false
+      readonly status: "needed"
+      /**
+       * Human-readable description of the pending migration.
+       */
+      readonly summary: string
       readonly warnings: readonly string[]
     }
   | {
-      readonly applicable: true
-      readonly summary?: string
+      readonly status: "not-applicable"
       readonly warnings: readonly string[]
     }
 

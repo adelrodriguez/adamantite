@@ -1,59 +1,9 @@
-import * as Effect from "effect/Effect"
-import {
-  defineIntegration,
-  type AssessmentAction,
-  type IntegrationAssessment,
-} from "#lib/integrations/base.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import {
-  getManagedScripts,
-  normalizeDependencyVersion,
-  readPackageJson,
-} from "#lib/workspace/package-json.ts"
+import { definePackageTooling } from "#lib/workspace/tooling/config.ts"
 
-const VERSION = getDependencyVersion("sherif")
-
-export default defineIntegration({
-  assess: (cwd: string) =>
-    Effect.gen(function* () {
-      const packageJson = yield* readPackageJson(cwd)
-      const managedScripts = getManagedScripts(packageJson)
-
-      if (!managedScripts.includes("check:monorepo") && !managedScripts.includes("fix:monorepo")) {
-        return {
-          applicable: false,
-          warnings: [],
-        } satisfies IntegrationAssessment
-      }
-
-      const packageSpecifier =
-        packageJson.devDependencies?.sherif ?? packageJson.dependencies?.sherif
-      const actions: AssessmentAction[] = []
-
-      if (!packageSpecifier) {
-        actions.push({
-          description: `Install \`sherif@${VERSION}\` for the managed monorepo scripts.`,
-          package: "sherif",
-          targetVersion: VERSION,
-          type: "install_package",
-        })
-      } else if (normalizeDependencyVersion(packageSpecifier) !== VERSION) {
-        actions.push({
-          currentVersion: packageSpecifier,
-          description: `Update \`sherif\` from \`${packageSpecifier}\` to \`${VERSION}\`.`,
-          package: "sherif",
-          targetVersion: VERSION,
-          type: "update_package",
-        })
-      }
-
-      return {
-        actions,
-        applicable: true,
-        warnings: [],
-      } satisfies IntegrationAssessment
-    }),
-  kind: "tooling",
+export default definePackageTooling({
   name: "sherif",
-  version: VERSION,
+  purpose: "the managed monorepo scripts",
+  scripts: ["check:monorepo", "fix:monorepo"],
+  version: getDependencyVersion("sherif"),
 })

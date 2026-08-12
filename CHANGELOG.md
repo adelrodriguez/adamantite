@@ -1,5 +1,11 @@
 # adamantite
 
+## 0.34.4
+
+### Patch Changes
+
+- [#355](https://github.com/adelrodriguez/adamantite/pull/355) [`cdc9716`](https://github.com/adelrodriguez/adamantite/commit/cdc9716d5955b576179f947261c558db1727c099) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove the default file exclusions from the analysis preset. The preset no longer sets `ignore: ["**/*.d.ts"]` or `ignoreFiles: ["**/dist/**", "**/build/**", "**/coverage/**", "**/.next/**", "**/.vercel/**", "**/.turbo/**"]`, so each project now declares the exclusions that match its own structure. Knip already honors `.gitignore`, so the build-output globs were mostly redundant; the change that can surface new `files` errors is the loss of `**/*.d.ts`, which affects projects with committed declaration files such as `vite-env.d.ts`. To keep the previous behavior, add the keys back in your own `knip.config.ts` after the `...analyze` spread.
+
 ## 0.34.3
 
 ### Patch Changes

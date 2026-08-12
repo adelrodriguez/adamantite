@@ -1,12 +1,14 @@
+import type * as FileSystem from "effect/FileSystem"
+import type * as Path from "effect/Path"
+import type * as PlatformError from "effect/PlatformError"
 import process from "node:process"
 import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
-import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
+import type { ToolingConfigState } from "#lib/workspace/tooling-config.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
@@ -17,12 +19,7 @@ import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { Prompter } from "#lib/services/prompter.ts"
-import {
-  FailedToWriteFile,
-  InvalidInitOptions,
-  NoPackageManager,
-  UnknownScript,
-} from "#lib/shared/errors.ts"
+import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { printTitle } from "#lib/shared/terminal.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
@@ -30,6 +27,8 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   checkIsSupportedPackageManager,
   readPackageJson,
+  writePackageJson,
+  MANAGED_SCRIPT_COMMANDS,
   type Script,
   type SupportedPackageManager,
 } from "#lib/workspace/package-json.ts"
@@ -68,103 +67,64 @@ function logLegacyConfigPreservedMessage(tool: string, configPath: string) {
   })
 }
 
-const setupOxlintConfig = (cwd: string, presets: string[]) =>
-  Effect.gen(function* () {
-    const prompter = yield* Prompter
-    const legacyConfig = yield* prompter.withSpinner(
-      (spinner) =>
-        Effect.gen(function* () {
-          const exists = yield* oxlint.detect(cwd)
-          const oxlintLegacyConfig = oxlint.files[1].path
-
-          if (exists.active?.format === "ts" && exists.legacy.length > 0) {
-            yield* prompter.log.warning(
-              `Found both \`${oxlint.config}\` and \`${oxlintLegacyConfig}\`. Adamantite will use \`${oxlint.config}\`.`
-            )
-          }
-
-          if (exists.active?.format === "json") {
-            yield* spinner.message(`Found \`${oxlintLegacyConfig}\`, keeping existing config.`)
-            return { created: false, legacyConfig: oxlintLegacyConfig }
-          }
-
-          if (exists.active?.format === "ts") {
-            yield* spinner.message(`Found \`${oxlint.config}\`, keeping existing config.`)
-            return { created: false, legacyConfig: null }
-          }
-
-          yield* spinner.message(`\`${oxlint.config}\` not found, creating...`)
-          yield* oxlint.create(cwd, presets)
-          return { created: true, legacyConfig: null }
-        }),
-      {
-        failure: "Failed to set up oxlint config.",
-        start: "Setting up oxlint config...",
-        success: (result) =>
-          result.created ? "oxlint config created successfully." : "oxlint config is ready.",
-      }
-    )
-
-    if (legacyConfig.legacyConfig) {
-      yield* logLegacyConfigPreservedMessage("oxlint", legacyConfig.legacyConfig)
-    }
-  })
-
-const setupOxfmtConfig = (cwd: string) =>
-  Effect.gen(function* () {
+function setupToolConfig<E, R>(
+  cwd: string,
+  tool: {
+    readonly config: string
+    readonly detect: (
+      cwd: string
+    ) => Effect.Effect<
+      ToolingConfigState,
+      PlatformError.PlatformError,
+      FileSystem.FileSystem | Path.Path
+    >
+    readonly name: string
+  },
+  create: Effect.Effect<void, E, R>
+) {
+  return Effect.gen(function* () {
     const prompter = yield* Prompter
     const outcome = yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
-          const exists = yield* oxfmt.detect(cwd)
+          const state = yield* tool.detect(cwd)
 
-          if (exists.active?.format === "ts" && exists.legacy.length > 0) {
-            yield* prompter.log.warning(
-              `Found both \`${oxfmt.config}\` and \`.oxfmtrc.json(c)\`. Adamantite will use \`${oxfmt.config}\`.`
-            )
+          for (const warning of state.warnings) {
+            yield* prompter.log.warning(warning)
           }
 
-          if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
-            yield* prompter.log.warning(
-              "Found both `.oxfmtrc.json` and `.oxfmtrc.jsonc`. Multiple legacy oxfmt configs exist; Adamantite will treat `.oxfmtrc.jsonc` as the source of truth when migration is needed."
-            )
+          if (state.active === null) {
+            yield* spinner.message(`\`${tool.config}\` not found, creating...`)
+            yield* create
+            return { created: true, legacyConfig: null }
           }
 
-          if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
-            const legacyConfig = exists.active.path.endsWith(oxfmt.files[1].path)
-              ? oxfmt.files[1].path
-              : oxfmt.files[2].path
-
-            yield* spinner.message(`Found \`${legacyConfig}\`, keeping existing config.`)
-            return { created: false, legacyConfig }
-          }
-
-          if (exists.active?.format === "ts") {
-            yield* spinner.message(`Found \`${oxfmt.config}\`, keeping existing config.`)
+          if (state.active.format === "ts") {
+            yield* spinner.message(`Found \`${tool.config}\`, keeping existing config.`)
             return { created: false, legacyConfig: null }
           }
 
-          yield* spinner.message(`\`${oxfmt.config}\` not found, creating...`)
-          yield* oxfmt.create(cwd)
-          return { created: true, legacyConfig: null }
+          yield* spinner.message(`Found \`${state.active.file}\`, keeping existing config.`)
+          return { created: false, legacyConfig: state.active.file }
         }),
       {
-        failure: "Failed to set up oxfmt config.",
-        start: "Setting up oxfmt config...",
+        failure: `Failed to set up ${tool.name} config.`,
+        start: `Setting up ${tool.name} config...`,
         success: (result) =>
-          result.created ? "oxfmt config created successfully." : "oxfmt config is ready.",
+          result.created
+            ? `${tool.name} config created successfully.`
+            : `${tool.name} config is ready.`,
       }
     )
 
     if (outcome.legacyConfig) {
-      yield* logLegacyConfigPreservedMessage("oxfmt", outcome.legacyConfig)
+      yield* logLegacyConfigPreservedMessage(tool.name, outcome.legacyConfig)
     }
   })
+}
 
 const addScripts = (cwd: string, scripts: Script[]) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
     const prompter = yield* Prompter
     const packageJson = yield* readPackageJson(cwd)
     yield* prompter.withSpinner(
@@ -173,34 +133,10 @@ const addScripts = (cwd: string, scripts: Script[]) =>
           packageJson.scripts ??= {}
 
           for (const script of scripts) {
-            switch (script) {
-              case "check":
-                packageJson.scripts.check = "adamantite check"
-                break
-              case "fix":
-                packageJson.scripts.fix = "adamantite fix"
-                break
-              case "format":
-                packageJson.scripts.format = "adamantite format"
-                break
-              case "check:monorepo":
-                packageJson.scripts["check:monorepo"] = "adamantite monorepo"
-                break
-              case "fix:monorepo":
-                packageJson.scripts["fix:monorepo"] = "adamantite monorepo --fix"
-                break
-              case "analyze":
-                packageJson.scripts.analyze = "adamantite analyze"
-                break
-              default:
-                return yield* new UnknownScript({ script })
-            }
+            packageJson.scripts[script] = MANAGED_SCRIPT_COMMANDS[script]
           }
 
-          const packagePath = path.join(cwd, "package.json")
-          yield* fs
-            .writeFileString(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
-            .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
+          yield* writePackageJson(cwd, packageJson)
         }),
       {
         failure: "Failed to add scripts to `package.json`.",
@@ -208,57 +144,6 @@ const addScripts = (cwd: string, scripts: Script[]) =>
         success: "Scripts added to your `package.json`",
       }
     )
-  })
-
-const setupKnipConfig = (cwd: string) =>
-  Effect.gen(function* () {
-    const prompter = yield* Prompter
-    const outcome = yield* prompter.withSpinner(
-      (spinner) =>
-        Effect.gen(function* () {
-          const exists = yield* knip.detect(cwd)
-
-          if (exists.active?.format === "ts" && exists.legacy.length > 0) {
-            yield* prompter.log.warning(
-              `Found both \`${knip.config}\` and \`knip.json(c)\`. Adamantite will use \`${knip.config}\`.`
-            )
-          }
-
-          if (exists.active && exists.active.format !== "ts" && exists.legacy.length > 0) {
-            yield* prompter.log.warning(
-              "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed."
-            )
-          }
-
-          if (exists.active?.format === "json" || exists.active?.format === "jsonc") {
-            const legacyConfig = exists.active.path.endsWith(knip.files[1].path)
-              ? knip.files[1].path
-              : knip.files[2].path
-
-            yield* spinner.message(`Found \`${legacyConfig}\`, keeping existing config.`)
-            return { created: false, legacyConfig }
-          }
-
-          if (exists.active?.format === "ts") {
-            yield* spinner.message(`Found \`${knip.config}\`, keeping existing config.`)
-            return { created: false, legacyConfig: null }
-          }
-
-          yield* spinner.message(`\`${knip.config}\` not found, creating...`)
-          yield* knip.create(cwd)
-          return { created: true, legacyConfig: null }
-        }),
-      {
-        failure: "Failed to set up knip config.",
-        start: "Setting up knip config...",
-        success: (result) =>
-          result.created ? "knip config created successfully." : "knip config is ready.",
-      }
-    )
-
-    if (outcome.legacyConfig) {
-      yield* logLegacyConfigPreservedMessage("knip", outcome.legacyConfig)
-    }
   })
 
 const setupTypescript = (cwd: string) =>
@@ -829,15 +714,15 @@ export default Command.make("init", {
       yield* installDependencies(cwd, dependencies)
 
       if (hasOxfmt) {
-        yield* setupOxfmtConfig(cwd)
+        yield* setupToolConfig(cwd, oxfmt, oxfmt.create(cwd))
       }
 
       if (hasOxlint) {
-        yield* setupOxlintConfig(cwd, presets)
+        yield* setupToolConfig(cwd, oxlint, oxlint.create(cwd, presets))
       }
 
       if (hasKnip) {
-        yield* setupKnipConfig(cwd)
+        yield* setupToolConfig(cwd, knip, knip.create(cwd))
       }
 
       yield* addScripts(cwd, selectedScripts)

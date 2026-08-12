@@ -22,7 +22,6 @@ const UNSUPPORTED_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can patch safely."
 const NON_BOOLEAN_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` object Adamantite cannot patch safely. Make sure each required option is a plain `key: true | false` property—avoid spreads (`...rest`), computed keys (`[name]: ...`), duplicate keys, methods/getters/setters, and non-boolean-literal values."
-const GENERATED_PATCH_FAILURE_REASON = "Adamantite could not generate the required `options` patch."
 
 type RequiredBooleanOption = (typeof REQUIRED_BOOLEAN_OPTIONS)[number]
 
@@ -216,68 +215,37 @@ function getNamedObjectProperty(
   }
 }
 
-function createRequiredOptionProperties(options: readonly RequiredBooleanOption[]) {
-  const content = `export default { options: { ${options.map((option) => `${option}: true`).join(", ")} } }\n`
-  const parsed = parse(content)
-
-  if (Option.isNone(parsed)) {
-    return Option.none()
+function createBooleanOptionProperty(option: RequiredBooleanOption): ObjectProperty {
+  return {
+    computed: false,
+    end: 0,
+    key: { end: 0, name: option, start: 0, type: "Identifier" },
+    kind: "init",
+    method: false,
+    shorthand: false,
+    start: 0,
+    type: "Property",
+    value: { end: 0, raw: "true", start: 0, type: "Literal", value: true },
   }
-
-  const configObjectExpression = getExportedConfigObject(parsed.value)
-
-  if (Option.isNone(configObjectExpression)) {
-    return Option.none()
-  }
-
-  const optionsPropertyResult = getNamedObjectProperty(configObjectExpression.value, "options")
-
-  if (optionsPropertyResult.status !== "found") {
-    return Option.none()
-  }
-
-  if (optionsPropertyResult.property.value.type !== "ObjectExpression") {
-    return Option.none()
-  }
-
-  const properties = optionsPropertyResult.property.value.properties.filter(
-    (property): property is ObjectProperty => property.type === "Property"
-  )
-
-  return properties.length === optionsPropertyResult.property.value.properties.length
-    ? Option.fromNullishOr(properties)
-    : Option.none()
 }
 
-function createRequiredOptionsProperty() {
-  const content = `export default { options: { ${REQUIRED_BOOLEAN_OPTIONS.map((option) => `${option}: true`).join(", ")} } }\n`
-  const parsed = parse(content)
-
-  if (Option.isNone(parsed)) {
-    return Option.none()
+function createRequiredOptionsProperty(): ObjectProperty {
+  return {
+    computed: false,
+    end: 0,
+    key: { end: 0, name: "options", start: 0, type: "Identifier" },
+    kind: "init",
+    method: false,
+    shorthand: false,
+    start: 0,
+    type: "Property",
+    value: {
+      end: 0,
+      properties: REQUIRED_BOOLEAN_OPTIONS.map((option) => createBooleanOptionProperty(option)),
+      start: 0,
+      type: "ObjectExpression",
+    },
   }
-
-  const configObjectExpression = getExportedConfigObject(parsed.value)
-
-  if (
-    Option.isNone(configObjectExpression) ||
-    configObjectExpression.value.properties.length !== 1
-  ) {
-    return Option.none()
-  }
-
-  const [property] = configObjectExpression.value.properties
-
-  if (
-    property?.type !== "Property" ||
-    property.computed ||
-    property.method ||
-    property.kind !== "init"
-  ) {
-    return Option.none()
-  }
-
-  return Option.fromNullishOr(property)
 }
 
 function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpression) {
@@ -318,16 +286,9 @@ function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpress
   }
 
   if (missingOptions.length > 0) {
-    const generatedOptionProperties = createRequiredOptionProperties(missingOptions)
-
-    if (Option.isNone(generatedOptionProperties)) {
-      return {
-        kind: "manual",
-        reason: GENERATED_PATCH_FAILURE_REASON,
-      } satisfies OxlintRequiredOptionsPatchResult
-    }
-
-    optionsObjectExpression.properties.unshift(...generatedOptionProperties.value)
+    optionsObjectExpression.properties.unshift(
+      ...missingOptions.map((option) => createBooleanOptionProperty(option))
+    )
     changed = true
   }
 
@@ -370,16 +331,7 @@ export function inspectRequiredOxlintConfig(content: string) {
   }
 
   if (optionsPropertyResult.status === "missing") {
-    const optionsProperty = createRequiredOptionsProperty()
-
-    if (Option.isNone(optionsProperty)) {
-      return {
-        kind: "manual",
-        reason: GENERATED_PATCH_FAILURE_REASON,
-      } satisfies OxlintRequiredOptionsPatchResult
-    }
-
-    configObjectExpression.value.properties.unshift(optionsProperty.value)
+    configObjectExpression.value.properties.unshift(createRequiredOptionsProperty())
 
     return {
       kind: "patchable",

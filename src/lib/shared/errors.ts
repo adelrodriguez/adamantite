@@ -201,12 +201,6 @@ export class PassthroughNotSupported extends Data.TaggedError("PassthroughNotSup
   }
 }
 
-export class UnknownScript extends Data.TaggedError("UnknownScript")<{ script: string }> {
-  override get message() {
-    return `Unknown script: \`${this.script}\`.`
-  }
-}
-
 export class VscodeCliNotFound extends Data.TaggedError("VscodeCliNotFound")<{
   cause?: unknown
 }> {

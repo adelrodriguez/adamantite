@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { AssessmentAction } from "#lib/integrations/base.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
@@ -23,39 +22,6 @@ const fix = Flag.boolean("fix").pipe(
 )
 
 const integrations = [knip, oxfmt, oxlint, sherif, tsgolint] as const
-
-const createFixersByIntegration = {
-  [knip.name]: knip,
-  [oxfmt.name]: oxfmt,
-  [oxlint.name]: oxlint,
-} as const
-
-const updateFixersByIntegration = {
-  [oxlint.name]: oxlint,
-} as const
-
-function checkHasIntegrationFixer<const T extends Record<string, unknown>>(
-  fixers: T,
-  integrationName: string
-): integrationName is Extract<keyof T, string> {
-  return Object.hasOwn(fixers, integrationName)
-}
-
-function getActionKey(integrationName: string, action: AssessmentAction) {
-  switch (action.type) {
-    case "install_package":
-      return `${integrationName}:${action.type}:${action.package}:${action.targetVersion}`
-    case "update_package":
-      return `${integrationName}:${action.type}:${action.package}:${action.targetVersion}`
-    case "create_config":
-    case "update_config":
-      return `${integrationName}:${action.type}:${action.path}`
-    case "manual_fix":
-      return `${integrationName}:${action.type}:${action.path ?? action.description}`
-    case "run_migration":
-      return `${integrationName}:${action.type}:${action.migrationId}`
-  }
-}
 
 export default Command.make("doctor", { fix }).pipe(
   Command.withDescription("Check Adamantite-managed integrations in the current project"),
@@ -107,7 +73,7 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       // 3. Optionally apply fixes in order: packages -> configs -> migrations.
-      const appliedActions = new Set<string>()
+      const appliedActions = new Set<(typeof actions)[number]>()
 
       if (fix) {
         yield* Effect.gen(function* () {
@@ -127,7 +93,9 @@ export default Command.make("doctor", { fix }).pipe(
 
             yield* dependencyInstaller.addDevDependencies(packages, cwd, { silent: true })
 
-            for (const { action, integration } of packageActions) {
+            for (const entry of packageActions) {
+              const { action } = entry
+
               if (action.type === "install_package") {
                 yield* prompter.log.success(
                   `Fixed: installed \`${action.package}@${action.targetVersion}\`.`
@@ -140,42 +108,37 @@ export default Command.make("doctor", { fix }).pipe(
                 )
               }
 
-              appliedActions.add(getActionKey(integration.name, action))
+              appliedActions.add(entry)
             }
           }
 
-          for (const { action, integration } of actions) {
-            if (action.type !== "create_config") {
+          for (const entry of actions) {
+            const { action, integration } = entry
+
+            if (action.type !== "create_config" || !("create" in integration)) {
               continue
             }
 
-            if (!checkHasIntegrationFixer(createFixersByIntegration, integration.name)) {
-              continue
-            }
-
-            const fixer = createFixersByIntegration[integration.name]
-            yield* fixer.create(cwd)
+            yield* integration.create(cwd)
             yield* prompter.log.success(`Fixed: created \`${action.path}\`.`)
-            appliedActions.add(getActionKey(integration.name, action))
+            appliedActions.add(entry)
           }
 
-          for (const { action, integration } of actions) {
-            if (action.type !== "update_config") {
+          for (const entry of actions) {
+            const { action, integration } = entry
+
+            if (action.type !== "update_config" || !("update" in integration)) {
               continue
             }
 
-            if (!checkHasIntegrationFixer(updateFixersByIntegration, integration.name)) {
-              continue
-            }
-
-            const fixer = updateFixersByIntegration[integration.name]
-            yield* fixer.update(cwd)
-
+            yield* integration.update(cwd)
             yield* prompter.log.success(`Fixed: updated \`${action.path}\`.`)
-            appliedActions.add(getActionKey(integration.name, action))
+            appliedActions.add(entry)
           }
 
-          for (const { action, integration } of actions) {
+          for (const entry of actions) {
+            const { action } = entry
+
             if (action.type !== "run_migration") {
               continue
             }
@@ -186,7 +149,7 @@ export default Command.make("doctor", { fix }).pipe(
             }
 
             yield* runMigration(migration, { cwd })
-            appliedActions.add(getActionKey(integration.name, action))
+            appliedActions.add(entry)
           }
         }).pipe(
           Effect.tapError(() =>
@@ -198,9 +161,7 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       // 4. Report remaining issues or success.
-      const remainingActions = actions.filter(
-        ({ action, integration }) => !appliedActions.has(getActionKey(integration.name, action))
-      )
+      const remainingActions = actions.filter((entry) => !appliedActions.has(entry))
 
       if (fix && remainingActions.length === 0) {
         yield* prompter.outro("✅ Doctor completed successfully!")

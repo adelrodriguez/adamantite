@@ -31,6 +31,7 @@ describe("knip", () => {
       expect(result).toEqual({
         active: null,
         legacy: [],
+        warnings: [],
       })
     })
 
@@ -42,6 +43,7 @@ describe("knip", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(result.active).toEqual({
+        file: "knip.config.ts",
         format: "ts",
         path: join(tempDir, "knip.config.ts"),
       })
@@ -57,6 +59,7 @@ describe("knip", () => {
         .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.active).toEqual({
+        file: "knip.config.ts",
         format: "ts",
         path: join(tempDir, "knip.config.ts"),
       })

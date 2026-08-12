@@ -5,12 +5,8 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import { defineIntegration } from "#lib/integrations/base.ts"
-import {
-  FailedToCreateDirectory,
-  FailedToReadFile,
-  FailedToWriteFile,
-  InvalidConfigFormat,
-} from "#lib/shared/errors.ts"
+import { FailedToReadFile, FailedToWriteFile, InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { ensureDirectory } from "#lib/shared/filesystem.ts"
 import { mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
@@ -99,11 +95,8 @@ export default defineIntegration({
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const settingsPath = path.join(cwd, files[0].path)
-      const settingsDir = path.dirname(settingsPath)
 
-      yield* fs
-        .makeDirectory(settingsDir, { recursive: true })
-        .pipe(Effect.mapError((cause) => new FailedToCreateDirectory({ cause, path: settingsDir })))
+      yield* ensureDirectory(path.dirname(settingsPath))
 
       yield* fs
         .writeFileString(settingsPath, `${JSON.stringify(CONFIG, null, 2)}\n`)

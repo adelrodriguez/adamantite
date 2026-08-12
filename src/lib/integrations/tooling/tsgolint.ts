@@ -1,60 +1,9 @@
-import * as Effect from "effect/Effect"
-import {
-  defineIntegration,
-  type AssessmentAction,
-  type IntegrationAssessment,
-} from "#lib/integrations/base.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import {
-  getManagedScripts,
-  normalizeDependencyVersion,
-  readPackageJson,
-} from "#lib/workspace/package-json.ts"
+import { definePackageTooling } from "#lib/workspace/tooling-config.ts"
 
-const VERSION = getDependencyVersion("oxlint-tsgolint")
-
-export default defineIntegration({
-  assess: (cwd: string) =>
-    Effect.gen(function* () {
-      const packageJson = yield* readPackageJson(cwd)
-      const managedScripts = getManagedScripts(packageJson)
-
-      if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
-        return {
-          applicable: false,
-          warnings: [],
-        } satisfies IntegrationAssessment
-      }
-
-      const packageSpecifier =
-        packageJson.devDependencies?.["oxlint-tsgolint"] ??
-        packageJson.dependencies?.["oxlint-tsgolint"]
-      const actions: AssessmentAction[] = []
-
-      if (!packageSpecifier) {
-        actions.push({
-          description: `Install \`oxlint-tsgolint@${VERSION}\` for the managed lint scripts.`,
-          package: "oxlint-tsgolint",
-          targetVersion: VERSION,
-          type: "install_package",
-        })
-      } else if (normalizeDependencyVersion(packageSpecifier) !== VERSION) {
-        actions.push({
-          currentVersion: packageSpecifier,
-          description: `Update \`oxlint-tsgolint\` from \`${packageSpecifier}\` to \`${VERSION}\`.`,
-          package: "oxlint-tsgolint",
-          targetVersion: VERSION,
-          type: "update_package",
-        })
-      }
-
-      return {
-        actions,
-        applicable: true,
-        warnings: [],
-      } satisfies IntegrationAssessment
-    }),
-  kind: "tooling",
+export default definePackageTooling({
   name: "oxlint-tsgolint",
-  version: VERSION,
+  purpose: "the managed lint scripts",
+  scripts: ["check", "fix"],
+  version: getDependencyVersion("oxlint-tsgolint"),
 })

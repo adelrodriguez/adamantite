@@ -34,6 +34,7 @@ describe("oxlint", () => {
       expect(state).toEqual({
         active: null,
         legacy: [],
+        warnings: [],
       })
     })
 
@@ -49,11 +50,13 @@ describe("oxlint", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
       expect(state.active).toEqual({
+        file: "oxlint.config.ts",
         format: "ts",
         path: join(tempDir, "oxlint.config.ts"),
       })
       expect(state.legacy).toEqual([
         {
+          file: ".oxlintrc.json",
           format: "json",
           path: join(tempDir, ".oxlintrc.json"),
         },
@@ -69,6 +72,7 @@ describe("oxlint", () => {
         .detect(tempDir)
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(state.active).toEqual({
+        file: "oxlint.config.ts",
         format: "ts",
         path: join(tempDir, "oxlint.config.ts"),
       })

@@ -1,5 +1,5 @@
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { definePackageTooling } from "#lib/workspace/tooling-config.ts"
+import { definePackageTooling } from "#lib/workspace/tooling/config.ts"
 
 export default definePackageTooling({
   name: "oxlint-tsgolint",

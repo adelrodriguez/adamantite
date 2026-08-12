@@ -1,6 +1,6 @@
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { toOxfmtTsConfigContent } from "#lib/workspace/oxfmt-config.ts"
-import { defineConfigTooling } from "#lib/workspace/tooling-config.ts"
+import { defineConfigTooling } from "#lib/workspace/tooling/config.ts"
 
 export default defineConfigTooling({
   configContent: () => toOxfmtTsConfigContent(),

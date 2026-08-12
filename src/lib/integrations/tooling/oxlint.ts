@@ -19,7 +19,7 @@ import {
   detectToolingConfig,
   getConfigActions,
   getPackageActions,
-} from "#lib/workspace/tooling-config.ts"
+} from "#lib/workspace/tooling/config.ts"
 
 const CONFIG_FILE = "oxlint.config.ts"
 const LEGACY_CONFIG_FILE = ".oxlintrc.json"

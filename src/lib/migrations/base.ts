@@ -21,16 +21,19 @@ export interface MigrationContext {
   readonly cwd: string
 }
 
-export type MigrationCheckStatus = "already-migrated" | "needed" | "not-applicable"
-
-export interface MigrationCheckResult {
-  readonly status: MigrationCheckStatus
-  /**
-   * Human-readable description of the pending migration. Only present when `status` is `needed`.
-   */
-  readonly summary?: string
-  readonly warnings: readonly string[]
-}
+export type MigrationCheckResult =
+  | {
+      readonly status: "needed"
+      /**
+       * Human-readable description of the pending migration.
+       */
+      readonly summary: string
+      readonly warnings: readonly string[]
+    }
+  | {
+      readonly status: "already-migrated" | "not-applicable"
+      readonly warnings: readonly string[]
+    }
 
 export type MigrationError =
   | FailedToDeleteFile

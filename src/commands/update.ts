@@ -100,9 +100,7 @@ export default Command.make("update").pipe(
           continue
         }
 
-        if (result.summary) {
-          yield* prompter.log.info(result.summary)
-        }
+        yield* prompter.log.info(result.summary)
 
         yield* runMigration(migration, migrationContext, {
           onRestore: prompter.log.warning(

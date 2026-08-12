@@ -1,6 +1,6 @@
 import knip from "#lib/integrations/tooling/knip.ts"
 import { defineLegacyJsonConfigMigration } from "#lib/migrations/legacy-json-config.ts"
-import { toKnipTsConfigContent } from "#lib/workspace/knip-config.ts"
+import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 
 export default defineLegacyJsonConfigMigration({
   displayName: "Knip",

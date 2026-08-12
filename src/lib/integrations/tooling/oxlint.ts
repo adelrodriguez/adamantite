@@ -9,17 +9,17 @@ import {
   UnsupportedConfigState,
 } from "#lib/shared/errors.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import {
-  getOxlintPresetNames,
-  inspectRequiredOxlintConfig,
-  toOxlintTsConfigContent,
-} from "#lib/workspace/oxlint-config.ts"
 import { getManagedScripts, readPackageJson } from "#lib/workspace/package-json.ts"
 import {
   detectToolingConfig,
   getConfigActions,
   getPackageActions,
 } from "#lib/workspace/tooling/config.ts"
+import {
+  getOxlintPresetNames,
+  inspectRequiredOxlintConfig,
+  toOxlintTsConfigContent,
+} from "#lib/workspace/tooling/oxlint.ts"
 
 const CONFIG_FILE = "oxlint.config.ts"
 const LEGACY_CONFIG_FILE = ".oxlintrc.json"

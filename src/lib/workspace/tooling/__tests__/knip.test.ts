@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { toKnipTsConfigContent } from "#lib/workspace/knip-config.ts"
+import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 
 describe("toKnipTsConfigContent", () => {
   test("preserve nested knip rule overrides when merging from the preset", () => {

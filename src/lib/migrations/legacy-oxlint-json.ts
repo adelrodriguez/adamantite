@@ -1,6 +1,6 @@
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { defineLegacyJsonConfigMigration } from "#lib/migrations/legacy-json-config.ts"
-import { getOxlintPresetNames, toOxlintTsConfigContent } from "#lib/workspace/oxlint-config.ts"
+import { getOxlintPresetNames, toOxlintTsConfigContent } from "#lib/workspace/tooling/oxlint.ts"
 
 const NODE_MODULES_PRESET_REGEX =
   /^(?:\.\/)?node_modules\/adamantite\/presets\/lint\/([a-z0-9-]+)\.(?:json|ts)$/

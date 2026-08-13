@@ -15,8 +15,6 @@ import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "m
 
 const version = getPackageVersion()
 
-const nodeVersionResolverLayer = NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer))
-
 const program = Effect.gen(function* () {
   const stdio = yield* Stdio.Stdio
   const args = yield* stdio.args
@@ -34,7 +32,7 @@ const program = Effect.gen(function* () {
   Effect.provide(
     Layer.mergeAll(
       NodeServices.layer,
-      nodeVersionResolverLayer,
+      NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
       Prompter.layer,
       CommandRunner.layer,
       DependencyInstaller.layer

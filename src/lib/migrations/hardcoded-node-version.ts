@@ -4,7 +4,6 @@ import * as Path from "effect/Path"
 import github from "#lib/integrations/ci/github.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { FailedToReadFile, MigrationValidationFailed } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
@@ -12,6 +11,7 @@ import {
   getManagedScripts,
   readPackageJson,
 } from "#lib/workspace/package-json.ts"
+import { Prompter } from "#terminal/prompter.ts"
 
 const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
 

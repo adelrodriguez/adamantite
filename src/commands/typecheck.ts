@@ -4,8 +4,8 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
 import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
+import { Prompter } from "#terminal/prompter.ts"
 
 export default Command.make("typecheck").pipe(
   Command.withDescription("Deprecated alias for `check`"),

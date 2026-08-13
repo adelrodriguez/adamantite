@@ -10,8 +10,8 @@ import { runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { Prompter } from "#terminal/prompter.ts"
 
 const version = getPackageVersion()
 

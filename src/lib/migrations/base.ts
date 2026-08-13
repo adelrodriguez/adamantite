@@ -4,7 +4,6 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import type { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
-import type { Prompter } from "#lib/services/prompter.ts"
 import type {
   FailedToDeleteFile,
   FailedToMergeConfig,
@@ -17,6 +16,7 @@ import type {
   NoPackageManager,
   UnsupportedConfigState,
 } from "#lib/shared/errors.ts"
+import type { Prompter } from "#terminal/prompter.ts"
 
 export interface MigrationContext {
   readonly cwd: string

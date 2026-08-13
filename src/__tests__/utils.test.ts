@@ -14,9 +14,9 @@ import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
 import { runResult } from "#__tests__/helpers.ts"
 import { mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
-import { printTitle } from "#lib/shared/terminal.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
+import { printTitle } from "#terminal/title.ts"
 
 const NodeContext = NodeServices
 const noop = () => null

@@ -11,11 +11,11 @@ import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { runMigration } from "#lib/migrations/base.ts"
 import { migrationsById } from "#lib/migrations/index.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
-import { printTitle } from "#lib/shared/terminal.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { Prompter } from "#terminal/prompter.ts"
+import { printTitle } from "#terminal/title.ts"
 
 const fix = Flag.boolean("fix").pipe(
   Flag.withDescription("Automatically fix safe package install/update issues")

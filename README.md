@@ -96,6 +96,12 @@ Presets and TypeScript require the `check` or `fix` script. Editor extension ins
 requires an editor. Monorepo scripts require a detected monorepo. GitHub Actions requires a
 compatible script and a supported package manager. Omitted boolean flags are disabled.
 
+Existing package scripts whose commands differ from Adamantite's are kept and reported
+instead of being replaced. The interactive initializer asks before overwriting them; in
+non-interactive mode, pass `--overwrite-scripts` to replace them. To keep custom flags,
+forward them to the Adamantite command after `--`, e.g.
+`adamantite monorepo -- --ignore-dependency tailwindcss`.
+
 In a detected monorepo, TypeScript setup does not write a root `tsconfig.json`, because a
 catch-all root config makes TypeScript treat all packages as one project. Adamantite
 prints guidance instead: add `"extends": "adamantite/typescript"` to each package's

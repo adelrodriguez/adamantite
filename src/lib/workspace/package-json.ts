@@ -7,6 +7,7 @@ import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
+import * as Result from "effect/Result"
 import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 import { parseJson } from "#lib/shared/json.ts"
 
@@ -77,4 +78,29 @@ export function getManagedScripts(packageJson: PackageJson): Script[] {
     Record.keys(MANAGED_SCRIPT_COMMANDS),
     Array.filter((name) => scripts[name] === MANAGED_SCRIPT_COMMANDS[name])
   )
+}
+
+export interface ScriptConflict {
+  readonly command: string
+  readonly script: Script
+}
+
+/**
+ * Finds requested scripts whose existing `package.json` command differs from the managed Adamantite
+ * command. Missing, empty, and already-managed scripts are not conflicts, so re-running `adamantite
+ * init` stays idempotent.
+ */
+export function getConflictingScripts(
+  packageJson: PackageJson,
+  scripts: readonly Script[]
+): ScriptConflict[] {
+  const existing = packageJson.scripts ?? {}
+
+  return Array.filterMap(scripts, (script) => {
+    const command = existing[script]
+
+    return command !== undefined && command !== "" && command !== MANAGED_SCRIPT_COMMANDS[script]
+      ? Result.succeed({ command, script })
+      : Result.failVoid
+  })
 }

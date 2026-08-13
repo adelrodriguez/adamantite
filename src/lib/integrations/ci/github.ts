@@ -3,10 +3,13 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import { defineIntegration } from "#lib/integrations/base.ts"
-import { type NodeVersionSource, NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 import { FailedToWriteFile } from "#lib/shared/errors.ts"
 import { ensureDirectory } from "#lib/shared/filesystem.ts"
 import { getCIWorkflowEntries } from "#lib/workspace/ci-scripts.ts"
+import {
+  type NodeVersionSource,
+  NodeVersionResolver,
+} from "#lib/workspace/node-version-resolver.ts"
 
 interface WorkflowOptions {
   packageManager: SupportedPackageManager

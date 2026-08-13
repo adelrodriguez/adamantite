@@ -2,8 +2,6 @@ import type * as PlatformError from "effect/PlatformError"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import type { DependencyInstaller } from "#lib/services/dependency-installer.ts"
-import type { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 import type {
   FailedToDeleteFile,
   FailedToMergeConfig,
@@ -16,6 +14,8 @@ import type {
   NoPackageManager,
   UnsupportedConfigState,
 } from "#lib/shared/errors.ts"
+import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import type { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import type { Prompter } from "#terminal/prompter.ts"
 
 export interface MigrationContext {

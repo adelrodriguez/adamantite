@@ -12,7 +12,7 @@ import {
 } from "#commands/__tests__/command-test-helpers.ts"
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
 import migrationLegacyTypecheckScript from "#lib/migrations/legacy-typecheck-script.ts"
-import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
+import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
 function runTestEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,

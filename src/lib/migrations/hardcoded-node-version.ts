@@ -3,9 +3,9 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import github from "#lib/integrations/ci/github.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
-import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { FailedToReadFile, MigrationValidationFailed } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   checkIsSupportedPackageManager,
   getManagedScripts,

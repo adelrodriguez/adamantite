@@ -17,10 +17,10 @@ import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   checkIsSupportedPackageManager,

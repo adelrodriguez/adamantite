@@ -8,6 +8,7 @@ describe("migrations", () => {
       "legacy-knip-json",
       "legacy-oxlint-json",
       "legacy-typecheck-script",
+      "hardcoded-node-version",
     ])
   })
 })

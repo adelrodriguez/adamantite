@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { DependencyInstaller } from "#lib/services/dependency-installer.ts"
+import type { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 import type { Prompter } from "#lib/services/prompter.ts"
 import type {
   FailedToDeleteFile,
@@ -51,6 +52,7 @@ export type MigrationError =
 export type MigrationRequirements =
   | DependencyInstaller
   | FileSystem.FileSystem
+  | NodeVersionResolver
   | Path.Path
   | Prompter
 

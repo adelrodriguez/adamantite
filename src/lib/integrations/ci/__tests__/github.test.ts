@@ -5,9 +5,32 @@ import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
 import { runResult } from "#__tests__/helpers.ts"
 import github from "#lib/integrations/ci/github.ts"
+import { type NodeVersionSource, NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
+
+function makeResolverLayer(source: NodeVersionSource) {
+  return Layer.succeed(NodeVersionResolver)({
+    resolve: () => Effect.succeed(source),
+  })
+}
+
+const fallbackTestLayer = Layer.mergeAll(
+  NodeServices.layer,
+  makeResolverLayer({ _tag: "Version", value: "lts/*" })
+)
+
+const fileTestLayer = Layer.mergeAll(
+  NodeServices.layer,
+  makeResolverLayer({ _tag: "File", path: ".node-version" })
+)
+
+const liveResolverLayer = Layer.mergeAll(
+  NodeServices.layer,
+  NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer))
+)
 
 function getActionReference(content: string, action: string): string | undefined {
   return content
@@ -35,7 +58,7 @@ describe("github", () => {
     test("detect when the workflow does not exist", async () => {
       const exists = await github
         .detect(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       expect(exists).toBe(false)
     })
@@ -48,11 +71,11 @@ describe("github", () => {
           packageManager: "bun",
           scripts: ["check", "format"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const exists = await github
         .detect(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
       expect(exists).toBe(true)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
@@ -65,7 +88,7 @@ describe("github", () => {
       expect(content).toContain("command: bun run check")
       expect(content).toContain("Setup Node.js")
       expect(content).toContain("actions/setup-node@v7")
-      expect(content).toContain('node-version: "26"')
+      expect(content).toContain('node-version: "lts/*"')
       expect(content).toContain("Setup Bun")
       expect(content).toContain("Cache dependencies")
       expect(content).toContain("actions/cache@v6")
@@ -79,7 +102,7 @@ describe("github", () => {
           packageManager: "bun",
           scripts: ["check"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const generatedWorkflow = await Bun.file(".github/workflows/adamantite.yml").text()
       const referenceWorkflow = await Bun.file(join(originalCwd, ".github/workflows/ci.yml")).text()
@@ -102,7 +125,7 @@ describe("github", () => {
           packageManager: "npm",
           scripts: ["check"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
@@ -118,7 +141,7 @@ describe("github", () => {
           packageManager: "pnpm",
           scripts: ["check"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup pnpm")
@@ -135,7 +158,7 @@ describe("github", () => {
           packageManager: "yarn",
           scripts: ["check"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
@@ -151,7 +174,7 @@ describe("github", () => {
           packageManager: "deno",
           scripts: ["check"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Deno")
@@ -166,7 +189,7 @@ describe("github", () => {
           packageManager: "bun",
           scripts: ["check", "format", "check:monorepo"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("name: check")
@@ -183,11 +206,11 @@ describe("github", () => {
           packageManager: "bun",
           scripts: ["fix", "fix:monorepo"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const exists = await github
         .detect(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
       expect(exists).toBe(false)
     })
 
@@ -197,13 +220,75 @@ describe("github", () => {
           packageManager: "bun",
           scripts: ["check"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("permissions:")
       expect(content).toContain("contents: read")
       expect(content).toContain("concurrency:")
       expect(content).toContain("cancel-in-progress: true")
+    })
+
+    test("render node-version-file for every Node-based workflow when the resolver selects a version file", async () => {
+      async function expectNodeVersionFileWorkflow(
+        packageManager: "bun" | "npm" | "pnpm" | "yarn"
+      ) {
+        await github
+          .create(tempDir, {
+            packageManager,
+            scripts: ["check"],
+          })
+          .pipe(Effect.provide(fileTestLayer), Effect.runPromise)
+
+        const content = await Bun.file(".github/workflows/adamantite.yml").text()
+        expect(content).toContain("Setup Node.js")
+        expect(content).toContain('node-version-file: ".node-version"')
+        expect(content).not.toContain('node-version: "')
+      }
+
+      await expectNodeVersionFileWorkflow("bun")
+      await expectNodeVersionFileWorkflow("npm")
+      await expectNodeVersionFileWorkflow("pnpm")
+      await expectNodeVersionFileWorkflow("yarn")
+    })
+
+    test("not render a Node setup step for deno regardless of the resolved source", async () => {
+      await github
+        .create(tempDir, {
+          packageManager: "deno",
+          scripts: ["check"],
+        })
+        .pipe(Effect.provide(fileTestLayer), Effect.runPromise)
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).not.toContain("Setup Node.js")
+      expect(content).not.toContain("node-version")
+    })
+
+    test("resolve a target project's .node-version with the live resolver", async () => {
+      await Bun.write(join(tempDir, ".node-version"), "22.19.0\n")
+
+      await github
+        .create(tempDir, {
+          packageManager: "npm",
+          scripts: ["check"],
+        })
+        .pipe(Effect.provide(liveResolverLayer), Effect.runPromise)
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain('node-version-file: ".node-version"')
+    })
+
+    test("fall back to lts/* with the live resolver when no declaration exists", async () => {
+      await github
+        .create(tempDir, {
+          packageManager: "npm",
+          scripts: ["check"],
+        })
+        .pipe(Effect.provide(liveResolverLayer), Effect.runPromise)
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain('node-version: "lts/*"')
     })
 
     test("return FailedToCreateDirectory when the workflow directory cannot be created", async () => {
@@ -213,7 +298,8 @@ describe("github", () => {
         github.create(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
-        })
+        }),
+        fallbackTestLayer
       )
 
       expect(Result.isFailure(result)).toBe(true)
@@ -233,13 +319,29 @@ describe("github", () => {
           packageManager: "bun",
           scripts: ["check"],
         })
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
       const content = await Bun.file(".github/workflows/adamantite.yml").text()
       expect(content).toContain("name: adamantite")
       expect(content).toContain("name: check")
       expect(content).toContain("verify:")
       expect(content).not.toContain("Old Workflow")
+    })
+
+    test("render the resolved Node.js source when updating", async () => {
+      mkdirSync(".github/workflows", { recursive: true })
+      await Bun.write(".github/workflows/adamantite.yml", 'node-version: "26"')
+
+      await github
+        .update(tempDir, {
+          packageManager: "bun",
+          scripts: ["check"],
+        })
+        .pipe(Effect.provide(fileTestLayer), Effect.runPromise)
+
+      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      expect(content).toContain('node-version-file: ".node-version"')
+      expect(content).not.toContain('node-version: "26"')
     })
 
     test("return FailedToWriteFile when writing the workflow fails", async () => {
@@ -251,7 +353,8 @@ describe("github", () => {
         github.update(tempDir, {
           packageManager: "bun",
           scripts: ["check"],
-        })
+        }),
+        fallbackTestLayer
       )
 
       expect(Result.isFailure(result)).toBe(true)

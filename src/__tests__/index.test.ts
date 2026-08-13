@@ -13,13 +13,20 @@ import {
   type RunnerTestContext,
 } from "#commands/__tests__/command-test-helpers.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
+import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 
 function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
   return Effect.runPromiseExit(
     runCli(args, "test").pipe(
       Effect.provide(
-        Layer.mergeAll(NodeServices.layer, Prompter.layer, runner.layer, DependencyInstaller.layer)
+        Layer.mergeAll(
+          NodeServices.layer,
+          NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
+          Prompter.layer,
+          runner.layer,
+          DependencyInstaller.layer
+        )
       )
     )
   )

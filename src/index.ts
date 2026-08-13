@@ -9,10 +9,13 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import { runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/services/command-runner.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
+import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const version = getPackageVersion()
+
+const nodeVersionResolverLayer = NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer))
 
 const program = Effect.gen(function* () {
   const stdio = yield* Stdio.Stdio
@@ -31,6 +34,7 @@ const program = Effect.gen(function* () {
   Effect.provide(
     Layer.mergeAll(
       NodeServices.layer,
+      nodeVersionResolverLayer,
       Prompter.layer,
       CommandRunner.layer,
       DependencyInstaller.layer

@@ -17,6 +17,7 @@ import {
   DependencyInstaller,
 } from "#lib/services/dependency-installer.ts"
 import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
+import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 import { Prompter } from "#lib/services/prompter.ts"
 import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
 
@@ -291,6 +292,7 @@ export async function runCommand(
 ) {
   let providedLayer = Layer.mergeAll(
     NodeServices.layer,
+    NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     makeQuietConsoleLayer(),
     makeQuietTerminalLayer()
   ) as TestLayer

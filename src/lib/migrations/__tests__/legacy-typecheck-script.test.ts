@@ -12,6 +12,7 @@ import {
 } from "#commands/__tests__/command-test-helpers.ts"
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
 import migrationLegacyTypecheckScript from "#lib/migrations/legacy-typecheck-script.ts"
+import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 
 function runTestEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -21,7 +22,12 @@ function runTestEffect<A, E, R>(
   const dependencyInstallerContext = createDependencyInstallerTestContext(options)
   const provided = effect.pipe(
     Effect.provide(
-      Layer.mergeAll(NodeServices.layer, prompterContext.layer, dependencyInstallerContext.layer)
+      Layer.mergeAll(
+        NodeServices.layer,
+        NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
+        prompterContext.layer,
+        dependencyInstallerContext.layer
+      )
     )
   ) as Effect.Effect<A, E>
   return Effect.runPromise(provided)

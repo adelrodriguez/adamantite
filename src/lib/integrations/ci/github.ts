@@ -3,6 +3,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import { defineIntegration } from "#lib/integrations/base.ts"
+import { type NodeVersionSource, NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
 import { FailedToWriteFile } from "#lib/shared/errors.ts"
 import { ensureDirectory } from "#lib/shared/filesystem.ts"
 import { getCIWorkflowEntries } from "#lib/workspace/ci-scripts.ts"
@@ -12,11 +13,21 @@ interface WorkflowOptions {
   scripts: Script[]
 }
 
-const setupSteps: Record<SupportedPackageManager, string> = {
-  bun: `      - name: Setup Node.js
+function renderNodeSetup(source: NodeVersionSource): string {
+  const versionInput =
+    source._tag === "File"
+      ? `node-version-file: "${source.path}"`
+      : `node-version: "${source.value}"`
+
+  return `      - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          ${versionInput}`
+}
+
+function getSetupSteps(source: NodeVersionSource): Record<SupportedPackageManager, string> {
+  return {
+    bun: `${renderNodeSetup(source)}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -33,41 +44,36 @@ const setupSteps: Record<SupportedPackageManager, string> = {
 
       - name: Install dependencies
         run: bun install --frozen-lockfile`,
-  deno: `      - name: Setup Deno
+    deno: `      - name: Setup Deno
         uses: denoland/setup-deno@v2
 
       - name: Install dependencies
         run: deno install --frozen`,
-  npm: `      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "24"
+    npm: `${renderNodeSetup(source)}
           cache: "npm"
 
       - name: Install dependencies
         run: npm ci`,
-  pnpm: `      - name: Setup pnpm
+    pnpm: `      - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "24"
+${renderNodeSetup(source)}
           cache: "pnpm"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile`,
-  yarn: `      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "24"
+    yarn: `${renderNodeSetup(source)}
           cache: "yarn"
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile`,
+  }
 }
 
-function generateWorkflow({ packageManager, scripts }: WorkflowOptions): string | null {
+function generateWorkflow(
+  { packageManager, scripts }: WorkflowOptions,
+  source: NodeVersionSource
+): string | null {
   const matrixEntries = getCIWorkflowEntries(packageManager, scripts)
 
   if (matrixEntries.length === 0) {
@@ -109,7 +115,7 @@ ${matrixInclude}
       - name: Checkout
         uses: actions/checkout@v7
 
-${setupSteps[packageManager]}
+${getSetupSteps(source)[packageManager]}
 
       - name: Run \${{ matrix.name }}
         run: \${{ matrix.command }}`
@@ -119,24 +125,32 @@ ${setupSteps[packageManager]}
 
 const files = [{ path: ".github/workflows/adamantite.yml", type: "ci" }] as const
 
+const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const resolver = yield* NodeVersionResolver
+    const workflowPath = path.join(cwd, files[0].path)
+
+    const source = yield* resolver.resolve(cwd)
+    const workflowContent = generateWorkflow(options, source)
+
+    if (!workflowContent) {
+      return
+    }
+
+    yield* fs
+      .writeFileString(workflowPath, workflowContent)
+      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
+  })
+
 export default defineIntegration({
   create: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const workflowPath = path.join(cwd, files[0].path)
 
-      yield* ensureDirectory(path.dirname(workflowPath))
-
-      const workflowContent = generateWorkflow(options)
-
-      if (!workflowContent) {
-        return
-      }
-
-      yield* fs
-        .writeFileString(workflowPath, workflowContent)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
+      yield* ensureDirectory(path.dirname(path.join(cwd, files[0].path)))
+      yield* writeWorkflow(cwd, options)
     }),
   detect: (cwd: string) =>
     Effect.gen(function* () {
@@ -147,19 +161,5 @@ export default defineIntegration({
   files,
   kind: "ci",
   name: "github",
-  update: (cwd: string, options: WorkflowOptions) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      const workflowPath = path.join(cwd, files[0].path)
-      const workflowContent = generateWorkflow(options)
-
-      if (!workflowContent) {
-        return
-      }
-
-      yield* fs
-        .writeFileString(workflowPath, workflowContent)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
-    }),
+  update: writeWorkflow,
 })

@@ -40,7 +40,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version-file: ".node-version"
 
       - name: Install intent
         run: npm install -g @tanstack/intent@0.3.6
@@ -64,7 +64,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version-file: ".node-version"
 
       - name: Install intent
         run: npm install -g @tanstack/intent@0.3.6

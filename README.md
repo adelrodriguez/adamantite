@@ -223,7 +223,8 @@ Adamantite publishes configuration that can also be consumed directly:
 
 ## Requirements and boundaries
 
-- Adamantite requires Node.js 24 or later when run with Node.js.
+- Adamantite requires Bun 1.0 or later when run with Bun, or Node.js 22.19 or later when
+  run with Node.js.
 - This repository uses Bun, but the CLI can configure projects that use Bun, Deno, npm,
   pnpm, or Yarn where the selected integration supports them.
 - Adamantite manages recognized package scripts and supported configuration shapes. It

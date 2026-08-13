@@ -1,4 +1,5 @@
 import type { Migration } from "#lib/migrations/base.ts"
+import migrationHardcodedNodeVersion from "#lib/migrations/hardcoded-node-version.ts"
 import migrationLegacyKnipJson from "#lib/migrations/legacy-knip-json.ts"
 import migrationLegacyOxfmtJson from "#lib/migrations/legacy-oxfmt-json.ts"
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
@@ -9,6 +10,7 @@ export const migrations: readonly Migration[] = [
   migrationLegacyKnipJson,
   migrationLegacyOxlintJson,
   migrationLegacyTypecheckScript,
+  migrationHardcodedNodeVersion,
 ]
 
 export const migrationsById: Readonly<Record<string, Migration>> = Object.fromEntries(

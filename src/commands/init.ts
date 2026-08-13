@@ -24,10 +24,12 @@ import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   checkIsSupportedPackageManager,
+  getConflictingScripts,
   readPackageJson,
   writePackageJson,
   MANAGED_SCRIPT_COMMANDS,
   type Script,
+  type ScriptConflict,
   type SupportedPackageManager,
 } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
@@ -114,16 +116,27 @@ function setupToolConfig<E, R>(
   })
 }
 
-const addScripts = (cwd: string, scripts: Script[]) =>
+const describeScriptConflict = (conflict: ScriptConflict) =>
+  `\`${conflict.script}\` is currently \`${conflict.command}\`; Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
+
+const addScripts = (cwd: string, scripts: Script[], overwriteScripts: boolean) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const packageJson = yield* readPackageJson(cwd)
+    const conflicts = overwriteScripts ? [] : getConflictingScripts(packageJson, scripts)
+    const conflictingNames = new Set(conflicts.map((conflict) => conflict.script))
+    const writtenScripts = scripts.filter((script) => !conflictingNames.has(script))
+
     yield* prompter.withSpinner(
       () =>
         Effect.gen(function* () {
+          if (writtenScripts.length === 0) {
+            return
+          }
+
           packageJson.scripts ??= {}
 
-          for (const script of scripts) {
+          for (const script of writtenScripts) {
             packageJson.scripts[script] = MANAGED_SCRIPT_COMMANDS[script]
           }
 
@@ -132,9 +145,28 @@ const addScripts = (cwd: string, scripts: Script[]) =>
       {
         failure: "Failed to add scripts to `package.json`.",
         start: "Adding scripts to your `package.json`...",
-        success: "Scripts added to your `package.json`",
+        success:
+          writtenScripts.length === 0
+            ? "Kept your existing `package.json` scripts."
+            : conflicts.length > 0
+              ? "Scripts added to your `package.json`; conflicting scripts were kept."
+              : "Scripts added to your `package.json`",
       }
     )
+
+    for (const conflict of conflicts) {
+      yield* prompter.log.warning(
+        `Kept existing \`${conflict.script}\` script (\`${conflict.command}\`) instead of \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`. Use \`--overwrite-scripts\` to replace it.`
+      )
+    }
+
+    if (conflicts.length > 0) {
+      yield* prompter.log.info(
+        "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite monorepo -- --ignore-dependency tailwindcss`."
+      )
+    }
+
+    return writtenScripts
   })
 
 const setupTypescript = (cwd: string, isMonorepo: boolean) =>
@@ -354,6 +386,7 @@ interface InitOptions {
   readonly editors: InitEditor[]
   readonly githubActions: boolean
   readonly installExtensions: boolean
+  readonly overwriteScripts: boolean
   readonly presets: InitPreset[]
   readonly scripts: Script[]
   readonly typescript: boolean
@@ -364,6 +397,7 @@ interface InitOptionsInput {
   readonly editors: readonly InitEditor[]
   readonly githubActions: boolean
   readonly installExtensions: boolean
+  readonly overwriteScripts: boolean
   readonly presets: readonly InitPreset[]
   readonly scripts: readonly Script[]
   readonly typescript: boolean
@@ -384,6 +418,7 @@ const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     editors: Array.dedupe(input.editors),
     githubActions: input.githubActions,
     installExtensions: input.installExtensions,
+    overwriteScripts: input.overwriteScripts,
     presets: Array.dedupe(input.presets),
     scripts: Array.dedupe(input.scripts),
     typescript: input.typescript,
@@ -481,7 +516,14 @@ const agents = Flag.boolean("agents").pipe(
   Flag.withDescription("Add Adamantite guidance to AGENTS.md")
 )
 
+const overwriteScripts = Flag.boolean("overwrite-scripts").pipe(
+  Flag.withDescription(
+    "Replace existing package scripts that conflict with Adamantite's managed commands"
+  )
+)
+
 const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
+  cwd: string,
   isMonorepo: boolean
 ) {
   const prompter = yield* Prompter
@@ -522,6 +564,24 @@ const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")
       },
     ],
   })
+
+  const packageJson = yield* readPackageJson(cwd)
+  const conflicts = getConflictingScripts(packageJson, selectedScripts)
+  let shouldOverwriteScripts = false
+
+  if (conflicts.length > 0) {
+    for (const conflict of conflicts) {
+      yield* prompter.log.warning(describeScriptConflict(conflict))
+    }
+
+    shouldOverwriteScripts = yield* prompter.confirm({
+      initialValue: false,
+      message:
+        conflicts.length === 1
+          ? "Overwrite this existing script with Adamantite's command?"
+          : "Overwrite these existing scripts with Adamantite's commands?",
+    })
+  }
 
   const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
   let selectedPresets: InitOptions["presets"] = []
@@ -584,6 +644,7 @@ const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")
     editors: selectedEditors,
     githubActions: shouldEnableGitHubActions,
     installExtensions: shouldInstallExtensions,
+    overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,
     typescript: shouldSetupTypescript,
@@ -596,6 +657,7 @@ export default Command.make("init", {
   githubActions,
   installExtensions,
   nonInteractive,
+  overwriteScripts,
   presets,
   scripts,
   typescript,
@@ -659,6 +721,7 @@ export default Command.make("init", {
             options.installExtensions,
             options.githubActions,
             options.agents,
+            options.overwriteScripts,
           ],
           Predicate.isTruthy
         )
@@ -670,7 +733,7 @@ export default Command.make("init", {
 
       const input = options.nonInteractive
         ? options
-        : yield* collectInteractiveInitOptions(isMonorepo)
+        : yield* collectInteractiveInitOptions(cwd, isMonorepo)
       const initOptions = yield* validateInitOptions(input, {
         isMonorepo,
         nonInteractive: options.nonInteractive,
@@ -726,10 +789,10 @@ export default Command.make("init", {
         yield* setupToolConfig(cwd, knip, knip.create(cwd))
       }
 
-      yield* addScripts(cwd, selectedScripts)
+      const writtenScripts = yield* addScripts(cwd, selectedScripts, initOptions.overwriteScripts)
 
       if (shouldAddAgentsGuidance) {
-        yield* setupAgentsGuidance(cwd, packageManager.name, selectedScripts)
+        yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts)
       }
 
       if (shouldSetupTypescript) {

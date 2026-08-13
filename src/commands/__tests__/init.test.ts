@@ -669,6 +669,11 @@ describe("init", () => {
         name: "setup flags without non-interactive mode",
         reason: "Setup flags require `--non-interactive`.",
       },
+      {
+        args: ["--overwrite-scripts"],
+        name: "script overwriting without non-interactive mode",
+        reason: "Setup flags require `--non-interactive`.",
+      },
     ])("reject $name before changing the project", async ({ args, reason }) => {
       const originalPackageJson = await readFile(join(tempDir, "package.json"), "utf8")
       const prompter = createPrompterTestContext()
@@ -723,6 +728,216 @@ describe("init", () => {
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(installer.calls).toEqual([])
+    })
+  })
+
+  describe("existing scripts", () => {
+    const conflictingMonorepoPackageJson = JSON.stringify(
+      {
+        name: "test-project",
+        scripts: {
+          "check:monorepo": "sherif --ignore-dependency tailwindcss",
+        },
+        version: "1.0.0",
+        workspaces: ["packages/*"],
+      },
+      null,
+      2
+    )
+
+    test("preserve conflicting scripts and warn in non-interactive mode", async () => {
+      await writeFile(join(tempDir, "package.json"), conflictingMonorepoPackageJson)
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "check:monorepo", "--script", "fix:monorepo"],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.confirmCalls).toEqual([])
+
+      const packageJson = await readJson<{ scripts: Record<string, string> }>(
+        join(tempDir, "package.json")
+      )
+      expect(packageJson.scripts).toEqual({
+        "check:monorepo": "sherif --ignore-dependency tailwindcss",
+        "fix:monorepo": "adamantite monorepo --fix",
+      })
+
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Kept existing `check:monorepo` script (`sherif --ignore-dependency tailwindcss`) instead of `adamantite monorepo`. Use `--overwrite-scripts` to replace it.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message:
+          "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite monorepo -- --ignore-dependency tailwindcss`.",
+      })
+    })
+
+    test("replace conflicting scripts when --overwrite-scripts is passed", async () => {
+      await writeFile(join(tempDir, "package.json"), conflictingMonorepoPackageJson)
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        [
+          "--non-interactive",
+          "--script",
+          "check:monorepo",
+          "--script",
+          "fix:monorepo",
+          "--overwrite-scripts",
+        ],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const packageJson = await readJson<{ scripts: Record<string, string> }>(
+        join(tempDir, "package.json")
+      )
+      expect(packageJson.scripts).toEqual({
+        "check:monorepo": "adamantite monorepo",
+        "fix:monorepo": "adamantite monorepo --fix",
+      })
+      expect(prompter.logs).not.toContainEqual(
+        expect.objectContaining({ message: expect.stringContaining("Kept existing") })
+      )
+    })
+
+    test("replace conflicting scripts when overwriting is confirmed interactively", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "test-project",
+            scripts: { check: "tsc && eslint ." },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true, false, false, false],
+        multiselectResponses: [["check"], [], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "`check` is currently `tsc && eslint .`; Adamantite would replace it with `adamantite check`.",
+      })
+      expect(prompter.confirmCalls[0]).toMatchObject({
+        message: "Overwrite this existing script with Adamantite's command?",
+      })
+
+      const packageJson = await readJson<{ scripts: Record<string, string> }>(
+        join(tempDir, "package.json")
+      )
+      expect(packageJson.scripts).toEqual({ check: "adamantite check" })
+    })
+
+    test("preserve conflicting scripts when overwriting is declined interactively", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "test-project",
+            scripts: { check: "tsc && eslint ." },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false, false, false],
+        multiselectResponses: [["check"], [], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const packageJson = await readJson<{ scripts: Record<string, string> }>(
+        join(tempDir, "package.json")
+      )
+      expect(packageJson.scripts).toEqual({ check: "tsc && eslint ." })
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Use `--overwrite-scripts` to replace it.",
+      })
+    })
+
+    test("do not prompt or warn when existing scripts already match the managed commands", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "test-project",
+            scripts: { check: "adamantite check" },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+
+      // Only the typescript, CI, and agents confirms should fire; an overwrite
+      // confirm would fail the run with a missing confirm response.
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false, false],
+        multiselectResponses: [["check"], [], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).not.toContainEqual(
+        expect.objectContaining({ message: expect.stringContaining("Kept existing") })
+      )
+
+      const packageJson = await readJson<{ scripts: Record<string, string> }>(
+        join(tempDir, "package.json")
+      )
+      expect(packageJson.scripts).toEqual({ check: "adamantite check" })
+    })
+
+    test("omit preserved scripts from AGENTS.md guidance", async () => {
+      await writeFile(join(tempDir, "package.json"), conflictingMonorepoPackageJson)
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "check:monorepo", "--script", "format", "--agents"],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      const agents = await readFile(join(tempDir, "AGENTS.md"), "utf8")
+      expect(agents).toContain("Run `bun run format` after editing files")
+      expect(agents).not.toContain("check:monorepo")
     })
   })
 

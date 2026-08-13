@@ -11,7 +11,7 @@ import {
   createPrompterTestContext,
 } from "#commands/__tests__/command-test-helpers.ts"
 import migrationHardcodedNodeVersion from "#lib/migrations/hardcoded-node-version.ts"
-import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
+import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
 const HARDCODED_WORKFLOW = `name: adamantite
 

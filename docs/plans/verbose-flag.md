@@ -33,7 +33,7 @@ path. It must not change the default behavior.
 
 ### Verbosity service
 
-Add a `Verbosity` service in `src/lib/services/verbosity.ts` with a default value of
+Add a `Verbosity` service in `src/terminal/verbosity.ts` with a default value of
 `false`. Use a `Context.Reference`-style service so consumers do not need explicit
 provision in tests. Message getters on error classes stay pure and context-free; they
 cannot read a flag. Apply verbosity only at the effect edges:

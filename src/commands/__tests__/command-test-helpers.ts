@@ -11,14 +11,14 @@ import {
   type CommandFailedLike,
   type CommandRunOptions,
   CommandRunner,
-} from "#lib/services/command-runner.ts"
+} from "#lib/execution/command-runner.ts"
+import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
 import {
   type DetectedPackageManager,
   DependencyInstaller,
-} from "#lib/services/dependency-installer.ts"
-import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
-import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
-import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
+} from "#lib/workspace/dependency-installer.ts"
+import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 interface LogEntry {

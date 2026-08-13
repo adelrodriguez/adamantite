@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
 import { runResult } from "#__tests__/helpers.ts"
-import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
+import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
 const testLayer = NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer))
 

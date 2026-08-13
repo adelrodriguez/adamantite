@@ -2,9 +2,9 @@ import * as Effect from "effect/Effect"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
+import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
-import { CommandRunner } from "#lib/services/command-runner.ts"
-import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
 const files = Argument.file("files", { mustExist: true }).pipe(

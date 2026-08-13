@@ -20,16 +20,16 @@ bundled CLI.
 
 ## Module seams
 
-| Module         | Responsibility                                                            |
-| -------------- | ------------------------------------------------------------------------- |
-| `commands`     | Define one CLI workflow and render its user-facing result.                |
-| `integrations` | Detect and maintain supported tooling, editor, workspace, and CI state.   |
-| `migrations`   | Perform one-time transitions from legacy state.                           |
-| `workspace`    | Read and write target-project files and derive workspace state.           |
-| `services`     | Isolate child commands, dependency installation, and argument forwarding. |
-| `shared`       | Define assessments, errors, filesystem helpers, and JSON helpers.         |
-| `terminal`     | Prompt the user and render the CLI title.                                 |
-| `presets`      | Publish lint, format, analysis, and TypeScript configuration.             |
+| Module         | Responsibility                                                                         |
+| -------------- | -------------------------------------------------------------------------------------- |
+| `commands`     | Define one CLI workflow and render its user-facing result.                             |
+| `execution`    | Run child commands and carry forwarded arguments to them.                              |
+| `integrations` | Detect and maintain supported tooling, editor, workspace, and CI state.                |
+| `migrations`   | Perform one-time transitions from legacy state.                                        |
+| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state. |
+| `shared`       | Define assessments, errors, filesystem helpers, and JSON helpers.                      |
+| `terminal`     | Prompt the user and render the CLI title.                                              |
+| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                          |
 
 Integration modules export only the integration itself as a default export.
 `src/lib/integrations/base.ts` is the shared infrastructure exception. Reusable behavior
@@ -84,9 +84,9 @@ presets/
 src/
   commands/         CLI workflows
   lib/
+    execution/      child command runs and forwarded arguments
     integrations/   tooling, editor, and CI adapters
     migrations/     one-time legacy transitions
-    services/       injectable external behavior
     shared/         cross-cutting types and helpers
     workspace/      target-project state and file operations
   terminal/         user prompting and title output

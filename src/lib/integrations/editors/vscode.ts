@@ -4,8 +4,8 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { Script } from "#lib/workspace/package-json.ts"
+import { type CommandFailedLike, CommandRunner } from "#lib/execution/command-runner.ts"
 import { defineIntegration } from "#lib/integrations/base.ts"
-import { type CommandFailedLike, CommandRunner } from "#lib/services/command-runner.ts"
 import {
   FailedToInstallExtension,
   FailedToReadFile,

@@ -7,10 +7,10 @@ import * as Runtime from "effect/Runtime"
 import * as Stdio from "effect/Stdio"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { runCli } from "#cli.ts"
-import { CommandRunner } from "#lib/services/command-runner.ts"
-import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
-import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 const version = getPackageVersion()

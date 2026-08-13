@@ -3,9 +3,9 @@ import * as Effect from "effect/Effect"
 import github from "#lib/integrations/ci/github.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
-import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { MigrationValidationFailed } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   checkIsSupportedPackageManager,
   getManagedScripts,

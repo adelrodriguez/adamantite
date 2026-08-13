@@ -1,6 +1,9 @@
 import type { PackageJson } from "type-fest"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import { pipe } from "effect/Function"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import {
   defineIntegration,
@@ -60,15 +63,20 @@ function getConfigFormat(file: string): ToolingConfigFormat {
   return "ts"
 }
 
+function findLegacyConfigByFormat(files: ToolingConfigFiles, format: ToolingConfigFormat) {
+  return Array.findFirst(files.legacyConfigs, (file) => getConfigFormat(file) === format)
+}
+
 function getLegacyConfigDisplayName(files: ToolingConfigFiles) {
-  const jsonFile = files.legacyConfigs.find((file) => getConfigFormat(file) === "json")
-  const jsoncFile = files.legacyConfigs.find((file) => getConfigFormat(file) === "jsonc")
+  const jsonFile = findLegacyConfigByFormat(files, "json")
+  const jsoncFile = findLegacyConfigByFormat(files, "jsonc")
 
-  if (jsonFile && jsoncFile) {
-    return `${jsonFile}(c)`
-  }
-
-  return jsoncFile ?? jsonFile ?? ""
+  return pipe(
+    Option.zipWith(jsonFile, jsoncFile, (json) => `${json}(c)`),
+    Option.orElse(() => jsoncFile),
+    Option.orElse(() => jsonFile),
+    Option.getOrElse(() => "")
+  )
 }
 
 function getToolingConfigWarnings(
@@ -87,16 +95,15 @@ function getToolingConfigWarnings(
     ]
   }
 
-  const jsonFile = files.legacyConfigs.find((file) => getConfigFormat(file) === "json")
-  const jsoncFile = files.legacyConfigs.find((file) => getConfigFormat(file) === "jsonc")
-
-  if (!jsonFile || !jsoncFile) {
-    return []
-  }
-
-  return [
-    `Found both \`${jsonFile}\` and \`${jsoncFile}\`. Multiple legacy ${toolName} configs exist; Adamantite will treat \`${jsoncFile}\` as the source of truth when migration is needed.`,
-  ]
+  return pipe(
+    Option.zipWith(
+      findLegacyConfigByFormat(files, "json"),
+      findLegacyConfigByFormat(files, "jsonc"),
+      (jsonFile, jsoncFile) =>
+        `Found both \`${jsonFile}\` and \`${jsoncFile}\`. Multiple legacy ${toolName} configs exist; Adamantite will treat \`${jsoncFile}\` as the source of truth when migration is needed.`
+    ),
+    Option.toArray
+  )
 }
 
 /**
@@ -121,11 +128,12 @@ export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
   })
   const present = candidates.filter((_, index) => existence[index])
 
-  const active =
-    present.find((candidate) => candidate.format === "ts") ??
-    present.find((candidate) => candidate.format === "jsonc") ??
-    present.find((candidate) => candidate.format === "json") ??
-    null
+  const active = pipe(
+    Array.findFirst(present, (candidate) => candidate.format === "ts"),
+    Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "jsonc")),
+    Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "json")),
+    Option.getOrNull
+  )
   const legacy = present.filter((candidate) => candidate !== active && candidate.format !== "ts")
 
   return {

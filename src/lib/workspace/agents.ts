@@ -1,6 +1,9 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import { pipe } from "effect/Function"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as String from "effect/String"
 import { runScriptCommand, type PackageManagerName } from "nypm"
 import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 import { MANAGED_SCRIPT_COMMANDS, type Script } from "#lib/workspace/package-json.ts"
@@ -79,13 +82,18 @@ export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOpt
           .readFileString(agentsPath)
           .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: agentsPath })))
       : ""
-    const start = existing.indexOf(ADAMANTITE_AGENTS_START_MARKER)
-    const endMarkerIndex = existing.indexOf(ADAMANTITE_AGENTS_END_MARKER)
+    const startIndex = pipe(existing, String.indexOf(ADAMANTITE_AGENTS_START_MARKER))
+    const endIndex = pipe(existing, String.indexOf(ADAMANTITE_AGENTS_END_MARKER))
+    const markerRange = pipe(
+      Option.all({ end: endIndex, start: startIndex }),
+      Option.filter(({ end, start }) => start < end)
+    )
     const section = getAgentsSection(options)
 
-    if (start !== -1 && endMarkerIndex !== -1 && start < endMarkerIndex) {
-      const end = endMarkerIndex + ADAMANTITE_AGENTS_END_MARKER.length
-      const nextContent = `${existing.slice(0, start)}${section.trimEnd()}${existing.slice(end)}`
+    if (Option.isSome(markerRange)) {
+      const { end, start } = markerRange.value
+      const sectionEnd = end + ADAMANTITE_AGENTS_END_MARKER.length
+      const nextContent = `${existing.slice(0, start)}${section.trimEnd()}${existing.slice(sectionEnd)}`
 
       yield* fs
         .writeFileString(agentsPath, nextContent.endsWith("\n") ? nextContent : `${nextContent}\n`)
@@ -94,7 +102,7 @@ export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOpt
       return "updated" as const
     }
 
-    if (start !== -1 || endMarkerIndex !== -1) {
+    if (Option.isSome(startIndex) || Option.isSome(endIndex)) {
       return "malformed" as const
     }
 

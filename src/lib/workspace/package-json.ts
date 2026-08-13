@@ -1,9 +1,12 @@
 import process from "node:process"
 import type { PackageManagerName } from "nypm"
 import type { PackageJson } from "type-fest"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
+import * as Record from "effect/Record"
 import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 import { parseJson } from "#lib/shared/json.ts"
 
@@ -69,15 +72,9 @@ export const MANAGED_SCRIPT_COMMANDS = {
 
 export function getManagedScripts(packageJson: PackageJson): Script[] {
   const scripts = packageJson.scripts ?? {}
-  const managedScripts: Script[] = []
 
-  for (const [name, command] of Object.entries(MANAGED_SCRIPT_COMMANDS) as Array<
-    [Script, string]
-  >) {
-    if (scripts[name] === command) {
-      managedScripts.push(name)
-    }
-  }
-
-  return managedScripts
+  return pipe(
+    Record.keys(MANAGED_SCRIPT_COMMANDS),
+    Array.filter((name) => scripts[name] === MANAGED_SCRIPT_COMMANDS[name])
+  )
 }

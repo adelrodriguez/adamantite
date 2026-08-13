@@ -1,3 +1,5 @@
+import * as Array from "effect/Array"
+import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import { print as printAst } from "esrap"
@@ -118,57 +120,45 @@ function print(program: Program) {
 
 function getStaticPropertyName(key: PropertyKey) {
   if (key.type === "Identifier") {
-    return key.name
+    return pipe(key.name, Option.some)
   }
 
-  if (key.type === "Literal" && typeof key.value === "string") {
-    return key.value
+  if (key.type === "Literal" && Predicate.isString(key.value)) {
+    return pipe(key.value, Option.some)
   }
 
-  return null
+  return Option.none<string>()
+}
+
+function getConfigObjectExpression(declaration: ExportDefaultDeclaration["declaration"]) {
+  if (declaration.type === "ObjectExpression") {
+    return pipe(declaration, Option.some)
+  }
+
+  if (
+    declaration.type !== "CallExpression" ||
+    declaration.callee.type !== "Identifier" ||
+    declaration.callee.name !== "defineConfig"
+  ) {
+    return Option.none<ObjectExpression>()
+  }
+
+  return pipe(
+    declaration.arguments.length === 1 ? Array.head(declaration.arguments) : Option.none(),
+    Option.filter((argument): argument is ObjectExpression => argument.type === "ObjectExpression")
+  )
 }
 
 function getExportedConfigObject(ast: Program) {
-  const exportDefaultDeclarations = ast.body.filter(
-    (statement): statement is ExportDefaultDeclaration =>
-      statement.type === "ExportDefaultDeclaration"
+  return pipe(
+    ast.body,
+    Array.filter(
+      (statement): statement is ExportDefaultDeclaration =>
+        statement.type === "ExportDefaultDeclaration"
+    ),
+    (declarations) => (declarations.length === 1 ? Array.head(declarations) : Option.none()),
+    Option.flatMap((exported) => getConfigObjectExpression(exported.declaration))
   )
-
-  if (exportDefaultDeclarations.length !== 1) {
-    return Option.none()
-  }
-
-  const [exportDefaultDeclaration] = exportDefaultDeclarations
-
-  if (!exportDefaultDeclaration) {
-    return Option.none()
-  }
-
-  const declaration = exportDefaultDeclaration.declaration
-
-  if (declaration.type === "ObjectExpression") {
-    return Option.fromNullishOr(declaration)
-  }
-
-  if (declaration.type !== "CallExpression") {
-    return Option.none()
-  }
-
-  if (declaration.callee.type !== "Identifier" || declaration.callee.name !== "defineConfig") {
-    return Option.none()
-  }
-
-  if (declaration.arguments.length !== 1) {
-    return Option.none()
-  }
-
-  const [firstArgument] = declaration.arguments
-
-  if (firstArgument?.type === "ObjectExpression") {
-    return Option.fromNullishOr(firstArgument)
-  }
-
-  return Option.none()
 }
 
 function getNamedObjectProperty(
@@ -186,15 +176,17 @@ function getNamedObjectProperty(
       return { status: "manual" }
     }
 
+    const nameMatches = Option.contains(getStaticPropertyName(property.key), propertyName)
+
     if (property.method || property.kind !== "init") {
-      if (getStaticPropertyName(property.key) === propertyName) {
+      if (nameMatches) {
         return { status: "manual" }
       }
 
       continue
     }
 
-    if (getStaticPropertyName(property.key) !== propertyName) {
+    if (!nameMatches) {
       continue
     }
 

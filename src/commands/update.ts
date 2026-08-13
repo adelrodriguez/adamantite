@@ -1,9 +1,11 @@
 import process from "node:process"
 import type { PackageJson } from "type-fest"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
+import * as Result from "effect/Result"
 import * as Command from "effect/unstable/cli/Command"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
-import type { Migration, MigrationCheckResult } from "#lib/migrations/base.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
@@ -32,27 +34,26 @@ type PackageUpdate = {
   readonly targetVersion: string
 }
 
-function getFallbackPackageUpdates(packageJson: PackageJson, coveredPackages: ReadonlySet<string>) {
-  const updates: PackageUpdate[] = []
-
-  for (const pkg of knownPackages) {
+function getFallbackPackageUpdates(
+  packageJson: PackageJson,
+  coveredPackages: ReadonlySet<string>
+): PackageUpdate[] {
+  return Array.filterMap(knownPackages, (pkg) => {
     if (coveredPackages.has(pkg.name)) {
-      continue
+      return Result.failVoid
     }
 
     const dependency =
       packageJson.devDependencies?.[pkg.name] ?? packageJson.dependencies?.[pkg.name]
 
-    if (dependency && normalizeDependencyVersion(dependency) !== pkg.version) {
-      updates.push({
-        currentVersion: dependency,
-        name: pkg.name,
-        targetVersion: pkg.version,
-      })
-    }
-  }
-
-  return updates
+    return dependency && normalizeDependencyVersion(dependency) !== pkg.version
+      ? Result.succeed({
+          currentVersion: dependency,
+          name: pkg.name,
+          targetVersion: pkg.version,
+        })
+      : Result.failVoid
+  })
 }
 
 export default Command.make("update").pipe(
@@ -72,15 +73,12 @@ export default Command.make("update").pipe(
 
       const assessments = yield* collectAssessments()
 
-      const migrationChecks: Array<{
-        migration: Migration
-        result: MigrationCheckResult
-      }> = []
-
-      for (const migration of migrations.filter((candidate) => candidate.tags.includes("update"))) {
-        const result = yield* migration.check(migrationContext)
-        migrationChecks.push({ migration, result })
-      }
+      const migrationChecks = yield* pipe(
+        migrations.filter((candidate) => candidate.tags.includes("update")),
+        Effect.forEach((migration) =>
+          migration.check(migrationContext).pipe(Effect.map((result) => ({ migration, result })))
+        )
+      )
 
       // Assessments and migration checks derive warnings from the same detected state, so a Set
       // collapses the overlap.
@@ -116,30 +114,33 @@ export default Command.make("update").pipe(
 
       const packageJson = yield* readPackageJson(cwd)
       const postMigrationAssessments = yield* collectAssessments()
-      const doctorFollowUpActions = postMigrationAssessments
-        .flatMap(({ assessment }) => assessment.actions)
-        .filter(
-          (action) =>
-            action.type === "create_config" ||
-            action.type === "update_config" ||
-            action.type === "manual_fix"
-        )
-      const packageUpdates = postMigrationAssessments
-        .flatMap(({ assessment }) => assessment.actions)
-        .filter((action) => action.type === "install_package" || action.type === "update_package")
-        .map((action) =>
-          action.type === "install_package"
-            ? {
-                currentVersion: "not installed",
-                name: action.package,
-                targetVersion: action.targetVersion,
-              }
-            : {
-                currentVersion: action.currentVersion,
-                name: action.package,
-                targetVersion: action.targetVersion,
-              }
-        )
+      const postMigrationActions = postMigrationAssessments.flatMap(
+        ({ assessment }) => assessment.actions
+      )
+      const doctorFollowUpActions = postMigrationActions.filter(
+        (action) =>
+          action.type === "create_config" ||
+          action.type === "update_config" ||
+          action.type === "manual_fix"
+      )
+      const packageUpdates = Array.filterMap(postMigrationActions, (action) => {
+        switch (action.type) {
+          case "install_package":
+            return Result.succeed({
+              currentVersion: "not installed",
+              name: action.package,
+              targetVersion: action.targetVersion,
+            })
+          case "update_package":
+            return Result.succeed({
+              currentVersion: action.currentVersion,
+              name: action.package,
+              targetVersion: action.targetVersion,
+            })
+          default:
+            return Result.failVoid
+        }
+      })
       const coveredPackages = new Set(packageUpdates.map((update) => update.name))
       const updates = [
         ...packageUpdates,

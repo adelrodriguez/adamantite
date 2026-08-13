@@ -41,11 +41,16 @@ function hasToolVersionsNodeEntry(content: string): boolean {
   return content
     .split("\n")
     .map((line) => line.split("#")[0]?.trim() ?? "")
-    .some((line) => /^nodejs\s+\S/.test(line))
+    .some((line) => /^node(?:js)?\s+\S/.test(line))
 }
 
 function isNodeRuntimeEntry(value: unknown): boolean {
-  return isJsonRecord(value) && value.name === "node" && isNonEmptyString(value.version)
+  return (
+    isJsonRecord(value) &&
+    isNonEmptyString(value.name) &&
+    value.name.toLowerCase() === "node" &&
+    isNonEmptyString(value.version)
+  )
 }
 
 /**

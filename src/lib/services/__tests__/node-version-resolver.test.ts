@@ -81,6 +81,14 @@ describe("NodeVersionResolver", () => {
     expect(source).toEqual({ _tag: "File", path: ".tool-versions" })
   })
 
+  test("select .tool-versions when it declares node with the mise spelling", async () => {
+    await Bun.write(join(tempDir, ".tool-versions"), "node 22.19.0\n")
+
+    const source = await runResolve(tempDir)
+
+    expect(source).toEqual({ _tag: "File", path: ".tool-versions" })
+  })
+
   test("ignore .tool-versions without a nodejs entry", async () => {
     await Bun.write(join(tempDir, ".tool-versions"), "ruby 3.3.0\n# nodejs 22.19.0\n")
 
@@ -105,6 +113,20 @@ describe("NodeVersionResolver", () => {
       join(tempDir, "package.json"),
       JSON.stringify({
         devEngines: { runtime: { name: "node", version: "22.19.0" } },
+        name: "test-project",
+      })
+    )
+
+    const source = await runResolve(tempDir)
+
+    expect(source).toEqual({ _tag: "File", path: "package.json" })
+  })
+
+  test("select package.json for a devEngines.runtime entry with a differently cased name", async () => {
+    await Bun.write(
+      join(tempDir, "package.json"),
+      JSON.stringify({
+        devEngines: { runtime: { name: "Node", version: "22.19.0" } },
         name: "test-project",
       })
     )

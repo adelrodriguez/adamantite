@@ -298,6 +298,96 @@ describe("init", () => {
     })
   })
 
+  describe("monorepo TypeScript setup", () => {
+    const monorepoGuidanceLogs = [
+      {
+        level: "info",
+        message:
+          "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project.",
+      },
+      {
+        level: "info",
+        message:
+          'To use the TypeScript preset, add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
+      },
+    ] as const
+
+    beforeEach(async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            name: "test-project",
+            version: "1.0.0",
+            workspaces: ["packages/*"],
+          },
+          null,
+          2
+        )
+      )
+    })
+
+    test("print guidance instead of creating a root tsconfig in a monorepo", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true, false, false],
+        multiselectResponses: [["check"], [], []],
+      })
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+
+      for (const log of monorepoGuidanceLogs) {
+        expect(prompter.logs).toContainEqual(log)
+      }
+    })
+
+    test("print guidance instead of creating a root tsconfig in non-interactive mode", async () => {
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "check", "--typescript"],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+
+      for (const log of monorepoGuidanceLogs) {
+        expect(prompter.logs).toContainEqual(log)
+      }
+    })
+
+    test("leave an existing root tsconfig unchanged in a monorepo", async () => {
+      const existingTsconfig = JSON.stringify(
+        {
+          extends: "./tooling/tsconfig.base.json",
+          files: [],
+          references: [{ path: "packages/app" }],
+        },
+        null,
+        2
+      )
+      await writeFile(join(tempDir, "tsconfig.json"), existingTsconfig)
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "check", "--typescript"],
+        [prompter.layer, installer.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await readFile(join(tempDir, "tsconfig.json"), "utf8")).toBe(existingTsconfig)
+    })
+  })
+
   describe("existing config updates", () => {
     test("update existing configs without dropping preserved user settings", async () => {
       const originalOxfmtConfig = [

@@ -137,9 +137,20 @@ const addScripts = (cwd: string, scripts: Script[]) =>
     )
   })
 
-const setupTypescript = (cwd: string) =>
+const setupTypescript = (cwd: string, isMonorepo: boolean) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
+
+    if (isMonorepo) {
+      yield* prompter.log.info(
+        "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project."
+      )
+      yield* prompter.log.info(
+        'To use the TypeScript preset, add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.'
+      )
+      return
+    }
+
     yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
@@ -723,7 +734,7 @@ export default Command.make("init", {
       }
 
       if (shouldSetupTypescript) {
-        yield* setupTypescript(cwd)
+        yield* setupTypescript(cwd, isMonorepo)
       }
 
       yield* setupEditors(cwd, selectedEditors)

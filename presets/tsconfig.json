@@ -8,6 +8,10 @@
     "resolveJsonModule": true,
     "moduleDetection": "force",
 
+    // The preset is a type-checking base. Set "noEmit": false in your project
+    // if you emit output with tsc.
+    "noEmit": true,
+
     // Strictness and best practices. We only recommend settings that are not
     // covered by linting rules.
     "strict": true,

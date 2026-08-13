@@ -1,3 +1,4 @@
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
@@ -7,7 +8,22 @@ import { FailedToReadFile, FailedToWriteFile, InvalidConfigFormat } from "#lib/s
 import { mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
-const CONFIG = { extends: "adamantite/typescript" }
+const PRESET_EXTENDS = "adamantite/typescript"
+const CONFIG = { extends: PRESET_EXTENDS }
+
+// Later entries in an `extends` array override earlier ones, so appending the
+// preset preserves the existing base while the preset's options win.
+function mergeExtends(existing: unknown) {
+  if (Predicate.isString(existing)) {
+    return existing === PRESET_EXTENDS ? existing : [existing, PRESET_EXTENDS]
+  }
+
+  if (Array.isArray(existing)) {
+    return existing.includes(PRESET_EXTENDS) ? existing : [...existing, PRESET_EXTENDS]
+  }
+
+  return PRESET_EXTENDS
+}
 
 export default defineIntegration({
   config: files[0].path,
@@ -46,7 +62,11 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: configPath })
       }
 
-      const newConfig = yield* mergeConfig(CONFIG, existingConfig)
+      const merged = yield* mergeConfig(CONFIG, existingConfig)
+      const newConfig = {
+        ...merged,
+        extends: mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined),
+      }
 
       yield* fs
         .writeFileString(configPath, `${JSON.stringify(newConfig, null, 2)}\n`)

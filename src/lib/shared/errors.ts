@@ -1,7 +1,48 @@
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { ParseError } from "jsonc-parser"
+import { stripVTControlCharacters } from "node:util"
+import * as Array from "effect/Array"
 import * as Data from "effect/Data"
+import { pipe } from "effect/Function"
+import * as Option from "effect/Option"
+import * as Predicate from "effect/Predicate"
+import * as String from "effect/String"
 import { printParseErrorCode } from "jsonc-parser"
+
+const MAX_CAUSE_OUTPUT_LINES = 20
+
+function causeLines(cause: unknown) {
+  return Predicate.isError(cause)
+    ? pipe(
+        stripVTControlCharacters(cause.message),
+        String.split(/\r\n|[\r\n]/),
+        Array.map((line) => String.trimEnd(line)),
+        Array.filter((line) => String.isNonEmpty(line))
+      )
+    : []
+}
+
+function formatCauseDetail(cause: unknown) {
+  return pipe(
+    causeLines(cause),
+    Array.head,
+    Option.map((line) => ` Cause: ${String.trim(line)}`),
+    Option.getOrElse(() => "")
+  )
+}
+
+function formatCauseOutput(cause: unknown) {
+  const lines = causeLines(cause)
+
+  if (!Array.isReadonlyArrayNonEmpty(lines)) {
+    return ""
+  }
+
+  const tail = Array.takeRight(lines, MAX_CAUSE_OUTPUT_LINES)
+  const shown = tail.length < lines.length ? ["…", ...tail] : tail
+
+  return `\n${shown.join("\n")}`
+}
 
 function formatParseErrors(errors: ParseError[] = []) {
   if (errors.length === 0) {
@@ -35,7 +76,7 @@ export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDir
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target directory"
-    return `Failed to create directory ${target}.`
+    return `Failed to create directory ${target}.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -45,7 +86,7 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
 }> {
   override get message() {
     const target = this.packages?.length ? `: ${this.packages.join(", ")}` : ""
-    return `Failed to install dependencies${target}.`
+    return `Failed to install dependencies${target}.${formatCauseOutput(this.cause)}`
   }
 }
 
@@ -55,7 +96,12 @@ export class FailedToInstallExtension extends Data.TaggedError("FailedToInstallE
 }> {
   override get message() {
     const target = this.extension ? `\`${this.extension}\`` : "the target extension"
-    return `Failed to install ${target}.`
+
+    if (Predicate.isNumber(this.cause)) {
+      return `Failed to install ${target}. The \`code\` CLI exited with code ${this.cause}.`
+    }
+
+    return `Failed to install ${target}.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -63,8 +109,7 @@ export class FailedToMergeConfig extends Data.TaggedError("FailedToMergeConfig")
   cause?: unknown
 }> {
   override get message() {
-    const detail = this.cause instanceof Error ? ` Cause: ${this.cause.message}` : ""
-    return `Failed to merge configuration.${detail}`
+    return `Failed to merge configuration.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -91,7 +136,7 @@ export class FailedToReadFile extends Data.TaggedError("FailedToReadFile")<{
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target file"
-    return `Failed to read ${target}.`
+    return `Failed to read ${target}.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -101,7 +146,7 @@ export class FailedToDeleteFile extends Data.TaggedError("FailedToDeleteFile")<{
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target file"
-    return `Failed to delete ${target}.`
+    return `Failed to delete ${target}.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -111,7 +156,7 @@ export class FailedToWriteFile extends Data.TaggedError("FailedToWriteFile")<{
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target file"
-    return `Failed to write ${target}.`
+    return `Failed to write ${target}.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -155,8 +200,7 @@ export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
   cause?: unknown
 }> {
   override get message() {
-    const detail = this.cause instanceof Error ? ` Cause: ${this.cause.message}` : ""
-    return `No package manager detected. Please run this command from a project with a lockfile.${detail}`
+    return `No package manager detected. Please run this command from a project with a lockfile.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -205,7 +249,6 @@ export class VscodeCliNotFound extends Data.TaggedError("VscodeCliNotFound")<{
   cause?: unknown
 }> {
   override get message() {
-    const detail = this.cause instanceof Error ? ` Cause: ${this.cause.message}` : ""
-    return `VS Code CLI (\`code\`) not found. Please install it to manage extensions.${detail}`
+    return `VS Code CLI (\`code\`) not found. Please install it to manage extensions.${formatCauseDetail(this.cause)}`
   }
 }

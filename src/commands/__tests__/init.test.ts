@@ -795,7 +795,7 @@ describe("init", () => {
       expect(prompter.logs).toContainEqual({
         level: "warning",
         message: expect.stringMatching(
-          /Could not update AGENTS\.md\. Failed to read `.*\/AGENTS\.md`\. Adamantite will continue initialization\./
+          /Could not update AGENTS\.md\. Failed to read `.*\/AGENTS\.md`\.( Cause: .*)? Adamantite will continue initialization\./
         ),
       })
       expect(prompter.logs).toContainEqual({

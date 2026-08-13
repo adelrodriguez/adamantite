@@ -18,9 +18,7 @@ import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
-import { printTitle } from "#lib/shared/terminal.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
@@ -33,6 +31,8 @@ import {
   type SupportedPackageManager,
 } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
+import { Prompter } from "#terminal/prompter.ts"
+import { printTitle } from "#terminal/title.ts"
 
 const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {

@@ -4,7 +4,7 @@ import * as prompts from "@clack/prompts"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Function from "effect/Function"
-import { Prompter } from "#lib/services/prompter.ts"
+import { Prompter } from "#terminal/prompter.ts"
 
 function createSpinner() {
   const messages: string[] = []

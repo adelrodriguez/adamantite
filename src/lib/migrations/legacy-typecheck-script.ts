@@ -4,7 +4,6 @@ import github from "#lib/integrations/ci/github.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { MigrationValidationFailed } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
@@ -15,6 +14,7 @@ import {
   MANAGED_SCRIPT_COMMANDS,
 } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
+import { Prompter } from "#terminal/prompter.ts"
 
 const LEGACY_TYPECHECK_SCRIPT_COMMAND = "adamantite typecheck"
 

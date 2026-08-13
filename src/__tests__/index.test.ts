@@ -14,7 +14,7 @@ import {
 } from "#commands/__tests__/command-test-helpers.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
-import { Prompter } from "#lib/services/prompter.ts"
+import { Prompter } from "#terminal/prompter.ts"
 
 function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
   return Effect.runPromiseExit(

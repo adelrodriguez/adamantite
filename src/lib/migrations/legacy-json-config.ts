@@ -5,7 +5,6 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { ToolingConfigState } from "#lib/workspace/tooling/config.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import {
   FailedToDeleteFile,
   FailedToReadFile,
@@ -14,6 +13,7 @@ import {
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
 import { parseJson } from "#lib/shared/json.ts"
+import { Prompter } from "#terminal/prompter.ts"
 
 interface LegacyJsonConfigIntegration {
   readonly config: string

@@ -18,8 +18,8 @@ import {
 } from "#lib/services/dependency-installer.ts"
 import { ForwardedArguments } from "#lib/services/forwarded-arguments.ts"
 import { NodeVersionResolver } from "#lib/services/node-version-resolver.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
+import { Prompter } from "#terminal/prompter.ts"
 
 interface LogEntry {
   readonly level: "error" | "info" | "success" | "warning"

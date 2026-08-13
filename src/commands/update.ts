@@ -14,10 +14,10 @@ import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { runMigration } from "#lib/migrations/base.ts"
 import { migrations } from "#lib/migrations/index.ts"
 import { DependencyInstaller } from "#lib/services/dependency-installer.ts"
-import { Prompter } from "#lib/services/prompter.ts"
 import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
-import { printTitle } from "#lib/shared/terminal.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
+import { Prompter } from "#terminal/prompter.ts"
+import { printTitle } from "#terminal/title.ts"
 
 const integrations = [oxlint, tsgolint, oxfmt, sherif, knip] as const
 const knownPackages = [

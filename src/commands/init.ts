@@ -137,9 +137,20 @@ const addScripts = (cwd: string, scripts: Script[]) =>
     )
   })
 
-const setupTypescript = (cwd: string) =>
+const setupTypescript = (cwd: string, isMonorepo: boolean) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
+
+    if (isMonorepo) {
+      yield* prompter.log.info(
+        "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project."
+      )
+      yield* prompter.log.info(
+        'To use the TypeScript preset, add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.'
+      )
+      return
+    }
+
     yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
@@ -535,8 +546,9 @@ const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")
   const shouldSetupTypescript = hasOxlint
     ? yield* prompter.confirm({
         initialValue: true,
-        message:
-          "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
+        message: isMonorepo
+          ? "Adamantite provides a TypeScript preset to enforce strict type-safety. In a monorepo, each package's `tsconfig.json` must extend it. Would you like instructions on how to set it up?"
+          : "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
       })
     : false
 
@@ -723,7 +735,7 @@ export default Command.make("init", {
       }
 
       if (shouldSetupTypescript) {
-        yield* setupTypescript(cwd)
+        yield* setupTypescript(cwd, isMonorepo)
       }
 
       yield* setupEditors(cwd, selectedEditors)

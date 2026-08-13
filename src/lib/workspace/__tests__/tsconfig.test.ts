@@ -97,7 +97,7 @@ describe("tsconfig", () => {
       expect(config.extends).toBe("adamantite/typescript")
     })
 
-    test("preserve the rest of the config when updating extends", async () => {
+    test("append the preset to an existing extends string instead of overwriting it", async () => {
       await Bun.write(
         "tsconfig.json",
         JSON.stringify(
@@ -117,8 +117,54 @@ describe("tsconfig", () => {
       const content = await Bun.file("tsconfig.json").text()
       const config = JSON.parse(content)
 
-      expect(config.extends).toBe("adamantite/typescript")
+      expect(config.extends).toEqual(["@company/tsconfig", "adamantite/typescript"])
       expect(config.compilerOptions).toEqual({ target: "ES2020" })
+    })
+
+    test("keep extends as a string when it is already the preset", async () => {
+      await Bun.write(
+        "tsconfig.json",
+        JSON.stringify({ extends: "adamantite/typescript" }, null, 2)
+      )
+
+      await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file("tsconfig.json").text()
+      const config = JSON.parse(content)
+
+      expect(config.extends).toBe("adamantite/typescript")
+    })
+
+    test("append the preset to an existing extends array", async () => {
+      await Bun.write(
+        "tsconfig.json",
+        JSON.stringify({ extends: ["@company/tsconfig", "@company/tsconfig-strict"] }, null, 2)
+      )
+
+      await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file("tsconfig.json").text()
+      const config = JSON.parse(content)
+
+      expect(config.extends).toEqual([
+        "@company/tsconfig",
+        "@company/tsconfig-strict",
+        "adamantite/typescript",
+      ])
+    })
+
+    test("leave an extends array unchanged when it already contains the preset", async () => {
+      await Bun.write(
+        "tsconfig.json",
+        JSON.stringify({ extends: ["adamantite/typescript", "@company/tsconfig"] }, null, 2)
+      )
+
+      await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file("tsconfig.json").text()
+      const config = JSON.parse(content)
+
+      expect(config.extends).toEqual(["adamantite/typescript", "@company/tsconfig"])
     })
 
     test("merge an empty config with Adamantite's config", async () => {

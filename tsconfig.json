@@ -6,8 +6,7 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
-    "types": ["bun"],
-    "noEmit": true
+    "types": ["bun"]
   },
   "include": ["src", "presets/**/*.ts", "oxlint.config.ts"],
   "exclude": [".packref", "dist", "node_modules"]

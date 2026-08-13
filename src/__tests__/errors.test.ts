@@ -124,7 +124,16 @@ describe("errors", () => {
       const error = new FailedToWriteFile({ cause, path: "/repo/oxlint.json" })
 
       expect(error.message).toBe(
-        "Failed to write `/repo/oxlint.json`. Cause: PermissionDenied: FileSystem.writeFile (/repo/oxlint.json)"
+        "Failed to write `/repo/oxlint.json`. Cause: PermissionDenied: FileSystem.writeFile (/repo/oxlint.json)."
+      )
+    })
+
+    test("do not double the period when the cause already ends with one", () => {
+      const cause = new Error("Something went wrong.")
+      const error = new FailedToWriteFile({ cause, path: "/repo/oxlint.json" })
+
+      expect(error.message).toBe(
+        "Failed to write `/repo/oxlint.json`. Cause: Something went wrong."
       )
     })
 
@@ -159,7 +168,7 @@ describe("errors", () => {
       const error = new FailedToInstallExtension({ cause, extension: "oxc.oxc-vscode" })
 
       expect(error.message).toBe(
-        "Failed to install `oxc.oxc-vscode`. Cause: SystemError: spawn code EAGAIN"
+        "Failed to install `oxc.oxc-vscode`. Cause: SystemError: spawn code EAGAIN."
       )
     })
   })

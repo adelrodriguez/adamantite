@@ -26,7 +26,10 @@ function formatCauseDetail(cause: unknown) {
   return pipe(
     causeLines(cause),
     Array.head,
-    Option.map((line) => ` Cause: ${String.trim(line)}`),
+    Option.map((line) => {
+      const detail = String.trim(line)
+      return /[.!?]$/.test(detail) ? ` Cause: ${detail}` : ` Cause: ${detail}.`
+    }),
     Option.getOrElse(() => "")
   )
 }

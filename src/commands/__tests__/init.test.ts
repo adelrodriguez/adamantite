@@ -988,6 +988,39 @@ describe("init", () => {
       expect(installer.calls).toEqual([])
     })
 
+    test("continue successfully and show the exit code when the extension install fails", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true, false, false],
+        multiselectResponses: [["format"], ["vscode"]],
+      })
+      const installer = createDependencyInstallerTestContext()
+      const runner = createRunnerTestContext({
+        implementation: (options) =>
+          Effect.succeed(ChildProcessSpawner.ExitCode(options.command === "code" ? 1 : 0)),
+      })
+
+      const exit = await runCommand(
+        initCommand,
+        [],
+        [prompter.layer, installer.layer, runner.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "⚠️ Failed to install `oxc.oxc-vscode`. The `code` CLI exited with code 1.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "Please install it manually after setup completes.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "Your project is now configured",
+      })
+    })
+
     test("continue successfully and show guidance when the VS Code CLI is unavailable", async () => {
       const prompter = createPrompterTestContext({
         confirmResponses: [true, false, false],

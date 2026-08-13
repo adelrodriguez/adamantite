@@ -65,7 +65,7 @@ describe("github", () => {
       expect(content).toContain("command: bun run check")
       expect(content).toContain("Setup Node.js")
       expect(content).toContain("actions/setup-node@v7")
-      expect(content).toContain('node-version: "24"')
+      expect(content).toContain('node-version: "26"')
       expect(content).toContain("Setup Bun")
       expect(content).toContain("Cache dependencies")
       expect(content).toContain("actions/cache@v6")

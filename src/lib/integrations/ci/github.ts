@@ -16,7 +16,7 @@ const setupSteps: Record<SupportedPackageManager, string> = {
   bun: `      - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version: "26"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -41,7 +41,7 @@ const setupSteps: Record<SupportedPackageManager, string> = {
   npm: `      - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version: "26"
           cache: "npm"
 
       - name: Install dependencies
@@ -52,7 +52,7 @@ const setupSteps: Record<SupportedPackageManager, string> = {
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version: "26"
           cache: "pnpm"
 
       - name: Install dependencies
@@ -60,7 +60,7 @@ const setupSteps: Record<SupportedPackageManager, string> = {
   yarn: `      - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: "24"
+          node-version: "26"
           cache: "yarn"
 
       - name: Install dependencies

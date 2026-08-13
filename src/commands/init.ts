@@ -546,8 +546,9 @@ const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")
   const shouldSetupTypescript = hasOxlint
     ? yield* prompter.confirm({
         initialValue: true,
-        message:
-          "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
+        message: isMonorepo
+          ? "Adamantite provides a TypeScript preset to enforce strict type-safety. In a monorepo, each package's `tsconfig.json` must extend it. Would you like instructions on how to set it up?"
+          : "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
       })
     : false
 

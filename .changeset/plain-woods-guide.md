@@ -1,5 +1,5 @@
 ---
-"adamantite": patch
+"adamantite": minor
 ---
 
 Skip root `tsconfig.json` creation and updates during `init` in a detected monorepo. A catch-all root config makes TypeScript treat all workspace packages as one project and can try to emit over JavaScript input files. In a monorepo, `init --typescript` now prints guidance to add `"extends": "adamantite/typescript"` to each package's `tsconfig.json` or to a shared base config, and does not change any files.

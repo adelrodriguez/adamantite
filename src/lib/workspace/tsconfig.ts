@@ -11,8 +11,9 @@ const files = [{ path: "tsconfig.json", type: "config" }] as const
 const PRESET_EXTENDS = "adamantite/typescript"
 const CONFIG = { extends: PRESET_EXTENDS }
 
-// Later entries in an `extends` array override earlier ones, so appending the
-// preset preserves the existing base while the preset's options win.
+// Later entries in an `extends` array override earlier ones, so the preset is
+// appended last when Adamantite adds it. An array that already contains the
+// preset is kept in the user's order, even when the preset is not last.
 function mergeExtends(existing: unknown) {
   if (Predicate.isString(existing)) {
     return existing === PRESET_EXTENDS ? existing : [existing, PRESET_EXTENDS]

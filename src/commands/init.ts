@@ -5,6 +5,7 @@ import process from "node:process"
 import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
 import * as Predicate from "effect/Predicate"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
@@ -30,7 +31,7 @@ import {
   type Script,
   type SupportedPackageManager,
 } from "#lib/workspace/package-json.ts"
-import tsconfig from "#lib/workspace/tsconfig.ts"
+import tsconfig, { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 
@@ -142,11 +143,9 @@ const setupTypescript = (cwd: string, isMonorepo: boolean) =>
     const prompter = yield* Prompter
 
     if (isMonorepo) {
-      yield* prompter.log.info(
-        "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project."
-      )
-      yield* prompter.log.info(
-        'To use the TypeScript preset, add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.'
+      yield* pipe(
+        MONOREPO_GUIDANCE,
+        Effect.forEach((line) => prompter.log.info(line))
       )
       return
     }

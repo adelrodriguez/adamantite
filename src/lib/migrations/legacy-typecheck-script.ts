@@ -1,5 +1,6 @@
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
 import github from "#lib/integrations/ci/github.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
@@ -13,7 +14,8 @@ import {
   writePackageJson,
   MANAGED_SCRIPT_COMMANDS,
 } from "#lib/workspace/package-json.ts"
-import tsconfig from "#lib/workspace/tsconfig.ts"
+import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
+import tsconfig, { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 const LEGACY_TYPECHECK_SCRIPT_COMMAND = "adamantite typecheck"
@@ -97,8 +99,17 @@ export default defineMigration({
           yield* oxlint.update(context.cwd)
         }
 
-        const hasTypescriptConfig = yield* tsconfig.detect(context.cwd)
-        yield* hasTypescriptConfig ? tsconfig.update(context.cwd) : tsconfig.create(context.cwd)
+        const isMonorepo = yield* checkIsMonorepo(context.cwd)
+
+        if (isMonorepo) {
+          yield* pipe(
+            MONOREPO_GUIDANCE,
+            Effect.forEach((line) => prompter.log.info(line))
+          )
+        } else {
+          const hasTypescriptConfig = yield* tsconfig.detect(context.cwd)
+          yield* hasTypescriptConfig ? tsconfig.update(context.cwd) : tsconfig.create(context.cwd)
+        }
 
         const workflowExists = yield* github.detect(context.cwd)
         const managedScripts = getManagedScripts(migratedPackageJson.packageJson)
@@ -170,6 +181,12 @@ export default defineMigration({
           migrationId: "legacy-typecheck-script",
           reason: `\`${oxlint.config}\` is not the active oxlint config.`,
         })
+      }
+
+      const isMonorepo = yield* checkIsMonorepo(context.cwd)
+
+      if (isMonorepo) {
+        return
       }
 
       const hasTypescriptConfig = yield* tsconfig.detect(context.cwd)

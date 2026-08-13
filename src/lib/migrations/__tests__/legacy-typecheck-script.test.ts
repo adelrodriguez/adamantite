@@ -13,13 +13,13 @@ import {
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
 import migrationLegacyTypecheckScript from "#lib/migrations/legacy-typecheck-script.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 
 function runTestEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
-  options?: Parameters<typeof createDependencyInstallerTestContext>[0]
+  prompterContext = createPrompterTestContext()
 ) {
-  const prompterContext = createPrompterTestContext()
-  const dependencyInstallerContext = createDependencyInstallerTestContext(options)
+  const dependencyInstallerContext = createDependencyInstallerTestContext()
   const provided = effect.pipe(
     Effect.provide(
       Layer.mergeAll(
@@ -200,6 +200,69 @@ describe("legacyTypecheckScript", () => {
     expect(oxlintConfig).toBe(migratedOxlintConfig)
     expect(tsconfig.compilerOptions).toEqual({ strict: true })
     expect(tsconfig.extends).toBe("adamantite/typescript")
+  })
+
+  test("migrate prints guidance instead of writing a root tsconfig in a monorepo", async () => {
+    await Bun.write(
+      "package.json",
+      JSON.stringify(
+        {
+          name: "test-project",
+          scripts: {
+            typecheck: "adamantite typecheck",
+          },
+          version: "1.0.0",
+          workspaces: ["packages/*"],
+        },
+        null,
+        2
+      )
+    )
+
+    const prompterContext = createPrompterTestContext()
+    await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }), prompterContext)
+
+    expect(await Bun.file("tsconfig.json").exists()).toBe(false)
+
+    for (const message of MONOREPO_GUIDANCE) {
+      expect(prompterContext.logs).toContainEqual({ level: "info", message })
+    }
+
+    await runTestEffect(migrationLegacyTypecheckScript.validate({ cwd: tempDir }))
+  })
+
+  test("migrate leaves an existing root tsconfig unchanged in a monorepo", async () => {
+    await Bun.write(
+      "package.json",
+      JSON.stringify(
+        {
+          name: "test-project",
+          scripts: {
+            typecheck: "adamantite typecheck",
+          },
+          version: "1.0.0",
+        },
+        null,
+        2
+      )
+    )
+    await Bun.write("pnpm-workspace.yaml", "packages:\n  - packages/*\n")
+    const existingTsconfig = JSON.stringify(
+      {
+        extends: "./tooling/tsconfig.base.json",
+        files: [],
+        references: [{ path: "packages/app" }],
+      },
+      null,
+      2
+    )
+    await Bun.write("tsconfig.json", existingTsconfig)
+
+    await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
+
+    expect(await Bun.file("tsconfig.json").text()).toBe(existingTsconfig)
+
+    await runTestEffect(migrationLegacyTypecheckScript.validate({ cwd: tempDir }))
   })
 
   test("migrate updates the GitHub Actions workflow when it exists", async () => {

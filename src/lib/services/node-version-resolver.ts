@@ -33,6 +33,8 @@ function versionSource(value: string): NodeVersionSource {
   return { _tag: "Version", value }
 }
 
+const VERSION_FILES = [".node-version", ".nvmrc"] as const
+
 const VoltaDeclaration = Schema.Struct({
   volta: Schema.Struct({ node: Schema.NonEmptyString }),
 })
@@ -112,7 +114,7 @@ export class NodeVersionResolver extends Context.Service<
 
       return {
         resolve: Effect.fn("NodeVersionResolver.resolve")(function* (cwd: string) {
-          for (const file of [".node-version", ".nvmrc"]) {
+          for (const file of VERSION_FILES) {
             const content = yield* readDeclarationFile(cwd, file)
 
             if (content !== null && Str.isNonEmpty(content.trim())) {

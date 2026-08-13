@@ -11,6 +11,11 @@ const files = [{ path: "tsconfig.json", type: "config" }] as const
 const PRESET_EXTENDS = "adamantite/typescript"
 const CONFIG = { extends: PRESET_EXTENDS }
 
+export const MONOREPO_GUIDANCE = [
+  "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project.",
+  `To use the TypeScript preset, add \`"extends": "${PRESET_EXTENDS}"\` to each package's \`tsconfig.json\` or to a shared base config.`,
+] as const
+
 // Later entries in an `extends` array override earlier ones, so the preset is
 // appended last when Adamantite adds it. An array that already contains the
 // preset is kept in the user's order, even when the preset is not last.

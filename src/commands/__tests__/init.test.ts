@@ -882,7 +882,7 @@ describe("init", () => {
       expect(prompter.logs).toContainEqual({
         level: "warning",
         message:
-          "Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Use `--overwrite-scripts` to replace it.",
+          "Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Re-run `adamantite init` and confirm overwriting to replace it.",
       })
     })
 

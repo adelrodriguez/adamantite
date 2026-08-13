@@ -119,11 +119,15 @@ function setupToolConfig<E, R>(
 const describeScriptConflict = (conflict: ScriptConflict) =>
   `\`${conflict.script}\` is currently \`${conflict.command}\`; Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
 
-const addScripts = (cwd: string, scripts: Script[], overwriteScripts: boolean) =>
+const addScripts = (
+  cwd: string,
+  scripts: Script[],
+  options: { readonly nonInteractive: boolean; readonly overwriteScripts: boolean }
+) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const packageJson = yield* readPackageJson(cwd)
-    const conflicts = overwriteScripts ? [] : getConflictingScripts(packageJson, scripts)
+    const conflicts = options.overwriteScripts ? [] : getConflictingScripts(packageJson, scripts)
     const conflictingNames = new Set(conflicts.map((conflict) => conflict.script))
     const writtenScripts = scripts.filter((script) => !conflictingNames.has(script))
 
@@ -146,17 +150,21 @@ const addScripts = (cwd: string, scripts: Script[], overwriteScripts: boolean) =
         failure: "Failed to add scripts to `package.json`.",
         start: "Adding scripts to your `package.json`...",
         success:
-          writtenScripts.length === 0
-            ? "Kept your existing `package.json` scripts."
-            : conflicts.length > 0
-              ? "Scripts added to your `package.json`; conflicting scripts were kept."
-              : "Scripts added to your `package.json`",
+          conflicts.length === 0
+            ? "Scripts added to your `package.json`"
+            : writtenScripts.length === 0
+              ? "Kept your existing `package.json` scripts."
+              : "Scripts added to your `package.json`; conflicting scripts were kept.",
       }
     )
 
+    const replaceHint = options.nonInteractive
+      ? "Use `--overwrite-scripts` to replace it."
+      : "Re-run `adamantite init` and confirm overwriting to replace it."
+
     for (const conflict of conflicts) {
       yield* prompter.log.warning(
-        `Kept existing \`${conflict.script}\` script (\`${conflict.command}\`) instead of \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`. Use \`--overwrite-scripts\` to replace it.`
+        `Kept existing \`${conflict.script}\` script (\`${conflict.command}\`) instead of \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`. ${replaceHint}`
       )
     }
 
@@ -789,7 +797,10 @@ export default Command.make("init", {
         yield* setupToolConfig(cwd, knip, knip.create(cwd))
       }
 
-      const writtenScripts = yield* addScripts(cwd, selectedScripts, initOptions.overwriteScripts)
+      const writtenScripts = yield* addScripts(cwd, selectedScripts, {
+        nonInteractive: options.nonInteractive,
+        overwriteScripts: initOptions.overwriteScripts,
+      })
 
       if (shouldAddAgentsGuidance) {
         yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts)

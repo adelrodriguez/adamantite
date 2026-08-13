@@ -7,6 +7,7 @@ import { defineMigration } from "#lib/migrations/base.ts"
 import { MigrationValidationFailed } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   checkIsSupportedPackageManager,
   getManagedScripts,
@@ -14,7 +15,6 @@ import {
   writePackageJson,
   MANAGED_SCRIPT_COMMANDS,
 } from "#lib/workspace/package-json.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import tsconfig, { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 import { Prompter } from "#terminal/prompter.ts"
 

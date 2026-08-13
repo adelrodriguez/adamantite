@@ -249,9 +249,7 @@ const installEditorExtensions = (editors: string[], scripts: Script[]) =>
       .pipe(
         Effect.catchTag("FailedToInstallExtension", (error) =>
           Effect.gen(function* () {
-            yield* prompter.log.warning(
-              `⚠️ Failed to install the \`${error.extension}\` extension.`
-            )
+            yield* prompter.log.warning(`⚠️ ${error.message}`)
             yield* prompter.log.warning("Please install it manually after setup completes.")
             return false as const
           })

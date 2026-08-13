@@ -885,7 +885,7 @@ describe("init", () => {
       expect(prompter.logs).toContainEqual({
         level: "warning",
         message: expect.stringMatching(
-          /Could not update AGENTS\.md\. Failed to read `.*\/AGENTS\.md`\. Adamantite will continue initialization\./
+          /Could not update AGENTS\.md\. Failed to read `.*\/AGENTS\.md`\.( Cause: .*)? Adamantite will continue initialization\./
         ),
       })
       expect(prompter.logs).toContainEqual({
@@ -1076,6 +1076,39 @@ describe("init", () => {
       expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])
       expect(prompter.outros).toEqual([])
       expect(installer.calls).toEqual([])
+    })
+
+    test("continue successfully and show the exit code when the extension install fails", async () => {
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true, false, false],
+        multiselectResponses: [["format"], ["vscode"]],
+      })
+      const installer = createDependencyInstallerTestContext()
+      const runner = createRunnerTestContext({
+        implementation: (options) =>
+          Effect.succeed(ChildProcessSpawner.ExitCode(options.command === "code" ? 1 : 0)),
+      })
+
+      const exit = await runCommand(
+        initCommand,
+        [],
+        [prompter.layer, installer.layer, runner.layer]
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "⚠️ Failed to install `oxc.oxc-vscode`. The `code` CLI exited with code 1.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "Please install it manually after setup completes.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "Your project is now configured",
+      })
     })
 
     test("continue successfully and show guidance when the VS Code CLI is unavailable", async () => {

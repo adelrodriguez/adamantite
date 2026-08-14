@@ -6,26 +6,19 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import {
-  createDependencyInstallerTestContext,
-  createPrompterTestContext,
-} from "#commands/__tests__/command-test-helpers.ts"
+import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
 import migrationLegacyTypecheckScript from "#lib/migrations/legacy-typecheck-script.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 
-function runTestEffect<A, E, R>(
-  effect: Effect.Effect<A, E, R>,
-  prompterContext = createPrompterTestContext()
-) {
+function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
   const dependencyInstallerContext = createDependencyInstallerTestContext()
   const provided = effect.pipe(
     Effect.provide(
       Layer.mergeAll(
         NodeServices.layer,
         NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
-        prompterContext.layer,
         dependencyInstallerContext.layer
       )
     )
@@ -202,7 +195,7 @@ describe("legacyTypecheckScript", () => {
     expect(tsconfig.extends).toBe("adamantite/typescript")
   })
 
-  test("migrate prints guidance instead of writing a root tsconfig in a monorepo", async () => {
+  test("migrate returns guidance instead of writing a root tsconfig in a monorepo", async () => {
     await Bun.write(
       "package.json",
       JSON.stringify(
@@ -219,14 +212,10 @@ describe("legacyTypecheckScript", () => {
       )
     )
 
-    const prompterContext = createPrompterTestContext()
-    await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }), prompterContext)
+    const result = await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
     expect(await Bun.file("tsconfig.json").exists()).toBe(false)
-
-    for (const message of MONOREPO_GUIDANCE) {
-      expect(prompterContext.logs).toContainEqual({ level: "info", message })
-    }
+    expect(result.warnings).toEqual([...MONOREPO_GUIDANCE])
 
     await runTestEffect(migrationLegacyTypecheckScript.validate({ cwd: tempDir }))
   })

@@ -587,9 +587,9 @@ describe("doctor", () => {
     expect(installer.calls).toEqual([])
     expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(false)
     expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
-    expect(prompter.spinnerEntries).toContainEqual({
-      message: "Oxfmt config migrated to `oxfmt.config.ts` successfully.",
-      type: "stop",
+    expect(prompter.logs).toContainEqual({
+      level: "success",
+      message: "Fixed: Migrate legacy `.oxfmtrc.json` to `oxfmt.config.ts`.",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
   })
@@ -672,9 +672,9 @@ describe("doctor", () => {
       level: "success",
       message: `Fixed: installed \`${oxfmt.name}@${oxfmt.version}\`.`,
     })
-    expect(prompter.spinnerEntries).toContainEqual({
-      message: "Oxfmt config migrated to `oxfmt.config.ts` successfully.",
-      type: "stop",
+    expect(prompter.logs).toContainEqual({
+      level: "success",
+      message: "Fixed: Migrate legacy `.oxfmtrc.json` to `oxfmt.config.ts`.",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
   })
@@ -790,9 +790,9 @@ describe("doctor", () => {
     expect(installer.calls).toEqual([])
     expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(false)
     expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
-    expect(prompter.spinnerEntries).toContainEqual({
-      message: "Knip config migrated to `knip.config.ts` successfully.",
-      type: "stop",
+    expect(prompter.logs).toContainEqual({
+      level: "success",
+      message: "Fixed: Migrate legacy `knip.json` to `knip.config.ts`.",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
   })
@@ -838,9 +838,9 @@ describe("doctor", () => {
       level: "success",
       message: `Fixed: installed \`${knip.name}@${knip.version}\`.`,
     })
-    expect(prompter.spinnerEntries).toContainEqual({
-      message: "Knip config migrated to `knip.config.ts` successfully.",
-      type: "stop",
+    expect(prompter.logs).toContainEqual({
+      level: "success",
+      message: "Fixed: Migrate legacy `knip.json` to `knip.config.ts`.",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
   })
@@ -959,9 +959,9 @@ describe("doctor", () => {
     expect(installer.calls).toEqual([])
     expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
     expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
-    expect(prompter.spinnerEntries).toContainEqual({
-      message: "Oxlint config migrated to `oxlint.config.ts` successfully.",
-      type: "stop",
+    expect(prompter.logs).toContainEqual({
+      level: "success",
+      message: "Fixed: Migrate legacy `.oxlintrc.json` to `oxlint.config.ts`.",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
   })
@@ -1008,9 +1008,9 @@ describe("doctor", () => {
       level: "success",
       message: `Fixed: installed \`${oxlint.name}@${oxlint.version}\`.`,
     })
-    expect(prompter.spinnerEntries).toContainEqual({
-      message: "Oxlint config migrated to `oxlint.config.ts` successfully.",
-      type: "stop",
+    expect(prompter.logs).toContainEqual({
+      level: "success",
+      message: "Fixed: Migrate legacy `.oxlintrc.json` to `oxlint.config.ts`.",
     })
     expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
   })

@@ -5,15 +5,10 @@ import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
-import { createPrompterTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationLegacyOxfmtJson from "#lib/migrations/legacy-oxfmt-json.ts"
 
 function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
-  const prompterContext = createPrompterTestContext()
-  const provided = effect.pipe(
-    Effect.provide(Layer.merge(NodeServices.layer, prompterContext.layer))
-  ) as Effect.Effect<A, E>
+  const provided = effect.pipe(Effect.provide(NodeServices.layer)) as Effect.Effect<A, E>
 
   return Effect.runPromise(provided)
 }

@@ -148,7 +148,13 @@ export default Command.make("doctor", { fix }).pipe(
               continue
             }
 
-            yield* runMigration(migration, { cwd })
+            const result = yield* runMigration(migration, { cwd })
+
+            for (const warning of result.warnings) {
+              yield* prompter.log.warning(warning)
+            }
+
+            yield* prompter.log.success(`Fixed: ${action.description}`)
             appliedActions.add(entry)
           }
         }).pipe(

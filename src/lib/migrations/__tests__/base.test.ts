@@ -27,6 +27,20 @@ describe("runMigration", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
+  test("return the migrate result", async () => {
+    const migration = defineMigration({
+      check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
+      id: "reporting-migration",
+      migrate: () => Effect.succeed({ warnings: ["something to surface"] }),
+      tags: ["update"],
+      title: "Reporting migration",
+    })
+
+    const result = await runTestEffect(runMigration(migration, { cwd: tempDir }))
+
+    expect(result).toEqual({ warnings: ["something to surface"] })
+  })
+
   test("restore tracked files when migrate fails", async () => {
     await Bun.write("existing.txt", "before\n")
 
@@ -60,7 +74,10 @@ describe("runMigration", () => {
       check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
       files: ["existing.txt"],
       id: "invalid-migration",
-      migrate: () => Effect.promise(() => Bun.write("existing.txt", "after\n")),
+      migrate: () =>
+        Effect.promise(() => Bun.write("existing.txt", "after\n")).pipe(
+          Effect.as({ warnings: [] })
+        ),
       tags: ["update"],
       title: "Invalid migration",
       validate: () =>

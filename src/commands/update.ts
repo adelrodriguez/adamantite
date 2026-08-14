@@ -98,13 +98,19 @@ export default Command.make("update").pipe(
           continue
         }
 
-        yield* prompter.log.info(result.summary)
+        const runResult = yield* prompter.withSpinner(
+          () => runMigration(migration, migrationContext),
+          {
+            failure: `Migration "${migration.title}" failed, files restored.`,
+            start: result.summary,
+            success: `Migration "${migration.title}" completed successfully.`,
+          }
+        )
 
-        yield* runMigration(migration, migrationContext, {
-          onRestore: prompter.log.warning(
-            `Migration "${migration.title}" failed, restoring files...`
-          ),
-        })
+        for (const warning of runResult.warnings) {
+          yield* prompter.log.warning(warning)
+        }
+
         migratedIds.push(migration.id)
       }
 

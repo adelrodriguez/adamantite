@@ -13,6 +13,7 @@ import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
+import { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,
@@ -402,6 +403,40 @@ describe("update", () => {
         prompter.logs.filter((entry) => entry.level === "success").map((entry) => entry.message)
       ).toEqual(["Migrations ran successfully.", "Dependencies updated successfully."])
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
+    })
+
+    test("surface migration warnings during a monorepo typecheck migration", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+            },
+            name: "test-project",
+            scripts: {
+              typecheck: "adamantite typecheck",
+            },
+            version: "1.0.0",
+            workspaces: ["packages/*"],
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+
+      for (const message of MONOREPO_GUIDANCE) {
+        expect(prompter.logs).toContainEqual({ level: "warning", message })
+      }
     })
 
     test("enable type-checked linting in an existing oxlint.config.ts during typecheck migration", async () => {

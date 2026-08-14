@@ -2,7 +2,6 @@ import process from "node:process"
 import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import { pipe } from "effect/Function"
 import * as Result from "effect/Result"
 import * as Command from "effect/unstable/cli/Command"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
@@ -73,28 +72,34 @@ export default Command.make("update").pipe(
 
       const assessments = yield* collectAssessments()
 
-      const migrationChecks = yield* pipe(
-        migrations.filter((candidate) => candidate.tags.includes("update")),
-        Effect.forEach((migration) =>
-          migration.check(migrationContext).pipe(Effect.map((result) => ({ migration, result })))
-        )
-      )
+      // Assessments, checks, and migrations derive warnings from the same detected state, so a
+      // shared Set collapses the overlap.
+      const printedWarnings = new Set<string>()
 
-      // Assessments and migration checks derive warnings from the same detected state, so a Set
-      // collapses the overlap.
-      const warnings = new Set([
-        ...assessments.flatMap(({ assessment }) => assessment.warnings),
-        ...migrationChecks.flatMap(({ result }) => result.warnings),
-      ])
+      const printWarnings = (warnings: readonly string[]) =>
+        Effect.gen(function* () {
+          for (const warning of warnings) {
+            if (printedWarnings.has(warning)) {
+              continue
+            }
 
-      for (const warning of warnings) {
-        yield* prompter.log.warning(warning)
-      }
+            printedWarnings.add(warning)
+            yield* prompter.log.warning(warning)
+          }
+        })
+
+      yield* printWarnings(assessments.flatMap(({ assessment }) => assessment.warnings))
 
       const migratedIds: string[] = []
 
-      for (const { migration, result } of migrationChecks) {
-        if (result.status !== "needed") {
+      // Each check runs immediately before its migration: earlier migrations change the
+      // workspace, so a batched up-front check would decide from stale state.
+      for (const migration of migrations.filter((candidate) => candidate.tags.includes("update"))) {
+        const checkResult = yield* migration.check(migrationContext)
+
+        yield* printWarnings(checkResult.warnings)
+
+        if (checkResult.status !== "needed") {
           continue
         }
 
@@ -102,14 +107,12 @@ export default Command.make("update").pipe(
           () => runMigration(migration, migrationContext),
           {
             failure: `Migration "${migration.title}" failed, files restored.`,
-            start: result.summary,
+            start: checkResult.summary,
             success: `Migration "${migration.title}" completed successfully.`,
           }
         )
 
-        for (const warning of runResult.warnings) {
-          yield* prompter.log.warning(warning)
-        }
+        yield* printWarnings(runResult.warnings)
 
         migratedIds.push(migration.id)
       }

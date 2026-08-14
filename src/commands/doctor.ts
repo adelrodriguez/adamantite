@@ -148,13 +148,29 @@ export default Command.make("doctor", { fix }).pipe(
               continue
             }
 
-            const result = yield* runMigration(migration, { cwd })
+            // Same gate as `update`: check() alone decides whether migrate runs, re-evaluated
+            // against the current workspace state rather than the assessment snapshot.
+            const checkResult = yield* migration.check({ cwd })
+
+            for (const warning of checkResult.warnings) {
+              yield* prompter.log.warning(warning)
+            }
+
+            if (checkResult.status !== "needed") {
+              appliedActions.add(entry)
+              continue
+            }
+
+            const result = yield* prompter.withSpinner(() => runMigration(migration, { cwd }), {
+              failure: `Migration "${migration.title}" failed, files restored.`,
+              start: checkResult.summary,
+              success: `Fixed: ${action.description}`,
+            })
 
             for (const warning of result.warnings) {
               yield* prompter.log.warning(warning)
             }
 
-            yield* prompter.log.success(`Fixed: ${action.description}`)
             appliedActions.add(entry)
           }
         }).pipe(

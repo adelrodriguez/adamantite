@@ -405,6 +405,53 @@ describe("update", () => {
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })
 
+    test("skip warning about a workflow that an earlier migration already regenerated", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+            },
+            name: "test-project",
+            scripts: {
+              typecheck: "adamantite typecheck",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true })
+      await writeFile(
+        join(tempDir, ".github", "workflows", "adamantite.yml"),
+        'name: adamantite\njobs:\n  verify:\n    steps:\n      - uses: actions/setup-node@v7\n        with:\n          node-version: "26"\n'
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      // The typecheck migration adds the `check` script and regenerates the workflow, so the
+      // node-version migration's check must see that state instead of warning from a stale one.
+      const workflow = await readFile(
+        join(tempDir, ".github", "workflows", "adamantite.yml"),
+        "utf8"
+      )
+      expect(workflow).not.toContain('node-version: "26"')
+      expect(prompter.logs).not.toContainEqual({
+        level: "warning",
+        message:
+          "No CI-compatible managed scripts were found, so the GitHub Actions workflow was not updated.",
+      })
+    })
+
     test("surface migration warnings during a monorepo typecheck migration", async () => {
       await writeFile(
         join(tempDir, "package.json"),

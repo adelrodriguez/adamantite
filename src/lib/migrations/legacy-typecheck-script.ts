@@ -82,6 +82,10 @@ export default defineMigration({
       const packageJson = yield* readPackageJson(context.cwd)
       const migratedPackageJson = migrateLegacyTypecheckScriptPackageJson(packageJson)
 
+      if (!migratedPackageJson.migrated) {
+        return yield* Effect.die(new Error("check() guaranteed the legacy typecheck script exists"))
+      }
+
       yield* writePackageJson(context.cwd, migratedPackageJson.packageJson)
 
       const oxlintState = yield* oxlint.detect(context.cwd)

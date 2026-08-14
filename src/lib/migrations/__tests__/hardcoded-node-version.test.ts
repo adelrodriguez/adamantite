@@ -6,10 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import {
-  createDependencyInstallerTestContext,
-  createPrompterTestContext,
-} from "#commands/__tests__/command-test-helpers.ts"
+import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationHardcodedNodeVersion from "#lib/migrations/hardcoded-node-version.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
@@ -28,14 +25,12 @@ function runTestEffect<A, E, R>(
   effect: Effect.Effect<A, E, R>,
   options?: Parameters<typeof createDependencyInstallerTestContext>[0]
 ) {
-  const prompterContext = createPrompterTestContext()
   const dependencyInstallerContext = createDependencyInstallerTestContext(options)
   const provided = effect.pipe(
     Effect.provide(
       Layer.mergeAll(
         NodeServices.layer,
         NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
-        prompterContext.layer,
         dependencyInstallerContext.layer
       )
     )
@@ -140,7 +135,7 @@ describe("hardcodedNodeVersion", () => {
     await runTestEffect(migrationHardcodedNodeVersion.validate({ cwd: tempDir }))
   })
 
-  test("migrate leaves the workflow unchanged without CI-compatible managed scripts", async () => {
+  test("check reports not-applicable with a warning without CI-compatible managed scripts", async () => {
     await Bun.write(
       "package.json",
       JSON.stringify({ name: "test-project", version: "1.0.0" }, null, 2)
@@ -148,26 +143,49 @@ describe("hardcodedNodeVersion", () => {
     mkdirSync(".github/workflows", { recursive: true })
     await Bun.write(".github/workflows/adamantite.yml", HARDCODED_WORKFLOW)
 
-    await runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }))
+    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
 
-    const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
-    expect(workflow).toBe(HARDCODED_WORKFLOW)
-
-    await runTestEffect(migrationHardcodedNodeVersion.validate({ cwd: tempDir }))
-  })
-
-  test("migrate leaves the workflow unchanged for an unsupported package manager", async () => {
-    await writeManagedProject()
-
-    await runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }), {
-      detectedPackageManager: { name: "aube" },
+    expect(result).toEqual({
+      status: "not-applicable",
+      warnings: [
+        "No CI-compatible managed scripts were found, so the GitHub Actions workflow was not updated.",
+      ],
     })
 
     const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
     expect(workflow).toBe(HARDCODED_WORKFLOW)
+  })
 
-    await runTestEffect(migrationHardcodedNodeVersion.validate({ cwd: tempDir }), {
+  test("check reports not-applicable with a warning for an unsupported package manager", async () => {
+    await writeManagedProject()
+
+    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }), {
       detectedPackageManager: { name: "aube" },
+    })
+
+    expect(result).toEqual({
+      status: "not-applicable",
+      warnings: [
+        "`aube` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow was not updated.",
+      ],
+    })
+
+    const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
+    expect(workflow).toBe(HARDCODED_WORKFLOW)
+  })
+
+  test("check reports not-applicable with a warning when no package manager is detected", async () => {
+    await writeManagedProject()
+
+    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }), {
+      detectedPackageManager: null,
+    })
+
+    expect(result).toEqual({
+      status: "not-applicable",
+      warnings: [
+        "Could not detect a package manager, so the GitHub Actions workflow was not updated.",
+      ],
     })
   })
 })

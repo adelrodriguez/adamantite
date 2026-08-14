@@ -13,6 +13,7 @@ import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
+import { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,
@@ -402,6 +403,87 @@ describe("update", () => {
         prompter.logs.filter((entry) => entry.level === "success").map((entry) => entry.message)
       ).toEqual(["Migrations ran successfully.", "Dependencies updated successfully."])
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
+    })
+
+    test("skip warning about a workflow that an earlier migration already regenerated", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+            },
+            name: "test-project",
+            scripts: {
+              typecheck: "adamantite typecheck",
+            },
+            version: "1.0.0",
+          },
+          null,
+          2
+        )
+      )
+      await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
+      mkdirSync(join(tempDir, ".github", "workflows"), { recursive: true })
+      await writeFile(
+        join(tempDir, ".github", "workflows", "adamantite.yml"),
+        'name: adamantite\njobs:\n  verify:\n    steps:\n      - uses: actions/setup-node@v7\n        with:\n          node-version: "26"\n'
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+
+      // The typecheck migration adds the `check` script and regenerates the workflow, so the
+      // node-version migration's check must see that state instead of warning from a stale one.
+      const workflow = await readFile(
+        join(tempDir, ".github", "workflows", "adamantite.yml"),
+        "utf8"
+      )
+      expect(workflow).not.toContain('node-version: "26"')
+      expect(prompter.logs).not.toContainEqual({
+        level: "warning",
+        message:
+          "No CI-compatible managed scripts were found, so the GitHub Actions workflow was not updated.",
+      })
+    })
+
+    test("surface migration warnings during a monorepo typecheck migration", async () => {
+      await writeFile(
+        join(tempDir, "package.json"),
+        JSON.stringify(
+          {
+            devDependencies: {
+              oxlint: oxlint.version,
+              "oxlint-tsgolint": tsgolint.version,
+            },
+            name: "test-project",
+            scripts: {
+              typecheck: "adamantite typecheck",
+            },
+            version: "1.0.0",
+            workspaces: ["packages/*"],
+          },
+          null,
+          2
+        )
+      )
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+
+      for (const message of MONOREPO_GUIDANCE) {
+        expect(prompter.logs).toContainEqual({ level: "warning", message })
+      }
     })
 
     test("enable type-checked linting in an existing oxlint.config.ts during typecheck migration", async () => {

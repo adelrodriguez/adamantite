@@ -8,4 +8,23 @@ export default defineConfig({
     typeAware: true,
     typeCheck: true,
   },
+  overrides: [
+    {
+      files: ["src/lib/**/*.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["#terminal/*"],
+                message:
+                  "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+  ],
 })

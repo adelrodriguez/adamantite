@@ -16,7 +16,6 @@ import type {
 } from "#lib/shared/errors.ts"
 import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import type { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
-import type { Prompter } from "#terminal/prompter.ts"
 
 export interface MigrationContext {
   readonly cwd: string
@@ -54,7 +53,13 @@ export type MigrationRequirements =
   | FileSystem.FileSystem
   | NodeVersionResolver
   | Path.Path
-  | Prompter
+
+export interface MigrationRunResult {
+  /**
+   * Messages for the command layer to surface; migrations never print themselves.
+   */
+  readonly warnings: readonly string[]
+}
 
 export interface Migration {
   readonly id: string
@@ -64,7 +69,12 @@ export interface Migration {
   check(
     context: MigrationContext
   ): Effect.Effect<MigrationCheckResult, MigrationError, MigrationRequirements>
-  migrate(context: MigrationContext): Effect.Effect<void, MigrationError, MigrationRequirements>
+  /**
+   * Applies the migration unconditionally: `check` alone decides whether it runs.
+   */
+  migrate(
+    context: MigrationContext
+  ): Effect.Effect<MigrationRunResult, MigrationError, MigrationRequirements>
   validate?(context: MigrationContext): Effect.Effect<void, MigrationError, MigrationRequirements>
 }
 
@@ -72,13 +82,7 @@ export function defineMigration<const T extends Migration>(migration: T): T {
   return migration
 }
 
-export function runMigration(
-  migration: Migration,
-  context: MigrationContext,
-  options?: {
-    readonly onRestore?: Effect.Effect<void>
-  }
-) {
+export function runMigration(migration: Migration, context: MigrationContext) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
@@ -97,14 +101,10 @@ export function runMigration(
       }
     }
 
-    yield* migration.migrate(context).pipe(
-      Effect.andThen(() => migration.validate?.(context) ?? Effect.void),
+    return yield* migration.migrate(context).pipe(
+      Effect.tap(() => migration.validate?.(context) ?? Effect.void),
       Effect.onError(() =>
         Effect.gen(function* () {
-          if (options?.onRestore) {
-            yield* options.onRestore
-          }
-
           for (const [fullPath, content] of snapshot) {
             if (content !== null) {
               yield* fs.writeFileString(fullPath, content).pipe(Effect.ignore)

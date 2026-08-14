@@ -13,7 +13,6 @@ import {
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
 import { parseJson } from "#lib/shared/json.ts"
-import { Prompter } from "#terminal/prompter.ts"
 
 interface LegacyJsonConfigIntegration {
   readonly config: string
@@ -48,7 +47,9 @@ function migrateLegacyJsonConfig(cwd: string, options: LegacyJsonConfigMigration
     const state = yield* options.integration.detect(cwd)
 
     if (state.active === null || state.active.format === "ts") {
-      return
+      return yield* Effect.die(
+        new Error(`check() guaranteed a legacy ${options.displayName} config exists`)
+      )
     }
 
     const legacyConfigPath = state.active.path
@@ -76,6 +77,8 @@ function migrateLegacyJsonConfig(cwd: string, options: LegacyJsonConfigMigration
           Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfig.path }))
         )
     }
+
+    return { warnings: [] }
   })
 }
 
@@ -101,21 +104,7 @@ export function defineLegacyJsonConfigMigration(options: LegacyJsonConfigMigrati
       }),
     files: options.integration.files.map((file) => file.path),
     id: options.id,
-    migrate: (context) =>
-      Effect.gen(function* () {
-        const prompter = yield* Prompter
-        const state = yield* options.integration.detect(context.cwd)
-        const legacyConfigFile =
-          state.active !== null && state.active.format !== "ts"
-            ? state.active.file
-            : (options.integration.files[1]?.path ?? options.integration.config)
-
-        yield* prompter.withSpinner(() => migrateLegacyJsonConfig(context.cwd, options), {
-          failure: `Failed to migrate ${legacyConfigFile}.`,
-          start: `Migrating \`${legacyConfigFile}\` to \`${options.integration.config}\`...`,
-          success: `${options.displayName} config migrated to \`${options.integration.config}\` successfully.`,
-        })
-      }),
+    migrate: (context) => migrateLegacyJsonConfig(context.cwd, options),
     tags: ["update"],
     title: options.title,
     validate: (context) =>

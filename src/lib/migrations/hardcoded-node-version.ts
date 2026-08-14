@@ -11,7 +11,6 @@ import {
   getManagedScripts,
   readPackageJson,
 } from "#lib/workspace/package-json.ts"
-import { Prompter } from "#terminal/prompter.ts"
 
 const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
 
@@ -75,6 +74,19 @@ export default defineMigration({
         return { status: "not-applicable", warnings: [] } as const
       }
 
+      const regeneration = yield* canRegenerateWorkflow(context.cwd)
+
+      if (!regeneration.supported) {
+        const warning =
+          regeneration.reason === "scripts"
+            ? "No CI-compatible managed scripts were found, so the GitHub Actions workflow was not updated."
+            : regeneration.reason === "no-package-manager"
+              ? "Could not detect a package manager, so the GitHub Actions workflow was not updated."
+              : `\`${regeneration.packageManagerName}\` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow was not updated.`
+
+        return { status: "not-applicable", warnings: [warning] } as const
+      }
+
       return {
         status: "needed",
         summary:
@@ -86,47 +98,18 @@ export default defineMigration({
   id: "hardcoded-node-version",
   migrate: (context) =>
     Effect.gen(function* () {
-      const prompter = yield* Prompter
+      const regeneration = yield* canRegenerateWorkflow(context.cwd)
 
-      const runMigration = Effect.gen(function* () {
-        const workflow = yield* readWorkflow(context.cwd)
+      if (!regeneration.supported) {
+        return yield* Effect.die(new Error("check() guaranteed workflow regeneration is supported"))
+      }
 
-        if (workflow === null || !HARDCODED_NODE_VERSION_REGEX.test(workflow)) {
-          return "noop" as const
-        }
-
-        const regeneration = yield* canRegenerateWorkflow(context.cwd)
-
-        if (!regeneration.supported) {
-          const warning =
-            regeneration.reason === "scripts"
-              ? "No CI-compatible managed scripts were found, so the GitHub Actions workflow was not updated."
-              : regeneration.reason === "no-package-manager"
-                ? "Could not detect a package manager, so the GitHub Actions workflow was not updated."
-                : `\`${regeneration.packageManagerName}\` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow was not updated.`
-
-          yield* prompter.log.warning(warning)
-          return "noop" as const
-        }
-
-        yield* github.update(context.cwd, {
-          packageManager: regeneration.packageManager,
-          scripts: regeneration.scripts,
-        })
-
-        return "migrated" as const
+      yield* github.update(context.cwd, {
+        packageManager: regeneration.packageManager,
+        scripts: regeneration.scripts,
       })
 
-      yield* prompter
-        .withSpinner(() => runMigration, {
-          failure: "Failed to update the GitHub Actions workflow Node.js version.",
-          start: "Updating the GitHub Actions workflow Node.js version...",
-          success: (status) =>
-            status === "noop"
-              ? "No migration needed."
-              : "GitHub Actions workflow Node.js version updated successfully.",
-        })
-        .pipe(Effect.asVoid)
+      return { warnings: [] }
     }),
   tags: ["update"],
   title: "Hard-coded workflow Node.js version",
@@ -134,13 +117,7 @@ export default defineMigration({
     Effect.gen(function* () {
       const workflow = yield* readWorkflow(context.cwd)
 
-      if (workflow === null || !HARDCODED_NODE_VERSION_REGEX.test(workflow)) {
-        return
-      }
-
-      const regeneration = yield* canRegenerateWorkflow(context.cwd)
-
-      if (regeneration.supported) {
+      if (workflow !== null && HARDCODED_NODE_VERSION_REGEX.test(workflow)) {
         return yield* new MigrationValidationFailed({
           migrationId: "hardcoded-node-version",
           reason: "The GitHub Actions workflow still contains a hard-coded Node.js version.",

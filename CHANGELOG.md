@@ -1,5 +1,29 @@
 # adamantite
 
+## 0.35.0
+
+### Minor Changes
+
+- [#360](https://github.com/adelrodriguez/adamantite/pull/360) [`8782acf`](https://github.com/adelrodriguez/adamantite/commit/8782acf3d4001190b8e155a744d79a7933aa56c2) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Support Bun 1.0 and Node.js 22.19 or later while using current runtimes for development.
+
+  Generated GitHub Actions workflows now follow the target project's Node.js version declaration (`.node-version`, `.nvmrc`, `.tool-versions`, or `package.json`) through `node-version-file`, and fall back to `node-version: "lts/*"` when no declaration exists. `adamantite update` migrates existing managed workflows away from a hard-coded Node.js version.
+
+- [#361](https://github.com/adelrodriguez/adamantite/pull/361) [`04f5494`](https://github.com/adelrodriguez/adamantite/commit/04f5494942f3752df107630520ab9131486f04db) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Skip root `tsconfig.json` creation and updates during `init` in a detected monorepo. A catch-all root config makes TypeScript treat all workspace packages as one project and can try to emit over JavaScript input files. In a monorepo, `init --typescript` now prints guidance to add `"extends": "adamantite/typescript"` to each package's `tsconfig.json` or to a shared base config, and does not change any files.
+
+  Stop overwriting an existing `extends` value when `init` updates a `tsconfig.json`. Adamantite now appends `"adamantite/typescript"` to the `extends` array instead, so a shared base config such as `"@company/tsconfig"` stays in place. The preset is appended last, so its compiler options override the earlier entries.
+
+  The `adamantite/typescript` preset now sets `"noEmit": true`, so projects that extend it type-check without emitting output. If your project emits output with `tsc` through the preset, set `"noEmit": false` in your own `tsconfig.json`.
+
+### Patch Changes
+
+- [#370](https://github.com/adelrodriguez/adamantite/pull/370) [`dfb307b`](https://github.com/adelrodriguez/adamantite/commit/dfb307b467a6d17a063d357fb48aa7773a04a178) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop `init` from silently overwriting existing package scripts. Scripts whose commands differ from Adamantite's managed commands are now kept and reported: the interactive initializer asks once before overwriting, and non-interactive runs preserve them unless the new `--overwrite-scripts` flag is passed. Preserved scripts are omitted from AGENTS.md guidance.
+
+- [#369](https://github.com/adelrodriguez/adamantite/pull/369) [`943a1a9`](https://github.com/adelrodriguez/adamantite/commit/943a1a979d308aa751ff0b531686a9d7ad66f20f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Skip root `tsconfig.json` creation and updates in the `legacy-typecheck-script` migration when a monorepo is detected. The migration, reachable through `adamantite update` and `adamantite doctor --fix`, previously wrote back the catch-all root config that `init` stopped writing in monorepos. It now prints the same guidance as `init` — add `"extends": "adamantite/typescript"` to each package's `tsconfig.json` or to a shared base config — and its validation no longer reports a failure for the deliberately absent file.
+
+- [#363](https://github.com/adelrodriguez/adamantite/pull/363) [`6270f58`](https://github.com/adelrodriguez/adamantite/commit/6270f5816498263f882dea91289d25d6a68d569e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Show the captured package manager output when dependency installation fails during `init`. The error message now includes the underlying diagnostic, for example `ERR_PNPM_UNSUPPORTED_ENGINE`, instead of only the package list.
+
+- [#363](https://github.com/adelrodriguez/adamantite/pull/363) [`6270f58`](https://github.com/adelrodriguez/adamantite/commit/6270f5816498263f882dea91289d25d6a68d569e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Include the underlying cause in file-system and extension error messages. Failed read, write, delete, and directory-creation operations now show the platform error detail, and a failed VS Code extension install reports the `code` CLI exit code.
+
 ## 0.34.4
 
 ### Patch Changes

@@ -1,6 +1,7 @@
+import type * as FileSystem from "effect/FileSystem"
 import type * as PlatformError from "effect/PlatformError"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type {
   FailedToDeleteFile,
@@ -16,6 +17,7 @@ import type {
 } from "#lib/shared/errors.ts"
 import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import type { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { readFileIfExists, removeFile, writeFile } from "#lib/shared/filesystem.ts"
 
 export interface MigrationContext {
   readonly cwd: string
@@ -82,45 +84,31 @@ export function defineMigration<const T extends Migration>(migration: T): T {
   return migration
 }
 
-export function runMigration(migration: Migration, context: MigrationContext) {
-  return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
-    const path = yield* Path.Path
-    const filePaths = migration.files ?? []
-    const snapshot = new Map<string, string | null>()
-
-    for (const relativePath of filePaths) {
+export const runMigration = Effect.fn("runMigration")(function* (
+  migration: Migration,
+  context: MigrationContext
+) {
+  const path = yield* Path.Path
+  const filePaths = migration.files ?? []
+  const snapshot = yield* Effect.forEach(
+    filePaths,
+    (relativePath) => {
       const fullPath = path.join(context.cwd, relativePath)
-      const exists = yield* fs.exists(fullPath)
+      return readFileIfExists(fullPath).pipe(Effect.map((content) => [fullPath, content] as const))
+    },
+    { concurrency: "unbounded" }
+  )
 
-      if (exists) {
-        const content = yield* fs.readFileString(fullPath)
-        snapshot.set(fullPath, content)
-      } else {
-        snapshot.set(fullPath, null)
-      }
-    }
-
-    return yield* migration.migrate(context).pipe(
-      Effect.tap(() => migration.validate?.(context) ?? Effect.void),
-      Effect.onError(() =>
-        Effect.gen(function* () {
-          for (const [fullPath, content] of snapshot) {
-            if (content !== null) {
-              yield* fs.writeFileString(fullPath, content).pipe(Effect.ignore)
-              continue
-            }
-
-            const exists = yield* fs.exists(fullPath).pipe(Effect.orElseSucceed(() => false))
-
-            if (!exists) {
-              continue
-            }
-
-            yield* fs.remove(fullPath).pipe(Effect.ignore)
-          }
+  return yield* migration.migrate(context).pipe(
+    Effect.tap(() => migration.validate?.(context) ?? Effect.void),
+    // Restore sequentially and absorb restore failures: the migration error must stay visible.
+    Effect.onError(() =>
+      Effect.forEach(([fullPath, content]: readonly [string, Option.Option<string>]) =>
+        Option.match(content, {
+          onNone: () => removeFile(fullPath).pipe(Effect.ignore),
+          onSome: (value) => writeFile(fullPath, value).pipe(Effect.ignore),
         })
-      )
+      )(snapshot)
     )
-  })
-}
+  )
+})

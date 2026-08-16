@@ -12,11 +12,10 @@ import {
   type IntegrationFile,
   type ToolingPackage,
 } from "#lib/integrations/base.ts"
-import { FailedToWriteFile } from "#lib/shared/errors.ts"
+import { writeFile } from "#lib/shared/filesystem.ts"
 import {
   getManagedScripts,
   normalizeDependencyVersion,
-  readPackageJson,
   type Script,
 } from "#lib/workspace/package-json.ts"
 
@@ -230,10 +229,8 @@ export function definePackageTooling(options: {
   readonly version: string
 }) {
   return defineIntegration({
-    assess: (cwd: string) =>
-      Effect.gen(function* () {
-        const packageJson = yield* readPackageJson(cwd)
-
+    assess: (_cwd: string, packageJson: PackageJson) =>
+      Effect.sync(() => {
         if (!checkHasManagedScript(packageJson, options.scripts)) {
           return {
             applicable: false,
@@ -275,10 +272,8 @@ export function defineConfigTooling(options: {
   const detect = (cwd: string) => detectToolingConfig(cwd, options.name, options.configFiles)
 
   return defineIntegration({
-    assess: (cwd: string) =>
+    assess: (cwd: string, packageJson: PackageJson) =>
       Effect.gen(function* () {
-        const packageJson = yield* readPackageJson(cwd)
-
         if (!checkHasManagedScript(packageJson, options.scripts)) {
           return {
             applicable: false,
@@ -304,13 +299,8 @@ export function defineConfigTooling(options: {
     config: options.configFiles.config,
     create: (cwd: string) =>
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
         const path = yield* Path.Path
-        const configPath = path.join(cwd, options.configFiles.config)
-
-        yield* fs
-          .writeFileString(configPath, options.configContent())
-          .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+        yield* writeFile(path.join(cwd, options.configFiles.config), options.configContent())
       }),
     detect,
     files,

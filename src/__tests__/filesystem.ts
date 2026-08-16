@@ -170,11 +170,18 @@ export function createFileSystemTestContext(options?: {
     readFile: makeUnimplemented("readFile"),
     readFileString: (path) =>
       Effect.suspend(() => {
-        const content = files.get(normalize(path))
+        const target = normalize(path)
+        const content = files.get(target)
 
-        return content === undefined
-          ? Effect.fail(makeSystemError("NotFound", "readFileString", path))
-          : Effect.succeed(content)
+        if (content !== undefined) {
+          return Effect.succeed(content)
+        }
+
+        // The Node backend maps EISDIR to BadResource, so reading a directory must not report
+        // NotFound: NotFound means the path can be treated as absent.
+        return directories.has(target)
+          ? Effect.fail(makeSystemError("BadResource", "readFileString", path))
+          : Effect.fail(makeSystemError("NotFound", "readFileString", path))
       }),
     readLink: makeUnimplemented("readLink"),
     realPath: makeUnimplemented("realPath"),

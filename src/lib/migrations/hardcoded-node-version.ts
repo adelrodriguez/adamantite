@@ -1,9 +1,10 @@
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import github from "#lib/integrations/ci/github.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
-import { FailedToReadFile, MigrationValidationFailed } from "#lib/shared/errors.ts"
+import { MigrationValidationFailed } from "#lib/shared/errors.ts"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
@@ -20,18 +21,8 @@ function getGitHubWorkflowPath() {
 
 const readWorkflow = (cwd: string) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const workflowPath = path.join(cwd, getGitHubWorkflowPath())
-    const exists = yield* fs.exists(workflowPath)
-
-    if (!exists) {
-      return null
-    }
-
-    return yield* fs
-      .readFileString(workflowPath)
-      .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: workflowPath })))
+    return yield* readFileIfExists(path.join(cwd, getGitHubWorkflowPath()))
   })
 
 const canRegenerateWorkflow = (cwd: string) =>
@@ -70,7 +61,7 @@ export default defineMigration({
     Effect.gen(function* () {
       const workflow = yield* readWorkflow(context.cwd)
 
-      if (workflow === null || !HARDCODED_NODE_VERSION_REGEX.test(workflow)) {
+      if (!Option.exists(workflow, (content) => HARDCODED_NODE_VERSION_REGEX.test(content))) {
         return { status: "not-applicable", warnings: [] } as const
       }
 
@@ -117,7 +108,7 @@ export default defineMigration({
     Effect.gen(function* () {
       const workflow = yield* readWorkflow(context.cwd)
 
-      if (workflow !== null && HARDCODED_NODE_VERSION_REGEX.test(workflow)) {
+      if (Option.exists(workflow, (content) => HARDCODED_NODE_VERSION_REGEX.test(content))) {
         return yield* new MigrationValidationFailed({
           migrationId: "hardcoded-node-version",
           reason: "The GitHub Actions workflow still contains a hard-coded Node.js version.",

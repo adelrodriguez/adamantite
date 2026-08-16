@@ -1,17 +1,12 @@
+import type * as FileSystem from "effect/FileSystem"
 import type * as PlatformError from "effect/PlatformError"
 import type { JsonObject } from "type-fest"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { ToolingConfigState } from "#lib/workspace/tooling/config.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
-import {
-  FailedToDeleteFile,
-  FailedToReadFile,
-  FailedToWriteFile,
-  InvalidConfigFormat,
-  MigrationValidationFailed,
-} from "#lib/shared/errors.ts"
+import { InvalidConfigFormat, MigrationValidationFailed } from "#lib/shared/errors.ts"
+import { readFile, removeFile, writeFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
 
 interface LegacyJsonConfigIntegration {
@@ -42,7 +37,6 @@ export interface LegacyJsonConfigMigrationOptions {
 
 function migrateLegacyJsonConfig(cwd: string, options: LegacyJsonConfigMigrationOptions) {
   return Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const state = yield* options.integration.detect(cwd)
 
@@ -54,10 +48,7 @@ function migrateLegacyJsonConfig(cwd: string, options: LegacyJsonConfigMigration
 
     const legacyConfigPath = state.active.path
     const configPath = path.join(cwd, options.integration.config)
-    const legacyConfigContent = yield* fs
-      .readFileString(legacyConfigPath)
-      .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: legacyConfigPath })))
-
+    const legacyConfigContent = yield* readFile(legacyConfigPath)
     const existingConfig = yield* parseJson(legacyConfigContent, legacyConfigPath)
 
     if (!checkIsJsonObject(existingConfig)) {
@@ -66,16 +57,10 @@ function migrateLegacyJsonConfig(cwd: string, options: LegacyJsonConfigMigration
 
     const { $schema: _schema, ...configWithoutSchema } = existingConfig
 
-    yield* fs
-      .writeFileString(configPath, options.serialize(configWithoutSchema))
-      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+    yield* writeFile(configPath, options.serialize(configWithoutSchema))
 
     for (const legacyConfig of [state.active, ...state.legacy]) {
-      yield* fs
-        .remove(legacyConfig.path)
-        .pipe(
-          Effect.mapError((cause) => new FailedToDeleteFile({ cause, path: legacyConfig.path }))
-        )
+      yield* removeFile(legacyConfig.path)
     }
 
     return { warnings: [] }

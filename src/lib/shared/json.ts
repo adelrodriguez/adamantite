@@ -9,18 +9,15 @@ import { type ParseError, parse } from "jsonc-parser"
 import { FailedToMergeConfig, FailedToParseFile } from "#lib/shared/errors.ts"
 
 export const parseJson = (content: string, path?: string) =>
-  Effect.sync(() => {
+  Effect.suspend(() => {
     const errors: ParseError[] = []
     // SAFETY: jsonc-parser returns plain JSON data; parse failures surface through `errors`.
     const parsed = parse(content, errors, { allowTrailingComma: true }) as JsonValue
-    return { errors, parsed }
-  }).pipe(
-    Effect.flatMap(({ errors, parsed }) =>
-      errors.length > 0
-        ? Effect.fail(new FailedToParseFile({ errors, path }))
-        : Effect.succeed(parsed)
-    )
-  )
+
+    return errors.length > 0
+      ? Effect.fail(new FailedToParseFile({ errors, path }))
+      : Effect.succeed(parsed)
+  })
 
 export const checkIsJsonObject = (value: JsonValue): value is JsonObject =>
   Predicate.isObject(value)

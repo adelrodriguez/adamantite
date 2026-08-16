@@ -3,8 +3,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import { defineIntegration } from "#lib/integrations/base.ts"
-import { FailedToWriteFile } from "#lib/shared/errors.ts"
-import { ensureDirectory } from "#lib/shared/filesystem.ts"
+import { ensureDirectory, writeFile } from "#lib/shared/filesystem.ts"
 import { getCIWorkflowEntries } from "#lib/workspace/ci-scripts.ts"
 import {
   type NodeVersionSource,
@@ -130,7 +129,6 @@ const files = [{ path: ".github/workflows/adamantite.yml", type: "ci" }] as cons
 
 const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const resolver = yield* NodeVersionResolver
     const workflowPath = path.join(cwd, files[0].path)
@@ -142,9 +140,7 @@ const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
       return
     }
 
-    yield* fs
-      .writeFileString(workflowPath, workflowContent)
-      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: workflowPath })))
+    yield* writeFile(workflowPath, workflowContent)
   })
 
 export default defineIntegration({

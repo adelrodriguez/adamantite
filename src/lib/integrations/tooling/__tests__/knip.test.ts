@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 
@@ -14,6 +15,13 @@ function makeFiles(files?: Record<string, string>) {
 
 function provideFiles(files: FileSystemTestContext) {
   return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
+
+function runAssess(files: FileSystemTestContext) {
+  return readPackageJson(ROOT).pipe(
+    Effect.flatMap((packageJson) => knip.assess(ROOT, packageJson)),
+    provideFiles(files)
+  )
 }
 
 describe("knip", () => {
@@ -88,7 +96,7 @@ describe("knip", () => {
           ),
         })
 
-        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           applicable: false,
@@ -116,7 +124,7 @@ describe("knip", () => {
           ),
         })
 
-        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [
@@ -152,7 +160,7 @@ describe("knip", () => {
           ),
         })
 
-        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [
@@ -189,7 +197,7 @@ describe("knip", () => {
           ),
         })
 
-        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [],

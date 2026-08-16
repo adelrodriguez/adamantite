@@ -1,4 +1,5 @@
 import type * as Effect from "effect/Effect"
+import type { PackageJson } from "type-fest"
 
 export type IntegrationKind = "tooling" | "workspace" | "editor" | "ci"
 
@@ -67,9 +68,13 @@ export interface AssessableIntegration<Error = unknown, Requirements = unknown> 
    * Read-only diagnosis for the current project state.
    *
    * `assess` may classify package drift, missing config, supported config updates, manual follow-up
-   * work, and known migrations. It must not mutate files or call migrations.
+   * work, and known migrations. It must not mutate files or call migrations. The caller reads
+   * `package.json` once and shares the parsed manifest with every assessment in the same pass.
    */
-  readonly assess: (cwd: string) => Effect.Effect<IntegrationAssessment, Error, Requirements>
+  readonly assess: (
+    cwd: string,
+    packageJson: PackageJson
+  ) => Effect.Effect<IntegrationAssessment, Error, Requirements>
 }
 
 export function defineIntegration<const T extends IntegrationBase<IntegrationKind>>(

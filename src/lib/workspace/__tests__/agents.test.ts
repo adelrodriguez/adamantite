@@ -56,17 +56,17 @@ describe("writeAgentsGuidance", () => {
     })
   )
 
-  it.effect("return FailedToReadFile when checking whether AGENTS.md exists fails", () =>
+  it.effect("return FailedToReadFile when reading AGENTS.md fails", () =>
     Effect.gen(function* () {
       const agentsPath = `${ROOT}/AGENTS.md`
       const cause = PlatformError.systemError({
         _tag: "PermissionDenied",
-        method: "access",
+        method: "readFileString",
         module: "FileSystem",
         pathOrDescriptor: agentsPath,
       })
       const fileSystemLayer = FileSystem.layerNoop({
-        exists: () => Effect.fail(cause),
+        readFileString: () => Effect.fail(cause),
       })
 
       const result = yield* writeAgentsGuidance(ROOT, {

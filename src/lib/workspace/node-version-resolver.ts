@@ -1,14 +1,15 @@
-import type * as PlatformError from "effect/PlatformError"
 import type { JsonValue } from "type-fest"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import * as Str from "effect/String"
-import { type FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
+import type { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import { parseJson } from "#lib/shared/json.ts"
 
 /**
@@ -87,10 +88,7 @@ export class NodeVersionResolver extends Context.Service<
   {
     readonly resolve: (
       cwd: string
-    ) => Effect.Effect<
-      NodeVersionSource,
-      FailedToParseFile | FailedToReadFile | PlatformError.PlatformError
-    >
+    ) => Effect.Effect<NodeVersionSource, FailedToParseFile | FailedToReadFile>
   }
 >()("NodeVersionResolver") {
   static readonly layer = Layer.effect(
@@ -100,39 +98,33 @@ export class NodeVersionResolver extends Context.Service<
       const path = yield* Path.Path
 
       const readDeclarationFile = (cwd: string, file: string) =>
-        Effect.gen(function* () {
-          const filePath = path.join(cwd, file)
-          const exists = yield* fs.exists(filePath)
-
-          if (!exists) {
-            return null
-          }
-
-          return yield* fs
-            .readFileString(filePath)
-            .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: filePath })))
-        })
+        readFileIfExists(path.join(cwd, file)).pipe(
+          Effect.provideService(FileSystem.FileSystem, fs)
+        )
 
       return {
         resolve: Effect.fn("NodeVersionResolver.resolve")(function* (cwd: string) {
           for (const file of VERSION_FILES) {
             const content = yield* readDeclarationFile(cwd, file)
 
-            if (content !== null && Str.isNonEmpty(content.trim())) {
+            if (Option.exists(content, (value) => Str.isNonEmpty(value.trim()))) {
               return fileSource(file)
             }
           }
 
           const toolVersions = yield* readDeclarationFile(cwd, ".tool-versions")
 
-          if (toolVersions !== null && hasToolVersionsNodeEntry(toolVersions)) {
+          if (Option.exists(toolVersions, (content) => hasToolVersionsNodeEntry(content))) {
             return fileSource(".tool-versions")
           }
 
           const packageJsonContent = yield* readDeclarationFile(cwd, "package.json")
 
-          if (packageJsonContent !== null) {
-            const packageJson = yield* parseJson(packageJsonContent, path.join(cwd, "package.json"))
+          if (Option.isSome(packageJsonContent)) {
+            const packageJson = yield* parseJson(
+              packageJsonContent.value,
+              path.join(cwd, "package.json")
+            )
 
             if (hasNodeDeclaration(packageJson)) {
               return fileSource("package.json")

@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 
@@ -14,6 +15,13 @@ function makeFiles(files?: Record<string, string>) {
 
 function provideFiles(files: FileSystemTestContext) {
   return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
+
+function runAssess(files: FileSystemTestContext) {
+  return readPackageJson(ROOT).pipe(
+    Effect.flatMap((packageJson) => oxfmt.assess(ROOT, packageJson)),
+    provideFiles(files)
+  )
 }
 
 describe("oxfmt", () => {
@@ -88,7 +96,7 @@ describe("oxfmt", () => {
           ),
         })
 
-        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           applicable: false,
@@ -116,7 +124,7 @@ describe("oxfmt", () => {
           ),
         })
 
-        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [
@@ -153,7 +161,7 @@ describe("oxfmt", () => {
           ),
         })
 
-        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [],
@@ -179,7 +187,7 @@ describe("oxfmt", () => {
           ),
         })
 
-        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [

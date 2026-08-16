@@ -30,21 +30,30 @@ export class CommandRunner extends Context.Service<
   }
 >()("CommandRunner") {
   static readonly layer = Layer.succeed(this)({
-    run: ({ args, command, cwd, stderr = "inherit", stdin = "ignore", stdout = "inherit" }) =>
-      Effect.mapError(
-        Effect.scoped(
-          Effect.gen(function* () {
-            const handle = yield* ChildProcess.make(command, args, {
-              cwd,
-              stderr,
-              stdin,
-              stdout,
-            })
-
-            return yield* handle.exitCode
+    run: Effect.fn("CommandRunner.run")(function* ({
+      args,
+      command,
+      cwd,
+      stderr = "inherit",
+      stdin = "ignore",
+      stdout = "inherit",
+    }: CommandRunOptions) {
+      return yield* Effect.scoped(
+        Effect.gen(function* () {
+          const handle = yield* ChildProcess.make(command, args, {
+            cwd,
+            stderr,
+            stdin,
+            stdout,
           })
-        ),
-        (cause) => (cause.reason._tag === "NotFound" ? new CliNotFound({ command }) : cause)
-      ),
+
+          return yield* handle.exitCode
+        })
+      ).pipe(
+        Effect.mapError((cause) =>
+          cause.reason._tag === "NotFound" ? new CliNotFound({ command }) : cause
+        )
+      )
+    }),
   })
 }

@@ -5,8 +5,8 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import { defineIntegration } from "#lib/integrations/base.ts"
-import { FailedToReadFile, FailedToWriteFile, InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { ensureDirectory } from "#lib/shared/filesystem.ts"
+import { InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { ensureDirectory, readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
@@ -92,15 +92,11 @@ export default defineIntegration({
   config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const settingsPath = path.join(cwd, files[0].path)
 
       yield* ensureDirectory(path.dirname(settingsPath))
-
-      yield* fs
-        .writeFileString(settingsPath, `${JSON.stringify(CONFIG, null, 2)}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: settingsPath })))
+      yield* writeJsonFile(settingsPath, CONFIG)
     }),
   detect: (cwd: string) =>
     Effect.gen(function* () {
@@ -113,14 +109,10 @@ export default defineIntegration({
   name: "zed",
   update: (cwd: string) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const settingsPath = path.join(cwd, files[0].path)
 
-      const zedFile = yield* fs
-        .readFileString(settingsPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: settingsPath })))
-
+      const zedFile = yield* readFile(settingsPath)
       const existingConfig = yield* parseJson(zedFile, settingsPath)
 
       if (!Predicate.isObject(existingConfig)) {
@@ -130,8 +122,6 @@ export default defineIntegration({
       const mergedConfig = yield* mergeConfig(CONFIG, existingConfig)
       const newConfig = deduplicateManagedFormatters(mergedConfig)
 
-      yield* fs
-        .writeFileString(settingsPath, `${JSON.stringify(newConfig, null, 2)}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: settingsPath })))
+      yield* writeJsonFile(settingsPath, newConfig)
     }),
 })

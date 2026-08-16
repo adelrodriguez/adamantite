@@ -40,7 +40,7 @@ export default Command.make("doctor", { fix }).pipe(
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
         )
         yield* prompter.outro("⚠️ Doctor found issues.")
-        yield* new CommandFailed({
+        return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
         })

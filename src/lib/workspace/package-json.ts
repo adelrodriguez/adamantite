@@ -3,12 +3,11 @@ import type { PackageManagerName } from "nypm"
 import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Result from "effect/Result"
-import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
+import { readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { parseJson } from "#lib/shared/json.ts"
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
@@ -20,12 +19,9 @@ export function normalizeDependencyVersion(specifier: string) {
 
 export const readPackageJson = (cwd: string = process.cwd()) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const packagePath = path.join(cwd, "package.json")
-    const content = yield* fs
-      .readFileString(packagePath)
-      .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: packagePath })))
+    const content = yield* readFile(packagePath)
     const parsed = yield* parseJson(content, packagePath)
     // SAFETY: the file is the project's package.json; every manifest field is optional in
     // `PackageJson`, so any parsed JSON object satisfies it.
@@ -34,13 +30,8 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
 
 export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const packagePath = path.join(cwd, "package.json")
-
-    yield* fs
-      .writeFileString(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
-      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: packagePath })))
+    yield* writeJsonFile(path.join(cwd, "package.json"), packageJson)
   })
 
 /**

@@ -339,7 +339,21 @@ const setupGitHubActions = (
           `GitHub Actions workflow ${created ? "created" : "updated"} successfully.`,
       }
     )
-  }).pipe(Effect.option)
+  }).pipe(
+    // GitHub Actions setup is optional, so initialization continues; the failure must still
+    // reach the user instead of disappearing.
+    Effect.catch((error) =>
+      Effect.gen(function* () {
+        const prompter = yield* Prompter
+        yield* prompter.log.warning(
+          `Could not set up the GitHub Actions workflow. ${error.message}`
+        )
+        yield* prompter.log.warning(
+          "Fix the reported problem and run `adamantite init` again, or create the workflow manually."
+        )
+      })
+    )
+  )
 
 const setupAgentsGuidance = (cwd: string, packageManager: PackageManagerName, scripts: Script[]) =>
   Effect.gen(function* () {

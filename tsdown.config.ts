@@ -27,7 +27,7 @@ export default defineConfig([
       },
     ],
     deps: { neverBundle: ["knip", "oxfmt", "oxlint"] },
-    dts: true,
+    dts: { oxc: true },
     entry: ["presets/**/*.ts"],
     fixedExtension: false,
     outDir: "dist/presets",

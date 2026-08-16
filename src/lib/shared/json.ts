@@ -22,7 +22,8 @@ export const parseJson = (content: string, path?: string) =>
     )
   )
 
-export const isJsonObject = (value: JsonValue): value is JsonObject => Predicate.isObject(value)
+export const checkIsJsonObject = (value: JsonValue): value is JsonObject =>
+  Predicate.isObject(value)
 
 export function serializeTsObjectLiteral(
   value: JsonValue,

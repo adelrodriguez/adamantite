@@ -12,7 +12,7 @@ import {
   InvalidConfigFormat,
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
-import { isJsonObject, parseJson } from "#lib/shared/json.ts"
+import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
 
 interface LegacyJsonConfigIntegration {
   readonly config: string
@@ -60,7 +60,7 @@ function migrateLegacyJsonConfig(cwd: string, options: LegacyJsonConfigMigration
 
     const existingConfig = yield* parseJson(legacyConfigContent, legacyConfigPath)
 
-    if (!isJsonObject(existingConfig)) {
+    if (!checkIsJsonObject(existingConfig)) {
       return yield* new InvalidConfigFormat({ path: legacyConfigPath })
     }
 

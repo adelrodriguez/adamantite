@@ -5,7 +5,9 @@
  * Anti-slop is deliberately not published to npm — upstream's distribution model is "copy the
  * source into your repo" — so Adamantite ships a bundled build instead of declaring a dependency.
  * The bundle inlines the plugin's only dependency (@oxlint/plugins, a small pure-JS,
- * dependency-free shim) so the vendored file is fully self-contained.
+ * dependency-free shim) so the vendored file is fully self-contained. That version is pinned by
+ * upstream's lockfile; if upstream ever drops the lockfile, a re-vendor at the same PINNED_REF can
+ * inline a different @oxlint/plugins version, so read re-vendor diffs with that in mind.
  *
  * Usage: bun run scripts/vendor-anti-slop.ts [ref]
  *

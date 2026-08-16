@@ -225,7 +225,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/node`     | Node.js rules.                                                                                                   |
 | `adamantite/lint/jest`     | Jest rules.                                                                                                      |
 | `adamantite/lint/vitest`   | Vitest rules.                                                                                                    |
-| `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. |
+| `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules. |
 | `adamantite/format`        | Oxfmt configuration.                                                                                             |
 | `adamantite/analyze`       | Knip configuration.                                                                                              |
 | `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                       |

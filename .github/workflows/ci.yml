@@ -47,6 +47,7 @@ jobs:
           npm install --engine-strict ./adamantite-*.tgz
           node node_modules/adamantite/bin/adamantite --help
           node --input-type=module --eval 'await import("adamantite/lint")'
+          node --input-type=module --eval 'await import("adamantite/lint/antislop")'
 
       - name: Test package with minimum Bun
         run: |

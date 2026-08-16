@@ -46,6 +46,7 @@ describe("adamantite", () => {
       const output = await new Response(proc.stdout).text()
       await proc.exited
 
+      // SAFETY: package.json is this repo's manifest, which the package manager already requires to conform to the PackageJson schema.
       const packageJson = (await Bun.file("package.json").json()) as PackageJson
       const version = output
         .trim()

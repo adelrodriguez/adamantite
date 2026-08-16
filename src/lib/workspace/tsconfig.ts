@@ -1,3 +1,4 @@
+import type { JsonValue } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -19,7 +20,7 @@ export const MONOREPO_GUIDANCE = [
 // Later entries in an `extends` array override earlier ones, so the preset is
 // appended last when Adamantite adds it. An array that already contains the
 // preset is kept in the user's order, even when the preset is not last.
-function mergeExtends(existing: unknown) {
+function mergeExtends(existing: JsonValue | undefined) {
   if (Predicate.isString(existing)) {
     return existing === PRESET_EXTENDS ? existing : [existing, PRESET_EXTENDS]
   }

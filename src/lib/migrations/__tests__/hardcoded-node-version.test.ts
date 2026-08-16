@@ -6,6 +6,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationHardcodedNodeVersion from "#lib/migrations/hardcoded-node-version.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
@@ -21,8 +22,12 @@ jobs:
           node-version: "26"
 `
 
-function runTestEffect<A, E, R>(
-  effect: Effect.Effect<A, E, R>,
+function runTestEffect<A, E>(
+  effect: Effect.Effect<
+    A,
+    E,
+    DependencyInstaller | NodeServices.NodeServices | NodeVersionResolver
+  >,
   options?: Parameters<typeof createDependencyInstallerTestContext>[0]
 ) {
   const dependencyInstallerContext = createDependencyInstallerTestContext(options)
@@ -34,7 +39,7 @@ function runTestEffect<A, E, R>(
         dependencyInstallerContext.layer
       )
     )
-  ) as Effect.Effect<A, E>
+  )
   return Effect.runPromise(provided)
 }
 

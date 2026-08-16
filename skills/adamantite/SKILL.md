@@ -28,7 +28,8 @@ npx adamantite init --non-interactive --script check --script fix --script forma
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `format`, `analyze`, `check:monorepo`, `fix:monorepo`
-- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`; editors: `vscode`, `zed`
+- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`; editors:
+  `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
 

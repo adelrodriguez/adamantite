@@ -1,4 +1,5 @@
 import type * as PlatformError from "effect/PlatformError"
+import type { JsonValue } from "type-fest"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -55,7 +56,7 @@ function hasToolVersionsNodeEntry(content: string): boolean {
     .some((line) => /^node(?:js)?\s+\S/.test(line))
 }
 
-function isNodeRuntimeEntry(value: unknown): boolean {
+function isNodeRuntimeEntry(value: JsonValue | undefined): boolean {
   return Schema.is(RuntimeEntry)(value) && value.name.toLowerCase() === "node"
 }
 
@@ -64,7 +65,7 @@ function isNodeRuntimeEntry(value: unknown): boolean {
  * `devEngines.runtime` entry named `node`, and `engines.node`. `actions/setup-node` remains
  * responsible for interpreting the selected field.
  */
-function hasNodeDeclaration(packageJson: unknown): boolean {
+function hasNodeDeclaration(packageJson: JsonValue): boolean {
   if (Schema.is(VoltaDeclaration)(packageJson)) {
     return true
   }

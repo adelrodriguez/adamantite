@@ -390,6 +390,8 @@ describe("update", () => {
         },
       ])
 
+      // SAFETY: the fixture written above and the update migrations only ever
+      // put string values under scripts.
       const packageJson = JSON.parse(await readFile(join(tempDir, "package.json"), "utf8")) as {
         scripts: Record<string, string>
       }
@@ -535,6 +537,8 @@ describe("update", () => {
       expect(oxlintConfig).toContain("typeAware")
       expect(oxlintConfig).toContain("typeCheck")
 
+      // SAFETY: the fixture written above and the update migrations only ever
+      // put string values under scripts.
       const packageJson = JSON.parse(await readFile(join(tempDir, "package.json"), "utf8")) as {
         scripts: Record<string, string>
       }
@@ -876,8 +880,8 @@ describe("update", () => {
       const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
-      expect(error._tag).toBe("FailedToInstallDependency")
+      const error = Option.getOrThrow(Exit.findErrorOption(exit))
+      expect(error).toMatchObject({ _tag: "FailedToInstallDependency" })
       expect(prompter.spinnerEntries).toContainEqual({
         message: "Failed to update dependencies",
         type: "stop",

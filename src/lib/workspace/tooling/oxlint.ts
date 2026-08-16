@@ -1,3 +1,4 @@
+import type { JsonObject } from "type-fest"
 import * as Array from "effect/Array"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
@@ -46,7 +47,7 @@ function getImportName(preset: string) {
 }
 
 export function toOxlintTsConfigContent(
-  config: Record<string, unknown>,
+  config: JsonObject,
   presetNames: string[],
   passthroughExtends: string[] = []
 ) {
@@ -82,7 +83,7 @@ export function toOxlintTsConfigContent(
     2
   )
   const serializedConfigEntries = Object.entries(configWithoutOptions).map(
-    ([key, value]) => [key, JSON.stringify(value, null, 2)] as [string, string]
+    ([key, value]): [string, string] => [key, JSON.stringify(value, null, 2)]
   )
   const serializedExtends = `[${allExtends.join(", ")}]`
   const body = [
@@ -261,7 +262,7 @@ function patchOptionsObject(ast: Program, optionsObjectExpression: ObjectExpress
 
     const value = propertyResult.property.value
 
-    if (value.type !== "Literal" || typeof value.value !== "boolean") {
+    if (value.type !== "Literal" || !Predicate.isBoolean(value.value)) {
       return {
         kind: "manual",
         reason: NON_BOOLEAN_OPTIONS_REASON,

@@ -1,5 +1,5 @@
-import * as Predicate from "effect/Predicate"
-import { serializeTsObjectLiteral } from "#lib/shared/json.ts"
+import type { JsonObject } from "type-fest"
+import { isJsonObject, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 
 const NESTED_MERGE_KEYS = new Set(["sortImports", "sortPackageJson", "sortTailwindcss"])
 
@@ -16,16 +16,16 @@ function getSerializedObjectBody(raw: string) {
     .join("\n")
 }
 
-function serializeNestedMergeEntry(key: string, value: Record<string, unknown>): string {
+function serializeNestedMergeEntry(key: string, value: JsonObject): string {
   const raw = serializeTsObjectLiteral(value)
   const body = getSerializedObjectBody(raw)
 
   return [`  ${key}: {`, `    ...format.${key},`, ...(body === "" ? [] : [body]), `  },`].join("\n")
 }
 
-export function toOxfmtTsConfigContent(config: Record<string, unknown> = {}) {
+export function toOxfmtTsConfigContent(config: JsonObject = {}) {
   const configEntries = Object.entries(config).map(([key, value]) => {
-    if (NESTED_MERGE_KEYS.has(key) && Predicate.isObject(value)) {
+    if (NESTED_MERGE_KEYS.has(key) && isJsonObject(value)) {
       return serializeNestedMergeEntry(key, value)
     }
 

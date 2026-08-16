@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { JsonObject } from "type-fest"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -26,7 +27,8 @@ import {
   runCommand,
 } from "./command-test-helpers.ts"
 
-async function readJson<T = Record<string, unknown>>(path: string): Promise<T> {
+async function readJson<T = JsonObject>(path: string): Promise<T> {
+  // SAFETY: every caller asserts the shape of a JSON fixture this test suite wrote itself.
   return JSON.parse(await readFile(path, "utf8")) as T
 }
 
@@ -1218,8 +1220,8 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
-      expect(error._tag).toBe("NoPackageManager")
+      const error = Option.getOrThrow(Exit.findErrorOption(exit))
+      expect(error).toMatchObject({ _tag: "NoPackageManager" })
     })
 
     test("create a GitHub Actions workflow for CI-compatible scripts when requested", async () => {

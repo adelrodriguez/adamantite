@@ -12,6 +12,8 @@ import packageJson from "../../../package.json" with { type: "json" }
  * import keeps the macros free of `await`, so consuming modules do not need top-level `await`.
  */
 
+// SAFETY: the static import is this repository's own manifest, which follows the
+// package.json schema.
 const pkg = packageJson as PackageJson
 
 export function getPackageVersion(): string {

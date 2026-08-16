@@ -1,15 +1,17 @@
-import type { JsonValue } from "type-fest"
+import type { JsonObject, JsonValue } from "type-fest"
 import { defu } from "defu"
 
 import * as Effect from "effect/Effect"
 
 import type * as Schema from "effect/Schema"
+import * as Predicate from "effect/Predicate"
 import { type ParseError, parse } from "jsonc-parser"
 import { FailedToMergeConfig, FailedToParseFile } from "#lib/shared/errors.ts"
 
 export const parseJson = (content: string, path?: string) =>
   Effect.sync(() => {
     const errors: ParseError[] = []
+    // SAFETY: jsonc-parser returns plain JSON data; parse failures surface through `errors`.
     const parsed = parse(content, errors, { allowTrailingComma: true }) as JsonValue
     return { errors, parsed }
   }).pipe(
@@ -20,8 +22,10 @@ export const parseJson = (content: string, path?: string) =>
     )
   )
 
+export const isJsonObject = (value: JsonValue): value is JsonObject => Predicate.isObject(value)
+
 export function serializeTsObjectLiteral(
-  value: unknown,
+  value: JsonValue,
   options: {
     continuationIndent?: string
     indentation?: number | string

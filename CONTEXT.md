@@ -10,6 +10,12 @@ Published configuration that a target project consumes for linting, formatting, 
 or TypeScript.
 _Avoid_: Plugin, template
 
+**Vendored bundle**:
+Third-party code that Adamantite builds into the package at a pinned upstream commit
+because upstream does not publish to npm, such as the anti-slop rules inside the
+`antislop` preset.
+_Avoid_: Plugin, dependency
+
 **Target project**:
 The project that Adamantite configures or checks.
 _Avoid_: Adamantite repository, consumer repository

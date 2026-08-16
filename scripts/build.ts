@@ -26,9 +26,8 @@ const resolveSubpathImports: BunPlugin = {
 
 await rm(path.join(root, "dist"), { force: true, recursive: true })
 
-// The presets need no external list: every preset import is type-only, so the bundler erases
-// them all before resolution and the compiled presets have zero imports.
-const [cli, presets] = await Promise.all([
+// Bun.build throws on bundler failures, so no success checks are needed.
+await Promise.all([
   Bun.build({
     entrypoints: [path.join(root, "src/index.ts")],
     minify: true,
@@ -37,6 +36,8 @@ const [cli, presets] = await Promise.all([
     plugins: [resolveSubpathImports],
     target: "node",
   }),
+  // No external list: every preset import is type-only, so the bundler erases
+  // them all before resolution and the compiled presets have zero imports.
   Bun.build({
     entrypoints: presetEntries.map((entry) => path.join(root, entry)),
     outdir: path.join(root, "dist/presets"),
@@ -44,11 +45,6 @@ const [cli, presets] = await Promise.all([
     target: "node",
   }),
 ])
-
-if (!(cli.success && presets.success)) {
-  const messages = [...cli.logs, ...presets.logs].map((log) => log.message)
-  throw new Error(`Build failed:\n${messages.join("\n")}`)
-}
 
 const declarations = await Promise.allSettled(
   presetEntries.map(async (entry) => {
@@ -70,7 +66,9 @@ const declarationFailures = declarations.filter(
 )
 
 if (declarationFailures.length > 0) {
-  const reasons = declarationFailures.map((failure) => String(failure.reason))
+  const reasons = declarationFailures.map((failure) =>
+    failure.reason instanceof Error ? failure.reason.message : String(failure.reason)
+  )
   throw new Error(`Declaration emit failed:\n${reasons.join("\n")}`)
 }
 

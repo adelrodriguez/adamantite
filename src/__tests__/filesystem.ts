@@ -4,6 +4,8 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as PlatformError from "effect/PlatformError"
+import * as Sink from "effect/Sink"
+import * as Stream from "effect/Stream"
 
 export interface FileSystemTestContext {
   /**
@@ -38,6 +40,17 @@ function makeSystemError(tag: PlatformError.SystemErrorTag, method: string, path
   })
 }
 
+// makeNoop fails unimplemented operations with a typed NotFound error, which a
+// Result-based test could absorb silently; die with a defect instead.
+function makeUnimplemented(method: string) {
+  return () =>
+    Effect.die(new Error(`FileSystem.${method} is not implemented in the test filesystem`))
+}
+
+function makeUnimplementedError(method: string) {
+  return new Error(`FileSystem.${method} is not implemented in the test filesystem`)
+}
+
 function makeFileInfo(type: FileSystem.File.Type, size: number): FileSystem.File.Info {
   return {
     atime: Option.none(),
@@ -59,7 +72,8 @@ function makeFileInfo(type: FileSystem.File.Type, size: number): FileSystem.File
 
 /**
  * Creates an isolated in-memory `FileSystem` for tests. Operations the production code does not use
- * stay unimplemented and fail loudly through `FileSystem.layerNoop`.
+ * stay unimplemented and die with a defect, so a test cannot absorb them as a typed failure and
+ * pass for the wrong reason.
  *
  * Missing parent directories and removals of missing paths fail with the same `SystemError` tags
  * the Node backend reports, so error-path tests exercise realistic failures without touching the
@@ -112,10 +126,17 @@ export function createFileSystemTestContext(options?: {
   }
 
   const layer = FileSystem.layerNoop({
+    access: makeUnimplemented("access"),
+    chmod: makeUnimplemented("chmod"),
+    chown: makeUnimplemented("chown"),
+    copy: makeUnimplemented("copy"),
+    copyFile: makeUnimplemented("copyFile"),
     exists: (path) => {
       const target = normalize(path)
       return Effect.succeed(files.has(target) || directories.has(target))
     },
+    glob: makeUnimplemented("glob"),
+    link: makeUnimplemented("link"),
     makeDirectory: (path, makeOptions) =>
       Effect.suspend(() => {
         const target = normalize(path)
@@ -140,6 +161,13 @@ export function createFileSystemTestContext(options?: {
         directories.add(target)
         return Effect.void
       }),
+    makeTempDirectory: makeUnimplemented("makeTempDirectory"),
+    makeTempDirectoryScoped: makeUnimplemented("makeTempDirectoryScoped"),
+    makeTempFile: makeUnimplemented("makeTempFile"),
+    makeTempFileScoped: makeUnimplemented("makeTempFileScoped"),
+    open: makeUnimplemented("open"),
+    readDirectory: makeUnimplemented("readDirectory"),
+    readFile: makeUnimplemented("readFile"),
     readFileString: (path) =>
       Effect.suspend(() => {
         const content = files.get(normalize(path))
@@ -148,6 +176,8 @@ export function createFileSystemTestContext(options?: {
           ? Effect.fail(makeSystemError("NotFound", "readFileString", path))
           : Effect.succeed(content)
       }),
+    readLink: makeUnimplemented("readLink"),
+    realPath: makeUnimplemented("realPath"),
     remove: (path, removeOptions) =>
       Effect.suspend(() => {
         const target = normalize(path)
@@ -183,6 +213,8 @@ export function createFileSystemTestContext(options?: {
           ? Effect.void
           : Effect.fail(makeSystemError("NotFound", "remove", path))
       }),
+    rename: makeUnimplemented("rename"),
+    sink: () => Sink.die(makeUnimplementedError("sink")),
     stat: (path) =>
       Effect.suspend(() => {
         const target = normalize(path)
@@ -196,6 +228,12 @@ export function createFileSystemTestContext(options?: {
           ? Effect.succeed(makeFileInfo("Directory", 0))
           : Effect.fail(makeSystemError("NotFound", "stat", path))
       }),
+    stream: () => Stream.die(makeUnimplementedError("stream")),
+    symlink: makeUnimplemented("symlink"),
+    truncate: makeUnimplemented("truncate"),
+    utimes: makeUnimplemented("utimes"),
+    watch: () => Stream.die(makeUnimplementedError("watch")),
+    writeFile: makeUnimplemented("writeFile"),
     writeFileString: (path, data) =>
       Effect.suspend(() => {
         const target = normalize(path)

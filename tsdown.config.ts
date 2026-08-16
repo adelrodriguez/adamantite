@@ -6,6 +6,8 @@ export default defineConfig([
   {
     deps: {
       neverBundle: true,
+      // Deliberately tracks package.json: adding a runtime dependency widens
+      // this import guard without a change to the build config.
       onlyImport: Object.keys(packageJson.dependencies),
     },
     dts: false,

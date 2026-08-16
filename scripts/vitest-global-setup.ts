@@ -8,7 +8,8 @@ import tsdownConfig from "../tsdown.config.ts"
 const [cliBundleConfig] = tsdownConfig
 
 async function buildCliBundle() {
-  await build({ ...cliBundleConfig, config: false })
+  // clean would erase dist/presets, which this partial build does not rebuild.
+  await build({ ...cliBundleConfig, clean: false, config: false })
 }
 
 export async function setup(project: TestProject) {

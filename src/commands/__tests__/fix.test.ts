@@ -1,7 +1,8 @@
 import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { writeFile } from "#__tests__/filesystem.ts"
@@ -24,91 +25,111 @@ describe("fix", () => {
   })
 
   describe("default invocation", () => {
-    test("always include the fix flag", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("always include the fix flag", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, [], runner)
+        const exit = yield* runCommandWithRunner(fixCommand, [], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
-        {
-          args: ["--fix"],
-          command: "oxlint",
-        },
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--fix"],
+            command: "oxlint",
+          },
+        ])
+      })
+    )
   })
 
   describe("fix mode flags", () => {
-    test("add suggested fixes when requested", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("add suggested fixes when requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["--suggested"], runner)
+        const exit = yield* runCommandWithRunner(fixCommand, ["--suggested"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-suggestions"])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-suggestions"])
+      })
+    )
 
-    test("add dangerous fixes when requested", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("add dangerous fixes when requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["--dangerous"], runner)
+        const exit = yield* runCommandWithRunner(fixCommand, ["--dangerous"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-dangerously"])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-dangerously"])
+      })
+    )
 
-    test("add all fix modes when all is requested", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("add all fix modes when all is requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["--all"], runner)
+        const exit = yield* runCommandWithRunner(fixCommand, ["--all"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual([
-        "--fix",
-        "--fix-suggestions",
-        "--fix-dangerously",
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual([
+          "--fix",
+          "--fix-suggestions",
+          "--fix-dangerously",
+        ])
+      })
+    )
   })
 
   describe("file arguments", () => {
-    test("deduplicate duplicate file arguments", async () => {
-      await writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
-      const runner = createRunnerTestContext()
+    it.effect("deduplicate duplicate file arguments", () =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
+        )
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["index.ts", "index.ts"], runner)
+        const exit = yield* runCommandWithRunner(fixCommand, ["index.ts", "index.ts"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual([
-        "--fix",
-        realpathSync(join(tempDir, "index.ts")),
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual([
+          "--fix",
+          realpathSync(join(tempDir, "index.ts")),
+        ])
+      })
+    )
   })
 
   describe("passthrough arguments", () => {
-    test("append arguments after managed fix flags", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("append arguments after managed fix flags", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(fixCommand, ["--dangerous"], runner, [
-        "--deny-warnings",
-      ])
+        const exit = yield* runCommandWithRunner(fixCommand, ["--dangerous"], runner, [
+          "--deny-warnings",
+        ])
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-dangerously", "--deny-warnings"])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual([
+          "--fix",
+          "--fix-dangerously",
+          "--deny-warnings",
+        ])
+      })
+    )
   })
 
   describe("error handling", () => {
-    test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
-      const runner = createRunnerTestContext([1])
+    it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(fixCommand, [], runner)
+        const exit = yield* runCommandWithRunner(fixCommand, [], runner)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit))
-      expect(error).toMatchObject({ _tag: "CommandFailed" })
-    })
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "CommandFailed" })
+      })
+    )
   })
 })

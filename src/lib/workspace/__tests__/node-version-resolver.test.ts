@@ -2,7 +2,7 @@ import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
@@ -20,7 +20,7 @@ function resolve(cwd: string) {
 }
 
 function runResolve(cwd: string) {
-  return resolve(cwd).pipe(Effect.provide(testLayer), Effect.runPromise)
+  return resolve(cwd).pipe(Effect.provide(testLayer))
 }
 
 describe("NodeVersionResolver", () => {
@@ -34,175 +34,227 @@ describe("NodeVersionResolver", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  test("select .node-version when it contains a version", async () => {
-    await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
+  it.effect("select .node-version when it contains a version", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(join(tempDir, ".node-version"), "22.19.0\n"))
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: ".node-version" })
-  })
+      expect(source).toEqual({ _tag: "File", path: ".node-version" })
+    })
+  )
 
-  test("select .nvmrc when .node-version is absent", async () => {
-    await writeFile(join(tempDir, ".nvmrc"), "22\n")
+  it.effect("select .nvmrc when .node-version is absent", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(join(tempDir, ".nvmrc"), "22\n"))
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: ".nvmrc" })
-  })
+      expect(source).toEqual({ _tag: "File", path: ".nvmrc" })
+    })
+  )
 
-  test("select .node-version when several valid declarations exist", async () => {
-    await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
-    await writeFile(join(tempDir, ".nvmrc"), "20\n")
-    await writeFile(join(tempDir, ".tool-versions"), "nodejs 22.19.0\n")
-    await writeFile(
-      join(tempDir, "package.json"),
-      JSON.stringify({ engines: { node: ">=22.19.0" }, name: "test-project" })
-    )
+  it.effect("select .node-version when several valid declarations exist", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(join(tempDir, ".node-version"), "22.19.0\n"))
+      yield* Effect.promise(() => writeFile(join(tempDir, ".nvmrc"), "20\n"))
+      yield* Effect.promise(() => writeFile(join(tempDir, ".tool-versions"), "nodejs 22.19.0\n"))
+      yield* Effect.promise(() =>
+        writeFile(
+          join(tempDir, "package.json"),
+          JSON.stringify({ engines: { node: ">=22.19.0" }, name: "test-project" })
+        )
+      )
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: ".node-version" })
-  })
+      expect(source).toEqual({ _tag: "File", path: ".node-version" })
+    })
+  )
 
-  test("fall through an empty .node-version to the next valid source", async () => {
-    await writeFile(join(tempDir, ".node-version"), "\n")
-    await writeFile(join(tempDir, ".nvmrc"), "22\n")
+  it.effect("fall through an empty .node-version to the next valid source", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(join(tempDir, ".node-version"), "\n"))
+      yield* Effect.promise(() => writeFile(join(tempDir, ".nvmrc"), "22\n"))
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: ".nvmrc" })
-  })
+      expect(source).toEqual({ _tag: "File", path: ".nvmrc" })
+    })
+  )
 
-  test("select .tool-versions when it declares nodejs", async () => {
-    await writeFile(join(tempDir, ".tool-versions"), "ruby 3.3.0\nnodejs 22.19.0\n")
+  it.effect("select .tool-versions when it declares nodejs", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(join(tempDir, ".tool-versions"), "ruby 3.3.0\nnodejs 22.19.0\n")
+      )
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: ".tool-versions" })
-  })
+      expect(source).toEqual({ _tag: "File", path: ".tool-versions" })
+    })
+  )
 
-  test("select .tool-versions when it declares node with the mise spelling", async () => {
-    await writeFile(join(tempDir, ".tool-versions"), "node 22.19.0\n")
+  it.effect("select .tool-versions when it declares node with the mise spelling", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(join(tempDir, ".tool-versions"), "node 22.19.0\n"))
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: ".tool-versions" })
-  })
+      expect(source).toEqual({ _tag: "File", path: ".tool-versions" })
+    })
+  )
 
-  test("ignore .tool-versions without a nodejs entry", async () => {
-    await writeFile(join(tempDir, ".tool-versions"), "ruby 3.3.0\n# nodejs 22.19.0\n")
+  it.effect("ignore .tool-versions without a nodejs entry", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(join(tempDir, ".tool-versions"), "ruby 3.3.0\n# nodejs 22.19.0\n")
+      )
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "Version", value: "lts/*" })
-  })
+      expect(source).toEqual({ _tag: "Version", value: "lts/*" })
+    })
+  )
 
-  test("select package.json for volta.node", async () => {
-    await writeFile(
-      join(tempDir, "package.json"),
-      JSON.stringify({ name: "test-project", volta: { node: "22.19.0" } })
-    )
+  it.effect("select package.json for volta.node", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(
+          join(tempDir, "package.json"),
+          JSON.stringify({ name: "test-project", volta: { node: "22.19.0" } })
+        )
+      )
 
-    const source = await runResolve(tempDir)
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: "package.json" })
-  })
+      expect(source).toEqual({ _tag: "File", path: "package.json" })
+    })
+  )
 
-  test("select package.json for a node entry in a devEngines.runtime object", async () => {
-    await writeFile(
-      join(tempDir, "package.json"),
-      JSON.stringify({
-        devEngines: { runtime: { name: "node", version: "22.19.0" } },
-        name: "test-project",
+  it.effect("select package.json for a node entry in a devEngines.runtime object", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(
+          join(tempDir, "package.json"),
+          JSON.stringify({
+            devEngines: { runtime: { name: "node", version: "22.19.0" } },
+            name: "test-project",
+          })
+        )
+      )
+
+      const source = yield* runResolve(tempDir)
+
+      expect(source).toEqual({ _tag: "File", path: "package.json" })
+    })
+  )
+
+  it.effect(
+    "select package.json for a devEngines.runtime entry with a differently cased name",
+    () =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          writeFile(
+            join(tempDir, "package.json"),
+            JSON.stringify({
+              devEngines: { runtime: { name: "Node", version: "22.19.0" } },
+              name: "test-project",
+            })
+          )
+        )
+
+        const source = yield* runResolve(tempDir)
+
+        expect(source).toEqual({ _tag: "File", path: "package.json" })
       })
-    )
+  )
 
-    const source = await runResolve(tempDir)
+  it.effect("select package.json for a node entry in a devEngines.runtime array", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(
+          join(tempDir, "package.json"),
+          JSON.stringify({
+            devEngines: {
+              runtime: [
+                { name: "bun", version: "1.0.0" },
+                { name: "node", version: "22.19.0" },
+              ],
+            },
+            name: "test-project",
+          })
+        )
+      )
 
-    expect(source).toEqual({ _tag: "File", path: "package.json" })
-  })
+      const source = yield* runResolve(tempDir)
 
-  test("select package.json for a devEngines.runtime entry with a differently cased name", async () => {
-    await writeFile(
-      join(tempDir, "package.json"),
-      JSON.stringify({
-        devEngines: { runtime: { name: "Node", version: "22.19.0" } },
-        name: "test-project",
-      })
-    )
+      expect(source).toEqual({ _tag: "File", path: "package.json" })
+    })
+  )
 
-    const source = await runResolve(tempDir)
+  it.effect("select package.json for engines.node", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(
+          join(tempDir, "package.json"),
+          JSON.stringify({ engines: { node: ">=22.19.0" }, name: "test-project" })
+        )
+      )
 
-    expect(source).toEqual({ _tag: "File", path: "package.json" })
-  })
+      const source = yield* runResolve(tempDir)
 
-  test("select package.json for a node entry in a devEngines.runtime array", async () => {
-    await writeFile(
-      join(tempDir, "package.json"),
-      JSON.stringify({
-        devEngines: {
-          runtime: [
-            { name: "bun", version: "1.0.0" },
-            { name: "node", version: "22.19.0" },
-          ],
-        },
-        name: "test-project",
-      })
-    )
+      expect(source).toEqual({ _tag: "File", path: "package.json" })
+    })
+  )
 
-    const source = await runResolve(tempDir)
+  it.effect("ignore package.json without a Node.js declaration", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() =>
+        writeFile(
+          join(tempDir, "package.json"),
+          JSON.stringify({ engines: { bun: ">=1.0.0" }, name: "test-project" })
+        )
+      )
 
-    expect(source).toEqual({ _tag: "File", path: "package.json" })
-  })
+      const source = yield* runResolve(tempDir)
 
-  test("select package.json for engines.node", async () => {
-    await writeFile(
-      join(tempDir, "package.json"),
-      JSON.stringify({ engines: { node: ">=22.19.0" }, name: "test-project" })
-    )
+      expect(source).toEqual({ _tag: "Version", value: "lts/*" })
+    })
+  )
 
-    const source = await runResolve(tempDir)
+  it.effect("fall back to lts/* when no declaration exists", () =>
+    Effect.gen(function* () {
+      const source = yield* runResolve(tempDir)
 
-    expect(source).toEqual({ _tag: "File", path: "package.json" })
-  })
+      expect(source).toEqual({ _tag: "Version", value: "lts/*" })
+    })
+  )
 
-  test("ignore package.json without a Node.js declaration", async () => {
-    await writeFile(
-      join(tempDir, "package.json"),
-      JSON.stringify({ engines: { bun: ">=1.0.0" }, name: "test-project" })
-    )
+  it.effect("return FailedToReadFile for an unreadable .node-version", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(join(tempDir, ".node-version"), "22.19.0\n"))
+      chmodSync(join(tempDir, ".node-version"), 0o000)
 
-    const source = await runResolve(tempDir)
+      const result = yield* runResult(resolve(tempDir), testLayer)
 
-    expect(source).toEqual({ _tag: "Version", value: "lts/*" })
-  })
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
+      }
+    })
+  )
 
-  test("fall back to lts/* when no declaration exists", async () => {
-    const source = await runResolve(tempDir)
+  it.effect("return FailedToParseFile for a malformed package.json", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeFile(join(tempDir, "package.json"), "{ not json"))
 
-    expect(source).toEqual({ _tag: "Version", value: "lts/*" })
-  })
+      const result = yield* runResult(resolve(tempDir), testLayer)
 
-  test("return FailedToReadFile for an unreadable .node-version", async () => {
-    await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
-    chmodSync(join(tempDir, ".node-version"), 0o000)
-
-    const result = await runResult(resolve(tempDir), testLayer)
-
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-    }
-  })
-
-  test("return FailedToParseFile for a malformed package.json", async () => {
-    await writeFile(join(tempDir, "package.json"), "{ not json")
-
-    const result = await runResult(resolve(tempDir), testLayer)
-
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
-    }
-  })
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
+      }
+    })
+  )
 })

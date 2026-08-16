@@ -9,5 +9,5 @@ export function runResult<A, E, R>(
 ) {
   const provided = effect.pipe(Effect.provide(layer))
 
-  return Effect.runPromise(provided.pipe(Effect.result))
+  return provided.pipe(Effect.result)
 }

@@ -4,7 +4,7 @@ import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -51,203 +51,213 @@ afterEach(() => {
 
 describe("readPackageJson", () => {
   describe("when a path is provided", () => {
-    test("read and parse a valid package.json", async () => {
-      const packageJson: PackageJson = {
-        dependencies: {
-          react: "^18.0.0",
-        },
-        devDependencies: {
-          typescript: "^5.0.0",
-        },
-        name: "test-package",
+    it.effect("read and parse a valid package.json", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          dependencies: {
+            react: "^18.0.0",
+          },
+          devDependencies: {
+            typescript: "^5.0.0",
+          },
+          name: "test-package",
+          version: "1.0.0",
+        }
+        yield* Effect.promise(() =>
+          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+        )
+
+        const result = yield* readPackageJson(testDir).pipe(Effect.provide(NodeContext.layer))
+
+        expect(result).toEqual(packageJson)
+      })
+    )
+
+    it.effect("return an error when package.json does not exist", () =>
+      Effect.gen(function* () {
+        const result = yield* runResult(readPackageJson(testDir), NodeServices.layer)
+        expect(Result.isFailure(result)).toBe(true)
+        if (Result.isFailure(result)) {
+          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
+        }
+      })
+    )
+
+    it.effect("return an error when package.json contains invalid JSON", () =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          writeFile(join(testDir, "package.json"), "invalid json content")
+        )
+
+        const result = yield* runResult(readPackageJson(testDir), NodeServices.layer)
+        expect(Result.isFailure(result)).toBe(true)
+        if (Result.isFailure(result)) {
+          expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
+        }
+      })
+    )
+  })
+
+  describe("when cwd is omitted", () => {
+    it.effect("use the current working directory by default", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          name: "test-package",
+          version: "1.0.0",
+        }
+        yield* Effect.promise(() =>
+          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+        )
+
+        const result = yield* readPackageJson().pipe(Effect.provide(NodeContext.layer))
+
+        expect(result).toEqual(packageJson)
+      })
+    )
+
+    it.effect("respect the explicit cwd argument", () =>
+      Effect.gen(function* () {
+        const fileSystemLayer = FileSystem.layerNoop({
+          readFileString: () =>
+            Effect.succeed(
+              JSON.stringify({
+                name: "test-project",
+                version: "1.0.0",
+              })
+            ),
+        })
+
+        const result = yield* readPackageJson("/test/project").pipe(
+          Effect.provide(fileSystemLayer),
+          Effect.provide(NodeServices.layer)
+        )
+
+        expect(result.name).toBe("test-project")
+        expect(result.version).toBe("1.0.0")
+      })
+    )
+  })
+})
+
+describe("parseJson", () => {
+  it.effect("parse valid JSON", () =>
+    Effect.gen(function* () {
+      const validJson = '{"name": "test", "version": "1.0.0"}'
+      const result = yield* parseJson(validJson).pipe(Effect.provide(NodeContext.layer))
+
+      expect(result).toEqual({
+        name: "test",
         version: "1.0.0",
-      }
-
-      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
-
-      const result = await readPackageJson(testDir).pipe(
-        Effect.provide(NodeContext.layer),
-        Effect.runPromise
-      )
-
-      expect(result).toEqual(packageJson)
+      })
     })
+  )
 
-    test("return an error when package.json does not exist", async () => {
-      const result = await runResult(readPackageJson(testDir), NodeServices.layer)
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-      }
+  it.effect("parse valid JSONC with comments", () =>
+    Effect.gen(function* () {
+      const jsonc = `{
+      // This is a comment
+      "name": "test",
+      "version": "1.0.0"
+    }`
+      const result = yield* parseJson(jsonc).pipe(Effect.provide(NodeContext.layer))
+
+      expect(result).toEqual({
+        name: "test",
+        version: "1.0.0",
+      })
     })
+  )
 
-    test("return an error when package.json contains invalid JSON", async () => {
-      await writeFile(join(testDir, "package.json"), "invalid json content")
+  it.effect("parse JSON with trailing commas", () =>
+    Effect.gen(function* () {
+      const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
+      const result = yield* parseJson(jsonWithTrailingComma).pipe(Effect.provide(NodeContext.layer))
 
-      const result = await runResult(readPackageJson(testDir), NodeServices.layer)
+      expect(result).toEqual({
+        name: "test",
+        version: "1.0.0",
+      })
+    })
+  )
+
+  it.effect("return an error for invalid JSON", () =>
+    Effect.gen(function* () {
+      const invalidJson = '{"name": "test", "version":}'
+      const result = yield* runResult(parseJson(invalidJson), NodeServices.layer)
       expect(Result.isFailure(result)).toBe(true)
       if (Result.isFailure(result)) {
         expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
       }
     })
-  })
+  )
 
-  describe("when cwd is omitted", () => {
-    test("use the current working directory by default", async () => {
-      const packageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
+  it.effect("return an error for an empty string", () =>
+    Effect.gen(function* () {
+      const result = yield* runResult(parseJson(""), NodeServices.layer)
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
       }
-
-      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
-
-      const result = await readPackageJson().pipe(
-        Effect.provide(NodeContext.layer),
-        Effect.runPromise
-      )
-
-      expect(result).toEqual(packageJson)
     })
-
-    test("respect the explicit cwd argument", async () => {
-      const fileSystemLayer = FileSystem.layerNoop({
-        readFileString: () =>
-          Effect.succeed(
-            JSON.stringify({
-              name: "test-project",
-              version: "1.0.0",
-            })
-          ),
-      })
-
-      const result = await readPackageJson("/test/project").pipe(
-        Effect.provide(fileSystemLayer),
-        Effect.provide(NodeServices.layer),
-        Effect.runPromise
-      )
-
-      expect(result.name).toBe("test-project")
-      expect(result.version).toBe("1.0.0")
-    })
-  })
-})
-
-describe("parseJson", () => {
-  test("parse valid JSON", async () => {
-    const validJson = '{"name": "test", "version": "1.0.0"}'
-    const result = await parseJson(validJson).pipe(
-      Effect.provide(NodeContext.layer),
-      Effect.runPromise
-    )
-
-    expect(result).toEqual({
-      name: "test",
-      version: "1.0.0",
-    })
-  })
-
-  test("parse valid JSONC with comments", async () => {
-    const jsonc = `{
-      // This is a comment
-      "name": "test",
-      "version": "1.0.0"
-    }`
-    const result = await parseJson(jsonc).pipe(Effect.provide(NodeContext.layer), Effect.runPromise)
-
-    expect(result).toEqual({
-      name: "test",
-      version: "1.0.0",
-    })
-  })
-
-  test("parse JSON with trailing commas", async () => {
-    const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
-    const result = await parseJson(jsonWithTrailingComma).pipe(
-      Effect.provide(NodeContext.layer),
-      Effect.runPromise
-    )
-
-    expect(result).toEqual({
-      name: "test",
-      version: "1.0.0",
-    })
-  })
-
-  test("return an error for invalid JSON", async () => {
-    const invalidJson = '{"name": "test", "version":}'
-    const result = await runResult(parseJson(invalidJson), NodeServices.layer)
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
-    }
-  })
-
-  test("return an error for an empty string", async () => {
-    const result = await runResult(parseJson(""), NodeServices.layer)
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
-    }
-  })
+  )
 })
 
 describe("mergeConfig", () => {
-  test("merge two objects", async () => {
-    const base = { a: 1, b: 2 }
-    const override = { b: 3, c: 4 }
-    const result = await mergeConfig(base, override).pipe(
-      Effect.provide(NodeContext.layer),
-      Effect.runPromise
-    )
+  it.effect("merge two objects", () =>
+    Effect.gen(function* () {
+      const base = { a: 1, b: 2 }
+      const override = { b: 3, c: 4 }
+      const result = yield* mergeConfig(base, override).pipe(Effect.provide(NodeContext.layer))
 
-    expect(result).toEqual({ a: 1, b: 2, c: 4 })
-  })
+      expect(result).toEqual({ a: 1, b: 2, c: 4 })
+    })
+  )
 
-  test("give priority to the first argument", async () => {
-    const first = { a: 1, b: 2 }
-    const second = { a: 3, b: 4 }
-    const result = await mergeConfig(first, second).pipe(
-      Effect.provide(NodeContext.layer),
-      Effect.runPromise
-    )
+  it.effect("give priority to the first argument", () =>
+    Effect.gen(function* () {
+      const first = { a: 1, b: 2 }
+      const second = { a: 3, b: 4 }
+      const result = yield* mergeConfig(first, second).pipe(Effect.provide(NodeContext.layer))
 
-    expect(result).toEqual({ a: 1, b: 2 })
-  })
+      expect(result).toEqual({ a: 1, b: 2 })
+    })
+  )
 
-  test("handle nested objects", async () => {
-    const base = { a: { x: 1, y: 2 }, b: 3 }
-    const override = { a: { y: 4, z: 5 }, b: 6 }
-    const result = await mergeConfig(base, override).pipe(
-      Effect.provide(NodeContext.layer),
-      Effect.runPromise
-    )
+  it.effect("handle nested objects", () =>
+    Effect.gen(function* () {
+      const base = { a: { x: 1, y: 2 }, b: 3 }
+      const override = { a: { y: 4, z: 5 }, b: 6 }
+      const result = yield* mergeConfig(base, override).pipe(Effect.provide(NodeContext.layer))
 
-    expect(result).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
-  })
+      expect(result).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
+    })
+  )
 
-  test("return an error when defu throws", async () => {
-    const throwingBase = new Proxy(
-      {},
-      {
-        get() {
-          throw new Error("Simulated defu error")
-        },
-        ownKeys() {
-          throw new Error("Simulated defu error")
-        },
+  it.effect("return an error when defu throws", () =>
+    Effect.gen(function* () {
+      const throwingBase = new Proxy(
+        {},
+        {
+          get() {
+            throw new Error("Simulated defu error")
+          },
+          ownKeys() {
+            throw new Error("Simulated defu error")
+          },
+        }
+      )
+
+      const result = yield* runResult(mergeConfig(throwingBase, { b: 2 }), NodeServices.layer)
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToMergeConfig" })
       }
-    )
-
-    const result = await runResult(mergeConfig(throwingBase, { b: 2 }), NodeServices.layer)
-    expect(Result.isFailure(result)).toBe(true)
-    if (Result.isFailure(result)) {
-      expect(result.failure).toMatchObject({ _tag: "FailedToMergeConfig" })
-    }
-  })
+    })
+  )
 })
 
 describe("serializeTsObjectLiteral", () => {
-  test("serialize objects as TypeScript object literals", () => {
+  it("serialize objects as TypeScript object literals", () => {
     const result = serializeTsObjectLiteral({
       enabled: true,
       nested: {
@@ -263,7 +273,7 @@ describe("serializeTsObjectLiteral", () => {
 }`)
   })
 
-  test("keep non-identifier keys quoted", () => {
+  it("keep non-identifier keys quoted", () => {
     const result = serializeTsObjectLiteral({
       "foo-bar": true,
       validKey: false,
@@ -275,7 +285,7 @@ describe("serializeTsObjectLiteral", () => {
 }`)
   })
 
-  test("indent continuation lines when embedding multiline values", () => {
+  it("indent continuation lines when embedding multiline values", () => {
     const result = serializeTsObjectLiteral(
       {
         nested: {
@@ -292,7 +302,7 @@ describe("serializeTsObjectLiteral", () => {
   }`)
   })
 
-  test("support custom indentation strings", () => {
+  it("support custom indentation strings", () => {
     const result = serializeTsObjectLiteral(
       {
         nested: {
@@ -312,82 +322,86 @@ describe("serializeTsObjectLiteral", () => {
 
 describe("checkIsMonorepo", () => {
   describe("when cwd is explicit", () => {
-    test("respect the explicit cwd argument", async () => {
-      const fileSystemLayer = FileSystem.layerNoop({
-        exists: () => Effect.succeed(false),
-        readFileString: () =>
-          Effect.succeed(
-            JSON.stringify({
-              name: "test-project",
-              version: "1.0.0",
-              workspaces: ["packages/*"],
-            })
-          ),
+    it.effect("respect the explicit cwd argument", () =>
+      Effect.gen(function* () {
+        const fileSystemLayer = FileSystem.layerNoop({
+          exists: () => Effect.succeed(false),
+          readFileString: () =>
+            Effect.succeed(
+              JSON.stringify({
+                name: "test-project",
+                version: "1.0.0",
+                workspaces: ["packages/*"],
+              })
+            ),
+        })
+
+        const result = yield* checkIsMonorepo("/test/project").pipe(
+          Effect.provide(fileSystemLayer),
+          Effect.provide(NodeServices.layer)
+        )
+
+        expect(result).toBe(true)
       })
-
-      const result = await checkIsMonorepo("/test/project").pipe(
-        Effect.provide(fileSystemLayer),
-        Effect.provide(NodeServices.layer),
-        Effect.runPromise
-      )
-
-      expect(result).toBe(true)
-    })
+    )
   })
 
   describe("when workspace files are present", () => {
-    test("return true when pnpm-workspace.yaml exists", async () => {
-      await writeFile(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
+    it.effect("return true when pnpm-workspace.yaml exists", () =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          writeFile(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
+        )
 
-      const result = await checkIsMonorepo(testDir).pipe(
-        Effect.provide(NodeContext.layer),
-        Effect.runPromise
-      )
+        const result = yield* checkIsMonorepo(testDir).pipe(Effect.provide(NodeContext.layer))
 
-      expect(result).toBe(true)
-    })
+        expect(result).toBe(true)
+      })
+    )
 
-    test("return true when package.json has a workspaces field", async () => {
-      const packageJson: PackageJson = {
-        name: "test-package",
-        workspaces: ["packages/*"],
-      }
+    it.effect("return true when package.json has a workspaces field", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          name: "test-package",
+          workspaces: ["packages/*"],
+        }
+        yield* Effect.promise(() =>
+          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+        )
 
-      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+        const result = yield* checkIsMonorepo(testDir).pipe(Effect.provide(NodeContext.layer))
 
-      const result = await checkIsMonorepo(testDir).pipe(
-        Effect.provide(NodeContext.layer),
-        Effect.runPromise
-      )
-
-      expect(result).toBe(true)
-    })
+        expect(result).toBe(true)
+      })
+    )
   })
 
   describe("when workspace files are absent", () => {
-    test("return false when neither condition is met", async () => {
-      const packageJson: PackageJson = {
-        name: "test-package",
-        version: "1.0.0",
-      }
+    it.effect("return false when neither condition is met", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          name: "test-package",
+          version: "1.0.0",
+        }
+        yield* Effect.promise(() =>
+          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+        )
 
-      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+        const result = yield* checkIsMonorepo(testDir).pipe(Effect.provide(NodeContext.layer))
 
-      const result = await checkIsMonorepo(testDir).pipe(
-        Effect.provide(NodeContext.layer),
-        Effect.runPromise
-      )
+        expect(result).toBe(false)
+      })
+    )
 
-      expect(result).toBe(false)
-    })
-
-    test("return an error when package.json does not exist", async () => {
-      const result = await runResult(checkIsMonorepo(testDir), NodeServices.layer)
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-      }
-    })
+    it.effect("return an error when package.json does not exist", () =>
+      Effect.gen(function* () {
+        const result = yield* runResult(checkIsMonorepo(testDir), NodeServices.layer)
+        expect(Result.isFailure(result)).toBe(true)
+        if (Result.isFailure(result)) {
+          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
+        }
+      })
+    )
   })
 })
 
@@ -428,43 +442,46 @@ describe("printTitle", () => {
     return Layer.succeed(Console.Console)(mockConsole)
   }
 
-  test("print the title when the terminal is wide enough", async () => {
-    const testLayer = Layer.merge(makeTerminalLayer(120), makeConsoleLayer())
+  it.effect("print the title when the terminal is wide enough", () =>
+    Effect.gen(function* () {
+      const testLayer = Layer.merge(makeTerminalLayer(120), makeConsoleLayer())
+      yield* printTitle().pipe(Effect.provide(testLayer))
 
-    await Effect.runPromise(printTitle().pipe(Effect.provide(testLayer)))
+      expect(capturedLogs.length).toBe(1)
+      expect(capturedLogs[0]).toContain(".ooooo.")
+    })
+  )
 
-    expect(capturedLogs.length).toBe(1)
-    expect(capturedLogs[0]).toContain(".ooooo.")
-  })
+  it.effect("not print the title when the terminal is too narrow", () =>
+    Effect.gen(function* () {
+      const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(50), makeConsoleLayer())
+      yield* printTitle().pipe(Effect.provide(testLayer))
 
-  test("not print the title when the terminal is too narrow", async () => {
-    const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(50), makeConsoleLayer())
+      expect(capturedLogs.length).toBe(0)
+    })
+  )
 
-    await Effect.runPromise(printTitle().pipe(Effect.provide(testLayer)))
+  it.effect("not print the title when process.stdout.columns is undefined", () =>
+    Effect.gen(function* () {
+      const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(), makeConsoleLayer())
+      yield* printTitle().pipe(Effect.provide(testLayer))
 
-    expect(capturedLogs.length).toBe(0)
-  })
-
-  test("not print the title when process.stdout.columns is undefined", async () => {
-    const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(), makeConsoleLayer())
-
-    await Effect.runPromise(printTitle().pipe(Effect.provide(testLayer)))
-
-    expect(capturedLogs.length).toBe(0)
-  })
+      expect(capturedLogs.length).toBe(0)
+    })
+  )
 })
 
 describe("normalizeDependencyVersion", () => {
-  test("strip caret and tilde prefixes", () => {
+  it("strip caret and tilde prefixes", () => {
     expect(normalizeDependencyVersion("^0.20.0")).toBe("0.20.0")
     expect(normalizeDependencyVersion("~0.20.0")).toBe("0.20.0")
   })
 
-  test("preserve exact versions", () => {
+  it("preserve exact versions", () => {
     expect(normalizeDependencyVersion("0.20.0")).toBe("0.20.0")
   })
 
-  test("trim whitespace and strip the workspace prefix", () => {
+  it("trim whitespace and strip the workspace prefix", () => {
     expect(normalizeDependencyVersion("  workspace:^0.20.0  ")).toBe("0.20.0")
   })
 })

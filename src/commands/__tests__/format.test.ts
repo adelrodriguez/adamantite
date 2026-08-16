@@ -1,7 +1,8 @@
 import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { writeFile } from "#__tests__/filesystem.ts"
@@ -24,67 +25,79 @@ describe("format", () => {
   })
 
   describe("default invocation", () => {
-    test("run oxfmt with no flags by default", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("run oxfmt with no flags by default", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(formatCommand, [], runner)
+        const exit = yield* runCommandWithRunner(formatCommand, [], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
-        {
-          args: [],
-          command: "oxfmt",
-        },
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: [],
+            command: "oxfmt",
+          },
+        ])
+      })
+    )
   })
 
   describe("check mode", () => {
-    test("add the check flag when requested", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("add the check flag when requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(formatCommand, ["--check"], runner)
+        const exit = yield* runCommandWithRunner(formatCommand, ["--check"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--check"])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual(["--check"])
+      })
+    )
   })
 
   describe("file arguments", () => {
-    test("append file arguments", async () => {
-      await writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
-      const runner = createRunnerTestContext()
+    it.effect("append file arguments", () =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
+        )
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(formatCommand, ["index.ts"], runner)
+        const exit = yield* runCommandWithRunner(formatCommand, ["index.ts"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual([realpathSync(join(tempDir, "index.ts"))])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual([realpathSync(join(tempDir, "index.ts"))])
+      })
+    )
   })
 
   describe("passthrough arguments", () => {
-    test("append arguments after managed formatter arguments", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("append arguments after managed formatter arguments", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(formatCommand, ["--check"], runner, [
-        "--ignore-path",
-        ".formatignore",
-      ])
+        const exit = yield* runCommandWithRunner(formatCommand, ["--check"], runner, [
+          "--ignore-path",
+          ".formatignore",
+        ])
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--check", "--ignore-path", ".formatignore"])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual(["--check", "--ignore-path", ".formatignore"])
+      })
+    )
   })
 
   describe("error handling", () => {
-    test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
-      const runner = createRunnerTestContext([1])
+    it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(formatCommand, [], runner)
+        const exit = yield* runCommandWithRunner(formatCommand, [], runner)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit))
-      expect(error).toMatchObject({ _tag: "CommandFailed" })
-    })
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "CommandFailed" })
+      })
+    )
   })
 })

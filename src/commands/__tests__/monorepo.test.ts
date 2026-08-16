@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import monorepoCommand from "#commands/monorepo.ts"
@@ -23,64 +24,72 @@ describe("monorepo", () => {
   })
 
   describe("default invocation", () => {
-    test("run sherif by default", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("run sherif by default", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(monorepoCommand, [], runner)
+        const exit = yield* runCommandWithRunner(monorepoCommand, [], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
-        {
-          args: [],
-          command: "sherif",
-          stdin: "inherit",
-        },
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: [],
+            command: "sherif",
+            stdin: "inherit",
+          },
+        ])
+      })
+    )
   })
 
   describe("fix mode", () => {
-    test("add fix when requested", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("add fix when requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(monorepoCommand, ["--fix"], runner)
+        const exit = yield* runCommandWithRunner(monorepoCommand, ["--fix"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]).toEqual({
-        args: ["--fix"],
-        command: "sherif",
-        stdin: "inherit",
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]).toEqual({
+          args: ["--fix"],
+          command: "sherif",
+          stdin: "inherit",
+        })
       })
-    })
+    )
   })
 
   describe("passthrough arguments", () => {
-    test("append arguments after managed Sherif flags", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("append arguments after managed Sherif flags", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(monorepoCommand, ["--fix"], runner, [
-        "--ignore-package",
-        "package-a",
-      ])
+        const exit = yield* runCommandWithRunner(monorepoCommand, ["--fix"], runner, [
+          "--ignore-package",
+          "package-a",
+        ])
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]).toEqual({
-        args: ["--fix", "--ignore-package", "package-a"],
-        command: "sherif",
-        stdin: "inherit",
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]).toEqual({
+          args: ["--fix", "--ignore-package", "package-a"],
+          command: "sherif",
+          stdin: "inherit",
+        })
       })
-    })
+    )
   })
 
   describe("error handling", () => {
-    test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
-      const runner = createRunnerTestContext([1])
+    it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(monorepoCommand, [], runner)
+        const exit = yield* runCommandWithRunner(monorepoCommand, [], runner)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit))
-      expect(error).toMatchObject({ _tag: "CommandFailed" })
-    })
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "CommandFailed" })
+      })
+    )
   })
 })

@@ -1,7 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import typecheckCommand from "#commands/typecheck.ts"
@@ -26,48 +27,54 @@ describe("typecheck", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  test("run oxlint with config-driven checks and log deprecation warning", async () => {
-    const prompter = createPrompterTestContext()
-    const runner = createRunnerTestContext()
+  it.effect("run oxlint with config-driven checks and log deprecation warning", () =>
+    Effect.gen(function* () {
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext()
 
-    const exit = await runCommand(typecheckCommand, [], [prompter.layer, runner.layer])
+      const exit = yield* runCommand(typecheckCommand, [], [prompter.layer, runner.layer])
 
-    expect(Exit.isSuccess(exit)).toBe(true)
-    expect(prompter.logs).toContainEqual({
-      level: "warning",
-      message: "Deprecated. Use `adamantite check` for typechecking.",
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "Deprecated. Use `adamantite check` for typechecking.",
+      })
+      expect(runner.invocations).toEqual([
+        {
+          args: [],
+          command: "oxlint",
+        },
+      ])
     })
-    expect(runner.invocations).toEqual([
-      {
-        args: [],
-        command: "oxlint",
-      },
-    ])
-  })
+  )
 
-  test("forward arguments to oxlint", async () => {
-    const prompter = createPrompterTestContext()
-    const runner = createRunnerTestContext()
+  it.effect("forward arguments to oxlint", () =>
+    Effect.gen(function* () {
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext()
 
-    const exit = await runCommand(
-      typecheckCommand,
-      [],
-      [prompter.layer, runner.layer],
-      ["--deny-warnings"]
-    )
+      const exit = yield* runCommand(
+        typecheckCommand,
+        [],
+        [prompter.layer, runner.layer],
+        ["--deny-warnings"]
+      )
 
-    expect(Exit.isSuccess(exit)).toBe(true)
-    expect(runner.invocations[0]?.args).toEqual(["--deny-warnings"])
-  })
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations[0]?.args).toEqual(["--deny-warnings"])
+    })
+  )
 
-  test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
-    const prompter = createPrompterTestContext()
-    const runner = createRunnerTestContext([1])
+  it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
+    Effect.gen(function* () {
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext([1])
 
-    const exit = await runCommand(typecheckCommand, [], [prompter.layer, runner.layer])
+      const exit = yield* runCommand(typecheckCommand, [], [prompter.layer, runner.layer])
 
-    expect(Exit.isFailure(exit)).toBe(true)
-    const error = Option.getOrThrow(Exit.findErrorOption(exit))
-    expect(error).toMatchObject({ _tag: "CommandFailed" })
-  })
+      expect(Exit.isFailure(exit)).toBe(true)
+      const error = Option.getOrThrow(Exit.findErrorOption(exit))
+      expect(error).toMatchObject({ _tag: "CommandFailed" })
+    })
+  )
 })

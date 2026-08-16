@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
@@ -40,7 +40,7 @@ function runTestEffect<A, E>(
       )
     )
   )
-  return Effect.runPromise(provided)
+  return provided
 }
 
 async function writeManagedProject() {
@@ -77,120 +77,152 @@ describe("hardcodedNodeVersion", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  test("check reports not-applicable when no workflow exists", async () => {
-    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
+  it.effect("check reports not-applicable when no workflow exists", () =>
+    Effect.gen(function* () {
+      const result = yield* runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
 
-    expect(result).toEqual({ status: "not-applicable", warnings: [] })
-  })
-
-  test("check reports not-applicable when the workflow already uses node-version-file", async () => {
-    mkdirSync(".github/workflows", { recursive: true })
-    await writeFile(
-      ".github/workflows/adamantite.yml",
-      'name: adamantite\n          node-version-file: ".node-version"\n'
-    )
-
-    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
-
-    expect(result).toEqual({ status: "not-applicable", warnings: [] })
-  })
-
-  test("check reports not-applicable when the workflow uses lts/*", async () => {
-    mkdirSync(".github/workflows", { recursive: true })
-    await writeFile(
-      ".github/workflows/adamantite.yml",
-      'name: adamantite\n          node-version: "lts/*"\n'
-    )
-
-    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
-
-    expect(result).toEqual({ status: "not-applicable", warnings: [] })
-  })
-
-  test("check reports that a hard-coded Node.js version needs migration", async () => {
-    await writeManagedProject()
-
-    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
-
-    expect(result).toMatchObject({ status: "needed" })
-  })
-
-  test("migrate points the workflow at the project's Node.js version file", async () => {
-    await writeManagedProject()
-    await writeFile(".node-version", "22.19.0\n")
-
-    await runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }))
-
-    const workflow = await testFile(".github/workflows/adamantite.yml").text()
-    expect(workflow).toContain('node-version-file: ".node-version"')
-    expect(workflow).not.toContain('node-version: "26"')
-
-    await runTestEffect(migrationHardcodedNodeVersion.validate({ cwd: tempDir }))
-  })
-
-  test("migrate falls back to lts/* when the project declares no Node.js version", async () => {
-    await writeManagedProject()
-
-    await runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }))
-
-    const workflow = await testFile(".github/workflows/adamantite.yml").text()
-    expect(workflow).toContain('node-version: "lts/*"')
-    expect(workflow).not.toContain('node-version: "26"')
-
-    await runTestEffect(migrationHardcodedNodeVersion.validate({ cwd: tempDir }))
-  })
-
-  test("check reports not-applicable with a warning without CI-compatible managed scripts", async () => {
-    await writeFile(
-      "package.json",
-      JSON.stringify({ name: "test-project", version: "1.0.0" }, null, 2)
-    )
-    mkdirSync(".github/workflows", { recursive: true })
-    await writeFile(".github/workflows/adamantite.yml", HARDCODED_WORKFLOW)
-
-    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
-
-    expect(result).toEqual({
-      status: "not-applicable",
-      warnings: [
-        "No CI-compatible managed scripts were found, so the GitHub Actions workflow was not updated.",
-      ],
+      expect(result).toEqual({ status: "not-applicable", warnings: [] })
     })
+  )
 
-    const workflow = await testFile(".github/workflows/adamantite.yml").text()
-    expect(workflow).toBe(HARDCODED_WORKFLOW)
-  })
+  it.effect("check reports not-applicable when the workflow already uses node-version-file", () =>
+    Effect.gen(function* () {
+      mkdirSync(".github/workflows", { recursive: true })
+      yield* Effect.promise(() =>
+        writeFile(
+          ".github/workflows/adamantite.yml",
+          'name: adamantite\n          node-version-file: ".node-version"\n'
+        )
+      )
 
-  test("check reports not-applicable with a warning for an unsupported package manager", async () => {
-    await writeManagedProject()
+      const result = yield* runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
 
-    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }), {
-      detectedPackageManager: { name: "aube" },
+      expect(result).toEqual({ status: "not-applicable", warnings: [] })
     })
+  )
 
-    expect(result).toEqual({
-      status: "not-applicable",
-      warnings: [
-        "`aube` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow was not updated.",
-      ],
+  it.effect("check reports not-applicable when the workflow uses lts/*", () =>
+    Effect.gen(function* () {
+      mkdirSync(".github/workflows", { recursive: true })
+      yield* Effect.promise(() =>
+        writeFile(
+          ".github/workflows/adamantite.yml",
+          'name: adamantite\n          node-version: "lts/*"\n'
+        )
+      )
+
+      const result = yield* runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
+
+      expect(result).toEqual({ status: "not-applicable", warnings: [] })
     })
+  )
 
-    const workflow = await testFile(".github/workflows/adamantite.yml").text()
-    expect(workflow).toBe(HARDCODED_WORKFLOW)
-  })
+  it.effect("check reports that a hard-coded Node.js version needs migration", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeManagedProject())
 
-  test("check reports not-applicable with a warning when no package manager is detected", async () => {
-    await writeManagedProject()
+      const result = yield* runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
 
-    const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }), {
-      detectedPackageManager: null,
+      expect(result).toMatchObject({ status: "needed" })
     })
+  )
 
-    expect(result).toEqual({
-      status: "not-applicable",
-      warnings: [
-        "Could not detect a package manager, so the GitHub Actions workflow was not updated.",
-      ],
+  it.effect("migrate points the workflow at the project's Node.js version file", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeManagedProject())
+      yield* Effect.promise(() => writeFile(".node-version", "22.19.0\n"))
+      yield* runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }))
+
+      const workflow = yield* Effect.promise(() =>
+        testFile(".github/workflows/adamantite.yml").text()
+      )
+      expect(workflow).toContain('node-version-file: ".node-version"')
+      expect(workflow).not.toContain('node-version: "26"')
+      yield* runTestEffect(migrationHardcodedNodeVersion.validate({ cwd: tempDir }))
     })
-  })
+  )
+
+  it.effect("migrate falls back to lts/* when the project declares no Node.js version", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeManagedProject())
+      yield* runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }))
+
+      const workflow = yield* Effect.promise(() =>
+        testFile(".github/workflows/adamantite.yml").text()
+      )
+      expect(workflow).toContain('node-version: "lts/*"')
+      expect(workflow).not.toContain('node-version: "26"')
+      yield* runTestEffect(migrationHardcodedNodeVersion.validate({ cwd: tempDir }))
+    })
+  )
+
+  it.effect(
+    "check reports not-applicable with a warning without CI-compatible managed scripts",
+    () =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() =>
+          writeFile(
+            "package.json",
+            JSON.stringify({ name: "test-project", version: "1.0.0" }, null, 2)
+          )
+        )
+        mkdirSync(".github/workflows", { recursive: true })
+        yield* Effect.promise(() =>
+          writeFile(".github/workflows/adamantite.yml", HARDCODED_WORKFLOW)
+        )
+
+        const result = yield* runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
+
+        expect(result).toEqual({
+          status: "not-applicable",
+          warnings: [
+            "No CI-compatible managed scripts were found, so the GitHub Actions workflow was not updated.",
+          ],
+        })
+
+        const workflow = yield* Effect.promise(() =>
+          testFile(".github/workflows/adamantite.yml").text()
+        )
+        expect(workflow).toBe(HARDCODED_WORKFLOW)
+      })
+  )
+
+  it.effect("check reports not-applicable with a warning for an unsupported package manager", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeManagedProject())
+
+      const result = yield* runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }), {
+        detectedPackageManager: { name: "aube" },
+      })
+
+      expect(result).toEqual({
+        status: "not-applicable",
+        warnings: [
+          "`aube` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow was not updated.",
+        ],
+      })
+
+      const workflow = yield* Effect.promise(() =>
+        testFile(".github/workflows/adamantite.yml").text()
+      )
+      expect(workflow).toBe(HARDCODED_WORKFLOW)
+    })
+  )
+
+  it.effect("check reports not-applicable with a warning when no package manager is detected", () =>
+    Effect.gen(function* () {
+      yield* Effect.promise(() => writeManagedProject())
+
+      const result = yield* runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }), {
+        detectedPackageManager: null,
+      })
+
+      expect(result).toEqual({
+        status: "not-applicable",
+        warnings: [
+          "Could not detect a package manager, so the GitHub Actions workflow was not updated.",
+        ],
+      })
+    })
+  )
 })

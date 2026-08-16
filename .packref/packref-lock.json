@@ -68,6 +68,18 @@
       },
       "tracking": "dependency",
       "version": "4.1.10"
+    },
+    {
+      "name": "@effect/vitest",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/vitest",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/effect"
+      },
+      "tracking": "dependency",
+      "version": "4.0.0-rc.108"
     }
   ]
 }

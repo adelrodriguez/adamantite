@@ -286,7 +286,7 @@ function makeQuietConsoleLayer() {
   })
 }
 
-export async function runCommand(
+export function runCommand(
   command: Command.Command.Any,
   args: readonly string[],
   layers: TestLayer[],
@@ -305,7 +305,7 @@ export async function runCommand(
     providedLayer = Layer.merge(providedLayer, layer)
   }
 
-  return Effect.runPromiseExit(
+  return Effect.exit(
     // SAFETY: TestLayer erases its outputs to unknown, so providing it cannot
     // discharge the requirement channel statically; the merged layers supply
     // every service the command uses at runtime.
@@ -316,13 +316,13 @@ export async function runCommand(
   )
 }
 
-export async function runCommandWithRunner(
+export function runCommandWithRunner(
   command: Command.Command.Any,
   args: readonly string[],
   runner: RunnerTestContext,
   forwardedArguments: readonly string[] = []
 ) {
-  return Effect.runPromiseExit(
+  return Effect.exit(
     // SAFETY: Command.Command.Any erases the command's requirements, so
     // TypeScript cannot verify them against the provided layers; runner tests
     // only need NodeServices and the stub CommandRunner supplied here.

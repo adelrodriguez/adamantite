@@ -2,7 +2,7 @@ import { spawn } from "node:child_process"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { describe, expect, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
@@ -18,18 +18,17 @@ import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
-  return Effect.runPromiseExit(
-    runCli(args, "test").pipe(
-      Effect.provide(
-        Layer.mergeAll(
-          NodeServices.layer,
-          NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
-          Prompter.layer,
-          runner.layer,
-          DependencyInstaller.layer
-        )
+  return runCli(args, "test").pipe(
+    Effect.provide(
+      Layer.mergeAll(
+        NodeServices.layer,
+        NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
+        Prompter.layer,
+        runner.layer,
+        DependencyInstaller.layer
       )
-    )
+    ),
+    Effect.exit
   )
 }
 
@@ -61,7 +60,7 @@ async function runCliProcess(args: string[]) {
 
 describe("adamantite", () => {
   describe("--version", () => {
-    test("display the package version", async () => {
+    it("display the package version", async () => {
       const result = await runCliProcess(["--version"])
 
       // SAFETY: package.json is this repo's manifest, which the package manager already requires to conform to the PackageJson schema.
@@ -77,7 +76,7 @@ describe("adamantite", () => {
   })
 
   describe("--help", () => {
-    test("print top-level help with key subcommands", async () => {
+    it("print top-level help with key subcommands", async () => {
       const result = await runCliProcess(["--help"])
 
       expect(result.stdout).toContain("USAGE")
@@ -88,7 +87,7 @@ describe("adamantite", () => {
       expect(result.exitCode).toBe(0)
     })
 
-    test("print non-interactive setup flags for init", async () => {
+    it("print non-interactive setup flags for init", async () => {
       const result = await runCliProcess(["init", "--help"])
 
       expect(result.stdout).toContain("adamantite init [flags]")
@@ -115,7 +114,7 @@ describe("adamantite", () => {
   })
 
   describe("unknown subcommands", () => {
-    test("print an error and exit non-zero", async () => {
+    it("print an error and exit non-zero", async () => {
       const result = await runCliProcess(["nope"])
 
       expect(result.stdout).toContain("Help requested")
@@ -125,40 +124,44 @@ describe("adamantite", () => {
   })
 
   describe("passthrough arguments", () => {
-    test("forward every argument after the first separator to the selected command", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("forward every argument after the first separator to the selected command", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCliWithRunner(
-        ["analyze", "--strict", "--", "--directory", "packages/app", "--", "--include", "src"],
-        runner
-      )
+        const exit = yield* runCliWithRunner(
+          ["analyze", "--strict", "--", "--directory", "packages/app", "--", "--include", "src"],
+          runner
+        )
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
-        {
-          args: [
-            "--production",
-            "--strict",
-            "--directory",
-            "packages/app",
-            "--",
-            "--include",
-            "src",
-          ],
-          command: "knip",
-        },
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: [
+              "--production",
+              "--strict",
+              "--directory",
+              "packages/app",
+              "--",
+              "--include",
+              "src",
+            ],
+            command: "knip",
+          },
+        ])
+      })
+    )
 
-    test("reject passthrough arguments for commands that do not proxy a CLI", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("reject passthrough arguments for commands that do not proxy a CLI", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCliWithRunner(["doctor", "--", "--unknown"], runner)
+        const exit = yield* runCliWithRunner(["doctor", "--", "--unknown"], runner)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit))
-      expect(error._tag).toBe("PassthroughNotSupported")
-      expect(runner.invocations).toEqual([])
-    })
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error._tag).toBe("PassthroughNotSupported")
+        expect(runner.invocations).toEqual([])
+      })
+    )
   })
 })

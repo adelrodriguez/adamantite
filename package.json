@@ -59,7 +59,7 @@
   },
   "scripts": {
     "analyze": "bun run src/index.ts analyze",
-    "build": "bunup && cp presets/tsconfig.json dist/presets/ && mkdir -p dist/presets/lint/antislop && cp presets/lint/antislop/plugin.mjs presets/lint/antislop/license.md dist/presets/lint/antislop/",
+    "build": "bun run scripts/build.ts",
     "bump:deps": "bun update --interactive",
     "check": "bun run src/index.ts check",
     "dev": "bunup --watch",
@@ -90,6 +90,7 @@
     "bunup": "0.16.32",
     "figlet": "1.11.4",
     "knip": "6.32.2",
+    "oxc-transform": "^0.144.0",
     "oxfmt": "0.63.0",
     "oxlint": "1.78.0",
     "oxlint-tsgolint": "7.0.2001",

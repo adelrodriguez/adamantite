@@ -13,10 +13,11 @@ import type { OxlintConfig } from "oxlint"
  * })
  * ```
  */
-export const ignorePatterns = [
+export const ignorePatterns: string[] = [
   // Dependencies and VCS. Oxlint only skips node_modules when a .gitignore lists it, so
   // projects without a .gitignore would otherwise lint installed packages.
   "**/node_modules",
+  "**/.yarn",
   "**/.git",
 
   // Build and framework output
@@ -29,7 +30,6 @@ export const ignorePatterns = [
   "**/.output",
   "**/.svelte-kit",
   "**/.vitepress/cache",
-  "**/.vitepress/dist",
   "**/.turbo",
   "**/.vercel",
   "**/.netlify",
@@ -40,7 +40,6 @@ export const ignorePatterns = [
   "**/.vite",
   "**/.astro",
   "**/_astro",
-  "**/public/build",
   "**/storybook-static",
 
   // Generated code
@@ -52,7 +51,6 @@ export const ignorePatterns = [
   "**/codegen",
   "**/graphql-types.*",
   "**/*.d.ts.map",
-  "**/.yarn",
 
   // Test coverage
   "**/coverage",
@@ -61,8 +59,6 @@ export const ignorePatterns = [
   // Mobile build output
   "**/.expo",
   "**/.expo-shared",
-  "**/android/build",
-  "**/ios/build",
 
   // Framework type definitions
   "**/next-env.d.ts",

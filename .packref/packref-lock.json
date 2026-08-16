@@ -32,6 +32,42 @@
       },
       "tracking": "dependency",
       "version": "4.0.0-rc.108"
+    },
+    {
+      "name": "@changesets/cli",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/cli",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/changesets/changesets"
+      },
+      "tracking": "dependency",
+      "version": "3.0.0"
+    },
+    {
+      "name": "pnpm",
+      "registry": "npm",
+      "source": {
+        "directory": "pnpm/npm/pnpm",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/pnpm/pnpm"
+      },
+      "tracking": "manual",
+      "version": "12.0.0-rc.6"
+    },
+    {
+      "name": "vitest",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/vitest",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/vitest-dev/vitest"
+      },
+      "tracking": "dependency",
+      "version": "4.1.10"
     }
   ]
 }

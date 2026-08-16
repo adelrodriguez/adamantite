@@ -8,6 +8,7 @@ export default defineConfig({
       provider: "v8",
     },
     fileParallelism: false,
+    globalSetup: ["scripts/vitest-global-setup.ts"],
     include: ["src/**/*.test.ts"],
   },
 })

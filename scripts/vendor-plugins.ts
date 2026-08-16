@@ -24,6 +24,7 @@ import * as Schema from "effect/Schema"
 import { build } from "tsdown"
 
 const execFileAsync = promisify(execFile)
+const maxCommandOutputBytes = 10 * 1024 * 1024
 
 const UpstreamPackageJson = Schema.Struct({ packageManager: Schema.String })
 const decodeUpstreamPackageJson = Schema.decodeUnknownSync(UpstreamPackageJson)
@@ -53,7 +54,7 @@ const VENDORED_PLUGINS: VendoredPlugin[] = [
 ]
 
 async function run(command: string, args: string[], cwd: string) {
-  return execFileAsync(command, args, { cwd })
+  return execFileAsync(command, args, { cwd, maxBuffer: maxCommandOutputBytes })
 }
 
 async function installUpstreamDependencies(cwd: string) {
@@ -144,7 +145,8 @@ export default vendoredPlugin
     await writeFile(path.join(outDir, "license.md"), license)
     console.info(`Vendored ${plugin.name}@${commit} to ${outDir}`)
   } finally {
-    await rm(cloneDir, { force: true, recursive: true })
+    // Keep a cleanup failure from masking the clone, install, or bundle error.
+    await rm(cloneDir, { force: true, recursive: true }).catch(() => null)
   }
 }
 

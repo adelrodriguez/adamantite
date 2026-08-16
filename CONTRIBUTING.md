@@ -28,11 +28,12 @@ Read [CONTEXT.md](CONTEXT.md) before you change domain behavior. Use
 pnpm run build       # Bundle the CLI and published presets into dist.
 pnpm run dev         # Rebuild when source files change.
 pnpm run test        # Build the package and run the Vitest suite.
-pnpm run test:watch  # Build once and run tests when files change.
+pnpm run test:watch  # Rebuild and rerun tests when files change.
 pnpm run check       # Check lint rules and TypeScript types.
 pnpm run fix         # Apply safe lint fixes.
 pnpm run format      # Format repository files.
 pnpm run analyze     # Find unused files, exports, and dependencies.
+pnpm run bump:deps   # Select package dependency updates manually.
 ```
 
 Build the CLI before you run it. The source uses compile-time macros that tsdown expands:
@@ -71,8 +72,9 @@ pnpm run fix
 pnpm run format
 ```
 
-Run `pnpm run analyze` after you add or remove dependencies or change imports and exports.
-Review all automatic fixes before you commit them.
+Dependabot does not yet support pnpm 12. Use `pnpm run bump:deps` for package dependency
+updates. Run `pnpm run analyze` after you add or remove dependencies or change imports and
+exports. Review all automatic fixes before you commit them.
 
 ## Changesets
 

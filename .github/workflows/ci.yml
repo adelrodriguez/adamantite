@@ -49,6 +49,7 @@ jobs:
           node node_modules/adamantite/bin/adamantite --help
           node --input-type=module --eval 'await import("adamantite/lint")'
           node --input-type=module --eval 'await import("adamantite/lint/antislop")'
+          node --input-type=module --eval 'const fs = await import("node:fs"); const url = await import("node:url"); const path = url.fileURLToPath(import.meta.resolve("adamantite/typescript")); if (!fs.statSync(path).isFile()) process.exit(1)'
           oxlint_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.oxlint")"
           npm install "oxlint@${oxlint_version}"
           npm pkg set type=module

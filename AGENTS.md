@@ -42,6 +42,8 @@ complete. See `docs/plans/README.md`.
 - Run `pnpm run test`, `pnpm run check`, `pnpm run fix`, and `pnpm run format` after
   edits.
 - Run `pnpm run analyze` after dependency, import, or export changes.
+- Effect tests use a paused `TestClock`. Use `TestClock.adjust` to advance test time, or
+  use `it.live` when the test must use real time.
 - Prefer function declarations for standalone functions. Keep arrow functions for
   callbacks, object methods, and functions that directly return an Effect chain.
 - Format suppressions as `@ts-expect-error - reason`. Prefer this form to casts that hide

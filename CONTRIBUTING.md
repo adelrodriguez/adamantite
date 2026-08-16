@@ -4,8 +4,8 @@ Thank you for contributing to Adamantite.
 
 ## Requirements
 
-- [Bun](https://bun.sh) 1.3.14 or later.
-- [Node.js](https://nodejs.org) 24 or later for Node.js compatibility checks.
+- [Node.js](https://nodejs.org) at the version in `.node-version`.
+- [pnpm](https://pnpm.io) 12.0.0-rc.6.
 - [Git](https://git-scm.com).
 
 ## Set up the repository
@@ -14,7 +14,7 @@ Thank you for contributing to Adamantite.
 2. Install dependencies:
 
    ```sh
-   bun install
+   pnpm install
    ```
 
 3. Create a branch for the change.
@@ -25,27 +25,29 @@ Read [CONTEXT.md](CONTEXT.md) before you change domain behavior. Use
 ## Development commands
 
 ```sh
-bun run build       # Bundle the CLI and published presets into dist.
-bun run dev         # Rebuild when source files change.
-bun run test        # Run the Bun test suite.
-bun run test:watch  # Run tests when files change.
-bun run check       # Check lint rules and TypeScript types.
-bun run fix         # Apply safe lint fixes.
-bun run format      # Format repository files.
-bun run analyze     # Find unused files, exports, and dependencies.
+pnpm run build       # Bundle the CLI and published presets into dist.
+pnpm run dev         # Rebuild when source files change.
+pnpm run test        # Build the package and run the Vitest suite.
+pnpm run test:watch  # Rebuild and rerun tests when files change.
+pnpm run check       # Check lint rules and TypeScript types.
+pnpm run fix         # Apply safe lint fixes.
+pnpm run format      # Format repository files.
+pnpm run analyze     # Find unused files, exports, and dependencies.
+pnpm run bump:deps   # Select package dependency updates manually.
 ```
 
-Run the CLI from source while developing:
+Build the CLI before you run it. The source uses compile-time macros that tsdown expands:
 
 ```sh
-bun run src/index.ts --help
-bun run src/index.ts doctor
+pnpm run build
+node bin/adamantite --help
+node bin/adamantite doctor
 ```
 
 Build before testing the packaged executable:
 
 ```sh
-bun run build
+pnpm run build
 ./bin/adamantite --help
 ```
 
@@ -64,14 +66,15 @@ bun run build
 Run the full repository workflow before you open a pull request:
 
 ```sh
-bun run test
-bun run check
-bun run fix
-bun run format
+pnpm run test
+pnpm run check
+pnpm run fix
+pnpm run format
 ```
 
-Run `bun run analyze` after you add or remove dependencies or change imports and exports.
-Review all automatic fixes before you commit them.
+Dependabot does not yet support pnpm 12. Use `pnpm run bump:deps` for package dependency
+updates. Run `pnpm run analyze` after you add or remove dependencies or change imports and
+exports. Review all automatic fixes before you commit them.
 
 ## Changesets
 
@@ -80,7 +83,7 @@ CLI behavior, presets, package exports, runtime dependencies, and documentation 
 with the package.
 
 ```sh
-bunx changeset
+pnpm exec changeset
 ```
 
 Do not add a changeset for tests, CI, contributor documentation, release tooling, or other

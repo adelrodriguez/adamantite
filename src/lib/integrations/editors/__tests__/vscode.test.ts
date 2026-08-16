@@ -1,15 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, layer } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
-import { runResult } from "#__tests__/helpers.ts"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 
-describe("vscode", () => {
+layer(NodeServices.layer)("vscode", (it) => {
   let originalCwd: string
   let tempDir: string
 
@@ -25,123 +24,135 @@ describe("vscode", () => {
   })
 
   describe("detect", () => {
-    test("detect when .vscode/settings.json does not exist", async () => {
-      const exists = await vscode
-        .detect(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+    it.effect("detect when .vscode/settings.json does not exist", () =>
+      Effect.gen(function* () {
+        const exists = yield* vscode.detect(tempDir)
 
-      expect(exists).toBe(false)
-    })
+        expect(exists).toBe(false)
+      })
+    )
   })
 
   describe("create", () => {
-    test("create .vscode/settings.json", async () => {
-      await vscode.create(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+    it.effect("create .vscode/settings.json", () =>
+      Effect.gen(function* () {
+        yield* vscode.create(tempDir)
 
-      const exists = await vscode
-        .detect(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      expect(exists).toBe(true)
+        const exists = yield* vscode.detect(tempDir)
+        expect(exists).toBe(true)
 
-      const content = await Bun.file(".vscode/settings.json").text()
-      const config = JSON.parse(content)
+        const content = yield* Effect.promise(() => testFile(".vscode/settings.json").text())
+        const config = JSON.parse(content)
 
-      expect(config).toHaveProperty(["editor.formatOnSave"])
-      expect(config["editor.formatOnSave"]).toBe(true)
-    })
+        expect(config).toHaveProperty(["editor.formatOnSave"])
+        expect(config["editor.formatOnSave"]).toBe(true)
+      })
+    )
   })
 
   describe("update", () => {
-    test("update an existing .vscode/settings.json config", async () => {
-      mkdirSync(".vscode", { recursive: true })
-      await Bun.write(
-        ".vscode/settings.json",
-        JSON.stringify(
-          {
-            "editor.tabSize": 4,
-            "files.autoSave": "afterDelay",
-          },
-          null,
-          2
+    it.effect("update an existing .vscode/settings.json config", () =>
+      Effect.gen(function* () {
+        mkdirSync(".vscode", { recursive: true })
+        yield* Effect.promise(() =>
+          writeFile(
+            ".vscode/settings.json",
+            JSON.stringify(
+              {
+                "editor.tabSize": 4,
+                "files.autoSave": "afterDelay",
+              },
+              null,
+              2
+            )
+          )
         )
-      )
 
-      const existsBefore = await vscode
-        .detect(tempDir)
-        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      expect(existsBefore).toBe(true)
+        const existsBefore = yield* vscode.detect(tempDir)
+        expect(existsBefore).toBe(true)
+        yield* vscode.update(tempDir)
 
-      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        const content = yield* Effect.promise(() => testFile(".vscode/settings.json").text())
+        const config = JSON.parse(content)
 
-      const content = await Bun.file(".vscode/settings.json").text()
-      const config = JSON.parse(content)
+        expect(config["editor.tabSize"]).toBe(4)
+        expect(config["files.autoSave"]).toBe("afterDelay")
+        expect(config["editor.formatOnSave"]).toBe(true)
+        expect(config["editor.formatOnPaste"]).toBe(true)
+      })
+    )
 
-      expect(config["editor.tabSize"]).toBe(4)
-      expect(config["files.autoSave"]).toBe("afterDelay")
-      expect(config["editor.formatOnSave"]).toBe(true)
-      expect(config["editor.formatOnPaste"]).toBe(true)
-    })
+    it.effect("remain idempotent across repeated updates", () =>
+      Effect.gen(function* () {
+        mkdirSync(".vscode", { recursive: true })
+        yield* Effect.promise(() =>
+          writeFile(".vscode/settings.json", JSON.stringify({ "editor.tabSize": 4 }, null, 2))
+        )
+        yield* vscode.update(tempDir)
+        const firstUpdate = yield* Effect.promise(() => testFile(".vscode/settings.json").text())
+        yield* vscode.update(tempDir)
+        const secondUpdate = yield* Effect.promise(() => testFile(".vscode/settings.json").text())
 
-    test("remain idempotent across repeated updates", async () => {
-      mkdirSync(".vscode", { recursive: true })
-      await Bun.write(".vscode/settings.json", JSON.stringify({ "editor.tabSize": 4 }, null, 2))
+        expect(secondUpdate).toBe(firstUpdate)
+      })
+    )
 
-      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      const firstUpdate = await Bun.file(".vscode/settings.json").text()
+    it.effect("merge an empty config with Adamantite's config", () =>
+      Effect.gen(function* () {
+        mkdirSync(".vscode", { recursive: true })
+        yield* Effect.promise(() => writeFile(".vscode/settings.json", "{}"))
+        yield* vscode.update(tempDir)
 
-      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      const secondUpdate = await Bun.file(".vscode/settings.json").text()
+        const content = yield* Effect.promise(() => testFile(".vscode/settings.json").text())
+        const config = JSON.parse(content)
 
-      expect(secondUpdate).toBe(firstUpdate)
-    })
+        expect(config["editor.formatOnSave"]).toBe(true)
+        expect(config["editor.formatOnPaste"]).toBe(true)
+      })
+    )
 
-    test("merge an empty config with Adamantite's config", async () => {
-      mkdirSync(".vscode", { recursive: true })
-      await Bun.write(".vscode/settings.json", "{}")
+    it.effect("return InvalidConfigFormat when the config is not a JSON object", () =>
+      Effect.gen(function* () {
+        mkdirSync(".vscode", { recursive: true })
+        yield* Effect.promise(() => writeFile(".vscode/settings.json", "[]"))
 
-      await vscode.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+        const result = yield* Effect.result(vscode.update(tempDir))
+        expect(Result.isFailure(result)).toBe(true)
+        if (Result.isFailure(result)) {
+          expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
+        }
+      })
+    )
 
-      const content = await Bun.file(".vscode/settings.json").text()
-      const config = JSON.parse(content)
+    it.effect("return FailedToReadFile when the config does not exist", () =>
+      Effect.gen(function* () {
+        const result = yield* Effect.result(vscode.update(tempDir))
+        expect(Result.isFailure(result)).toBe(true)
+        if (Result.isFailure(result)) {
+          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
+        }
+      })
+    )
 
-      expect(config["editor.formatOnSave"]).toBe(true)
-      expect(config["editor.formatOnPaste"]).toBe(true)
-    })
+    it.effect("return FailedToWriteFile when writing the config fails", () =>
+      Effect.gen(function* () {
+        mkdirSync(".vscode", { recursive: true })
+        yield* Effect.promise(() =>
+          writeFile(
+            ".vscode/settings.json",
+            JSON.stringify({
+              "editor.tabSize": 2,
+            })
+          )
+        )
+        chmodSync(".vscode/settings.json", 0o444)
 
-    test("return InvalidConfigFormat when the config is not a JSON object", async () => {
-      mkdirSync(".vscode", { recursive: true })
-      await Bun.write(".vscode/settings.json", "[]")
-
-      const result = await runResult(vscode.update(tempDir))
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
-      }
-    })
-
-    test("return FailedToReadFile when the config does not exist", async () => {
-      const result = await runResult(vscode.update(tempDir))
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-      }
-    })
-
-    test("return FailedToWriteFile when writing the config fails", async () => {
-      mkdirSync(".vscode", { recursive: true })
-      await Bun.write(
-        ".vscode/settings.json",
-        JSON.stringify({
-          "editor.tabSize": 2,
-        })
-      )
-      chmodSync(".vscode/settings.json", 0o444)
-
-      const result = await runResult(vscode.update(tempDir))
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
-      }
-    })
+        const result = yield* Effect.result(vscode.update(tempDir))
+        expect(Result.isFailure(result)).toBe(true)
+        if (Result.isFailure(result)) {
+          expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
+        }
+      })
+    )
   })
 })

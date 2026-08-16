@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import analyzeCommand from "#commands/analyze.ts"
@@ -23,87 +24,99 @@ describe("analyze", () => {
   })
 
   describe("default invocation", () => {
-    test("run knip with no flags by default", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("run knip with no flags by default", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, [], runner)
+        const exit = yield* runCommandWithRunner(analyzeCommand, [], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
-        {
-          args: [],
-          command: "knip",
-        },
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: [],
+            command: "knip",
+          },
+        ])
+      })
+    )
   })
 
   describe("fix mode", () => {
-    test("add fix flags when requested", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("add fix flags when requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, ["--fix"], runner)
+        const exit = yield* runCommandWithRunner(analyzeCommand, ["--fix"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--fix", "--allow-remove-files"])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual(["--fix", "--allow-remove-files"])
+      })
+    )
   })
 
   describe("strict mode", () => {
-    test("add strict flags when requested", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("add strict flags when requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, ["--strict"], runner)
+        const exit = yield* runCommandWithRunner(analyzeCommand, ["--strict"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual(["--production", "--strict"])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual(["--production", "--strict"])
+      })
+    )
   })
 
   describe("combined flags", () => {
-    test("support fix and strict together", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("support fix and strict together", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, ["--fix", "--strict"], runner)
+        const exit = yield* runCommandWithRunner(analyzeCommand, ["--fix", "--strict"], runner)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual([
-        "--fix",
-        "--allow-remove-files",
-        "--production",
-        "--strict",
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual([
+          "--fix",
+          "--allow-remove-files",
+          "--production",
+          "--strict",
+        ])
+      })
+    )
   })
 
   describe("passthrough arguments", () => {
-    test("append arguments after Adamantite-managed flags", async () => {
-      const runner = createRunnerTestContext()
+    it.effect("append arguments after Adamantite-managed flags", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-      const exit = await runCommandWithRunner(analyzeCommand, ["--strict"], runner, [
-        "--directory",
-        "packages/app",
-      ])
+        const exit = yield* runCommandWithRunner(analyzeCommand, ["--strict"], runner, [
+          "--directory",
+          "packages/app",
+        ])
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations[0]?.args).toEqual([
-        "--production",
-        "--strict",
-        "--directory",
-        "packages/app",
-      ])
-    })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations[0]?.args).toEqual([
+          "--production",
+          "--strict",
+          "--directory",
+          "packages/app",
+        ])
+      })
+    )
   })
 
   describe("error handling", () => {
-    test("fail with CommandFailed when the runner returns a non-zero exit code", async () => {
-      const runner = createRunnerTestContext([1])
+    it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext([1])
 
-      const exit = await runCommandWithRunner(analyzeCommand, [], runner)
+        const exit = yield* runCommandWithRunner(analyzeCommand, [], runner)
 
-      expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit))
-      expect(error).toMatchObject({ _tag: "CommandFailed" })
-    })
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "CommandFailed" })
+      })
+    )
   })
 })

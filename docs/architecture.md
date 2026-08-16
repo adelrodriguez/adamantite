@@ -15,8 +15,10 @@ invoke target-project operations.
 services. Other external behavior, such as prompts and child commands, is also behind
 services so command behavior can be tested without changing a real project.
 
-Bunup bundles the CLI and presets into `dist`. The `bin/adamantite` executable loads the
-bundled CLI.
+Tsdown bundles the CLI and presets into `dist`. Unplugin macros expands compile-time
+package metadata and terminal-title values during builds and Vitest source transforms.
+The `bin/adamantite` executable loads the bundled CLI. Repository tests run with Vitest
+under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Module seams
 

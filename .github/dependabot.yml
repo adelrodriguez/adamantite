@@ -1,26 +1,7 @@
 version: 2
 updates:
-  # Enable version updates for Bun dependencies
-  - package-ecosystem: "bun"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "UTC"
-    open-pull-requests-limit: 10
-    reviewers:
-      - "adelrodriguez"
-    assignees:
-      - "adelrodriguez"
-    commit-message:
-      prefix: "deps"
-      include: "scope"
-    labels:
-      - "dependencies"
-      - "automated"
-
-  # Enable version updates for GitHub Actions
+  # Dependabot supports pnpm through v10. Keep pnpm 12 dependency updates manual.
+  # Continue automatic version updates for GitHub Actions.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

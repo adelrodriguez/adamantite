@@ -1,5 +1,5 @@
-import { describe, expect, test } from "bun:test"
 import type { ParseError } from "jsonc-parser"
+import { describe, expect, test } from "@effect/vitest"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { parse, printParseErrorCode } from "jsonc-parser"
 import {

@@ -21,21 +21,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: "12.0.0-rc.6"
+
       - name: Setup minimum Node.js
         uses: actions/setup-node@v7
         with:
           node-version: "22.19.0"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.14"
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build package
-        run: bun run build
+        run: pnpm run build
 
       - name: Test package with minimum Node.js
         run: |
@@ -48,6 +49,7 @@ jobs:
           node node_modules/adamantite/bin/adamantite --help
           node --input-type=module --eval 'await import("adamantite/lint")'
           node --input-type=module --eval 'await import("adamantite/lint/antislop")'
+          node --input-type=module --eval 'const fs = await import("node:fs"); const url = await import("node:url"); const path = url.fileURLToPath(import.meta.resolve("adamantite/typescript")); if (!fs.statSync(path).isFile()) process.exit(1)'
           oxlint_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.oxlint")"
           npm install "oxlint@${oxlint_version}"
           npm pkg set type=module
@@ -60,12 +62,17 @@ jobs:
           fi
           grep "anti-slop(no-chained-type-assertions)" oxlint-output.txt
 
-      - name: Test package with minimum Bun
+      - name: Setup minimum Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.0.0"
+
+      - name: Run package with minimum Bun
         run: |
           compatibility_dir="${RUNNER_TEMP}/adamantite-node-compatibility"
           cd "${compatibility_dir}"
-          npx --yes bun@1.0.0 node_modules/adamantite/bin/adamantite --help
-          npx --yes bun@1.0.0 node_modules/adamantite/dist/presets/lint/core.js
+          bun node_modules/adamantite/bin/adamantite --help
+          bun node_modules/adamantite/dist/presets/lint/core.js
 
   verify:
     name: ${{ matrix.name }}
@@ -76,42 +83,33 @@ jobs:
       matrix:
         include:
           - name: check
-            command: bun run check
+            command: pnpm run check
           - name: format
-            command: bun run format --check
+            command: pnpm run format --check
           - name: test
-            command: bun run test
+            command: pnpm run test
           - name: analyze
-            command: bun run analyze
+            command: pnpm run analyze
           - name: build
-            command: bun run build
+            command: pnpm run build
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: "12.0.0-rc.6"
+
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version-file: ".node-version"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.14"
-
-      - name: Cache dependencies
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.bun/install/cache
-            node_modules
-          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}

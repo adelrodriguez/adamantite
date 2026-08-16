@@ -10,7 +10,7 @@ Before you explore or change code, read `CONTEXT.md` and the relevant parts of
 ### Source references
 
 When a skill requires a local dependency source checkout, use Packref. Add the package
-with `bunx packref add <package>` and read its version-locked source under
+with `pnpm dlx packref add <package>` and read its version-locked source under
 `.packref/packages/`.
 
 ### Issue tracker
@@ -38,9 +38,12 @@ complete. See `docs/plans/README.md`.
 
 ## Repository rules
 
-- Use Bun for package management and scripts.
-- Run `bun run test`, `bun run check`, `bun run fix`, and `bun run format` after edits.
-- Run `bun run analyze` after dependency, import, or export changes.
+- Use pnpm for package management and scripts.
+- Run `pnpm run test`, `pnpm run check`, `pnpm run fix`, and `pnpm run format` after
+  edits.
+- Run `pnpm run analyze` after dependency, import, or export changes.
+- Effect tests use a paused `TestClock`. Use `TestClock.adjust` to advance test time, or
+  use `it.live` when the test must use real time.
 - Prefer function declarations for standalone functions. Keep arrow functions for
   callbacks, object methods, and functions that directly return an Effect chain.
 - Format suppressions as `@ts-expect-error - reason`. Prefer this form to casts that hide

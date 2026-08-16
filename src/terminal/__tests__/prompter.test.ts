@@ -1,6 +1,5 @@
 import type { SpinnerResult } from "@clack/prompts"
-import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
-import * as prompts from "@clack/prompts"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Function from "effect/Function"
@@ -33,78 +32,77 @@ function createSpinner() {
   return { messages, spinner, starts, stops }
 }
 
-function runWithPrompter<A, E>(effect: Effect.Effect<A, E, Prompter>) {
-  return Effect.runPromiseExit(effect.pipe(Effect.provide(Prompter.layer)))
+function runWithPrompter<A, E>(effect: Effect.Effect<A, E, Prompter>, spinner: SpinnerResult) {
+  return effect.pipe(Effect.provide(Prompter.layerWithSpinner(() => spinner)), Effect.exit)
 }
 
-afterEach(() => {
-  mock.restore()
-})
-
 describe("Prompter.withSpinner", () => {
-  test("manage the spinner around a successful effect", async () => {
-    const { messages, spinner, starts, stops } = createSpinner()
-    spyOn(prompts, "spinner").mockReturnValue(spinner)
+  it.effect("manage the spinner around a successful effect", () =>
+    Effect.gen(function* () {
+      const { messages, spinner, starts, stops } = createSpinner()
+      const exit = yield* runWithPrompter(
+        Effect.gen(function* () {
+          const prompter = yield* Prompter
+          return yield* prompter.withSpinner(
+            (control) =>
+              Effect.gen(function* () {
+                yield* control.message("Still working...")
+                return 42
+              }),
+            {
+              failure: "Operation failed.",
+              start: "Starting operation...",
+              success: (result) => `Operation returned ${result}.`,
+            }
+          )
+        }),
+        spinner
+      )
 
-    const exit = await runWithPrompter(
-      Effect.gen(function* () {
-        const prompter = yield* Prompter
-        return yield* prompter.withSpinner(
-          (control) =>
-            Effect.gen(function* () {
-              yield* control.message("Still working...")
-              return 42
-            }),
-          {
+      expect(exit).toEqual(Exit.succeed(42))
+      expect(starts).toEqual(["Starting operation..."])
+      expect(messages).toEqual(["Still working..."])
+      expect(stops).toEqual(["Operation returned 42."])
+    })
+  )
+
+  it.effect("stop the spinner when the effect fails", () =>
+    Effect.gen(function* () {
+      const { spinner, stops } = createSpinner()
+      const exit = yield* runWithPrompter(
+        Effect.gen(function* () {
+          const prompter = yield* Prompter
+          return yield* prompter.withSpinner(() => Effect.fail("failed"), {
             failure: "Operation failed.",
             start: "Starting operation...",
-            success: (result) => `Operation returned ${result}.`,
-          }
-        )
-      })
-    )
+            success: "Operation succeeded.",
+          })
+        }),
+        spinner
+      )
 
-    expect(exit).toEqual(Exit.succeed(42))
-    expect(starts).toEqual(["Starting operation..."])
-    expect(messages).toEqual(["Still working..."])
-    expect(stops).toEqual(["Operation returned 42."])
-  })
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(stops).toEqual(["Operation failed."])
+    })
+  )
 
-  test("stop the spinner when the effect fails", async () => {
-    const { spinner, stops } = createSpinner()
-    spyOn(prompts, "spinner").mockReturnValue(spinner)
+  it.effect("stop the spinner when the effect is interrupted", () =>
+    Effect.gen(function* () {
+      const { spinner, stops } = createSpinner()
+      const exit = yield* runWithPrompter(
+        Effect.gen(function* () {
+          const prompter = yield* Prompter
+          return yield* prompter.withSpinner(() => Effect.interrupt, {
+            failure: "Operation interrupted.",
+            start: "Starting operation...",
+            success: "Operation succeeded.",
+          })
+        }),
+        spinner
+      )
 
-    const exit = await runWithPrompter(
-      Effect.gen(function* () {
-        const prompter = yield* Prompter
-        return yield* prompter.withSpinner(() => Effect.fail("failed"), {
-          failure: "Operation failed.",
-          start: "Starting operation...",
-          success: "Operation succeeded.",
-        })
-      })
-    )
-
-    expect(Exit.isFailure(exit)).toBe(true)
-    expect(stops).toEqual(["Operation failed."])
-  })
-
-  test("stop the spinner when the effect is interrupted", async () => {
-    const { spinner, stops } = createSpinner()
-    spyOn(prompts, "spinner").mockReturnValue(spinner)
-
-    const exit = await runWithPrompter(
-      Effect.gen(function* () {
-        const prompter = yield* Prompter
-        return yield* prompter.withSpinner(() => Effect.interrupt, {
-          failure: "Operation interrupted.",
-          start: "Starting operation...",
-          success: "Operation succeeded.",
-        })
-      })
-    )
-
-    expect(Exit.isFailure(exit)).toBe(true)
-    expect(stops).toEqual(["Operation interrupted."])
-  })
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(stops).toEqual(["Operation interrupted."])
+    })
+  )
 })

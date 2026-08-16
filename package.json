@@ -58,17 +58,17 @@
     "./typescript": "./dist/presets/tsconfig.json"
   },
   "scripts": {
-    "analyze": "bun run src/index.ts analyze",
-    "build": "bunup && cp presets/tsconfig.json dist/presets/ && mkdir -p dist/presets/lint/antislop && cp presets/lint/antislop/plugin.mjs presets/lint/antislop/license.md dist/presets/lint/antislop/",
-    "bump:deps": "bun update --interactive",
-    "check": "bun run src/index.ts check",
-    "dev": "bunup --watch",
-    "fix": "bun run src/index.ts fix",
-    "format": "bun run src/index.ts format",
+    "analyze": "knip",
+    "build": "tsdown",
+    "bump:deps": "pnpm update --interactive",
+    "check": "oxlint",
+    "dev": "tsdown --watch",
+    "fix": "oxlint --fix",
+    "format": "oxfmt",
     "release": "changeset publish",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage",
-    "test:watch": "bun --watch test",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
     "version": "changeset version"
   },
   "dependencies": {
@@ -84,18 +84,22 @@
   "devDependencies": {
     "@changesets/changelog-github": "1.0.0",
     "@changesets/cli": "3.0.0",
+    "@effect/vitest": "4.0.0-rc.108",
     "@tanstack/intent": "0.3.6",
-    "@types/bun": "1.3.14",
     "@types/figlet": "1.7.0",
-    "bunup": "0.16.32",
+    "@types/node": "22.20.1",
+    "@vitest/coverage-v8": "4.1.10",
     "figlet": "1.11.4",
     "knip": "6.32.2",
     "oxfmt": "0.63.0",
     "oxlint": "1.78.0",
     "oxlint-tsgolint": "7.0.2001",
     "sherif": "1.13.0",
+    "tsdown": "0.22.14",
     "type-fest": "5.8.0",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "unplugin-macros": "0.23.2",
+    "vitest": "4.1.10"
   },
   "peerDependencies": {
     "typescript": ">=7"
@@ -104,5 +108,5 @@
     "bun": ">=1.0.0",
     "node": ">=22.19.0"
   },
-  "packageManager": "bun@1.3.14"
+  "packageManager": "pnpm@12.0.0-rc.6"
 }

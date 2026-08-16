@@ -1,18 +1,20 @@
-import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
-import Bun from "bun"
+import { describe, expect, test } from "@effect/vitest"
+import { testFile } from "#__tests__/filesystem.ts"
 
 describe("package metadata", () => {
   test("publish expected package metadata", async () => {
     // SAFETY: this reads the repo's own package.json, which the package manager already requires to conform to the PackageJson schema.
-    const packageJson = (await Bun.file(
-      join(import.meta.dir, "..", "..", "package.json")
-    ).json()) as PackageJson
+    const packageJson = JSON.parse(
+      await testFile(join(import.meta.dirname, "..", "..", "package.json")).text()
+    ) as PackageJson
 
     expect(packageJson.main).toBe("dist/presets/lint/core.js")
     expect(packageJson.devDependencies?.typescript).toBe("7.0.2")
     expect(packageJson.peerDependencies?.typescript).toBe(">=7")
+    expect(packageJson.packageManager).toBe("pnpm@12.0.0-rc.6")
+    expect(packageJson.engines?.bun).toBe(">=1.0.0")
     expect(packageJson.exports).toMatchObject({
       "./analyze": {
         default: "./dist/presets/analyze.js",

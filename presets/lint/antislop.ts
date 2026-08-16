@@ -6,12 +6,14 @@ import type { OxlintConfig } from "oxlint"
 // property access, module mocking, and similar escape hatches. Upstream is
 // deliberately not published to npm, so Adamantite ships a self-contained
 // bundled build in antislop/plugin.mjs — see antislop/license.md for
-// attribution and scripts/vendor-anti-slop.ts for how it is regenerated.
+// attribution and scripts/vendor-plugins.ts for how it is regenerated.
 //
 // The specifier is an absolute path computed from this module's location so
 // the bundled plugin loads regardless of how the consuming project resolves
 // packages. The plugin.mjs file sits at the same relative location in the
-// source tree and in the published dist tree.
+// source tree and in the published dist tree. This module runs under whatever
+// runtime executes oxlint in the target project, so it sticks to
+// runtime-neutral APIs.
 const config: OxlintConfig = {
   jsPlugins: [
     {

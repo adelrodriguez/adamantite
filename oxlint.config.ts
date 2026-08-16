@@ -5,7 +5,7 @@ import node from "./presets/lint/node.ts"
 
 export default defineConfig({
   extends: [core, node, antislop],
-  // Generated vendored bundle and its declaration; see scripts/vendor-anti-slop.ts.
+  // Generated vendored bundle and its declaration; see scripts/vendor-plugins.ts.
   ignorePatterns: ["presets/lint/antislop/plugin.mjs", "presets/lint/antislop/plugin.d.mts"],
   options: {
     typeAware: true,

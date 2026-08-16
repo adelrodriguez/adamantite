@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdtempSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import Bun from "bun"
 import antislop from "#presets/lint/antislop.ts"
 import antislopPlugin from "#presets/lint/antislop/plugin.mjs"
 
-const REPO_ROOT = join(import.meta.dir, "../..")
+const REPO_ROOT = join(import.meta.dir, "../../..")
 
 describe("antislop preset", () => {
   test("enable exactly the rules the vendored plugin defines", () => {
@@ -18,12 +18,12 @@ describe("antislop preset", () => {
     expect(new Set(presetRules)).toEqual(new Set(pluginRules))
   })
 
-  test("report anti-slop diagnostics through extends", () => {
+  test("report anti-slop diagnostics through extends", async () => {
     const tempDir = mkdtempSync(join(tmpdir(), "adamantite-antislop-test-"))
 
     try {
       symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
-      writeFileSync(
+      await Bun.write(
         join(tempDir, "oxlint.config.ts"),
         [
           'import { defineConfig } from "oxlint"',
@@ -33,7 +33,7 @@ describe("antislop preset", () => {
           "",
         ].join("\n")
       )
-      writeFileSync(
+      await Bun.write(
         join(tempDir, "bad.ts"),
         "export const value = JSON.parse('{}') as unknown as string\n"
       )

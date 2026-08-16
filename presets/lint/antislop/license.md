@@ -2,7 +2,7 @@
 
 The bundled `plugin.mjs` is a build of
 [anti-slop](https://github.com/dmmulroy/anti-slop) at commit 446268e5d15baa968eaec669ff65358d36ae6259,
-with its `@oxlint/plugins` dependency (MIT) inlined.
+with its dependencies (MIT) inlined.
 
 MIT License
 

@@ -12,8 +12,7 @@ _Avoid_: Plugin, template
 
 **Vendored bundle**:
 Third-party code that Adamantite builds into the package at a pinned upstream commit
-because upstream does not publish to npm, such as the anti-slop rules inside the
-`antislop` preset.
+because upstream does not publish to npm. Bundles ship inside the preset that owns them.
 _Avoid_: Plugin, dependency
 
 **Target project**:

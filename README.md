@@ -28,9 +28,8 @@ and Sherif so humans and coding agents can use the same project workflow.
 - **Fast checks**: Run Oxlint and Oxfmt on the Oxc toolchain.
 - **Strict defaults**: Use opinionated lint and TypeScript presets without assembling a
   configuration from scratch.
-- **Framework presets**: Add rules for React, Next.js, Vue, Node.js, Jest, or Vitest.
-- **Anti-slop preset**: Opt into vendored [anti-slop](https://github.com/dmmulroy/anti-slop)
-  rules that reject low-evidence, low-signal patterns.
+- **Optional presets**: Add rules for different needs — frameworks like React, Next.js,
+  and Vue, test runners like Jest and Vitest, Node.js, and stricter opt-in rule sets.
 - **Project setup**: Create package scripts, configuration files, editor settings, and CI
   through an interactive or non-interactive initializer.
 - **Setup maintenance**: Assess managed integrations with `doctor`, apply safe fixes, and

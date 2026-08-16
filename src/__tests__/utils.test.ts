@@ -1,28 +1,29 @@
 import type { PackageJson } from "type-fest"
 
-import { mkdirSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
-import { writeFile } from "#__tests__/filesystem.ts"
-import { runResult } from "#__tests__/helpers.ts"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printTitle } from "#terminal/title.ts"
 
-const NodeContext = NodeServices
+const ROOT = "/project"
 const noop = () => null
 
-let testDir: string
-let originalCwd: string
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
+
+function provideFiles(files: FileSystemTestContext) {
+  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
 
 function makeTerminalLayer(columns?: number) {
   return Layer.succeed(Terminal.Terminal)(
@@ -36,18 +37,6 @@ function makeTerminalLayer(columns?: number) {
     })
   )
 }
-
-beforeEach(() => {
-  testDir = join(tmpdir(), `adamantite-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-  mkdirSync(testDir, { recursive: true })
-  originalCwd = process.cwd()
-  process.chdir(testDir)
-})
-
-afterEach(() => {
-  process.chdir(originalCwd)
-  rmSync(testDir, { force: true, recursive: true })
-})
 
 describe("readPackageJson", () => {
   describe("when a path is provided", () => {
@@ -63,11 +52,9 @@ describe("readPackageJson", () => {
           name: "test-package",
           version: "1.0.0",
         }
-        yield* Effect.promise(() =>
-          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
-        )
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
 
-        const result = yield* readPackageJson(testDir).pipe(Effect.provide(NodeContext.layer))
+        const result = yield* readPackageJson(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual(packageJson)
       })
@@ -75,7 +62,10 @@ describe("readPackageJson", () => {
 
     it.effect("return an error when package.json does not exist", () =>
       Effect.gen(function* () {
-        const result = yield* runResult(readPackageJson(testDir), NodeServices.layer)
+        const files = makeFiles()
+
+        const result = yield* Effect.result(readPackageJson(ROOT).pipe(provideFiles(files)))
+
         expect(Result.isFailure(result)).toBe(true)
         if (Result.isFailure(result)) {
           expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
@@ -85,11 +75,10 @@ describe("readPackageJson", () => {
 
     it.effect("return an error when package.json contains invalid JSON", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(join(testDir, "package.json"), "invalid json content")
-        )
+        const files = makeFiles({ "package.json": "invalid json content" })
 
-        const result = yield* runResult(readPackageJson(testDir), NodeServices.layer)
+        const result = yield* Effect.result(readPackageJson(ROOT).pipe(provideFiles(files)))
+
         expect(Result.isFailure(result)).toBe(true)
         if (Result.isFailure(result)) {
           expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
@@ -105,11 +94,11 @@ describe("readPackageJson", () => {
           name: "test-package",
           version: "1.0.0",
         }
-        yield* Effect.promise(() =>
-          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
-        )
+        const files = createFileSystemTestContext({
+          files: { "package.json": JSON.stringify(packageJson, null, 2) },
+        })
 
-        const result = yield* readPackageJson().pipe(Effect.provide(NodeContext.layer))
+        const result = yield* readPackageJson().pipe(provideFiles(files))
 
         expect(result).toEqual(packageJson)
       })
@@ -128,8 +117,7 @@ describe("readPackageJson", () => {
         })
 
         const result = yield* readPackageJson("/test/project").pipe(
-          Effect.provide(fileSystemLayer),
-          Effect.provide(NodeServices.layer)
+          Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer))
         )
 
         expect(result.name).toBe("test-project")
@@ -143,7 +131,7 @@ describe("parseJson", () => {
   it.effect("parse valid JSON", () =>
     Effect.gen(function* () {
       const validJson = '{"name": "test", "version": "1.0.0"}'
-      const result = yield* parseJson(validJson).pipe(Effect.provide(NodeContext.layer))
+      const result = yield* parseJson(validJson)
 
       expect(result).toEqual({
         name: "test",
@@ -159,7 +147,7 @@ describe("parseJson", () => {
       "name": "test",
       "version": "1.0.0"
     }`
-      const result = yield* parseJson(jsonc).pipe(Effect.provide(NodeContext.layer))
+      const result = yield* parseJson(jsonc)
 
       expect(result).toEqual({
         name: "test",
@@ -171,7 +159,7 @@ describe("parseJson", () => {
   it.effect("parse JSON with trailing commas", () =>
     Effect.gen(function* () {
       const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
-      const result = yield* parseJson(jsonWithTrailingComma).pipe(Effect.provide(NodeContext.layer))
+      const result = yield* parseJson(jsonWithTrailingComma)
 
       expect(result).toEqual({
         name: "test",
@@ -183,7 +171,8 @@ describe("parseJson", () => {
   it.effect("return an error for invalid JSON", () =>
     Effect.gen(function* () {
       const invalidJson = '{"name": "test", "version":}'
-      const result = yield* runResult(parseJson(invalidJson), NodeServices.layer)
+      const result = yield* Effect.result(parseJson(invalidJson))
+
       expect(Result.isFailure(result)).toBe(true)
       if (Result.isFailure(result)) {
         expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
@@ -193,7 +182,8 @@ describe("parseJson", () => {
 
   it.effect("return an error for an empty string", () =>
     Effect.gen(function* () {
-      const result = yield* runResult(parseJson(""), NodeServices.layer)
+      const result = yield* Effect.result(parseJson(""))
+
       expect(Result.isFailure(result)).toBe(true)
       if (Result.isFailure(result)) {
         expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
@@ -207,7 +197,7 @@ describe("mergeConfig", () => {
     Effect.gen(function* () {
       const base = { a: 1, b: 2 }
       const override = { b: 3, c: 4 }
-      const result = yield* mergeConfig(base, override).pipe(Effect.provide(NodeContext.layer))
+      const result = yield* mergeConfig(base, override)
 
       expect(result).toEqual({ a: 1, b: 2, c: 4 })
     })
@@ -217,7 +207,7 @@ describe("mergeConfig", () => {
     Effect.gen(function* () {
       const first = { a: 1, b: 2 }
       const second = { a: 3, b: 4 }
-      const result = yield* mergeConfig(first, second).pipe(Effect.provide(NodeContext.layer))
+      const result = yield* mergeConfig(first, second)
 
       expect(result).toEqual({ a: 1, b: 2 })
     })
@@ -227,7 +217,7 @@ describe("mergeConfig", () => {
     Effect.gen(function* () {
       const base = { a: { x: 1, y: 2 }, b: 3 }
       const override = { a: { y: 4, z: 5 }, b: 6 }
-      const result = yield* mergeConfig(base, override).pipe(Effect.provide(NodeContext.layer))
+      const result = yield* mergeConfig(base, override)
 
       expect(result).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
     })
@@ -247,7 +237,8 @@ describe("mergeConfig", () => {
         }
       )
 
-      const result = yield* runResult(mergeConfig(throwingBase, { b: 2 }), NodeServices.layer)
+      const result = yield* Effect.result(mergeConfig(throwingBase, { b: 2 }))
+
       expect(Result.isFailure(result)).toBe(true)
       if (Result.isFailure(result)) {
         expect(result.failure).toMatchObject({ _tag: "FailedToMergeConfig" })
@@ -337,8 +328,7 @@ describe("checkIsMonorepo", () => {
         })
 
         const result = yield* checkIsMonorepo("/test/project").pipe(
-          Effect.provide(fileSystemLayer),
-          Effect.provide(NodeServices.layer)
+          Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer))
         )
 
         expect(result).toBe(true)
@@ -349,11 +339,9 @@ describe("checkIsMonorepo", () => {
   describe("when workspace files are present", () => {
     it.effect("return true when pnpm-workspace.yaml exists", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
-        )
+        const files = makeFiles({ "pnpm-workspace.yaml": "packages:\n  - 'packages/*'" })
 
-        const result = yield* checkIsMonorepo(testDir).pipe(Effect.provide(NodeContext.layer))
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
 
         expect(result).toBe(true)
       })
@@ -365,11 +353,9 @@ describe("checkIsMonorepo", () => {
           name: "test-package",
           workspaces: ["packages/*"],
         }
-        yield* Effect.promise(() =>
-          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
-        )
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
 
-        const result = yield* checkIsMonorepo(testDir).pipe(Effect.provide(NodeContext.layer))
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
 
         expect(result).toBe(true)
       })
@@ -383,11 +369,9 @@ describe("checkIsMonorepo", () => {
           name: "test-package",
           version: "1.0.0",
         }
-        yield* Effect.promise(() =>
-          writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
-        )
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
 
-        const result = yield* checkIsMonorepo(testDir).pipe(Effect.provide(NodeContext.layer))
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
 
         expect(result).toBe(false)
       })
@@ -395,7 +379,10 @@ describe("checkIsMonorepo", () => {
 
     it.effect("return an error when package.json does not exist", () =>
       Effect.gen(function* () {
-        const result = yield* runResult(checkIsMonorepo(testDir), NodeServices.layer)
+        const files = makeFiles()
+
+        const result = yield* Effect.result(checkIsMonorepo(ROOT).pipe(provideFiles(files)))
+
         expect(Result.isFailure(result)).toBe(true)
         if (Result.isFailure(result)) {
           expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
@@ -406,13 +393,8 @@ describe("checkIsMonorepo", () => {
 })
 
 describe("printTitle", () => {
-  let capturedLogs: string[]
-
-  beforeEach(() => {
-    capturedLogs = []
-  })
-
-  function makeConsoleLayer() {
+  function makeConsoleContext() {
+    const capturedLogs: string[] = []
     const mockConsole: Console.Console = {
       assert: noop,
       clear: noop,
@@ -439,34 +421,37 @@ describe("printTitle", () => {
       warn: noop,
     }
 
-    return Layer.succeed(Console.Console)(mockConsole)
+    return { capturedLogs, layer: Layer.succeed(Console.Console)(mockConsole) }
   }
 
   it.effect("print the title when the terminal is wide enough", () =>
     Effect.gen(function* () {
-      const testLayer = Layer.merge(makeTerminalLayer(120), makeConsoleLayer())
-      yield* printTitle().pipe(Effect.provide(testLayer))
+      const console = makeConsoleContext()
 
-      expect(capturedLogs.length).toBe(1)
-      expect(capturedLogs[0]).toContain(".ooooo.")
+      yield* printTitle().pipe(Effect.provide(Layer.merge(makeTerminalLayer(120), console.layer)))
+
+      expect(console.capturedLogs.length).toBe(1)
+      expect(console.capturedLogs[0]).toContain(".ooooo.")
     })
   )
 
   it.effect("not print the title when the terminal is too narrow", () =>
     Effect.gen(function* () {
-      const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(50), makeConsoleLayer())
-      yield* printTitle().pipe(Effect.provide(testLayer))
+      const console = makeConsoleContext()
 
-      expect(capturedLogs.length).toBe(0)
+      yield* printTitle().pipe(Effect.provide(Layer.merge(makeTerminalLayer(50), console.layer)))
+
+      expect(console.capturedLogs.length).toBe(0)
     })
   )
 
   it.effect("not print the title when process.stdout.columns is undefined", () =>
     Effect.gen(function* () {
-      const testLayer = Layer.mergeAll(NodeContext.layer, makeTerminalLayer(), makeConsoleLayer())
-      yield* printTitle().pipe(Effect.provide(testLayer))
+      const console = makeConsoleContext()
 
-      expect(capturedLogs.length).toBe(0)
+      yield* printTitle().pipe(Effect.provide(Layer.merge(makeTerminalLayer(), console.layer)))
+
+      expect(console.capturedLogs.length).toBe(0)
     })
   )
 })

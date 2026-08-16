@@ -1,51 +1,50 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { readFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
-import { testFile, writeFile } from "#__tests__/filesystem.ts"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
   writeAgentsGuidance,
 } from "#lib/workspace/agents.ts"
 
+const ROOT = "/project"
+
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
+
+function provideFiles(files: FileSystemTestContext) {
+  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
+
 function countOccurrences(content: string, search: string) {
   return content.split(search).length - 1
 }
 
 function runWriteAgentsGuidance(
-  tempDir: string,
+  files: FileSystemTestContext,
   options: Parameters<typeof writeAgentsGuidance>[1]
 ) {
-  return writeAgentsGuidance(tempDir, options).pipe(Effect.provide(NodeServices.layer))
+  return writeAgentsGuidance(ROOT, options).pipe(provideFiles(files))
 }
 
 describe("writeAgentsGuidance", () => {
-  let tempDir: string
-
-  beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-agents-guidance-test-"))
-  })
-
-  afterEach(() => {
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   it.effect("create AGENTS.md when it does not exist", () =>
     Effect.gen(function* () {
-      const result = yield* runWriteAgentsGuidance(tempDir, {
+      const files = makeFiles()
+
+      const result = yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
         scripts: ["format", "check"],
       })
 
       expect(result).toBe("updated")
 
-      const agents = yield* Effect.promise(() => readFile(join(tempDir, "AGENTS.md"), "utf8"))
+      const agents = files.read("AGENTS.md")
       expect(agents).toContain(ADAMANTITE_AGENTS_START_MARKER)
       expect(agents).toContain("## Adamantite")
       expect(agents).toContain("Run `bun run format` after editing files")
@@ -59,7 +58,7 @@ describe("writeAgentsGuidance", () => {
 
   it.effect("return FailedToReadFile when checking whether AGENTS.md exists fails", () =>
     Effect.gen(function* () {
-      const agentsPath = join(tempDir, "AGENTS.md")
+      const agentsPath = `${ROOT}/AGENTS.md`
       const cause = PlatformError.systemError({
         _tag: "PermissionDenied",
         method: "access",
@@ -70,10 +69,10 @@ describe("writeAgentsGuidance", () => {
         exists: () => Effect.fail(cause),
       })
 
-      const result = yield* writeAgentsGuidance(tempDir, {
+      const result = yield* writeAgentsGuidance(ROOT, {
         packageManager: "bun",
         scripts: ["format"],
-      }).pipe(Effect.provide(fileSystemLayer), Effect.provide(NodeServices.layer), Effect.result)
+      }).pipe(Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer)), Effect.result)
 
       expect(result._tag).toBe("Failure")
       if (result._tag === "Failure") {
@@ -89,16 +88,16 @@ describe("writeAgentsGuidance", () => {
   it.effect("append guidance to an existing AGENTS.md without markers", () =>
     Effect.gen(function* () {
       const existingAgents = "# Existing Instructions\n\nKeep project guidance here.\n"
-      yield* Effect.promise(() => writeFile(join(tempDir, "AGENTS.md"), existingAgents))
+      const files = makeFiles({ "AGENTS.md": existingAgents })
 
-      const result = yield* runWriteAgentsGuidance(tempDir, {
+      const result = yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
         scripts: ["format"],
       })
 
       expect(result).toBe("updated")
 
-      const agents = yield* Effect.promise(() => readFile(join(tempDir, "AGENTS.md"), "utf8"))
+      const agents = files.read("AGENTS.md")
       expect(agents.startsWith(`${existingAgents}\n${ADAMANTITE_AGENTS_START_MARKER}\n`)).toBe(true)
       expect(agents).toContain("Run `bun run format` after editing files")
     })
@@ -107,46 +106,43 @@ describe("writeAgentsGuidance", () => {
   it.effect("preserve an existing blank line when appending guidance", () =>
     Effect.gen(function* () {
       const existingAgents = "# Existing Instructions\n\nKeep project guidance here.\n\n"
-      yield* Effect.promise(() => writeFile(join(tempDir, "AGENTS.md"), existingAgents))
+      const files = makeFiles({ "AGENTS.md": existingAgents })
 
-      const result = yield* runWriteAgentsGuidance(tempDir, {
+      const result = yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
         scripts: ["format"],
       })
 
       expect(result).toBe("updated")
 
-      const agents = yield* Effect.promise(() => readFile(join(tempDir, "AGENTS.md"), "utf8"))
+      const agents = files.read("AGENTS.md")
       expect(agents.startsWith(`${existingAgents}${ADAMANTITE_AGENTS_START_MARKER}\n`)).toBe(true)
     })
   )
 
   it.effect("replace only the existing Adamantite marker block", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "AGENTS.md"),
-          [
-            "# Existing Instructions",
-            "",
-            "Keep this before.",
-            ADAMANTITE_AGENTS_START_MARKER,
-            "old content",
-            ADAMANTITE_AGENTS_END_MARKER,
-            "Keep this after.",
-            "",
-          ].join("\n")
-        )
-      )
+      const files = makeFiles({
+        "AGENTS.md": [
+          "# Existing Instructions",
+          "",
+          "Keep this before.",
+          ADAMANTITE_AGENTS_START_MARKER,
+          "old content",
+          ADAMANTITE_AGENTS_END_MARKER,
+          "Keep this after.",
+          "",
+        ].join("\n"),
+      })
 
-      const result = yield* runWriteAgentsGuidance(tempDir, {
+      const result = yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
         scripts: ["analyze"],
       })
 
       expect(result).toBe("updated")
 
-      const agents = yield* Effect.promise(() => readFile(join(tempDir, "AGENTS.md"), "utf8"))
+      const agents = files.read("AGENTS.md")
       expect(agents).toContain("Keep this before.")
       expect(agents).toContain("Keep this after.")
       expect(agents).toContain("Run `bun run analyze` after changing dependencies")
@@ -161,17 +157,15 @@ describe("writeAgentsGuidance", () => {
     () =>
       Effect.gen(function* () {
         const existingAgents = `# Existing Instructions\n\n${ADAMANTITE_AGENTS_START_MARKER}\nmanual content\n`
-        yield* Effect.promise(() => writeFile(join(tempDir, "AGENTS.md"), existingAgents))
+        const files = makeFiles({ "AGENTS.md": existingAgents })
 
-        const result = yield* runWriteAgentsGuidance(tempDir, {
+        const result = yield* runWriteAgentsGuidance(files, {
           packageManager: "bun",
           scripts: ["format"],
         })
 
         expect(result).toBe("malformed")
-        expect(yield* Effect.promise(() => readFile(join(tempDir, "AGENTS.md"), "utf8"))).toBe(
-          existingAgents
-        )
+        expect(files.read("AGENTS.md")).toBe(existingAgents)
       })
   )
 
@@ -180,28 +174,28 @@ describe("writeAgentsGuidance", () => {
     () =>
       Effect.gen(function* () {
         const existingAgents = `# Existing Instructions\n\nmanual content\n${ADAMANTITE_AGENTS_END_MARKER}\n`
-        yield* Effect.promise(() => writeFile(join(tempDir, "AGENTS.md"), existingAgents))
+        const files = makeFiles({ "AGENTS.md": existingAgents })
 
-        const result = yield* runWriteAgentsGuidance(tempDir, {
+        const result = yield* runWriteAgentsGuidance(files, {
           packageManager: "bun",
           scripts: ["format"],
         })
 
         expect(result).toBe("malformed")
-        expect(yield* Effect.promise(() => readFile(join(tempDir, "AGENTS.md"), "utf8"))).toBe(
-          existingAgents
-        )
+        expect(files.read("AGENTS.md")).toBe(existingAgents)
       })
   )
 
   it.effect("generate guidance only for selected scripts", () =>
     Effect.gen(function* () {
-      yield* runWriteAgentsGuidance(tempDir, {
+      const files = makeFiles()
+
+      yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
         scripts: ["fix", "check:monorepo", "fix:monorepo"],
       })
 
-      const agents = yield* Effect.promise(() => readFile(join(tempDir, "AGENTS.md"), "utf8"))
+      const agents = files.read("AGENTS.md")
       expect(agents).toContain("Direct command: `adamantite fix`")
       expect(agents).toContain("Direct command: `adamantite monorepo`")
       expect(agents).toContain("Direct command: `adamantite monorepo --fix`")
@@ -213,12 +207,14 @@ describe("writeAgentsGuidance", () => {
 
   it.effect("generate package-manager-specific script commands", () =>
     Effect.gen(function* () {
-      yield* runWriteAgentsGuidance(tempDir, {
+      const files = makeFiles()
+
+      yield* runWriteAgentsGuidance(files, {
         packageManager: "npm",
         scripts: ["format"],
       })
 
-      const agents = yield* Effect.promise(() => testFile(join(tempDir, "AGENTS.md")).text())
+      const agents = files.read("AGENTS.md")
       expect(agents).toContain("Run `npm run format` after editing files")
     })
   )

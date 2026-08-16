@@ -1,12 +1,9 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
-import { testFile, writeFile } from "#__tests__/filesystem.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
@@ -21,26 +18,11 @@ import {
 } from "./command-test-helpers.ts"
 
 describe("doctor", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-doctor-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   it.effect("report a compact no-op result when no integrations apply yet", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -50,13 +32,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.intros).toEqual(["💠 adamantite doctor"])
@@ -70,23 +52,22 @@ describe("doctor", () => {
 
   it.effect("fail when adamantite is not installed in the project", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               name: "test-project",
               version: "1.0.0",
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
@@ -100,10 +81,9 @@ describe("doctor", () => {
 
   it.effect("report missing oxfmt config as action needed when oxfmt is installed", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -117,13 +97,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
@@ -136,10 +116,11 @@ describe("doctor", () => {
 
   it.effect("report no issues when the package and config are present", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "oxfmt.config.ts":
+            'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n',
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -153,19 +134,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "oxfmt.config.ts"),
-          'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n'
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
@@ -178,10 +153,9 @@ describe("doctor", () => {
 
   it.effect("report missing oxlint config when the managed check script is present", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -195,13 +169,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
@@ -214,10 +188,9 @@ describe("doctor", () => {
 
   it.effect("report missing knip config when the managed analyze script is present", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -231,13 +204,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
@@ -250,10 +223,19 @@ describe("doctor", () => {
 
   it.effect("report missing tsgolint package when managed linting is configured", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            "",
+            "export default defineConfig({",
+            '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
+            "  extends: [core],",
+            "})",
+            "",
+          ].join("\n"),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -267,28 +249,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "oxlint.config.ts"),
-          [
-            'import { defineConfig } from "oxlint"',
-            'import core from "adamantite/lint"',
-            "",
-            "export default defineConfig({",
-            '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
-            "  extends: [core],",
-            "})",
-            "",
-          ].join("\n")
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
@@ -301,10 +268,9 @@ describe("doctor", () => {
 
   it.effect("report missing sherif package when managed monorepo scripts are configured", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -317,13 +283,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
@@ -336,10 +302,11 @@ describe("doctor", () => {
 
   it.effect("report only issues when some integrations are already healthy", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "oxfmt.config.ts":
+            'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n',
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -354,19 +321,13 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "oxfmt.config.ts"),
-          'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n'
-        )
-      )
+          ),
+        },
+      })
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, [], [prompter.layer])
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs.filter((entry) => entry.level === "success")).toEqual([])
@@ -380,10 +341,19 @@ describe("doctor", () => {
 
   it.effect("install fixable package issues with --fix", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            "",
+            "export default defineConfig({",
+            '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
+            "  extends: [core],",
+            "})",
+            "",
+          ].join("\n"),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -397,29 +367,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "oxlint.config.ts"),
-          [
-            'import { defineConfig } from "oxlint"',
-            'import core from "adamantite/lint"',
-            "",
-            "export default defineConfig({",
-            '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
-            "  extends: [core],",
-            "})",
-            "",
-          ].join("\n")
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -438,10 +396,19 @@ describe("doctor", () => {
 
   it.effect("update fixable package issues with --fix", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            "",
+            "export default defineConfig({",
+            '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
+            "  extends: [core],",
+            "})",
+            "",
+          ].join("\n"),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -456,29 +423,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "oxlint.config.ts"),
-          [
-            'import { defineConfig } from "oxlint"',
-            'import core from "adamantite/lint"',
-            "",
-            "export default defineConfig({",
-            '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
-            "  extends: [core],",
-            "})",
-            "",
-          ].join("\n")
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -497,10 +452,11 @@ describe("doctor", () => {
 
   it.effect("fail cleanly when fixing dependencies fails", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts":
+            'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n',
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -514,15 +470,9 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "oxlint.config.ts"),
-          'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext({
         addDevDependenciesError: new FailedToInstallDependency({
@@ -531,7 +481,10 @@ describe("doctor", () => {
       })
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
@@ -543,10 +496,9 @@ describe("doctor", () => {
 
   it.effect("create oxfmt config with --fix when config creation is the only issue", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -560,20 +512,21 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "oxfmt.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists("oxfmt.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: "Fixed: created `oxfmt.config.ts`.",
@@ -584,10 +537,9 @@ describe("doctor", () => {
 
   it.effect("install oxfmt and create its config with --fix when both are missing", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -600,14 +552,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -616,9 +571,7 @@ describe("doctor", () => {
           packages: [`${oxfmt.name}@${oxfmt.version}`],
         },
       ])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "oxfmt.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists("oxfmt.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: `Fixed: installed \`${oxfmt.name}@${oxfmt.version}\`.`,
@@ -633,10 +586,10 @@ describe("doctor", () => {
 
   it.effect("migrate legacy oxfmt config with --fix when migration is the only issue", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          ".oxfmtrc.json": JSON.stringify({ semi: false }, null, 2),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -650,26 +603,22 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(join(tempDir, ".oxfmtrc.json"), JSON.stringify({ semi: false }, null, 2))
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, ".oxfmtrc.json")).exists())).toBe(
-        false
-      )
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "oxfmt.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists(".oxfmtrc.json")).toBe(false)
+      expect(files.exists("oxfmt.config.ts")).toBe(true)
       expect(prompter.spinnerEntries).toContainEqual({
         message: "Fixed: Migrate legacy `.oxfmtrc.json` to `oxfmt.config.ts`.",
         type: "stop",
@@ -680,10 +629,10 @@ describe("doctor", () => {
 
   it.effect("fail cleanly when a migration fix fails", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          ".oxfmtrc.json": JSON.stringify([], null, 2),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -697,17 +646,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(join(tempDir, ".oxfmtrc.json"), JSON.stringify([], null, 2))
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
       const error = Option.getOrThrow(Exit.findErrorOption(exit))
       const errorPath =
         Predicate.isObject(error) && Predicate.isString(error.path) ? error.path : ""
@@ -725,10 +674,10 @@ describe("doctor", () => {
 
   it.effect("install oxfmt and migrate its legacy config with --fix when both are missing", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          ".oxfmtrc.json": JSON.stringify({ semi: false }, null, 2),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -741,17 +690,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(join(tempDir, ".oxfmtrc.json"), JSON.stringify({ semi: false }, null, 2))
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -760,12 +709,8 @@ describe("doctor", () => {
           packages: [`${oxfmt.name}@${oxfmt.version}`],
         },
       ])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, ".oxfmtrc.json")).exists())).toBe(
-        false
-      )
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "oxfmt.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists(".oxfmtrc.json")).toBe(false)
+      expect(files.exists("oxfmt.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: `Fixed: installed \`${oxfmt.name}@${oxfmt.version}\`.`,
@@ -780,10 +725,9 @@ describe("doctor", () => {
 
   it.effect("create knip config with --fix when config creation is the only issue", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -797,20 +741,21 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "knip.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists("knip.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: "Fixed: created `knip.config.ts`.",
@@ -821,10 +766,9 @@ describe("doctor", () => {
 
   it.effect("install knip and create its config with --fix when both are missing", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -837,14 +781,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -853,9 +800,7 @@ describe("doctor", () => {
           packages: [`${knip.name}@${knip.version}`],
         },
       ])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "knip.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists("knip.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: `Fixed: installed \`${knip.name}@${knip.version}\`.`,
@@ -870,10 +815,10 @@ describe("doctor", () => {
 
   it.effect("migrate legacy knip config with --fix when migration is the only issue", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "knip.json": JSON.stringify({ entry: ["src/index.ts"] }, null, 2),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -887,24 +832,22 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(join(tempDir, "knip.json"), JSON.stringify({ entry: ["src/index.ts"] }, null, 2))
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "knip.json")).exists())).toBe(false)
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "knip.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists("knip.json")).toBe(false)
+      expect(files.exists("knip.config.ts")).toBe(true)
       expect(prompter.spinnerEntries).toContainEqual({
         message: "Fixed: Migrate legacy `knip.json` to `knip.config.ts`.",
         type: "stop",
@@ -915,10 +858,10 @@ describe("doctor", () => {
 
   it.effect("install knip and migrate its legacy config with --fix when both are missing", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "knip.json": JSON.stringify({ entry: ["src/index.ts"] }, null, 2),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -931,17 +874,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(join(tempDir, "knip.json"), JSON.stringify({ entry: ["src/index.ts"] }, null, 2))
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -950,10 +893,8 @@ describe("doctor", () => {
           packages: [`${knip.name}@${knip.version}`],
         },
       ])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "knip.json")).exists())).toBe(false)
-      expect(yield* Effect.promise(() => testFile(join(tempDir, "knip.config.ts")).exists())).toBe(
-        true
-      )
+      expect(files.exists("knip.json")).toBe(false)
+      expect(files.exists("knip.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: `Fixed: installed \`${knip.name}@${knip.version}\`.`,
@@ -968,10 +909,9 @@ describe("doctor", () => {
 
   it.effect("create oxlint config with --fix when config creation is the only issue", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -986,20 +926,21 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(
-        yield* Effect.promise(() => testFile(join(tempDir, "oxlint.config.ts")).exists())
-      ).toBe(true)
+      expect(files.exists("oxlint.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: "Fixed: created `oxlint.config.ts`.",
@@ -1010,10 +951,9 @@ describe("doctor", () => {
 
   it.effect("install oxlint and create its config with --fix when both are missing", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -1027,14 +967,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -1043,9 +986,7 @@ describe("doctor", () => {
           packages: [`${oxlint.name}@${oxlint.version}`],
         },
       ])
-      expect(
-        yield* Effect.promise(() => testFile(join(tempDir, "oxlint.config.ts")).exists())
-      ).toBe(true)
+      expect(files.exists("oxlint.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: `Fixed: installed \`${oxlint.name}@${oxlint.version}\`.`,
@@ -1060,10 +1001,10 @@ describe("doctor", () => {
 
   it.effect("migrate legacy oxlint config with --fix when migration is the only issue", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          ".oxlintrc.json": JSON.stringify({ rules: { semi: "error" } }, null, 2),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -1078,29 +1019,22 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, ".oxlintrc.json"),
-          JSON.stringify({ rules: { semi: "error" } }, null, 2)
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, ".oxlintrc.json")).exists())).toBe(
-        false
-      )
-      expect(
-        yield* Effect.promise(() => testFile(join(tempDir, "oxlint.config.ts")).exists())
-      ).toBe(true)
+      expect(files.exists(".oxlintrc.json")).toBe(false)
+      expect(files.exists("oxlint.config.ts")).toBe(true)
       expect(prompter.spinnerEntries).toContainEqual({
         message: "Fixed: Migrate legacy `.oxlintrc.json` to `oxlint.config.ts`.",
         type: "stop",
@@ -1111,10 +1045,10 @@ describe("doctor", () => {
 
   it.effect("install oxlint and migrate its legacy config with --fix when both are missing", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          ".oxlintrc.json": JSON.stringify({ rules: { semi: "error" } }, null, 2),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -1128,20 +1062,17 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, ".oxlintrc.json"),
-          JSON.stringify({ rules: { semi: "error" } }, null, 2)
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([
@@ -1150,12 +1081,8 @@ describe("doctor", () => {
           packages: [`${oxlint.name}@${oxlint.version}`],
         },
       ])
-      expect(yield* Effect.promise(() => testFile(join(tempDir, ".oxlintrc.json")).exists())).toBe(
-        false
-      )
-      expect(
-        yield* Effect.promise(() => testFile(join(tempDir, "oxlint.config.ts")).exists())
-      ).toBe(true)
+      expect(files.exists(".oxlintrc.json")).toBe(false)
+      expect(files.exists("oxlint.config.ts")).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: `Fixed: installed \`${oxlint.name}@${oxlint.version}\`.`,
@@ -1170,10 +1097,18 @@ describe("doctor", () => {
 
   it.effect("patch oxlint config with --fix when type-aware options are missing", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "package.json"),
-          JSON.stringify(
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            "",
+            "export default defineConfig({",
+            "  extends: [core],",
+            "})",
+            "",
+          ].join("\n"),
+          "package.json": JSON.stringify(
             {
               devDependencies: {
                 adamantite: "1.0.0",
@@ -1188,34 +1123,21 @@ describe("doctor", () => {
             },
             null,
             2
-          )
-        )
-      )
-      yield* Effect.promise(() =>
-        writeFile(
-          join(tempDir, "oxlint.config.ts"),
-          [
-            'import { defineConfig } from "oxlint"',
-            'import core from "adamantite/lint"',
-            "",
-            "export default defineConfig({",
-            "  extends: [core],",
-            "})",
-            "",
-          ].join("\n")
-        )
-      )
+          ),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext()
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      const oxlintConfig = yield* Effect.promise(() =>
-        testFile(join(tempDir, "oxlint.config.ts")).text()
-      )
+      const oxlintConfig = files.read("oxlint.config.ts")
       expect(oxlintConfig).toContain("respectEslintDisableDirectives: true")
       expect(oxlintConfig).toContain("typeAware: true")
       expect(oxlintConfig).toContain("typeCheck: true")
@@ -1231,10 +1153,18 @@ describe("doctor", () => {
     "report manual oxlint config drift with --fix when the file cannot be patched safely",
     () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            join(tempDir, "package.json"),
-            JSON.stringify(
+        const originalConfig = [
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({",
+          "  options: getOptions(),",
+          "})",
+          "",
+        ].join("\n")
+        const files = createFileSystemTestContext({
+          files: {
+            "oxlint.config.ts": originalConfig,
+            "package.json": JSON.stringify(
               {
                 devDependencies: {
                   adamantite: "1.0.0",
@@ -1249,29 +1179,21 @@ describe("doctor", () => {
               },
               null,
               2
-            )
-          )
-        )
-        const originalConfig = [
-          'import { defineConfig } from "oxlint"',
-          "",
-          "export default defineConfig({",
-          "  options: getOptions(),",
-          "})",
-          "",
-        ].join("\n")
-        yield* Effect.promise(() => writeFile(join(tempDir, "oxlint.config.ts"), originalConfig))
+            ),
+          },
+        })
 
         const installer = createDependencyInstallerTestContext()
         const prompter = createPrompterTestContext()
 
-        const exit = yield* runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
+        const exit = yield* runCommand(doctorCommand, ["--fix"], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
 
         expect(Exit.isFailure(exit)).toBe(true)
         expect(installer.calls).toEqual([])
-        expect(
-          yield* Effect.promise(() => testFile(join(tempDir, "oxlint.config.ts")).text())
-        ).toBe(originalConfig)
+        expect(files.read("oxlint.config.ts")).toBe(originalConfig)
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message:

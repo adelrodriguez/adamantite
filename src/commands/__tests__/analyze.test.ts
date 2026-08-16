@@ -1,34 +1,17 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import analyzeCommand from "#commands/analyze.ts"
-import { createRunnerTestContext, runCommandWithRunner } from "./command-test-helpers.ts"
+import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("analyze", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-analyze-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   describe("default invocation", () => {
     it.effect("run knip with no flags by default", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(analyzeCommand, [], runner)
+        const exit = yield* runCommand(analyzeCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toEqual([
@@ -46,7 +29,7 @@ describe("analyze", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(analyzeCommand, ["--fix"], runner)
+        const exit = yield* runCommand(analyzeCommand, ["--fix"], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toEqual(["--fix", "--allow-remove-files"])
@@ -59,7 +42,7 @@ describe("analyze", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(analyzeCommand, ["--strict"], runner)
+        const exit = yield* runCommand(analyzeCommand, ["--strict"], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toEqual(["--production", "--strict"])
@@ -72,7 +55,9 @@ describe("analyze", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(analyzeCommand, ["--fix", "--strict"], runner)
+        const exit = yield* runCommand(analyzeCommand, ["--fix", "--strict"], {
+          layers: [runner.layer],
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toEqual([
@@ -90,10 +75,10 @@ describe("analyze", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(analyzeCommand, ["--strict"], runner, [
-          "--directory",
-          "packages/app",
-        ])
+        const exit = yield* runCommand(analyzeCommand, ["--strict"], {
+          forwardedArguments: ["--directory", "packages/app"],
+          layers: [runner.layer],
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toEqual([
@@ -111,7 +96,7 @@ describe("analyze", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext([1])
 
-        const exit = yield* runCommandWithRunner(analyzeCommand, [], runner)
+        const exit = yield* runCommand(analyzeCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))

@@ -1,32 +1,22 @@
 import { defineConfig } from "tsdown"
 import { Macros } from "unplugin-macros"
+import packageJson from "./package.json" with { type: "json" }
 
 export default defineConfig([
   {
-    clean: true,
     deps: {
       neverBundle: true,
-      onlyImport: [
-        "@clack/prompts",
-        "@effect/platform-node",
-        "defu",
-        "effect",
-        "esrap",
-        "jsonc-parser",
-        "nypm",
-        "oxc-parser",
-      ],
+      // Deliberately tracks package.json: adding a runtime dependency widens
+      // this import guard without a change to the build config.
+      onlyImport: Object.keys(packageJson.dependencies),
     },
     dts: false,
     entry: ["src/index.ts"],
+    fixedExtension: false,
     minify: true,
-    outDir: "dist",
-    outExtensions: () => ({ js: ".js" }),
-    platform: "node",
     plugins: [Macros.rolldown()],
   },
   {
-    clean: false,
     copy: [
       { from: "presets/tsconfig.json", to: "dist/presets" },
       {
@@ -39,11 +29,9 @@ export default defineConfig([
       },
     ],
     deps: { neverBundle: ["knip", "oxfmt", "oxlint"] },
-    dts: true,
+    dts: { oxc: true },
     entry: ["presets/**/*.ts"],
+    fixedExtension: false,
     outDir: "dist/presets",
-    outExtensions: () => ({ dts: ".d.ts", js: ".js" }),
-    platform: "node",
-    tsconfig: "tsconfig.build.json",
   },
 ])

@@ -1,48 +1,39 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, layer } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { writeFile } from "#__tests__/filesystem.ts"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 
-layer(NodeServices.layer)("sherif", (it) => {
-  let originalCwd: string
-  let tempDir: string
+const ROOT = "/project"
 
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-sherif-test-"))
-    process.chdir(tempDir)
-  })
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
 
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
+function provideFiles(files: FileSystemTestContext) {
+  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
 
+describe("sherif", () => {
   describe("assess", () => {
     it.effect("report not applicable when managed monorepo scripts are absent", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  sherif: sherif.version,
-                },
-                name: "test-project",
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                sherif: sherif.version,
               },
-              null,
-              2
-            )
-          )
-        )
+              name: "test-project",
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* sherif.assess(tempDir)
+        const result = yield* sherif.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           applicable: false,
@@ -53,24 +44,21 @@ layer(NodeServices.layer)("sherif", (it) => {
 
     it.effect("report missing package when the managed monorepo check script exists", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                name: "test-project",
-                scripts: {
-                  "check:monorepo": "adamantite monorepo",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              name: "test-project",
+              scripts: {
+                "check:monorepo": "adamantite monorepo",
               },
-              null,
-              2
-            )
-          )
-        )
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* sherif.assess(tempDir)
+        const result = yield* sherif.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [
@@ -89,27 +77,24 @@ layer(NodeServices.layer)("sherif", (it) => {
 
     it.effect("report healthy when the package and managed monorepo script are present", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  sherif: sherif.version,
-                },
-                name: "test-project",
-                scripts: {
-                  "fix:monorepo": "adamantite monorepo --fix",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                sherif: sherif.version,
               },
-              null,
-              2
-            )
-          )
-        )
+              name: "test-project",
+              scripts: {
+                "fix:monorepo": "adamantite monorepo --fix",
+              },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* sherif.assess(tempDir)
+        const result = yield* sherif.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [],

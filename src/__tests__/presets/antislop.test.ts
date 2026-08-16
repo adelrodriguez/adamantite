@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, symlinkSync } from "node:fs"
+import { writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "@effect/vitest"
-import { writeFile } from "#__tests__/filesystem.ts"
 import antislop from "#presets/lint/antislop.ts"
 import antislopPlugin from "#presets/lint/antislop/plugin.mjs"
 

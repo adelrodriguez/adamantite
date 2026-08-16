@@ -1,31 +1,28 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, layer } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { testFile, writeFile } from "#__tests__/filesystem.ts"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 
-layer(NodeServices.layer)("oxfmt", (it) => {
-  let originalCwd: string
-  let tempDir: string
+const ROOT = "/project"
 
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-oxfmt-test-"))
-    process.chdir(tempDir)
-  })
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
 
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
+function provideFiles(files: FileSystemTestContext) {
+  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
 
+describe("oxfmt", () => {
   describe("detect", () => {
     it.effect("detect when oxfmt.config.ts does not exist", () =>
       Effect.gen(function* () {
-        const result = yield* oxfmt.detect(tempDir)
+        const files = makeFiles()
+
+        const result = yield* oxfmt.detect(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           active: null,
@@ -37,14 +34,14 @@ layer(NodeServices.layer)("oxfmt", (it) => {
 
     it.effect("detect when oxfmt.config.ts exists", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() => writeFile("oxfmt.config.ts", "export default {}\n"))
+        const files = makeFiles({ "oxfmt.config.ts": "export default {}\n" })
 
-        const result = yield* oxfmt.detect(tempDir)
+        const result = yield* oxfmt.detect(ROOT).pipe(provideFiles(files))
 
         expect(result.active).toEqual({
           file: "oxfmt.config.ts",
           format: "ts",
-          path: join(tempDir, "oxfmt.config.ts"),
+          path: join(ROOT, "oxfmt.config.ts"),
         })
         expect(result.legacy).toEqual([])
       })
@@ -54,16 +51,18 @@ layer(NodeServices.layer)("oxfmt", (it) => {
   describe("create", () => {
     it.effect("create oxfmt.config.ts with the correct config", () =>
       Effect.gen(function* () {
-        yield* oxfmt.create(tempDir)
+        const files = makeFiles()
 
-        const state = yield* oxfmt.detect(tempDir)
+        yield* oxfmt.create(ROOT).pipe(provideFiles(files))
+
+        const state = yield* oxfmt.detect(ROOT).pipe(provideFiles(files))
         expect(state.active).toEqual({
           file: "oxfmt.config.ts",
           format: "ts",
-          path: join(tempDir, "oxfmt.config.ts"),
+          path: join(ROOT, "oxfmt.config.ts"),
         })
 
-        const content = yield* Effect.promise(() => testFile("oxfmt.config.ts").text())
+        const content = files.read("oxfmt.config.ts")
 
         expect(content).toContain('import { defineConfig } from "oxfmt"')
         expect(content).toContain('import format from "adamantite/format"')
@@ -75,24 +74,21 @@ layer(NodeServices.layer)("oxfmt", (it) => {
   describe("assess", () => {
     it.effect("report not applicable when the managed format script is absent", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  oxfmt: oxfmt.version,
-                },
-                name: "test-project",
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                oxfmt: oxfmt.version,
               },
-              null,
-              2
-            )
-          )
-        )
+              name: "test-project",
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* oxfmt.assess(tempDir)
+        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           applicable: false,
@@ -103,27 +99,24 @@ layer(NodeServices.layer)("oxfmt", (it) => {
 
     it.effect("report missing managed config when the managed format script exists", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  oxfmt: oxfmt.version,
-                },
-                name: "test-project",
-                scripts: {
-                  format: "adamantite format",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                oxfmt: oxfmt.version,
               },
-              null,
-              2
-            )
-          )
-        )
+              name: "test-project",
+              scripts: {
+                format: "adamantite format",
+              },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* oxfmt.assess(tempDir)
+        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [
@@ -141,33 +134,26 @@ layer(NodeServices.layer)("oxfmt", (it) => {
 
     it.effect("report healthy when managed format script and config exist", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  oxfmt: oxfmt.version,
-                },
-                name: "test-project",
-                scripts: {
-                  format: "adamantite format",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "oxfmt.config.ts":
+            'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n',
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                oxfmt: oxfmt.version,
               },
-              null,
-              2
-            )
-          )
-        )
-        yield* Effect.promise(() =>
-          writeFile(
-            "oxfmt.config.ts",
-            'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n'
-          )
-        )
+              name: "test-project",
+              scripts: {
+                format: "adamantite format",
+              },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* oxfmt.assess(tempDir)
+        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [],
@@ -179,24 +165,21 @@ layer(NodeServices.layer)("oxfmt", (it) => {
 
     it.effect("report missing package when managed format script exists", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                name: "test-project",
-                scripts: {
-                  format: "adamantite format",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              name: "test-project",
+              scripts: {
+                format: "adamantite format",
               },
-              null,
-              2
-            )
-          )
-        )
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* oxfmt.assess(tempDir)
+        const result = yield* oxfmt.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [

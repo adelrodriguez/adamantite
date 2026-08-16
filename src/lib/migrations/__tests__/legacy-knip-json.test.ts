@@ -1,39 +1,29 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { testFile, writeFile } from "#__tests__/filesystem.ts"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import migrationLegacyKnipJson from "#lib/migrations/legacy-knip-json.ts"
 
-function runTestEffect<A, E>(effect: Effect.Effect<A, E, NodeServices.NodeServices>) {
-  const provided = effect.pipe(Effect.provide(NodeServices.layer))
+const ROOT = "/project"
 
-  return provided
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
+
+function provideFiles(files: FileSystemTestContext) {
+  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
 }
 
 describe("legacyKnipJson", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-legacy-knip-migration-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   it.effect("check warns when both config formats exist and keeps the TS config active", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("knip.config.ts", "export default {}\n"))
-      yield* Effect.promise(() => writeFile("knip.json", "{}\n"))
+      const files = makeFiles({
+        "knip.config.ts": "export default {}\n",
+        "knip.json": "{}\n",
+      })
 
-      const result = yield* runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
+      const result = yield* migrationLegacyKnipJson.check({ cwd: ROOT }).pipe(provideFiles(files))
 
       expect(result).toEqual({
         status: "not-applicable",
@@ -46,10 +36,12 @@ describe("legacyKnipJson", () => {
 
   it.effect("check warns when both legacy JSON and JSONC exist without a TS config", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("knip.json", "{}\n"))
-      yield* Effect.promise(() => writeFile("knip.jsonc", '{ "entry": ["src/index.ts"] }\n'))
+      const files = makeFiles({
+        "knip.json": "{}\n",
+        "knip.jsonc": '{ "entry": ["src/index.ts"] }\n',
+      })
 
-      const result = yield* runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
+      const result = yield* migrationLegacyKnipJson.check({ cwd: ROOT }).pipe(provideFiles(files))
 
       expect(result).toEqual({
         status: "needed",
@@ -65,27 +57,25 @@ describe("legacyKnipJson", () => {
     "migrate removes both legacy files when JSON and JSONC exist without knip.config.ts",
     () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() => writeFile("knip.json", '{ "entry": ["src/other.ts"] }\n'))
-        yield* Effect.promise(() =>
-          writeFile(
-            "knip.jsonc",
-            JSON.stringify(
-              {
-                entry: ["src/index.ts"],
-                ignore: ["bunup.config.ts"],
-              },
-              null,
-              2
-            )
-          )
-        )
-        yield* runTestEffect(migrationLegacyKnipJson.migrate({ cwd: tempDir }))
+        const files = makeFiles({
+          "knip.json": '{ "entry": ["src/other.ts"] }\n',
+          "knip.jsonc": JSON.stringify(
+            {
+              entry: ["src/index.ts"],
+              ignore: ["bunup.config.ts"],
+            },
+            null,
+            2
+          ),
+        })
 
-        expect(yield* Effect.promise(() => testFile("knip.config.ts").exists())).toBe(true)
-        expect(yield* Effect.promise(() => testFile("knip.json").exists())).toBe(false)
-        expect(yield* Effect.promise(() => testFile("knip.jsonc").exists())).toBe(false)
+        yield* migrationLegacyKnipJson.migrate({ cwd: ROOT }).pipe(provideFiles(files))
 
-        const content = yield* Effect.promise(() => testFile("knip.config.ts").text())
+        expect(files.exists("knip.config.ts")).toBe(true)
+        expect(files.exists("knip.json")).toBe(false)
+        expect(files.exists("knip.jsonc")).toBe(false)
+
+        const content = files.read("knip.config.ts")
         expect(content).toContain('"src/index.ts"')
         expect(content).not.toContain("src/other.ts")
       })
@@ -93,35 +83,34 @@ describe("legacyKnipJson", () => {
 
   it.effect("migrate converts a legacy JSON config into the current TS config format", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          "knip.json",
-          JSON.stringify(
-            {
-              entry: ["src/main.ts"],
-              ignore: ["bunup.config.ts"],
-              rules: {
-                devDependencies: "off",
-              },
+      const files = makeFiles({
+        "knip.json": JSON.stringify(
+          {
+            entry: ["src/main.ts"],
+            ignore: ["bunup.config.ts"],
+            rules: {
+              devDependencies: "off",
             },
-            null,
-            2
-          )
-        )
-      )
+          },
+          null,
+          2
+        ),
+      })
 
-      const checkResult = yield* runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
+      const checkResult = yield* migrationLegacyKnipJson
+        .check({ cwd: ROOT })
+        .pipe(provideFiles(files))
       expect(checkResult).toEqual({
         status: "needed",
         summary: "Migrating legacy `knip.json` configuration to `knip.config.ts`.",
         warnings: [],
       })
-      yield* runTestEffect(migrationLegacyKnipJson.migrate({ cwd: tempDir }))
+      yield* migrationLegacyKnipJson.migrate({ cwd: ROOT }).pipe(provideFiles(files))
 
-      expect(yield* Effect.promise(() => testFile("knip.config.ts").exists())).toBe(true)
-      expect(yield* Effect.promise(() => testFile("knip.json").exists())).toBe(false)
+      expect(files.exists("knip.config.ts")).toBe(true)
+      expect(files.exists("knip.json")).toBe(false)
 
-      const content = yield* Effect.promise(() => testFile("knip.config.ts").text())
+      const content = files.read("knip.config.ts")
       expect(content).toContain('import analyze from "adamantite/analyze"')
       expect(content).toContain("  ...analyze,")
       expect(content).toContain("    ...analyze.rules,")
@@ -129,38 +118,37 @@ describe("legacyKnipJson", () => {
       expect(content).toContain('"src/main.ts"')
       expect(content).toContain('"bunup.config.ts"')
       expect(content).toContain('devDependencies: "off"')
-      yield* runTestEffect(migrationLegacyKnipJson.validate({ cwd: tempDir }))
+      yield* migrationLegacyKnipJson.validate({ cwd: ROOT }).pipe(provideFiles(files))
     })
   )
 
   it.effect("migrate converts a legacy JSONC config with comments and trailing commas", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() =>
-        writeFile(
-          "knip.jsonc",
-          [
-            "{",
-            "  // preserve semantic override",
-            '  "entry": ["src/index.ts"],',
-            '  "ignore": ["bunup.config.ts"],',
-            "}",
-            "",
-          ].join("\n")
-        )
-      )
+      const files = makeFiles({
+        "knip.jsonc": [
+          "{",
+          "  // preserve semantic override",
+          '  "entry": ["src/index.ts"],',
+          '  "ignore": ["bunup.config.ts"],',
+          "}",
+          "",
+        ].join("\n"),
+      })
 
-      const checkResult = yield* runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
+      const checkResult = yield* migrationLegacyKnipJson
+        .check({ cwd: ROOT })
+        .pipe(provideFiles(files))
       expect(checkResult).toEqual({
         status: "needed",
         summary: "Migrating legacy `knip.jsonc` configuration to `knip.config.ts`.",
         warnings: [],
       })
-      yield* runTestEffect(migrationLegacyKnipJson.migrate({ cwd: tempDir }))
+      yield* migrationLegacyKnipJson.migrate({ cwd: ROOT }).pipe(provideFiles(files))
 
-      expect(yield* Effect.promise(() => testFile("knip.config.ts").exists())).toBe(true)
-      expect(yield* Effect.promise(() => testFile("knip.jsonc").exists())).toBe(false)
+      expect(files.exists("knip.config.ts")).toBe(true)
+      expect(files.exists("knip.jsonc")).toBe(false)
 
-      const content = yield* Effect.promise(() => testFile("knip.config.ts").text())
+      const content = files.read("knip.config.ts")
       expect(content).toContain('"src/index.ts"')
       expect(content).toContain('"bunup.config.ts"')
     })

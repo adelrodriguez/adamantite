@@ -44,6 +44,14 @@ complete. See `docs/plans/README.md`.
 - Run `pnpm run analyze` after dependency, import, or export changes.
 - Effect tests use a paused `TestClock`. Use `TestClock.adjust` to advance test time, or
   use `it.live` when the test must use real time.
+- Unit tests must not touch the host filesystem. Use `createFileSystemTestContext` from
+  `src/__tests__/filesystem.ts` (with `Path.layer`) for filesystem access, fixtures, and
+  failure injection. Only integration tests that spawn real processes (CLI smoke tests,
+  antislop oxlint run) may use `node:fs`.
+- Set `ADAMANTITE_SKIP_TEST_BUILD=1` to skip the CLI bundle build in the vitest global
+  setup when you iterate on tests that do not spawn the CLI.
+- Preset declarations build with oxc isolated declarations: every export in
+  `presets/**/*.ts` must carry an explicit type annotation, or the build fails.
 - Prefer function declarations for standalone functions. Keep arrow functions for
   callbacks, object methods, and functions that directly return an Effect chain.
 - Format suppressions as `@ts-expect-error - reason`. Prefer this form to casts that hide

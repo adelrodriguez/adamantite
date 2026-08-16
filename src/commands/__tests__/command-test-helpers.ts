@@ -1,13 +1,15 @@
 import type * as prompts from "@clack/prompts"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import * as Stdio from "effect/Stdio"
 import * as Terminal from "effect/Terminal"
+import { TestConsole } from "effect/testing"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   type CommandFailedLike,
   type CommandRunOptions,
@@ -62,10 +64,6 @@ export interface RunnerTestContext {
 }
 
 type TestLayer = Layer.Layer<never, unknown, unknown>
-
-function noop() {
-  return null
-}
 
 function shiftResponse<T>(queue: T[], kind: string): T {
   const response = queue.shift()
@@ -262,46 +260,38 @@ function makeQuietTerminalLayer() {
   )
 }
 
-function makeQuietConsoleLayer() {
-  return Layer.succeed(Console.Console)({
-    assert: noop,
-    clear: noop,
-    count: noop,
-    countReset: noop,
-    debug: noop,
-    dir: noop,
-    dirxml: noop,
-    error: noop,
-    group: noop,
-    groupCollapsed: noop,
-    groupEnd: noop,
-    info: noop,
-    log: noop,
-    table: noop,
-    time: noop,
-    timeEnd: noop,
-    timeLog: noop,
-    trace: noop,
-    warn: noop,
-  })
+const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
+  ChildProcessSpawner.make(() =>
+    Effect.die("Command tests must stub CommandRunner instead of spawning processes")
+  )
+)
+
+export interface RunCommandOptions {
+  readonly files?: FileSystemTestContext
+  readonly forwardedArguments?: readonly string[]
+  readonly layers?: TestLayer[]
 }
 
 export function runCommand(
   command: Command.Command.Any,
   args: readonly string[],
-  layers: TestLayer[],
-  forwardedArguments: readonly string[] = []
+  options: RunCommandOptions = {}
 ) {
+  const files = options.files ?? createFileSystemTestContext()
+  const platformLayer = Layer.mergeAll(files.layer, Path.layer)
+
   // SAFETY: Layer's type parameters are invariant, so accumulating heterogeneous
   // per-test layers in the merge loop below requires widening to TestLayer.
   let providedLayer = Layer.mergeAll(
-    NodeServices.layer,
-    NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
-    makeQuietConsoleLayer(),
-    makeQuietTerminalLayer()
+    platformLayer,
+    NodeVersionResolver.layer.pipe(Layer.provide(platformLayer)),
+    TestConsole.layer,
+    makeQuietTerminalLayer(),
+    Stdio.layerTest({}),
+    failingSpawnerLayer
   ) as TestLayer
 
-  for (const layer of layers) {
+  for (const layer of options.layers ?? []) {
     providedLayer = Layer.merge(providedLayer, layer)
   }
 
@@ -310,25 +300,8 @@ export function runCommand(
     // discharge the requirement channel statically; the merged layers supply
     // every service the command uses at runtime.
     Command.runWith(command, { version: "test" })(args).pipe(
-      Effect.provideService(ForwardedArguments, forwardedArguments),
+      Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
       Effect.provide(providedLayer)
-    ) as Effect.Effect<void, unknown>
-  )
-}
-
-export function runCommandWithRunner(
-  command: Command.Command.Any,
-  args: readonly string[],
-  runner: RunnerTestContext,
-  forwardedArguments: readonly string[] = []
-) {
-  return Effect.exit(
-    // SAFETY: Command.Command.Any erases the command's requirements, so
-    // TypeScript cannot verify them against the provided layers; runner tests
-    // only need NodeServices and the stub CommandRunner supplied here.
-    Command.runWith(command, { version: "test" })(args).pipe(
-      Effect.provideService(ForwardedArguments, forwardedArguments),
-      Effect.provide(Layer.mergeAll(NodeServices.layer, runner.layer))
     ) as Effect.Effect<void, unknown>
   )
 }

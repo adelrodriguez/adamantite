@@ -1,34 +1,17 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import monorepoCommand from "#commands/monorepo.ts"
-import { createRunnerTestContext, runCommandWithRunner } from "./command-test-helpers.ts"
+import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("monorepo", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-monorepo-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   describe("default invocation", () => {
     it.effect("run sherif by default", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(monorepoCommand, [], runner)
+        const exit = yield* runCommand(monorepoCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toEqual([
@@ -47,7 +30,7 @@ describe("monorepo", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(monorepoCommand, ["--fix"], runner)
+        const exit = yield* runCommand(monorepoCommand, ["--fix"], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]).toEqual({
@@ -64,10 +47,10 @@ describe("monorepo", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(monorepoCommand, ["--fix"], runner, [
-          "--ignore-package",
-          "package-a",
-        ])
+        const exit = yield* runCommand(monorepoCommand, ["--fix"], {
+          forwardedArguments: ["--ignore-package", "package-a"],
+          layers: [runner.layer],
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]).toEqual({
@@ -84,7 +67,7 @@ describe("monorepo", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext([1])
 
-        const exit = yield* runCommandWithRunner(monorepoCommand, [], runner)
+        const exit = yield* runCommand(monorepoCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))

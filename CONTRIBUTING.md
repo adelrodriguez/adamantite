@@ -26,7 +26,6 @@ Read [CONTEXT.md](CONTEXT.md) before you change domain behavior. Use
 
 ```sh
 bun run build       # Bundle the CLI and published presets into dist.
-bun run dev         # Rebuild when source files change.
 bun run test        # Run the Bun test suite.
 bun run test:watch  # Run tests when files change.
 bun run check       # Check lint rules and TypeScript types.

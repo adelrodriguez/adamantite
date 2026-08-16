@@ -58,9 +58,10 @@ if (!cli.success) {
   reportBuildFailure("CLI", cli.logs)
 }
 
+// No external list: every preset import is type-only, so the bundler erases
+// them all before resolution and the compiled presets have zero imports.
 const presets = await Bun.build({
   entrypoints: presetEntries.map((entry) => path.join(root, entry)),
-  external: ["oxlint", "oxfmt", "knip"],
   outdir: path.join(root, "dist/presets"),
   root: path.join(root, "presets"),
   target: "node",
@@ -70,12 +71,19 @@ if (!presets.success) {
   reportBuildFailure("Presets", presets.logs)
 }
 
-await Promise.all(
+const declarationResults = await Promise.allSettled(
   presetEntries.map(async (entry) => {
     const source = await Bun.file(path.join(root, entry)).text()
     return emitDeclaration(entry, source)
   })
 )
+const declarationFailures = declarationResults
+  .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+  .map((result) => String(result.reason))
+
+if (declarationFailures.length > 0) {
+  throw new Error(declarationFailures.join("\n"))
+}
 
 await cp(path.join(root, "presets/tsconfig.json"), path.join(root, "dist/presets/tsconfig.json"))
 await mkdir(path.join(root, "dist/presets/lint/antislop"), { recursive: true })

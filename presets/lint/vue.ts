@@ -1,6 +1,6 @@
-import { defineConfig } from "oxlint"
+import type { OxlintConfig } from "oxlint"
 
-export default defineConfig({
+const config: OxlintConfig = {
   plugins: ["vue"],
   rules: {
     "vue/define-emits-declaration": "error",
@@ -47,4 +47,6 @@ export default defineConfig({
     "vue/valid-define-props": "error",
     "vue/valid-next-tick": "error",
   },
-})
+}
+
+export default config

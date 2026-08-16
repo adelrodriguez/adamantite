@@ -1,6 +1,6 @@
-import { defineConfig } from "oxlint"
+import type { OxlintConfig } from "oxlint"
 
-export default defineConfig({
+const config: OxlintConfig = {
   plugins: ["vitest"],
   rules: {
     "vitest/consistent-each-for": "error",
@@ -68,4 +68,6 @@ export default defineConfig({
     "vitest/valid-expect-in-promise": "error",
     "vitest/valid-title": "error",
   },
-})
+}
+
+export default config

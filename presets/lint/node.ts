@@ -1,6 +1,6 @@
-import { defineConfig } from "oxlint"
+import type { OxlintConfig } from "oxlint"
 
-export default defineConfig({
+const config: OxlintConfig = {
   plugins: ["node"],
   rules: {
     "node/handle-callback-err": "error",
@@ -9,4 +9,6 @@ export default defineConfig({
     "node/no-new-require": "error",
     "node/no-path-concat": "error",
   },
-})
+}
+
+export default config

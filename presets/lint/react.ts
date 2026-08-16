@@ -1,6 +1,6 @@
-import { defineConfig } from "oxlint"
+import type { OxlintConfig } from "oxlint"
 
-export default defineConfig({
+const config: OxlintConfig = {
   plugins: ["react", "react-perf", "jsx-a11y"],
   rules: {
     "jsx-a11y/alt-text": "error",
@@ -100,4 +100,6 @@ export default defineConfig({
     "react/style-prop-object": "error",
     "react/void-dom-elements-no-children": "error",
   },
-})
+}
+
+export default config

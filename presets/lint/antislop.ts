@@ -1,4 +1,4 @@
-import { defineConfig } from "oxlint"
+import type { OxlintConfig } from "oxlint"
 
 // The anti-slop plugin (https://github.com/dmmulroy/anti-slop) rejects
 // low-evidence, low-signal TypeScript and JavaScript patterns — unjustified
@@ -14,7 +14,7 @@ import { defineConfig } from "oxlint"
 // source tree and in the published dist tree. This module runs under whatever
 // runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs.
-export default defineConfig({
+const config: OxlintConfig = {
   jsPlugins: [
     {
       name: "anti-slop",
@@ -49,4 +49,6 @@ export default defineConfig({
     "typescript/consistent-indexed-object-style": "off",
     "unicorn/no-immediate-mutation": "off",
   },
-})
+}
+
+export default config

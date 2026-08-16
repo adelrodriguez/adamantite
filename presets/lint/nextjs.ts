@@ -1,6 +1,6 @@
-import { defineConfig } from "oxlint"
+import type { OxlintConfig } from "oxlint"
 
-export default defineConfig({
+const config: OxlintConfig = {
   plugins: ["nextjs"],
   rules: {
     "nextjs/google-font-display": "error",
@@ -25,4 +25,6 @@ export default defineConfig({
     "nextjs/no-typos": "error",
     "nextjs/no-unwanted-polyfillio": "error",
   },
-})
+}
+
+export default config

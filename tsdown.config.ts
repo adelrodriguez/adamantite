@@ -41,6 +41,11 @@ export default defineConfig([
   },
   {
     clean: false,
+    copy: [
+      { from: "presets/tsconfig.json", to: "dist/presets/tsconfig.json" },
+      { from: "presets/lint/antislop/plugin.mjs", to: "dist/presets/lint/antislop/plugin.mjs" },
+      { from: "presets/lint/antislop/license.md", to: "dist/presets/lint/antislop/license.md" },
+    ],
     deps: { neverBundle: ["oxfmt", "knip"] },
     dts: true,
     entry: ["presets/**/*.ts"],

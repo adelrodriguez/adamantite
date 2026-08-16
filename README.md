@@ -216,19 +216,19 @@ underlying CLI.
 
 Adamantite publishes configuration that can also be consumed directly:
 
-| Export                     | Purpose                                                                                                          |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `adamantite/lint`          | Core Oxlint rules.                                                                                               |
-| `adamantite/lint/react`    | React, JSX accessibility, and performance.                                                                       |
-| `adamantite/lint/nextjs`   | Next.js rules.                                                                                                   |
-| `adamantite/lint/vue`      | Vue rules.                                                                                                       |
-| `adamantite/lint/node`     | Node.js rules.                                                                                                   |
-| `adamantite/lint/jest`     | Jest rules.                                                                                                      |
-| `adamantite/lint/vitest`   | Vitest rules.                                                                                                    |
+| Export                     | Purpose                                                                                                                                                                                                                                                                 |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adamantite/lint`          | Core Oxlint rules.                                                                                                                                                                                                                                                      |
+| `adamantite/lint/react`    | React, JSX accessibility, and performance.                                                                                                                                                                                                                              |
+| `adamantite/lint/nextjs`   | Next.js rules.                                                                                                                                                                                                                                                          |
+| `adamantite/lint/vue`      | Vue rules.                                                                                                                                                                                                                                                              |
+| `adamantite/lint/node`     | Node.js rules.                                                                                                                                                                                                                                                          |
+| `adamantite/lint/jest`     | Jest rules.                                                                                                                                                                                                                                                             |
+| `adamantite/lint/vitest`   | Vitest rules.                                                                                                                                                                                                                                                           |
 | `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules. |
-| `adamantite/format`        | Oxfmt configuration.                                                                                             |
-| `adamantite/analyze`       | Knip configuration.                                                                                              |
-| `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                       |
+| `adamantite/format`        | Oxfmt configuration.                                                                                                                                                                                                                                                    |
+| `adamantite/analyze`       | Knip configuration.                                                                                                                                                                                                                                                     |
+| `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                              |
 
 ## Requirements and boundaries
 

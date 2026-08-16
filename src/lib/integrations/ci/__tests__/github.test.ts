@@ -1,18 +1,27 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+// The "keep shared action versions aligned" test compares generated output
+// against this repository's committed `.github/workflows/ci.yml`, so that one
+// reference read uses the real filesystem.
+import { readFileSync } from "node:fs"
 import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
 import * as Result from "effect/Result"
-import { testFile, writeFile } from "#__tests__/filesystem.ts"
-import { runResult } from "#__tests__/helpers.ts"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import github from "#lib/integrations/ci/github.ts"
 import {
   type NodeVersionSource,
   NodeVersionResolver,
 } from "#lib/workspace/node-version-resolver.ts"
+
+const ROOT = "/project"
+
+const WORKFLOW_PATH = ".github/workflows/adamantite.yml"
+
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
 
 function makeResolverLayer(source: NodeVersionSource) {
   return Layer.succeed(NodeVersionResolver)({
@@ -20,20 +29,27 @@ function makeResolverLayer(source: NodeVersionSource) {
   })
 }
 
-const fallbackTestLayer = Layer.mergeAll(
-  NodeServices.layer,
-  makeResolverLayer({ _tag: "Version", value: "lts/*" })
-)
+function provideFallback(files: FileSystemTestContext) {
+  return Effect.provide(
+    Layer.mergeAll(files.layer, Path.layer, makeResolverLayer({ _tag: "Version", value: "lts/*" }))
+  )
+}
 
-const fileTestLayer = Layer.mergeAll(
-  NodeServices.layer,
-  makeResolverLayer({ _tag: "File", path: ".node-version" })
-)
+function provideFileResolver(files: FileSystemTestContext) {
+  return Effect.provide(
+    Layer.mergeAll(
+      files.layer,
+      Path.layer,
+      makeResolverLayer({ _tag: "File", path: ".node-version" })
+    )
+  )
+}
 
-const liveResolverLayer = Layer.mergeAll(
-  NodeServices.layer,
-  NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer))
-)
+function provideLiveResolver(files: FileSystemTestContext) {
+  const base = Layer.mergeAll(files.layer, Path.layer)
+
+  return Effect.provide(Layer.mergeAll(base, NodeVersionResolver.layer.pipe(Layer.provide(base))))
+}
 
 function getActionReference(content: string, action: string): string | undefined {
   return content
@@ -43,24 +59,12 @@ function getActionReference(content: string, action: string): string | undefined
 }
 
 describe("github", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-github-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   describe("detect", () => {
     it.effect("detect when the workflow does not exist", () =>
       Effect.gen(function* () {
-        const exists = yield* github.detect(tempDir).pipe(Effect.provide(fallbackTestLayer))
+        const files = makeFiles()
+
+        const exists = yield* github.detect(ROOT).pipe(provideFallback(files))
 
         expect(exists).toBe(false)
       })
@@ -70,19 +74,19 @@ describe("github", () => {
   describe("create", () => {
     it.effect("create a GitHub Actions workflow with the expected bun structure", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "bun",
             scripts: ["check", "format"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const exists = yield* github.detect(tempDir).pipe(Effect.provide(fallbackTestLayer))
+        const exists = yield* github.detect(ROOT).pipe(provideFallback(files))
         expect(exists).toBe(true)
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("name: adamantite")
         expect(content).toContain("verify:")
         expect(content).toContain("strategy:")
@@ -103,18 +107,19 @@ describe("github", () => {
 
     it.effect("keep shared action versions aligned with this repository's CI workflow", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "bun",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const generatedWorkflow = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
-        const referenceWorkflow = yield* Effect.promise(() =>
-          testFile(join(originalCwd, ".github/workflows/ci.yml")).text()
+        const generatedWorkflow = files.read(WORKFLOW_PATH)
+        const referenceWorkflow = readFileSync(
+          join(process.cwd(), ".github/workflows/ci.yml"),
+          "utf8"
         )
 
         for (const action of ["actions/checkout", "actions/setup-node", "oven-sh/setup-bun"]) {
@@ -127,16 +132,16 @@ describe("github", () => {
 
     it.effect("generate the correct workflow for npm", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "npm",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("Setup Node.js")
         expect(content).toContain("actions/setup-node@v7")
         expect(content).toContain('cache: "npm"')
@@ -147,16 +152,16 @@ describe("github", () => {
 
     it.effect("generate the correct workflow for pnpm", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "pnpm",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("Setup pnpm")
         expect(content).toContain("pnpm/action-setup@v4")
         expect(content).toContain("actions/setup-node@v7")
@@ -168,16 +173,16 @@ describe("github", () => {
 
     it.effect("generate the correct workflow for yarn", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "yarn",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("Setup Node.js")
         expect(content).toContain("actions/setup-node@v7")
         expect(content).toContain('cache: "yarn"')
@@ -188,16 +193,16 @@ describe("github", () => {
 
     it.effect("generate the correct workflow for deno", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "deno",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("Setup Deno")
         expect(content).toContain("denoland/setup-deno@v2")
         expect(content).toContain("deno install --frozen")
@@ -207,16 +212,16 @@ describe("github", () => {
 
     it.effect("include all CI-compatible scripts as jobs", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "bun",
             scripts: ["check", "format", "check:monorepo"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("name: check")
         expect(content).toContain("name: format")
         expect(content).toContain("name: monorepo")
@@ -228,30 +233,32 @@ describe("github", () => {
 
     it.effect("not create a workflow when no CI-compatible scripts are selected", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "bun",
             scripts: ["fix", "fix:monorepo"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const exists = yield* github.detect(tempDir).pipe(Effect.provide(fallbackTestLayer))
+        const exists = yield* github.detect(ROOT).pipe(provideFallback(files))
         expect(exists).toBe(false)
       })
     )
 
     it.effect("include concurrency settings", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "bun",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("permissions:")
         expect(content).toContain("contents: read")
         expect(content).toContain("concurrency:")
@@ -265,16 +272,16 @@ describe("github", () => {
         Effect.gen(function* () {
           function expectNodeVersionFileWorkflow(packageManager: "bun" | "npm" | "pnpm" | "yarn") {
             return Effect.gen(function* () {
+              const files = makeFiles()
+
               yield* github
-                .create(tempDir, {
+                .create(ROOT, {
                   packageManager,
                   scripts: ["check"],
                 })
-                .pipe(Effect.provide(fileTestLayer))
+                .pipe(provideFileResolver(files))
 
-              const content = yield* Effect.promise(() =>
-                testFile(".github/workflows/adamantite.yml").text()
-              )
+              const content = files.read(WORKFLOW_PATH)
               expect(content).toContain("Setup Node.js")
               expect(content).toContain('node-version-file: ".node-version"')
               expect(content).not.toContain('node-version: "')
@@ -290,16 +297,16 @@ describe("github", () => {
 
     it.effect("not render a Node setup step for deno regardless of the resolved source", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "deno",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fileTestLayer))
+          .pipe(provideFileResolver(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).not.toContain("Setup Node.js")
         expect(content).not.toContain("node-version")
       })
@@ -307,47 +314,48 @@ describe("github", () => {
 
     it.effect("resolve a target project's .node-version with the live resolver", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() => writeFile(join(tempDir, ".node-version"), "22.19.0\n"))
+        const files = makeFiles({ ".node-version": "22.19.0\n" })
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "npm",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(liveResolverLayer))
+          .pipe(provideLiveResolver(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain('node-version-file: ".node-version"')
       })
     )
 
     it.effect("fall back to lts/* with the live resolver when no declaration exists", () =>
       Effect.gen(function* () {
+        const files = makeFiles()
+
         yield* github
-          .create(tempDir, {
+          .create(ROOT, {
             packageManager: "npm",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(liveResolverLayer))
+          .pipe(provideLiveResolver(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain('node-version: "lts/*"')
       })
     )
 
     it.effect("return FailedToCreateDirectory when the workflow directory cannot be created", () =>
       Effect.gen(function* () {
-        writeFileSync(".github", "not a directory")
+        const files = makeFiles()
+        files.makeReadOnly(".github")
 
-        const result = yield* runResult(
-          github.create(tempDir, {
-            packageManager: "bun",
-            scripts: ["check"],
-          }),
-          fallbackTestLayer
+        const result = yield* Effect.result(
+          github
+            .create(ROOT, {
+              packageManager: "bun",
+              scripts: ["check"],
+            })
+            .pipe(provideFallback(files))
         )
 
         expect(Result.isFailure(result)).toBe(true)
@@ -361,20 +369,16 @@ describe("github", () => {
   describe("update", () => {
     it.effect("update an existing workflow", () =>
       Effect.gen(function* () {
-        mkdirSync(".github/workflows", { recursive: true })
-        yield* Effect.promise(() =>
-          writeFile(".github/workflows/adamantite.yml", "name: Old Workflow")
-        )
+        const files = makeFiles({ [WORKFLOW_PATH]: "name: Old Workflow" })
+
         yield* github
-          .update(tempDir, {
+          .update(ROOT, {
             packageManager: "bun",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fallbackTestLayer))
+          .pipe(provideFallback(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("name: adamantite")
         expect(content).toContain("name: check")
         expect(content).toContain("verify:")
@@ -384,20 +388,16 @@ describe("github", () => {
 
     it.effect("render the resolved Node.js source when updating", () =>
       Effect.gen(function* () {
-        mkdirSync(".github/workflows", { recursive: true })
-        yield* Effect.promise(() =>
-          writeFile(".github/workflows/adamantite.yml", 'node-version: "26"')
-        )
+        const files = makeFiles({ [WORKFLOW_PATH]: 'node-version: "26"' })
+
         yield* github
-          .update(tempDir, {
+          .update(ROOT, {
             packageManager: "bun",
             scripts: ["check"],
           })
-          .pipe(Effect.provide(fileTestLayer))
+          .pipe(provideFileResolver(files))
 
-        const content = yield* Effect.promise(() =>
-          testFile(".github/workflows/adamantite.yml").text()
-        )
+        const content = files.read(WORKFLOW_PATH)
         expect(content).toContain('node-version-file: ".node-version"')
         expect(content).not.toContain('node-version: "26"')
       })
@@ -405,16 +405,16 @@ describe("github", () => {
 
     it.effect("return FailedToWriteFile when writing the workflow fails", () =>
       Effect.gen(function* () {
-        mkdirSync(".github/workflows", { recursive: true })
-        writeFileSync(".github/workflows/adamantite.yml", "name: Old")
-        chmodSync(".github/workflows/adamantite.yml", 0o444)
+        const files = makeFiles({ [WORKFLOW_PATH]: "name: Old" })
+        files.makeReadOnly(WORKFLOW_PATH)
 
-        const result = yield* runResult(
-          github.update(tempDir, {
-            packageManager: "bun",
-            scripts: ["check"],
-          }),
-          fallbackTestLayer
+        const result = yield* Effect.result(
+          github
+            .update(ROOT, {
+              packageManager: "bun",
+              scripts: ["check"],
+            })
+            .pipe(provideFallback(files))
         )
 
         expect(Result.isFailure(result)).toBe(true)

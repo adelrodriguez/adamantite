@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
@@ -7,7 +8,6 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
-import { testFile } from "#__tests__/filesystem.ts"
 import { runCli } from "#cli.ts"
 import {
   createRunnerTestContext,
@@ -64,7 +64,7 @@ describe("adamantite", () => {
       const result = await runCliProcess(["--version"])
 
       // SAFETY: package.json is this repo's manifest, which the package manager already requires to conform to the PackageJson schema.
-      const packageJson = JSON.parse(await testFile("package.json").text()) as PackageJson
+      const packageJson = JSON.parse(await readFile("package.json", "utf8")) as PackageJson
       const version = result.stdout
         .trim()
         .replace(/^\[log\]\s*/, "")

@@ -1,13 +1,13 @@
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import { describe, expect, test } from "@effect/vitest"
-import { testFile } from "#__tests__/filesystem.ts"
 
 describe("package metadata", () => {
   test("publish expected package metadata", async () => {
     // SAFETY: this reads the repo's own package.json, which the package manager already requires to conform to the PackageJson schema.
     const packageJson = JSON.parse(
-      await testFile(join(import.meta.dirname, "..", "..", "package.json")).text()
+      await readFile(join(import.meta.dirname, "..", "..", "package.json"), "utf8")
     ) as PackageJson
 
     expect(packageJson.main).toBe("dist/presets/lint/core.js")

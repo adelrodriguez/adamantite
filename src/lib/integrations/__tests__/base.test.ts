@@ -1,25 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 
 describe("defineIntegration", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-integrations-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   test("preserve kind-specific capabilities and metadata", () => {
     const toolingIntegration = defineIntegration({
       assess: (_cwd: string) =>

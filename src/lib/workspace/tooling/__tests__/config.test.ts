@@ -1,10 +1,8 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { writeFile } from "#__tests__/filesystem.ts"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   detectToolingConfig,
   getConfigActions,
@@ -12,31 +10,29 @@ import {
   type ToolingConfigState,
 } from "#lib/workspace/tooling/config.ts"
 
+const ROOT = "/project"
 const FILES = { config: "tool.config.ts", legacyConfigs: ["tool.json", "tool.jsonc"] }
 const SINGLE_LEGACY_FILES = { config: "tool.config.ts", legacyConfigs: [".toolrc.json"] }
 
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
+
+function detect(
+  files: FileSystemTestContext,
+  configFiles: typeof FILES | typeof SINGLE_LEGACY_FILES = FILES
+) {
+  return detectToolingConfig(ROOT, "tool", configFiles).pipe(
+    Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  )
+}
+
 describe("detectToolingConfig", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-tooling-config-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
-  function detect(files: typeof FILES | typeof SINGLE_LEGACY_FILES = FILES) {
-    return detectToolingConfig(tempDir, "tool", files).pipe(Effect.provide(NodeServices.layer))
-  }
-
   it.effect("return an empty state when no config exists", () =>
     Effect.gen(function* () {
-      expect(yield* detect()).toEqual({
+      const files = makeFiles()
+
+      expect(yield* detect(files)).toEqual({
         active: null,
         legacy: [],
         warnings: [],
@@ -46,10 +42,10 @@ describe("detectToolingConfig", () => {
 
   it.effect("activate a lone legacy JSON config without warnings", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("tool.json", "{}\n"))
+      const files = makeFiles({ "tool.json": "{}\n" })
 
-      expect(yield* detect()).toEqual({
-        active: { file: "tool.json", format: "json", path: join(tempDir, "tool.json") },
+      expect(yield* detect(files)).toEqual({
+        active: { file: "tool.json", format: "json", path: `${ROOT}/tool.json` },
         legacy: [],
         warnings: [],
       })
@@ -58,48 +54,54 @@ describe("detectToolingConfig", () => {
 
   it.effect("prefer the TS config over every legacy config", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("tool.config.ts", "export default {}\n"))
-      yield* Effect.promise(() => writeFile("tool.json", "{}\n"))
-      yield* Effect.promise(() => writeFile("tool.jsonc", "{}\n"))
+      const files = makeFiles({
+        "tool.config.ts": "export default {}\n",
+        "tool.json": "{}\n",
+        "tool.jsonc": "{}\n",
+      })
 
-      const state = yield* detect()
+      const state = yield* detect(files)
 
       expect(state.active).toEqual({
         file: "tool.config.ts",
         format: "ts",
-        path: join(tempDir, "tool.config.ts"),
+        path: `${ROOT}/tool.config.ts`,
       })
       expect(state.legacy).toEqual([
-        { file: "tool.json", format: "json", path: join(tempDir, "tool.json") },
-        { file: "tool.jsonc", format: "jsonc", path: join(tempDir, "tool.jsonc") },
+        { file: "tool.json", format: "json", path: `${ROOT}/tool.json` },
+        { file: "tool.jsonc", format: "jsonc", path: `${ROOT}/tool.jsonc` },
       ])
     })
   )
 
   it.effect("prefer the JSONC config over the JSON config when no TS config exists", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("tool.json", "{}\n"))
-      yield* Effect.promise(() => writeFile("tool.jsonc", "{}\n"))
+      const files = makeFiles({
+        "tool.json": "{}\n",
+        "tool.jsonc": "{}\n",
+      })
 
-      const state = yield* detect()
+      const state = yield* detect(files)
 
       expect(state.active).toEqual({
         file: "tool.jsonc",
         format: "jsonc",
-        path: join(tempDir, "tool.jsonc"),
+        path: `${ROOT}/tool.jsonc`,
       })
       expect(state.legacy).toEqual([
-        { file: "tool.json", format: "json", path: join(tempDir, "tool.json") },
+        { file: "tool.json", format: "json", path: `${ROOT}/tool.json` },
       ])
     })
   )
 
   it.effect("warn with the json(c) display name when the TS config shadows legacy configs", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("tool.config.ts", "export default {}\n"))
-      yield* Effect.promise(() => writeFile("tool.json", "{}\n"))
+      const files = makeFiles({
+        "tool.config.ts": "export default {}\n",
+        "tool.json": "{}\n",
+      })
 
-      const state = yield* detect()
+      const state = yield* detect(files)
 
       expect(state.warnings).toEqual([
         "Found both `tool.config.ts` and `tool.json(c)`. Adamantite will use `tool.config.ts`.",
@@ -109,10 +111,12 @@ describe("detectToolingConfig", () => {
 
   it.effect("warn with the plain legacy name when the tool has a single legacy config", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("tool.config.ts", "export default {}\n"))
-      yield* Effect.promise(() => writeFile(".toolrc.json", "{}\n"))
+      const files = makeFiles({
+        ".toolrc.json": "{}\n",
+        "tool.config.ts": "export default {}\n",
+      })
 
-      const state = yield* detect(SINGLE_LEGACY_FILES)
+      const state = yield* detect(files, SINGLE_LEGACY_FILES)
 
       expect(state.warnings).toEqual([
         "Found both `tool.config.ts` and `.toolrc.json`. Adamantite will use `tool.config.ts`.",
@@ -122,10 +126,12 @@ describe("detectToolingConfig", () => {
 
   it.effect("warn when multiple legacy configs exist without a TS config", () =>
     Effect.gen(function* () {
-      yield* Effect.promise(() => writeFile("tool.json", "{}\n"))
-      yield* Effect.promise(() => writeFile("tool.jsonc", "{}\n"))
+      const files = makeFiles({
+        "tool.json": "{}\n",
+        "tool.jsonc": "{}\n",
+      })
 
-      const state = yield* detect()
+      const state = yield* detect(files)
 
       expect(state.warnings).toEqual([
         "Found both `tool.json` and `tool.jsonc`. Multiple legacy tool configs exist; Adamantite will treat `tool.jsonc` as the source of truth when migration is needed.",

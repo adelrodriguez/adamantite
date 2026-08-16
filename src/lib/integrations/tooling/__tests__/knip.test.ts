@@ -1,31 +1,28 @@
-import { mkdtempSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
 import { join } from "node:path"
-import * as NodeServices from "@effect/platform-node/NodeServices"
-import { afterEach, beforeEach, describe, expect, layer } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import { testFile, writeFile } from "#__tests__/filesystem.ts"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 
-layer(NodeServices.layer)("knip", (it) => {
-  let originalCwd: string
-  let tempDir: string
+const ROOT = "/project"
 
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-knip-test-"))
-    process.chdir(tempDir)
-  })
+function makeFiles(files?: Record<string, string>) {
+  return createFileSystemTestContext({ files, root: ROOT })
+}
 
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
+function provideFiles(files: FileSystemTestContext) {
+  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
 
+describe("knip", () => {
   describe("detect", () => {
     it.effect("return null when no knip config is present", () =>
       Effect.gen(function* () {
-        const result = yield* knip.detect(tempDir)
+        const files = makeFiles()
+
+        const result = yield* knip.detect(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           active: null,
@@ -37,14 +34,14 @@ layer(NodeServices.layer)("knip", (it) => {
 
     it.effect("detect knip.config.ts when present", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() => writeFile("knip.config.ts", "export default {}\n"))
+        const files = makeFiles({ "knip.config.ts": "export default {}\n" })
 
-        const result = yield* knip.detect(tempDir)
+        const result = yield* knip.detect(ROOT).pipe(provideFiles(files))
 
         expect(result.active).toEqual({
           file: "knip.config.ts",
           format: "ts",
-          path: join(tempDir, "knip.config.ts"),
+          path: join(ROOT, "knip.config.ts"),
         })
         expect(result.legacy).toEqual([])
       })
@@ -54,16 +51,18 @@ layer(NodeServices.layer)("knip", (it) => {
   describe("create", () => {
     it.effect("create knip.config.ts with the preset config", () =>
       Effect.gen(function* () {
-        yield* knip.create(tempDir)
+        const files = makeFiles()
 
-        const state = yield* knip.detect(tempDir)
+        yield* knip.create(ROOT).pipe(provideFiles(files))
+
+        const state = yield* knip.detect(ROOT).pipe(provideFiles(files))
         expect(state.active).toEqual({
           file: "knip.config.ts",
           format: "ts",
-          path: join(tempDir, "knip.config.ts"),
+          path: join(ROOT, "knip.config.ts"),
         })
 
-        const content = yield* Effect.promise(() => testFile("knip.config.ts").text())
+        const content = files.read("knip.config.ts")
         expect(content).toContain('import type { KnipConfig } from "knip"')
         expect(content).toContain('import analyze from "adamantite/analyze"')
         expect(content).toContain("const config: KnipConfig = analyze")
@@ -75,24 +74,21 @@ layer(NodeServices.layer)("knip", (it) => {
   describe("assess", () => {
     it.effect("report not applicable when the managed analyze script is absent", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  knip: knip.version,
-                },
-                name: "test-project",
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                knip: knip.version,
               },
-              null,
-              2
-            )
-          )
-        )
+              name: "test-project",
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* knip.assess(tempDir)
+        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           applicable: false,
@@ -103,27 +99,24 @@ layer(NodeServices.layer)("knip", (it) => {
 
     it.effect("report missing managed config when the managed analyze script exists", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  knip: knip.version,
-                },
-                name: "test-project",
-                scripts: {
-                  analyze: "adamantite analyze",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                knip: knip.version,
               },
-              null,
-              2
-            )
-          )
-        )
+              name: "test-project",
+              scripts: {
+                analyze: "adamantite analyze",
+              },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* knip.assess(tempDir)
+        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [
@@ -141,30 +134,25 @@ layer(NodeServices.layer)("knip", (it) => {
 
     it.effect("report a migration when a legacy config is active", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  knip: knip.version,
-                },
-                name: "test-project",
-                scripts: {
-                  analyze: "adamantite analyze",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "knip.json": JSON.stringify({ entry: ["src/index.ts"] }, null, 2),
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                knip: knip.version,
               },
-              null,
-              2
-            )
-          )
-        )
-        yield* Effect.promise(() =>
-          writeFile("knip.json", JSON.stringify({ entry: ["src/index.ts"] }, null, 2))
-        )
+              name: "test-project",
+              scripts: {
+                analyze: "adamantite analyze",
+              },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* knip.assess(tempDir)
+        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [
@@ -182,33 +170,26 @@ layer(NodeServices.layer)("knip", (it) => {
 
     it.effect("report healthy when package and managed config are present", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(
-            "package.json",
-            JSON.stringify(
-              {
-                devDependencies: {
-                  knip: knip.version,
-                },
-                name: "test-project",
-                scripts: {
-                  analyze: "adamantite analyze",
-                },
-                version: "1.0.0",
+        const files = makeFiles({
+          "knip.config.ts":
+            'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = {}\n\nexport default config\n',
+          "package.json": JSON.stringify(
+            {
+              devDependencies: {
+                knip: knip.version,
               },
-              null,
-              2
-            )
-          )
-        )
-        yield* Effect.promise(() =>
-          writeFile(
-            "knip.config.ts",
-            'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = {}\n\nexport default config\n'
-          )
-        )
+              name: "test-project",
+              scripts: {
+                analyze: "adamantite analyze",
+              },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
 
-        const result = yield* knip.assess(tempDir)
+        const result = yield* knip.assess(ROOT).pipe(provideFiles(files))
 
         expect(result).toEqual({
           actions: [],

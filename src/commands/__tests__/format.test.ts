@@ -1,35 +1,19 @@
-import { mkdtempSync, realpathSync, rmSync } from "node:fs"
-import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
-import { writeFile } from "#__tests__/filesystem.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import formatCommand from "#commands/format.ts"
-import { createRunnerTestContext, runCommandWithRunner } from "./command-test-helpers.ts"
+import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("format", () => {
-  let originalCwd: string
-  let tempDir: string
-
-  beforeEach(() => {
-    originalCwd = process.cwd()
-    tempDir = mkdtempSync(join(tmpdir(), "adamantite-format-test-"))
-    process.chdir(tempDir)
-  })
-
-  afterEach(() => {
-    process.chdir(originalCwd)
-    rmSync(tempDir, { force: true, recursive: true })
-  })
-
   describe("default invocation", () => {
     it.effect("run oxfmt with no flags by default", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(formatCommand, [], runner)
+        const exit = yield* runCommand(formatCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toEqual([
@@ -47,7 +31,7 @@ describe("format", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(formatCommand, ["--check"], runner)
+        const exit = yield* runCommand(formatCommand, ["--check"], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toEqual(["--check"])
@@ -58,15 +42,18 @@ describe("format", () => {
   describe("file arguments", () => {
     it.effect("append file arguments", () =>
       Effect.gen(function* () {
-        yield* Effect.promise(() =>
-          writeFile(join(tempDir, "index.ts"), "export const value = 1\n")
-        )
+        const files = createFileSystemTestContext({
+          files: { "index.ts": "export const value = 1\n" },
+        })
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(formatCommand, ["index.ts"], runner)
+        const exit = yield* runCommand(formatCommand, ["index.ts"], {
+          files,
+          layers: [runner.layer],
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual([realpathSync(join(tempDir, "index.ts"))])
+        expect(runner.invocations[0]?.args).toEqual([join(files.root, "index.ts")])
       })
     )
   })
@@ -76,10 +63,10 @@ describe("format", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommandWithRunner(formatCommand, ["--check"], runner, [
-          "--ignore-path",
-          ".formatignore",
-        ])
+        const exit = yield* runCommand(formatCommand, ["--check"], {
+          forwardedArguments: ["--ignore-path", ".formatignore"],
+          layers: [runner.layer],
+        })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toEqual(["--check", "--ignore-path", ".formatignore"])
@@ -92,7 +79,7 @@ describe("format", () => {
       Effect.gen(function* () {
         const runner = createRunnerTestContext([1])
 
-        const exit = yield* runCommandWithRunner(formatCommand, [], runner)
+        const exit = yield* runCommand(formatCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))

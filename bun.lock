@@ -22,7 +22,7 @@
         "@types/figlet": "1.7.0",
         "figlet": "1.11.4",
         "knip": "6.32.2",
-        "oxc-transform": "^0.144.0",
+        "oxc-transform": "0.144.0",
         "oxfmt": "0.63.0",
         "oxlint": "1.78.0",
         "oxlint-tsgolint": "7.0.2001",

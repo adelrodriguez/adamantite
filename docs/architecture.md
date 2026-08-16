@@ -15,8 +15,8 @@ invoke target-project operations.
 services. Other external behavior, such as prompts and child commands, is also behind
 services so command behavior can be tested without changing a real project.
 
-Bunup bundles the CLI and presets into `dist`. The `bin/adamantite` executable loads the
-bundled CLI.
+A native Bun build script bundles the CLI and presets into `dist`. The
+`bin/adamantite` executable loads the bundled CLI.
 
 ## Module seams
 

@@ -1,7 +1,7 @@
 import type { KnipConfig } from "knip"
 import analyze from "./presets/analyze.ts"
 
-const config: KnipConfig = {
+export default {
   ...analyze,
   entry: ["presets/**/*.ts", "scripts/*.ts"],
   ignore: ["presets/lint/antislop/plugin.d.mts"],
@@ -10,6 +10,4 @@ const config: KnipConfig = {
     devDependencies: "off",
     optionalPeerDependencies: "off",
   },
-}
-
-export default config
+} satisfies KnipConfig

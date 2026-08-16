@@ -44,5 +44,6 @@ export default defineConfig([
     outDir: "dist/presets",
     outExtensions: () => ({ dts: ".d.ts", js: ".js" }),
     platform: "node",
+    tsconfig: "tsconfig.build.json",
   },
 ])

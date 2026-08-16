@@ -72,8 +72,27 @@ describe("legacyOxlintJson", () => {
     expect(content).toContain('"respectEslintDisableDirectives": true')
     expect(content).toContain('"typeAware": true')
     expect(content).toContain('"typeCheck": true')
+    expect(content).toContain("ignorePatterns: core.ignorePatterns")
 
     await runTestEffect(migrationLegacyOxlintJson.validate({ cwd: tempDir }))
+  })
+
+  test("migrate hoists legacy ignore patterns alongside the core preset's patterns", async () => {
+    await Bun.write(
+      ".oxlintrc.json",
+      JSON.stringify(
+        {
+          ignorePatterns: ["**/node_modules", "vendor/**"],
+        },
+        null,
+        2
+      )
+    )
+
+    await runTestEffect(migrationLegacyOxlintJson.migrate({ cwd: tempDir }))
+
+    const content = await Bun.file("oxlint.config.ts").text()
+    expect(content).toContain('ignorePatterns: [...core.ignorePatterns, "vendor/**"]')
   })
 
   test("migrate converts Adamantite preset paths with and without a dot prefix", async () => {

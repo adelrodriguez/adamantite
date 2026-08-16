@@ -84,6 +84,7 @@ describe("oxlint", () => {
       expect(content).toContain('"respectEslintDisableDirectives": true')
       expect(content).toContain('"typeAware": true')
       expect(content).toContain('"typeCheck": true')
+      expect(content).toContain("ignorePatterns: core.ignorePatterns")
       expect(content).toContain("extends: [core]")
     })
 

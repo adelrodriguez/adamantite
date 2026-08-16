@@ -1,4 +1,4 @@
-import type { JsonObject } from "type-fest"
+import type { JsonObject, JsonValue } from "type-fest"
 import * as Array from "effect/Array"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
@@ -13,6 +13,7 @@ import {
   type Program,
   type PropertyKey,
 } from "oxc-parser"
+import { ignorePatterns as coreIgnorePatterns } from "#presets/lint/core.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",
@@ -46,12 +47,26 @@ function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
 
+// Oxlint does not merge `ignorePatterns` from extended configs, so the generated config
+// hoists the core preset's patterns to the root, appending any project-specific patterns.
+function serializeIgnorePatterns(ignorePatterns: JsonValue | undefined) {
+  const extraPatterns = (Array.isArray(ignorePatterns) ? ignorePatterns : [])
+    .filter((pattern): pattern is string => Predicate.isString(pattern))
+    .filter((pattern) => !coreIgnorePatterns.includes(pattern))
+
+  if (extraPatterns.length === 0) {
+    return "core.ignorePatterns"
+  }
+
+  return `[...core.ignorePatterns, ${extraPatterns.map((pattern) => JSON.stringify(pattern)).join(", ")}]`
+}
+
 export function toOxlintTsConfigContent(
   config: JsonObject,
   presetNames: string[],
   passthroughExtends: string[] = []
 ) {
-  const { options, ...configWithoutOptions } = config
+  const { ignorePatterns, options, ...configWithoutOptions } = config
   const imports = [
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
@@ -88,6 +103,7 @@ export function toOxlintTsConfigContent(
   const serializedExtends = `[${allExtends.join(", ")}]`
   const body = [
     ["options", serializedOptions],
+    ["ignorePatterns", serializeIgnorePatterns(ignorePatterns)],
     ...serializedConfigEntries,
     ["extends", serializedExtends],
   ]

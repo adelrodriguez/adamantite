@@ -1,12 +1,16 @@
 import { defineConfig } from "oxlint"
 import antislop from "./presets/lint/antislop.ts"
-import core from "./presets/lint/core.ts"
+import core, { ignorePatterns } from "./presets/lint/core.ts"
 import node from "./presets/lint/node.ts"
 
 export default defineConfig({
   extends: [core, node, antislop],
-  // Generated vendored bundle and its declaration; see scripts/vendor-plugins.ts.
-  ignorePatterns: ["presets/lint/antislop/plugin.mjs", "presets/lint/antislop/plugin.d.mts"],
+  ignorePatterns: [
+    ...ignorePatterns,
+    // Generated vendored bundle and its declaration; see scripts/vendor-plugins.ts.
+    "presets/lint/antislop/plugin.mjs",
+    "presets/lint/antislop/plugin.d.mts",
+  ],
   options: {
     typeAware: true,
     typeCheck: true,

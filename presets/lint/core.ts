@@ -1,6 +1,72 @@
 import type { OxlintConfig } from "oxlint"
 
+/**
+ * Canonical ignore patterns for dependencies, build output, and generated code.
+ *
+ * Oxlint does not merge `ignorePatterns` from extended configs — only the root config's patterns
+ * apply — so extending the core preset is not enough. Hoist them explicitly:
+ *
+ * ```ts
+ * export default defineConfig({
+ *   extends: [core],
+ *   ignorePatterns: core.ignorePatterns,
+ * })
+ * ```
+ */
+export const ignorePatterns: string[] = [
+  // Dependencies and VCS. Oxlint only skips node_modules when a .gitignore lists it, so
+  // projects without a .gitignore would otherwise lint installed packages.
+  "**/node_modules",
+  "**/.yarn",
+  "**/.git",
+
+  // Build and framework output
+  "**/dist",
+  "**/build",
+  "**/out",
+  "**/.next",
+  "**/.open-next",
+  "**/.nuxt",
+  "**/.output",
+  "**/.svelte-kit",
+  "**/.vitepress/cache",
+  "**/.turbo",
+  "**/.vercel",
+  "**/.netlify",
+  "**/.wrangler",
+  "**/.docusaurus",
+  "**/.cache",
+  "**/.parcel-cache",
+  "**/.vite",
+  "**/.astro",
+  "**/_astro",
+  "**/storybook-static",
+
+  // Generated code
+  "**/_generated",
+  "**/__generated__",
+  "**/*.gen.*",
+  "**/*.generated.*",
+  "**/generated",
+  "**/codegen",
+  "**/graphql-types.*",
+  "**/*.d.ts.map",
+
+  // Test coverage
+  "**/coverage",
+  "**/.nyc_output",
+
+  // Mobile build output
+  "**/.expo",
+  "**/.expo-shared",
+
+  // Framework type definitions
+  "**/next-env.d.ts",
+  "**/worker-configuration.d.ts",
+]
+
 const config: OxlintConfig = {
+  ignorePatterns,
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   rules: {
     "accessor-pairs": "error",

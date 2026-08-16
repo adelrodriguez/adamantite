@@ -11,9 +11,7 @@ const REPO_ROOT = join(import.meta.dir, "../../..")
 describe("antislop preset", () => {
   test("enable exactly the rules the vendored plugin defines", () => {
     const pluginRules = Object.keys(antislopPlugin.rules).map((name) => `anti-slop/${name}`)
-    const presetRules = Object.keys(antislop.rules ?? {}).filter((name) =>
-      name.startsWith("anti-slop/")
-    )
+    const presetRules = Object.keys(antislop.rules).filter((name) => name.startsWith("anti-slop/"))
 
     expect(new Set(presetRules)).toEqual(new Set(pluginRules))
   })

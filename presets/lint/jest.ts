@@ -1,6 +1,6 @@
-import type { OxlintConfig } from "oxlint"
+import { defineConfig } from "oxlint"
 
-const config: OxlintConfig = {
+export default defineConfig({
   plugins: ["jest"],
   rules: {
     "jest/consistent-test-it": "error",
@@ -63,6 +63,4 @@ const config: OxlintConfig = {
     "jest/valid-expect-in-promise": "error",
     "jest/valid-title": "error",
   },
-}
-
-export default config
+})

@@ -1,4 +1,4 @@
-import type { OxlintConfig } from "oxlint"
+import { defineConfig } from "oxlint"
 
 /**
  * Canonical ignore patterns for dependencies, build output, and generated code.
@@ -65,7 +65,7 @@ export const ignorePatterns: string[] = [
   "**/worker-configuration.d.ts",
 ]
 
-const config: OxlintConfig = {
+export default defineConfig({
   ignorePatterns,
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   rules: {
@@ -542,6 +542,4 @@ const config: OxlintConfig = {
     "vars-on-top": "error",
     yoda: "error",
   },
-}
-
-export default config
+})

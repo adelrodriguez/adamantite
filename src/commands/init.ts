@@ -341,17 +341,26 @@ const setupGitHubActions = (
     )
   }).pipe(
     // GitHub Actions setup is optional, so initialization continues; the failure must still
-    // reach the user instead of disappearing.
-    Effect.catch((error) =>
-      Effect.gen(function* () {
-        const prompter = yield* Prompter
-        yield* prompter.log.warning(
-          `Could not set up the GitHub Actions workflow. ${error.message}`
-        )
-        yield* prompter.log.warning(
-          "Fix the reported problem and run `adamantite init` again, or create the workflow manually."
-        )
-      })
+    // reach the user instead of disappearing. Named tags keep a future error type from
+    // degrading to a warning without an explicit decision.
+    Effect.catchTag(
+      [
+        "FailedToCreateDirectory",
+        "FailedToParseFile",
+        "FailedToReadFile",
+        "FailedToWriteFile",
+        "PlatformError",
+      ],
+      (error) =>
+        Effect.gen(function* () {
+          const prompter = yield* Prompter
+          yield* prompter.log.warning(
+            `Could not set up the GitHub Actions workflow. ${error.message}`
+          )
+          yield* prompter.log.warning(
+            "Fix the reported problem and run `adamantite init` again, or create the workflow manually."
+          )
+        })
     )
   )
 

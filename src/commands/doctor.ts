@@ -46,8 +46,8 @@ export default Command.make("doctor", { fix }).pipe(
         })
       }
 
-      // 1. Assess integrations.
-      const assessments = yield* collectApplicableAssessments(integrations, cwd)
+      // 1. Assess integrations, reusing the manifest parsed above.
+      const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
 
       // 2. Print warnings.
       for (const { assessment } of assessments) {

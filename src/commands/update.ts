@@ -68,7 +68,8 @@ export default Command.make("update").pipe(
 
       yield* prompter.intro("💠 adamantite update")
 
-      const collectAssessments = () => collectApplicableAssessments(integrations, cwd)
+      const collectAssessments = (packageJson?: PackageJson) =>
+        collectApplicableAssessments(integrations, cwd, packageJson)
 
       const assessments = yield* collectAssessments()
 
@@ -122,7 +123,7 @@ export default Command.make("update").pipe(
       }
 
       const packageJson = yield* readPackageJson(cwd)
-      const postMigrationAssessments = yield* collectAssessments()
+      const postMigrationAssessments = yield* collectAssessments(packageJson)
       const postMigrationActions = postMigrationAssessments.flatMap(
         ({ assessment }) => assessment.actions
       )

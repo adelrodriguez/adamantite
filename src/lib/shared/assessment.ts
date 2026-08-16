@@ -1,5 +1,6 @@
 import type * as FileSystem from "effect/FileSystem"
 import type * as Path from "effect/Path"
+import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -23,9 +24,10 @@ type AnyAssessableIntegration = IntegrationBase<IntegrationKind> & AssessableInt
 
 const collect = Effect.fn("collectApplicableAssessments")(function* (
   integrations: readonly AnyAssessableIntegration[],
-  cwd: string
+  cwd: string,
+  manifest?: PackageJson
 ) {
-  const packageJson = yield* readPackageJson(cwd)
+  const packageJson = manifest ?? (yield* readPackageJson(cwd))
 
   return yield* Effect.forEach(
     integrations,
@@ -46,7 +48,8 @@ const collect = Effect.fn("collectApplicableAssessments")(function* (
 
 export function collectApplicableAssessments<const I extends AnyAssessableIntegration>(
   integrations: readonly I[],
-  cwd: string
+  cwd: string,
+  packageJson?: PackageJson
 ): Effect.Effect<
   Array<AssessedIntegration<I>>,
   Effect.Error<ReturnType<I["assess"]>> | FailedToParseFile | FailedToReadFile,
@@ -54,7 +57,8 @@ export function collectApplicableAssessments<const I extends AnyAssessableIntegr
 >
 export function collectApplicableAssessments(
   integrations: readonly AnyAssessableIntegration[],
-  cwd: string
+  cwd: string,
+  packageJson?: PackageJson
 ) {
-  return collect(integrations, cwd)
+  return collect(integrations, cwd, packageJson)
 }

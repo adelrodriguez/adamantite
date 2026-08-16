@@ -1389,6 +1389,44 @@ describe("init", () => {
       })
     )
 
+    it.effect("continues initialization when the GitHub Actions workflow cannot be written", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const workflowPath = ".github/workflows/adamantite.yml"
+        files.makeReadOnly(workflowPath)
+
+        const prompter = createPrompterTestContext({
+          confirmResponses: [false, true, false],
+          multiselectResponses: [["check"], [], []],
+        })
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.exists(workflowPath)).toBe(false)
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message: expect.stringMatching(
+            /Could not set up the GitHub Actions workflow\. Failed to write `.*adamantite\.yml`\./
+          ),
+        })
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message:
+            "Fix the reported problem and run `adamantite init` again, or create the workflow manually.",
+        })
+        expect(prompter.logs).toContainEqual({
+          level: "success",
+          message: "Your project is now configured",
+        })
+        expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
+      })
+    )
+
     it.effect("skip tsconfig setup when the user declines the TypeScript preset prompt", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()

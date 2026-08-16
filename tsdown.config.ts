@@ -3,7 +3,7 @@ import { defineConfig, type TsdownPlugin } from "tsdown"
 import { Macros } from "unplugin-macros"
 
 // Presets call oxlint's defineConfig, an identity function documented to
-// return the config unchanged (pinned by a test in src/__tests__/presets).
+// return the config unchanged.
 // Inlining a shim keeps the compiled presets importable without oxlint
 // installed. The virtual module id embeds the importer so every preset gets
 // its own inlined copy instead of a shared, content-hashed chunk.

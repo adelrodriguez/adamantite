@@ -1,8 +1,8 @@
 import type * as PlatformError from "effect/PlatformError"
+import type { JsonObject } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import type { ToolingConfigState } from "#lib/workspace/tooling/config.ts"
 import { defineMigration } from "#lib/migrations/base.ts"
 import {
@@ -12,7 +12,7 @@ import {
   InvalidConfigFormat,
   MigrationValidationFailed,
 } from "#lib/shared/errors.ts"
-import { parseJson } from "#lib/shared/json.ts"
+import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
 
 interface LegacyJsonConfigIntegration {
   readonly config: string
@@ -36,7 +36,7 @@ export interface LegacyJsonConfigMigrationOptions {
   /**
    * Serialize the parsed legacy JSON config (without `$schema`) into the new TS config file.
    */
-  readonly serialize: (config: Record<string, unknown>) => string
+  readonly serialize: (config: JsonObject) => string
   readonly title: string
 }
 
@@ -60,7 +60,7 @@ function migrateLegacyJsonConfig(cwd: string, options: LegacyJsonConfigMigration
 
     const existingConfig = yield* parseJson(legacyConfigContent, legacyConfigPath)
 
-    if (!Predicate.isObject(existingConfig)) {
+    if (!checkIsJsonObject(existingConfig)) {
       return yield* new InvalidConfigFormat({ path: legacyConfigPath })
     }
 

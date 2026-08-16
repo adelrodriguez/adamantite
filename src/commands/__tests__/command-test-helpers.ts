@@ -4,6 +4,7 @@ import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as Predicate from "effect/Predicate"
 import * as Terminal from "effect/Terminal"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
@@ -179,6 +180,7 @@ export function createPrompterTestContext(options?: {
           }
 
           multiselectCalls.push(config)
+          // SAFETY: each test queues multiselect responses matching the option type of the prompt it triggers.
           return shiftResponse(multiselectResponses, "multiselect") as T[]
         }),
       outro: (message) =>
@@ -203,7 +205,7 @@ export function createPrompterTestContext(options?: {
                 message: Exit.match(exit, {
                   onFailure: () => spinnerOptions.failure,
                   onSuccess: (value) =>
-                    typeof spinnerOptions.success === "function"
+                    Predicate.isFunction(spinnerOptions.success)
                       ? spinnerOptions.success(value)
                       : spinnerOptions.success,
                 }),
@@ -290,6 +292,8 @@ export async function runCommand(
   layers: TestLayer[],
   forwardedArguments: readonly string[] = []
 ) {
+  // SAFETY: Layer's type parameters are invariant, so accumulating heterogeneous
+  // per-test layers in the merge loop below requires widening to TestLayer.
   let providedLayer = Layer.mergeAll(
     NodeServices.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
@@ -302,6 +306,9 @@ export async function runCommand(
   }
 
   return Effect.runPromiseExit(
+    // SAFETY: TestLayer erases its outputs to unknown, so providing it cannot
+    // discharge the requirement channel statically; the merged layers supply
+    // every service the command uses at runtime.
     Command.runWith(command, { version: "test" })(args).pipe(
       Effect.provideService(ForwardedArguments, forwardedArguments),
       Effect.provide(providedLayer)
@@ -316,6 +323,9 @@ export async function runCommandWithRunner(
   forwardedArguments: readonly string[] = []
 ) {
   return Effect.runPromiseExit(
+    // SAFETY: Command.Command.Any erases the command's requirements, so
+    // TypeScript cannot verify them against the provided layers; runner tests
+    // only need NodeServices and the stub CommandRunner supplied here.
     Command.runWith(command, { version: "test" })(args).pipe(
       Effect.provideService(ForwardedArguments, forwardedArguments),
       Effect.provide(Layer.mergeAll(NodeServices.layer, runner.layer))

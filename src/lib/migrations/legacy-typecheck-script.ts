@@ -42,6 +42,8 @@ function migrateLegacyTypecheckScriptPackageJson(packageJson: PackageJson) {
 
   return {
     migrated: true,
+    // SAFETY: only `scripts` changed, and it remains a string-to-string record, so the
+    // spread still matches the manifest shape.
     packageJson: {
       ...packageJson,
       scripts,

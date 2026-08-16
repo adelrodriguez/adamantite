@@ -9,6 +9,7 @@ import { defineMigration, runMigration } from "#lib/migrations/base.ts"
 import { FileNotFound, MigrationValidationFailed } from "#lib/shared/errors.ts"
 
 function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  // SAFETY: runMigration declares DependencyInstaller and NodeVersionResolver for migrations that use them, but the stub migrations here never do, so NodeServices satisfies every service actually accessed.
   return Effect.runPromise(effect.pipe(Effect.provide(NodeServices.layer)) as Effect.Effect<A, E>)
 }
 

@@ -27,6 +27,8 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
       .readFileString(packagePath)
       .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: packagePath })))
     const parsed = yield* parseJson(content, packagePath)
+    // SAFETY: the file is the project's package.json; every manifest field is optional in
+    // `PackageJson`, so any parsed JSON object satisfies it.
     return parsed as PackageJson
   })
 

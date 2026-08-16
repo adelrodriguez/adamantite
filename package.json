@@ -59,7 +59,7 @@
   },
   "scripts": {
     "analyze": "bun run src/index.ts analyze",
-    "build": "bunup && cp presets/tsconfig.json dist/presets/",
+    "build": "bunup && cp presets/tsconfig.json dist/presets/ && mkdir -p dist/presets/lint/antislop && cp presets/lint/antislop/plugin.mjs presets/lint/antislop/license.md dist/presets/lint/antislop/",
     "bump:deps": "bun update --interactive",
     "check": "bun run src/index.ts check",
     "dev": "bunup --watch",

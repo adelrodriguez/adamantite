@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as Predicate from "effect/Predicate"
 import doctorCommand from "#commands/doctor.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
@@ -620,13 +621,7 @@ describe("doctor", () => {
 
     const exit = await runCommand(doctorCommand, ["--fix"], [prompter.layer, installer.layer])
     const error = Option.getOrThrow(Exit.findErrorOption(exit))
-    const errorPath =
-      typeof error === "object" &&
-      error !== null &&
-      "path" in error &&
-      typeof error.path === "string"
-        ? error.path
-        : ""
+    const errorPath = Predicate.isObject(error) && Predicate.isString(error.path) ? error.path : ""
 
     expect(Exit.isFailure(exit)).toBe(true)
     expect(error).toMatchObject({ _tag: "InvalidConfigFormat" })

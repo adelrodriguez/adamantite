@@ -107,8 +107,8 @@ describe("fix", () => {
       const exit = await runCommandWithRunner(fixCommand, [], runner)
 
       expect(Exit.isFailure(exit)).toBe(true)
-      const error = Option.getOrThrow(Exit.findErrorOption(exit)) as { _tag: string }
-      expect(error._tag).toBe("CommandFailed")
+      const error = Option.getOrThrow(Exit.findErrorOption(exit))
+      expect(error).toMatchObject({ _tag: "CommandFailed" })
     })
   })
 })

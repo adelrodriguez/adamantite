@@ -86,6 +86,17 @@ describe("oxlint", () => {
       expect(content).toContain('"typeCheck": true')
       expect(content).toContain("extends: [core]")
     })
+
+    test("create oxlint.config.ts with selected presets", async () => {
+      await oxlint
+        .create(tempDir, ["antislop"])
+        .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
+
+      const content = await Bun.file("oxlint.config.ts").text()
+      expect(content).toContain('import core from "adamantite/lint"')
+      expect(content).toContain('import antislop from "adamantite/lint/antislop"')
+      expect(content).toContain("extends: [core, antislop]")
+    })
   })
 
   describe("update", () => {

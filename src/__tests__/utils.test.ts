@@ -27,10 +27,8 @@ let originalCwd: string
 function makeTerminalLayer(columns?: number) {
   return Layer.succeed(Terminal.Terminal)(
     Terminal.make({
-      columns:
-        columns === undefined
-          ? Effect.succeed(undefined as unknown as number)
-          : Effect.succeed(columns),
+      // SAFETY: Node reports undefined columns when stdout is not a TTY despite the Terminal interface promising a number, and printTitle guards the missing width with a falsy check.
+      columns: Effect.succeed<number | undefined>(columns) as Effect.Effect<number>,
       display: () => Effect.void,
       readInput: Effect.never,
       readLine: Effect.never,

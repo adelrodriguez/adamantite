@@ -7,8 +7,8 @@ import Bun from "bun"
 import * as Effect from "effect/Effect"
 import migrationLegacyOxfmtJson from "#lib/migrations/legacy-oxfmt-json.ts"
 
-function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
-  const provided = effect.pipe(Effect.provide(NodeServices.layer)) as Effect.Effect<A, E>
+function runTestEffect<A, E>(effect: Effect.Effect<A, E, NodeServices.NodeServices>) {
+  const provided = effect.pipe(Effect.provide(NodeServices.layer))
 
   return Effect.runPromise(provided)
 }

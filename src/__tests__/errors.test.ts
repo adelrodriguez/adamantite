@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { ParseError } from "jsonc-parser"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { parse, printParseErrorCode } from "jsonc-parser"
 import {
   CliNotFound,
@@ -177,7 +178,7 @@ describe("errors", () => {
     test("include the command and exit code in the message", () => {
       const error = new CommandFailed({
         command: "oxlint",
-        exitCode: 2 as unknown as never,
+        exitCode: ChildProcessSpawner.ExitCode(2),
       })
 
       expect(error.message).toBe("Command `oxlint` failed with exit code 2.")

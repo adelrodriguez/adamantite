@@ -28,7 +28,7 @@ function renderNodeSetup(source: NodeVersionSource): string {
           ${versionInput}`
 }
 
-function getSetupSteps(source: NodeVersionSource): Record<SupportedPackageManager, string> {
+function getSetupSteps(source: NodeVersionSource) {
   return {
     bun: `${renderNodeSetup(source)}
 
@@ -70,7 +70,7 @@ ${renderNodeSetup(source)}
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile`,
-  }
+  } satisfies Record<SupportedPackageManager, string>
 }
 
 function generateWorkflow(

@@ -381,7 +381,7 @@ const INIT_SCRIPTS = [
   "analyze",
 ] as const satisfies readonly Script[]
 
-const INIT_PRESETS = ["react", "nextjs", "vue", "jest", "vitest", "node"] as const
+const INIT_PRESETS = ["react", "nextjs", "vue", "jest", "vitest", "node", "antislop"] as const
 
 const INIT_EDITORS = ["vscode", "zed"] as const
 
@@ -597,12 +597,17 @@ const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")
     selectedPresets = yield* prompter.multiselect({
       message: "Which presets do you want to install? (core is always included)",
       options: [
-        { label: "React", value: "react" },
-        { label: "Next.js", value: "nextjs" },
-        { label: "Vue", value: "vue" },
-        { label: "Jest", value: "jest" },
-        { label: "Vitest", value: "vitest" },
-        { label: "Node", value: "node" },
+        { hint: "React, JSX accessibility, and performance rules", label: "React", value: "react" },
+        { hint: "Next.js rules", label: "Next.js", value: "nextjs" },
+        { hint: "Vue rules", label: "Vue", value: "vue" },
+        { hint: "Jest rules", label: "Jest", value: "jest" },
+        { hint: "Vitest rules", label: "Vitest", value: "vitest" },
+        { hint: "Node.js rules", label: "Node", value: "node" },
+        {
+          hint: "anti-slop rules that reject low-evidence, low-signal patterns",
+          label: "antislop",
+          value: "antislop",
+        },
       ],
       required: false,
     })

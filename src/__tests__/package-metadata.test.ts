@@ -5,6 +5,7 @@ import Bun from "bun"
 
 describe("package metadata", () => {
   test("publish expected package metadata", async () => {
+    // SAFETY: this reads the repo's own package.json, which the package manager already requires to conform to the PackageJson schema.
     const packageJson = (await Bun.file(
       join(import.meta.dir, "..", "..", "package.json")
     ).json()) as PackageJson

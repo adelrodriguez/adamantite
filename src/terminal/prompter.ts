@@ -3,6 +3,7 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as Predicate from "effect/Predicate"
 import { OperationCancelled } from "#lib/shared/errors.ts"
 
 interface PrompterService {
@@ -97,7 +98,7 @@ export class Prompter extends Context.Service<Prompter, PrompterService>()("Prom
               Exit.match(exit, {
                 onFailure: () => options.failure,
                 onSuccess: (value) =>
-                  typeof options.success === "function" ? options.success(value) : options.success,
+                  Predicate.isFunction(options.success) ? options.success(value) : options.success,
               })
             )
           })

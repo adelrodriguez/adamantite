@@ -2,17 +2,21 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { TsConfigJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import Bun from "bun"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
 import migrationLegacyTypecheckScript from "#lib/migrations/legacy-typecheck-script.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 
-function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
+function runTestEffect<A, E>(
+  effect: Effect.Effect<A, E, DependencyInstaller | NodeServices.NodeServices | NodeVersionResolver>
+) {
   const dependencyInstallerContext = createDependencyInstallerTestContext()
   const provided = effect.pipe(
     Effect.provide(
@@ -22,7 +26,7 @@ function runTestEffect<A, E, R>(effect: Effect.Effect<A, E, R>) {
         dependencyInstallerContext.layer
       )
     )
-  ) as Effect.Effect<A, E>
+  )
   return Effect.runPromise(provided)
 }
 
@@ -92,6 +96,7 @@ describe("legacyTypecheckScript", () => {
 
     await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
+    // SAFETY: the test seeds package.json above with only a string-valued scripts map, and the migration only rewrites those scripts.
     const packageJson = (await Bun.file("package.json").json()) as {
       scripts?: Record<string, string>
     }
@@ -136,10 +141,8 @@ describe("legacyTypecheckScript", () => {
     await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
     const oxlintConfig = await Bun.file("oxlint.config.ts").text()
-    const tsconfig = (await Bun.file("tsconfig.json").json()) as {
-      compilerOptions?: Record<string, unknown>
-      extends?: string
-    }
+    // SAFETY: the test seeds tsconfig.json above with standard tsconfig fields, and the migration only merges more of them.
+    const tsconfig = (await Bun.file("tsconfig.json").json()) as TsConfigJson
 
     expect(oxlintConfig).toContain("respectEslintDisableDirectives")
     expect(oxlintConfig).toContain("typeAware")
@@ -185,10 +188,8 @@ describe("legacyTypecheckScript", () => {
     expect(await Bun.file(".oxlintrc.json").exists()).toBe(false)
 
     const oxlintConfig = await Bun.file("oxlint.config.ts").text()
-    const tsconfig = (await Bun.file("tsconfig.json").json()) as {
-      compilerOptions?: Record<string, unknown>
-      extends?: string
-    }
+    // SAFETY: the test seeds tsconfig.json above with standard tsconfig fields, and the migration only merges more of them.
+    const tsconfig = (await Bun.file("tsconfig.json").json()) as TsConfigJson
 
     expect(oxlintConfig).toBe(migratedOxlintConfig)
     expect(tsconfig.compilerOptions).toEqual({ strict: true })

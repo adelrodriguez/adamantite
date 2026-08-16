@@ -41,9 +41,9 @@ export default defineConfig([
   },
   {
     clean: false,
+    deps: { neverBundle: ["oxfmt", "knip"] },
     dts: true,
     entry: ["presets/**/*.ts"],
-    deps: { neverBundle: ["oxfmt", "knip"] },
     outDir: "dist/presets",
     outExtensions: () => ({ dts: ".d.ts", js: ".js" }),
     platform: "node",

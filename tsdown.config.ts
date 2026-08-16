@@ -4,6 +4,19 @@ import { Macros } from "unplugin-macros"
 export default defineConfig([
   {
     clean: true,
+    deps: {
+      neverBundle: true,
+      onlyImport: [
+        "@clack/prompts",
+        "@effect/platform-node",
+        "defu",
+        "effect",
+        "esrap",
+        "jsonc-parser",
+        "nypm",
+        "oxc-parser",
+      ],
+    },
     dts: false,
     entry: ["src/index.ts"],
     minify: true,
@@ -15,9 +28,15 @@ export default defineConfig([
   {
     clean: false,
     copy: [
-      { from: "presets/tsconfig.json", to: "dist/presets/tsconfig.json" },
-      { from: "presets/lint/antislop/plugin.mjs", to: "dist/presets/lint/antislop/plugin.mjs" },
-      { from: "presets/lint/antislop/license.md", to: "dist/presets/lint/antislop/license.md" },
+      { from: "presets/tsconfig.json", to: "dist/presets" },
+      {
+        from: [
+          "presets/lint/antislop/plugin.mjs",
+          "presets/lint/antislop/plugin.d.mts",
+          "presets/lint/antislop/license.md",
+        ],
+        to: "dist/presets/lint/antislop",
+      },
     ],
     deps: { neverBundle: ["knip", "oxfmt", "oxlint"] },
     dts: true,

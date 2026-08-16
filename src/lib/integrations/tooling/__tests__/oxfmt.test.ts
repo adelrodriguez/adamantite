@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 
 describe("oxfmt", () => {
@@ -36,7 +36,7 @@ describe("oxfmt", () => {
     })
 
     test("detect when oxfmt.config.ts exists", async () => {
-      await Bun.write("oxfmt.config.ts", "export default {}\n")
+      await writeFile("oxfmt.config.ts", "export default {}\n")
 
       const result = await oxfmt
         .detect(tempDir)
@@ -64,7 +64,7 @@ describe("oxfmt", () => {
         path: join(tempDir, "oxfmt.config.ts"),
       })
 
-      const content = await Bun.file("oxfmt.config.ts").text()
+      const content = await testFile("oxfmt.config.ts").text()
 
       expect(content).toContain('import { defineConfig } from "oxfmt"')
       expect(content).toContain('import format from "adamantite/format"')
@@ -74,7 +74,7 @@ describe("oxfmt", () => {
 
   describe("assess", () => {
     test("report not applicable when the managed format script is absent", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -100,7 +100,7 @@ describe("oxfmt", () => {
     })
 
     test("report missing managed config when the managed format script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -136,7 +136,7 @@ describe("oxfmt", () => {
     })
 
     test("report healthy when managed format script and config exist", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -153,7 +153,7 @@ describe("oxfmt", () => {
           2
         )
       )
-      await Bun.write(
+      await writeFile(
         "oxfmt.config.ts",
         'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n'
       )
@@ -170,7 +170,7 @@ describe("oxfmt", () => {
     })
 
     test("report missing package when managed format script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {

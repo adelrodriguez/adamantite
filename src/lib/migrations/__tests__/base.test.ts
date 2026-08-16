@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import { defineMigration, runMigration } from "#lib/migrations/base.ts"
 import { FileNotFound, MigrationValidationFailed } from "#lib/shared/errors.ts"
 
@@ -43,7 +43,7 @@ describe("runMigration", () => {
   })
 
   test("restore tracked files when migrate fails", async () => {
-    await Bun.write("existing.txt", "before\n")
+    await writeFile("existing.txt", "before\n")
 
     const migration = defineMigration({
       check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
@@ -51,8 +51,8 @@ describe("runMigration", () => {
       id: "failing-migration",
       migrate: () =>
         Effect.gen(function* () {
-          yield* Effect.promise(() => Bun.write("existing.txt", "after\n"))
-          yield* Effect.promise(() => Bun.write("created.txt", "created\n"))
+          yield* Effect.promise(() => writeFile("existing.txt", "after\n"))
+          yield* Effect.promise(() => writeFile("created.txt", "created\n"))
           return yield* new FileNotFound({ path: "missing.txt" })
         }),
       tags: ["update"],
@@ -63,20 +63,20 @@ describe("runMigration", () => {
       await runTestEffect(runMigration(migration, { cwd: tempDir }))
       throw new Error("Expected migration to fail")
     } catch {
-      expect(await Bun.file("existing.txt").text()).toBe("before\n")
-      expect(await Bun.file("created.txt").exists()).toBe(false)
+      expect(await testFile("existing.txt").text()).toBe("before\n")
+      expect(await testFile("created.txt").exists()).toBe(false)
     }
   })
 
   test("restore tracked files when validate fails", async () => {
-    await Bun.write("existing.txt", "before\n")
+    await writeFile("existing.txt", "before\n")
 
     const migration = defineMigration({
       check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
       files: ["existing.txt"],
       id: "invalid-migration",
       migrate: () =>
-        Effect.promise(() => Bun.write("existing.txt", "after\n")).pipe(
+        Effect.promise(() => writeFile("existing.txt", "after\n")).pipe(
           Effect.as({ warnings: [] })
         ),
       tags: ["update"],
@@ -94,19 +94,19 @@ describe("runMigration", () => {
       await runTestEffect(runMigration(migration, { cwd: tempDir }))
       throw new Error("Expected validation to fail")
     } catch {
-      expect(await Bun.file("existing.txt").text()).toBe("before\n")
+      expect(await testFile("existing.txt").text()).toBe("before\n")
     }
   })
 
   test("restore tracked files when migrate defects", async () => {
-    await Bun.write("existing.txt", "before\n")
+    await writeFile("existing.txt", "before\n")
 
     const migration = defineMigration({
       check: () => Effect.succeed({ status: "not-applicable" as const, warnings: [] }),
       files: ["existing.txt"],
       id: "defective-migration",
       migrate: () =>
-        Effect.promise(() => Bun.write("existing.txt", "after\n")).pipe(
+        Effect.promise(() => writeFile("existing.txt", "after\n")).pipe(
           Effect.andThen(Effect.die("migration defect"))
         ),
       tags: ["update"],
@@ -117,7 +117,7 @@ describe("runMigration", () => {
       await runTestEffect(runMigration(migration, { cwd: tempDir }))
       throw new Error("Expected migration to defect")
     } catch {
-      expect(await Bun.file("existing.txt").text()).toBe("before\n")
+      expect(await testFile("existing.txt").text()).toBe("before\n")
     }
   })
 })

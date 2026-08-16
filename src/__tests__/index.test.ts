@@ -1,12 +1,13 @@
-import { describe, expect, test } from "bun:test"
+import { spawn } from "node:child_process"
 import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun, { spawn } from "bun"
+import { describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import { testFile } from "#__tests__/filesystem.ts"
 import { runCli } from "#cli.ts"
 import {
   createRunnerTestContext,
@@ -32,99 +33,94 @@ function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
   )
 }
 
-describe("adamantite", () => {
-  const cliPath = join(import.meta.dir, "..", "index.ts")
+async function runCliProcess(args: string[]) {
+  const cliPath = join(import.meta.dirname, "..", "..", "bin", "adamantite")
+  const child = spawn(process.execPath, [cliPath, ...args], {
+    env: { ...process.env, NODE_ENV: undefined },
+    stdio: ["ignore", "pipe", "pipe"],
+  })
+  let stderr = ""
+  let stdout = ""
 
+  child.stderr.setEncoding("utf8")
+  child.stderr.on("data", (chunk: string) => {
+    stderr += chunk
+  })
+  child.stdout.setEncoding("utf8")
+  child.stdout.on("data", (chunk: string) => {
+    stdout += chunk
+  })
+
+  const exitCode = await new Promise<number | null>((resolve, reject) => {
+    child.once("error", reject)
+    child.once("close", resolve)
+  })
+
+  return { exitCode, stderr, stdout }
+}
+
+describe("adamantite", () => {
   describe("--version", () => {
     test("display the package version", async () => {
-      const proc = spawn(["bun", cliPath, "--version"], {
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
-
-      const output = await new Response(proc.stdout).text()
-      await proc.exited
+      const result = await runCliProcess(["--version"])
 
       // SAFETY: package.json is this repo's manifest, which the package manager already requires to conform to the PackageJson schema.
-      const packageJson = (await Bun.file("package.json").json()) as PackageJson
-      const version = output
+      const packageJson = JSON.parse(await testFile("package.json").text()) as PackageJson
+      const version = result.stdout
         .trim()
         .replace(/^\[log\]\s*/, "")
         .replace(/^adamantite v/, "")
 
       expect(version).toBe(packageJson.version ?? "")
-      expect(proc.exitCode).toBe(0)
+      expect(result.exitCode).toBe(0)
     })
   })
 
   describe("--help", () => {
     test("print top-level help with key subcommands", async () => {
-      const proc = spawn(["bun", cliPath, "--help"], {
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
+      const result = await runCliProcess(["--help"])
 
-      const output = await new Response(proc.stdout).text()
-      await proc.exited
-
-      expect(output).toContain("USAGE")
-      expect(output).toContain("adamantite <subcommand> [flags]")
-      expect(output).toContain("check")
-      expect(output).toContain("init")
-      expect(output).toContain("update")
-      expect(proc.exitCode).toBe(0)
+      expect(result.stdout).toContain("USAGE")
+      expect(result.stdout).toContain("adamantite <subcommand> [flags]")
+      expect(result.stdout).toContain("check")
+      expect(result.stdout).toContain("init")
+      expect(result.stdout).toContain("update")
+      expect(result.exitCode).toBe(0)
     })
 
     test("print non-interactive setup flags for init", async () => {
-      const proc = spawn(["bun", cliPath, "init", "--help"], {
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
+      const result = await runCliProcess(["init", "--help"])
 
-      const output = await new Response(proc.stdout).text()
-      await proc.exited
-
-      expect(output).toContain("adamantite init [flags]")
-      expect(output).toContain("--non-interactive")
-      expect(output).toContain("--script choice")
-      expect(output).toContain("--preset choice")
-      expect(output).toContain("--editor choice")
-      expect(output).toContain("--typescript")
-      expect(output).toContain("--install-extensions")
-      expect(output).toContain("--github-actions")
-      expect(output).toContain("--agents")
-      expect(output).toContain("Setup flags require --non-interactive")
-      expect(output).toContain("omitted boolean setup flags are disabled")
-      expect(output).toContain("requires at least one --script")
-      expect(output).toContain("Monorepo scripts require a detected monorepo")
-      expect(output).toContain("requires --script check or fix")
-      expect(output).toContain("requires at least one --editor")
-      expect(output).toContain("requires a compatible script")
-      expect(output).toContain("bun, deno, npm, pnpm, or yarn")
-      expect(output).toContain("EXAMPLES")
-      expect(output).toContain("adamantite init --non-interactive --script check")
-      expect(proc.exitCode).toBe(0)
+      expect(result.stdout).toContain("adamantite init [flags]")
+      expect(result.stdout).toContain("--non-interactive")
+      expect(result.stdout).toContain("--script choice")
+      expect(result.stdout).toContain("--preset choice")
+      expect(result.stdout).toContain("--editor choice")
+      expect(result.stdout).toContain("--typescript")
+      expect(result.stdout).toContain("--install-extensions")
+      expect(result.stdout).toContain("--github-actions")
+      expect(result.stdout).toContain("--agents")
+      expect(result.stdout).toContain("Setup flags require --non-interactive")
+      expect(result.stdout).toContain("omitted boolean setup flags are disabled")
+      expect(result.stdout).toContain("requires at least one --script")
+      expect(result.stdout).toContain("Monorepo scripts require a detected monorepo")
+      expect(result.stdout).toContain("requires --script check or fix")
+      expect(result.stdout).toContain("requires at least one --editor")
+      expect(result.stdout).toContain("requires a compatible script")
+      expect(result.stdout).toContain("bun, deno, npm, pnpm, or yarn")
+      expect(result.stdout).toContain("EXAMPLES")
+      expect(result.stdout).toContain("adamantite init --non-interactive --script check")
+      expect(result.exitCode).toBe(0)
     })
   })
 
   describe("unknown subcommands", () => {
     test("print an error and exit non-zero", async () => {
-      const proc = spawn(["bun", cliPath, "nope"], {
-        env: { ...process.env, NODE_ENV: undefined },
-        stderr: "pipe",
-        stdout: "pipe",
-      })
+      const result = await runCliProcess(["nope"])
 
-      const stdout = await new Response(proc.stdout).text()
-      const stderr = await new Response(proc.stderr).text()
-      await proc.exited
-
-      expect(stdout).toContain("Help requested")
-      expect(stderr).toContain('Unknown subcommand "nope"')
-      expect(proc.exitCode).toBe(1)
+      expect(result.stdout).toContain("Help requested")
+      expect(result.stderr).toContain('Unknown subcommand "nope"')
+      expect(result.exitCode).toBe(1)
     })
   })
 

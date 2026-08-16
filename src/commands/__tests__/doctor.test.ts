@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
-import { writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
@@ -507,7 +507,7 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: "Fixed: created `oxfmt.config.ts`.",
@@ -546,7 +546,7 @@ describe("doctor", () => {
         packages: [`${oxfmt.name}@${oxfmt.version}`],
       },
     ])
-    expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: `Fixed: installed \`${oxfmt.name}@${oxfmt.version}\`.`,
@@ -586,8 +586,8 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(false)
-    expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, ".oxfmtrc.json")).exists()).toBe(false)
+    expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
     expect(prompter.spinnerEntries).toContainEqual({
       message: "Fixed: Migrate legacy `.oxfmtrc.json` to `oxfmt.config.ts`.",
       type: "stop",
@@ -625,7 +625,7 @@ describe("doctor", () => {
 
     expect(Exit.isFailure(exit)).toBe(true)
     expect(error).toMatchObject({ _tag: "InvalidConfigFormat" })
-    expect(errorPath).toEndWith("/.oxfmtrc.json")
+    expect(errorPath.endsWith("/.oxfmtrc.json")).toBe(true)
     expect(prompter.spinnerEntries).toContainEqual({
       message: 'Migration "Legacy oxfmt JSON config" failed, files restored.',
       type: "stop",
@@ -665,8 +665,8 @@ describe("doctor", () => {
         packages: [`${oxfmt.name}@${oxfmt.version}`],
       },
     ])
-    expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(false)
-    expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, ".oxfmtrc.json")).exists()).toBe(false)
+    expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: `Fixed: installed \`${oxfmt.name}@${oxfmt.version}\`.`,
@@ -705,7 +705,7 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: "Fixed: created `knip.config.ts`.",
@@ -744,7 +744,7 @@ describe("doctor", () => {
         packages: [`${knip.name}@${knip.version}`],
       },
     ])
-    expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: `Fixed: installed \`${knip.name}@${knip.version}\`.`,
@@ -787,8 +787,8 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(false)
-    expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "knip.json")).exists()).toBe(false)
+    expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(true)
     expect(prompter.spinnerEntries).toContainEqual({
       message: "Fixed: Migrate legacy `knip.json` to `knip.config.ts`.",
       type: "stop",
@@ -831,8 +831,8 @@ describe("doctor", () => {
         packages: [`${knip.name}@${knip.version}`],
       },
     ])
-    expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(false)
-    expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "knip.json")).exists()).toBe(false)
+    expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: `Fixed: installed \`${knip.name}@${knip.version}\`.`,
@@ -872,7 +872,7 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: "Fixed: created `oxlint.config.ts`.",
@@ -912,7 +912,7 @@ describe("doctor", () => {
         packages: [`${oxlint.name}@${oxlint.version}`],
       },
     ])
-    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: `Fixed: installed \`${oxlint.name}@${oxlint.version}\`.`,
@@ -956,8 +956,8 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
-    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
+    expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
     expect(prompter.spinnerEntries).toContainEqual({
       message: "Fixed: Migrate legacy `.oxlintrc.json` to `oxlint.config.ts`.",
       type: "stop",
@@ -1001,8 +1001,8 @@ describe("doctor", () => {
         packages: [`${oxlint.name}@${oxlint.version}`],
       },
     ])
-    expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
-    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+    expect(await testFile(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
+    expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
     expect(prompter.logs).toContainEqual({
       level: "success",
       message: `Fixed: installed \`${oxlint.name}@${oxlint.version}\`.`,
@@ -1054,7 +1054,7 @@ describe("doctor", () => {
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    const oxlintConfig = await Bun.file(join(tempDir, "oxlint.config.ts")).text()
+    const oxlintConfig = await testFile(join(tempDir, "oxlint.config.ts")).text()
     expect(oxlintConfig).toContain("respectEslintDisableDirectives: true")
     expect(oxlintConfig).toContain("typeAware: true")
     expect(oxlintConfig).toContain("typeCheck: true")
@@ -1102,7 +1102,7 @@ describe("doctor", () => {
 
     expect(Exit.isFailure(exit)).toBe(true)
     expect(installer.calls).toEqual([])
-    expect(await Bun.file(join(tempDir, "oxlint.config.ts")).text()).toBe(originalConfig)
+    expect(await testFile(join(tempDir, "oxlint.config.ts")).text()).toBe(originalConfig)
     expect(prompter.logs).toContainEqual({
       level: "warning",
       message:

@@ -1,17 +1,17 @@
 import type { PackageJson } from "type-fest"
 
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
+import { writeFile } from "#__tests__/filesystem.ts"
 import { runResult } from "#__tests__/helpers.ts"
 import { mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
@@ -63,7 +63,7 @@ describe("readPackageJson", () => {
         version: "1.0.0",
       }
 
-      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await readPackageJson(testDir).pipe(
         Effect.provide(NodeContext.layer),
@@ -82,7 +82,7 @@ describe("readPackageJson", () => {
     })
 
     test("return an error when package.json contains invalid JSON", async () => {
-      await Bun.write(join(testDir, "package.json"), "invalid json content")
+      await writeFile(join(testDir, "package.json"), "invalid json content")
 
       const result = await runResult(readPackageJson(testDir), NodeServices.layer)
       expect(Result.isFailure(result)).toBe(true)
@@ -99,7 +99,7 @@ describe("readPackageJson", () => {
         version: "1.0.0",
       }
 
-      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await readPackageJson().pipe(
         Effect.provide(NodeContext.layer),
@@ -337,7 +337,7 @@ describe("checkIsMonorepo", () => {
 
   describe("when workspace files are present", () => {
     test("return true when pnpm-workspace.yaml exists", async () => {
-      await Bun.write(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
+      await writeFile(join(testDir, "pnpm-workspace.yaml"), "packages:\n  - 'packages/*'")
 
       const result = await checkIsMonorepo(testDir).pipe(
         Effect.provide(NodeContext.layer),
@@ -353,7 +353,7 @@ describe("checkIsMonorepo", () => {
         workspaces: ["packages/*"],
       }
 
-      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await checkIsMonorepo(testDir).pipe(
         Effect.provide(NodeContext.layer),
@@ -371,7 +371,7 @@ describe("checkIsMonorepo", () => {
         version: "1.0.0",
       }
 
-      await Bun.write(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
+      await writeFile(join(testDir, "package.json"), JSON.stringify(packageJson, null, 2))
 
       const result = await checkIsMonorepo(testDir).pipe(
         Effect.provide(NodeContext.layer),

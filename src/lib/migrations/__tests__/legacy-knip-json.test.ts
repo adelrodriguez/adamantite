@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import migrationLegacyKnipJson from "#lib/migrations/legacy-knip-json.ts"
 
 function runTestEffect<A, E>(effect: Effect.Effect<A, E, NodeServices.NodeServices>) {
@@ -29,8 +29,8 @@ describe("legacyKnipJson", () => {
   })
 
   test("check warns when both config formats exist and keeps the TS config active", async () => {
-    await Bun.write("knip.config.ts", "export default {}\n")
-    await Bun.write("knip.json", "{}\n")
+    await writeFile("knip.config.ts", "export default {}\n")
+    await writeFile("knip.json", "{}\n")
 
     const result = await runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
 
@@ -43,8 +43,8 @@ describe("legacyKnipJson", () => {
   })
 
   test("check warns when both legacy JSON and JSONC exist without a TS config", async () => {
-    await Bun.write("knip.json", "{}\n")
-    await Bun.write("knip.jsonc", '{ "entry": ["src/index.ts"] }\n')
+    await writeFile("knip.json", "{}\n")
+    await writeFile("knip.jsonc", '{ "entry": ["src/index.ts"] }\n')
 
     const result = await runTestEffect(migrationLegacyKnipJson.check({ cwd: tempDir }))
 
@@ -58,8 +58,8 @@ describe("legacyKnipJson", () => {
   })
 
   test("migrate removes both legacy files when JSON and JSONC exist without knip.config.ts", async () => {
-    await Bun.write("knip.json", '{ "entry": ["src/other.ts"] }\n')
-    await Bun.write(
+    await writeFile("knip.json", '{ "entry": ["src/other.ts"] }\n')
+    await writeFile(
       "knip.jsonc",
       JSON.stringify(
         {
@@ -73,17 +73,17 @@ describe("legacyKnipJson", () => {
 
     await runTestEffect(migrationLegacyKnipJson.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("knip.config.ts").exists()).toBe(true)
-    expect(await Bun.file("knip.json").exists()).toBe(false)
-    expect(await Bun.file("knip.jsonc").exists()).toBe(false)
+    expect(await testFile("knip.config.ts").exists()).toBe(true)
+    expect(await testFile("knip.json").exists()).toBe(false)
+    expect(await testFile("knip.jsonc").exists()).toBe(false)
 
-    const content = await Bun.file("knip.config.ts").text()
+    const content = await testFile("knip.config.ts").text()
     expect(content).toContain('"src/index.ts"')
     expect(content).not.toContain("src/other.ts")
   })
 
   test("migrate converts a legacy JSON config into the current TS config format", async () => {
-    await Bun.write(
+    await writeFile(
       "knip.json",
       JSON.stringify(
         {
@@ -107,10 +107,10 @@ describe("legacyKnipJson", () => {
 
     await runTestEffect(migrationLegacyKnipJson.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("knip.config.ts").exists()).toBe(true)
-    expect(await Bun.file("knip.json").exists()).toBe(false)
+    expect(await testFile("knip.config.ts").exists()).toBe(true)
+    expect(await testFile("knip.json").exists()).toBe(false)
 
-    const content = await Bun.file("knip.config.ts").text()
+    const content = await testFile("knip.config.ts").text()
     expect(content).toContain('import analyze from "adamantite/analyze"')
     expect(content).toContain("  ...analyze,")
     expect(content).toContain("    ...analyze.rules,")
@@ -123,7 +123,7 @@ describe("legacyKnipJson", () => {
   })
 
   test("migrate converts a legacy JSONC config with comments and trailing commas", async () => {
-    await Bun.write(
+    await writeFile(
       "knip.jsonc",
       [
         "{",
@@ -144,10 +144,10 @@ describe("legacyKnipJson", () => {
 
     await runTestEffect(migrationLegacyKnipJson.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("knip.config.ts").exists()).toBe(true)
-    expect(await Bun.file("knip.jsonc").exists()).toBe(false)
+    expect(await testFile("knip.config.ts").exists()).toBe(true)
+    expect(await testFile("knip.jsonc").exists()).toBe(false)
 
-    const content = await Bun.file("knip.config.ts").text()
+    const content = await testFile("knip.config.ts").text()
     expect(content).toContain('"src/index.ts"')
     expect(content).toContain('"bunup.config.ts"')
   })

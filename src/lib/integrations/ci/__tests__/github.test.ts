@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import { runResult } from "#__tests__/helpers.ts"
 import github from "#lib/integrations/ci/github.ts"
 import {
@@ -81,7 +81,7 @@ describe("github", () => {
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
       expect(exists).toBe(true)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("name: adamantite")
       expect(content).toContain("verify:")
       expect(content).toContain("strategy:")
@@ -107,15 +107,10 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const generatedWorkflow = await Bun.file(".github/workflows/adamantite.yml").text()
-      const referenceWorkflow = await Bun.file(join(originalCwd, ".github/workflows/ci.yml")).text()
+      const generatedWorkflow = await testFile(".github/workflows/adamantite.yml").text()
+      const referenceWorkflow = await testFile(join(originalCwd, ".github/workflows/ci.yml")).text()
 
-      for (const action of [
-        "actions/checkout",
-        "actions/setup-node",
-        "oven-sh/setup-bun",
-        "actions/cache",
-      ]) {
+      for (const action of ["actions/checkout", "actions/setup-node", "oven-sh/setup-bun"]) {
         expect(getActionReference(generatedWorkflow, action)).toBe(
           getActionReference(referenceWorkflow, action)
         )
@@ -130,7 +125,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
       expect(content).toContain("actions/setup-node@v7")
       expect(content).toContain('cache: "npm"')
@@ -146,7 +141,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup pnpm")
       expect(content).toContain("pnpm/action-setup@v4")
       expect(content).toContain("actions/setup-node@v7")
@@ -163,7 +158,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Node.js")
       expect(content).toContain("actions/setup-node@v7")
       expect(content).toContain('cache: "yarn"')
@@ -179,7 +174,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("Setup Deno")
       expect(content).toContain("denoland/setup-deno@v2")
       expect(content).toContain("deno install --frozen")
@@ -194,7 +189,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("name: check")
       expect(content).toContain("name: format")
       expect(content).toContain("name: monorepo")
@@ -225,7 +220,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("permissions:")
       expect(content).toContain("contents: read")
       expect(content).toContain("concurrency:")
@@ -243,7 +238,7 @@ describe("github", () => {
           })
           .pipe(Effect.provide(fileTestLayer), Effect.runPromise)
 
-        const content = await Bun.file(".github/workflows/adamantite.yml").text()
+        const content = await testFile(".github/workflows/adamantite.yml").text()
         expect(content).toContain("Setup Node.js")
         expect(content).toContain('node-version-file: ".node-version"')
         expect(content).not.toContain('node-version: "')
@@ -263,13 +258,13 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fileTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).not.toContain("Setup Node.js")
       expect(content).not.toContain("node-version")
     })
 
     test("resolve a target project's .node-version with the live resolver", async () => {
-      await Bun.write(join(tempDir, ".node-version"), "22.19.0\n")
+      await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
 
       await github
         .create(tempDir, {
@@ -278,7 +273,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(liveResolverLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain('node-version-file: ".node-version"')
     })
 
@@ -290,7 +285,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(liveResolverLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain('node-version: "lts/*"')
     })
 
@@ -315,7 +310,7 @@ describe("github", () => {
   describe("update", () => {
     test("update an existing workflow", async () => {
       mkdirSync(".github/workflows", { recursive: true })
-      await Bun.write(".github/workflows/adamantite.yml", "name: Old Workflow")
+      await writeFile(".github/workflows/adamantite.yml", "name: Old Workflow")
 
       await github
         .update(tempDir, {
@@ -324,7 +319,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fallbackTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain("name: adamantite")
       expect(content).toContain("name: check")
       expect(content).toContain("verify:")
@@ -333,7 +328,7 @@ describe("github", () => {
 
     test("render the resolved Node.js source when updating", async () => {
       mkdirSync(".github/workflows", { recursive: true })
-      await Bun.write(".github/workflows/adamantite.yml", 'node-version: "26"')
+      await writeFile(".github/workflows/adamantite.yml", 'node-version: "26"')
 
       await github
         .update(tempDir, {
@@ -342,7 +337,7 @@ describe("github", () => {
         })
         .pipe(Effect.provide(fileTestLayer), Effect.runPromise)
 
-      const content = await Bun.file(".github/workflows/adamantite.yml").text()
+      const content = await testFile(".github/workflows/adamantite.yml").text()
       expect(content).toContain('node-version-file: ".node-version"')
       expect(content).not.toContain('node-version: "26"')
     })

@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
+import { writeFile } from "#__tests__/filesystem.ts"
 import { runResult } from "#__tests__/helpers.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
@@ -35,7 +35,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select .node-version when it contains a version", async () => {
-    await Bun.write(join(tempDir, ".node-version"), "22.19.0\n")
+    await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
 
     const source = await runResolve(tempDir)
 
@@ -43,7 +43,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select .nvmrc when .node-version is absent", async () => {
-    await Bun.write(join(tempDir, ".nvmrc"), "22\n")
+    await writeFile(join(tempDir, ".nvmrc"), "22\n")
 
     const source = await runResolve(tempDir)
 
@@ -51,10 +51,10 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select .node-version when several valid declarations exist", async () => {
-    await Bun.write(join(tempDir, ".node-version"), "22.19.0\n")
-    await Bun.write(join(tempDir, ".nvmrc"), "20\n")
-    await Bun.write(join(tempDir, ".tool-versions"), "nodejs 22.19.0\n")
-    await Bun.write(
+    await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
+    await writeFile(join(tempDir, ".nvmrc"), "20\n")
+    await writeFile(join(tempDir, ".tool-versions"), "nodejs 22.19.0\n")
+    await writeFile(
       join(tempDir, "package.json"),
       JSON.stringify({ engines: { node: ">=22.19.0" }, name: "test-project" })
     )
@@ -65,8 +65,8 @@ describe("NodeVersionResolver", () => {
   })
 
   test("fall through an empty .node-version to the next valid source", async () => {
-    await Bun.write(join(tempDir, ".node-version"), "\n")
-    await Bun.write(join(tempDir, ".nvmrc"), "22\n")
+    await writeFile(join(tempDir, ".node-version"), "\n")
+    await writeFile(join(tempDir, ".nvmrc"), "22\n")
 
     const source = await runResolve(tempDir)
 
@@ -74,7 +74,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select .tool-versions when it declares nodejs", async () => {
-    await Bun.write(join(tempDir, ".tool-versions"), "ruby 3.3.0\nnodejs 22.19.0\n")
+    await writeFile(join(tempDir, ".tool-versions"), "ruby 3.3.0\nnodejs 22.19.0\n")
 
     const source = await runResolve(tempDir)
 
@@ -82,7 +82,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select .tool-versions when it declares node with the mise spelling", async () => {
-    await Bun.write(join(tempDir, ".tool-versions"), "node 22.19.0\n")
+    await writeFile(join(tempDir, ".tool-versions"), "node 22.19.0\n")
 
     const source = await runResolve(tempDir)
 
@@ -90,7 +90,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("ignore .tool-versions without a nodejs entry", async () => {
-    await Bun.write(join(tempDir, ".tool-versions"), "ruby 3.3.0\n# nodejs 22.19.0\n")
+    await writeFile(join(tempDir, ".tool-versions"), "ruby 3.3.0\n# nodejs 22.19.0\n")
 
     const source = await runResolve(tempDir)
 
@@ -98,7 +98,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select package.json for volta.node", async () => {
-    await Bun.write(
+    await writeFile(
       join(tempDir, "package.json"),
       JSON.stringify({ name: "test-project", volta: { node: "22.19.0" } })
     )
@@ -109,7 +109,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select package.json for a node entry in a devEngines.runtime object", async () => {
-    await Bun.write(
+    await writeFile(
       join(tempDir, "package.json"),
       JSON.stringify({
         devEngines: { runtime: { name: "node", version: "22.19.0" } },
@@ -123,7 +123,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select package.json for a devEngines.runtime entry with a differently cased name", async () => {
-    await Bun.write(
+    await writeFile(
       join(tempDir, "package.json"),
       JSON.stringify({
         devEngines: { runtime: { name: "Node", version: "22.19.0" } },
@@ -137,7 +137,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select package.json for a node entry in a devEngines.runtime array", async () => {
-    await Bun.write(
+    await writeFile(
       join(tempDir, "package.json"),
       JSON.stringify({
         devEngines: {
@@ -156,7 +156,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("select package.json for engines.node", async () => {
-    await Bun.write(
+    await writeFile(
       join(tempDir, "package.json"),
       JSON.stringify({ engines: { node: ">=22.19.0" }, name: "test-project" })
     )
@@ -167,7 +167,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("ignore package.json without a Node.js declaration", async () => {
-    await Bun.write(
+    await writeFile(
       join(tempDir, "package.json"),
       JSON.stringify({ engines: { bun: ">=1.0.0" }, name: "test-project" })
     )
@@ -184,7 +184,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("return FailedToReadFile for an unreadable .node-version", async () => {
-    await Bun.write(join(tempDir, ".node-version"), "22.19.0\n")
+    await writeFile(join(tempDir, ".node-version"), "22.19.0\n")
     chmodSync(join(tempDir, ".node-version"), 0o000)
 
     const result = await runResult(resolve(tempDir), testLayer)
@@ -196,7 +196,7 @@ describe("NodeVersionResolver", () => {
   })
 
   test("return FailedToParseFile for a malformed package.json", async () => {
-    await Bun.write(join(tempDir, "package.json"), "{ not json")
+    await writeFile(join(tempDir, "package.json"), "{ not json")
 
     const result = await runResult(resolve(tempDir), testLayer)
 

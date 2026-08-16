@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test } from "@effect/vitest"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 
 describe("hasCICompatibleScripts", () => {

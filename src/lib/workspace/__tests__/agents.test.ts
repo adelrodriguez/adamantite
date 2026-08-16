@@ -1,13 +1,13 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
-import { readFile, writeFile } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as PlatformError from "effect/PlatformError"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
@@ -199,7 +199,7 @@ describe("writeAgentsGuidance", () => {
       scripts: ["format"],
     })
 
-    const agents = await Bun.file(join(tempDir, "AGENTS.md")).text()
+    const agents = await testFile(join(tempDir, "AGENTS.md")).text()
     expect(agents).toContain("Run `npm run format` after editing files")
   })
 })

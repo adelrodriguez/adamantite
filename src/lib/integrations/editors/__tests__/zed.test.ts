@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import { runResult } from "#__tests__/helpers.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 
@@ -39,7 +39,7 @@ describe("zed", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
-      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const content = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(content)
 
       expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
@@ -50,7 +50,7 @@ describe("zed", () => {
   describe("update", () => {
     test("update an existing .zed/settings.json config", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".zed", "settings.json"),
         JSON.stringify(
           {
@@ -68,7 +68,7 @@ describe("zed", () => {
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const content = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(content)
 
       expect(config.ui_font_size).toBe(14)
@@ -77,7 +77,7 @@ describe("zed", () => {
 
     test("deduplicate formatter entries for managed languages", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".zed", "settings.json"),
         JSON.stringify({
           languages: {
@@ -93,7 +93,7 @@ describe("zed", () => {
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const content = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(content)
 
       expect(config.languages.JavaScript.formatter).toEqual([
@@ -104,7 +104,7 @@ describe("zed", () => {
 
     test("preserve repeated values in user-owned arrays", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".zed", "settings.json"),
         JSON.stringify({
           languages: {
@@ -124,7 +124,7 @@ describe("zed", () => {
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const content = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(content)
 
       expect(config.lsp.custom.initialization_options.arguments).toEqual(["--flag", "--flag"])
@@ -134,14 +134,14 @@ describe("zed", () => {
     test("preserve formatter entries for unmanaged languages", async () => {
       const formatter = [{ external: "custom" }, { external: "custom" }]
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".zed", "settings.json"),
         JSON.stringify({ languages: { Astro: { formatter } } })
       )
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const content = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(content)
 
       expect(config.languages.Astro.formatter).toEqual(formatter)
@@ -155,14 +155,14 @@ describe("zed", () => {
         },
       }
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".zed", "settings.json"),
         JSON.stringify({ languages: { JavaScript: { formatter: [formatter, formatter] } } })
       )
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const content = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(content)
 
       expect(config.languages.JavaScript.formatter).toContainEqual(formatter)
@@ -171,16 +171,16 @@ describe("zed", () => {
 
     test("remain idempotent across repeated updates", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".zed", "settings.json"),
         JSON.stringify({ ui_font_size: 14 }, null, 2)
       )
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      const firstUpdate = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const firstUpdate = await testFile(join(tempDir, ".zed", "settings.json")).text()
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
-      const secondUpdate = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const secondUpdate = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(secondUpdate)
 
       expect(secondUpdate).toBe(firstUpdate)
@@ -190,11 +190,11 @@ describe("zed", () => {
 
     test("merge an empty config with Adamantite's config", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(join(tempDir, ".zed", "settings.json"), "{}")
+      await writeFile(join(tempDir, ".zed", "settings.json"), "{}")
 
       await zed.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file(join(tempDir, ".zed", "settings.json")).text()
+      const content = await testFile(join(tempDir, ".zed", "settings.json")).text()
       const config = JSON.parse(content)
 
       expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
@@ -203,7 +203,7 @@ describe("zed", () => {
 
     test("return InvalidConfigFormat when the config is not a JSON object", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(join(tempDir, ".zed", "settings.json"), "[]")
+      await writeFile(join(tempDir, ".zed", "settings.json"), "[]")
 
       const result = await runResult(zed.update(tempDir))
       expect(Result.isFailure(result)).toBe(true)
@@ -222,7 +222,7 @@ describe("zed", () => {
 
     test("return FailedToWriteFile when writing the config fails", async () => {
       mkdirSync(join(tempDir, ".zed"), { recursive: true })
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".zed", "settings.json"),
         JSON.stringify({
           ui_font_size: 12,

@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 
 describe("knip", () => {
@@ -36,7 +36,7 @@ describe("knip", () => {
     })
 
     test("detect knip.config.ts when present", async () => {
-      await Bun.write("knip.config.ts", "export default {}\n")
+      await writeFile("knip.config.ts", "export default {}\n")
 
       const result = await knip
         .detect(tempDir)
@@ -64,7 +64,7 @@ describe("knip", () => {
         path: join(tempDir, "knip.config.ts"),
       })
 
-      const content = await Bun.file("knip.config.ts").text()
+      const content = await testFile("knip.config.ts").text()
       expect(content).toContain('import type { KnipConfig } from "knip"')
       expect(content).toContain('import analyze from "adamantite/analyze"')
       expect(content).toContain("const config: KnipConfig = analyze")
@@ -74,7 +74,7 @@ describe("knip", () => {
 
   describe("assess", () => {
     test("report not applicable when the managed analyze script is absent", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -100,7 +100,7 @@ describe("knip", () => {
     })
 
     test("report missing managed config when the managed analyze script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -136,7 +136,7 @@ describe("knip", () => {
     })
 
     test("report a migration when a legacy config is active", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -153,7 +153,7 @@ describe("knip", () => {
           2
         )
       )
-      await Bun.write("knip.json", JSON.stringify({ entry: ["src/index.ts"] }, null, 2))
+      await writeFile("knip.json", JSON.stringify({ entry: ["src/index.ts"] }, null, 2))
 
       const result = await knip
         .assess(tempDir)
@@ -173,7 +173,7 @@ describe("knip", () => {
     })
 
     test("report healthy when package and managed config are present", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -190,7 +190,7 @@ describe("knip", () => {
           2
         )
       )
-      await Bun.write(
+      await writeFile(
         "knip.config.ts",
         'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = {}\n\nexport default config\n'
       )

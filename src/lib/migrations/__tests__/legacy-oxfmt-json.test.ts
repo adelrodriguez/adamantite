@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import migrationLegacyOxfmtJson from "#lib/migrations/legacy-oxfmt-json.ts"
 
 function runTestEffect<A, E>(effect: Effect.Effect<A, E, NodeServices.NodeServices>) {
@@ -29,8 +29,8 @@ describe("legacyOxfmtJson", () => {
   })
 
   test("check warns when both config formats exist and keeps the TS config active", async () => {
-    await Bun.write("oxfmt.config.ts", "export default { semi: false }\n")
-    await Bun.write(".oxfmtrc.json", "{}\n")
+    await writeFile("oxfmt.config.ts", "export default { semi: false }\n")
+    await writeFile(".oxfmtrc.json", "{}\n")
 
     const result = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
 
@@ -43,7 +43,7 @@ describe("legacyOxfmtJson", () => {
   })
 
   test("migrate converts a legacy JSON config into the current TS config format", async () => {
-    await Bun.write(
+    await writeFile(
       ".oxfmtrc.json",
       JSON.stringify(
         {
@@ -66,10 +66,10 @@ describe("legacyOxfmtJson", () => {
 
     await runTestEffect(migrationLegacyOxfmtJson.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("oxfmt.config.ts").exists()).toBe(true)
-    expect(await Bun.file(".oxfmtrc.json").exists()).toBe(false)
+    expect(await testFile("oxfmt.config.ts").exists()).toBe(true)
+    expect(await testFile(".oxfmtrc.json").exists()).toBe(false)
 
-    const content = await Bun.file("oxfmt.config.ts").text()
+    const content = await testFile("oxfmt.config.ts").text()
     expect(content).toContain('import format from "adamantite/format"')
     expect(content).toContain("  ...format,")
     expect(content).toContain("semi: true")
@@ -80,8 +80,8 @@ describe("legacyOxfmtJson", () => {
   })
 
   test("check warns when both legacy JSON and JSONC exist without a TS config", async () => {
-    await Bun.write(".oxfmtrc.json", "{}\n")
-    await Bun.write(".oxfmtrc.jsonc", '{ "semi": true }\n')
+    await writeFile(".oxfmtrc.json", "{}\n")
+    await writeFile(".oxfmtrc.jsonc", '{ "semi": true }\n')
 
     const result = await runTestEffect(migrationLegacyOxfmtJson.check({ cwd: tempDir }))
 
@@ -95,8 +95,8 @@ describe("legacyOxfmtJson", () => {
   })
 
   test("migrate removes both legacy files when JSON and JSONC exist without oxfmt.config.ts", async () => {
-    await Bun.write(".oxfmtrc.json", '{ "semi": false }\n')
-    await Bun.write(
+    await writeFile(".oxfmtrc.json", '{ "semi": false }\n')
+    await writeFile(
       ".oxfmtrc.jsonc",
       JSON.stringify(
         {
@@ -109,16 +109,16 @@ describe("legacyOxfmtJson", () => {
 
     await runTestEffect(migrationLegacyOxfmtJson.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("oxfmt.config.ts").exists()).toBe(true)
-    expect(await Bun.file(".oxfmtrc.json").exists()).toBe(false)
-    expect(await Bun.file(".oxfmtrc.jsonc").exists()).toBe(false)
+    expect(await testFile("oxfmt.config.ts").exists()).toBe(true)
+    expect(await testFile(".oxfmtrc.json").exists()).toBe(false)
+    expect(await testFile(".oxfmtrc.jsonc").exists()).toBe(false)
 
-    const content = await Bun.file("oxfmt.config.ts").text()
+    const content = await testFile("oxfmt.config.ts").text()
     expect(content).toContain("semi: true")
   })
 
   test("migrate converts a legacy JSONC config with comments and trailing commas", async () => {
-    await Bun.write(
+    await writeFile(
       ".oxfmtrc.jsonc",
       [
         "{",
@@ -139,10 +139,10 @@ describe("legacyOxfmtJson", () => {
 
     await runTestEffect(migrationLegacyOxfmtJson.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("oxfmt.config.ts").exists()).toBe(true)
-    expect(await Bun.file(".oxfmtrc.jsonc").exists()).toBe(false)
+    expect(await testFile("oxfmt.config.ts").exists()).toBe(true)
+    expect(await testFile(".oxfmtrc.jsonc").exists()).toBe(false)
 
-    const content = await Bun.file("oxfmt.config.ts").text()
+    const content = await testFile("oxfmt.config.ts").text()
     expect(content).toContain("semi: true")
     expect(content).toContain("singleQuote: true")
   })

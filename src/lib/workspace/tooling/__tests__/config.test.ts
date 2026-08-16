@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import { writeFile } from "#__tests__/filesystem.ts"
 import {
   detectToolingConfig,
   getConfigActions,
@@ -46,7 +46,7 @@ describe("detectToolingConfig", () => {
   })
 
   test("activate a lone legacy JSON config without warnings", async () => {
-    await Bun.write("tool.json", "{}\n")
+    await writeFile("tool.json", "{}\n")
 
     expect(await detect()).toEqual({
       active: { file: "tool.json", format: "json", path: join(tempDir, "tool.json") },
@@ -56,9 +56,9 @@ describe("detectToolingConfig", () => {
   })
 
   test("prefer the TS config over every legacy config", async () => {
-    await Bun.write("tool.config.ts", "export default {}\n")
-    await Bun.write("tool.json", "{}\n")
-    await Bun.write("tool.jsonc", "{}\n")
+    await writeFile("tool.config.ts", "export default {}\n")
+    await writeFile("tool.json", "{}\n")
+    await writeFile("tool.jsonc", "{}\n")
 
     const state = await detect()
 
@@ -74,8 +74,8 @@ describe("detectToolingConfig", () => {
   })
 
   test("prefer the JSONC config over the JSON config when no TS config exists", async () => {
-    await Bun.write("tool.json", "{}\n")
-    await Bun.write("tool.jsonc", "{}\n")
+    await writeFile("tool.json", "{}\n")
+    await writeFile("tool.jsonc", "{}\n")
 
     const state = await detect()
 
@@ -90,8 +90,8 @@ describe("detectToolingConfig", () => {
   })
 
   test("warn with the json(c) display name when the TS config shadows legacy configs", async () => {
-    await Bun.write("tool.config.ts", "export default {}\n")
-    await Bun.write("tool.json", "{}\n")
+    await writeFile("tool.config.ts", "export default {}\n")
+    await writeFile("tool.json", "{}\n")
 
     const state = await detect()
 
@@ -101,8 +101,8 @@ describe("detectToolingConfig", () => {
   })
 
   test("warn with the plain legacy name when the tool has a single legacy config", async () => {
-    await Bun.write("tool.config.ts", "export default {}\n")
-    await Bun.write(".toolrc.json", "{}\n")
+    await writeFile("tool.config.ts", "export default {}\n")
+    await writeFile(".toolrc.json", "{}\n")
 
     const state = await detect(SINGLE_LEGACY_FILES)
 
@@ -112,8 +112,8 @@ describe("detectToolingConfig", () => {
   })
 
   test("warn when multiple legacy configs exist without a TS config", async () => {
-    await Bun.write("tool.json", "{}\n")
-    await Bun.write("tool.jsonc", "{}\n")
+    await writeFile("tool.json", "{}\n")
+    await writeFile("tool.jsonc", "{}\n")
 
     const state = await detect()
 

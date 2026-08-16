@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import { runResult } from "#__tests__/helpers.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
@@ -43,7 +43,7 @@ describe("tsconfig", () => {
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
       expect(exists).toBe(true)
 
-      const content = await Bun.file("tsconfig.json").text()
+      const content = await testFile("tsconfig.json").text()
       const config = JSON.parse(content)
 
       expect(config).toHaveProperty("extends")
@@ -64,7 +64,7 @@ describe("tsconfig", () => {
 
   describe("update", () => {
     test("update an existing tsconfig.json config", async () => {
-      await Bun.write(
+      await writeFile(
         "tsconfig.json",
         JSON.stringify(
           {
@@ -86,7 +86,7 @@ describe("tsconfig", () => {
 
       await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("tsconfig.json").text()
+      const content = await testFile("tsconfig.json").text()
       const config = JSON.parse(content)
 
       expect(config.compilerOptions).toEqual({
@@ -98,7 +98,7 @@ describe("tsconfig", () => {
     })
 
     test("append the preset to an existing extends string instead of overwriting it", async () => {
-      await Bun.write(
+      await writeFile(
         "tsconfig.json",
         JSON.stringify(
           {
@@ -114,7 +114,7 @@ describe("tsconfig", () => {
 
       await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("tsconfig.json").text()
+      const content = await testFile("tsconfig.json").text()
       const config = JSON.parse(content)
 
       expect(config.extends).toEqual(["@company/tsconfig", "adamantite/typescript"])
@@ -122,28 +122,28 @@ describe("tsconfig", () => {
     })
 
     test("keep extends as a string when it is already the preset", async () => {
-      await Bun.write(
+      await writeFile(
         "tsconfig.json",
         JSON.stringify({ extends: "adamantite/typescript" }, null, 2)
       )
 
       await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("tsconfig.json").text()
+      const content = await testFile("tsconfig.json").text()
       const config = JSON.parse(content)
 
       expect(config.extends).toBe("adamantite/typescript")
     })
 
     test("append the preset to an existing extends array", async () => {
-      await Bun.write(
+      await writeFile(
         "tsconfig.json",
         JSON.stringify({ extends: ["@company/tsconfig", "@company/tsconfig-strict"] }, null, 2)
       )
 
       await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("tsconfig.json").text()
+      const content = await testFile("tsconfig.json").text()
       const config = JSON.parse(content)
 
       expect(config.extends).toEqual([
@@ -154,32 +154,32 @@ describe("tsconfig", () => {
     })
 
     test("leave an extends array unchanged when it already contains the preset", async () => {
-      await Bun.write(
+      await writeFile(
         "tsconfig.json",
         JSON.stringify({ extends: ["adamantite/typescript", "@company/tsconfig"] }, null, 2)
       )
 
       await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("tsconfig.json").text()
+      const content = await testFile("tsconfig.json").text()
       const config = JSON.parse(content)
 
       expect(config.extends).toEqual(["adamantite/typescript", "@company/tsconfig"])
     })
 
     test("merge an empty config with Adamantite's config", async () => {
-      await Bun.write("tsconfig.json", "{}")
+      await writeFile("tsconfig.json", "{}")
 
       await tsconfig.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("tsconfig.json").text()
+      const content = await testFile("tsconfig.json").text()
       const config = JSON.parse(content)
 
       expect(config.extends).toBe("adamantite/typescript")
     })
 
     test("return InvalidConfigFormat when tsconfig.json is not a JSON object", async () => {
-      await Bun.write("tsconfig.json", "true")
+      await writeFile("tsconfig.json", "true")
 
       const result = await runResult(tsconfig.update(tempDir))
       expect(Result.isFailure(result)).toBe(true)
@@ -197,7 +197,7 @@ describe("tsconfig", () => {
     })
 
     test("return FailedToWriteFile when writing the config fails", async () => {
-      await Bun.write(
+      await writeFile(
         "tsconfig.json",
         JSON.stringify({
           compilerOptions: {

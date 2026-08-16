@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
+import { writeFile } from "#__tests__/filesystem.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 
 describe("sherif", () => {
@@ -24,7 +24,7 @@ describe("sherif", () => {
 
   describe("assess", () => {
     test("report not applicable when managed monorepo scripts are absent", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -50,7 +50,7 @@ describe("sherif", () => {
     })
 
     test("report missing package when the managed monorepo check script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -84,7 +84,7 @@ describe("sherif", () => {
     })
 
     test("report healthy when the package and managed monorepo script are present", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {

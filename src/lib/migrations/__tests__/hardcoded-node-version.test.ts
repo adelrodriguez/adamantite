@@ -1,12 +1,12 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationHardcodedNodeVersion from "#lib/migrations/hardcoded-node-version.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
@@ -44,7 +44,7 @@ function runTestEffect<A, E>(
 }
 
 async function writeManagedProject() {
-  await Bun.write(
+  await writeFile(
     "package.json",
     JSON.stringify(
       {
@@ -59,7 +59,7 @@ async function writeManagedProject() {
     )
   )
   mkdirSync(".github/workflows", { recursive: true })
-  await Bun.write(".github/workflows/adamantite.yml", HARDCODED_WORKFLOW)
+  await writeFile(".github/workflows/adamantite.yml", HARDCODED_WORKFLOW)
 }
 
 describe("hardcodedNodeVersion", () => {
@@ -85,7 +85,7 @@ describe("hardcodedNodeVersion", () => {
 
   test("check reports not-applicable when the workflow already uses node-version-file", async () => {
     mkdirSync(".github/workflows", { recursive: true })
-    await Bun.write(
+    await writeFile(
       ".github/workflows/adamantite.yml",
       'name: adamantite\n          node-version-file: ".node-version"\n'
     )
@@ -97,7 +97,7 @@ describe("hardcodedNodeVersion", () => {
 
   test("check reports not-applicable when the workflow uses lts/*", async () => {
     mkdirSync(".github/workflows", { recursive: true })
-    await Bun.write(
+    await writeFile(
       ".github/workflows/adamantite.yml",
       'name: adamantite\n          node-version: "lts/*"\n'
     )
@@ -117,11 +117,11 @@ describe("hardcodedNodeVersion", () => {
 
   test("migrate points the workflow at the project's Node.js version file", async () => {
     await writeManagedProject()
-    await Bun.write(".node-version", "22.19.0\n")
+    await writeFile(".node-version", "22.19.0\n")
 
     await runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }))
 
-    const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
+    const workflow = await testFile(".github/workflows/adamantite.yml").text()
     expect(workflow).toContain('node-version-file: ".node-version"')
     expect(workflow).not.toContain('node-version: "26"')
 
@@ -133,7 +133,7 @@ describe("hardcodedNodeVersion", () => {
 
     await runTestEffect(migrationHardcodedNodeVersion.migrate({ cwd: tempDir }))
 
-    const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
+    const workflow = await testFile(".github/workflows/adamantite.yml").text()
     expect(workflow).toContain('node-version: "lts/*"')
     expect(workflow).not.toContain('node-version: "26"')
 
@@ -141,12 +141,12 @@ describe("hardcodedNodeVersion", () => {
   })
 
   test("check reports not-applicable with a warning without CI-compatible managed scripts", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify({ name: "test-project", version: "1.0.0" }, null, 2)
     )
     mkdirSync(".github/workflows", { recursive: true })
-    await Bun.write(".github/workflows/adamantite.yml", HARDCODED_WORKFLOW)
+    await writeFile(".github/workflows/adamantite.yml", HARDCODED_WORKFLOW)
 
     const result = await runTestEffect(migrationHardcodedNodeVersion.check({ cwd: tempDir }))
 
@@ -157,7 +157,7 @@ describe("hardcodedNodeVersion", () => {
       ],
     })
 
-    const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
+    const workflow = await testFile(".github/workflows/adamantite.yml").text()
     expect(workflow).toBe(HARDCODED_WORKFLOW)
   })
 
@@ -175,7 +175,7 @@ describe("hardcodedNodeVersion", () => {
       ],
     })
 
-    const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
+    const workflow = await testFile(".github/workflows/adamantite.yml").text()
     expect(workflow).toBe(HARDCODED_WORKFLOW)
   })
 

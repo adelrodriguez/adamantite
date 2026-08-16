@@ -1,12 +1,13 @@
-import { describe, expect, test } from "bun:test"
+import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, symlinkSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import Bun from "bun"
+import { describe, expect, test } from "@effect/vitest"
+import { writeFile } from "#__tests__/filesystem.ts"
 import antislop from "#presets/lint/antislop.ts"
 import antislopPlugin from "#presets/lint/antislop/plugin.mjs"
 
-const REPO_ROOT = join(import.meta.dir, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../../..")
 
 describe("antislop preset", () => {
   test("enable exactly the rules the vendored plugin defines", () => {
@@ -23,7 +24,7 @@ describe("antislop preset", () => {
 
     try {
       symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
-      await Bun.write(
+      await writeFile(
         join(tempDir, "oxlint.config.ts"),
         [
           'import { defineConfig } from "oxlint"',
@@ -33,18 +34,19 @@ describe("antislop preset", () => {
           "",
         ].join("\n")
       )
-      await Bun.write(
+      await writeFile(
         join(tempDir, "bad.ts"),
         "export const value = JSON.parse('{}') as unknown as string\n"
       )
 
-      const result = Bun.spawnSync(
-        [join(REPO_ROOT, "node_modules/.bin/oxlint"), "-c", "oxlint.config.ts", "bad.ts"],
-        { cwd: tempDir }
+      const result = spawnSync(
+        join(REPO_ROOT, "node_modules/.bin/oxlint"),
+        ["-c", "oxlint.config.ts", "bad.ts"],
+        { cwd: tempDir, encoding: "utf8" }
       )
 
-      expect(result.exitCode).not.toBe(0)
-      expect(result.stdout.toString()).toContain("anti-slop(no-chained-type-assertions)")
+      expect(result.status).not.toBe(0)
+      expect(result.stdout).toContain("anti-slop(no-chained-type-assertions)")
     } finally {
       rmSync(tempDir, { force: true, recursive: true })
     }

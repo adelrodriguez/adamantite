@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import { runResult } from "#__tests__/helpers.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
@@ -39,11 +39,11 @@ describe("oxlint", () => {
     })
 
     test("report both configs and prefer oxlint.config.ts", async () => {
-      await Bun.write(
+      await writeFile(
         "oxlint.config.ts",
         'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n'
       )
-      await Bun.write(".oxlintrc.json", "{}")
+      await writeFile(".oxlintrc.json", "{}")
 
       const state = await oxlint
         .detect(tempDir)
@@ -78,7 +78,7 @@ describe("oxlint", () => {
       })
       expect(state.legacy).toEqual([])
 
-      const content = await Bun.file("oxlint.config.ts").text()
+      const content = await testFile("oxlint.config.ts").text()
       expect(content).toContain('import { defineConfig } from "oxlint"')
       expect(content).toContain('import core from "adamantite/lint"')
       expect(content).toContain('"respectEslintDisableDirectives": true')
@@ -93,7 +93,7 @@ describe("oxlint", () => {
         .create(tempDir, ["antislop"])
         .pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("oxlint.config.ts").text()
+      const content = await testFile("oxlint.config.ts").text()
       expect(content).toContain('import core from "adamantite/lint"')
       expect(content).toContain('import antislop from "adamantite/lint/antislop"')
       expect(content).toContain("extends: [core, antislop]")
@@ -102,7 +102,7 @@ describe("oxlint", () => {
 
   describe("update", () => {
     test("patch oxlint.config.ts when type-aware options are missing", async () => {
-      await Bun.write(
+      await writeFile(
         "oxlint.config.ts",
         [
           'import { defineConfig } from "oxlint"',
@@ -117,7 +117,7 @@ describe("oxlint", () => {
 
       await oxlint.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      const content = await Bun.file("oxlint.config.ts").text()
+      const content = await testFile("oxlint.config.ts").text()
       expect(content).toContain("respectEslintDisableDirectives: true")
       expect(content).toContain("typeAware: true")
       expect(content).toContain("typeCheck: true")
@@ -135,11 +135,11 @@ describe("oxlint", () => {
         "})",
         "",
       ].join("\n")
-      await Bun.write("oxlint.config.ts", originalContent)
+      await writeFile("oxlint.config.ts", originalContent)
 
       await oxlint.update(tempDir).pipe(Effect.provide(NodeServices.layer), Effect.runPromise)
 
-      expect(await Bun.file("oxlint.config.ts").text()).toBe(originalContent)
+      expect(await testFile("oxlint.config.ts").text()).toBe(originalContent)
     })
 
     test("return FileNotFound when no oxlint config exists", async () => {
@@ -151,7 +151,7 @@ describe("oxlint", () => {
     })
 
     test("fail when oxlint.config.ts cannot be patched safely", async () => {
-      await Bun.write(
+      await writeFile(
         "oxlint.config.ts",
         [
           'import { defineConfig } from "oxlint"',
@@ -173,7 +173,7 @@ describe("oxlint", () => {
 
   describe("assess", () => {
     test("report not applicable when no managed lint script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -199,7 +199,7 @@ describe("oxlint", () => {
     })
 
     test("report missing managed config when the managed check script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -235,7 +235,7 @@ describe("oxlint", () => {
     })
 
     test("report a migration when a legacy config is active", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -252,7 +252,7 @@ describe("oxlint", () => {
           2
         )
       )
-      await Bun.write(".oxlintrc.json", JSON.stringify({ rules: { semi: "error" } }, null, 2))
+      await writeFile(".oxlintrc.json", JSON.stringify({ rules: { semi: "error" } }, null, 2))
 
       const result = await oxlint
         .assess(tempDir)
@@ -272,7 +272,7 @@ describe("oxlint", () => {
     })
 
     test("report healthy when package and managed config are present", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -289,7 +289,7 @@ describe("oxlint", () => {
           2
         )
       )
-      await Bun.write(
+      await writeFile(
         "oxlint.config.ts",
         [
           'import { defineConfig } from "oxlint"',
@@ -315,7 +315,7 @@ describe("oxlint", () => {
     })
 
     test("report a config update when managed check config lacks type-aware options", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -332,7 +332,7 @@ describe("oxlint", () => {
           2
         )
       )
-      await Bun.write(
+      await writeFile(
         "oxlint.config.ts",
         [
           'import { defineConfig } from "oxlint"',
@@ -363,7 +363,7 @@ describe("oxlint", () => {
     })
 
     test("report a manual fix when managed check config cannot be patched safely", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -380,7 +380,7 @@ describe("oxlint", () => {
           2
         )
       )
-      await Bun.write(
+      await writeFile(
         "oxlint.config.ts",
         [
           'import { defineConfig } from "oxlint"',
@@ -429,7 +429,7 @@ describe("tsgolint", () => {
 
   describe("assess", () => {
     test("report not applicable when no managed lint script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -455,7 +455,7 @@ describe("tsgolint", () => {
     })
 
     test("report missing package when the managed check script exists", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {
@@ -489,7 +489,7 @@ describe("tsgolint", () => {
     })
 
     test("report healthy when the package and managed lint script are present", async () => {
-      await Bun.write(
+      await writeFile(
         "package.json",
         JSON.stringify(
           {

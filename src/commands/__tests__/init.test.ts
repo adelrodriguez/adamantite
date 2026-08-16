@@ -1,14 +1,14 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { JsonObject } from "type-fest"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import initCommand from "#commands/init.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
@@ -151,8 +151,8 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
@@ -186,8 +186,8 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(false)
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
@@ -217,8 +217,8 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "knip.jsonc")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(false)
       expect(prompter.logs).toContainEqual({
         level: "info",
         message:
@@ -261,9 +261,9 @@ describe("init", () => {
         message:
           "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest knip config.",
       })
-      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "knip.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "knip.jsonc")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(false)
     })
   })
 
@@ -339,7 +339,7 @@ describe("init", () => {
       const exit = await runCommand(initCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
 
       for (const log of monorepoGuidanceLogs) {
         expect(prompter.logs).toContainEqual(log)
@@ -357,7 +357,7 @@ describe("init", () => {
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
 
       for (const log of monorepoGuidanceLogs) {
         expect(prompter.logs).toContainEqual(log)
@@ -418,7 +418,7 @@ describe("init", () => {
           2
         )
       )
-      await Bun.write(
+      await writeFile(
         join(tempDir, ".vscode", "settings.json"),
         JSON.stringify({ "editor.tabSize": 4 }, null, 2)
       )
@@ -450,7 +450,7 @@ describe("init", () => {
       const vscodeSettings = await readJson(join(tempDir, ".vscode", "settings.json"))
       expect(vscodeSettings["editor.tabSize"]).toBe(4)
       expect(vscodeSettings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
     })
   })
 
@@ -477,12 +477,12 @@ describe("init", () => {
         format: "adamantite format",
       })
 
-      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, ".zed", "settings.json")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, ".vscode", "settings.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".zed", "settings.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, ".vscode", "settings.json")).exists()).toBe(false)
     })
   })
 
@@ -535,13 +535,13 @@ describe("init", () => {
         check: "adamantite check",
         format: "adamantite format",
       })
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, ".zed", "settings.json")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "AGENTS.md")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".zed", "settings.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "AGENTS.md")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
         true
       )
     })
@@ -565,9 +565,9 @@ describe("init", () => {
           packages: ["adamantite", `oxfmt@${oxfmt.version}`],
         },
       ])
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, "AGENTS.md")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "AGENTS.md")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
         false
       )
     })
@@ -713,7 +713,7 @@ describe("init", () => {
       })
       expect(installer.calls).toEqual([])
       expect(await readFile(join(tempDir, "package.json"), "utf8")).toBe(originalPackageJson)
-      expect(await Bun.file(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
+      expect(await testFile(join(tempDir, ".github", "workflows", "adamantite.yml")).exists()).toBe(
         false
       )
     })
@@ -1126,7 +1126,7 @@ describe("init", () => {
       expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])
       expect(prompter.outros).toEqual([])
       expect(installer.calls).toEqual([])
-      expect(await Bun.file(join(tempDir, "AGENTS.md")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "AGENTS.md")).exists()).toBe(false)
     })
   })
 
@@ -1155,7 +1155,7 @@ describe("init", () => {
         message:
           "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
       })
-      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "knip.json")).exists()).toBe(true)
     })
 
     test("warn when both legacy and modern oxfmt configs exist", async () => {
@@ -1179,7 +1179,7 @@ describe("init", () => {
         message:
           "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
       })
-      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
     })
 
     test("warn when both legacy and modern oxlint configs exist", async () => {
@@ -1206,7 +1206,7 @@ describe("init", () => {
         message:
           "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`.",
       })
-      expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
     })
   })
 
@@ -1247,7 +1247,7 @@ describe("init", () => {
       ])
 
       const workflowPath = join(tempDir, ".github", "workflows", "adamantite.yml")
-      expect(await Bun.file(workflowPath).exists()).toBe(true)
+      expect(await testFile(workflowPath).exists()).toBe(true)
 
       const workflow = await readFile(workflowPath, "utf8")
       expect(workflow).toContain("oven-sh/setup-bun@v2")
@@ -1277,8 +1277,8 @@ describe("init", () => {
           ],
         },
       ])
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
     })
 
     test("gracefully handle prompt cancellation", async () => {
@@ -1363,7 +1363,7 @@ describe("init", () => {
       })
       expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
 
-      expect(await Bun.file(join(tempDir, ".vscode", "settings.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".vscode", "settings.json")).exists()).toBe(true)
     })
   })
 })

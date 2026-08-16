@@ -21,6 +21,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: "12.0.0-rc.6"
+
       # Setup Node.js to enable trusted publishing with OIDC authentication.
       # The registry-url configures npm to use GitHub Actions OIDC tokens for
       # authentication, eliminating the need for NPM_TOKEN secrets. When
@@ -31,27 +36,20 @@ jobs:
         with:
           node-version-file: ".node-version"
           registry-url: "https://registry.npmjs.org"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.14
+          cache: "pnpm"
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
-        run: bun run build
-
-      - name: Configure npm authentication
-        run: echo '//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}' >> .npmrc
+        run: pnpm run build
 
       - name: Create Release Pull Request or Publish to npm
         id: changesets
         uses: changesets/action@v2
         with:
-          publish-script: bun run release
-          version-script: bun run version
+          publish-script: pnpm run release
+          version-script: pnpm run version
           pr-title: "chore: release"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

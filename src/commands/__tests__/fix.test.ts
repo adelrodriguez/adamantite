@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, realpathSync, rmSync } from "node:fs"
-import { writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import { writeFile } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
 import { createRunnerTestContext, runCommandWithRunner } from "./command-test-helpers.ts"
 

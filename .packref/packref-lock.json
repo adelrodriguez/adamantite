@@ -1,6 +1,27 @@
 {
   "packages": [
     {
+      "name": "oxc-parser",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.144.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "0.144.0"
+    },
+    {
+      "name": "tsdown",
+      "registry": "npm",
+      "source": {
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/rolldown/tsdown"
+      },
+      "tracking": "dependency",
+      "version": "0.22.14"
+    },
+    {
       "name": "effect",
       "registry": "npm",
       "source": {
@@ -11,16 +32,6 @@
       },
       "tracking": "dependency",
       "version": "4.0.0-rc.108"
-    },
-    {
-      "name": "oxc-parser",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.144.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "0.144.0"
     }
   ]
 }

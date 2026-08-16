@@ -1,7 +1,7 @@
 version: 2
 updates:
-  # Enable version updates for Bun dependencies
-  - package-ecosystem: "bun"
+  # Enable version updates for pnpm dependencies
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"

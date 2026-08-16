@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, test } from "@effect/vitest"
 import { getConflictingScripts } from "#lib/workspace/package-json.ts"
 
 describe("getConflictingScripts", () => {

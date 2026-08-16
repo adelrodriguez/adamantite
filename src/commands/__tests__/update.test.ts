@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
-import { readFile, writeFile } from "node:fs/promises"
+import { readFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import updateCommand from "#commands/update.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
@@ -148,8 +148,8 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
       expect(prompter.logs).toContainEqual({
         level: "warning",
         message: "Some configuration follow-up belongs to `adamantite doctor --fix`.",
@@ -192,8 +192,8 @@ describe("update", () => {
           packages: [`oxlint@${oxlint.version}`, `oxlint-tsgolint@${tsgolint.version}`],
         },
       ])
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
       expect(prompter.logs).toContainEqual({
         level: "success",
         message: "Dependencies updated successfully.",
@@ -244,7 +244,7 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(await Bun.file(join(tempDir, "knip.jsonc")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "knip.jsonc")).exists()).toBe(false)
 
       const knipConfig = await readFile(join(tempDir, "knip.config.ts"), "utf8")
       expect(knipConfig).toContain('import analyze from "adamantite/analyze"')
@@ -295,7 +295,7 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(await Bun.file(join(tempDir, ".oxfmtrc.jsonc")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, ".oxfmtrc.jsonc")).exists()).toBe(false)
 
       const oxfmtConfig = await readFile(join(tempDir, "oxfmt.config.ts"), "utf8")
       expect(oxfmtConfig).toContain('import format from "adamantite/format"')
@@ -347,7 +347,7 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toEqual([])
-      expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, ".oxlintrc.json")).exists()).toBe(false)
 
       const oxlintConfig = await readFile(join(tempDir, "oxlint.config.ts"), "utf8")
       expect(oxlintConfig).toContain('"semi": "error"')
@@ -399,8 +399,8 @@ describe("update", () => {
         check: "adamantite check",
       })
 
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(true)
       expect(
         prompter.logs.filter((entry) => entry.level === "success").map((entry) => entry.message)
       ).toEqual(["Migrations ran successfully.", "Dependencies updated successfully."])
@@ -481,7 +481,7 @@ describe("update", () => {
       const exit = await runCommand(updateCommand, [], [prompter.layer, installer.layer])
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(await Bun.file(join(tempDir, "tsconfig.json")).exists()).toBe(false)
+      expect(await testFile(join(tempDir, "tsconfig.json")).exists()).toBe(false)
 
       for (const message of MONOREPO_GUIDANCE) {
         expect(prompter.logs).toContainEqual({ level: "warning", message })
@@ -756,8 +756,8 @@ describe("update", () => {
         level: "success",
         message: "No changes needed.",
       })
-      expect(await Bun.file(join(tempDir, "knip.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, "knip.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "knip.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "knip.json")).exists()).toBe(true)
     })
 
     test("warn when both oxfmt config formats are present and prefer oxfmt.config.ts", async () => {
@@ -796,8 +796,8 @@ describe("update", () => {
         level: "success",
         message: "No changes needed.",
       })
-      expect(await Bun.file(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxfmt.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".oxfmtrc.json")).exists()).toBe(true)
     })
 
     test("warn when both oxlint config formats are present and prefer oxlint.config.ts", async () => {
@@ -847,8 +847,8 @@ describe("update", () => {
         level: "success",
         message: "No changes needed.",
       })
-      expect(await Bun.file(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
-      expect(await Bun.file(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, "oxlint.config.ts")).exists()).toBe(true)
+      expect(await testFile(join(tempDir, ".oxlintrc.json")).exists()).toBe(true)
     })
 
     test("fail when dependency installation fails", async () => {

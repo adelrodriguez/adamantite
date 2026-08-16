@@ -1,13 +1,13 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { TsConfigJson } from "type-fest"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import Bun from "bun"
+import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { testFile, writeFile } from "#__tests__/filesystem.ts"
 import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
 import migrationLegacyTypecheckScript from "#lib/migrations/legacy-typecheck-script.ts"
@@ -46,7 +46,7 @@ describe("legacyTypecheckScript", () => {
   })
 
   test("check reports that the legacy typecheck script needs migration", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify(
         {
@@ -72,7 +72,7 @@ describe("legacyTypecheckScript", () => {
   })
 
   test("migrate replaces the legacy typecheck script and bootstraps the current config state", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify(
         {
@@ -97,20 +97,20 @@ describe("legacyTypecheckScript", () => {
     await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
     // SAFETY: the test seeds package.json above with only a string-valued scripts map, and the migration only rewrites those scripts.
-    const packageJson = (await Bun.file("package.json").json()) as {
+    const packageJson = JSON.parse(await testFile("package.json").text()) as {
       scripts?: Record<string, string>
     }
     expect(packageJson.scripts).toEqual({
       check: "adamantite check",
     })
-    expect(await Bun.file("oxlint.config.ts").exists()).toBe(true)
-    expect(await Bun.file("tsconfig.json").exists()).toBe(true)
+    expect(await testFile("oxlint.config.ts").exists()).toBe(true)
+    expect(await testFile("tsconfig.json").exists()).toBe(true)
 
     await runTestEffect(migrationLegacyTypecheckScript.validate({ cwd: tempDir }))
   })
 
   test("migrate updates an existing oxlint config to the latest supported shape", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify(
         {
@@ -124,7 +124,7 @@ describe("legacyTypecheckScript", () => {
         2
       )
     )
-    await Bun.write(
+    await writeFile(
       "oxlint.config.ts",
       [
         'import { defineConfig } from "oxlint"',
@@ -136,13 +136,13 @@ describe("legacyTypecheckScript", () => {
         "",
       ].join("\n")
     )
-    await Bun.write("tsconfig.json", JSON.stringify({ compilerOptions: { strict: true } }, null, 2))
+    await writeFile("tsconfig.json", JSON.stringify({ compilerOptions: { strict: true } }, null, 2))
 
     await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
-    const oxlintConfig = await Bun.file("oxlint.config.ts").text()
+    const oxlintConfig = await testFile("oxlint.config.ts").text()
     // SAFETY: the test seeds tsconfig.json above with standard tsconfig fields, and the migration only merges more of them.
-    const tsconfig = (await Bun.file("tsconfig.json").json()) as TsConfigJson
+    const tsconfig = JSON.parse(await testFile("tsconfig.json").text()) as TsConfigJson
 
     expect(oxlintConfig).toContain("respectEslintDisableDirectives")
     expect(oxlintConfig).toContain("typeAware")
@@ -152,7 +152,7 @@ describe("legacyTypecheckScript", () => {
   })
 
   test("migrate preserves an already migrated oxlint config", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify(
         {
@@ -166,7 +166,7 @@ describe("legacyTypecheckScript", () => {
         2
       )
     )
-    await Bun.write(
+    await writeFile(
       ".oxlintrc.json",
       JSON.stringify(
         {
@@ -178,18 +178,18 @@ describe("legacyTypecheckScript", () => {
         2
       )
     )
-    await Bun.write("tsconfig.json", JSON.stringify({ compilerOptions: { strict: true } }, null, 2))
+    await writeFile("tsconfig.json", JSON.stringify({ compilerOptions: { strict: true } }, null, 2))
 
     await runTestEffect(migrationLegacyOxlintJson.migrate({ cwd: tempDir }))
-    const migratedOxlintConfig = await Bun.file("oxlint.config.ts").text()
+    const migratedOxlintConfig = await testFile("oxlint.config.ts").text()
 
     await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file(".oxlintrc.json").exists()).toBe(false)
+    expect(await testFile(".oxlintrc.json").exists()).toBe(false)
 
-    const oxlintConfig = await Bun.file("oxlint.config.ts").text()
+    const oxlintConfig = await testFile("oxlint.config.ts").text()
     // SAFETY: the test seeds tsconfig.json above with standard tsconfig fields, and the migration only merges more of them.
-    const tsconfig = (await Bun.file("tsconfig.json").json()) as TsConfigJson
+    const tsconfig = JSON.parse(await testFile("tsconfig.json").text()) as TsConfigJson
 
     expect(oxlintConfig).toBe(migratedOxlintConfig)
     expect(tsconfig.compilerOptions).toEqual({ strict: true })
@@ -197,7 +197,7 @@ describe("legacyTypecheckScript", () => {
   })
 
   test("migrate returns guidance instead of writing a root tsconfig in a monorepo", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify(
         {
@@ -215,14 +215,14 @@ describe("legacyTypecheckScript", () => {
 
     const result = await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("tsconfig.json").exists()).toBe(false)
+    expect(await testFile("tsconfig.json").exists()).toBe(false)
     expect(result.warnings).toEqual([...MONOREPO_GUIDANCE])
 
     await runTestEffect(migrationLegacyTypecheckScript.validate({ cwd: tempDir }))
   })
 
   test("migrate leaves an existing root tsconfig unchanged in a monorepo", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify(
         {
@@ -236,7 +236,7 @@ describe("legacyTypecheckScript", () => {
         2
       )
     )
-    await Bun.write("pnpm-workspace.yaml", "packages:\n  - packages/*\n")
+    await writeFile("pnpm-workspace.yaml", "packages:\n  - packages/*\n")
     const existingTsconfig = JSON.stringify(
       {
         extends: "./tooling/tsconfig.base.json",
@@ -246,17 +246,17 @@ describe("legacyTypecheckScript", () => {
       null,
       2
     )
-    await Bun.write("tsconfig.json", existingTsconfig)
+    await writeFile("tsconfig.json", existingTsconfig)
 
     await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
-    expect(await Bun.file("tsconfig.json").text()).toBe(existingTsconfig)
+    expect(await testFile("tsconfig.json").text()).toBe(existingTsconfig)
 
     await runTestEffect(migrationLegacyTypecheckScript.validate({ cwd: tempDir }))
   })
 
   test("migrate updates the GitHub Actions workflow when it exists", async () => {
-    await Bun.write(
+    await writeFile(
       "package.json",
       JSON.stringify(
         {
@@ -271,17 +271,17 @@ describe("legacyTypecheckScript", () => {
         2
       )
     )
-    await Bun.write("oxlint.config.ts", "export default {}\n")
-    await Bun.write("tsconfig.json", JSON.stringify({ extends: "adamantite/typescript" }, null, 2))
+    await writeFile("oxlint.config.ts", "export default {}\n")
+    await writeFile("tsconfig.json", JSON.stringify({ extends: "adamantite/typescript" }, null, 2))
     mkdirSync(".github/workflows", { recursive: true })
-    await Bun.write(
+    await writeFile(
       ".github/workflows/adamantite.yml",
       "name: adamantite\njobs:\n  verify:\n    strategy:\n      matrix:\n        include:\n          - name: check\n            command: bun run check\n          - name: types\n            command: bun run typecheck\n"
     )
 
     await runTestEffect(migrationLegacyTypecheckScript.migrate({ cwd: tempDir }))
 
-    const workflow = await Bun.file(".github/workflows/adamantite.yml").text()
+    const workflow = await testFile(".github/workflows/adamantite.yml").text()
     expect(workflow).toContain("name: check")
     expect(workflow).toContain("name: format")
     expect(workflow).not.toContain("name: types")

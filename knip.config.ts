@@ -4,7 +4,7 @@ import analyze from "./presets/analyze.ts"
 export default {
   ...analyze,
   entry: ["presets/**/*.ts", "scripts/*.ts"],
-  ignore: ["bunup.config.ts", "presets/lint/antislop/plugin.d.mts"],
+  ignore: ["presets/lint/antislop/plugin.d.mts"],
   rules: {
     ...analyze.rules,
     devDependencies: "off",

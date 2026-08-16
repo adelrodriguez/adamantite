@@ -1,6 +1,3 @@
-import { mkdtempSync } from "node:fs"
-import { tmpdir } from "node:os"
-import path from "node:path"
 /**
  * Re-vendors third-party oxlint plugins into the presets that ship them.
  *
@@ -18,6 +15,9 @@ import path from "node:path"
  * bumping a pinned ref, review the upstream diff and update the rules in the owning preset if rules
  * were added, removed, or renamed (the preset's drift test will catch a mismatch).
  */
+import { mkdtempSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { $ } from "bun"
 
 interface VendoredPlugin {
@@ -108,7 +108,8 @@ export default vendoredPlugin
     await Bun.write(path.join(outDir, "license.md"), license)
     console.info(`Vendored ${plugin.name}@${commit} to ${outDir}`)
   } finally {
-    await $`rm -rf ${cloneDir}`
+    // nothrow so a cleanup failure cannot mask the real error from clone, install, or bundle.
+    await $`rm -rf ${cloneDir}`.nothrow()
   }
 }
 

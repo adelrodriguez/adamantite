@@ -19,7 +19,7 @@ export const parseJson = (content: string, path?: string) =>
       : Effect.succeed(parsed)
   })
 
-export const checkIsJsonObject = (value: JsonValue): value is JsonObject =>
+export const checkIsJsonObject = (value: JsonValue | undefined): value is JsonObject =>
   Predicate.isObject(value)
 
 export function serializeTsObjectLiteral(

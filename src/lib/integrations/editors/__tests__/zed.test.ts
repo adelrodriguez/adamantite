@@ -45,6 +45,11 @@ describe("zed", () => {
 
         expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
         expect(config.languages.JavaScript.format_on_save).toBe("on")
+        expect(config.languages.Astro).toEqual({
+          format_on_save: "on",
+          formatter: "prettier",
+          prettier: { allowed: true, parser: "astro", plugins: ["prettier-plugin-astro"] },
+        })
       })
     )
   })
@@ -131,14 +136,33 @@ describe("zed", () => {
       Effect.gen(function* () {
         const formatter = [{ external: "custom" }, { external: "custom" }]
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({ languages: { Astro: { formatter } } }),
+          [SETTINGS_PATH]: JSON.stringify({ languages: { Svelte: { formatter } } }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
-        expect(config.languages.Astro.formatter).toEqual(formatter)
+        expect(config.languages.Svelte.formatter).toEqual(formatter)
+      })
+    )
+
+    it.effect("deduplicate prettier plugins for the managed Astro entry", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [SETTINGS_PATH]: JSON.stringify({
+            languages: {
+              Astro: { prettier: { allowed: true, plugins: ["prettier-plugin-astro"] } },
+            },
+          }),
+        })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        const config = JSON.parse(files.read(SETTINGS_PATH))
+
+        expect(config.languages.Astro.formatter).toBe("prettier")
+        expect(config.languages.Astro.prettier.plugins).toEqual(["prettier-plugin-astro"])
       })
     )
 

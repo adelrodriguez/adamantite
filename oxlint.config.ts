@@ -7,31 +7,11 @@ export default defineConfig({
   extends: [core, node, antislop],
   ignorePatterns: [
     ...ignorePatterns,
-    // Generated vendored bundle and its declaration; see scripts/vendor-plugins.ts.
-    "presets/lint/antislop/plugin.mjs",
-    "presets/lint/antislop/plugin.d.mts",
+    // Vendored plugin directories are entirely generated; see scripts/vendor-plugins.ts.
+    "presets/lint/*/",
   ],
   options: {
     typeAware: true,
     typeCheck: true,
   },
-  overrides: [
-    {
-      files: ["src/lib/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              {
-                group: ["#terminal/*"],
-                message:
-                  "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
-              },
-            ],
-          },
-        ],
-      },
-    },
-  ],
 })

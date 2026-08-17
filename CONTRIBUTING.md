@@ -27,8 +27,9 @@ Read [CONTEXT.md](CONTEXT.md) before you change domain behavior. Use
 ```sh
 pnpm run build       # Bundle the CLI and published presets into dist.
 pnpm run dev         # Rebuild when source files change.
-pnpm run test        # Build the package and run the Vitest suite.
-pnpm run test:watch  # Rebuild and rerun tests when files change.
+pnpm run test        # Run the Vitest suite.
+pnpm run test:build  # Build the package and verify the packaged CLI.
+pnpm run test:watch  # Rerun tests when files change.
 pnpm run check       # Check lint rules and TypeScript types.
 pnpm run fix         # Apply safe lint fixes.
 pnpm run format      # Format repository files.
@@ -44,11 +45,10 @@ node bin/adamantite --help
 node bin/adamantite doctor
 ```
 
-Build before testing the packaged executable:
+Build and verify the packaged CLI:
 
 ```sh
-pnpm run build
-./bin/adamantite --help
+pnpm run test:build
 ```
 
 ## Make a change

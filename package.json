@@ -66,6 +66,7 @@
     "format": "oxfmt",
     "release": "changeset publish",
     "test": "vitest run",
+    "test:build": "pnpm run build && node scripts/test-build.ts",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "version": "changeset version"

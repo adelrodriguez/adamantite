@@ -1,11 +1,10 @@
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as String from "effect/String"
 import { runScriptCommand, type PackageManagerName } from "nypm"
-import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
+import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { MANAGED_SCRIPT_COMMANDS, type Script } from "#lib/workspace/package-json.ts"
 
 const AGENTS_NAME = "AGENTS.md"
@@ -71,17 +70,12 @@ function getAgentsSection({ packageManager, scripts }: WriteAgentsGuidanceOption
 
 export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOptions) =>
   Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const agentsPath = path.join(cwd, AGENTS_NAME)
-    const exists = yield* fs
-      .exists(agentsPath)
-      .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: agentsPath })))
-    const existing = exists
-      ? yield* fs
-          .readFileString(agentsPath)
-          .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: agentsPath })))
-      : ""
+    const existing = pipe(
+      yield* readFileIfExists(agentsPath),
+      Option.getOrElse(() => "")
+    )
     const startIndex = pipe(existing, String.indexOf(ADAMANTITE_AGENTS_START_MARKER))
     const endIndex = pipe(existing, String.indexOf(ADAMANTITE_AGENTS_END_MARKER))
     const markerRange = pipe(
@@ -95,9 +89,7 @@ export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOpt
       const sectionEnd = end + ADAMANTITE_AGENTS_END_MARKER.length
       const nextContent = `${existing.slice(0, start)}${section.trimEnd()}${existing.slice(sectionEnd)}`
 
-      yield* fs
-        .writeFileString(agentsPath, nextContent.endsWith("\n") ? nextContent : `${nextContent}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: agentsPath })))
+      yield* writeFile(agentsPath, nextContent.endsWith("\n") ? nextContent : `${nextContent}\n`)
 
       return "updated" as const
     }
@@ -114,9 +106,7 @@ export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOpt
           ? "\n"
           : "\n\n"
 
-    yield* fs
-      .writeFileString(agentsPath, `${existing}${separator}${section}`)
-      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: agentsPath })))
+    yield* writeFile(agentsPath, `${existing}${separator}${section}`)
 
     return "updated" as const
   })

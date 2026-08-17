@@ -7,6 +7,7 @@ import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 
@@ -16,6 +17,13 @@ function makeFiles(files?: Record<string, string>) {
 
 function provideFiles(files: FileSystemTestContext) {
   return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
+
+function runAssess(integration: typeof oxlint | typeof tsgolint, files: FileSystemTestContext) {
+  return readPackageJson(ROOT).pipe(
+    Effect.flatMap((packageJson) => integration.assess(ROOT, packageJson)),
+    provideFiles(files)
+  )
 }
 
 describe("oxlint", () => {
@@ -200,7 +208,7 @@ describe("oxlint", () => {
           ),
         })
 
-        const result = yield* oxlint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(oxlint, files)
 
         expect(result).toEqual({
           applicable: false,
@@ -228,7 +236,7 @@ describe("oxlint", () => {
           ),
         })
 
-        const result = yield* oxlint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(oxlint, files)
 
         expect(result).toEqual({
           actions: [
@@ -264,7 +272,7 @@ describe("oxlint", () => {
           ),
         })
 
-        const result = yield* oxlint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(oxlint, files)
 
         expect(result).toEqual({
           actions: [
@@ -309,7 +317,7 @@ describe("oxlint", () => {
           ),
         })
 
-        const result = yield* oxlint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(oxlint, files)
 
         expect(result).toEqual({
           actions: [],
@@ -347,7 +355,7 @@ describe("oxlint", () => {
           ),
         })
 
-        const result = yield* oxlint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(oxlint, files)
 
         expect(result).toEqual({
           actions: [
@@ -390,7 +398,7 @@ describe("oxlint", () => {
           ),
         })
 
-        const result = yield* oxlint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(oxlint, files)
 
         expect(result).toEqual({
           actions: [
@@ -427,7 +435,7 @@ describe("tsgolint", () => {
           ),
         })
 
-        const result = yield* tsgolint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(tsgolint, files)
 
         expect(result).toEqual({
           applicable: false,
@@ -452,7 +460,7 @@ describe("tsgolint", () => {
           ),
         })
 
-        const result = yield* tsgolint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(tsgolint, files)
 
         expect(result).toEqual({
           actions: [
@@ -488,7 +496,7 @@ describe("tsgolint", () => {
           ),
         })
 
-        const result = yield* tsgolint.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(tsgolint, files)
 
         expect(result).toEqual({
           actions: [],

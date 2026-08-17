@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 
@@ -13,6 +14,13 @@ function makeFiles(files?: Record<string, string>) {
 
 function provideFiles(files: FileSystemTestContext) {
   return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+}
+
+function runAssess(files: FileSystemTestContext) {
+  return readPackageJson(ROOT).pipe(
+    Effect.flatMap((packageJson) => sherif.assess(ROOT, packageJson)),
+    provideFiles(files)
+  )
 }
 
 describe("sherif", () => {
@@ -33,7 +41,7 @@ describe("sherif", () => {
           ),
         })
 
-        const result = yield* sherif.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           applicable: false,
@@ -58,7 +66,7 @@ describe("sherif", () => {
           ),
         })
 
-        const result = yield* sherif.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [
@@ -94,7 +102,7 @@ describe("sherif", () => {
           ),
         })
 
-        const result = yield* sherif.assess(ROOT).pipe(provideFiles(files))
+        const result = yield* runAssess(files)
 
         expect(result).toEqual({
           actions: [],

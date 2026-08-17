@@ -40,14 +40,14 @@ export default Command.make("doctor", { fix }).pipe(
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
         )
         yield* prompter.outro("⚠️ Doctor found issues.")
-        yield* new CommandFailed({
+        return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
       }
 
-      // 1. Assess integrations.
-      const assessments = yield* collectApplicableAssessments(integrations, cwd)
+      // 1. Assess integrations, reusing the manifest parsed above.
+      const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
 
       // 2. Print warnings.
       for (const { assessment } of assessments) {

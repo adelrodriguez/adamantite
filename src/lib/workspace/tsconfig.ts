@@ -5,7 +5,8 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import { defineIntegration } from "#lib/integrations/base.ts"
-import { FailedToReadFile, FailedToWriteFile, InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
@@ -36,14 +37,8 @@ export default defineIntegration({
   config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(cwd, files[0].path)
-      const payload = JSON.stringify(CONFIG, null, 2)
-
-      yield* fs
-        .writeFileString(configPath, `${payload}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+      yield* writeJsonFile(path.join(cwd, files[0].path), CONFIG)
     }),
   detect: (cwd: string) =>
     Effect.gen(function* () {
@@ -56,13 +51,10 @@ export default defineIntegration({
   name: "tsconfig",
   update: (cwd: string) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const configPath = path.join(cwd, files[0].path)
 
-      const tsconfigFile = yield* fs
-        .readFileString(configPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
+      const tsconfigFile = yield* readFile(configPath)
       const existingConfig = yield* parseJson(tsconfigFile, configPath)
 
       if (!Predicate.isObject(existingConfig)) {
@@ -75,8 +67,6 @@ export default defineIntegration({
         extends: mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined),
       }
 
-      yield* fs
-        .writeFileString(configPath, `${JSON.stringify(newConfig, null, 2)}\n`)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+      yield* writeJsonFile(configPath, newConfig)
     }),
 })

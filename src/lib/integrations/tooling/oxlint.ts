@@ -1,15 +1,12 @@
+import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
-import {
-  FailedToReadFile,
-  FailedToWriteFile,
-  FileNotFound,
-  UnsupportedConfigState,
-} from "#lib/shared/errors.ts"
+import { FileNotFound, UnsupportedConfigState } from "#lib/shared/errors.ts"
+import { readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { getManagedScripts, readPackageJson } from "#lib/workspace/package-json.ts"
+import { getManagedScripts } from "#lib/workspace/package-json.ts"
 import {
   detectToolingConfig,
   getConfigActions,
@@ -36,10 +33,8 @@ const VERSION = getDependencyVersion("oxlint")
 const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 
 export default defineIntegration({
-  assess: (cwd: string) =>
+  assess: (cwd: string, packageJson: PackageJson) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const packageJson = yield* readPackageJson(cwd)
       const managedScripts = getManagedScripts(packageJson)
 
       if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
@@ -66,11 +61,7 @@ export default defineIntegration({
       const activeConfig = state.active
 
       if (activeConfig?.format === "ts") {
-        const content = yield* fs
-          .readFileString(activeConfig.path)
-          .pipe(
-            Effect.mapError((cause) => new FailedToReadFile({ cause, path: activeConfig.path }))
-          )
+        const content = yield* readFile(activeConfig.path)
         const patch = inspectRequiredOxlintConfig(content)
 
         if (patch.kind === "patchable") {
@@ -100,14 +91,10 @@ export default defineIntegration({
   config: CONFIG_FILE,
   create: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE)
       const payload = toOxlintTsConfigContent({}, getOxlintPresetNames(presets))
 
-      yield* fs
-        .writeFileString(configPath, payload)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+      yield* writeFile(path.join(cwd, CONFIG_FILE), payload)
     }),
   detect,
   files,
@@ -123,9 +110,7 @@ export default defineIntegration({
         return yield* new FileNotFound({ path: CONFIG_FILE })
       }
 
-      const content = yield* fs
-        .readFileString(configPath)
-        .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: configPath })))
+      const content = yield* readFile(configPath)
       const patch = inspectRequiredOxlintConfig(content)
 
       if (patch.kind === "configured") {
@@ -136,9 +121,7 @@ export default defineIntegration({
         return yield* new UnsupportedConfigState({ path: CONFIG_FILE, reason: patch.reason })
       }
 
-      yield* fs
-        .writeFileString(configPath, patch.updatedContent)
-        .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: configPath })))
+      yield* writeFile(configPath, patch.updatedContent)
     }),
   version: VERSION,
 })

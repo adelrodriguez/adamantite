@@ -30,15 +30,22 @@ export class DependencyInstaller extends Context.Service<
   }
 >()("DependencyInstaller") {
   static readonly layer = Layer.succeed(this)({
-    addDevDependencies: (packages, cwd, options) =>
-      Effect.tryPromise({
-        catch: (cause) => new FailedToInstallDependency({ cause, packages }),
-        try: () => addDevDependency(packages, { ...options, cwd }),
-      }).pipe(Effect.asVoid),
-    detectPackageManager: (cwd) =>
+    addDevDependencies: Effect.fn("DependencyInstaller.addDevDependencies")(
+      (
+        packages: string[],
+        cwd: string,
+        options?: { readonly silent?: boolean; readonly workspace?: boolean }
+      ) =>
+        Effect.tryPromise({
+          catch: (cause) => new FailedToInstallDependency({ cause, packages }),
+          try: () => addDevDependency(packages, { ...options, cwd }),
+        }).pipe(Effect.asVoid)
+    ),
+    detectPackageManager: Effect.fn("DependencyInstaller.detectPackageManager")((cwd: string) =>
       Effect.tryPromise({
         catch: (cause) => new NoPackageManager({ cause }),
         try: () => detectNypmPackageManager(cwd),
-      }).pipe(Effect.map((detectedPackageManager) => detectedPackageManager ?? null)),
+      }).pipe(Effect.map((detectedPackageManager) => detectedPackageManager ?? null))
+    ),
   })
 }

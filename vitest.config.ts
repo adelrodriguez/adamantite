@@ -7,7 +7,6 @@ export default defineConfig({
     coverage: {
       provider: "v8",
     },
-    globalSetup: ["scripts/vitest-global-setup.ts"],
     include: ["src/**/*.test.ts"],
   },
 })

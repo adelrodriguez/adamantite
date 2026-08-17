@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   compatibility:
-    name: Minimum runtime compatibility
+    name: compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -91,7 +91,7 @@ jobs:
           - name: analyze
             command: pnpm run analyze
           - name: build
-            command: pnpm run build
+            command: pnpm run test:build
 
     steps:
       - name: Checkout

@@ -1,5 +1,19 @@
 # adamantite
 
+## 0.36.0
+
+### Minor Changes
+
+- [#372](https://github.com/adelrodriguez/adamantite/pull/372) [`02f9064`](https://github.com/adelrodriguez/adamantite/commit/02f906448448ba544e8518d3ab06946b9e623c5d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `antislop` lint preset, a vendored build of [anti-slop](https://github.com/dmmulroy/anti-slop) that rejects low-evidence, low-signal TypeScript and JavaScript patterns. Extend `adamantite/lint/antislop` alongside the core preset, or select it during `adamantite init`; nothing extra needs to be installed. Note that the preset also turns off two core rules that conflict with the anti-slop rules: `typescript/consistent-indexed-object-style` (its autofix produces code that `anti-slop/no-known-value-widening` re-flags) and `unicorn/no-immediate-mutation`. The init preset prompt now also shows a one-line description for every preset.
+
+- [#373](https://github.com/adelrodriguez/adamantite/pull/373) [`79fea78`](https://github.com/adelrodriguez/adamantite/commit/79fea78a8df66bb42960153b863bbb11406563c5) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add canonical `ignorePatterns` (dependencies, build output, generated code) to the core lint preset, exported both on the preset and as a named export. Oxlint does not merge `ignorePatterns` from extended configs, so generated `oxlint.config.ts` files now hoist `core.ignorePatterns` onto the root config, appending any project-specific patterns carried over from a legacy config.
+
+### Patch Changes
+
+- [#379](https://github.com/adelrodriguez/adamantite/pull/379) [`2e3262b`](https://github.com/adelrodriguez/adamantite/commit/2e3262bfaa25661c1ec33471e123f6158fa7f019) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Surface GitHub Actions setup failures during `adamantite init` instead of silently continuing. When the workflow cannot be written, `init` now warns with the underlying reason and a recovery hint. `doctor` and `update` also assess integrations concurrently and read `package.json` once per assessment pass instead of once per integration.
+
+- [#378](https://github.com/adelrodriguez/adamantite/pull/378) [`ed71957`](https://github.com/adelrodriguez/adamantite/commit/ed7195787ca68f80f8984a83f9b83851141f94cd) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop shipping the raw `presets/*.ts` sources in the npm package. The published tarball now contains only the compiled `dist/presets` output that the package exports already point to, which removes duplicate files and shrinks the unpacked size from 311 kB to 196 kB.
+
 ## 0.35.0
 
 ### Minor Changes

@@ -3,8 +3,8 @@ import { defu } from "defu"
 
 import * as Effect from "effect/Effect"
 
-import type * as Schema from "effect/Schema"
 import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import { type ParseError, parse } from "jsonc-parser"
 import { FailedToMergeConfig, FailedToParseFile } from "#lib/shared/errors.ts"
 
@@ -21,6 +21,10 @@ export const parseJson = (content: string, path?: string) =>
 
 export const checkIsJsonObject = (value: JsonValue | undefined): value is JsonObject =>
   Predicate.isObject(value)
+
+export const checkIsJsonRecord = Schema.is(Schema.Record(Schema.String, Schema.Json))
+
+export const checkIsJsonArray = Schema.is(Schema.Array(Schema.Json))
 
 export function serializeTsObjectLiteral(
   value: JsonValue,

@@ -3,11 +3,11 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
-import * as Schema from "effect/Schema"
+import type * as Schema from "effect/Schema"
 import { defineIntegration } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { checkIsJsonArray, checkIsJsonRecord, mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
 const CONFIG = {
@@ -93,9 +93,6 @@ const CONFIG = {
     },
   },
 } as const
-
-const checkIsJsonRecord = Schema.is(Schema.Record(Schema.String, Schema.Json))
-const checkIsJsonArray = Schema.is(Schema.Array(Schema.Json))
 
 function deduplicatePrettierPlugins(prettierConfig: Schema.Json) {
   if (!checkIsJsonRecord(prettierConfig) || !checkIsJsonArray(prettierConfig.plugins)) {

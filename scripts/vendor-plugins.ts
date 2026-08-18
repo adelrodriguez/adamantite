@@ -47,7 +47,7 @@ const VENDORED_PLUGINS: VendoredPlugin[] = [
   {
     entry: "src/index.ts",
     name: "anti-slop",
-    outDir: "presets/lint/antislop",
+    outDir: "presets/lint/vendor/antislop",
     pinnedRef: "446268e5d15baa968eaec669ff65358d36ae6259",
     repoUrl: "https://github.com/dmmulroy/anti-slop.git",
   },

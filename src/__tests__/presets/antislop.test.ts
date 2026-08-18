@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, test } from "@effect/vitest"
 import antislop from "#presets/lint/antislop.ts"
-import antislopPlugin from "#presets/lint/antislop/plugin.mjs"
+import antislopPlugin from "#presets/lint/vendor/antislop/plugin.mjs"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 

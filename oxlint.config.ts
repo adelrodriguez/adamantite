@@ -7,8 +7,8 @@ export default defineConfig({
   extends: [core, node, antislop],
   ignorePatterns: [
     ...ignorePatterns,
-    // Vendored plugin directories are entirely generated; see scripts/vendor-plugins.ts.
-    "presets/lint/*/",
+    // Vendored plugin bundles are entirely generated; see scripts/vendor-plugins.ts.
+    "presets/lint/vendor/",
   ],
   options: {
     typeAware: true,

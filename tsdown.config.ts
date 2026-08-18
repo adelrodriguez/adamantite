@@ -21,11 +21,11 @@ export default defineConfig([
       { from: "presets/tsconfig.json", to: "dist/presets" },
       {
         from: [
-          "presets/lint/antislop/plugin.mjs",
-          "presets/lint/antislop/plugin.d.mts",
-          "presets/lint/antislop/license.md",
+          "presets/lint/vendor/antislop/plugin.mjs",
+          "presets/lint/vendor/antislop/plugin.d.mts",
+          "presets/lint/vendor/antislop/license.md",
         ],
-        to: "dist/presets/lint/antislop",
+        to: "dist/presets/lint/vendor/antislop",
       },
     ],
     deps: { neverBundle: ["knip", "oxfmt", "oxlint"] },

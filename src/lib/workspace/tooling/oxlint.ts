@@ -536,5 +536,18 @@ export function removeOxlintRules(
     content
   )
 
+  // A final guard for hidden references the walk cannot classify, such as identifier values and
+  // call results: never report patchable content that still names a removed rule.
+  const verified = parse(updatedContent)
+
+  if (
+    Option.isNone(verified) ||
+    ruleNames.some((ruleName) =>
+      stripComments(updatedContent, verified.value.comments).includes(ruleName)
+    )
+  ) {
+    return { kind: "manual", reason: UNSUPPORTED_RULES_REASON }
+  }
+
   return { kind: "patchable", updatedContent }
 }

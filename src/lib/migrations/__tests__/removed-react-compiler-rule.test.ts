@@ -170,6 +170,60 @@ describe("removedReactCompilerRule", () => {
       })
   )
 
+  it.effect("check warns for every shape that would leave a hidden reference behind", () =>
+    Effect.gen(function* () {
+      const configs = [
+        // Identifier element in the overrides array.
+        [
+          'import { defineConfig } from "oxlint"',
+          "",
+          'const shared = { rules: { "react/react-compiler": "off" } }',
+          "",
+          "export default defineConfig({",
+          '  rules: { "react/react-compiler": "off" },',
+          "  overrides: [shared],",
+          "})",
+          "",
+        ],
+        // Shorthand identifier value.
+        [
+          'import { defineConfig } from "oxlint"',
+          "",
+          'const overrides = [{ rules: { "react/react-compiler": "off" } }]',
+          "",
+          "export default defineConfig({",
+          '  rules: { "react/react-compiler": "off" },',
+          "  overrides,",
+          "})",
+          "",
+        ],
+        // Call expression element.
+        [
+          'import { defineConfig } from "oxlint"',
+          'import { makeOverride } from "./overrides.ts"',
+          "",
+          "export default defineConfig({",
+          '  rules: { "react/react-compiler": "off" },',
+          '  overrides: [makeOverride({ rules: { "react/react-compiler": "off" } })],',
+          "})",
+          "",
+        ],
+      ]
+
+      for (const config of configs) {
+        const files = makeFiles({ "oxlint.config.ts": config.join("\n") })
+
+        const result = yield* migrationRemovedReactCompilerRule
+          .check({ cwd: ROOT })
+          .pipe(provideFiles(files))
+
+        expect(result.status).toBe("not-applicable")
+        expect(result.warnings).toHaveLength(1)
+        expect(result.warnings[0]).toContain("react/react-compiler")
+      }
+    })
+  )
+
   it.effect("migrate removes a trailing line comment that annotated the removed entry", () =>
     Effect.gen(function* () {
       const files = makeFiles({

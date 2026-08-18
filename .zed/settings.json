@@ -2,10 +2,8 @@
   "languages": {
     "Astro": {
       "format_on_save": "on",
-      "formatter": "prettier",
       "prettier": {
         "allowed": true,
-        "parser": "astro",
         "plugins": ["prettier-plugin-astro"]
       }
     },

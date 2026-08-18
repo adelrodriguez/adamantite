@@ -47,8 +47,7 @@ describe("zed", () => {
         expect(config.languages.JavaScript.format_on_save).toBe("on")
         expect(config.languages.Astro).toEqual({
           format_on_save: "on",
-          formatter: "prettier",
-          prettier: { allowed: true, parser: "astro", plugins: ["prettier-plugin-astro"] },
+          prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
         })
       })
     )
@@ -161,7 +160,7 @@ describe("zed", () => {
 
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
-        expect(config.languages.Astro.formatter).toBe("prettier")
+        expect(config.languages.Astro.formatter).toBeUndefined()
         expect(config.languages.Astro.prettier.plugins).toEqual(["prettier-plugin-astro"])
       })
     )

@@ -8,12 +8,12 @@ import ts from "esrap/languages/ts"
 import {
   parseSync,
   type ArrayExpression,
+  type Comment,
   type ExportDefaultDeclaration,
   type ObjectExpression,
   type ObjectProperty,
   type Program,
   type PropertyKey,
-  type SpreadElement,
 } from "oxc-parser"
 import { ignorePatterns as coreIgnorePatterns } from "#presets/lint/core.ts"
 
@@ -123,10 +123,17 @@ const parseThrowable = Option.liftThrowable((content: string) =>
   })
 )
 
+interface ParsedConfig {
+  readonly comments: readonly Comment[]
+  readonly program: Program
+}
+
 function parse(content: string) {
   return parseThrowable(content).pipe(
     Option.flatMap((result) =>
-      result.errors.length === 0 ? Option.fromNullishOr(result.program) : Option.none<Program>()
+      result.errors.length === 0
+        ? Option.some<ParsedConfig>({ comments: result.comments, program: result.program })
+        : Option.none<ParsedConfig>()
     )
   )
 }
@@ -323,7 +330,7 @@ export function inspectRequiredOxlintConfig(content: string) {
     } satisfies OxlintRequiredOptionsPatchResult
   }
 
-  const configObjectExpression = getExportedConfigObject(parsed.value)
+  const configObjectExpression = getExportedConfigObject(parsed.value.program)
 
   if (Option.isNone(configObjectExpression)) {
     return {
@@ -346,7 +353,7 @@ export function inspectRequiredOxlintConfig(content: string) {
 
     return {
       kind: "patchable",
-      updatedContent: print(parsed.value),
+      updatedContent: print(parsed.value.program),
     } satisfies OxlintRequiredOptionsPatchResult
   }
 
@@ -357,7 +364,7 @@ export function inspectRequiredOxlintConfig(content: string) {
     } satisfies OxlintRequiredOptionsPatchResult
   }
 
-  return patchOptionsObject(parsed.value, optionsPropertyResult.property.value)
+  return patchOptionsObject(parsed.value.program, optionsPropertyResult.property.value)
 }
 
 export type OxlintRuleRemovalResult =
@@ -365,56 +372,124 @@ export type OxlintRuleRemovalResult =
   | { readonly kind: "manual"; readonly reason: string }
   | { readonly kind: "patchable"; readonly updatedContent: string }
 
-function removeMatchingProperties(
+const UNSUPPORTED_RULES_REASON =
+  '`oxlint.config.ts` references a removed rule in a shape Adamantite cannot patch safely. Make sure every rule entry is a plain `"rule-name": severity` property—avoid spreads (`...rest`) and computed keys (`[name]: ...`).'
+
+interface RuleMatchResult {
+  /**
+   * Set when a spread or computed key could hide a rule entry the static walk cannot see. A partial
+   * patch would still leave oxlint failing to load the config, so any ambiguity downgrades the
+   * whole file to a manual fix.
+   */
+  readonly ambiguous: boolean
+  readonly matches: readonly ObjectProperty[]
+}
+
+function collectMatchingProperties(
   node: ArrayExpression | ObjectExpression,
   ruleNames: ReadonlySet<string>
-): number {
-  if (node.type === "ArrayExpression") {
-    let removed = 0
+): RuleMatchResult {
+  let ambiguous = false
+  const matches: ObjectProperty[] = []
 
+  const mergeChild = (child: ArrayExpression | ObjectExpression) => {
+    const result = collectMatchingProperties(child, ruleNames)
+
+    ambiguous = ambiguous || result.ambiguous
+    matches.push(...result.matches)
+  }
+
+  if (node.type === "ArrayExpression") {
     for (const element of node.elements) {
       if (element && (element.type === "ArrayExpression" || element.type === "ObjectExpression")) {
-        removed += removeMatchingProperties(element, ruleNames)
+        mergeChild(element)
       }
     }
 
-    return removed
+    return { ambiguous, matches }
   }
 
-  let removed = 0
-  const kept: Array<ObjectProperty | SpreadElement> = []
-
   for (const property of node.properties) {
-    if (
-      property.type === "Property" &&
-      !property.computed &&
-      property.kind === "init" &&
-      Option.exists(getStaticPropertyName(property.key), (name) => ruleNames.has(name))
-    ) {
-      removed += 1
+    if (property.type === "SpreadElement") {
+      const argument = property.argument
+
+      if (argument.type === "ArrayExpression" || argument.type === "ObjectExpression") {
+        mergeChild(argument)
+      } else {
+        ambiguous = true
+      }
+
       continue
     }
 
-    kept.push(property)
+    if (property.computed && property.key.type !== "Literal") {
+      ambiguous = true
+      continue
+    }
 
-    const child = property.type === "SpreadElement" ? property.argument : property.value
+    if (Option.exists(getStaticPropertyName(property.key), (name) => ruleNames.has(name))) {
+      if (property.method || property.kind !== "init") {
+        ambiguous = true
+        continue
+      }
 
-    if (child.type === "ArrayExpression" || child.type === "ObjectExpression") {
-      removed += removeMatchingProperties(child, ruleNames)
+      matches.push(property)
+      continue
+    }
+
+    if (property.value.type === "ArrayExpression" || property.value.type === "ObjectExpression") {
+      mergeChild(property.value)
     }
   }
 
-  if (removed > 0) {
-    node.properties.splice(0, node.properties.length, ...kept)
+  return { ambiguous, matches }
+}
+
+// Splices a property out of the original source text instead of reprinting the AST, so the
+// user's comments and formatting survive the removal.
+function removePropertyText(content: string, property: ObjectProperty) {
+  let start = property.start
+  let end = property.end
+
+  const trailingComma = /^[ \t]*,/.exec(content.slice(end))
+
+  if (trailingComma) {
+    end += trailingComma[0].length
+  } else {
+    const leadingComma = /,[ \t]*$/.exec(content.slice(0, start))
+
+    if (leadingComma) {
+      start -= leadingComma[0].length
+    }
   }
 
-  return removed
+  // Take the surrounding lines too when nothing else remains on them.
+  const lineStart = content.lastIndexOf("\n", start - 1) + 1
+  const nextNewline = content.indexOf("\n", end)
+  const lineEnd = nextNewline === -1 ? content.length : nextNewline + 1
+
+  if (`${content.slice(lineStart, start)}${content.slice(end, lineEnd)}`.trim() === "") {
+    start = lineStart
+    end = lineEnd
+  }
+
+  return `${content.slice(0, start)}${content.slice(end)}`
+}
+
+// Comments arrive in source order, so the right-to-left reduce keeps earlier offsets valid
+// while splicing.
+function stripComments(content: string, comments: readonly Comment[]) {
+  return comments.reduceRight(
+    (current, comment) => `${current.slice(0, comment.start)}${current.slice(comment.end)}`,
+    content
+  )
 }
 
 /**
  * Removes rule entries with the given names from anywhere in the exported config object, including
- * nested `overrides` entries. Returns `absent` when the config does not set any of the rules, so
- * callers can distinguish "nothing to do" from an unpatchable file shape.
+ * nested `overrides` entries, by splicing them out of the original source text so comments and
+ * formatting survive. Returns `absent` when the config does not reference any of the rules outside
+ * comments, and `manual` when a reference exists that the static walk cannot remove safely.
  */
 export function removeOxlintRules(
   content: string,
@@ -430,17 +505,32 @@ export function removeOxlintRules(
     return { kind: "manual", reason: UNSUPPORTED_CONFIG_REASON }
   }
 
-  const configObjectExpression = getExportedConfigObject(parsed.value)
+  const contentWithoutComments = stripComments(content, parsed.value.comments)
+
+  if (!ruleNames.some((ruleName) => contentWithoutComments.includes(ruleName))) {
+    return { kind: "absent" }
+  }
+
+  const configObjectExpression = getExportedConfigObject(parsed.value.program)
 
   if (Option.isNone(configObjectExpression)) {
     return { kind: "manual", reason: UNSUPPORTED_CONFIG_REASON }
   }
 
-  const removed = removeMatchingProperties(configObjectExpression.value, new Set(ruleNames))
+  const state = collectMatchingProperties(configObjectExpression.value, new Set(ruleNames))
 
-  if (removed === 0) {
-    return { kind: "absent" }
+  if (state.ambiguous || state.matches.length === 0) {
+    // Either a spread or computed key could hide an entry, or the name appears outside comments
+    // in a position the walk cannot remove; both need a human.
+    return { kind: "manual", reason: UNSUPPORTED_RULES_REASON }
   }
 
-  return { kind: "patchable", updatedContent: print(parsed.value) }
+  // The walk collects matches in source order, so the right-to-left reduce keeps earlier
+  // offsets valid while splicing.
+  const updatedContent = state.matches.reduceRight(
+    (current, property) => removePropertyText(current, property),
+    content
+  )
+
+  return { kind: "patchable", updatedContent }
 }

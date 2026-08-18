@@ -92,6 +92,95 @@ describe("removedReactCompilerRule", () => {
     })
   )
 
+  it.effect("check warns when the rule hides behind a computed key", () =>
+    Effect.gen(function* () {
+      const files = makeFiles({
+        "oxlint.config.ts": [
+          'import { defineConfig } from "oxlint"',
+          "",
+          'const name = "react/react-compiler"',
+          "",
+          "export default defineConfig({",
+          '  rules: { [name]: "off" },',
+          "})",
+          "",
+        ].join("\n"),
+      })
+
+      const result = yield* migrationRemovedReactCompilerRule
+        .check({ cwd: ROOT })
+        .pipe(provideFiles(files))
+
+      expect(result.status).toBe("not-applicable")
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]).toContain("react/react-compiler")
+    })
+  )
+
+  it.effect("check warns when the rule could hide behind a spread", () =>
+    Effect.gen(function* () {
+      const files = makeFiles({
+        "oxlint.config.ts": [
+          'import { defineConfig } from "oxlint"',
+          "",
+          'const shared = { "react/react-compiler": "off" }',
+          "",
+          "export default defineConfig({",
+          "  rules: { ...shared },",
+          "})",
+          "",
+        ].join("\n"),
+      })
+
+      const result = yield* migrationRemovedReactCompilerRule
+        .check({ cwd: ROOT })
+        .pipe(provideFiles(files))
+
+      expect(result.status).toBe("not-applicable")
+      expect(result.warnings).toHaveLength(1)
+      expect(result.warnings[0]).toContain("react/react-compiler")
+    })
+  )
+
+  it.effect("migrate preserves the user's comments and formatting", () =>
+    Effect.gen(function* () {
+      const files = makeFiles({
+        "oxlint.config.ts": [
+          'import { defineConfig } from "oxlint"',
+          "",
+          "// keep this comment",
+          "export default defineConfig({",
+          "  rules: {",
+          "    // team decision, do not remove",
+          '    "react/jsx-key": "error",',
+          '    "react/react-compiler": "off",',
+          "  },",
+          "})",
+          "",
+        ].join("\n"),
+      })
+
+      yield* migrationRemovedReactCompilerRule.migrate({ cwd: ROOT }).pipe(provideFiles(files))
+
+      expect(files.read("oxlint.config.ts")).toBe(
+        [
+          'import { defineConfig } from "oxlint"',
+          "",
+          "// keep this comment",
+          "export default defineConfig({",
+          "  rules: {",
+          "    // team decision, do not remove",
+          '    "react/jsx-key": "error",',
+          "  },",
+          "})",
+          "",
+        ].join("\n")
+      )
+
+      yield* migrationRemovedReactCompilerRule.validate({ cwd: ROOT }).pipe(provideFiles(files))
+    })
+  )
+
   it.effect("migrate removes the rule from the root rules object", () =>
     Effect.gen(function* () {
       const files = makeFiles({

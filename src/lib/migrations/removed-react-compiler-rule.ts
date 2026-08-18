@@ -13,8 +13,8 @@ import { removeOxlintRules } from "#lib/workspace/tooling/oxlint.ts"
  */
 const REMOVED_RULES = ["react/react-compiler"]
 
-const MANUAL_WARNING =
-  "`oxlint.config.ts` references the removed `react/react-compiler` rule, but Adamantite cannot patch the current file shape safely. Remove the rule manually; oxlint fails to load configs that reference it."
+const MANUAL_WARNING_SUFFIX =
+  "Remove the `react/react-compiler` rule manually; oxlint fails to load configs that reference it."
 
 const readConfig = (cwd: string) =>
   Effect.gen(function* () {
@@ -39,7 +39,10 @@ export default defineMigration({
       }
 
       if (removal.kind === "manual") {
-        return { status: "not-applicable", warnings: [MANUAL_WARNING] } as const
+        return {
+          status: "not-applicable",
+          warnings: [`${removal.reason} ${MANUAL_WARNING_SUFFIX}`],
+        } as const
       }
 
       return {

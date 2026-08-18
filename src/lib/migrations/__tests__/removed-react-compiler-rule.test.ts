@@ -142,6 +142,69 @@ describe("removedReactCompilerRule", () => {
     })
   )
 
+  it.effect(
+    "check warns instead of partially patching when an array spread could hide the rule",
+    () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            "",
+            'const shared = [{ rules: { "react/react-compiler": "off" } }]',
+            "",
+            "export default defineConfig({",
+            '  rules: { "react/react-compiler": "off" },',
+            "  overrides: [...shared],",
+            "})",
+            "",
+          ].join("\n"),
+        })
+
+        const result = yield* migrationRemovedReactCompilerRule
+          .check({ cwd: ROOT })
+          .pipe(provideFiles(files))
+
+        expect(result.status).toBe("not-applicable")
+        expect(result.warnings).toHaveLength(1)
+        expect(result.warnings[0]).toContain("react/react-compiler")
+      })
+  )
+
+  it.effect("migrate removes a trailing line comment that annotated the removed entry", () =>
+    Effect.gen(function* () {
+      const files = makeFiles({
+        "oxlint.config.ts": [
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({",
+          "  rules: {",
+          '    "react/jsx-key": "error",',
+          '    "react/react-compiler": "off", // legacy nursery rule',
+          "  },",
+          "})",
+          "",
+        ].join("\n"),
+      })
+
+      yield* migrationRemovedReactCompilerRule.migrate({ cwd: ROOT }).pipe(provideFiles(files))
+
+      expect(files.read("oxlint.config.ts")).toBe(
+        [
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({",
+          "  rules: {",
+          '    "react/jsx-key": "error",',
+          "  },",
+          "})",
+          "",
+        ].join("\n")
+      )
+
+      yield* migrationRemovedReactCompilerRule.validate({ cwd: ROOT }).pipe(provideFiles(files))
+    })
+  )
+
   it.effect("migrate preserves the user's comments and formatting", () =>
     Effect.gen(function* () {
       const files = makeFiles({

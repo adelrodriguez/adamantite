@@ -403,6 +403,8 @@ function collectMatchingProperties(
     for (const element of node.elements) {
       if (element && (element.type === "ArrayExpression" || element.type === "ObjectExpression")) {
         mergeChild(element)
+      } else if (element?.type === "SpreadElement") {
+        ambiguous = true
       }
     }
 
@@ -451,7 +453,7 @@ function removePropertyText(content: string, property: ObjectProperty) {
   let start = property.start
   let end = property.end
 
-  const trailingComma = /^[ \t]*,/.exec(content.slice(end))
+  const trailingComma = /^[ \t]*,[ \t]*/.exec(content.slice(end))
 
   if (trailingComma) {
     end += trailingComma[0].length
@@ -463,12 +465,14 @@ function removePropertyText(content: string, property: ObjectProperty) {
     }
   }
 
-  // Take the surrounding lines too when nothing else remains on them.
+  // Take the surrounding lines too when only whitespace remains on them, along with a trailing
+  // line comment that annotated the removed entry.
   const lineStart = content.lastIndexOf("\n", start - 1) + 1
   const nextNewline = content.indexOf("\n", end)
   const lineEnd = nextNewline === -1 ? content.length : nextNewline + 1
+  const remainder = `${content.slice(lineStart, start)}${content.slice(end, lineEnd)}`
 
-  if (`${content.slice(lineStart, start)}${content.slice(end, lineEnd)}`.trim() === "") {
+  if (remainder.trim() === "" || /^[ \t]*\/\/.*\n?$/.test(remainder)) {
     start = lineStart
     end = lineEnd
   }

@@ -7,11 +7,13 @@ import { print as printAst } from "esrap"
 import ts from "esrap/languages/ts"
 import {
   parseSync,
+  type ArrayExpression,
   type ExportDefaultDeclaration,
   type ObjectExpression,
   type ObjectProperty,
   type Program,
   type PropertyKey,
+  type SpreadElement,
 } from "oxc-parser"
 import { ignorePatterns as coreIgnorePatterns } from "#presets/lint/core.ts"
 
@@ -356,4 +358,89 @@ export function inspectRequiredOxlintConfig(content: string) {
   }
 
   return patchOptionsObject(parsed.value, optionsPropertyResult.property.value)
+}
+
+export type OxlintRuleRemovalResult =
+  | { readonly kind: "absent" }
+  | { readonly kind: "manual"; readonly reason: string }
+  | { readonly kind: "patchable"; readonly updatedContent: string }
+
+function removeMatchingProperties(
+  node: ArrayExpression | ObjectExpression,
+  ruleNames: ReadonlySet<string>
+): number {
+  if (node.type === "ArrayExpression") {
+    let removed = 0
+
+    for (const element of node.elements) {
+      if (element && (element.type === "ArrayExpression" || element.type === "ObjectExpression")) {
+        removed += removeMatchingProperties(element, ruleNames)
+      }
+    }
+
+    return removed
+  }
+
+  let removed = 0
+  const kept: Array<ObjectProperty | SpreadElement> = []
+
+  for (const property of node.properties) {
+    if (
+      property.type === "Property" &&
+      !property.computed &&
+      property.kind === "init" &&
+      Option.exists(getStaticPropertyName(property.key), (name) => ruleNames.has(name))
+    ) {
+      removed += 1
+      continue
+    }
+
+    kept.push(property)
+
+    const child = property.type === "SpreadElement" ? property.argument : property.value
+
+    if (child.type === "ArrayExpression" || child.type === "ObjectExpression") {
+      removed += removeMatchingProperties(child, ruleNames)
+    }
+  }
+
+  if (removed > 0) {
+    node.properties.splice(0, node.properties.length, ...kept)
+  }
+
+  return removed
+}
+
+/**
+ * Removes rule entries with the given names from anywhere in the exported config object, including
+ * nested `overrides` entries. Returns `absent` when the config does not set any of the rules, so
+ * callers can distinguish "nothing to do" from an unpatchable file shape.
+ */
+export function removeOxlintRules(
+  content: string,
+  ruleNames: readonly string[]
+): OxlintRuleRemovalResult {
+  if (!ruleNames.some((ruleName) => content.includes(ruleName))) {
+    return { kind: "absent" }
+  }
+
+  const parsed = parse(content)
+
+  if (Option.isNone(parsed)) {
+    return { kind: "manual", reason: UNSUPPORTED_CONFIG_REASON }
+  }
+
+  const configObjectExpression = getExportedConfigObject(parsed.value)
+
+  if (Option.isNone(configObjectExpression)) {
+    return { kind: "manual", reason: UNSUPPORTED_CONFIG_REASON }
+  }
+
+  const removed = removeMatchingProperties(configObjectExpression.value, new Set(ruleNames))
+
+  if (removed === 0) {
+    return { kind: "absent" }
+  }
+
+  return { kind: "patchable", updatedContent: print(parsed.value) }
 }

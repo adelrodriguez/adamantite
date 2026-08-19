@@ -1,4 +1,4 @@
-import type { PackageJson } from "type-fest"
+import type { JsonValue, PackageJson } from "type-fest"
 
 import { describe, expect, it } from "@effect/vitest"
 import * as Console from "effect/Console"
@@ -6,8 +6,10 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
+import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
@@ -16,6 +18,29 @@ import { printTitle } from "#terminal/title.ts"
 
 const ROOT = "/project"
 const noop = () => null
+
+function someKey(value: JsonValue, predicate: (key: string) => boolean): boolean {
+  if (Array.isArray(value)) {
+    return value.some((entry) => someKey(entry, predicate))
+  }
+
+  if (Predicate.isObject(value)) {
+    return Object.entries(value).some(([key, entry]) => predicate(key) || someKey(entry, predicate))
+  }
+
+  return false
+}
+
+// SAFETY: fast-check's JsonValue and type-fest's JsonValue describe the same JSON data shapes.
+const jsonValueArbitrary = FastCheck.jsonValue({ maxDepth: 4 }).map((value) => value as JsonValue)
+
+async function evaluateTsLiteral(serialized: string): Promise<JsonValue> {
+  const uri = `data:text/javascript,export default (${encodeURIComponent(serialized)})`
+  // SAFETY: the module evaluates a serialized JSON value, so its default export is a JsonValue.
+  const module = (await import(/* @vite-ignore */ uri)) as { default: JsonValue }
+
+  return module.default
+}
 
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
@@ -190,6 +215,42 @@ describe("parseJson", () => {
       }
     })
   )
+
+  it.effect("strip __proto__ keys (jsonc-parser pollution protection)", () =>
+    Effect.gen(function* () {
+      const parsed = yield* parseJson('{"__proto__": {"polluted": true}, "a": 1}')
+
+      expect(parsed).toEqual({ a: 1 })
+    })
+  )
+
+  it.effect.prop(
+    "round-trip any JSON value without __proto__ keys through JSON.stringify",
+    {
+      value: jsonValueArbitrary.filter((value) => !someKey(value, (key) => key === "__proto__")),
+    },
+    ({ value }) =>
+      Effect.gen(function* () {
+        const parsed = yield* parseJson(JSON.stringify(value))
+
+        expect(JSON.stringify(parsed)).toBe(JSON.stringify(value))
+      }),
+    { fastCheck: { numRuns: 300 } }
+  )
+
+  it.effect.prop(
+    "resolve to success or FailedToParseFile for arbitrary input, never a defect",
+    { content: FastCheck.string() },
+    ({ content }) =>
+      Effect.gen(function* () {
+        const result = yield* Effect.result(parseJson(content))
+
+        if (Result.isFailure(result)) {
+          expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
+        }
+      }),
+    { fastCheck: { numRuns: 500 } }
+  )
 })
 
 describe("mergeConfig", () => {
@@ -244,6 +305,73 @@ describe("mergeConfig", () => {
         expect(result.failure).toMatchObject({ _tag: "FailedToMergeConfig" })
       }
     })
+  )
+
+  it.effect("drop null-valued keys from the first argument (defu behavior)", () =>
+    Effect.gen(function* () {
+      expect(yield* mergeConfig({ a: null }, {})).toEqual({})
+      expect(yield* mergeConfig({}, { a: null })).toEqual({ a: null })
+    })
+  )
+
+  // defu drops `__proto__`/`constructor` keys and null-valued keys from its first argument, and
+  // concatenates arrays on conflicts, so these algebraic properties hold on array-free, null-free
+  // configs with plain keys.
+  const jsonPrimitive = FastCheck.oneof(
+    FastCheck.string(),
+    FastCheck.integer(),
+    FastCheck.boolean()
+  )
+  const plainKey = FastCheck.string().filter((key) => key !== "__proto__" && key !== "constructor")
+  const arrayFreeConfig = FastCheck.dictionary(
+    plainKey,
+    FastCheck.oneof(jsonPrimitive, FastCheck.dictionary(plainKey, jsonPrimitive, { maxKeys: 4 })),
+    { maxKeys: 8 }
+  )
+
+  it.effect.prop(
+    "treat the empty object as the identity on both sides",
+    { config: arrayFreeConfig },
+    ({ config }) =>
+      Effect.gen(function* () {
+        expect(yield* mergeConfig(config, {})).toEqual(config)
+        expect(yield* mergeConfig({}, config)).toEqual(config)
+      }),
+    { fastCheck: { numRuns: 200 } }
+  )
+
+  it.effect.prop(
+    "merge any config with itself without changing it",
+    { config: arrayFreeConfig },
+    ({ config }) =>
+      Effect.gen(function* () {
+        expect(yield* mergeConfig(config, config)).toEqual(config)
+      }),
+    { fastCheck: { numRuns: 200 } }
+  )
+
+  it.effect.prop(
+    "keep every key from both inputs and prefer the first argument on conflicts",
+    { base: arrayFreeConfig, override: arrayFreeConfig },
+    ({ base, override }) =>
+      Effect.gen(function* () {
+        const merged = yield* mergeConfig(base, override)
+
+        for (const key of [...Object.keys(base), ...Object.keys(override)]) {
+          expect(Object.hasOwn(merged, key)).toBe(true)
+        }
+        for (const [key, value] of Object.entries(base)) {
+          if (!Predicate.isObject(value)) {
+            expect(merged[key]).toBe(value)
+          }
+        }
+        for (const key of Object.keys(override)) {
+          if (!Object.hasOwn(base, key)) {
+            expect(merged[key]).toEqual(override[key])
+          }
+        }
+      }),
+    { fastCheck: { numRuns: 200 } }
   )
 })
 
@@ -309,6 +437,73 @@ describe("serializeTsObjectLiteral", () => {
     }
 }`)
   })
+
+  // Both known bugs come from the key-unquoting regex matching text it should not: the escaped
+  // quote in a serialized key produces a bare `"A":` substring, and `__proto__` is a valid
+  // identifier but means prototype assignment once unquoted.
+  it.fails("known bug: a key containing a double quote produces invalid syntax", async () => {
+    const value = { '"A': null }
+    const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))
+
+    expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
+  })
+
+  it.fails("known bug: an unquoted __proto__ key changes the evaluated object", async () => {
+    // SAFETY: JSON.parse creates `__proto__` as an own property, unlike an object literal.
+    const value = JSON.parse('{"__proto__": {"polluted": true}}') as JsonValue
+    const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))
+
+    expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
+  })
+
+  const hazardFreeJsonValue = jsonValueArbitrary.filter(
+    (value) => !someKey(value, (key) => key.includes('"') || key === "__proto__")
+  )
+
+  it.effect.prop(
+    "evaluate back to the original value for any JSON value without hazardous keys",
+    { value: hazardFreeJsonValue },
+    ({ value }) =>
+      Effect.gen(function* () {
+        const evaluated = yield* Effect.promise(() =>
+          evaluateTsLiteral(serializeTsObjectLiteral(value))
+        )
+
+        expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
+      }),
+    { fastCheck: { numRuns: 300 } }
+  )
+
+  // Focused generator for the risky surface: identifier-like keys next to string values full of
+  // quotes, backslashes, colons, and braces that the key-unquoting regex could corrupt. Escaping
+  // keeps string values safe; only keys containing a double quote break (pinned above).
+  const trickyString = FastCheck.array(
+    FastCheck.constantFrom('"', "\\", ":", "\n", " ", "a", "$", "_", "{", "}", "'", "`"),
+    { maxLength: 12 }
+  ).map((chars) => chars.join(""))
+  const trickyKey = FastCheck.oneof(
+    FastCheck.constantFrom("enabled", "entry", "$schema", "_private", "a1"),
+    trickyString.map((text) => text.replaceAll('"', ""))
+  )
+  const trickyObject = FastCheck.dictionary(
+    trickyKey,
+    FastCheck.oneof(trickyString, FastCheck.dictionary(trickyKey, trickyString, { maxKeys: 3 })),
+    { maxKeys: 6 }
+  )
+
+  it.effect.prop(
+    "never corrupt string values that look like keys, at any indentation",
+    { indentation: FastCheck.constantFrom<number | string>(0, 2, 4, "\t"), value: trickyObject },
+    ({ indentation, value }) =>
+      Effect.gen(function* () {
+        const evaluated = yield* Effect.promise(() =>
+          evaluateTsLiteral(serializeTsObjectLiteral(value, { indentation }))
+        )
+
+        expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
+      }),
+    { fastCheck: { numRuns: 500 } }
+  )
 })
 
 describe("checkIsMonorepo", () => {
@@ -469,4 +664,44 @@ describe("normalizeDependencyVersion", () => {
   it("trim whitespace and strip the workspace prefix", () => {
     expect(normalizeDependencyVersion("  workspace:^0.20.0  ")).toBe("0.20.0")
   })
+
+  // The input domain is real dependency specifiers: optional whitespace padding, an optional
+  // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
+  // valid specifiers and are out of scope.
+  const version = FastCheck.tuple(
+    FastCheck.nat({ max: 99 }),
+    FastCheck.nat({ max: 99 }),
+    FastCheck.nat({ max: 99 }),
+    FastCheck.option(FastCheck.constantFrom("-alpha", "-beta.1", "-rc.0"))
+  ).map(([major, minor, patch, prerelease]) => `${major}.${minor}.${patch}${prerelease ?? ""}`)
+  const specifierParts = {
+    padding: FastCheck.constantFrom("", " ", "  ", "\t"),
+    rangePrefix: FastCheck.constantFrom("", "^", "~"),
+    version,
+    workspacePrefix: FastCheck.constantFrom("", "workspace:"),
+  }
+
+  it.prop(
+    "recover the exact version from any padded, prefixed specifier",
+    specifierParts,
+    ({ padding, rangePrefix, version: versionCore, workspacePrefix }) => {
+      const specifier = `${padding}${workspacePrefix}${rangePrefix}${versionCore}${padding}`
+
+      expect(normalizeDependencyVersion(specifier)).toBe(versionCore)
+    },
+    { fastCheck: { numRuns: 500 } }
+  )
+
+  it.prop(
+    "be idempotent on the specifier domain",
+    specifierParts,
+    ({ padding, rangePrefix, version: versionCore, workspacePrefix }) => {
+      const once = normalizeDependencyVersion(
+        `${padding}${workspacePrefix}${rangePrefix}${versionCore}${padding}`
+      )
+
+      expect(normalizeDependencyVersion(once)).toBe(once)
+    },
+    { fastCheck: { numRuns: 500 } }
+  )
 })

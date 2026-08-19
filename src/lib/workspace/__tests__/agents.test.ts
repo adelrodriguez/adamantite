@@ -4,6 +4,8 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
+import { FastCheck } from "effect/testing"
+import type { Script } from "#lib/workspace/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
@@ -217,5 +219,109 @@ describe("writeAgentsGuidance", () => {
       const agents = files.read("AGENTS.md")
       expect(agents).toContain("Run `npm run format` after editing files")
     })
+  )
+
+  const ALL_SCRIPTS: Script[] = [
+    "format",
+    "check",
+    "fix",
+    "analyze",
+    "check:monorepo",
+    "fix:monorepo",
+  ]
+  const guidanceOptions = {
+    packageManager: FastCheck.constantFrom("bun", "deno", "npm", "pnpm", "yarn"),
+    scripts: FastCheck.subarray(ALL_SCRIPTS),
+  }
+  // Marker-free so generated content cannot collide with the managed block by accident.
+  const markerFreeContent = FastCheck.string({ maxLength: 200 }).filter(
+    (content) => !content.includes("ADAMANTITE")
+  )
+
+  it.effect.prop(
+    "preserve marker-free content verbatim and append exactly one managed block",
+    { ...guidanceOptions, existing: markerFreeContent },
+    ({ existing, packageManager, scripts }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "AGENTS.md": existing })
+
+        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+
+        expect(result).toBe("updated")
+
+        const agents = files.read("AGENTS.md")
+        expect(agents.startsWith(existing)).toBe(true)
+        expect(countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER)).toBe(1)
+        expect(countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER)).toBe(1)
+        expect(agents.endsWith("\n")).toBe(true)
+      }),
+    { fastCheck: { numRuns: 150 } }
+  )
+
+  it.effect.prop(
+    "write the same content no matter how often it runs",
+    { ...guidanceOptions, existing: markerFreeContent },
+    ({ existing, packageManager, scripts }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "AGENTS.md": existing })
+
+        yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+        const afterFirst = files.read("AGENTS.md")
+
+        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+        expect(result).toBe("updated")
+        expect(files.read("AGENTS.md")).toBe(afterFirst)
+      }),
+    { fastCheck: { numRuns: 150 } }
+  )
+
+  it.effect.prop(
+    "replace only the managed block, keeping surrounding content intact",
+    { ...guidanceOptions, prefix: markerFreeContent, suffix: markerFreeContent },
+    ({ packageManager, prefix, scripts, suffix }) =>
+      Effect.gen(function* () {
+        const existing = `${prefix}${ADAMANTITE_AGENTS_START_MARKER}\nOLD-CONTENT-SENTINEL\n${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
+        const files = makeFiles({ "AGENTS.md": existing })
+
+        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+
+        expect(result).toBe("updated")
+
+        const agents = files.read("AGENTS.md")
+        expect(agents.startsWith(prefix)).toBe(true)
+        expect(agents).not.toContain("OLD-CONTENT-SENTINEL")
+        expect(countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER)).toBe(1)
+        expect(countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER)).toBe(1)
+
+        expect(agents.endsWith(suffix) || agents.endsWith(`${suffix}\n`)).toBe(true)
+        expect(agents.endsWith("\n")).toBe(true)
+      }),
+    { fastCheck: { numRuns: 150 } }
+  )
+
+  it.effect.prop(
+    "report malformed markers without touching the file",
+    {
+      ...guidanceOptions,
+      prefix: markerFreeContent,
+      suffix: markerFreeContent,
+      variant: FastCheck.constantFrom("start-only", "end-only", "end-before-start"),
+    },
+    ({ packageManager, prefix, scripts, suffix, variant }) =>
+      Effect.gen(function* () {
+        const existing =
+          variant === "start-only"
+            ? `${prefix}${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
+            : variant === "end-only"
+              ? `${prefix}${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
+              : `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
+        const files = makeFiles({ "AGENTS.md": existing })
+
+        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+
+        expect(result).toBe("malformed")
+        expect(files.read("AGENTS.md")).toBe(existing)
+      }),
+    { fastCheck: { numRuns: 150 } }
   )
 })

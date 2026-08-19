@@ -1,7 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Order from "effect/Order"
 import * as Path from "effect/Path"
+import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   detectToolingConfig,
@@ -138,6 +141,58 @@ describe("detectToolingConfig", () => {
       ])
     })
   )
+
+  it.effect.prop(
+    "follow ts > jsonc > json precedence for every combination of present files",
+    {
+      hasJson: FastCheck.boolean(),
+      hasJsonc: FastCheck.boolean(),
+      hasTs: FastCheck.boolean(),
+      legacyOrder: FastCheck.constantFrom<string[]>(
+        ["tool.json", "tool.jsonc"],
+        ["tool.jsonc", "tool.json"]
+      ),
+    },
+    ({ hasJson, hasJsonc, hasTs, legacyOrder }) =>
+      Effect.gen(function* () {
+        const fixtures: Record<string, string> = {}
+        if (hasTs) {
+          fixtures["tool.config.ts"] = "export default {}\n"
+        }
+        if (hasJsonc) {
+          fixtures["tool.jsonc"] = "{}\n"
+        }
+        if (hasJson) {
+          fixtures["tool.json"] = "{}\n"
+        }
+        const files = makeFiles(fixtures)
+
+        const state = yield* detect(files, { config: "tool.config.ts", legacyConfigs: legacyOrder })
+
+        const expectedActive = hasTs
+          ? "tool.config.ts"
+          : hasJsonc
+            ? "tool.jsonc"
+            : hasJson
+              ? "tool.json"
+              : null
+        expect(state.active?.file ?? null).toBe(expectedActive)
+
+        const expectedLegacy = [hasJson ? "tool.json" : null, hasJsonc ? "tool.jsonc" : null]
+          .filter((file) => file !== null)
+          .filter((file) => file !== expectedActive)
+        expect(
+          EffectArray.sort(
+            state.legacy.map((entry) => entry.file),
+            Order.String
+          )
+        ).toEqual(EffectArray.sort(expectedLegacy, Order.String))
+
+        const hasWarnings = expectedActive !== null && expectedLegacy.length > 0
+        expect(state.warnings.length > 0).toBe(hasWarnings)
+      }),
+    { fastCheck: { numRuns: 100 } }
+  )
 })
 
 describe("getPackageActions", () => {
@@ -172,6 +227,44 @@ describe("getPackageActions", () => {
       getPackageActions({ dependencies: { tool: "workspace:~1.2.3" } }, pkg, "purpose")
     ).toEqual([])
   })
+
+  const specifier = FastCheck.tuple(
+    FastCheck.constantFrom("", "workspace:"),
+    FastCheck.constantFrom("", "^", "~"),
+    FastCheck.constantFrom("1.2.3", "1.0.0", "2.4.6-beta.1")
+  ).map(([workspacePrefix, rangePrefix, version]) => ({
+    version,
+    written: `${workspacePrefix}${rangePrefix}${version}`,
+  }))
+
+  it.prop(
+    "classify any manifest into exactly one of match, install, or update",
+    {
+      field: FastCheck.constantFrom("dependencies", "devDependencies"),
+      installed: FastCheck.option(specifier),
+    },
+    ({ field, installed }) => {
+      const manifest = installed === null ? {} : { [field]: { tool: installed.written } }
+      const actions = getPackageActions(manifest, pkg, "purpose")
+
+      if (installed === null) {
+        expect(actions).toEqual([
+          expect.objectContaining({ targetVersion: pkg.version, type: "install_package" }),
+        ])
+      } else if (installed.version === pkg.version) {
+        expect(actions).toEqual([])
+      } else {
+        expect(actions).toEqual([
+          expect.objectContaining({
+            currentVersion: installed.written,
+            targetVersion: pkg.version,
+            type: "update_package",
+          }),
+        ])
+      }
+    },
+    { fastCheck: { numRuns: 200 } }
+  )
 })
 
 function state(active: ToolingConfigState["active"]): ToolingConfigState {

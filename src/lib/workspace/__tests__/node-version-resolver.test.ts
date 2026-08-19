@@ -5,6 +5,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
 import * as Result from "effect/Result"
+import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
@@ -243,5 +244,187 @@ describe("NodeVersionResolver", () => {
         expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
       }
     })
+  )
+
+  const nodeLine = FastCheck.tuple(
+    FastCheck.constantFrom("", "  ", "\t"),
+    FastCheck.constantFrom("node", "nodejs"),
+    FastCheck.constantFrom(" ", "  ", "\t"),
+    FastCheck.constantFrom("22.19.0", "22", "lts/iron"),
+    FastCheck.constantFrom("", "  ", " # pinned")
+  ).map((parts) => parts.join(""))
+  // Lines the parser must ignore: comments, other tools, node-prefixed tool names, and bare
+  // `node` entries without a version.
+  const inertLine = FastCheck.constantFrom(
+    "",
+    "# pinned tools",
+    "  # node 22.19.0",
+    "python 3.12.0",
+    "ruby 3.3.0  # main",
+    "node",
+    "nodejs",
+    "node-canvas 1.0.0",
+    "gonode 1.0.0"
+  )
+
+  it.effect.prop(
+    "detect a .tool-versions node entry regardless of surrounding noise",
+    {
+      hasNode: FastCheck.boolean(),
+      lines: FastCheck.array(inertLine, { maxLength: 8 }),
+      node: nodeLine,
+      position: FastCheck.nat({ max: 8 }),
+    },
+    ({ hasNode, lines, node, position }) =>
+      Effect.gen(function* () {
+        const allLines: string[] = [...lines]
+        if (hasNode) {
+          allLines.splice(Math.min(position, allLines.length), 0, node)
+        }
+        const files = makeFiles({ ".tool-versions": allLines.join("\n") })
+
+        const source = yield* runResolve(files)
+
+        expect(source).toEqual(
+          hasNode ? { _tag: "File", path: ".tool-versions" } : { _tag: "Version", value: "lts/*" }
+        )
+      }),
+    { fastCheck: { numRuns: 200 } }
+  )
+
+  const versionFileContent = FastCheck.constantFrom(
+    { content: "22.19.0\n", valid: true },
+    { content: "22\n", valid: true },
+    { content: "", valid: false },
+    { content: "   \n", valid: false }
+  )
+  const toolVersionsContent = FastCheck.constantFrom(
+    { content: "nodejs 22.19.0\n", valid: true },
+    { content: "node 22\n", valid: true },
+    { content: "python 3.12.0\n", valid: false },
+    { content: "# only comments\n", valid: false }
+  )
+  const packageJsonContent = FastCheck.constantFrom(
+    { content: JSON.stringify({ engines: { node: ">=22" }, name: "pkg" }), valid: true },
+    { content: JSON.stringify({ name: "pkg", volta: { node: "22.19.0" } }), valid: true },
+    {
+      content: JSON.stringify({
+        devEngines: { runtime: { name: "node", version: "22" } },
+        name: "pkg",
+      }),
+      valid: true,
+    },
+    { content: JSON.stringify({ name: "pkg" }), valid: false }
+  )
+
+  it.effect.prop(
+    "resolve the highest-precedence valid declaration for any file combination",
+    {
+      nodeVersion: FastCheck.option(versionFileContent),
+      nvmrc: FastCheck.option(versionFileContent),
+      packageJson: FastCheck.option(packageJsonContent),
+      toolVersions: FastCheck.option(toolVersionsContent),
+    },
+    ({ nodeVersion, nvmrc, packageJson, toolVersions }) =>
+      Effect.gen(function* () {
+        const fixtures: Record<string, string> = {}
+        if (nodeVersion) {
+          fixtures[".node-version"] = nodeVersion.content
+        }
+        if (nvmrc) {
+          fixtures[".nvmrc"] = nvmrc.content
+        }
+        if (toolVersions) {
+          fixtures[".tool-versions"] = toolVersions.content
+        }
+        if (packageJson) {
+          fixtures["package.json"] = packageJson.content
+        }
+        const files = makeFiles(fixtures)
+
+        const source = yield* runResolve(files)
+
+        const expected = nodeVersion?.valid
+          ? { _tag: "File", path: ".node-version" }
+          : nvmrc?.valid
+            ? { _tag: "File", path: ".nvmrc" }
+            : toolVersions?.valid
+              ? { _tag: "File", path: ".tool-versions" }
+              : packageJson?.valid
+                ? { _tag: "File", path: "package.json" }
+                : { _tag: "Version", value: "lts/*" }
+        expect(source).toEqual(expected)
+      }),
+    { fastCheck: { numRuns: 200 } }
+  )
+
+  const nonEmptyVersion = FastCheck.constantFrom("22.19.0", ">=22", "lts/*")
+  const declaringManifest = FastCheck.oneof(
+    nonEmptyVersion.map((node) => ({ volta: { node } })),
+    nonEmptyVersion.map((node) => ({ engines: { node } })),
+    FastCheck.tuple(FastCheck.constantFrom("node", "Node", "NODE"), nonEmptyVersion).map(
+      ([name, version]) => ({ devEngines: { runtime: { name, version } } })
+    ),
+    nonEmptyVersion.map((version) => ({
+      devEngines: {
+        runtime: [
+          { name: "deno", version: "2.0.0" },
+          { name: "node", version },
+        ],
+      },
+    }))
+  )
+  const nonDeclaringManifest = FastCheck.constantFrom(
+    {},
+    { engines: {} },
+    { engines: { node: "" } },
+    { volta: {} },
+    { volta: { node: "" } },
+    { devEngines: {} },
+    { devEngines: { runtime: { name: "bun", version: "1.2.0" } } },
+    { devEngines: { runtime: { name: "node" } } },
+    { devEngines: { runtime: [{ name: "deno", version: "2.0.0" }] } }
+  )
+
+  it.effect.prop(
+    "recognize every supported package.json declaration shape",
+    { manifest: declaringManifest },
+    ({ manifest }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "package.json": JSON.stringify({ name: "pkg", ...manifest }) })
+
+        const source = yield* runResolve(files)
+
+        expect(source).toEqual({ _tag: "File", path: "package.json" })
+      }),
+    { fastCheck: { numRuns: 200 } }
+  )
+
+  it.effect.prop(
+    "fall back to lts/* when package.json declares nothing",
+    { manifest: nonDeclaringManifest },
+    ({ manifest }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "package.json": JSON.stringify({ name: "pkg", ...manifest }) })
+
+        const source = yield* runResolve(files)
+
+        expect(source).toEqual({ _tag: "Version", value: "lts/*" })
+      }),
+    { fastCheck: { numRuns: 100 } }
+  )
+
+  it.effect.prop(
+    "resolve without failing for arbitrary package.json JSON",
+    { value: FastCheck.jsonValue({ maxDepth: 3 }) },
+    ({ value }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "package.json": JSON.stringify(value) })
+
+        const source = yield* runResolve(files)
+
+        expect(["File", "Version"]).toContain(source._tag)
+      }),
+    { fastCheck: { numRuns: 200 } }
   )
 })

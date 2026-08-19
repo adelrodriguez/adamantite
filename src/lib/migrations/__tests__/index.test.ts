@@ -7,7 +7,6 @@ describe("migrations", () => {
       "legacy-oxfmt-json",
       "legacy-knip-json",
       "legacy-oxlint-json",
-      "removed-react-compiler-rule",
       "legacy-typecheck-script",
       "hardcoded-node-version",
     ])

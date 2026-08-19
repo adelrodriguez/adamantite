@@ -7,8 +7,6 @@ import { print as printAst } from "esrap"
 import ts from "esrap/languages/ts"
 import {
   parseSync,
-  type ArrayExpression,
-  type Comment,
   type ExportDefaultDeclaration,
   type ObjectExpression,
   type ObjectProperty,
@@ -123,17 +121,10 @@ const parseThrowable = Option.liftThrowable((content: string) =>
   })
 )
 
-interface ParsedConfig {
-  readonly comments: readonly Comment[]
-  readonly program: Program
-}
-
 function parse(content: string) {
   return parseThrowable(content).pipe(
     Option.flatMap((result) =>
-      result.errors.length === 0
-        ? Option.some<ParsedConfig>({ comments: result.comments, program: result.program })
-        : Option.none<ParsedConfig>()
+      result.errors.length === 0 ? Option.fromNullishOr(result.program) : Option.none<Program>()
     )
   )
 }
@@ -330,7 +321,7 @@ export function inspectRequiredOxlintConfig(content: string) {
     } satisfies OxlintRequiredOptionsPatchResult
   }
 
-  const configObjectExpression = getExportedConfigObject(parsed.value.program)
+  const configObjectExpression = getExportedConfigObject(parsed.value)
 
   if (Option.isNone(configObjectExpression)) {
     return {
@@ -353,7 +344,7 @@ export function inspectRequiredOxlintConfig(content: string) {
 
     return {
       kind: "patchable",
-      updatedContent: print(parsed.value.program),
+      updatedContent: print(parsed.value),
     } satisfies OxlintRequiredOptionsPatchResult
   }
 
@@ -364,190 +355,5 @@ export function inspectRequiredOxlintConfig(content: string) {
     } satisfies OxlintRequiredOptionsPatchResult
   }
 
-  return patchOptionsObject(parsed.value.program, optionsPropertyResult.property.value)
-}
-
-export type OxlintRuleRemovalResult =
-  | { readonly kind: "absent" }
-  | { readonly kind: "manual"; readonly reason: string }
-  | { readonly kind: "patchable"; readonly updatedContent: string }
-
-const UNSUPPORTED_RULES_REASON =
-  '`oxlint.config.ts` references a removed rule in a shape Adamantite cannot patch safely. Make sure every rule entry is a plain `"rule-name": severity` property—avoid spreads (`...rest`) and computed keys (`[name]: ...`).'
-
-interface RuleMatchResult {
-  /**
-   * Set when a spread or computed key could hide a rule entry the static walk cannot see. A partial
-   * patch would still leave oxlint failing to load the config, so any ambiguity downgrades the
-   * whole file to a manual fix.
-   */
-  readonly ambiguous: boolean
-  readonly matches: readonly ObjectProperty[]
-}
-
-function collectMatchingProperties(
-  node: ArrayExpression | ObjectExpression,
-  ruleNames: ReadonlySet<string>
-): RuleMatchResult {
-  let ambiguous = false
-  const matches: ObjectProperty[] = []
-
-  const mergeChild = (child: ArrayExpression | ObjectExpression) => {
-    const result = collectMatchingProperties(child, ruleNames)
-
-    ambiguous = ambiguous || result.ambiguous
-    matches.push(...result.matches)
-  }
-
-  if (node.type === "ArrayExpression") {
-    for (const element of node.elements) {
-      if (element && (element.type === "ArrayExpression" || element.type === "ObjectExpression")) {
-        mergeChild(element)
-      } else if (element?.type === "SpreadElement") {
-        ambiguous = true
-      }
-    }
-
-    return { ambiguous, matches }
-  }
-
-  for (const property of node.properties) {
-    if (property.type === "SpreadElement") {
-      const argument = property.argument
-
-      if (argument.type === "ArrayExpression" || argument.type === "ObjectExpression") {
-        mergeChild(argument)
-      } else {
-        ambiguous = true
-      }
-
-      continue
-    }
-
-    if (property.computed && property.key.type !== "Literal") {
-      ambiguous = true
-      continue
-    }
-
-    if (Option.exists(getStaticPropertyName(property.key), (name) => ruleNames.has(name))) {
-      if (property.method || property.kind !== "init") {
-        ambiguous = true
-        continue
-      }
-
-      matches.push(property)
-      continue
-    }
-
-    if (property.value.type === "ArrayExpression" || property.value.type === "ObjectExpression") {
-      mergeChild(property.value)
-    }
-  }
-
-  return { ambiguous, matches }
-}
-
-// Splices a property out of the original source text instead of reprinting the AST, so the
-// user's comments and formatting survive the removal.
-function removePropertyText(content: string, property: ObjectProperty) {
-  let start = property.start
-  let end = property.end
-
-  const trailingComma = /^[ \t]*,[ \t]*/.exec(content.slice(end))
-
-  if (trailingComma) {
-    end += trailingComma[0].length
-  } else {
-    const leadingComma = /,[ \t]*$/.exec(content.slice(0, start))
-
-    if (leadingComma) {
-      start -= leadingComma[0].length
-    }
-  }
-
-  // Take the surrounding lines too when only whitespace remains on them, along with a trailing
-  // line comment that annotated the removed entry.
-  const lineStart = content.lastIndexOf("\n", start - 1) + 1
-  const nextNewline = content.indexOf("\n", end)
-  const lineEnd = nextNewline === -1 ? content.length : nextNewline + 1
-  const remainder = `${content.slice(lineStart, start)}${content.slice(end, lineEnd)}`
-
-  if (remainder.trim() === "" || /^[ \t]*\/\/.*\n?$/.test(remainder)) {
-    start = lineStart
-    end = lineEnd
-  }
-
-  return `${content.slice(0, start)}${content.slice(end)}`
-}
-
-// Comments arrive in source order, so the right-to-left reduce keeps earlier offsets valid
-// while splicing.
-function stripComments(content: string, comments: readonly Comment[]) {
-  return comments.reduceRight(
-    (current, comment) => `${current.slice(0, comment.start)}${current.slice(comment.end)}`,
-    content
-  )
-}
-
-/**
- * Removes rule entries with the given names from anywhere in the exported config object, including
- * nested `overrides` entries, by splicing them out of the original source text so comments and
- * formatting survive. Returns `absent` when the config does not reference any of the rules outside
- * comments, and `manual` when a reference exists that the static walk cannot remove safely.
- */
-export function removeOxlintRules(
-  content: string,
-  ruleNames: readonly string[]
-): OxlintRuleRemovalResult {
-  if (!ruleNames.some((ruleName) => content.includes(ruleName))) {
-    return { kind: "absent" }
-  }
-
-  const parsed = parse(content)
-
-  if (Option.isNone(parsed)) {
-    return { kind: "manual", reason: UNSUPPORTED_CONFIG_REASON }
-  }
-
-  const contentWithoutComments = stripComments(content, parsed.value.comments)
-
-  if (!ruleNames.some((ruleName) => contentWithoutComments.includes(ruleName))) {
-    return { kind: "absent" }
-  }
-
-  const configObjectExpression = getExportedConfigObject(parsed.value.program)
-
-  if (Option.isNone(configObjectExpression)) {
-    return { kind: "manual", reason: UNSUPPORTED_CONFIG_REASON }
-  }
-
-  const state = collectMatchingProperties(configObjectExpression.value, new Set(ruleNames))
-
-  if (state.ambiguous || state.matches.length === 0) {
-    // Either a spread or computed key could hide an entry, or the name appears outside comments
-    // in a position the walk cannot remove; both need a human.
-    return { kind: "manual", reason: UNSUPPORTED_RULES_REASON }
-  }
-
-  // The walk collects matches in source order, so the right-to-left reduce keeps earlier
-  // offsets valid while splicing.
-  const updatedContent = state.matches.reduceRight(
-    (current, property) => removePropertyText(current, property),
-    content
-  )
-
-  // A final guard for hidden references the walk cannot classify, such as identifier values and
-  // call results: never report patchable content that still names a removed rule.
-  const verified = parse(updatedContent)
-
-  if (
-    Option.isNone(verified) ||
-    ruleNames.some((ruleName) =>
-      stripComments(updatedContent, verified.value.comments).includes(ruleName)
-    )
-  ) {
-    return { kind: "manual", reason: UNSUPPORTED_RULES_REASON }
-  }
-
-  return { kind: "patchable", updatedContent }
+  return patchOptionsObject(parsed.value, optionsPropertyResult.property.value)
 }

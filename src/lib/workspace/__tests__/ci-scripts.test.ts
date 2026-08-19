@@ -49,6 +49,9 @@ describe("CI workflow entries", () => {
       const entries = getCIWorkflowEntries(manager, selected)
 
       expect(entries.length > 0).toBe(hasCICompatibleScripts(selected))
+      for (const entry of entries) {
+        expect(entry.command).toContain(manager)
+      }
     },
     { fastCheck: { numRuns: 300 } }
   )

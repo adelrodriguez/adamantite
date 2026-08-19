@@ -34,6 +34,8 @@ function someKey(value: JsonValue, predicate: (key: string) => boolean): boolean
 // SAFETY: fast-check's JsonValue and type-fest's JsonValue describe the same JSON data shapes.
 const jsonValueArbitrary = FastCheck.jsonValue({ maxDepth: 4 }).map((value) => value as JsonValue)
 
+// Evaluates through a data: URI module import instead of `new Function` so the oracle stays
+// within the repo's no-eval lint policy without disable comments.
 async function evaluateTsLiteral(serialized: string): Promise<JsonValue> {
   const uri = `data:text/javascript,export default (${encodeURIComponent(serialized)})`
   // SAFETY: the module evaluates a serialized JSON value, so its default export is a JsonValue.
@@ -441,14 +443,14 @@ describe("serializeTsObjectLiteral", () => {
   // Both known bugs come from the key-unquoting regex matching text it should not: the escaped
   // quote in a serialized key produces a bare `"A":` substring, and `__proto__` is a valid
   // identifier but means prototype assignment once unquoted.
-  it.fails("known bug: a key containing a double quote produces invalid syntax", async () => {
+  it.fails("known bug (#385): a key containing a double quote produces invalid syntax", async () => {
     const value = { '"A': null }
     const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))
 
     expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
   })
 
-  it.fails("known bug: an unquoted __proto__ key changes the evaluated object", async () => {
+  it.fails("known bug (#385): an unquoted __proto__ key changes the evaluated object", async () => {
     // SAFETY: JSON.parse creates `__proto__` as an own property, unlike an object literal.
     const value = JSON.parse('{"__proto__": {"polluted": true}}') as JsonValue
     const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))

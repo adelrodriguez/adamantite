@@ -5,13 +5,13 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
 import { FastCheck } from "effect/testing"
-import type { Script } from "#lib/workspace/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
   writeAgentsGuidance,
 } from "#lib/workspace/agents.ts"
+import { MANAGED_SCRIPT_COMMANDS, type Script } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 
@@ -254,6 +254,17 @@ describe("writeAgentsGuidance", () => {
         expect(countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER)).toBe(1)
         expect(countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER)).toBe(1)
         expect(agents.endsWith("\n")).toBe(true)
+
+        // The block body lists guidance for exactly the selected scripts, with commands that
+        // invoke the selected package manager.
+        for (const script of ALL_SCRIPTS) {
+          expect(agents.includes(`Direct command: \`${MANAGED_SCRIPT_COMMANDS[script]}\`.`)).toBe(
+            scripts.includes(script)
+          )
+        }
+        if (scripts.length > 0) {
+          expect(agents).toContain(`${packageManager} `)
+        }
       }),
     { fastCheck: { numRuns: 150 } }
   )

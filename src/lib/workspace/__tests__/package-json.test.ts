@@ -107,17 +107,23 @@ describe("script management", () => {
   )
 
   it.prop(
-    "only report requested scripts whose non-empty command differs from the managed one",
+    "report exactly the requested scripts whose non-empty command differs from the managed one",
     { manifest, requested: requestedScripts },
     ({ manifest: packageJson, requested }) => {
       const conflicts = getConflictingScripts(packageJson, requested)
 
       for (const conflict of conflicts) {
-        expect(requested).toContain(conflict.script)
-        expect(conflict.command).not.toBe("")
-        expect(conflict.command).not.toBe(MANAGED_SCRIPT_COMMANDS[conflict.script])
-        expect(packageJson.scripts?.[conflict.script]).toBe(conflict.command)
+        expect(conflict.command).toBe(packageJson.scripts?.[conflict.script])
       }
+
+      const expectedConflicting = requested.filter((script) => {
+        const command = packageJson.scripts?.[script]
+
+        return (
+          command !== undefined && command !== "" && command !== MANAGED_SCRIPT_COMMANDS[script]
+        )
+      })
+      expect(conflicts.map((conflict) => conflict.script)).toEqual(expectedConflicting)
     },
     { fastCheck: { numRuns: 300 } }
   )

@@ -254,11 +254,14 @@ describe("NodeVersionResolver", () => {
     FastCheck.constantFrom("", "  ", " # pinned")
   ).map((parts) => parts.join(""))
   // Lines the parser must ignore: comments, other tools, node-prefixed tool names, and bare
-  // `node` entries without a version.
+  // `node` entries without a version. The `node # pinned` shapes stay inert only when comments
+  // are stripped before matching, so they keep the comment handling load-bearing.
   const inertLine = FastCheck.constantFrom(
     "",
     "# pinned tools",
     "  # node 22.19.0",
+    "node # pinned",
+    "nodejs\t# 22.19.0",
     "python 3.12.0",
     "ruby 3.3.0  # main",
     "node",

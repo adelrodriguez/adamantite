@@ -620,14 +620,38 @@ const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")
     selectedPresets = yield* prompter.multiselect({
       message: "Which presets do you want to install? (core is always included)",
       options: [
-        { hint: "React, JSX accessibility, and performance rules", label: "React", value: "react" },
-        { hint: "Next.js rules", label: "Next.js", value: "nextjs" },
-        { hint: "Vue rules", label: "Vue", value: "vue" },
-        { hint: "Jest rules", label: "Jest", value: "jest" },
-        { hint: "Vitest rules", label: "Vitest", value: "vitest" },
-        { hint: "Node.js rules", label: "Node", value: "node" },
         {
-          hint: "anti-slop rules that reject low-evidence, low-signal patterns",
+          hint: "React correctness, JSX accessibility, and render performance rules",
+          label: "react",
+          value: "react",
+        },
+        {
+          hint: "Next.js pitfalls around scripts, fonts, images, and document/head usage",
+          label: "next.js",
+          value: "nextjs",
+        },
+        {
+          hint: "Vue 3 correctness rules and deprecated API detection",
+          label: "vue",
+          value: "vue",
+        },
+        {
+          hint: "Jest test hygiene: focused/disabled tests, matcher and snapshot discipline",
+          label: "jest",
+          value: "jest",
+        },
+        {
+          hint: "Vitest test hygiene: focused/disabled tests, matcher and snapshot discipline",
+          label: "vitest",
+          value: "vitest",
+        },
+        {
+          hint: "Node.js callback and CommonJS pitfalls",
+          label: "node",
+          value: "node",
+        },
+        {
+          hint: "Rejects low-signal escape hatches: unjustified assertions, unknown leaks, module mocks",
           label: "antislop",
           value: "antislop",
         },

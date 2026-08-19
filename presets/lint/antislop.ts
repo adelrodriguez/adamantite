@@ -5,8 +5,8 @@ import type { OxlintConfig } from "oxlint"
 // type assertions, `unknown` leaking through signatures, Reflect-based
 // property access, module mocking, and similar escape hatches. Upstream is
 // deliberately not published to npm, so Adamantite ships a self-contained
-// bundled build in antislop/plugin.mjs — see antislop/license.md for
-// attribution and scripts/vendor-plugins.ts for how it is regenerated.
+// bundled build in vendor/antislop/plugin.mjs — see vendor/antislop/license.md
+// for attribution and scripts/vendor-plugins.ts for how it is regenerated.
 //
 // The specifier is an absolute path computed from this module's location so
 // the bundled plugin loads regardless of how the consuming project resolves
@@ -18,7 +18,7 @@ const config: OxlintConfig = {
   jsPlugins: [
     {
       name: "anti-slop",
-      specifier: new URL("antislop/plugin.mjs", import.meta.url).href,
+      specifier: new URL("vendor/antislop/plugin.mjs", import.meta.url).href,
     },
   ],
   rules: {

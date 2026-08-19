@@ -12,4 +12,5 @@ if (!output.includes(expectedVersion)) {
   )
 }
 
-console.log(`Verified built CLI: ${expectedVersion}`)
+// Report successful build verification in CI.
+console.info(`Verified built CLI: ${expectedVersion}`)

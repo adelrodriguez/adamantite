@@ -9,6 +9,7 @@ describe("migrations", () => {
       "legacy-oxlint-json",
       "legacy-typecheck-script",
       "hardcoded-node-version",
+      "legacy-zed-oxfmt-settings",
     ])
   })
 })

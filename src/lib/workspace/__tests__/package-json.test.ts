@@ -1,5 +1,12 @@
-import { describe, expect, test } from "@effect/vitest"
-import { getConflictingScripts } from "#lib/workspace/package-json.ts"
+import type { PackageJson } from "type-fest"
+import { describe, expect, it, test } from "@effect/vitest"
+import { FastCheck } from "effect/testing"
+import {
+  getConflictingScripts,
+  getManagedScripts,
+  MANAGED_SCRIPT_COMMANDS,
+  type Script,
+} from "#lib/workspace/package-json.ts"
 
 describe("getConflictingScripts", () => {
   test("returns scripts whose existing command differs from the managed command", () => {
@@ -63,4 +70,81 @@ describe("getConflictingScripts", () => {
 
     expect(conflicts).toEqual([{ command: "prettier --write .", script: "format" }])
   })
+})
+
+describe("script management", () => {
+  // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
+  const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
+
+  const requestedScripts = FastCheck.subarray(ALL_SCRIPTS)
+  const scriptCommand = FastCheck.oneof(
+    FastCheck.constantFrom(...Object.values(MANAGED_SCRIPT_COMMANDS)),
+    FastCheck.constantFrom("", "tsc && eslint .", "prettier --write ."),
+    FastCheck.string()
+  )
+  const manifestScripts = FastCheck.dictionary(
+    FastCheck.oneof(
+      FastCheck.constantFrom<string>(...ALL_SCRIPTS),
+      FastCheck.constantFrom("build", "dev", "test")
+    ),
+    scriptCommand,
+    { maxKeys: 9 }
+  )
+  const manifest = manifestScripts.map((scripts): PackageJson => ({ name: "fixture", scripts }))
+
+  it.prop(
+    "never report a script as both managed and conflicting",
+    { manifest, requested: requestedScripts },
+    ({ manifest: packageJson, requested }) => {
+      const managed = getManagedScripts(packageJson)
+      const conflicts = getConflictingScripts(packageJson, requested)
+
+      for (const conflict of conflicts) {
+        expect(managed).not.toContain(conflict.script)
+      }
+    },
+    { fastCheck: { numRuns: 300 } }
+  )
+
+  it.prop(
+    "report exactly the requested scripts whose non-empty command differs from the managed one",
+    { manifest, requested: requestedScripts },
+    ({ manifest: packageJson, requested }) => {
+      const conflicts = getConflictingScripts(packageJson, requested)
+
+      for (const conflict of conflicts) {
+        expect(conflict.command).toBe(packageJson.scripts?.[conflict.script])
+      }
+
+      const expectedConflicting = requested.filter((script) => {
+        const command = packageJson.scripts?.[script]
+
+        return (
+          command !== undefined && command !== "" && command !== MANAGED_SCRIPT_COMMANDS[script]
+        )
+      })
+      expect(conflicts.map((conflict) => conflict.script)).toEqual(expectedConflicting)
+    },
+    { fastCheck: { numRuns: 300 } }
+  )
+
+  it.prop(
+    "leave nothing conflicting once the managed commands are adopted",
+    { requested: requestedScripts, scripts: manifestScripts },
+    ({ requested, scripts }) => {
+      const adoptedScripts = { ...scripts }
+      for (const script of requested) {
+        adoptedScripts[script] = MANAGED_SCRIPT_COMMANDS[script]
+      }
+      const adopted: PackageJson = { name: "fixture", scripts: adoptedScripts }
+
+      expect(getConflictingScripts(adopted, requested)).toEqual([])
+
+      const managed = getManagedScripts(adopted)
+      for (const script of requested) {
+        expect(managed).toContain(script)
+      }
+    },
+    { fastCheck: { numRuns: 300 } }
+  )
 })

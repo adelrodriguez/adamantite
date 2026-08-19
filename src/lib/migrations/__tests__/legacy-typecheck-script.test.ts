@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import migrationLegacyOxlintJson from "#lib/migrations/legacy-oxlint-json.ts"
@@ -228,5 +229,86 @@ describe("legacyTypecheckScript", () => {
       expect(workflow).toContain("name: format")
       expect(workflow).not.toContain("name: types")
     })
+  )
+
+  const otherScripts = FastCheck.dictionary(
+    FastCheck.constantFrom("build", "dev", "lint", "check", "format"),
+    FastCheck.constantFrom("adamantite check", "adamantite format", "", "tsc -b", "eslint ."),
+    { maxKeys: 5 }
+  )
+  const manifestFields = {
+    dependencies: FastCheck.constantFrom({}, { react: "^18.0.0" }),
+    name: FastCheck.constantFrom("test-project", "@scope/pkg"),
+  }
+
+  it.effect.prop(
+    "check reports needed exactly when the legacy typecheck command is present",
+    {
+      ...manifestFields,
+      scripts: otherScripts,
+      typecheckCommand: FastCheck.option(
+        FastCheck.constantFrom("adamantite typecheck", "tsc --noEmit", "")
+      ),
+    },
+    ({ dependencies, name, scripts, typecheckCommand }) =>
+      Effect.gen(function* () {
+        const scriptsField = { ...scripts }
+        if (typecheckCommand !== null) {
+          scriptsField.typecheck = typecheckCommand
+        }
+        const manifest = {
+          dependencies,
+          name,
+          scripts: scriptsField,
+          version: "1.0.0",
+        }
+        const files = makeFiles({ "package.json": JSON.stringify(manifest, null, 2) })
+
+        const result = yield* migrationLegacyTypecheckScript
+          .check({ cwd: ROOT })
+          .pipe(provideServices(files))
+
+        expect(result.status).toBe(
+          typecheckCommand === "adamantite typecheck" ? "needed" : "not-applicable"
+        )
+      }),
+    { fastCheck: { numRuns: 100 } }
+  )
+
+  it.effect.prop(
+    "migrate rewrites only the typecheck and check scripts and preserves everything else",
+    { ...manifestFields, scripts: otherScripts },
+    ({ dependencies, name, scripts }) =>
+      Effect.gen(function* () {
+        const manifest = {
+          dependencies,
+          name,
+          scripts: { ...scripts, typecheck: "adamantite typecheck" },
+          version: "1.0.0",
+        }
+        const files = makeFiles({ "package.json": JSON.stringify(manifest, null, 2) })
+
+        yield* migrationLegacyTypecheckScript.migrate({ cwd: ROOT }).pipe(provideServices(files))
+
+        // SAFETY: the test seeds package.json above, and the migration only rewrites scripts.
+        const migrated = JSON.parse(files.read("package.json")) as typeof manifest
+
+        expect(migrated.scripts).toEqual({
+          ...scripts,
+          // `??=` only fills a missing check script; an existing command (even "") is preserved.
+          check: scripts.check ?? "adamantite check",
+        })
+        expect(migrated.name).toBe(name)
+        expect(migrated.dependencies).toEqual(dependencies)
+        expect(migrated.version).toBe("1.0.0")
+
+        yield* migrationLegacyTypecheckScript.validate({ cwd: ROOT }).pipe(provideServices(files))
+
+        const secondCheck = yield* migrationLegacyTypecheckScript
+          .check({ cwd: ROOT })
+          .pipe(provideServices(files))
+        expect(secondCheck.status).toBe("not-applicable")
+      }),
+    { fastCheck: { numRuns: 60 } }
   )
 })

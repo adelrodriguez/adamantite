@@ -1,8 +1,10 @@
+import type { TsConfigJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
+import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
@@ -228,4 +230,79 @@ describe("tsconfig", () => {
       })
     )
   })
+})
+
+function readTsConfig(files: FileSystemTestContext): TsConfigJson {
+  // SAFETY: the test seeds tsconfig.json with standard tsconfig fields, and update writes JSON of
+  // the same shape back.
+  return JSON.parse(files.read("tsconfig.json")) as TsConfigJson
+}
+
+function readExtends(files: FileSystemTestContext): string[] {
+  const extendsValue = readTsConfig(files).extends ?? []
+
+  return Array.isArray(extendsValue) ? extendsValue : [extendsValue]
+}
+
+describe("tsconfig update properties", () => {
+  const PRESET = "adamantite/typescript"
+
+  const userExtends = FastCheck.oneof(
+    FastCheck.constant(null),
+    FastCheck.constantFrom(PRESET, "@tsconfig/node22/tsconfig.json", "./base.json"),
+    FastCheck.subarray(["@tsconfig/node22/tsconfig.json", "./base.json", PRESET, "./other.json"])
+  )
+  const userConfig = FastCheck.record({
+    compilerOptions: FastCheck.constantFrom(
+      { strict: true },
+      { module: "esnext", strict: false },
+      {}
+    ),
+    include: FastCheck.constantFrom(["src/**/*"], ["src", "test"]),
+  })
+
+  it.effect.prop(
+    "keep user extends entries in order and add the preset exactly once",
+    { config: userConfig, extendsValue: userExtends },
+    ({ config, extendsValue }) =>
+      Effect.gen(function* () {
+        const original = extendsValue === null ? config : { ...config, extends: extendsValue }
+        const files = makeFiles({ "tsconfig.json": JSON.stringify(original) })
+
+        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+
+        const mergedExtends = readExtends(files)
+        expect(mergedExtends.filter((entry) => entry === PRESET)).toHaveLength(1)
+
+        const userEntries =
+          extendsValue === null
+            ? []
+            : (Array.isArray(extendsValue) ? extendsValue : [extendsValue]).filter(
+                (entry) => entry !== PRESET
+              )
+        expect(mergedExtends.filter((entry) => entry !== PRESET)).toEqual(userEntries)
+
+        const parsed = readTsConfig(files)
+        expect(parsed.compilerOptions).toEqual(config.compilerOptions)
+        expect(parsed.include).toEqual(config.include)
+      }),
+    { fastCheck: { numRuns: 150 } }
+  )
+
+  it.effect.prop(
+    "write the same config no matter how often update runs",
+    { config: userConfig, extendsValue: userExtends },
+    ({ config, extendsValue }) =>
+      Effect.gen(function* () {
+        const original = extendsValue === null ? config : { ...config, extends: extendsValue }
+        const files = makeFiles({ "tsconfig.json": JSON.stringify(original) })
+
+        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+        const afterFirst = files.read("tsconfig.json")
+
+        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+        expect(files.read("tsconfig.json")).toBe(afterFirst)
+      }),
+    { fastCheck: { numRuns: 150 } }
+  )
 })

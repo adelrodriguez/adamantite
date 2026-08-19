@@ -1,11 +1,19 @@
+import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createDependencyInstallerTestContext } from "#commands/__tests__/command-test-helpers.ts"
+import github from "#lib/integrations/ci/github.ts"
 import migrationHardcodedNodeVersion from "#lib/migrations/hardcoded-node-version.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import {
+  MANAGED_SCRIPT_COMMANDS,
+  type Script,
+  type SupportedPackageManager,
+} from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 
@@ -195,5 +203,55 @@ describe("hardcodedNodeVersion", () => {
         ],
       })
     })
+  )
+
+  // A freshly generated workflow must never be flagged by this migration, or `adamantite update`
+  // would loop: regenerate, flag, regenerate again.
+  it.effect.prop(
+    "check never flags a workflow that github.create just generated",
+    {
+      nodeDeclaration: FastCheck.constantFrom("none", "node-version", "nvmrc", "engines"),
+      packageManager: FastCheck.constantFrom<SupportedPackageManager>(
+        "bun",
+        "deno",
+        "npm",
+        "pnpm",
+        "yarn"
+      ),
+      // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
+      scripts: FastCheck.subarray(Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]),
+    },
+    ({ nodeDeclaration, packageManager, scripts }) =>
+      Effect.gen(function* () {
+        const manifest: PackageJson = {
+          name: "test-project",
+          scripts: Object.fromEntries(
+            scripts.map((script) => [script, MANAGED_SCRIPT_COMMANDS[script]])
+          ),
+          version: "1.0.0",
+        }
+        if (nodeDeclaration === "engines") {
+          manifest.engines = { node: ">=22" }
+        }
+
+        const fixtures: Record<string, string> = {}
+        fixtures["package.json"] = JSON.stringify(manifest, null, 2)
+        if (nodeDeclaration === "node-version") {
+          fixtures[".node-version"] = "22.19.0\n"
+        }
+        if (nodeDeclaration === "nvmrc") {
+          fixtures[".nvmrc"] = "20\n"
+        }
+        const files = makeFiles(fixtures)
+
+        yield* github.create(ROOT, { packageManager, scripts }).pipe(provideServices(files))
+
+        const result = yield* migrationHardcodedNodeVersion
+          .check({ cwd: ROOT })
+          .pipe(provideServices(files, { detectedPackageManager: { name: packageManager } }))
+
+        expect(result).toEqual({ status: "not-applicable", warnings: [] })
+      }),
+    { fastCheck: { numRuns: 150 } }
   )
 })

@@ -99,9 +99,12 @@ used:
 
 - The legacy-typecheck finding keeps the script rename as its goal; the oxlint config
   is already verified by oxlint's own content-level assessment.
-- A tsconfig assessment checks that `extends` includes adamantite's preset, applicable
-  only outside a monorepo; in a monorepo the existing `MONOREPO_GUIDANCE` text is
-  surfaced as a warning instead, mirroring the old `validate()` exemption.
+- A tsconfig assessment checks that `tsconfig.json` exists and its `extends` includes
+  adamantite's preset, applicable only outside a monorepo — a missing file is a
+  finding, not not-applicable, mirroring the old `migrate()`'s create-vs-update branch
+  and its `validate()` failing on absence. In a monorepo the existing
+  `MONOREPO_GUIDANCE` text is surfaced as a warning instead, mirroring the old
+  `validate()` exemption.
 - A workflow assessment checks that an existing `.github/workflows/adamantite.yml`
   references the `check` script, applicable only when the managed scripts are
   CI-compatible with a supported package manager — `migrate()` never created a

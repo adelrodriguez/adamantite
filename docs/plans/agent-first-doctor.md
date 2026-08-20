@@ -99,11 +99,16 @@ Per surface:
   warning. It becomes a finding because it has a clear ideal state (absent) and a
   trivial, safe repair.
 - Managed scripts: no script invokes the deprecated `adamantite typecheck` alias.
-  That is the whole of the phase 1 assessment for this surface, and it subsumes the
-  legacy `typecheck` migration. Nothing records the init-time selection, so a
-  customized command is indistinguishable from a slot never taken — script drift
-  beyond the alias is unobservable at doctor time and stays out of scope (init already
-  keeps and reports conflicting scripts).
+  That is the whole of the phase 1 detection for this surface. While the alias is
+  present, the finding's goals demand a replacement, not a deletion: remove the alias
+  _and_ ensure a `check` script running the managed command exists, mirroring the old
+  `migrate()`'s `scripts.check ??=` in the same step. Once the alias is gone,
+  replaced-vs-deleted is unobservable — the same limitation as script drift, since
+  nothing records the init-time selection and a customized command is
+  indistinguishable from a slot never taken — so the `check` half is enforced through
+  the finding's goals and the prompt's do-not-suppress rule rather than the oracle.
+  Script drift beyond the alias stays out of scope (init already keeps and reports
+  conflicting scripts).
 - tsconfig: `tsconfig.json` exists and its `extends` includes adamantite's preset,
   applicable only outside a monorepo — a missing file is a finding, not
   not-applicable. In a monorepo the `MONOREPO_GUIDANCE` text is surfaced as a warning

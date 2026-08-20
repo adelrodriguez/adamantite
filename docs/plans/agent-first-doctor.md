@@ -43,18 +43,18 @@ Each integration's `assess` returns structured findings in place of today's acti
 ```ts
 interface Finding {
   /** Stable machine-readable key, e.g. "legacy-knip-json". */
-  readonly id: string;
+  readonly id: string
   /** Source integration, for grouping and re-assessment diffs. */
-  readonly integration: string;
-  readonly title: string;
+  readonly integration: string
+  readonly title: string
   /** What was detected and why it is a problem. */
-  readonly currentState: string;
+  readonly currentState: string
   /** End criteria — the same facts assess checks, as bullets. */
-  readonly goal: readonly string[];
+  readonly goal: readonly string[]
   /** Canonical file content, when applicable. */
-  readonly reference?: string;
+  readonly reference?: string
   /** Constraints: preserve user customizations, monorepo caveats, and similar. */
-  readonly notes?: readonly string[];
+  readonly notes?: readonly string[]
 }
 ```
 

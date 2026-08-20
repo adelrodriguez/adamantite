@@ -49,7 +49,7 @@ interface Finding {
   readonly title: string
   /** What was detected and why it is a problem. */
   readonly currentState: string
-  /** End criteria — the same facts assess checks, as bullets. */
+  /** End criteria, as bullets — normally the same facts assess checks. */
   readonly goal: readonly string[]
   /** Canonical file content, when applicable. */
   readonly reference?: string
@@ -69,7 +69,9 @@ Re-assessment diffs, tests, and fixtures key on `id`, never on prose fields.
 Generalize oxlint's `inspectRequiredOxlintConfig` model to every managed config:
 required-subset semantics, not exact match. Parse the config, assert the required
 options and shape are present, and let user additions pass. The goal bullets in each
-finding state the same facts the inspection checks. Exact-match comparison is rejected:
+finding state the same facts the inspection checks (the one exception, a goal the
+oracle cannot re-check, is documented in the managed-scripts surface below).
+Exact-match comparison is rejected:
 it would permanently flag legitimate user customizations.
 
 ### Ideal-state coverage replaces migrations
@@ -78,8 +80,10 @@ Migrations are not ported one-to-one. Doctor assesses the current state of each
 managed surface against its ideal state and emits findings for the difference; where a
 project came from is irrelevant. All `migrate()` code, `runMigration`, the
 snapshot/rollback machinery, and the migration registry are deleted. There is no
-trigger separate from the goal, so a partially applied fix cannot make doctor exit 0 —
-whatever remains off-ideal keeps its finding open.
+trigger separate from the goal, so a partially applied fix keeps its finding open —
+with one named exception: a goal whose satisfaction is unobservable after the fact
+(the `check`-script half of the alias replacement below) is enforced through the
+finding's goal text and the prompt rules, not the oracle.
 
 The coverage obligation: every state the old migrations could repair must still be
 detected, which means every surface they touched has an assessment whose ideal state
@@ -101,8 +105,9 @@ Per surface:
 - Managed scripts: no script invokes the deprecated `adamantite typecheck` alias.
   That is the whole of the phase 1 detection for this surface. While the alias is
   present, the finding's goals demand a replacement, not a deletion: remove the alias
-  _and_ ensure a `check` script running the managed command exists, mirroring the old
-  `migrate()`'s `scripts.check ??=` in the same step. Once the alias is gone,
+  _and_ ensure a `check` script exists, adding the managed command only when the
+  `check` key is absent — matching the old `migrate()`'s `scripts.check ??=` and the
+  required-subset rule (a customized `check` stays untouched). Once the alias is gone,
   replaced-vs-deleted is unobservable — the same limitation as script drift, since
   nothing records the init-time selection and a customized command is
   indistinguishable from a slot never taken — so the `check` half is enforced through

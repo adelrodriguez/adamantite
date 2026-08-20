@@ -1,5 +1,9 @@
 import type { JsonObject } from "type-fest"
-import { checkIsJsonObject, serializeTsObjectLiteral } from "#lib/shared/json.ts"
+import {
+  checkIsJsonObject,
+  serializeTsObjectLiteral,
+  serializeTsPropertyKey,
+} from "#lib/shared/json.ts"
 
 const NESTED_MERGE_KEYS = new Set(["sortImports", "sortPackageJson", "sortTailwindcss"])
 
@@ -31,7 +35,7 @@ export function toOxfmtTsConfigContent(config: JsonObject = {}) {
 
     const serialized = serializeTsObjectLiteral(value, { continuationIndent: "  " })
 
-    return `  ${key}: ${serialized},`
+    return `  ${serializeTsPropertyKey(key)}: ${serialized},`
   })
 
   if (configEntries.length === 0) {

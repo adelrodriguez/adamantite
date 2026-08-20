@@ -13,4 +13,10 @@ describe("toOxfmtTsConfigContent", () => {
     expect(content).toContain("    ...format.sortImports,")
     expect(content).toContain('    order: "desc"')
   })
+
+  test("quote top-level keys that are not valid identifiers", () => {
+    const content = toOxfmtTsConfigContent({ "experimental-option": true })
+
+    expect(content).toContain('  "experimental-option": true,')
+  })
 })

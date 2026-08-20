@@ -440,17 +440,14 @@ describe("serializeTsObjectLiteral", () => {
 }`)
   })
 
-  // Both known bugs come from the key-unquoting regex matching text it should not: the escaped
-  // quote in a serialized key produces a bare `"A":` substring, and `__proto__` is a valid
-  // identifier but means prototype assignment once unquoted.
-  it.fails("known bug (#385): a key containing a double quote produces invalid syntax", async () => {
+  it("round-trip keys that contain a double quote (#385)", async () => {
     const value = { '"A': null }
     const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))
 
     expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
   })
 
-  it.fails("known bug (#385): an unquoted __proto__ key changes the evaluated object", async () => {
+  it("keep own __proto__ keys as own properties (#385)", async () => {
     // SAFETY: JSON.parse creates `__proto__` as an own property, unlike an object literal.
     const value = JSON.parse('{"__proto__": {"polluted": true}}') as JsonValue
     const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))
@@ -458,13 +455,9 @@ describe("serializeTsObjectLiteral", () => {
     expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
   })
 
-  const hazardFreeJsonValue = jsonValueArbitrary.filter(
-    (value) => !someKey(value, (key) => key.includes('"') || key === "__proto__")
-  )
-
   it.effect.prop(
-    "evaluate back to the original value for any JSON value without hazardous keys",
-    { value: hazardFreeJsonValue },
+    "evaluate back to the original value for any JSON value",
+    { value: jsonValueArbitrary },
     ({ value }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -477,15 +470,14 @@ describe("serializeTsObjectLiteral", () => {
   )
 
   // Focused generator for the risky surface: identifier-like keys next to string values full of
-  // quotes, backslashes, colons, and braces that the key-unquoting regex could corrupt. Escaping
-  // keeps string values safe; only keys containing a double quote break (pinned above).
+  // quotes, backslashes, colons, and braces that the key-unquoting regex could corrupt.
   const trickyString = FastCheck.array(
     FastCheck.constantFrom('"', "\\", ":", "\n", " ", "a", "$", "_", "{", "}", "'", "`"),
     { maxLength: 12 }
   ).map((chars) => chars.join(""))
   const trickyKey = FastCheck.oneof(
-    FastCheck.constantFrom("enabled", "entry", "$schema", "_private", "a1"),
-    trickyString.map((text) => text.replaceAll('"', ""))
+    FastCheck.constantFrom("enabled", "entry", "$schema", "_private", "a1", "__proto__"),
+    trickyString
   )
   const trickyObject = FastCheck.dictionary(
     trickyKey,

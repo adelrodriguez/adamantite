@@ -1,5 +1,19 @@
 # adamantite
 
+## 0.37.0
+
+### Minor Changes
+
+- [#382](https://github.com/adelrodriguez/adamantite/pull/382) [`a70fd83`](https://github.com/adelrodriguez/adamantite/commit/a70fd83d0209ed4c1acba108a5c5aa699066b9b2) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Adopt the React Compiler rules that replace `react/react-compiler` in oxlint 1.79.0
+
+  oxlint 1.79.0 removed the nursery `react/react-compiler` rule and split it into per-category React Compiler rules. The react preset now enables the correctness rules (`error-boundaries`, `globals`, `immutability`, `incompatible-library`, `preserve-manual-memoization`, `purity`, `refs`, `set-state-in-effect`, `set-state-in-render`, `static-components`, `use-memo`, `void-use-memo`), the suspicious rules (`capitalized-calls`, `hooks`, `memo-dependencies`), and the perf rule `no-deriving-state-in-effects` as errors. `exhaustive-effect-dependencies` stays off because it duplicates the diagnostics `react/exhaustive-deps` already reports, and the restriction-category rules (`invariant`, `rule-suppression`, `syntax`, `todo`, `unsupported-syntax`) stay off because they only apply to codebases running the React Compiler build.
+
+  **Breaking behavior:** oxlint 1.79.0 fails to load any config that still references the removed rule — linting stays completely down until the reference is gone. Projects that only extend the Adamantite presets are covered by this release, but if your own `oxlint.config.ts` overrides `react/react-compiler` (for example to turn it off), delete that entry when you update. Managed projects install oxlint 1.79.0 on the next `adamantite update`.
+
+- [#381](https://github.com/adelrodriguez/adamantite/pull/381) [`e60bfb5`](https://github.com/adelrodriguez/adamantite/commit/e60bfb52b1b22c9dae88383b11c08974b21f3051) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add Astro formatting to the Zed preset and migrate stale Zed oxfmt settings
+
+  The Zed preset now formats `.astro` files through Zed's managed Prettier with `prettier-plugin-astro` (oxfmt cannot format Astro), mirroring Zed's shipped defaults, and explicitly disables Prettier for the languages oxfmt owns so the two formatters never compete. A new migration removes settings the old Zed preset wrote under the oxfmt language server that the formatter never reads (`configPath`, `typeAware`, `unusedDisableDirectives`, and the deprecated `fmt.experimental`); only exact value matches are removed, so user-edited values survive.
+
 ## 0.36.0
 
 ### Minor Changes

@@ -1,18 +1,22 @@
 import type { JsonObject } from "type-fest"
-import { checkIsJsonObject, serializeTsObjectLiteral } from "#lib/shared/json.ts"
+import {
+  checkIsJsonObject,
+  serializeTsObjectLiteral,
+  serializeTsPropertyKey,
+} from "#lib/shared/json.ts"
 
 export function toKnipTsConfigContent(config: JsonObject = {}) {
   const configEntries = Object.entries(config).map(([key, value]) => {
     if (key === "rules" && checkIsJsonObject(value)) {
       const rulesEntries = Object.entries(value).map(
         ([ruleName, ruleValue]) =>
-          `    ${ruleName}: ${serializeTsObjectLiteral(ruleValue, { continuationIndent: "    ", indentation: "    " })},`
+          `    ${serializeTsPropertyKey(ruleName)}: ${serializeTsObjectLiteral(ruleValue, { continuationIndent: "    ", indentation: "    " })},`
       )
 
       return ["  rules: {", "    ...analyze.rules,", ...rulesEntries, "  },"].join("\n")
     }
 
-    return `  ${key}: ${serializeTsObjectLiteral(value)},`
+    return `  ${serializeTsPropertyKey(key)}: ${serializeTsObjectLiteral(value)},`
   })
 
   if (configEntries.length === 0) {

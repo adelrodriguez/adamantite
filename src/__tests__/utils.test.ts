@@ -11,7 +11,12 @@ import * as Result from "effect/Result"
 import * as Terminal from "effect/Terminal"
 import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { mergeConfig, parseJson, serializeTsObjectLiteral } from "#lib/shared/json.ts"
+import {
+  mergeConfig,
+  parseJson,
+  serializeTsObjectLiteral,
+  serializeTsPropertyKey,
+} from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printTitle } from "#terminal/title.ts"
@@ -497,6 +502,26 @@ describe("serializeTsObjectLiteral", () => {
         expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
       }),
     { fastCheck: { numRuns: 500 } }
+  )
+})
+
+describe("serializeTsPropertyKey", () => {
+  it("emit __proto__ as a computed property name", () => {
+    expect(serializeTsPropertyKey("__proto__")).toBe('["__proto__"]')
+  })
+
+  it.effect.prop(
+    "emit a property name that evaluates back to the original key",
+    { key: FastCheck.string() },
+    ({ key }) =>
+      Effect.gen(function* () {
+        const evaluated = yield* Effect.promise(() =>
+          evaluateTsLiteral(`{ ${serializeTsPropertyKey(key)}: 1 }`)
+        )
+
+        expect(JSON.stringify(evaluated)).toBe(JSON.stringify({ [key]: 1 }))
+      }),
+    { fastCheck: { numRuns: 300 } }
   )
 })
 

@@ -18,4 +18,18 @@ describe("toKnipTsConfigContent", () => {
     expect(content).toContain("    binaries: {")
     expect(content).toContain('        severity: "error"')
   })
+
+  test("quote config and rule keys that are not valid identifiers", () => {
+    const content = toKnipTsConfigContent({
+      "lint-staged": {
+        entry: ["a.js"],
+      },
+      rules: {
+        "no-such/rule": "off",
+      },
+    })
+
+    expect(content).toContain('  "lint-staged": {')
+    expect(content).toContain('    "no-such/rule": "off",')
+  })
 })

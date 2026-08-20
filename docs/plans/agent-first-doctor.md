@@ -79,26 +79,38 @@ All six migrations' `check()` detection logic ports over as finding-emitting ass
 hardcoded node version, stale Zed oxfmt settings). All `migrate()` code, `runMigration`,
 and the snapshot/rollback machinery are deleted.
 
-Porting rule: each ported finding's goal criteria must cover the full end state its
-`migrate()` produced, not just the trigger its `check()` tested — and each goal carries
-over the conditions the `migrate()` applied it under. Conditions that produced warnings
-instead of writes become `notes`, not gated goals. No project shape may leave a finding
-open with no action that closes it.
+Porting rule: a ported finding's detection must be end-state detection — the finding
+fires while any of its goal criteria is unmet under its conditions, not only while the
+original `check()` trigger matches. Each goal carries over the conditions the
+`migrate()` applied it under, and conditions that produced warnings instead of writes
+become `notes`, not gated goals. Two invariants follow: no project shape may leave a
+finding open with no action that closes it, and satisfying a strict subset of the goals
+must not make doctor exit 0. Five of the six migrations already satisfy this — their
+`check()` detects the end state directly (a legacy file exists, a hardcoded version
+remains), so trigger and goal coincide.
 
-The concrete case is `legacy-typecheck-script`: its `check()` reads one script key, but
-its `migrate()` wrote up to five files. It stays one finding (the states are coupled —
-that is why it was one migration). Its goals cover the script rename and the oxlint
-config (already verified by oxlint's own content-level assessment) unconditionally. The
-tsconfig `extends` goal applies only outside a monorepo; in a monorepo it is dropped
-and the existing `MONOREPO_GUIDANCE` text becomes a note, mirroring the old
-`validate()` exemption. The CI workflow goal applies only when the workflow file
-already exists and the managed scripts are CI-compatible with a supported package
-manager — `migrate()` never created a workflow, and neither does this finding; when the
-conditions fail, the old warning text becomes a note. Both new checks (tsconfig
-`extends`, workflow `check`-script) are conditional and need the managed-script and
-package-manager context that `github.update` takes; they land in phase 1 as early
-slivers of the phase 2 surfaces. Doctor must not exit 0 while a partially applied
-legacy migration remains satisfiable.
+The exception is `legacy-typecheck-script`: its `check()` reads one script key, but its
+`migrate()` wrote up to five files. Widening that finding's trigger to all its goals
+would misfire — once the script is renamed, "half-migrated" is indistinguishable from
+"never had the legacy script", and projects that were never in the legacy state would
+be flagged with a legacy finding. Instead, the coupled surfaces become standalone
+phase 1 assessments with their own findings and the same conditions the `migrate()`
+used:
+
+- The legacy-typecheck finding keeps the script rename as its goal; the oxlint config
+  is already verified by oxlint's own content-level assessment.
+- A tsconfig assessment checks that `extends` includes adamantite's preset, applicable
+  only outside a monorepo; in a monorepo the existing `MONOREPO_GUIDANCE` text is
+  surfaced as a warning instead, mirroring the old `validate()` exemption.
+- A workflow assessment checks that an existing `.github/workflows/adamantite.yml`
+  references the `check` script, applicable only when the managed scripts are
+  CI-compatible with a supported package manager — `migrate()` never created a
+  workflow, and neither does this assessment. It needs the managed-script and
+  package-manager context that `github.update` takes.
+
+A partially applied fix then keeps doctor red through the standalone findings, and the
+combined prompt (below) still presents the coupled findings together whenever they
+co-occur. The two assessments are early slivers of the phase 2 surfaces.
 
 ### Prompt
 
@@ -221,11 +233,12 @@ stale copies become structurally impossible.
 ## Steps
 
 1. Define the `Finding` type and rework `assess` signatures; port the six migration
-   `check()`s into finding-emitting assessments under the porting rule (goals cover
-   each `migrate()`'s full end state); delete `src/lib/migrations/` and its tests.
+   `check()`s into finding-emitting assessments under the porting rule (end-state
+   detection covering each `migrate()`'s conditions); delete `src/lib/migrations/` and
+   its tests.
 2. Build content-level inspection for knip and oxfmt configs on the oxlint model, plus
-   the tsconfig-`extends` and workflow-script checks the legacy-typecheck finding
-   needs; express every finding's goal bullets from the same checks.
+   the standalone tsconfig-`extends` and workflow-script assessments that back the
+   legacy-typecheck porting; express every finding's goal bullets from the same checks.
 3. Build the two renderers from shared finding structs — markdown prompt in
    `src/lib/`, terminal view in `src/terminal/` — with snapshot tests.
 4. Rework `doctor.ts`: assess, render, exit codes, `--fix` stub error. Delete the fix

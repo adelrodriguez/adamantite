@@ -49,7 +49,7 @@ interface Finding {
   readonly title: string
   /** What was detected and why it is a problem. */
   readonly currentState: string
-  /** End criteria, as bullets — normally the same facts assess checks. */
+  /** End criteria — the same facts assess checks, as bullets. */
   readonly goal: readonly string[]
   /** Canonical file content, when applicable. */
   readonly reference?: string
@@ -69,9 +69,7 @@ Re-assessment diffs, tests, and fixtures key on `id`, never on prose fields.
 Generalize oxlint's `inspectRequiredOxlintConfig` model to every managed config:
 required-subset semantics, not exact match. Parse the config, assert the required
 options and shape are present, and let user additions pass. The goal bullets in each
-finding state the same facts the inspection checks (the one exception, a goal the
-oracle cannot re-check, is documented in the managed-scripts surface below).
-Exact-match comparison is rejected:
+finding state the same facts the inspection checks. Exact-match comparison is rejected:
 it would permanently flag legitimate user customizations.
 
 ### Ideal-state coverage replaces migrations
@@ -80,14 +78,19 @@ Migrations are not ported one-to-one. Doctor assesses the current state of each
 managed surface against its ideal state and emits findings for the difference; where a
 project came from is irrelevant. All `migrate()` code, `runMigration`, the
 snapshot/rollback machinery, and the migration registry are deleted. There is no
-trigger separate from the goal, so a partially applied fix keeps its finding open —
-with one named exception: a goal whose satisfaction is unobservable after the fact
-(the `check`-script half of the alias replacement below) is enforced through the
-finding's goal text and the prompt rules, not the oracle.
+trigger separate from the goal, so a partially applied fix cannot make doctor exit 0 —
+whatever remains off-ideal keeps its finding open.
 
 The coverage obligation: every state the old migrations could repair must still be
 detected, which means every surface they touched has an assessment whose ideal state
-flags the legacy condition. Two general rules carry over from the old system. First,
+flags the legacy condition. One state is deliberately dropped rather than covered
+(2026-08-20): the legacy `typecheck` script. The deprecated `adamantite typecheck`
+alias is treated as if it never existed — no detection, no finding, no goals; a
+project still carrying the script keeps it until its owner notices. This removes the
+managed-scripts surface from phase 1 entirely and keeps the invariant above
+exception-free: every goal doctor states is one its oracle can re-check.
+
+Two general rules carry over from the old system. First,
 when a surface's applicability gate fails but the surface is visibly off-ideal, the
 assessment emits a warning, not a finding — mirroring the warning-only branches the
 migrations had (no CI-compatible scripts, no package manager detected, unsupported
@@ -102,18 +105,6 @@ Per surface:
   config was active, the old migration never ran and the stray legacy file only drew a
   warning. It becomes a finding because it has a clear ideal state (absent) and a
   trivial, safe repair.
-- Managed scripts: no script invokes the deprecated `adamantite typecheck` alias.
-  That is the whole of the phase 1 detection for this surface. While the alias is
-  present, the finding's goals demand a replacement, not a deletion: remove the alias
-  _and_ ensure a `check` script exists, adding the managed command only when the
-  `check` key is absent — matching the old `migrate()`'s `scripts.check ??=` and the
-  required-subset rule (a customized `check` stays untouched). Once the alias is gone,
-  replaced-vs-deleted is unobservable — the same limitation as script drift, since
-  nothing records the init-time selection and a customized command is
-  indistinguishable from a slot never taken — so the `check` half is enforced through
-  the finding's goals and the prompt's do-not-suppress rule rather than the oracle.
-  Script drift beyond the alias stays out of scope (init already keeps and reports
-  conflicting scripts).
 - tsconfig: `tsconfig.json` exists and its `extends` includes adamantite's preset,
   applicable only outside a monorepo — a missing file is a finding, not
   not-applicable. In a monorepo the `MONOREPO_GUIDANCE` text is surfaced as a warning
@@ -132,7 +123,8 @@ surfaces, kept so no state the tool repairs today goes undetected.
 
 The six migrations survive as two humbler assets. Their test fixtures (~1,300 lines
 enumerating real legacy states) carry over as assessment fixtures proving the coverage
-obligation. And their transformation knowledge becomes instruction `notes` — a finding
+obligation, except the typecheck fixtures, which are deleted with their dropped state.
+And their transformation knowledge becomes instruction `notes` — a finding
 whose `currentState` is a legacy `knip.json` tells the agent to port the settings into
 the `.ts` config and then delete the legacy file, preserving user content rather than
 recreating from scratch. Coupled legacy states need no special handling: the combined
@@ -267,7 +259,8 @@ stale copies become structurally impossible.
 3. Build the two renderers from shared finding structs — markdown prompt in
    `src/lib/`, terminal view in `src/terminal/` — with snapshot tests.
 4. Rework `doctor.ts`: assess, render, exit codes, `--fix` stub error. Delete the fix
-   machinery and its tests.
+   machinery and its tests, and remove the deprecated `typecheck` command alias from
+   the CLI in the same pass.
 5. Add the TTY menu, harness table with PATH detection, OSC 52 copy.
 6. Add the harness-runner service (`src/lib/workspace/`, `DependencyInstaller`
    pattern), the spawn flow in `doctor.ts` (permission flags, command echo, dirty-tree
@@ -275,7 +268,8 @@ stale copies become structurally impossible.
 7. Rework `update.ts`: bumps plus the shared assess-and-render pipeline, keeping exit 0
    while findings remain; delete its migration pass and tests.
 8. Slim `writeAgentsGuidance` and `SKILL.md`; update README and `docs/architecture.md`.
-9. Minor changeset describing the breaking `doctor --fix` removal and the new model.
+9. Minor changeset describing the breaking `doctor --fix` and `typecheck` removals and
+   the new model.
 
 ## Phase 2 (named, not specified here)
 

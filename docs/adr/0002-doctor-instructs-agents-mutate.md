@@ -17,8 +17,10 @@ The decisions:
 - Migrations are not ported one-to-one. Doctor assesses each managed surface against
   its ideal state (including absence criteria for legacy files); every state the old
   migrations could repair must be flagged by some assessment, with the migration test
-  fixtures carried over to prove it. All `migrate()` code and the snapshot/rollback
-  machinery are deleted; transformation knowledge survives as instruction notes.
+  fixtures carried over to prove it. One exception (2026-08-20): the legacy
+  `typecheck` script is deliberately forgotten — no detection, and the deprecated CLI
+  alias is removed. All `migrate()` code and the snapshot/rollback machinery are
+  deleted; transformation knowledge survives as instruction notes.
 - Detection becomes content-level with required-subset semantics (oxlint's inspection
   model generalized): required shape must be present, user additions pass. Exact-match
   comparison is rejected because it permanently flags legitimate customizations.

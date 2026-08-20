@@ -83,25 +83,41 @@ whatever remains off-ideal keeps its finding open.
 
 The coverage obligation: every state the old migrations could repair must still be
 detected, which means every surface they touched has an assessment whose ideal state
-flags the legacy condition. Per surface:
+flags the legacy condition. Two general rules carry over from the old system. First,
+when a surface's applicability gate fails but the surface is visibly off-ideal, the
+assessment emits a warning, not a finding — mirroring the warning-only branches the
+migrations had (no CI-compatible scripts, no package manager detected, unsupported
+package manager). Second, ideal states use required-subset semantics throughout:
+user-chosen values and customizations pass; only adamantite-owned state is asserted.
+
+Per surface:
 
 - Tooling configs (knip, oxfmt, oxlint): the active config is the `.ts` file with the
   required content, and no legacy `.json`/`.jsonc` config shadows or replaces it. The
-  absence criterion matters — a valid `.ts` config alongside a stray legacy file is
-  still a finding, since the old migrations deleted the stray.
-- Managed scripts: the scripts in `package.json` match the managed set, and no script
-  invokes a removed command (this subsumes the legacy `typecheck` script).
+  absence criterion is a deliberate widening, not coverage parity: when a valid `.ts`
+  config was active, the old migration never ran and the stray legacy file only drew a
+  warning. It becomes a finding because it has a clear ideal state (absent) and a
+  trivial, safe repair.
+- Managed scripts: any script slot the project has given to adamantite still runs its
+  managed command, honoring the subset chosen at init and the existing tolerance for
+  user-customized commands (kept and reported, never flagged). What is flagged is a
+  script still invoking the deprecated `adamantite typecheck` alias — this subsumes
+  the legacy `typecheck` migration.
 - tsconfig: `tsconfig.json` exists and its `extends` includes adamantite's preset,
   applicable only outside a monorepo — a missing file is a finding, not
   not-applicable. In a monorepo the `MONOREPO_GUIDANCE` text is surfaced as a warning
   instead.
 - CI workflow: an existing `.github/workflows/adamantite.yml` references the `check`
   script and uses no hardcoded node version where the resolver belongs, applicable
-  only when the managed scripts are CI-compatible with a supported package manager.
-  The assessment never creates a workflow.
-- Zed settings: no stale oxfmt formatter entries. This and the workflow check are
-  narrow phase 1 slivers of the phase 2 surfaces, kept so no state the tool repairs
-  today goes undetected.
+  only when the managed scripts are CI-compatible with a supported package manager
+  (warnings per the general rule when that gate fails). The assessment never creates a
+  workflow.
+- Zed settings: no oxfmt entries still carrying the stale defaults the old preset
+  wrote — matched on key and value, as `checkIsStaleOxfmtSetting` does today, so
+  user-customized values are preserved.
+
+The tsconfig, workflow, and Zed assessments are narrow phase 1 slivers of the phase 2
+surfaces, kept so no state the tool repairs today goes undetected.
 
 The six migrations survive as two humbler assets. Their test fixtures (~1,300 lines
 enumerating real legacy states) carry over as assessment fixtures proving the coverage

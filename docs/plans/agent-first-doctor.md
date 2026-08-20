@@ -80,15 +80,25 @@ hardcoded node version, stale Zed oxfmt settings). All `migrate()` code, `runMig
 and the snapshot/rollback machinery are deleted.
 
 Porting rule: each ported finding's goal criteria must cover the full end state its
-`migrate()` produced, not just the trigger its `check()` tested. The concrete case is
-`legacy-typecheck-script`: its `check()` reads one script key, but its `migrate()`
-wrote five files. It stays one finding (the states are coupled — that is why it was one
-migration), and its goals cover the script rename, the oxlint config (already verified
-by oxlint's own content-level assessment), the tsconfig `extends` including
-adamantite's preset, and the CI workflow referencing the `check` script. The last two
-need small new checks (roughly ten lines each) that land in phase 1 as early slivers of
-the phase 2 surfaces. Doctor must not exit 0 while a partially applied legacy migration
-remains.
+`migrate()` produced, not just the trigger its `check()` tested — and each goal carries
+over the conditions the `migrate()` applied it under. Conditions that produced warnings
+instead of writes become `notes`, not gated goals. No project shape may leave a finding
+open with no action that closes it.
+
+The concrete case is `legacy-typecheck-script`: its `check()` reads one script key, but
+its `migrate()` wrote up to five files. It stays one finding (the states are coupled —
+that is why it was one migration). Its goals cover the script rename and the oxlint
+config (already verified by oxlint's own content-level assessment) unconditionally. The
+tsconfig `extends` goal applies only outside a monorepo; in a monorepo it is dropped
+and the existing `MONOREPO_GUIDANCE` text becomes a note, mirroring the old
+`validate()` exemption. The CI workflow goal applies only when the workflow file
+already exists and the managed scripts are CI-compatible with a supported package
+manager — `migrate()` never created a workflow, and neither does this finding; when the
+conditions fail, the old warning text becomes a note. Both new checks (tsconfig
+`extends`, workflow `check`-script) are conditional and need the managed-script and
+package-manager context that `github.update` takes; they land in phase 1 as early
+slivers of the phase 2 surfaces. Doctor must not exit 0 while a partially applied
+legacy migration remains satisfiable.
 
 ### Prompt
 
@@ -135,9 +145,9 @@ the same fixture-driven tests.
 
 Placement: `src/lib/**` must not import `#terminal/*` (the `no-restricted-imports`
 override in `oxlint.config.ts`), so the markdown renderer — a pure struct-to-string
-function — lives in `src/lib/`, and the clack terminal renderer lives in the command
-layer (`src/terminal/`), matching the rule that lib returns data and commands render
-it.
+function — lives in `src/lib/`, and the clack terminal renderer lives in the terminal
+layer (`src/terminal/`, alongside `Prompter`), matching the rule that lib returns data
+and the command/terminal layers render it.
 
 ### Doctor command flow
 
@@ -163,9 +173,11 @@ today's into code without checking.
   running `adamantite doctor` / `adamantite update`), not full autonomy.
 - Print the exact command before spawning.
 - Warn and confirm when the working tree is dirty; do not hard-refuse.
-- Afterward, re-assess once and report converged or the surviving findings, with the
-  matching exit code. No outer retry loop: the agent already loops internally against
-  the oracle, and a second identical round doubles cost without a human look-in.
+- Afterward, re-assess once and report converged or the surviving findings. The
+  process exit code follows the invoking command's contract: doctor exits 1 while
+  findings survive; `update` keeps its own exit rule (below) even after a spawn. No
+  outer retry loop: the agent already loops internally against the oracle, and a
+  second identical round doubles cost without a human look-in.
 
 The invocation lives behind an injectable Effect service following the
 `DependencyInstaller` pattern (`src/lib/workspace/`): the service owns process spawning
@@ -186,9 +198,11 @@ findings instruct running `adamantite update`.
 
 Exit code: `update` keeps exiting 0 when the bumps succeed, even while findings
 remain — findings in its output are informational. It exits nonzero only when a bump
-itself fails. Doctor is the only CI gate; giving `update` doctor's exit contract would
-break existing CI jobs at exactly the common moment, since bumps are what create
-findings.
+itself fails. This rule wins in every path through `update`, including after a spawned
+harness run from its TTY menu: the shared pipeline provides assess, render, and menu,
+but the exit contract belongs to the invoking command. Doctor is the only CI gate;
+giving `update` doctor's exit contract would break existing CI jobs at exactly the
+common moment, since bumps are what create findings.
 
 ### init unchanged
 

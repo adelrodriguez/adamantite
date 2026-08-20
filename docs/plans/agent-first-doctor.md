@@ -98,11 +98,12 @@ Per surface:
   config was active, the old migration never ran and the stray legacy file only drew a
   warning. It becomes a finding because it has a clear ideal state (absent) and a
   trivial, safe repair.
-- Managed scripts: any script slot the project has given to adamantite still runs its
-  managed command, honoring the subset chosen at init and the existing tolerance for
-  user-customized commands (kept and reported, never flagged). What is flagged is a
-  script still invoking the deprecated `adamantite typecheck` alias — this subsumes
-  the legacy `typecheck` migration.
+- Managed scripts: no script invokes the deprecated `adamantite typecheck` alias.
+  That is the whole of the phase 1 assessment for this surface, and it subsumes the
+  legacy `typecheck` migration. Nothing records the init-time selection, so a
+  customized command is indistinguishable from a slot never taken — script drift
+  beyond the alias is unobservable at doctor time and stays out of scope (init already
+  keeps and reports conflicting scripts).
 - tsconfig: `tsconfig.json` exists and its `extends` includes adamantite's preset,
   applicable only outside a monorepo — a missing file is a finding, not
   not-applicable. In a monorepo the `MONOREPO_GUIDANCE` text is surfaced as a warning

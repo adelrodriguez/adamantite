@@ -1,5 +1,2 @@
-packages:
-  - "."
-
 allowBuilds:
   msgpackr-extract: false

@@ -24,8 +24,10 @@ The brittleness in doctor and `update` is concentrated in mutation code, not det
   it converged.
 - Doctor and `update` assess only the five tooling integrations (knip, oxfmt, oxlint,
   sherif, tsgolint). The zed, vscode, GitHub-workflow, and tsconfig write paths are
-  init-only and never assessed — precisely because assessing them would have required
-  merge machinery. Instruction-based repair makes that coverage cheap (phase 2).
+  init-only and not assessed for drift — precisely because assessing them would have
+  required merge machinery. (Two migration checks read parts of those surfaces, but
+  nothing verifies their content.) Instruction-based repair makes that coverage cheap
+  (phase 2).
 - Drift detection today is existence-and-extension only for every config except oxlint,
   which parses content and classifies `configured`/`patchable`/`manual`. An oracle that
   cannot tell "fixed" from "file exists" would pass agent runs that did not converge, so
@@ -40,6 +42,10 @@ Each integration's `assess` returns structured findings in place of today's acti
 
 ```ts
 interface Finding {
+  /** Stable machine-readable key, e.g. "legacy-knip-json". */
+  readonly id: string;
+  /** Source integration, for grouping and re-assessment diffs. */
+  readonly integration: string;
   readonly title: string;
   /** What was detected and why it is a problem. */
   readonly currentState: string;
@@ -56,6 +62,7 @@ interface Finding {
 but doctor renders them as findings whose instruction is to run `adamantite update`.
 Findings are colocated with the detection code that triggers them so criteria and
 instructions cannot drift; a renderer owns tone and format, integrations own substance.
+Re-assessment diffs, tests, and fixtures key on `id`, never on prose fields.
 
 ### Content-level oracle
 
@@ -71,6 +78,17 @@ All six migrations' `check()` detection logic ports over as finding-emitting ass
 (legacy `knip.json`, legacy oxfmt JSON, legacy oxlint JSON, legacy typecheck script,
 hardcoded node version, stale Zed oxfmt settings). All `migrate()` code, `runMigration`,
 and the snapshot/rollback machinery are deleted.
+
+Porting rule: each ported finding's goal criteria must cover the full end state its
+`migrate()` produced, not just the trigger its `check()` tested. The concrete case is
+`legacy-typecheck-script`: its `check()` reads one script key, but its `migrate()`
+wrote five files. It stays one finding (the states are coupled — that is why it was one
+migration), and its goals cover the script rename, the oxlint config (already verified
+by oxlint's own content-level assessment), the tsconfig `extends` including
+adamantite's preset, and the CI workflow referencing the `check` script. The last two
+need small new checks (roughly ten lines each) that land in phase 1 as early slivers of
+the phase 2 surfaces. Doctor must not exit 0 while a partially applied legacy migration
+remains.
 
 ### Prompt
 
@@ -115,14 +133,21 @@ blocks) and the markdown prompt used by copy-prompt and the spawn path. Only
 presentation may differ between the renderings, never substance; both are exercised by
 the same fixture-driven tests.
 
+Placement: `src/lib/**` must not import `#terminal/*` (the `no-restricted-imports`
+override in `oxlint.config.ts`), so the markdown renderer — a pure struct-to-string
+function — lives in `src/lib/`, and the clack terminal renderer lives in the command
+layer (`src/terminal/`), matching the rule that lib returns data and commands render
+it.
+
 ### Doctor command flow
 
 1. Assess. If no findings, exit 0.
 2. Print the terminal rendering of every finding. Exit code is 1 while findings exist.
-3. If stdout is a TTY, offer a menu: fix with Claude Code, fix with Codex (each shown
-   only if its binary is detected on PATH, driven by a small extensible harness table),
-   or get the prompt. Non-TTY consumers (agents, CI, pipes) get the report and exit
-   code, no menu, no detection heuristics.
+3. If stdout and stdin are both TTYs (the menu prints to one and reads from the
+   other), offer a menu: fix with Claude Code, fix with Codex (each shown only if its
+   binary is detected on PATH, driven by a small extensible harness table), or get the
+   prompt. Other consumers (agents, CI, pipes, redirected stdin) get the report and
+   exit code, no menu, no detection heuristics.
 4. "Get the prompt" prints the markdown prompt and attempts an OSC 52 clipboard copy
    (write-and-forget escape sequence, no dependency, silent no-op where unsupported).
 5. `--fix` is removed. The flag remains parseable for one release and errors with a
@@ -142,8 +167,11 @@ today's into code without checking.
   matching exit code. No outer retry loop: the agent already loops internally against
   the oracle, and a second identical round doubles cost without a human look-in.
 
-The invocation lives behind an injectable Effect service (as with `Prompter` and
-`DependencyInstaller`) so tests substitute a fake harness that mutates fixture files.
+The invocation lives behind an injectable Effect service following the
+`DependencyInstaller` pattern (`src/lib/workspace/`): the service owns process spawning
+and PATH detection only, no terminal I/O. The command echo, dirty-tree confirmation,
+and spinner stay in `doctor.ts` via `Prompter`, keeping the lib/terminal lint boundary
+intact. Tests substitute a fake harness that mutates fixture files.
 Integration tests pin the loop's failure modes: harness missing, nonzero exit, partial
 fix, full convergence. Real-harness runs stay manual.
 
@@ -155,6 +183,12 @@ version bump is exactly what creates legacy states, so the findings and prompt a
 the moment they are needed — including the TTY menu. Its migration pass and "Doctor
 follow-up" lines are deleted. Doctor never installs packages; its outdated-package
 findings instruct running `adamantite update`.
+
+Exit code: `update` keeps exiting 0 when the bumps succeed, even while findings
+remain — findings in its output are informational. It exits nonzero only when a bump
+itself fails. Doctor is the only CI gate; giving `update` doctor's exit contract would
+break existing CI jobs at exactly the common moment, since bumps are what create
+findings.
 
 ### init unchanged
 
@@ -173,19 +207,21 @@ stale copies become structurally impossible.
 ## Steps
 
 1. Define the `Finding` type and rework `assess` signatures; port the six migration
-   `check()`s into finding-emitting assessments; delete `src/lib/migrations/` and its
-   tests.
-2. Build content-level inspection for knip and oxfmt configs on the oxlint model;
-   express every finding's goal bullets from the same checks.
-3. Build the two renderers (terminal view, markdown prompt) from shared finding structs,
-   with snapshot tests.
+   `check()`s into finding-emitting assessments under the porting rule (goals cover
+   each `migrate()`'s full end state); delete `src/lib/migrations/` and its tests.
+2. Build content-level inspection for knip and oxfmt configs on the oxlint model, plus
+   the tsconfig-`extends` and workflow-script checks the legacy-typecheck finding
+   needs; express every finding's goal bullets from the same checks.
+3. Build the two renderers from shared finding structs — markdown prompt in
+   `src/lib/`, terminal view in `src/terminal/` — with snapshot tests.
 4. Rework `doctor.ts`: assess, render, exit codes, `--fix` stub error. Delete the fix
    machinery and its tests.
 5. Add the TTY menu, harness table with PATH detection, OSC 52 copy.
-6. Add the harness-runner service, spawn flow (permission flags, command echo,
-   dirty-tree confirm), post-run re-assessment, and fake-harness integration tests.
-7. Rework `update.ts`: bumps plus the shared assess-and-render pipeline; delete its
-   migration pass and tests.
+6. Add the harness-runner service (`src/lib/workspace/`, `DependencyInstaller`
+   pattern), the spawn flow in `doctor.ts` (permission flags, command echo, dirty-tree
+   confirm), post-run re-assessment, and fake-harness integration tests.
+7. Rework `update.ts`: bumps plus the shared assess-and-render pipeline, keeping exit 0
+   while findings remain; delete its migration pass and tests.
 8. Slim `writeAgentsGuidance` and `SKILL.md`; update README and `docs/architecture.md`.
 9. Minor changeset describing the breaking `doctor --fix` removal and the new model.
 

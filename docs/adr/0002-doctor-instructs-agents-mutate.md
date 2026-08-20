@@ -12,7 +12,8 @@ The decisions:
 - Init keeps deterministic `create()` and its write paths; templating into empty space
   is reliable and must not require an agent. Doctor and `update` never write files.
 - `doctor --fix` is removed (stubbed with a pointer error for one release). `update`
-  survives, scoped to dependency bumps, then runs doctor's assess-and-render pipeline.
+  survives, scoped to dependency bumps, then runs doctor's assess-and-render pipeline;
+  it keeps exiting 0 while findings remain, so doctor stays the only CI gate.
 - All six migrations port their `check()` detection to findings; all `migrate()` code
   and the snapshot/rollback machinery are deleted.
 - Detection becomes content-level with required-subset semantics (oxlint's inspection

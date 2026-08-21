@@ -149,7 +149,7 @@ describe("github", () => {
         const files = makeFiles({
           [WORKFLOW_PATH]: [
             "steps:",
-            "  - run: |",
+            "  - run: |2-  ",
             "      pnpm install --frozen-lockfile",
             "      pnpm --filter app run check",
           ].join("\n"),

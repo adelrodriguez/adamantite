@@ -6,6 +6,7 @@ import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { toOxfmtTsConfigContent } from "#lib/workspace/tooling/oxfmt.ts"
 
 const ROOT = "/project"
 
@@ -126,15 +127,10 @@ describe("oxfmt", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: "Create `oxfmt.config.ts` for `oxfmt`.",
-              path: "oxfmt.config.ts",
-              type: "create_config",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "missing-oxfmt-config" }],
+          packageActions: [],
           warnings: [],
         })
       })
@@ -143,8 +139,7 @@ describe("oxfmt", () => {
     it.effect("report healthy when managed format script and config exist", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "oxfmt.config.ts":
-            'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({})\n',
+          "oxfmt.config.ts": toOxfmtTsConfigContent(),
           "package.json": JSON.stringify(
             {
               devDependencies: {
@@ -164,8 +159,9 @@ describe("oxfmt", () => {
         const result = yield* runAssess(files)
 
         expect(result).toEqual({
-          actions: [],
           applicable: true,
+          findings: [],
+          packageActions: [],
           warnings: [],
         })
       })
@@ -189,21 +185,10 @@ describe("oxfmt", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: `Install \`oxfmt@${oxfmt.version}\` for the managed \`format\` script.`,
-              package: "oxfmt",
-              targetVersion: oxfmt.version,
-              type: "install_package",
-            },
-            {
-              description: "Create `oxfmt.config.ts` for `oxfmt`.",
-              path: "oxfmt.config.ts",
-              type: "create_config",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "missing-oxfmt" }, { id: "missing-oxfmt-config" }],
+          packageActions: [{ package: "oxfmt", type: "install_package" }],
           warnings: [],
         })
       })

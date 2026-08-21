@@ -19,6 +19,53 @@ function provideFiles(files: FileSystemTestContext) {
 }
 
 describe("zed", () => {
+  describe("assess", () => {
+    it.effect("report stale oxfmt settings and preserve changed values", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [SETTINGS_PATH]: JSON.stringify({
+            lsp: {
+              oxfmt: {
+                initialization_options: {
+                  settings: {
+                    configPath: null,
+                    typeAware: true,
+                    unusedDisableDirectives: false,
+                  },
+                },
+              },
+            },
+          }),
+        })
+
+        const result = yield* zed.assess(ROOT, {}).pipe(provideFiles(files))
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("configPath"),
+              id: "legacy-zed-oxfmt-settings",
+            },
+          ],
+        })
+        if (result.applicable) {
+          expect(result.findings[0]?.currentState).not.toContain("typeAware")
+        }
+      })
+    )
+
+    it.effect("ignore a missing settings file", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+        expect(yield* zed.assess(ROOT, {}).pipe(provideFiles(files))).toEqual({
+          applicable: false,
+          warnings: [],
+        })
+      })
+    )
+  })
+
   describe("detect", () => {
     it.effect("detect when .zed/settings.json does not exist", () =>
       Effect.gen(function* () {

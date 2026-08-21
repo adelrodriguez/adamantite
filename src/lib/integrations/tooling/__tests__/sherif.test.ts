@@ -68,16 +68,10 @@ describe("sherif", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: `Install \`sherif@${sherif.version}\` for the managed monorepo scripts.`,
-              package: sherif.name,
-              targetVersion: sherif.version,
-              type: "install_package",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "missing-sherif" }],
+          packageActions: [{ package: sherif.name, type: "install_package" }],
           warnings: [],
         })
       })
@@ -105,8 +99,9 @@ describe("sherif", () => {
         const result = yield* runAssess(files)
 
         expect(result).toEqual({
-          actions: [],
           applicable: true,
+          findings: [],
+          packageActions: [],
           warnings: [],
         })
       })

@@ -143,16 +143,6 @@ export class FailedToReadFile extends Data.TaggedError("FailedToReadFile")<{
   }
 }
 
-export class FailedToDeleteFile extends Data.TaggedError("FailedToDeleteFile")<{
-  path?: string
-  cause?: unknown
-}> {
-  override get message() {
-    const target = this.path ? `\`${this.path}\`` : "the target file"
-    return `Failed to delete ${target}.${formatCauseDetail(this.cause)}`
-  }
-}
-
 export class FailedToWriteFile extends Data.TaggedError("FailedToWriteFile")<{
   path?: string
   cause?: unknown
@@ -219,15 +209,6 @@ export class MissingPackageVersion extends Data.TaggedError("MissingPackageVersi
     }
 
     return `Missing version field in ${target}.`
-  }
-}
-
-export class MigrationValidationFailed extends Data.TaggedError("MigrationValidationFailed")<{
-  migrationId: string
-  reason: string
-}> {
-  override get message() {
-    return `Migration \`${this.migrationId}\` validation failed. ${this.reason}`
   }
 }
 

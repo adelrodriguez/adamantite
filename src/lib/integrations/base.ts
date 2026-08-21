@@ -15,7 +15,7 @@ export interface ToolingPackage {
   readonly version: string
 }
 
-export type AssessmentAction =
+export type PackageAction =
   | {
       readonly description: string
       readonly package: string
@@ -29,21 +29,16 @@ export type AssessmentAction =
       readonly targetVersion: string
       readonly type: "update_package"
     }
-  | {
-      readonly description: string
-      readonly path: string
-      readonly type: "create_config" | "update_config"
-    }
-  | {
-      readonly description: string
-      readonly path?: string
-      readonly type: "manual_fix"
-    }
-  | {
-      readonly description: string
-      readonly migrationId: string
-      readonly type: "run_migration"
-    }
+
+export interface Finding {
+  readonly currentState: string
+  readonly goal: readonly string[]
+  readonly id: string
+  readonly integration: string
+  readonly notes?: readonly string[]
+  readonly reference?: string
+  readonly title: string
+}
 
 export type IntegrationAssessment =
   | {
@@ -51,8 +46,9 @@ export type IntegrationAssessment =
       readonly warnings: readonly string[]
     }
   | {
-      readonly actions: readonly AssessmentAction[]
       readonly applicable: true
+      readonly findings: readonly Finding[]
+      readonly packageActions: readonly PackageAction[]
       readonly warnings: readonly string[]
     }
 
@@ -67,9 +63,9 @@ export interface AssessableIntegration<Error = unknown, Requirements = unknown> 
   /**
    * Read-only diagnosis for the current project state.
    *
-   * `assess` may classify package drift, missing config, supported config updates, manual follow-up
-   * work, and known migrations. It must not mutate files or call migrations. The caller reads
-   * `package.json` once and shares the parsed manifest with every assessment in the same pass.
+   * `assess` classifies package drift and managed state against the latest supported state. It must
+   * not mutate files. The caller reads `package.json` once and shares the parsed manifest with
+   * every assessment in the same pass.
    */
   readonly assess: (
     cwd: string,

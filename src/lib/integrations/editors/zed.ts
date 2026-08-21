@@ -1,12 +1,18 @@
 import type * as Schema from "effect/Schema"
+import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
-import { defineIntegration } from "#lib/integrations/base.ts"
+import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { ensureDirectory, readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
+import {
+  ensureDirectory,
+  readFile,
+  readFileIfExists,
+  writeJsonFile,
+} from "#lib/shared/filesystem.ts"
 import { checkIsJsonArray, checkIsJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
@@ -94,6 +100,35 @@ const CONFIG = {
   },
 } as const
 
+const STALE_OXFMT_SETTINGS = {
+  configPath: null,
+  "fmt.experimental": true,
+  typeAware: false,
+  unusedDisableDirectives: false,
+} as const satisfies Record<string, Schema.Json>
+
+function findStaleOxfmtSettingKeys(config: Schema.JsonObject): string[] {
+  const lsp = config.lsp
+  const oxfmt = checkIsJsonObject(lsp) ? lsp.oxfmt : undefined
+  const initializationOptions = checkIsJsonObject(oxfmt) ? oxfmt.initialization_options : undefined
+  const settings = checkIsJsonObject(initializationOptions)
+    ? initializationOptions.settings
+    : undefined
+
+  if (!checkIsJsonObject(settings)) {
+    return []
+  }
+
+  const staleEntries: ReadonlyArray<readonly [string, Schema.Json]> =
+    Object.entries(STALE_OXFMT_SETTINGS)
+
+  return Object.entries(settings)
+    .filter(([key, value]) =>
+      staleEntries.some(([staleKey, staleValue]) => staleKey === key && staleValue === value)
+    )
+    .map(([key]) => key)
+}
+
 function deduplicatePrettierPlugins(prettierConfig: Schema.Json) {
   if (!checkIsJsonObject(prettierConfig) || !checkIsJsonArray(prettierConfig.plugins)) {
     return prettierConfig
@@ -143,6 +178,40 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
 }
 
 export default defineIntegration({
+  assess: (cwd: string, _packageJson: PackageJson) =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path
+      const settingsPath = path.join(cwd, files[0].path)
+      const content = yield* readFileIfExists(settingsPath)
+
+      if (content._tag === "None") {
+        return { applicable: false, warnings: [] } satisfies IntegrationAssessment
+      }
+
+      const config = yield* parseJson(content.value, settingsPath)
+      const staleKeys = checkIsJsonObject(config) ? findStaleOxfmtSettingKeys(config) : []
+
+      return {
+        applicable: true,
+        findings:
+          staleKeys.length === 0
+            ? []
+            : [
+                {
+                  currentState: `\`${files[0].path}\` contains stale oxfmt settings: ${staleKeys.map((key) => `\`${key}\``).join(", ")}.`,
+                  goal: [
+                    "Remove only the stale oxfmt entries that still have Adamantite's old default values.",
+                    "Preserve entries that the project changed.",
+                  ],
+                  id: "legacy-zed-oxfmt-settings",
+                  integration: "zed",
+                  title: "Legacy Zed oxfmt settings",
+                },
+              ],
+        packageActions: [],
+        warnings: [],
+      } satisfies IntegrationAssessment
+    }),
   config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {

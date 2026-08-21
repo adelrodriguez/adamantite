@@ -4,13 +4,13 @@ Migrations and doctor's fix machinery encoded transformations between enumerated
 and grew brittler with every legacy state discovered. We decided (2026-08-20) to make
 `adamantite doctor` assess-and-instruct only: the CLI deterministically detects broken
 state and emits findings — current state, goal criteria, verification — and agents or
-humans perform the mutations, with doctor's re-run as the convergence oracle. See
-[the implementation plan](../plans/agent-first-doctor.md) for the full design.
+humans perform the mutations, with doctor's re-run as the convergence oracle.
 
 The decisions:
 
 - Init keeps deterministic `create()` and its write paths; templating into empty space
-  is reliable and must not require an agent. Doctor and `update` never write files.
+  is reliable and must not require an agent. Doctor never writes files. `update` writes
+  managed dependency changes only.
 - `doctor --fix` is removed (stubbed with a pointer error for one release). `update`
   survives, scoped to dependency bumps, then runs doctor's assess-and-render pipeline;
   it keeps exiting 0 while findings remain, so doctor stays the only CI gate.

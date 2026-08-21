@@ -3,12 +3,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
-import {
-  FailedToCreateDirectory,
-  FailedToDeleteFile,
-  FailedToReadFile,
-  FailedToWriteFile,
-} from "#lib/shared/errors.ts"
+import { FailedToCreateDirectory, FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 
 export const ensureDirectory = (path: string) =>
   FileSystem.FileSystem.pipe(
@@ -50,9 +45,3 @@ export const writeFile = (path: string, content: string) =>
  */
 export const writeJsonFile = (path: string, value: Schema.Json) =>
   writeFile(path, `${JSON.stringify(value, null, 2)}\n`)
-
-export const removeFile = (path: string) =>
-  FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => fs.remove(path)),
-    Effect.mapError((cause) => new FailedToDeleteFile({ cause, path }))
-  )

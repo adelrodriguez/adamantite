@@ -27,7 +27,6 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `commands`     | Define one CLI workflow and render its user-facing result.                             |
 | `execution`    | Run child commands and carry forwarded arguments to them.                              |
 | `integrations` | Detect and maintain supported tooling, editor, workspace, and CI state.                |
-| `migrations`   | Perform one-time transitions from legacy state.                                        |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state. |
 | `shared`       | Define assessments, errors, filesystem helpers, and JSON helpers.                      |
 | `terminal`     | Prompt the user and render the CLI title.                                              |
@@ -42,25 +41,22 @@ belongs in a nearby workspace or shared module instead of a named integration ex
 ```mermaid
 flowchart TD
   A[Detect current state] --> B[Assess without mutation]
-  B --> C{Assessment action}
-  C -->|No action| D[Report healthy]
-  C -->|Create config| E[Integration create]
-  C -->|Update config| F[Integration update]
-  C -->|Run migration| G[Migration system]
-  C -->|Manual fix| H[Report guidance only]
+  B --> C{Findings exist}
+  C -->|No| D[Report healthy]
+  C -->|Yes| E[Render terminal findings and one agent prompt]
+  E --> F[Agent or human repairs the target project]
+  F --> A
 ```
 
-`assess` is always read-only. It must not write files or call migrations. `doctor` reports
-the resulting assessments. `doctor --fix` is the only dispatcher that turns assessment
-actions into mutations; manual fixes remain report-only.
+`assess` and `doctor` are always read-only. Each finding contains the current state, the
+goal criteria, and optional reference content or notes. The agent or the human changes the
+target project. A second assessment confirms whether the project reached the goal state.
 
-Migrations may call integrations to reach the latest supported shape. Integrations must
-not call migrations. This dependency direction keeps normal maintenance separate from
-one-time legacy transitions.
+Package drift also stays structured so that `update` can install current managed package
+versions. Doctor renders package drift as findings that tell the user to run `update`.
 
-`init` creates selected setup for a target project. It does not orchestrate migrations. If
-it finds existing setup that it intentionally leaves unchanged, it warns the user and
-points to `adamantite doctor` or `adamantite doctor --fix`.
+`init` creates selected setup for a target project. If it preserves existing setup, it
+warns the user and points to `adamantite doctor`.
 
 ## Command boundaries
 
@@ -68,9 +64,8 @@ points to `adamantite doctor` or `adamantite doctor --fix`.
 - `analyze` runs Knip.
 - `monorepo` runs Sherif.
 - `init` creates selected integrations and managed scripts.
-- `doctor` assesses managed integrations; `doctor --fix` applies safe assessment actions.
-- `update` runs applicable migrations and updates managed dependencies.
-- `typecheck` is a deprecated alias for `check`.
+- `doctor` assesses managed integrations and emits repair findings.
+- `update` updates managed dependencies, then emits any remaining doctor findings.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -88,7 +83,6 @@ src/
   lib/
     execution/      child command runs and forwarded arguments
     integrations/   tooling, editor, and CI adapters
-    migrations/     one-time legacy transitions
     shared/         cross-cutting types and helpers
     workspace/      target-project state and file operations
   terminal/         user prompting and title output

@@ -19,6 +19,52 @@ function provideFiles(files: FileSystemTestContext) {
 }
 
 describe("tsconfig", () => {
+  describe("assess", () => {
+    const packageJson = {
+      scripts: { check: "adamantite check" },
+    }
+
+    it.effect("report a missing root config outside a monorepo", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson) })
+        const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [{ id: "missing-tsconfig" }],
+        })
+      })
+    )
+
+    it.effect("accept string or array preset extends", () =>
+      Effect.gen(function* () {
+        for (const preset of ["adamantite/typescript", ["./base.json", "adamantite/typescript"]]) {
+          const files = makeFiles({
+            "package.json": JSON.stringify(packageJson),
+            "tsconfig.json": JSON.stringify({ extends: preset }),
+          })
+          const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
+
+          expect(result).toMatchObject({ applicable: true, findings: [] })
+        }
+      })
+    )
+
+    it.effect("return monorepo guidance instead of a root finding", () =>
+      Effect.gen(function* () {
+        const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
+        const files = makeFiles({ "package.json": JSON.stringify(monorepoPackageJson) })
+        const result = yield* tsconfig.assess(ROOT, monorepoPackageJson).pipe(provideFiles(files))
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [],
+          warnings: expect.arrayContaining([expect.stringContaining("monorepo")]),
+        })
+      })
+    )
+  })
+
   describe("detect", () => {
     it.effect("detect when tsconfig.json does not exist", () =>
       Effect.gen(function* () {

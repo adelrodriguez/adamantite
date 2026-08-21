@@ -52,7 +52,9 @@ describe("writeAgentsGuidance", () => {
       expect(agents).toContain("Run `bun run format` after editing files")
       expect(agents).toContain("Run `bun run check` to catch lint and type issues")
       expect(agents).not.toContain("adamantite analyze")
-      expect(agents).toContain("safe local fixes.\n\n<!-- ADAMANTITE:END -->")
+      expect(agents).toContain(
+        "Run `adamantite doctor` and follow its findings to repair managed setup.\n\n<!-- ADAMANTITE:END -->"
+      )
       expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
       expect(agents.endsWith("\n")).toBe(true)
     })

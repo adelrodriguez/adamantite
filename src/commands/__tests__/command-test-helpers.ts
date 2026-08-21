@@ -22,6 +22,7 @@ import {
   DependencyInstaller,
 } from "#lib/workspace/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 interface LogEntry {
@@ -42,6 +43,7 @@ export interface PrompterTestContext {
   readonly logs: LogEntry[]
   readonly multiselectCalls: unknown[]
   readonly outros: string[]
+  readonly selectCalls: unknown[]
   readonly spinnerEntries: SpinnerEntry[]
 }
 
@@ -111,16 +113,19 @@ export function createPrompterTestContext(options?: {
   readonly cancelAtPromptIndex?: number
   readonly confirmResponses?: boolean[]
   readonly multiselectResponses?: unknown[][]
+  readonly selectResponses?: unknown[]
 }): PrompterTestContext {
   const cancelAtPromptIndex = options?.cancelAtPromptIndex
   const confirmResponses = [...(options?.confirmResponses ?? [])]
   const multiselectResponses = [...(options?.multiselectResponses ?? [])]
+  const selectResponses = [...(options?.selectResponses ?? [])]
   const cancels: string[] = []
   const confirmCalls: prompts.ConfirmOptions[] = []
   const intros: string[] = []
   const logs: LogEntry[] = []
   const multiselectCalls: unknown[] = []
   const outros: string[] = []
+  const selectCalls: unknown[] = []
   const spinnerEntries: SpinnerEntry[] = []
   let promptIndex = 0
 
@@ -185,6 +190,16 @@ export function createPrompterTestContext(options?: {
         Effect.sync(() => {
           outros.push(message)
         }),
+      select: <T>(config: prompts.SelectOptions<T>) =>
+        Effect.gen(function* () {
+          if (shouldCancelPrompt()) {
+            return yield* new OperationCancelled({})
+          }
+
+          selectCalls.push(config)
+          // SAFETY: each test queues a select response that matches the option type of the prompt.
+          return shiftResponse(selectResponses, "select") as T
+        }),
       withSpinner: (run, spinnerOptions) =>
         Effect.acquireUseRelease(
           Effect.sync(() => {
@@ -215,6 +230,7 @@ export function createPrompterTestContext(options?: {
     logs,
     multiselectCalls,
     outros,
+    selectCalls,
     spinnerEntries,
   }
 }
@@ -288,6 +304,10 @@ export function runCommand(
     TestConsole.layer,
     makeQuietTerminalLayer(),
     Stdio.layerTest({}),
+    Layer.succeed(TerminalCapabilities)({
+      copyToClipboard: () => Effect.void,
+      isInteractive: Effect.succeed(false),
+    }),
     failingSpawnerLayer
   ) as TestLayer
 

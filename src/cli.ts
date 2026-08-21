@@ -8,7 +8,6 @@ import fixCommand from "#commands/fix.ts"
 import formatCommand from "#commands/format.ts"
 import initCommand from "#commands/init.ts"
 import monorepoCommand from "#commands/monorepo.ts"
-import typecheckCommand from "#commands/typecheck.ts"
 import updateCommand from "#commands/update.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import { PassthroughNotSupported } from "#lib/shared/errors.ts"
@@ -19,7 +18,6 @@ const passthroughCommands = [
   fixCommand,
   formatCommand,
   monorepoCommand,
-  typecheckCommand,
 ] as const
 
 const commands = [
@@ -30,7 +28,6 @@ const commands = [
   formatCommand,
   initCommand,
   monorepoCommand,
-  typecheckCommand,
   updateCommand,
 ] as const
 const commandNames: ReadonlySet<string> = new Set(commands.map((command) => command.name))

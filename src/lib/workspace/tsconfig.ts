@@ -1,13 +1,15 @@
-import type { JsonValue } from "type-fest"
+import type { JsonValue, PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
-import { defineIntegration } from "#lib/integrations/base.ts"
+import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
+import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
+import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
 const PRESET_EXTENDS = "adamantite/typescript"
@@ -34,6 +36,73 @@ function mergeExtends(existing: JsonValue | undefined) {
 }
 
 export default defineIntegration({
+  assess: (cwd: string, packageJson: PackageJson) =>
+    Effect.gen(function* () {
+      const managedScripts = getManagedScripts(packageJson)
+
+      if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
+        return { applicable: false, warnings: [] } satisfies IntegrationAssessment
+      }
+
+      if (yield* checkIsMonorepo(cwd)) {
+        return {
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: MONOREPO_GUIDANCE,
+        } satisfies IntegrationAssessment
+      }
+
+      const path = yield* Path.Path
+      const configPath = path.join(cwd, files[0].path)
+      const content = yield* readFileIfExists(configPath)
+
+      if (content._tag === "None") {
+        return {
+          applicable: true,
+          findings: [
+            {
+              currentState: "`tsconfig.json` is missing.",
+              goal: [
+                "Create `tsconfig.json` and set `extends` to include `adamantite/typescript`.",
+              ],
+              id: "missing-tsconfig",
+              integration: "tsconfig",
+              reference: `${JSON.stringify(CONFIG, null, 2)}\n`,
+              title: "Missing TypeScript configuration",
+            },
+          ],
+          packageActions: [],
+          warnings: [],
+        } satisfies IntegrationAssessment
+      }
+
+      const config = yield* parseJson(content.value, configPath)
+      const configured =
+        Predicate.isObject(config) &&
+        (config.extends === PRESET_EXTENDS ||
+          (Array.isArray(config.extends) && config.extends.includes(PRESET_EXTENDS)))
+
+      return {
+        applicable: true,
+        findings: configured
+          ? []
+          : [
+              {
+                currentState: "`tsconfig.json` does not extend `adamantite/typescript`.",
+                goal: [
+                  "Add `adamantite/typescript` to `extends`. Preserve every existing TypeScript option and existing base config.",
+                ],
+                id: "missing-adamantite-tsconfig-extends",
+                integration: "tsconfig",
+                reference: `${JSON.stringify(CONFIG, null, 2)}\n`,
+                title: "TypeScript preset is not configured",
+              },
+            ],
+        packageActions: [],
+        warnings: [],
+      } satisfies IntegrationAssessment
+    }),
   config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {

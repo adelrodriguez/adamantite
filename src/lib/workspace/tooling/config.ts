@@ -7,12 +7,13 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import {
   defineIntegration,
-  type AssessmentAction,
+  type Finding,
   type IntegrationAssessment,
   type IntegrationFile,
+  type PackageAction,
   type ToolingPackage,
 } from "#lib/integrations/base.ts"
-import { writeFile } from "#lib/shared/filesystem.ts"
+import { readFile, writeFile } from "#lib/shared/filesystem.ts"
 import {
   getManagedScripts,
   normalizeDependencyVersion,
@@ -49,6 +50,10 @@ export interface ToolingConfigFiles {
    */
   readonly legacyConfigs: readonly string[]
 }
+
+export type RequiredConfigInspection =
+  | { readonly kind: "configured" }
+  | { readonly kind: "invalid"; readonly reason: string }
 
 function getConfigFormat(file: string): ToolingConfigFormat {
   if (file.endsWith(".jsonc")) {
@@ -99,7 +104,7 @@ function getToolingConfigWarnings(
       findLegacyConfigByFormat(files, "json"),
       findLegacyConfigByFormat(files, "jsonc"),
       (jsonFile, jsoncFile) =>
-        `Found both \`${jsonFile}\` and \`${jsoncFile}\`. Multiple legacy ${toolName} configs exist; Adamantite will treat \`${jsoncFile}\` as the source of truth when migration is needed.`
+        `Found both \`${jsonFile}\` and \`${jsoncFile}\`. Multiple legacy ${toolName} configs exist; Adamantite will treat \`${jsoncFile}\` as the source of truth in its findings.`
     ),
     Option.toArray
   )
@@ -108,7 +113,7 @@ function getToolingConfigWarnings(
 /**
  * The single source of truth for a tooling integration's config state. Reads the filesystem once
  * and derives the active config, remaining legacy configs, and user-facing warnings; every other
- * layer (assess, migrations, init) builds on this state instead of re-deriving it.
+ * layer (assess and init) builds on this state instead of re-deriving it.
  */
 export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
   cwd: string,
@@ -149,7 +154,7 @@ export function getPackageActions(
   packageJson: PackageJson,
   pkg: ToolingPackage,
   purpose: string
-): AssessmentAction[] {
+): PackageAction[] {
   const specifier = packageJson.devDependencies?.[pkg.name] ?? packageJson.dependencies?.[pkg.name]
 
   if (!specifier) {
@@ -178,23 +183,49 @@ export function getPackageActions(
   return []
 }
 
-/**
- * Classify config drift from a detected config state: missing config or a pending legacy migration.
- */
-export function getConfigActions(
+export function getPackageFindings(
+  actions: readonly PackageAction[],
+  integration: string
+): Finding[] {
+  return actions.map((action) => ({
+    currentState:
+      action.type === "install_package"
+        ? `The required package \`${action.package}\` is not installed.`
+        : `The installed \`${action.package}\` version is \`${action.currentVersion}\`, but Adamantite requires \`${action.targetVersion}\`.`,
+    goal: [
+      `Run \`adamantite update\` so \`${action.package}@${action.targetVersion}\` is installed.`,
+    ],
+    id: `${action.type === "install_package" ? "missing" : "outdated"}-${action.package}`,
+    integration,
+    title:
+      action.type === "install_package"
+        ? `Missing ${action.package}`
+        : `Outdated ${action.package}`,
+  }))
+}
+
+export function getConfigFindings(
   state: ToolingConfigState,
   options: {
+    readonly configContent: string
     readonly configFile: string
-    readonly migrationId: string
+    readonly inspection?: RequiredConfigInspection
+    readonly invalidGoal?: string
     readonly toolName: string
   }
-): AssessmentAction[] {
+): Finding[] {
   if (state.active === null) {
     return [
       {
-        description: `Create \`${options.configFile}\` for \`${options.toolName}\`.`,
-        path: options.configFile,
-        type: "create_config",
+        currentState: `The managed \`${options.configFile}\` file is missing.`,
+        goal: [
+          `Create \`${options.configFile}\` with the reference content.`,
+          `Do not create a legacy JSON or JSONC ${options.toolName} config.`,
+        ],
+        id: `missing-${options.toolName}-config`,
+        integration: options.toolName,
+        reference: options.configContent,
+        title: `Missing ${options.toolName} configuration`,
       },
     ]
   }
@@ -202,14 +233,52 @@ export function getConfigActions(
   if (state.active.format !== "ts") {
     return [
       {
-        description: `Migrate legacy \`${state.active.file}\` to \`${options.configFile}\`.`,
-        migrationId: options.migrationId,
-        type: "run_migration",
+        currentState: `Legacy \`${state.active.file}\` is the active ${options.toolName} configuration.`,
+        goal: [
+          `Port the project settings into \`${options.configFile}\` using the reference content as the base.`,
+          `Delete every legacy ${options.toolName} JSON or JSONC config after its settings are preserved.`,
+        ],
+        id: `legacy-${options.toolName}-config`,
+        integration: options.toolName,
+        notes: [
+          "Preserve project-specific settings. Do not replace them with the reference defaults.",
+        ],
+        reference: options.configContent,
+        title: `Legacy ${options.toolName} configuration`,
       },
     ]
   }
 
-  return []
+  const findings: Finding[] = []
+
+  if (state.legacy.length > 0) {
+    findings.push({
+      currentState: `Legacy ${options.toolName} config files remain next to \`${options.configFile}\`: ${state.legacy.map(({ file }) => `\`${file}\``).join(", ")}.`,
+      goal: [
+        `Delete the legacy files after you confirm that \`${options.configFile}\` preserves their project-specific settings.`,
+      ],
+      id: `shadowed-legacy-${options.toolName}-config`,
+      integration: options.toolName,
+      title: `Legacy ${options.toolName} files remain`,
+    })
+  }
+
+  if (options.inspection?.kind === "invalid") {
+    findings.push({
+      currentState: `\`${options.configFile}\` does not meet Adamantite's required shape. ${options.inspection.reason}`,
+      goal: [
+        options.invalidGoal ??
+          `Update \`${options.configFile}\` so it includes the required Adamantite preset while preserving project-specific settings.`,
+      ],
+      id: `invalid-${options.toolName}-config`,
+      integration: options.toolName,
+      notes: ["Treat the reference as a known-good example, not an exact replacement."],
+      reference: options.configContent,
+      title: `Invalid ${options.toolName} configuration`,
+    })
+  }
+
+  return findings
 }
 
 function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Script[]) {
@@ -238,9 +307,12 @@ export function definePackageTooling(options: {
           } satisfies IntegrationAssessment
         }
 
+        const packageActions = getPackageActions(packageJson, options, options.purpose)
+
         return {
-          actions: getPackageActions(packageJson, options, options.purpose),
           applicable: true,
+          findings: getPackageFindings(packageActions, options.name),
+          packageActions,
           warnings: [],
         } satisfies IntegrationAssessment
       }),
@@ -257,7 +329,7 @@ export function definePackageTooling(options: {
 export function defineConfigTooling(options: {
   readonly configContent: () => string
   readonly configFiles: ToolingConfigFiles
-  readonly migrationId: string
+  readonly inspectConfig: (content: string) => RequiredConfigInspection
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
@@ -282,17 +354,25 @@ export function defineConfigTooling(options: {
         }
 
         const state = yield* detect(cwd)
+        const packageActions = getPackageActions(packageJson, options, options.purpose)
+        const configContent = options.configContent()
+        const inspection =
+          state.active?.format === "ts"
+            ? options.inspectConfig(yield* readFile(state.active.path))
+            : undefined
 
         return {
-          actions: [
-            ...getPackageActions(packageJson, options, options.purpose),
-            ...getConfigActions(state, {
+          applicable: true,
+          findings: [
+            ...getPackageFindings(packageActions, options.name),
+            ...getConfigFindings(state, {
+              configContent,
               configFile: options.configFiles.config,
-              migrationId: options.migrationId,
+              inspection,
               toolName: options.name,
             }),
           ],
-          applicable: true,
+          packageActions,
           warnings: state.warnings,
         } satisfies IntegrationAssessment
       }),

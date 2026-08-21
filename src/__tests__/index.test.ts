@@ -9,8 +9,11 @@ import {
   createRunnerTestContext,
   type RunnerTestContext,
 } from "#commands/__tests__/command-test-helpers.ts"
+import { AgentRunner } from "#lib/workspace/agent-runner.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { GitStatus } from "#lib/workspace/git-status.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
@@ -18,10 +21,13 @@ function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
     Effect.provide(
       Layer.mergeAll(
         NodeServices.layer,
+        AgentRunner.layer.pipe(Layer.provide(runner.layer)),
         NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
         Prompter.layer,
         runner.layer,
-        DependencyInstaller.layer
+        DependencyInstaller.layer,
+        GitStatus.layer,
+        TerminalCapabilities.layer
       )
     ),
     Effect.exit

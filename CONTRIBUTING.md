@@ -56,8 +56,9 @@ pnpm run test:build
 - Keep command modules thin and put reusable behavior in `src/lib`.
 - Keep integration modules limited to their default integration export. Put shared logic in
   `src/lib/workspace` or `src/lib/shared`.
-- Keep one-time legacy transitions in `src/lib/migrations`.
-- Do not make `assess` mutate files. `doctor --fix` is the mutating assessment dispatcher.
+- Keep `assess` and `doctor` read-only. Findings define the goal state that an agent or a
+  human must reach.
+- Keep `update` limited to managed dependency updates and follow-up findings.
 - Add or update tests for behavior changes. Tests are colocated in `__tests__` directories.
 - Update user documentation when CLI behavior, presets, exports, or requirements change.
 

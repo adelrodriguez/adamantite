@@ -10,6 +10,7 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import github from "#lib/integrations/ci/github.ts"
+import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   type NodeVersionSource,
   NodeVersionResolver,
@@ -32,6 +33,19 @@ function makeResolverLayer(source: NodeVersionSource) {
 function provideFallback(files: FileSystemTestContext) {
   return Effect.provide(
     Layer.mergeAll(files.layer, Path.layer, makeResolverLayer({ _tag: "Version", value: "lts/*" }))
+  )
+}
+
+function provideAssessment(files: FileSystemTestContext) {
+  return Effect.provide(
+    Layer.mergeAll(
+      files.layer,
+      Path.layer,
+      Layer.succeed(DependencyInstaller)({
+        addDevDependencies: () => Effect.void,
+        detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+      })
+    )
   )
 }
 
@@ -59,6 +73,52 @@ function getActionReference(content: string, action: string): string | undefined
 }
 
 describe("github", () => {
+  describe("assess", () => {
+    const packageJson = { scripts: { check: "adamantite check" } }
+
+    it.effect("report hard-coded Node.js and a missing check command", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: 'node-version: "22"\nrun: pnpm format\n',
+        })
+        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("hard-coded"),
+              id: "outdated-adamantite-workflow",
+            },
+          ],
+        })
+      })
+    )
+
+    it.effect("do not create a finding when the workflow is absent", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+        expect(yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))).toEqual({
+          applicable: false,
+          warnings: [],
+        })
+      })
+    )
+
+    it.effect("warn when an off-ideal workflow cannot be regenerated", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({ [WORKFLOW_PATH]: 'node-version: "22"\n' })
+        const result = yield* github.assess(ROOT, {}).pipe(provideAssessment(files))
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [],
+          warnings: [expect.stringContaining("CI-compatible")],
+        })
+      })
+    )
+  })
+
   describe("detect", () => {
     it.effect("detect when the workflow does not exist", () =>
       Effect.gen(function* () {

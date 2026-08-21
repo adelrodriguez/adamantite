@@ -8,7 +8,7 @@ import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   detectToolingConfig,
-  getConfigActions,
+  getConfigFindings,
   getPackageActions,
   type ToolingConfigState,
 } from "#lib/workspace/tooling/config.ts"
@@ -137,7 +137,7 @@ describe("detectToolingConfig", () => {
       const state = yield* detect(files)
 
       expect(state.warnings).toEqual([
-        "Found both `tool.json` and `tool.jsonc`. Multiple legacy tool configs exist; Adamantite will treat `tool.jsonc` as the source of truth when migration is needed.",
+        "Found both `tool.json` and `tool.jsonc`. Multiple legacy tool configs exist; Adamantite will treat `tool.jsonc` as the source of truth in its findings.",
       ])
     })
   )
@@ -271,44 +271,50 @@ function state(active: ToolingConfigState["active"]): ToolingConfigState {
   return { active, legacy: [], warnings: [] }
 }
 
-describe("getConfigActions", () => {
+describe("getConfigFindings", () => {
   const options = {
+    configContent: "export default preset\n",
     configFile: "tool.config.ts",
-    migrationId: "legacy-tool-json",
     toolName: "tool",
   }
 
-  it("request a config creation when no config exists", () => {
-    expect(getConfigActions(state(null), options)).toEqual([
-      {
-        description: "Create `tool.config.ts` for `tool`.",
-        path: "tool.config.ts",
-        type: "create_config",
-      },
+  it("report a missing config with canonical content", () => {
+    expect(getConfigFindings(state(null), options)).toEqual([
+      expect.objectContaining({
+        id: "missing-tool-config",
+        reference: options.configContent,
+      }),
     ])
   })
 
-  it("request a migration when a legacy config is active", () => {
+  it("report the ideal state when a legacy config is active", () => {
     expect(
-      getConfigActions(
+      getConfigFindings(
         state({ file: "tool.jsonc", format: "jsonc", path: "/tmp/tool.jsonc" }),
         options
       )
-    ).toEqual([
-      {
-        description: "Migrate legacy `tool.jsonc` to `tool.config.ts`.",
-        migrationId: "legacy-tool-json",
-        type: "run_migration",
-      },
-    ])
+    ).toEqual([expect.objectContaining({ id: "legacy-tool-config" })])
   })
 
-  it("report nothing when the TS config is active", () => {
+  it("report nothing when the TS config is active and configured", () => {
     expect(
-      getConfigActions(
+      getConfigFindings(
         state({ file: "tool.config.ts", format: "ts", path: "/tmp/tool.config.ts" }),
-        options
+        { ...options, inspection: { kind: "configured" } }
       )
     ).toEqual([])
+  })
+
+  it("report invalid content and shadowed legacy files independently", () => {
+    expect(
+      getConfigFindings(
+        {
+          active: { file: "tool.config.ts", format: "ts", path: "/tmp/tool.config.ts" },
+          legacy: [{ file: "tool.json", format: "json", path: "/tmp/tool.json" }],
+          warnings: [],
+        },
+        { ...options, inspection: { kind: "invalid", reason: "Preset missing." } }
+      ).map(({ id }) => id)
+    ).toEqual(["shadowed-legacy-tool-config", "invalid-tool-config"])
   })
 })

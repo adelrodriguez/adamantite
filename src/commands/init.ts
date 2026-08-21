@@ -111,7 +111,7 @@ function setupToolConfig<E, R>(
 
     if (outcome.legacyConfig) {
       yield* prompter.log.info(
-        `Legacy \`${outcome.legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor --fix\` to migrate it to the latest ${tool.name} config.`
+        `Legacy \`${outcome.legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor\` and follow its findings to migrate it to the latest ${tool.name} config.`
       )
     }
   })

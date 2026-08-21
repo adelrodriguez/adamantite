@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import { offerFindingActions } from "#commands/finding-actions.ts"
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
@@ -13,10 +12,13 @@ import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
-import { collectFindings } from "#lib/shared/findings.ts"
+import { collectFindings, renderFindingsPrompt } from "#lib/shared/findings.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { type AgentHarness, AgentRunner } from "#lib/workspace/agent-runner.ts"
+import { GitStatus } from "#lib/workspace/git-status.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
@@ -27,13 +29,6 @@ const fix = Flag.boolean("fix").pipe(
 
 const integrations = [knip, oxfmt, oxlint, sherif, tsgolint, tsconfig, github, zed] as const
 const version = getPackageVersion()
-
-function failDoctor() {
-  return new CommandFailed({
-    command: "doctor",
-    exitCode: ChildProcessSpawner.ExitCode(1),
-  })
-}
 
 export default Command.make("doctor", { fix }).pipe(
   Command.withDescription("Assess Adamantite-managed integrations in the current project"),
@@ -50,7 +45,10 @@ export default Command.make("doctor", { fix }).pipe(
           "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria."
         )
         yield* prompter.outro("❌ Doctor did not run")
-        return yield* failDoctor()
+        return yield* new CommandFailed({
+          command: "doctor",
+          exitCode: ChildProcessSpawner.ExitCode(1),
+        })
       }
 
       const packageJson = yield* readPackageJson(cwd)
@@ -60,7 +58,10 @@ export default Command.make("doctor", { fix }).pipe(
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
         )
         yield* prompter.outro("⚠️ Doctor found issues.")
-        return yield* failDoctor()
+        return yield* new CommandFailed({
+          command: "doctor",
+          exitCode: ChildProcessSpawner.ExitCode(1),
+        })
       }
 
       const collectCurrentAssessments = () =>
@@ -75,7 +76,7 @@ export default Command.make("doctor", { fix }).pipe(
         }
       }
 
-      const findings = collectFindings(assessments)
+      let findings = collectFindings(assessments)
 
       if (assessments.length === 0) {
         yield* prompter.log.success("No applicable integrations found.")
@@ -90,30 +91,83 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       yield* printFindings(findings)
+      const terminal = yield* TerminalCapabilities
 
-      const actionResult = yield* offerFindingActions({
-        adamantiteVersion: version,
-        cwd,
-        findings,
-        reassess: () =>
-          collectCurrentAssessments().pipe(
-            Effect.map((currentAssessments) => collectFindings(currentAssessments))
-          ),
-      })
+      if (yield* terminal.isInteractive) {
+        const agentRunner = yield* AgentRunner
+        const availableHarnesses = yield* agentRunner.detect()
+        const prompt = renderFindingsPrompt(findings, version)
+        const choice = yield* prompter.select<AgentHarness | "prompt">({
+          message: "How would you like to handle these findings?",
+          options: [
+            ...availableHarnesses.map((harness) => ({
+              label: harness === "claude" ? "Fix with Claude Code" : "Fix with Codex",
+              value: harness,
+            })),
+            { label: "Get the prompt", value: "prompt" },
+          ],
+        })
 
-      if (actionResult.kind === "reassessed") {
-        if (actionResult.findings.length === 0) {
-          yield* prompter.log.success("The agent resolved every finding.")
-          yield* prompter.outro("✅ Doctor completed successfully!")
-          return
+        if (choice === "prompt") {
+          yield* prompter.log.info(prompt)
+          yield* terminal.copyToClipboard(prompt)
+          yield* prompter.log.success("The prompt was printed and sent to the terminal clipboard.")
+        } else {
+          const gitStatus = yield* GitStatus
+          let shouldRunAgent = true
+
+          if (yield* gitStatus.isDirty(cwd)) {
+            yield* prompter.log.warning(
+              "Adamantite could not confirm a clean working tree. The agent can overwrite or mix with existing changes."
+            )
+            shouldRunAgent = yield* prompter.confirm({
+              initialValue: false,
+              message: "Run the agent anyway?",
+            })
+          }
+
+          if (shouldRunAgent) {
+            const command = agentRunner.getCommand(choice, prompt)
+            yield* prompter.log.info(
+              `Running: ${[command.command, ...command.args]
+                .map((part) => JSON.stringify(part))
+                .join(" ")}`
+            )
+
+            const exitCode = yield* prompter.withSpinner(
+              () => agentRunner.run(choice, prompt, cwd),
+              {
+                failure: `${choice} failed to start.`,
+                start: `Running ${choice}...`,
+                success: (code) => `${choice} exited with code ${code}.`,
+              }
+            )
+
+            if (exitCode !== 0) {
+              yield* prompter.log.warning(`${choice} did not complete the requested repair.`)
+            }
+
+            findings = yield* collectCurrentAssessments().pipe(
+              Effect.map((currentAssessments) => collectFindings(currentAssessments))
+            )
+
+            if (findings.length === 0) {
+              yield* prompter.log.success("The agent resolved every finding.")
+              yield* prompter.outro("✅ Doctor completed successfully!")
+              return
+            }
+
+            yield* prompter.log.warning("Findings remain after the agent run.")
+            yield* printFindings(findings)
+          }
         }
-
-        yield* prompter.log.warning("Findings remain after the agent run.")
-        yield* printFindings(actionResult.findings)
       }
 
       yield* prompter.outro("⚠️ Doctor found issues.")
-      return yield* failDoctor()
+      return yield* new CommandFailed({
+        command: "doctor",
+        exitCode: ChildProcessSpawner.ExitCode(1),
+      })
     })
   )
 )

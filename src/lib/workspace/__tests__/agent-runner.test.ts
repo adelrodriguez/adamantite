@@ -40,9 +40,22 @@ describe("AgentRunner", () => {
       const claude = runner.getCommand("claude", "repair prompt")
       const codex = runner.getCommand("codex", "repair prompt")
 
-      expect(claude.args).toContain("acceptEdits")
+      expect(claude.args).toEqual([
+        "--print",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        "Edit,Write,Bash(adamantite doctor*),Bash(adamantite update*)",
+        "repair prompt",
+      ])
       expect(claude.args).not.toContain("--dangerously-skip-permissions")
-      expect(codex.args).toContain("workspace-write")
+      expect(codex.args).toEqual([
+        "exec",
+        "--sandbox",
+        "workspace-write",
+        "--approve-for-me",
+        "repair prompt",
+      ])
       expect(codex.args).not.toContain("--dangerously-bypass-approvals-and-sandbox")
     }).pipe(provideAgentRunner([]))
   )

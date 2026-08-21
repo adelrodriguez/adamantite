@@ -105,6 +105,45 @@ describe("github", () => {
       })
     )
 
+    it.effect("ignore check text that is not a workflow command", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "# run check in CI",
+            "jobs:",
+            "  check-types:",
+            "    name: check",
+            "    steps:",
+            "      - run: pnpm run format",
+          ].join("\n"),
+        })
+        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+
+        expect(result).toMatchObject({
+          findings: [
+            {
+              currentState: expect.stringContaining("does not run the managed `check` script"),
+              id: "outdated-adamantite-workflow",
+            },
+          ],
+        })
+      })
+    )
+
+    it.effect("accept a package-manager check command", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: "steps:\n  - run: pnpm run check\n",
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [],
+        })
+      })
+    )
+
     it.effect("warn when an off-ideal workflow cannot be regenerated", () =>
       Effect.gen(function* () {
         const files = makeFiles({ [WORKFLOW_PATH]: 'node-version: "22"\n' })

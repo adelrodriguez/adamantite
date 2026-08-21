@@ -14,11 +14,19 @@ import {
 import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
-const CHECK_COMMAND_REGEX = /\b(?:run\s+)?check\b/
+const CHECK_COMMAND_REGEX = /\b(?:(?:bun|npm|pnpm|yarn)\s+run\s+check|deno\s+task\s+check)\b/
+const WORKFLOW_COMMAND_REGEX = /^\s*(?:-\s*)?(?:command|run):\s*(.+)$/
 
 interface WorkflowOptions {
   packageManager: SupportedPackageManager
   scripts: Script[]
+}
+
+function hasCheckCommand(content: string): boolean {
+  return content.split("\n").some((line) => {
+    const command = WORKFLOW_COMMAND_REGEX.exec(line)?.[1]
+    return command !== undefined && CHECK_COMMAND_REGEX.test(command)
+  })
 }
 
 function renderNodeSetup(source: NodeVersionSource): string {
@@ -163,7 +171,7 @@ export default defineIntegration({
       const managedScripts = getManagedScripts(packageJson)
       const hasHardcodedNodeVersion = HARDCODED_NODE_VERSION_REGEX.test(content.value)
       const isMissingCheckCommand =
-        managedScripts.includes("check") && !CHECK_COMMAND_REGEX.test(content.value)
+        managedScripts.includes("check") && !hasCheckCommand(content.value)
 
       if (!hasHardcodedNodeVersion && !isMissingCheckCommand) {
         return {

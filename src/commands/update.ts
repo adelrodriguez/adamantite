@@ -111,12 +111,14 @@ export default Command.make("update").pipe(
         yield* prompter.log.success("Dependencies updated successfully.")
       }
 
-      const updatedPackageJson = updates.length > 0 ? yield* readPackageJson(cwd) : packageJson
-      const finalAssessments = yield* collectApplicableAssessments(
-        integrations,
-        cwd,
-        updatedPackageJson
-      )
+      const finalAssessments =
+        updates.length === 0
+          ? assessments
+          : yield* readPackageJson(cwd).pipe(
+              Effect.flatMap((updatedPackageJson) =>
+                collectApplicableAssessments(integrations, cwd, updatedPackageJson)
+              )
+            )
 
       for (const { assessment } of finalAssessments) {
         for (const warning of assessment.warnings) {

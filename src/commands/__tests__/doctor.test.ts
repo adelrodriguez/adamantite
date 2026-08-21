@@ -194,6 +194,49 @@ describe("doctor", () => {
     })
   )
 
+  it.effect("use a safe warning when the working tree is not confirmed clean", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0", knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+          }),
+        },
+      })
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false],
+        selectResponses: ["codex"],
+      })
+      const interactive = Layer.succeed(TerminalCapabilities)({
+        copyToClipboard: () => Effect.void,
+        isInteractive: Effect.succeed(true),
+      })
+      const agentRunner = Layer.succeed(AgentRunner)({
+        detect: () => Effect.succeed(["codex"]),
+        getCommand: () => ({ args: ["exec", "prompt"], command: "codex" }),
+        run: () => Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+      })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [
+          prompter.layer,
+          interactive,
+          agentRunner,
+          Layer.succeed(GitStatus)({ isDirty: () => Effect.succeed(true) }),
+        ],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Adamantite could not confirm a clean working tree. The agent can overwrite or mix with existing changes.",
+      })
+    })
+  )
+
   it.effect("report a nonzero agent exit and surviving findings", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

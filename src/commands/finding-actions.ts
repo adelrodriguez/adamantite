@@ -52,7 +52,7 @@ export const offerFindingActions = Effect.fn("offerFindingActions")(function* <E
 
   if (yield* gitStatus.isDirty(options.cwd)) {
     yield* prompter.log.warning(
-      "The working tree has uncommitted changes. The agent can overwrite or mix with them."
+      "Adamantite could not confirm a clean working tree. The agent can overwrite or mix with existing changes."
     )
     const shouldContinue = yield* prompter.confirm({
       initialValue: false,

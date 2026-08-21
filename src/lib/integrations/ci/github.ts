@@ -14,7 +14,7 @@ import {
 import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
-const BLOCK_SCALAR_REGEX = /^[>|](?:[1-9][+-]?|[+-][1-9]?|[+-])?(?:\s+#.*)?$/
+const BLOCK_SCALAR_REGEX = /^[>|](?:[1-9][+-]?|[+-][1-9]?)?(?:\s+#.*)?$/
 const CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
 const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/

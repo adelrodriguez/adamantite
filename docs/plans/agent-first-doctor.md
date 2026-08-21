@@ -84,11 +84,17 @@ whatever remains off-ideal keeps its finding open.
 The coverage obligation: every state the old migrations could repair must still be
 detected, which means every surface they touched has an assessment whose ideal state
 flags the legacy condition. One state is deliberately dropped rather than covered
-(2026-08-20): the legacy `typecheck` script. The deprecated `adamantite typecheck`
-alias is treated as if it never existed — no detection, no finding, no goals; a
-project still carrying the script keeps it until its owner notices. This removes the
-managed-scripts surface from phase 1 entirely and keeps the invariant above
-exception-free: every goal doctor states is one its oracle can re-check.
+(2026-08-20): the legacy `typecheck` script, in both places the old repair touched
+it — the `package.json` script and any CI workflow matrix entry invoking it (the old
+`migrate()` regenerated the workflow, which purged such entries). The deprecated
+`adamantite typecheck` alias is treated as if it never existed: no detection, no
+finding, no goals, and the workflow ideal state below deliberately does not look for
+stale entries, since flagging them would require exactly the alias-knowledge being
+deleted. The failure mode is a hard break, not drift: once the alias is removed
+(step 4), a project still carrying the script — or a CI matrix entry that runs it —
+fails with an unknown-command error until its owner deletes it; the changeset (step 9)
+documents this. Dropping the surface keeps the invariant above exception-free: every
+goal doctor states is one its oracle can re-check.
 
 Two general rules carry over from the old system. First,
 when a surface's applicability gate fails but the surface is visibly off-ideal, the

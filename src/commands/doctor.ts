@@ -76,7 +76,7 @@ export default Command.make("doctor", { fix }).pipe(
         }
       }
 
-      let findings = collectFindings(assessments)
+      const findings = collectFindings(assessments)
 
       if (assessments.length === 0) {
         yield* prompter.log.success("No applicable integrations found.")
@@ -147,18 +147,18 @@ export default Command.make("doctor", { fix }).pipe(
               yield* prompter.log.warning(`${choice} did not complete the requested repair.`)
             }
 
-            findings = yield* collectCurrentAssessments().pipe(
+            const reassessedFindings = yield* collectCurrentAssessments().pipe(
               Effect.map((currentAssessments) => collectFindings(currentAssessments))
             )
 
-            if (findings.length === 0) {
+            if (reassessedFindings.length === 0) {
               yield* prompter.log.success("The agent resolved every finding.")
               yield* prompter.outro("✅ Doctor completed successfully!")
               return
             }
 
             yield* prompter.log.warning("Findings remain after the agent run.")
-            yield* printFindings(findings)
+            yield* printFindings(reassessedFindings)
           }
         }
       }

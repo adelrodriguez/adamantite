@@ -144,6 +144,25 @@ describe("github", () => {
       })
     )
 
+    it.effect("accept a check command in a run block scalar", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "steps:",
+            "  - run: |",
+            "      pnpm install --frozen-lockfile",
+            "      pnpm --filter app run check",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [],
+        })
+      })
+    )
+
     it.effect("warn when an off-ideal workflow cannot be regenerated", () =>
       Effect.gen(function* () {
         const files = makeFiles({ [WORKFLOW_PATH]: 'node-version: "22"\n' })

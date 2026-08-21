@@ -234,6 +234,10 @@ describe("doctor", () => {
         message:
           "Adamantite could not confirm a clean working tree. The agent can overwrite or mix with existing changes.",
       })
+      expect(prompter.confirmCalls).toContainEqual({
+        initialValue: false,
+        message: "Run the agent anyway?",
+      })
     })
   )
 

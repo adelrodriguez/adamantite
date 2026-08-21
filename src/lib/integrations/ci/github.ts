@@ -14,8 +14,10 @@ import {
 import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
-const CHECK_COMMAND_REGEX = /\b(?:(?:bun|npm|pnpm|yarn)\s+run\s+check|deno\s+task\s+check)\b/
-const WORKFLOW_COMMAND_REGEX = /^\s*(?:-\s*)?(?:command|run):\s*(.+)$/
+const BLOCK_SCALAR_REGEX = /^[>|][+-]?(?:\s+#.*)?$/
+const CHECK_COMMAND_REGEX =
+  /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
+const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
 
 interface WorkflowOptions {
   packageManager: SupportedPackageManager
@@ -23,10 +25,46 @@ interface WorkflowOptions {
 }
 
 function hasCheckCommand(content: string): boolean {
-  return content.split("\n").some((line) => {
-    const command = WORKFLOW_COMMAND_REGEX.exec(line)?.[1]
-    return command !== undefined && CHECK_COMMAND_REGEX.test(command)
-  })
+  const lines = content.split("\n")
+
+  for (const [index, line] of lines.entries()) {
+    const match = WORKFLOW_COMMAND_REGEX.exec(line)
+
+    if (!match) {
+      continue
+    }
+
+    const indentation = match[1]?.length ?? 0
+    const command = match[2] ?? ""
+
+    if (CHECK_COMMAND_REGEX.test(command)) {
+      return true
+    }
+
+    if (!BLOCK_SCALAR_REGEX.test(command)) {
+      continue
+    }
+
+    for (const blockLine of lines.slice(index + 1)) {
+      const trimmed = blockLine.trim()
+
+      if (trimmed.length === 0) {
+        continue
+      }
+
+      const blockIndentation = blockLine.length - blockLine.trimStart().length
+
+      if (blockIndentation <= indentation) {
+        break
+      }
+
+      if (CHECK_COMMAND_REGEX.test(trimmed)) {
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 function renderNodeSetup(source: NodeVersionSource): string {

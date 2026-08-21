@@ -56,7 +56,7 @@ export const offerFindingActions = Effect.fn("offerFindingActions")(function* <E
     )
     const shouldContinue = yield* prompter.confirm({
       initialValue: false,
-      message: "Run the agent with this dirty working tree?",
+      message: "Run the agent anyway?",
     })
 
     if (!shouldContinue) {

@@ -72,48 +72,69 @@ options and shape are present, and let user additions pass. The goal bullets in 
 finding state the same facts the inspection checks. Exact-match comparison is rejected:
 it would permanently flag legitimate user customizations.
 
-### Legacy states port to findings
+### Ideal-state coverage replaces migrations
 
-All six migrations' `check()` detection logic ports over as finding-emitting assessments
-(legacy `knip.json`, legacy oxfmt JSON, legacy oxlint JSON, legacy typecheck script,
-hardcoded node version, stale Zed oxfmt settings). All `migrate()` code, `runMigration`,
-and the snapshot/rollback machinery are deleted.
+Migrations are not ported one-to-one. Doctor assesses the current state of each
+managed surface against its ideal state and emits findings for the difference; where a
+project came from is irrelevant. All `migrate()` code, `runMigration`, the
+snapshot/rollback machinery, and the migration registry are deleted. There is no
+trigger separate from the goal, so a partially applied fix cannot make doctor exit 0 —
+whatever remains off-ideal keeps its finding open.
 
-Porting rule: a ported finding's detection must be end-state detection — the finding
-fires while any of its goal criteria is unmet under its conditions, not only while the
-original `check()` trigger matches. Each goal carries over the conditions the
-`migrate()` applied it under, and conditions that produced warnings instead of writes
-become `notes`, not gated goals. Two invariants follow: no project shape may leave a
-finding open with no action that closes it, and satisfying a strict subset of the goals
-must not make doctor exit 0. Five of the six migrations already satisfy this — their
-`check()` detects the end state directly (a legacy file exists, a hardcoded version
-remains), so trigger and goal coincide.
+The coverage obligation: every state the old migrations could repair must still be
+detected, which means every surface they touched has an assessment whose ideal state
+flags the legacy condition. One state is deliberately dropped rather than covered
+(2026-08-20): the legacy `typecheck` script, in both places the old repair touched
+it — the `package.json` script and any CI workflow matrix entry invoking it (the old
+`migrate()` regenerated the workflow, which purged such entries). The deprecated
+`adamantite typecheck` alias is treated as if it never existed: no detection, no
+finding, no goals, and the workflow ideal state below deliberately does not look for
+stale entries, since flagging them would require exactly the alias-knowledge being
+deleted. The failure mode is a hard break, not drift: once the alias is removed
+(step 4), a project still carrying the script — or a CI matrix entry that runs it —
+fails with an unknown-command error until its owner deletes it; the changeset (step 9)
+documents this. Dropping the surface keeps the invariant above exception-free: every
+goal doctor states is one its oracle can re-check.
 
-The exception is `legacy-typecheck-script`: its `check()` reads one script key, but its
-`migrate()` wrote up to five files. Widening that finding's trigger to all its goals
-would misfire — once the script is renamed, "half-migrated" is indistinguishable from
-"never had the legacy script", and projects that were never in the legacy state would
-be flagged with a legacy finding. Instead, the coupled surfaces become standalone
-phase 1 assessments with their own findings and the same conditions the `migrate()`
-used:
+Two general rules carry over from the old system. First,
+when a surface's applicability gate fails but the surface is visibly off-ideal, the
+assessment emits a warning, not a finding — mirroring the warning-only branches the
+migrations had (no CI-compatible scripts, no package manager detected, unsupported
+package manager). Second, ideal states use required-subset semantics throughout:
+user-chosen values and customizations pass; only adamantite-owned state is asserted.
 
-- The legacy-typecheck finding keeps the script rename as its goal; the oxlint config
-  is already verified by oxlint's own content-level assessment.
-- A tsconfig assessment checks that `tsconfig.json` exists and its `extends` includes
-  adamantite's preset, applicable only outside a monorepo — a missing file is a
-  finding, not not-applicable, mirroring the old `migrate()`'s create-vs-update branch
-  and its `validate()` failing on absence. In a monorepo the existing
-  `MONOREPO_GUIDANCE` text is surfaced as a warning instead, mirroring the old
-  `validate()` exemption.
-- A workflow assessment checks that an existing `.github/workflows/adamantite.yml`
-  references the `check` script, applicable only when the managed scripts are
-  CI-compatible with a supported package manager — `migrate()` never created a
-  workflow, and neither does this assessment. It needs the managed-script and
-  package-manager context that `github.update` takes.
+Per surface:
 
-A partially applied fix then keeps doctor red through the standalone findings, and the
-combined prompt (below) still presents the coupled findings together whenever they
-co-occur. The two assessments are early slivers of the phase 2 surfaces.
+- Tooling configs (knip, oxfmt, oxlint): the active config is the `.ts` file with the
+  required content, and no legacy `.json`/`.jsonc` config shadows or replaces it. The
+  absence criterion is a deliberate widening, not coverage parity: when a valid `.ts`
+  config was active, the old migration never ran and the stray legacy file only drew a
+  warning. It becomes a finding because it has a clear ideal state (absent) and a
+  trivial, safe repair.
+- tsconfig: `tsconfig.json` exists and its `extends` includes adamantite's preset,
+  applicable only outside a monorepo — a missing file is a finding, not
+  not-applicable. In a monorepo the `MONOREPO_GUIDANCE` text is surfaced as a warning
+  instead.
+- CI workflow: an existing `.github/workflows/adamantite.yml` references the `check`
+  script and uses no hardcoded node version where the resolver belongs, applicable
+  only when the managed scripts are CI-compatible with a supported package manager
+  (warnings per the general rule when that gate fails). The assessment never creates a
+  workflow.
+- Zed settings: no oxfmt entries still carrying the stale defaults the old preset
+  wrote — matched on key and value, as `checkIsStaleOxfmtSetting` does today, so
+  user-customized values are preserved.
+
+The tsconfig, workflow, and Zed assessments are narrow phase 1 slivers of the phase 2
+surfaces, kept so no state the tool repairs today goes undetected.
+
+The six migrations survive as two humbler assets. Their test fixtures (~1,300 lines
+enumerating real legacy states) carry over as assessment fixtures proving the coverage
+obligation, except the typecheck fixtures, which are deleted with their dropped state.
+And their transformation knowledge becomes instruction `notes` — a finding
+whose `currentState` is a legacy `knip.json` tells the agent to port the settings into
+the `.ts` config and then delete the legacy file, preserving user content rather than
+recreating from scratch. Coupled legacy states need no special handling: the combined
+prompt (below) already presents co-occurring findings together.
 
 ### Prompt
 
@@ -235,17 +256,17 @@ stale copies become structurally impossible.
 
 ## Steps
 
-1. Define the `Finding` type and rework `assess` signatures; port the six migration
-   `check()`s into finding-emitting assessments under the porting rule (end-state
-   detection covering each `migrate()`'s conditions); delete `src/lib/migrations/` and
-   its tests.
+1. Define the `Finding` type and rework `assess` signatures; define the ideal state
+   per managed surface (including absence criteria for legacy configs); delete
+   `src/lib/migrations/`, carrying its test fixtures over as assessment fixtures.
 2. Build content-level inspection for knip and oxfmt configs on the oxlint model, plus
-   the standalone tsconfig-`extends` and workflow-script assessments that back the
-   legacy-typecheck porting; express every finding's goal bullets from the same checks.
+   the standalone tsconfig, workflow, and Zed-settings assessments that complete the
+   coverage obligation; express every finding's goal bullets from the same checks.
 3. Build the two renderers from shared finding structs — markdown prompt in
    `src/lib/`, terminal view in `src/terminal/` — with snapshot tests.
 4. Rework `doctor.ts`: assess, render, exit codes, `--fix` stub error. Delete the fix
-   machinery and its tests.
+   machinery and its tests, and remove the deprecated `typecheck` command alias from
+   the CLI in the same pass.
 5. Add the TTY menu, harness table with PATH detection, OSC 52 copy.
 6. Add the harness-runner service (`src/lib/workspace/`, `DependencyInstaller`
    pattern), the spawn flow in `doctor.ts` (permission flags, command echo, dirty-tree
@@ -253,14 +274,17 @@ stale copies become structurally impossible.
 7. Rework `update.ts`: bumps plus the shared assess-and-render pipeline, keeping exit 0
    while findings remain; delete its migration pass and tests.
 8. Slim `writeAgentsGuidance` and `SKILL.md`; update README and `docs/architecture.md`.
-9. Minor changeset describing the breaking `doctor --fix` removal and the new model.
+9. Minor changeset describing the breaking `doctor --fix` and `typecheck` removals and
+   the new model.
 
 ## Phase 2 (named, not specified here)
 
-Extend assessment and findings to the init-only surfaces: zed, vscode, GitHub workflow,
-tsconfig. Instruction-based repair makes this coverage cheap — detection plus
-instruction text, no merge machinery. Requires content-level checks to be meaningful
-(editor settings files always exist once the editor is used). Spec separately.
+Extend assessment and findings to full coverage of the init-only surfaces: zed,
+vscode, GitHub workflow, tsconfig — beyond the narrow phase 1 slivers the coverage
+obligation already lands there. Instruction-based repair makes this cheap — detection
+plus instruction text, no merge machinery. Requires content-level checks to be
+meaningful (editor settings files always exist once the editor is used). Spec
+separately.
 
 ## Out of scope
 

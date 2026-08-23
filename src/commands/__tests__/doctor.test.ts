@@ -49,7 +49,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("report findings and exit 1", () =>
+  it.effect("print the Markdown prompt directly in a non-interactive terminal", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
@@ -64,10 +64,12 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "warning",
-        message: "1. Missing knip configuration",
-      })
+      expect(prompter.messages).toHaveLength(1)
+      expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
+      expect(prompter.messages[0]).toContain("## 1. Missing knip configuration")
+      expect(prompter.intros).toEqual([])
+      expect(prompter.notes).toEqual([])
+      expect(prompter.outros).toEqual([])
     })
   )
 
@@ -112,7 +114,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("print and copy the combined prompt in an interactive terminal", () =>
+  it.effect("show formatted findings and copy the Markdown prompt", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
@@ -145,9 +147,25 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.notes).toEqual([
+        expect.objectContaining({
+          message: expect.stringContaining(
+            "Current state\nThe managed `knip.config.ts` file is missing."
+          ),
+          title: "1. Missing knip configuration",
+        }),
+      ])
+      expect(prompter.selectCalls).toContainEqual({
+        message: "What would you like to do?",
+        options: [
+          { label: "Pass to a coding agent", value: "agent" },
+          { label: "Copy the Markdown prompt", value: "prompt" },
+        ],
+      })
       expect(copied).toHaveLength(1)
       expect(copied[0]).toContain("# Adamantite doctor findings")
       expect(copied[0]).toContain("Do not suppress or work around checks")
+      expect(prompter.messages).toEqual([])
     })
   )
 
@@ -161,16 +179,18 @@ describe("doctor", () => {
           }),
         },
       })
-      const prompter = createPrompterTestContext({ selectResponses: ["codex"] })
+      const prompter = createPrompterTestContext({ selectResponses: ["agent", "codex"] })
+      const agentPrompts: string[] = []
       const interactive = Layer.succeed(TerminalCapabilities)({
         copyToClipboard: () => Effect.void,
         isInteractive: Effect.succeed(true),
       })
       const agentRunner = Layer.succeed(AgentRunner)({
-        detect: () => Effect.succeed(["codex"]),
+        detect: () => Effect.succeed(["claude", "codex"]),
         getCommand: () => ({ args: ["exec", "prompt"], command: "codex" }),
-        run: () =>
+        run: (_harness, prompt) =>
           Effect.sync(() => {
+            agentPrompts.push(prompt)
             files.write("knip.config.ts", toKnipTsConfigContent())
             return ChildProcessSpawner.ExitCode(0)
           }),
@@ -191,6 +211,51 @@ describe("doctor", () => {
         level: "success",
         message: "The agent resolved every finding.",
       })
+      expect(agentPrompts).toHaveLength(1)
+      expect(agentPrompts[0]).toContain("# Adamantite doctor findings")
+      expect(prompter.selectCalls[1]).toEqual({
+        message: "Which coding agent should handle these findings?",
+        options: [
+          { label: "Claude Code", value: "claude" },
+          { label: "Codex", value: "codex" },
+        ],
+      })
+    })
+  )
+
+  it.effect("report when no supported coding agent is available", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0", knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+          }),
+        },
+      })
+      const prompter = createPrompterTestContext({ selectResponses: ["agent"] })
+      const interactive = Layer.succeed(TerminalCapabilities)({
+        copyToClipboard: () => Effect.void,
+        isInteractive: Effect.succeed(true),
+      })
+      const agentRunner = Layer.succeed(AgentRunner)({
+        detect: () => Effect.succeed([]),
+        getCommand: () => ({ args: [], command: "codex" }),
+        run: () => Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+      })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, interactive, agentRunner],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "No supported coding agent was found. Install Codex or Claude Code, or copy the Markdown prompt.",
+      })
+      expect(prompter.selectCalls).toHaveLength(1)
     })
   )
 
@@ -206,7 +271,7 @@ describe("doctor", () => {
       })
       const prompter = createPrompterTestContext({
         confirmResponses: [false],
-        selectResponses: ["codex"],
+        selectResponses: ["agent", "codex"],
       })
       const interactive = Layer.succeed(TerminalCapabilities)({
         copyToClipboard: () => Effect.void,
@@ -251,7 +316,7 @@ describe("doctor", () => {
           }),
         },
       })
-      const prompter = createPrompterTestContext({ selectResponses: ["codex"] })
+      const prompter = createPrompterTestContext({ selectResponses: ["agent", "codex"] })
       const interactive = Layer.succeed(TerminalCapabilities)({
         copyToClipboard: () => Effect.void,
         isInteractive: Effect.succeed(true),
@@ -295,7 +360,7 @@ describe("doctor", () => {
           }),
         },
       })
-      const prompter = createPrompterTestContext({ selectResponses: ["codex"] })
+      const prompter = createPrompterTestContext({ selectResponses: ["agent", "codex"] })
       const interactive = Layer.succeed(TerminalCapabilities)({
         copyToClipboard: () => Effect.void,
         isInteractive: Effect.succeed(true),
@@ -325,10 +390,9 @@ describe("doctor", () => {
         level: "warning",
         message: "Findings remain after the agent run.",
       })
-      expect(prompter.logs).toContainEqual({
-        level: "warning",
-        message: "1. Legacy knip files remain",
-      })
+      expect(prompter.notes).toContainEqual(
+        expect.objectContaining({ title: "1. Legacy knip files remain" })
+      )
     })
   )
 })

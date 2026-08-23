@@ -36,9 +36,13 @@ export default Command.make("doctor", { fix }).pipe(
     Effect.gen(function* () {
       const cwd = process.cwd()
       const prompter = yield* Prompter
+      const terminal = yield* TerminalCapabilities
+      const isInteractive = yield* terminal.isInteractive
 
-      yield* printTitle()
-      yield* prompter.intro("💠 adamantite doctor")
+      if (isInteractive) {
+        yield* printTitle()
+        yield* prompter.intro("💠 adamantite doctor")
+      }
 
       if (fix) {
         yield* prompter.log.error(
@@ -90,80 +94,93 @@ export default Command.make("doctor", { fix }).pipe(
         return
       }
 
-      yield* printFindings(findings)
-      const terminal = yield* TerminalCapabilities
+      const prompt = renderFindingsPrompt(findings, version)
 
-      if (yield* terminal.isInteractive) {
-        const agentRunner = yield* AgentRunner
-        const availableHarnesses = yield* agentRunner.detect()
-        const prompt = renderFindingsPrompt(findings, version)
-        const choice = yield* prompter.select<AgentHarness | "prompt">({
-          message: "How would you like to handle these findings?",
+      if (isInteractive) {
+        yield* printFindings(findings)
+        const action = yield* prompter.select<"agent" | "prompt">({
+          message: "What would you like to do?",
           options: [
-            ...availableHarnesses.map((harness) => ({
-              label: harness === "claude" ? "Fix with Claude Code" : "Fix with Codex",
-              value: harness,
-            })),
-            { label: "Get the prompt", value: "prompt" },
+            { label: "Pass to a coding agent", value: "agent" },
+            { label: "Copy the Markdown prompt", value: "prompt" },
           ],
         })
 
-        if (choice === "prompt") {
-          yield* prompter.log.info(prompt)
+        if (action === "prompt") {
           yield* terminal.copyToClipboard(prompt)
-          yield* prompter.log.success("The prompt was printed and sent to the terminal clipboard.")
+          yield* prompter.log.success("The Markdown prompt was copied to the terminal clipboard.")
         } else {
-          const gitStatus = yield* GitStatus
-          let shouldRunAgent = true
+          const agentRunner = yield* AgentRunner
+          const availableHarnesses = yield* agentRunner.detect()
 
-          if (yield* gitStatus.isDirty(cwd)) {
+          if (availableHarnesses.length === 0) {
             yield* prompter.log.warning(
-              "Adamantite could not confirm a clean working tree. The agent can overwrite or mix with existing changes."
+              "No supported coding agent was found. Install Codex or Claude Code, or copy the Markdown prompt."
             )
-            shouldRunAgent = yield* prompter.confirm({
-              initialValue: false,
-              message: "Run the agent anyway?",
+          } else {
+            const choice = yield* prompter.select<AgentHarness>({
+              message: "Which coding agent should handle these findings?",
+              options: availableHarnesses.map((harness) => ({
+                label: harness === "claude" ? "Claude Code" : "Codex",
+                value: harness,
+              })),
             })
-          }
+            const gitStatus = yield* GitStatus
+            let shouldRunAgent = true
 
-          if (shouldRunAgent) {
-            const command = agentRunner.getCommand(choice, prompt)
-            yield* prompter.log.info(
-              `Running: ${[command.command, ...command.args]
-                .map((part) => JSON.stringify(part))
-                .join(" ")}`
-            )
+            if (yield* gitStatus.isDirty(cwd)) {
+              yield* prompter.log.warning(
+                "Adamantite could not confirm a clean working tree. The agent can overwrite or mix with existing changes."
+              )
+              shouldRunAgent = yield* prompter.confirm({
+                initialValue: false,
+                message: "Run the agent anyway?",
+              })
+            }
 
-            const exitCode = yield* prompter.withSpinner(
-              () => agentRunner.run(choice, prompt, cwd),
-              {
-                failure: `${choice} failed to start.`,
-                start: `Running ${choice}...`,
-                success: (code) => `${choice} exited with code ${code}.`,
+            if (shouldRunAgent) {
+              const command = agentRunner.getCommand(choice, prompt)
+              yield* prompter.log.info(
+                `Running: ${[command.command, ...command.args]
+                  .map((part) => JSON.stringify(part))
+                  .join(" ")}`
+              )
+
+              const exitCode = yield* prompter.withSpinner(
+                () => agentRunner.run(choice, prompt, cwd),
+                {
+                  failure: `${choice} failed to start.`,
+                  start: `Running ${choice}...`,
+                  success: (code) => `${choice} exited with code ${code}.`,
+                }
+              )
+
+              if (exitCode !== 0) {
+                yield* prompter.log.warning(`${choice} did not complete the requested repair.`)
               }
-            )
 
-            if (exitCode !== 0) {
-              yield* prompter.log.warning(`${choice} did not complete the requested repair.`)
+              const reassessedFindings = yield* collectCurrentAssessments().pipe(
+                Effect.map((currentAssessments) => collectFindings(currentAssessments))
+              )
+
+              if (reassessedFindings.length === 0) {
+                yield* prompter.log.success("The agent resolved every finding.")
+                yield* prompter.outro("✅ Doctor completed successfully!")
+                return
+              }
+
+              yield* prompter.log.warning("Findings remain after the agent run.")
+              yield* printFindings(reassessedFindings)
             }
-
-            const reassessedFindings = yield* collectCurrentAssessments().pipe(
-              Effect.map((currentAssessments) => collectFindings(currentAssessments))
-            )
-
-            if (reassessedFindings.length === 0) {
-              yield* prompter.log.success("The agent resolved every finding.")
-              yield* prompter.outro("✅ Doctor completed successfully!")
-              return
-            }
-
-            yield* prompter.log.warning("Findings remain after the agent run.")
-            yield* printFindings(reassessedFindings)
           }
         }
+      } else {
+        yield* prompter.message(prompt)
       }
 
-      yield* prompter.outro("⚠️ Doctor found issues.")
+      if (isInteractive) {
+        yield* prompter.outro("⚠️ Doctor found issues.")
+      }
       return yield* new CommandFailed({
         command: "doctor",
         exitCode: ChildProcessSpawner.ExitCode(1),

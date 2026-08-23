@@ -80,10 +80,9 @@ describe("update", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "warning",
-        message: "1. Missing knip configuration",
-      })
+      expect(prompter.notes).toContainEqual(
+        expect.objectContaining({ title: "1. Missing knip configuration" })
+      )
     })
   )
 

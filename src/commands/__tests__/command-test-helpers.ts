@@ -41,7 +41,9 @@ export interface PrompterTestContext {
   readonly intros: string[]
   readonly layer: Layer.Layer<Prompter>
   readonly logs: LogEntry[]
+  readonly messages: string[]
   readonly multiselectCalls: unknown[]
+  readonly notes: Array<{ readonly message: string; readonly title: string }>
   readonly outros: string[]
   readonly selectCalls: unknown[]
   readonly spinnerEntries: SpinnerEntry[]
@@ -123,7 +125,9 @@ export function createPrompterTestContext(options?: {
   const confirmCalls: prompts.ConfirmOptions[] = []
   const intros: string[] = []
   const logs: LogEntry[] = []
+  const messages: string[] = []
   const multiselectCalls: unknown[] = []
+  const notes: Array<{ readonly message: string; readonly title: string }> = []
   const outros: string[] = []
   const selectCalls: unknown[] = []
   const spinnerEntries: SpinnerEntry[] = []
@@ -176,6 +180,10 @@ export function createPrompterTestContext(options?: {
             logs.push({ level: "warning", message })
           }),
       },
+      message: (message) =>
+        Effect.sync(() => {
+          messages.push(message)
+        }),
       multiselect: <T>(config: prompts.MultiSelectOptions<T>) =>
         Effect.gen(function* () {
           if (shouldCancelPrompt()) {
@@ -185,6 +193,10 @@ export function createPrompterTestContext(options?: {
           multiselectCalls.push(config)
           // SAFETY: each test queues multiselect responses matching the option type of the prompt it triggers.
           return shiftResponse(multiselectResponses, "multiselect") as T[]
+        }),
+      note: (message, title) =>
+        Effect.sync(() => {
+          notes.push({ message, title })
         }),
       outro: (message) =>
         Effect.sync(() => {
@@ -228,7 +240,9 @@ export function createPrompterTestContext(options?: {
         ),
     }),
     logs,
+    messages,
     multiselectCalls,
+    notes,
     outros,
     selectCalls,
     spinnerEntries,

@@ -2,25 +2,27 @@ import * as Effect from "effect/Effect"
 import type { Finding } from "#lib/integrations/base.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
-export function printFindings(findings: readonly Finding[]) {
-  return Effect.gen(function* () {
-    const prompter = yield* Prompter
+function renderFinding(finding: Finding): string {
+  const sections = [
+    `Current state\n${finding.currentState}`,
+    `Goal\n${finding.goal.map((goal) => `• ${goal}`).join("\n")}`,
+  ]
 
-    for (const [index, finding] of findings.entries()) {
-      yield* prompter.log.warning(`${index + 1}. ${finding.title}`)
-      yield* prompter.log.info(`Current state: ${finding.currentState}`)
+  if (finding.reference) {
+    sections.push(`Reference\n${finding.reference.trimEnd()}`)
+  }
 
-      for (const goal of finding.goal) {
-        yield* prompter.log.info(`Goal: ${goal}`)
-      }
+  if (finding.notes && finding.notes.length > 0) {
+    sections.push(`Notes\n${finding.notes.map((note) => `• ${note}`).join("\n")}`)
+  }
 
-      if (finding.reference) {
-        yield* prompter.log.info(`Reference:\n${finding.reference.trimEnd()}`)
-      }
-
-      for (const note of finding.notes ?? []) {
-        yield* prompter.log.info(`Note: ${note}`)
-      }
-    }
-  })
+  return sections.join("\n\n")
 }
+
+export const printFindings = Effect.fn("printFindings")(function* (findings: readonly Finding[]) {
+  const prompter = yield* Prompter
+
+  for (const [index, finding] of findings.entries()) {
+    yield* prompter.note(renderFinding(finding), `${index + 1}. ${finding.title}`)
+  }
+})

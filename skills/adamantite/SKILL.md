@@ -79,8 +79,10 @@ adamantite doctor
 ```
 
 Follow each finding. Doctor supplies the current state, the goal criteria, reference
-content when needed, and the verification command. In an interactive terminal, choose an
-available agent or copy the combined prompt. Run `adamantite doctor` again until it exits 0.
+content when needed, and the verification command. In an interactive terminal, copy the
+combined Markdown prompt or pass it to an available coding agent. In a non-interactive
+run, Doctor prints the Markdown prompt directly. Run `adamantite doctor` again until it
+exits 0.
 
 ## Update
 

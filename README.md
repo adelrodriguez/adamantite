@@ -171,9 +171,11 @@ the current state, the goal state, and how to verify the repair.
 adamantite doctor
 ```
 
-In an interactive terminal, choose Claude Code, Codex, or a copyable prompt. Doctor runs
-an available agent with workspace-write permissions and reassesses the project once. In
-CI or a pipe, doctor prints findings and exits 1 without a prompt.
+In an interactive terminal, Doctor presents each finding as formatted text. You can copy
+one combined Markdown prompt or pass it to an available coding agent. If you choose an
+agent, select Claude Code or Codex. Doctor runs it with workspace-write permissions and
+reassesses the project once. In CI, a pipe, or another non-interactive run, Doctor prints
+the combined Markdown prompt directly and exits 1.
 
 ### `adamantite update`
 

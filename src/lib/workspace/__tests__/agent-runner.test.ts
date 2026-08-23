@@ -49,13 +49,8 @@ describe("AgentRunner", () => {
         "repair prompt",
       ])
       expect(claude.args).not.toContain("--dangerously-skip-permissions")
-      expect(codex.args).toEqual([
-        "exec",
-        "--sandbox",
-        "workspace-write",
-        "--approve-for-me",
-        "repair prompt",
-      ])
+      expect(codex.args).toEqual(["exec", "--approve-for-me", "repair prompt"])
+      expect(codex.args).not.toContain("--sandbox")
       expect(codex.args).not.toContain("--dangerously-bypass-approvals-and-sandbox")
     }).pipe(provideAgentRunner([]))
   )

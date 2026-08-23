@@ -27,7 +27,7 @@ function getAgentCommand(harness: AgentHarness, prompt: string): AgentCommand {
       }
     case "codex":
       return {
-        args: ["exec", "--sandbox", "workspace-write", "--approve-for-me", prompt],
+        args: ["exec", "--approve-for-me", prompt],
         command: "codex",
       }
   }

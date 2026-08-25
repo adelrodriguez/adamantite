@@ -42,7 +42,12 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
+      })
+      expect(prompter.outros).toEqual([])
     })
   )
 
@@ -66,6 +71,29 @@ describe("doctor", () => {
       expect(prompter.messages[0]).toContain("## 1. Missing knip configuration")
       expect(prompter.intros).toEqual([])
       expect(prompter.notes).toEqual([])
+      expect(prompter.outros).toEqual([])
+    })
+  )
+
+  it.effect("keep assessment warnings out of the non-interactive Markdown output", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0", knip: knip.version },
+            scripts: { analyze: "adamantite analyze", check: "adamantite check" },
+            workspaces: ["packages/*"],
+          }),
+        },
+      })
+      const prompter = createPrompterTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toHaveLength(1)
+      expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
+      expect(prompter.logs).toEqual([])
       expect(prompter.outros).toEqual([])
     })
   )
@@ -154,7 +182,13 @@ describe("doctor", () => {
       expect(copied).toHaveLength(1)
       expect(copied[0]).toContain("# Adamantite doctor findings")
       expect(copied[0]).toContain("Do not suppress or work around checks")
-      expect(prompter.messages).toEqual([])
+      expect(prompter.messages).toHaveLength(1)
+      expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
+      expect(prompter.messages[0]).toContain("Do not suppress or work around checks")
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "The Markdown prompt was printed and sent to the terminal clipboard.",
+      })
     })
   )
 })

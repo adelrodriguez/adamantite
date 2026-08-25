@@ -174,7 +174,7 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
     })
   )
 
-  return { ...config, languages }
+  return Object.fromEntries([...Object.entries(config), ["languages", languages]])
 }
 
 export default defineIntegration({

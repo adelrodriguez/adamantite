@@ -14,11 +14,18 @@ const files = Argument.file("files", { mustExist: true }).pipe(
   Argument.variadic()
 )
 
-const suggested = Flag.boolean("suggested").pipe(Flag.withDescription("Apply suggested fixes"))
+const suggested = Flag.boolean("suggested").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Apply suggested fixes")
+)
 
-const dangerous = Flag.boolean("dangerous").pipe(Flag.withDescription("Apply dangerous fixes"))
+const dangerous = Flag.boolean("dangerous").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Apply dangerous fixes")
+)
 
 const all = Flag.boolean("all").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("Apply all fixes, including suggested and dangerous fixes")
 )
 

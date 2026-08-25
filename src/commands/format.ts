@@ -14,6 +14,7 @@ const files = Argument.file("files", { mustExist: true }).pipe(
 )
 
 const check = Flag.boolean("check").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("Check if files are formatted without writing")
 )
 

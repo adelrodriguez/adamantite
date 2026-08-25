@@ -131,10 +131,10 @@ export default defineIntegration({
       }
 
       const merged = yield* mergeConfig(CONFIG, existingConfig)
-      const newConfig = {
-        ...merged,
-        extends: mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined),
-      }
+      const newConfig = Object.fromEntries([
+        ...Object.entries(merged),
+        ["extends", mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined)],
+      ])
 
       yield* writeJsonFile(configPath, newConfig)
     }),

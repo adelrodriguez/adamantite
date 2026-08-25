@@ -588,6 +588,34 @@ describe("checkIsMonorepo", () => {
       })
     )
 
+    it.effect("return true when package.json has workspace packages in object form", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          name: "test-package",
+          workspaces: { packages: ["packages/*"] },
+        }
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(true)
+      })
+    )
+
+    it.effect("return false when package.json has no workspace packages in object form", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          name: "test-package",
+          workspaces: { packages: [] },
+        }
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(false)
+      })
+    )
+
     it.effect("return false when package.json has no workspace packages", () =>
       Effect.gen(function* () {
         const files = makeFiles({

@@ -22,6 +22,7 @@ import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 
 const fix = Flag.boolean("fix").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("Removed. Run doctor and follow its findings")
 )
 
@@ -46,7 +47,9 @@ export default Command.make("doctor", { fix }).pipe(
         yield* prompter.log.error(
           "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria."
         )
-        yield* prompter.outro("❌ Doctor did not run")
+        if (isInteractive) {
+          yield* prompter.outro("❌ Doctor did not run")
+        }
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -59,7 +62,9 @@ export default Command.make("doctor", { fix }).pipe(
         yield* prompter.log.warning(
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
         )
-        yield* prompter.outro("⚠️ Doctor found issues.")
+        if (isInteractive) {
+          yield* prompter.outro("⚠️ Doctor found issues.")
+        }
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -68,9 +73,11 @@ export default Command.make("doctor", { fix }).pipe(
 
       const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
 
-      for (const { assessment } of assessments) {
-        for (const warning of assessment.warnings) {
-          yield* prompter.log.warning(warning)
+      if (isInteractive) {
+        for (const { assessment } of assessments) {
+          for (const warning of assessment.warnings) {
+            yield* prompter.log.warning(warning)
+          }
         }
       }
 
@@ -78,13 +85,17 @@ export default Command.make("doctor", { fix }).pipe(
 
       if (assessments.length === 0) {
         yield* prompter.log.success("No applicable integrations found.")
-        yield* prompter.outro("✅ Doctor completed successfully!")
+        if (isInteractive) {
+          yield* prompter.outro("✅ Doctor completed successfully!")
+        }
         return
       }
 
       if (findings.length === 0) {
         yield* prompter.log.success("No issues found.")
-        yield* prompter.outro("✅ Doctor completed successfully!")
+        if (isInteractive) {
+          yield* prompter.outro("✅ Doctor completed successfully!")
+        }
         return
       }
 
@@ -101,8 +112,11 @@ export default Command.make("doctor", { fix }).pipe(
         })
 
         if (shouldCopyPrompt) {
+          yield* prompter.message(prompt)
           yield* terminal.copyToClipboard(prompt)
-          yield* prompter.log.success("The Markdown prompt was copied to the terminal clipboard.")
+          yield* prompter.log.success(
+            "The Markdown prompt was printed and sent to the terminal clipboard."
+          )
         }
       } else {
         yield* prompter.message(prompt)

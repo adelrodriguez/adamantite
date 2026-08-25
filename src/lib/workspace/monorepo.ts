@@ -43,5 +43,8 @@ export const checkIsMonorepo = (cwd: string = process.cwd()) =>
     }
 
     const packageJson = yield* readPackageJson(cwd)
-    return Array.isArray(packageJson.workspaces) && packageJson.workspaces.length > 0
+    const workspaces = packageJson.workspaces
+    const patterns = Array.isArray(workspaces) ? workspaces : workspaces?.packages
+
+    return (patterns?.length ?? 0) > 0
   })

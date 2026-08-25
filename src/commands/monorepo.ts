@@ -7,7 +7,10 @@ import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
-const fix = Flag.boolean("fix").pipe(Flag.withDescription("Automatically fix issues"))
+const fix = Flag.boolean("fix").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Automatically fix issues")
+)
 
 export default Command.make("monorepo", { fix }).pipe(
   Command.withDescription("Find and fix monorepo-specific issues using Sherif"),

@@ -7,9 +7,15 @@ import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
-const fix = Flag.boolean("fix").pipe(Flag.withDescription("Automatically fix issues"))
+const fix = Flag.boolean("fix").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Automatically fix issues")
+)
 
-const strict = Flag.boolean("strict").pipe(Flag.withDescription("Enable strict mode"))
+const strict = Flag.boolean("strict").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Enable strict mode")
+)
 
 export default Command.make("analyze", { fix, strict }).pipe(
   Command.withDescription("Find unused dependencies, exports, and files using knip"),

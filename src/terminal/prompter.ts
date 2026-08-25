@@ -22,7 +22,6 @@ interface PrompterService {
   ) => Effect.Effect<T[], OperationCancelled>
   readonly note: (message: string, title: string) => Effect.Effect<void>
   readonly outro: (message: string) => Effect.Effect<void>
-  readonly select: <T>(options: p.SelectOptions<T>) => Effect.Effect<T, OperationCancelled>
   readonly withSpinner: <A, E, R>(
     run: (spinner: {
       readonly message: (message: string) => Effect.Effect<void>
@@ -90,13 +89,6 @@ export class Prompter extends Context.Service<Prompter, PrompterService>()("Prom
         Effect.sync(() => {
           p.outro(message)
         }),
-      select: <T>(options: p.SelectOptions<T>) =>
-        Effect.promise(() => p.select(options)).pipe(
-          Effect.filterOrFail(
-            (value): value is T => !p.isCancel(value),
-            () => new OperationCancelled({})
-          )
-        ),
       withSpinner: (run, options) =>
         Effect.acquireUseRelease(
           Effect.sync(() => {

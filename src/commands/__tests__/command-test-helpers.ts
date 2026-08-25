@@ -45,7 +45,6 @@ export interface PrompterTestContext {
   readonly multiselectCalls: unknown[]
   readonly notes: Array<{ readonly message: string; readonly title: string }>
   readonly outros: string[]
-  readonly selectCalls: unknown[]
   readonly spinnerEntries: SpinnerEntry[]
 }
 
@@ -115,12 +114,10 @@ export function createPrompterTestContext(options?: {
   readonly cancelAtPromptIndex?: number
   readonly confirmResponses?: boolean[]
   readonly multiselectResponses?: unknown[][]
-  readonly selectResponses?: unknown[]
 }): PrompterTestContext {
   const cancelAtPromptIndex = options?.cancelAtPromptIndex
   const confirmResponses = [...(options?.confirmResponses ?? [])]
   const multiselectResponses = [...(options?.multiselectResponses ?? [])]
-  const selectResponses = [...(options?.selectResponses ?? [])]
   const cancels: string[] = []
   const confirmCalls: prompts.ConfirmOptions[] = []
   const intros: string[] = []
@@ -129,7 +126,6 @@ export function createPrompterTestContext(options?: {
   const multiselectCalls: unknown[] = []
   const notes: Array<{ readonly message: string; readonly title: string }> = []
   const outros: string[] = []
-  const selectCalls: unknown[] = []
   const spinnerEntries: SpinnerEntry[] = []
   let promptIndex = 0
 
@@ -202,16 +198,6 @@ export function createPrompterTestContext(options?: {
         Effect.sync(() => {
           outros.push(message)
         }),
-      select: <T>(config: prompts.SelectOptions<T>) =>
-        Effect.gen(function* () {
-          if (shouldCancelPrompt()) {
-            return yield* new OperationCancelled({})
-          }
-
-          selectCalls.push(config)
-          // SAFETY: each test queues a select response that matches the option type of the prompt.
-          return shiftResponse(selectResponses, "select") as T
-        }),
       withSpinner: (run, spinnerOptions) =>
         Effect.acquireUseRelease(
           Effect.sync(() => {
@@ -244,7 +230,6 @@ export function createPrompterTestContext(options?: {
     multiselectCalls,
     notes,
     outros,
-    selectCalls,
     spinnerEntries,
   }
 }

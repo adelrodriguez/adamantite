@@ -44,11 +44,13 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       if (fix) {
-        yield* prompter.log.error(
+        const message =
           "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria."
-        )
         if (isInteractive) {
+          yield* prompter.log.error(message)
           yield* prompter.outro("❌ Doctor did not run")
+        } else {
+          yield* prompter.message(message)
         }
         return yield* new CommandFailed({
           command: "doctor",
@@ -59,11 +61,13 @@ export default Command.make("doctor", { fix }).pipe(
       const packageJson = yield* readPackageJson(cwd)
 
       if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
-        yield* prompter.log.warning(
+        const message =
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
-        )
         if (isInteractive) {
+          yield* prompter.log.warning(message)
           yield* prompter.outro("⚠️ Doctor found issues.")
+        } else {
+          yield* prompter.message(message)
         }
         return yield* new CommandFailed({
           command: "doctor",

@@ -14,6 +14,13 @@ function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
 }
 
+function makeInteractiveTerminalLayer() {
+  return Layer.succeed(TerminalCapabilities)({
+    copyToClipboard: () => Effect.void,
+    isInteractive: Effect.succeed(true),
+  })
+}
+
 describe("doctor", () => {
   it.effect("report success when no managed integration applies", () =>
     Effect.gen(function* () {
@@ -30,6 +37,27 @@ describe("doctor", () => {
     })
   )
 
+  it.effect("show no-applicable success framing in an interactive terminal", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }) },
+      })
+      const prompter = createPrompterTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "No applicable integrations found.",
+      })
+      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+    })
+  )
+
   it.effect("fail when Adamantite is not installed", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -40,12 +68,34 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toEqual([])
+      expect(prompter.messages).toEqual([
+        "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
+      ])
+      expect(prompter.outros).toEqual([])
+    })
+  )
+
+  it.effect("show the missing-package failure in an interactive terminal", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "package.json": manifest({}) },
+      })
+      const prompter = createPrompterTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "warning",
         message:
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
       })
-      expect(prompter.outros).toEqual([])
+      expect(prompter.messages).toEqual([])
+      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
     })
   )
 
@@ -129,14 +179,10 @@ describe("doctor", () => {
         },
       })
       const prompter = createPrompterTestContext()
-      const interactive = Layer.succeed(TerminalCapabilities)({
-        copyToClipboard: () => Effect.void,
-        isInteractive: Effect.succeed(true),
-      })
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, interactive],
+        layers: [prompter.layer, makeInteractiveTerminalLayer()],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -158,11 +204,34 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toEqual([])
+      expect(prompter.messages).toEqual([
+        "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria.",
+      ])
+      expect(prompter.outros).toEqual([])
+    })
+  )
+
+  it.effect("show the removed-fix failure in an interactive terminal", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }) },
+      })
+      const prompter = createPrompterTestContext()
+
+      const exit = yield* runCommand(doctorCommand, ["--fix"], {
+        files,
+        layers: [prompter.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "error",
         message:
           "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria.",
       })
+      expect(prompter.messages).toEqual([])
+      expect(prompter.outros).toEqual(["❌ Doctor did not run"])
     })
   )
 

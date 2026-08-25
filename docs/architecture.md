@@ -50,11 +50,11 @@ flowchart TD
 
 `assess` and `doctor` are always read-only. Each finding contains the current state, the
 goal criteria, and optional reference content or notes. The agent or the human changes the
-target project. A second assessment confirms whether the project reached the goal state.
-Interactive Doctor runs render findings as terminal notes, then let the user copy the
-combined Markdown prompt or select an available coding agent. Non-interactive runs print
-the Markdown prompt directly so a calling agent receives repair instructions without an
-interactive choice.
+target project. A later Doctor run confirms whether the project reached the goal state.
+Interactive Doctor runs render findings as terminal notes, explain that a coding agent can
+run Doctor directly, and offer to copy the combined Markdown prompt. Non-interactive runs
+print the Markdown prompt directly so a calling agent receives repair instructions without
+an interactive choice.
 
 Package drift also stays structured so that `update` can install current managed package
 versions. Doctor renders package drift as findings that tell the user to run `update`.

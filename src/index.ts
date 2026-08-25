@@ -9,9 +9,7 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import { runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { AgentRunner } from "#lib/workspace/agent-runner.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { GitStatus } from "#lib/workspace/git-status.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
@@ -35,12 +33,10 @@ const program = Effect.gen(function* () {
   Effect.provide(
     Layer.mergeAll(
       NodeServices.layer,
-      AgentRunner.layer.pipe(Layer.provide(CommandRunner.layer)),
       NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
       Prompter.layer,
       CommandRunner.layer,
       DependencyInstaller.layer,
-      GitStatus.layer,
       TerminalCapabilities.layer
     )
   )

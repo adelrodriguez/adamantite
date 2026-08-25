@@ -13,20 +13,15 @@ import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
-import { collectFindings, renderFindingsPrompt } from "#lib/shared/findings.ts"
-import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { type AgentHarness, AgentRunner } from "#lib/workspace/agent-runner.ts"
+import { collectFindings } from "#lib/shared/findings.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { GitStatus } from "#lib/workspace/git-status.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 
 const integrations = [oxlint, tsgolint, oxfmt, sherif, knip, tsconfig, github, zed] as const
-const version = getPackageVersion()
 const knownPackages = [
   oxlint,
   tsgolint,
@@ -132,80 +127,9 @@ export default Command.make("update").pipe(
 
       if (findings.length > 0) {
         yield* printFindings(findings)
-        const terminal = yield* TerminalCapabilities
-
-        if (yield* terminal.isInteractive) {
-          const agentRunner = yield* AgentRunner
-          const availableHarnesses = yield* agentRunner.detect()
-          const prompt = renderFindingsPrompt(findings, version)
-          const choice = yield* prompter.select<AgentHarness | "prompt">({
-            message: "How would you like to handle these findings?",
-            options: [
-              ...availableHarnesses.map((harness) => ({
-                label: harness === "claude" ? "Fix with Claude Code" : "Fix with Codex",
-                value: harness,
-              })),
-              { label: "Get the prompt", value: "prompt" },
-            ],
-          })
-
-          if (choice === "prompt") {
-            yield* prompter.log.info(prompt)
-            yield* terminal.copyToClipboard(prompt)
-            yield* prompter.log.success(
-              "The prompt was printed and sent to the terminal clipboard."
-            )
-          } else {
-            const gitStatus = yield* GitStatus
-            let shouldRunAgent = true
-
-            if (yield* gitStatus.isDirty(cwd)) {
-              yield* prompter.log.warning(
-                "Adamantite could not confirm a clean working tree. The agent can overwrite or mix with existing changes."
-              )
-              shouldRunAgent = yield* prompter.confirm({
-                initialValue: false,
-                message: "Run the agent anyway?",
-              })
-            }
-
-            if (shouldRunAgent) {
-              const command = agentRunner.getCommand(choice, prompt)
-              yield* prompter.log.info(
-                `Running: ${[command.command, ...command.args]
-                  .map((part) => JSON.stringify(part))
-                  .join(" ")}`
-              )
-
-              const exitCode = yield* prompter.withSpinner(
-                () => agentRunner.run(choice, prompt, cwd),
-                {
-                  failure: `${choice} failed to start.`,
-                  start: `Running ${choice}...`,
-                  success: (code) => `${choice} exited with code ${code}.`,
-                }
-              )
-
-              if (exitCode !== 0) {
-                yield* prompter.log.warning(`${choice} did not complete the requested repair.`)
-              }
-
-              const reassessedFindings = yield* readPackageJson(cwd).pipe(
-                Effect.flatMap((manifest) =>
-                  collectApplicableAssessments(integrations, cwd, manifest)
-                ),
-                Effect.map((currentAssessments) => collectFindings(currentAssessments))
-              )
-
-              if (reassessedFindings.length === 0) {
-                yield* prompter.log.success("The agent resolved every finding.")
-              } else {
-                yield* prompter.log.warning("Findings remain after the agent run.")
-                yield* printFindings(reassessedFindings)
-              }
-            }
-          }
-        }
+        yield* prompter.log.info(
+          "Run `adamantite doctor` to get the combined Markdown repair prompt."
+        )
       }
 
       if (updates.length === 0 && findings.length === 0) {

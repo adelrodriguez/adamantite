@@ -29,12 +29,13 @@ The decisions:
   structs; only presentation may differ.
 - Creation findings embed exact canonical content; repair findings are criteria-first
   with canonical content as reference, preserving user customizations.
-- In a TTY, doctor offers to spawn Claude Code or Codex headless (PATH-detected,
-  extensible table) with edit-level permissions, a printed command, and a dirty-tree
-  confirmation, then re-assesses once — no outer retry loop. Non-TTY gets the report
-  and exit code only. The prompt is also printable with best-effort OSC 52 clipboard
-  copy.
-- Harness invocation sits behind an injectable service so tests run a fake harness.
+- In a TTY, Doctor renders the findings, explains that a coding agent can run Doctor
+  directly, and offers a best-effort OSC 52 clipboard copy of the Markdown prompt.
+  Non-TTY gets the Markdown prompt and exit code only.
+- Direct Claude Code and Codex CLI invocation was removed on 2026-08-25. Their prompt,
+  permission, sandbox, and trust flags changed independently and made the integration
+  brittle. A future direct handoff will use ACP; see
+  [`docs/plans/acp-agent-handoff.md`](../plans/acp-agent-handoff.md).
 - `AGENTS.md` and the shipped skill slim to "run `adamantite doctor` and follow its
   instructions"; instructions exist only in doctor's output.
 
@@ -43,12 +44,12 @@ The decisions:
 - Newly discovered legacy states cost a detection check and instruction text, not
   transformation code, rollback handling, and their tests.
 - A version bump can leave a project flagged-but-not-fixed until an agent or human acts
-  on the prompt; `update`'s contract changes from "converges" to "converges or hands
-  you a prompt".
+  on the findings; `update`'s contract changes from "converges" to "converges or points
+  you to Doctor".
 - The oracle is only as strong as `assess`: any managed config without content-level
   inspection weakens the verification step, so new managed surfaces must ship with
   inspection (phase 2 covers zed, vscode, the GitHub workflow, and tsconfig).
-- Atomicity moves from `runMigration` snapshots to git hygiene; the prompt and the
-  spawn flow both surface the clean-tree requirement.
+- Atomicity moves from `runMigration` snapshots to git hygiene; the Markdown prompt
+  surfaces the clean-tree requirement.
 - CI scripts calling `doctor --fix` break on the next minor; the stub error and a
   changeset document the replacement.

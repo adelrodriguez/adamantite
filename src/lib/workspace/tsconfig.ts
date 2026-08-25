@@ -1,4 +1,4 @@
-import type { JsonValue, PackageJson } from "type-fest"
+import type { JsonObject, JsonValue, PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -131,7 +131,8 @@ export default defineIntegration({
       }
 
       const merged = yield* mergeConfig(CONFIG, existingConfig)
-      const newConfig = Object.fromEntries([
+      // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON object.
+      const newConfig: JsonObject = Object.fromEntries([
         ...Object.entries(merged),
         ["extends", mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined)],
       ])

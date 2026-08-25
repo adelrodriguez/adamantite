@@ -174,6 +174,7 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
     })
   )
 
+  // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON object.
   return Object.fromEntries([...Object.entries(config), ["languages", languages]])
 }
 

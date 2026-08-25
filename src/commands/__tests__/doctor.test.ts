@@ -25,10 +25,8 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "success",
-        message: "No applicable integrations found.",
-      })
+      expect(prompter.logs).toEqual([])
+      expect(prompter.outros).toEqual([])
     })
   )
 
@@ -114,7 +112,36 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toEqual([])
+      expect(prompter.outros).toEqual([])
+    })
+  )
+
+  it.effect("show success framing in an interactive terminal", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "knip.config.ts": toKnipTsConfigContent(),
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0", knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+          }),
+        },
+      })
+      const prompter = createPrompterTestContext()
+      const interactive = Layer.succeed(TerminalCapabilities)({
+        copyToClipboard: () => Effect.void,
+        isInteractive: Effect.succeed(true),
+      })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, interactive],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({ level: "success", message: "No issues found." })
+      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
     })
   )
 

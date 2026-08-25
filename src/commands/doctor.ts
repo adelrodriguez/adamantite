@@ -84,16 +84,16 @@ export default Command.make("doctor", { fix }).pipe(
       const findings = collectFindings(assessments)
 
       if (assessments.length === 0) {
-        yield* prompter.log.success("No applicable integrations found.")
         if (isInteractive) {
+          yield* prompter.log.success("No applicable integrations found.")
           yield* prompter.outro("✅ Doctor completed successfully!")
         }
         return
       }
 
       if (findings.length === 0) {
-        yield* prompter.log.success("No issues found.")
         if (isInteractive) {
+          yield* prompter.log.success("No issues found.")
           yield* prompter.outro("✅ Doctor completed successfully!")
         }
         return

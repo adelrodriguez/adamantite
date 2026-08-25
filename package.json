@@ -74,6 +74,7 @@
   "dependencies": {
     "@clack/prompts": "1.7.0",
     "@effect/platform-node": "4.0.0-rc.108",
+    "@effect/platform-node-shared": "4.0.0-rc.108",
     "defu": "6.1.7",
     "effect": "4.0.0-rc.108",
     "esrap": "2.3.2",

@@ -95,6 +95,9 @@ const requestPermission = (request: AgentPermissionRequest) =>
   })
 ```
 
+Before this code can land, add `select` back to `PrompterService`, its Clack layer, and
+the command test double. The prompt-only baseline removed this unused method.
+
 Adamantite must not translate a general user choice such as "Pass to Codex" into blanket
 approval. Each permission request stays visible unless the agent itself offers and the
 user selects a persistent permission option.

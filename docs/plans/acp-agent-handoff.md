@@ -19,8 +19,8 @@ handoff ships:
   prompt.
 - A coding agent can run `adamantite doctor` itself and receive the Markdown prompt
   directly.
-- Non-interactive Doctor prints only the Markdown prompt and exits 1 while findings
-  remain.
+- Non-interactive Doctor prints only Markdown. It prints the repair prompt and exits 1
+  while findings remain. Assessment warnings alone produce a warning report and exit 0.
 - `update` reports findings and points to Doctor. It does not start an agent.
 
 This baseline is the fallback behavior for every ACP failure.
@@ -116,7 +116,7 @@ No ACP service is resolved in a non-interactive run:
 adamantite doctor
 ```
 
-The calling agent receives the existing Markdown prompt. This path must not depend on an
+The calling agent receives the existing Markdown output. This path must not depend on an
 ACP adapter, network connection, authentication state, or terminal capability.
 
 ## Domain shape

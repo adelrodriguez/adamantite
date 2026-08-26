@@ -224,7 +224,7 @@ export function getConfigFindings(
         ],
         id: `missing-${options.toolName}-config`,
         integration: options.toolName,
-        reference: options.configContent,
+        reference: { content: options.configContent, language: "ts" },
         title: `Missing ${options.toolName} configuration`,
       },
     ]
@@ -243,7 +243,7 @@ export function getConfigFindings(
         notes: [
           "Preserve project-specific settings. Do not replace them with the reference defaults.",
         ],
-        reference: options.configContent,
+        reference: { content: options.configContent, language: "ts" },
         title: `Legacy ${options.toolName} configuration`,
       },
     ]
@@ -273,7 +273,7 @@ export function getConfigFindings(
       id: `invalid-${options.toolName}-config`,
       integration: options.toolName,
       notes: ["Treat the reference as a known-good example, not an exact replacement."],
-      reference: options.configContent,
+      reference: { content: options.configContent, language: "ts" },
       title: `Invalid ${options.toolName} configuration`,
     })
   }

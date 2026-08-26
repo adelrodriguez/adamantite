@@ -123,7 +123,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("keep assessment warnings out of the non-interactive Markdown output", () =>
+  it.effect("include assessment warnings in the non-interactive Markdown output", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
@@ -141,6 +141,28 @@ describe("doctor", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.messages).toHaveLength(1)
       expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
+      expect(prompter.messages[0]).toContain("Skipping `tsconfig.json` setup")
+      expect(prompter.logs).toEqual([])
+      expect(prompter.outros).toEqual([])
+    })
+  )
+
+  it.effect("print warning-only Markdown in a non-interactive terminal", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".github/workflows/adamantite.yml": "node-version: 22\n",
+          "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+        },
+      })
+      const prompter = createPrompterTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.messages).toHaveLength(1)
+      expect(prompter.messages[0]).toContain("# Adamantite doctor warnings")
+      expect(prompter.messages[0]).toContain("No CI-compatible managed scripts were found")
       expect(prompter.logs).toEqual([])
       expect(prompter.outros).toEqual([])
     })

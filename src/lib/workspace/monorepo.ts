@@ -6,18 +6,40 @@ import * as Path from "effect/Path"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
+const PNPM_PACKAGES_KEY_REGEX = /^(?:packages|"packages"|'packages')\s*:/u
+
+function stripYamlComment(value: string): string {
+  return value.replace(/(?:^|\s+)#.*$/u, "").trim()
+}
+
 function definesPnpmWorkspacePackages(content: string): boolean {
-  const lines = content.split(/\r?\n/u)
-  const packagesIndex = lines.findIndex((line) => /^packages\s*:/u.test(line))
+  const lines = content.replace(/^\uFEFF/u, "").split(/\r?\n/u)
+  const packagesIndex = lines.findIndex((line) => PNPM_PACKAGES_KEY_REGEX.test(line))
 
   if (packagesIndex === -1) {
     return false
   }
 
-  const declaration = lines[packagesIndex]?.replace(/^packages\s*:/u, "").trim()
+  const declaration = stripYamlComment(
+    (lines[packagesIndex] ?? "").replace(PNPM_PACKAGES_KEY_REGEX, "")
+  )
+
+  if (declaration === "[") {
+    for (const line of lines.slice(packagesIndex + 1)) {
+      const item = stripYamlComment(line)
+
+      if (item.length === 0) {
+        continue
+      }
+
+      return item !== "]"
+    }
+
+    return false
+  }
 
   if (declaration && !declaration.startsWith("#")) {
-    return declaration !== "[]"
+    return !/^\[\s*\]$/u.test(declaration)
   }
 
   for (const line of lines.slice(packagesIndex + 1)) {

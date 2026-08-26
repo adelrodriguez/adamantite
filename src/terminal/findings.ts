@@ -9,7 +9,7 @@ function renderFinding(finding: Finding): string {
   ]
 
   if (finding.reference) {
-    sections.push(`Reference\n${finding.reference.trimEnd()}`)
+    sections.push(`Reference\n${finding.reference.content.trimEnd()}`)
   }
 
   if (finding.notes && finding.notes.length > 0) {

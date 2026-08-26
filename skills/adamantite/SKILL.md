@@ -80,8 +80,9 @@ adamantite doctor
 
 Follow each finding. Doctor supplies the current state, the goal criteria, reference
 content when needed, and the verification command. In an interactive terminal, Doctor
-offers to copy the combined Markdown prompt. In a non-interactive run, Doctor prints the
-Markdown prompt directly. Run `adamantite doctor` again until it exits 0.
+offers to copy the combined Markdown prompt. In a non-interactive run, Doctor prints
+Markdown directly. Findings produce a repair prompt and exit 1. Assessment warnings alone
+produce a warning report and exit 0. Run `adamantite doctor` again until it exits 0.
 
 ## Update
 

@@ -30,13 +30,18 @@ export type PackageAction =
       readonly type: "update_package"
     }
 
+export interface FindingReference {
+  readonly content: string
+  readonly language: "json" | "ts"
+}
+
 export interface Finding {
   readonly currentState: string
   readonly goal: readonly string[]
   readonly id: string
   readonly integration: string
   readonly notes?: readonly string[]
-  readonly reference?: string
+  readonly reference?: FindingReference
   readonly title: string
 }
 

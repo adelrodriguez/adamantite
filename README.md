@@ -173,8 +173,9 @@ adamantite doctor
 
 In an interactive terminal, Doctor presents each finding as formatted text and offers to
 copy one combined Markdown repair prompt. A coding agent can also run `adamantite doctor`
-in the target project to receive the prompt directly. In CI, a pipe, or another
-non-interactive run, Doctor prints the combined Markdown prompt and exits 1.
+in the target project to receive Markdown directly. In a non-interactive run, Doctor
+prints the combined repair prompt and exits 1 when findings remain. If only assessment
+warnings remain, Doctor prints a Markdown warning report and exits 0.
 
 ### `adamantite update`
 

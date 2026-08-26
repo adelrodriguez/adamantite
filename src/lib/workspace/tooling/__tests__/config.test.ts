@@ -282,7 +282,7 @@ describe("getConfigFindings", () => {
     expect(getConfigFindings(state(null), options)).toEqual([
       expect.objectContaining({
         id: "missing-tool-config",
-        reference: options.configContent,
+        reference: { content: options.configContent, language: "ts" },
       }),
     ])
   })

@@ -12,7 +12,11 @@ import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
-import { collectFindings, renderFindingsPrompt } from "#lib/shared/findings.ts"
+import {
+  collectFindings,
+  renderAssessmentWarnings,
+  renderFindingsPrompt,
+} from "#lib/shared/findings.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
@@ -76,12 +80,11 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
+      const warnings = assessments.flatMap(({ assessment }) => assessment.warnings)
 
       if (isInteractive) {
-        for (const { assessment } of assessments) {
-          for (const warning of assessment.warnings) {
-            yield* prompter.log.warning(warning)
-          }
+        for (const warning of warnings) {
+          yield* prompter.log.warning(warning)
         }
       }
 
@@ -99,11 +102,13 @@ export default Command.make("doctor", { fix }).pipe(
         if (isInteractive) {
           yield* prompter.log.success("No issues found.")
           yield* prompter.outro("✅ Doctor completed successfully!")
+        } else if (warnings.length > 0) {
+          yield* prompter.message(renderAssessmentWarnings(warnings, version))
         }
         return
       }
 
-      const prompt = renderFindingsPrompt(findings, version)
+      const prompt = renderFindingsPrompt(findings, version, warnings)
 
       if (isInteractive) {
         yield* printFindings(findings)

@@ -11,7 +11,8 @@ The decisions:
 - Init keeps deterministic `create()` and its write paths; templating into empty space
   is reliable and must not require an agent. Doctor never writes files. `update` writes
   managed dependency changes only.
-- `doctor --fix` is removed (stubbed with a pointer error for one release). `update`
+- `doctor --fix` is removed (stubbed with a pointer error for one release; removal is
+  tracked in [#394](https://github.com/adelrodriguez/adamantite/issues/394)). `update`
   survives, scoped to dependency bumps, then runs doctor's assess-and-render pipeline;
   it keeps exiting 0 while findings remain, so doctor stays the only CI gate.
 - Migrations are not ported one-to-one. Doctor assesses each managed surface against
@@ -31,7 +32,8 @@ The decisions:
   with canonical content as reference, preserving user customizations.
 - In a TTY, Doctor renders the findings, explains that a coding agent can run Doctor
   directly, and offers a best-effort OSC 52 clipboard copy of the Markdown prompt.
-  Non-TTY gets the Markdown prompt and exit code only.
+  Non-TTY gets Markdown and an exit code only. Findings produce the repair prompt and
+  exit 1. Assessment warnings alone produce a warning report and exit 0.
 - Direct Claude Code and Codex CLI invocation was removed on 2026-08-25. Their prompt,
   permission, sandbox, and trust flags changed independently and made the integration
   brittle. A future direct handoff will use ACP; see

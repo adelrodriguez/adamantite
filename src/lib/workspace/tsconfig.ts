@@ -68,7 +68,10 @@ export default defineIntegration({
               ],
               id: "missing-tsconfig",
               integration: "tsconfig",
-              reference: `${JSON.stringify(CONFIG, null, 2)}\n`,
+              reference: {
+                content: `${JSON.stringify(CONFIG, null, 2)}\n`,
+                language: "json",
+              },
               title: "Missing TypeScript configuration",
             },
           ],
@@ -95,7 +98,10 @@ export default defineIntegration({
                 ],
                 id: "missing-adamantite-tsconfig-extends",
                 integration: "tsconfig",
-                reference: `${JSON.stringify(CONFIG, null, 2)}\n`,
+                reference: {
+                  content: `${JSON.stringify(CONFIG, null, 2)}\n`,
+                  language: "json",
+                },
                 title: "TypeScript preset is not configured",
               },
             ],

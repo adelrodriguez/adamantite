@@ -1,18 +1,70 @@
+import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
-import { defineIntegration } from "#lib/integrations/base.ts"
-import { ensureDirectory, writeFile } from "#lib/shared/filesystem.ts"
-import { getCIWorkflowEntries } from "#lib/workspace/ci-scripts.ts"
+import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
+import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   type NodeVersionSource,
   NodeVersionResolver,
 } from "#lib/workspace/node-version-resolver.ts"
+import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
+
+const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
+const BLOCK_SCALAR_REGEX = /^[>|](?:[1-9][+-]?|[+-][1-9]?)?(?:\s+#.*)?$/
+const CHECK_COMMAND_REGEX =
+  /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
+const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
 
 interface WorkflowOptions {
   packageManager: SupportedPackageManager
   scripts: Script[]
+}
+
+function hasCheckCommand(content: string): boolean {
+  const lines = content.split("\n")
+
+  for (const [index, line] of lines.entries()) {
+    const match = WORKFLOW_COMMAND_REGEX.exec(line)
+
+    if (!match) {
+      continue
+    }
+
+    const indentation = match[1]?.length ?? 0
+    const command = (match[2] ?? "").trim()
+
+    if (CHECK_COMMAND_REGEX.test(command)) {
+      return true
+    }
+
+    if (!BLOCK_SCALAR_REGEX.test(command)) {
+      continue
+    }
+
+    for (const blockLine of lines.slice(index + 1)) {
+      const trimmed = blockLine.trim()
+
+      if (trimmed.length === 0) {
+        continue
+      }
+
+      const blockIndentation = blockLine.length - blockLine.trimStart().length
+
+      if (blockIndentation <= indentation) {
+        break
+      }
+
+      if (CHECK_COMMAND_REGEX.test(trimmed)) {
+        return true
+      }
+    }
+  }
+
+  return false
 }
 
 function renderNodeSetup(source: NodeVersionSource): string {
@@ -144,6 +196,94 @@ const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
   })
 
 export default defineIntegration({
+  assess: (cwd: string, packageJson: PackageJson) =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path
+      const workflowPath = path.join(cwd, files[0].path)
+      const content = yield* readFileIfExists(workflowPath)
+
+      if (content._tag === "None") {
+        return { applicable: false, warnings: [] } satisfies IntegrationAssessment
+      }
+
+      const managedScripts = getManagedScripts(packageJson)
+      const hasHardcodedNodeVersion = HARDCODED_NODE_VERSION_REGEX.test(content.value)
+      const isMissingCheckCommand =
+        managedScripts.includes("check") && !hasCheckCommand(content.value)
+
+      if (!hasHardcodedNodeVersion && !isMissingCheckCommand) {
+        return {
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        } satisfies IntegrationAssessment
+      }
+
+      if (!hasCICompatibleScripts(managedScripts)) {
+        return {
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [
+            "No CI-compatible managed scripts were found, so the GitHub Actions workflow cannot be regenerated.",
+          ],
+        } satisfies IntegrationAssessment
+      }
+
+      const dependencyInstaller = yield* DependencyInstaller
+      const detectedPackageManager = yield* dependencyInstaller.detectPackageManager(cwd)
+
+      if (!detectedPackageManager) {
+        return {
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [
+            "Could not detect a package manager, so the GitHub Actions workflow cannot be regenerated.",
+          ],
+        } satisfies IntegrationAssessment
+      }
+
+      if (!checkIsSupportedPackageManager(detectedPackageManager.name)) {
+        return {
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [
+            `\`${detectedPackageManager.name}\` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow cannot be regenerated.`,
+          ],
+        } satisfies IntegrationAssessment
+      }
+
+      return {
+        applicable: true,
+        findings: [
+          {
+            currentState: [
+              ...(hasHardcodedNodeVersion
+                ? ["The workflow contains a hard-coded Node.js version."]
+                : []),
+              ...(isMissingCheckCommand
+                ? ["The workflow does not run the managed `check` script."]
+                : []),
+            ].join(" "),
+            goal: [
+              "Make the workflow run the managed `check` script.",
+              "Use the project's Node.js version declaration instead of a hard-coded version.",
+            ],
+            id: "outdated-adamantite-workflow",
+            integration: "github",
+            notes: [
+              `The detected package manager is \`${detectedPackageManager.name}\`. Preserve unrelated workflow jobs and project-specific settings.`,
+            ],
+            title: "Outdated Adamantite workflow",
+          },
+        ],
+        packageActions: [],
+        warnings: [],
+      } satisfies IntegrationAssessment
+    }),
   create: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
       const path = yield* Path.Path

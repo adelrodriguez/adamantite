@@ -3,199 +3,138 @@ import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import github from "#lib/integrations/ci/github.ts"
+import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { runMigration } from "#lib/migrations/base.ts"
-import { migrationsById } from "#lib/migrations/index.ts"
 import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import {
+  collectFindings,
+  renderAssessmentWarnings,
+  renderFindingsPrompt,
+} from "#lib/shared/findings.ts"
+import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import tsconfig from "#lib/workspace/tsconfig.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
+import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 
 const fix = Flag.boolean("fix").pipe(
-  Flag.withDescription("Automatically fix safe package install/update issues")
+  Flag.withDefault(false),
+  Flag.withDescription("Removed. Run doctor and follow its findings")
 )
 
-const integrations = [knip, oxfmt, oxlint, sherif, tsgolint] as const
+const integrations = [knip, oxfmt, oxlint, sherif, tsgolint, tsconfig, github, zed] as const
+const version = getPackageVersion()
 
 export default Command.make("doctor", { fix }).pipe(
-  Command.withDescription("Check Adamantite-managed integrations in the current project"),
+  Command.withDescription("Assess Adamantite-managed integrations in the current project"),
   Command.withHandler(({ fix }) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
       const prompter = yield* Prompter
+      const terminal = yield* TerminalCapabilities
+      const isInteractive = yield* terminal.isInteractive
 
-      yield* printTitle()
-      yield* prompter.intro("💠 adamantite doctor")
+      if (isInteractive) {
+        yield* printTitle()
+        yield* prompter.intro("💠 adamantite doctor")
+      }
 
-      const packageJson = yield* readPackageJson(cwd)
-
-      if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
-        yield* prompter.log.warning(
-          "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
-        )
-        yield* prompter.outro("⚠️ Doctor found issues.")
+      if (fix) {
+        const message =
+          "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria."
+        if (isInteractive) {
+          yield* prompter.log.error(message)
+          yield* prompter.outro("❌ Doctor did not run")
+        } else {
+          yield* prompter.message(message)
+        }
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
       }
 
-      // 1. Assess integrations, reusing the manifest parsed above.
-      const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
+      const packageJson = yield* readPackageJson(cwd)
 
-      // 2. Print warnings.
-      for (const { assessment } of assessments) {
-        for (const warning of assessment.warnings) {
+      if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
+        const message =
+          "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
+        if (isInteractive) {
+          yield* prompter.log.warning(message)
+          yield* prompter.outro("⚠️ Doctor found issues.")
+        } else {
+          yield* prompter.message(message)
+        }
+        return yield* new CommandFailed({
+          command: "doctor",
+          exitCode: ChildProcessSpawner.ExitCode(1),
+        })
+      }
+
+      const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
+      const warnings = assessments.flatMap(({ assessment }) => assessment.warnings)
+
+      if (isInteractive) {
+        for (const warning of warnings) {
           yield* prompter.log.warning(warning)
         }
       }
 
+      const findings = collectFindings(assessments)
+
       if (assessments.length === 0) {
-        yield* prompter.log.success("No applicable integrations found.")
-        yield* prompter.outro("✅ Doctor completed successfully!")
+        if (isInteractive) {
+          yield* prompter.log.success("No applicable integrations found.")
+          yield* prompter.outro("✅ Doctor completed successfully!")
+        }
         return
       }
 
-      const actions = assessments.flatMap(({ assessment, integration }) =>
-        assessment.actions.map((action) => ({ action, integration }))
-      )
-
-      if (actions.length === 0) {
-        yield* prompter.log.success("No issues found.")
-        yield* prompter.outro("✅ Doctor completed successfully!")
+      if (findings.length === 0) {
+        if (isInteractive) {
+          yield* prompter.log.success("No issues found.")
+          yield* prompter.outro("✅ Doctor completed successfully!")
+        } else if (warnings.length > 0) {
+          yield* prompter.message(renderAssessmentWarnings(warnings, version))
+        }
         return
       }
 
-      // 3. Optionally apply fixes in order: packages -> configs -> migrations.
-      const appliedActions = new Set<(typeof actions)[number]>()
+      const prompt = renderFindingsPrompt(findings, version, warnings)
 
-      if (fix) {
-        yield* Effect.gen(function* () {
-          const packageActions = actions.filter(
-            ({ action }) => action.type === "install_package" || action.type === "update_package"
-          )
-
-          if (packageActions.length > 0) {
-            const dependencyInstaller = yield* DependencyInstaller
-            const packages: string[] = []
-
-            for (const { action } of packageActions) {
-              if (action.type === "install_package" || action.type === "update_package") {
-                packages.push(`${action.package}@${action.targetVersion}`)
-              }
-            }
-
-            yield* dependencyInstaller.addDevDependencies(packages, cwd, { silent: true })
-
-            for (const entry of packageActions) {
-              const { action } = entry
-
-              if (action.type === "install_package") {
-                yield* prompter.log.success(
-                  `Fixed: installed \`${action.package}@${action.targetVersion}\`.`
-                )
-              }
-
-              if (action.type === "update_package") {
-                yield* prompter.log.success(
-                  `Fixed: updated \`${action.package}\` from \`${action.currentVersion}\` to \`${action.targetVersion}\`.`
-                )
-              }
-
-              appliedActions.add(entry)
-            }
-          }
-
-          for (const entry of actions) {
-            const { action, integration } = entry
-
-            if (action.type !== "create_config" || !("create" in integration)) {
-              continue
-            }
-
-            yield* integration.create(cwd)
-            yield* prompter.log.success(`Fixed: created \`${action.path}\`.`)
-            appliedActions.add(entry)
-          }
-
-          for (const entry of actions) {
-            const { action, integration } = entry
-
-            if (action.type !== "update_config" || !("update" in integration)) {
-              continue
-            }
-
-            yield* integration.update(cwd)
-            yield* prompter.log.success(`Fixed: updated \`${action.path}\`.`)
-            appliedActions.add(entry)
-          }
-
-          for (const entry of actions) {
-            const { action } = entry
-
-            if (action.type !== "run_migration") {
-              continue
-            }
-
-            const migration = migrationsById[action.migrationId]
-            if (!migration) {
-              continue
-            }
-
-            // Same gate as `update`: check() alone decides whether migrate runs, re-evaluated
-            // against the current workspace state rather than the assessment snapshot.
-            const checkResult = yield* migration.check({ cwd })
-
-            for (const warning of checkResult.warnings) {
-              yield* prompter.log.warning(warning)
-            }
-
-            if (checkResult.status !== "needed") {
-              appliedActions.add(entry)
-              continue
-            }
-
-            const result = yield* prompter.withSpinner(() => runMigration(migration, { cwd }), {
-              failure: `Migration "${migration.title}" failed, files restored.`,
-              start: checkResult.summary,
-              success: `Fixed: ${action.description}`,
-            })
-
-            for (const warning of result.warnings) {
-              yield* prompter.log.warning(warning)
-            }
-
-            appliedActions.add(entry)
-          }
-        }).pipe(
-          Effect.tapError(() =>
-            Effect.gen(function* () {
-              yield* prompter.outro("❌ Doctor failed")
-            })
-          )
+      if (isInteractive) {
+        yield* printFindings(findings)
+        yield* prompter.log.info(
+          "To hand off these findings, start a coding agent in this project and ask it to run `adamantite doctor`."
         )
+        const shouldCopyPrompt = yield* prompter.confirm({
+          initialValue: true,
+          message: "Copy the Markdown prompt for a coding agent?",
+        })
+
+        if (shouldCopyPrompt) {
+          yield* prompter.message(prompt)
+          yield* terminal.copyToClipboard(prompt)
+          yield* prompter.log.success(
+            "The Markdown prompt was printed and sent to the terminal clipboard."
+          )
+        }
+      } else {
+        yield* prompter.message(prompt)
       }
 
-      // 4. Report remaining issues or success.
-      const remainingActions = actions.filter((entry) => !appliedActions.has(entry))
-
-      if (fix && remainingActions.length === 0) {
-        yield* prompter.outro("✅ Doctor completed successfully!")
-        return
+      if (isInteractive) {
+        yield* prompter.outro("⚠️ Doctor found issues.")
       }
-
-      for (const { action } of fix ? remainingActions : actions) {
-        yield* prompter.log.warning(`Needs attention: ${action.description}`)
-      }
-
-      yield* prompter.outro("⚠️ Doctor found issues.")
-      yield* new CommandFailed({
+      return yield* new CommandFailed({
         command: "doctor",
         exitCode: ChildProcessSpawner.ExitCode(1),
       })

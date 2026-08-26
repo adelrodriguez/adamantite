@@ -57,11 +57,11 @@ complete. See `docs/plans/README.md`.
 - Keep integration modules limited to their default integration export.
   `src/lib/integrations/base.ts` is the shared infrastructure exception.
 - Keep reusable integration behavior in `src/lib/workspace` or `src/lib/shared`.
-- Keep one-time transition behavior in `src/lib/migrations`.
-- Keep `init` independent from migration orchestration.
-- Keep `assess` read-only. `doctor --fix` is the mutating assessment dispatcher, and
-  manual fixes are report-only.
-- Migrations may call integrations. Integrations must not call migrations.
+- Keep `init` deterministic and independent from doctor assessment.
+- Keep `assess` and `doctor` read-only. Doctor reports current state, goal criteria, and
+  verification instructions. Agents or humans perform repairs.
+- Keep `update` limited to managed dependency updates. It can report doctor findings, but
+  findings do not make a successful update fail.
 - Keep tooling integration versions aligned with the corresponding versions in
   `package.json`.
 

@@ -1,6 +1,6 @@
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { defineConfigTooling } from "#lib/workspace/tooling/config.ts"
-import { toOxfmtTsConfigContent } from "#lib/workspace/tooling/oxfmt.ts"
+import { inspectRequiredOxfmtConfig, toOxfmtTsConfigContent } from "#lib/workspace/tooling/oxfmt.ts"
 
 export default defineConfigTooling({
   configContent: () => toOxfmtTsConfigContent(),
@@ -8,7 +8,7 @@ export default defineConfigTooling({
     config: "oxfmt.config.ts",
     legacyConfigs: [".oxfmtrc.json", ".oxfmtrc.jsonc"],
   },
-  migrationId: "legacy-oxfmt-json",
+  inspectConfig: inspectRequiredOxfmtConfig,
   name: "oxfmt",
   purpose: "the managed `format` script",
   scripts: ["format"],

@@ -22,6 +22,7 @@ import {
   DependencyInstaller,
 } from "#lib/workspace/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 interface LogEntry {
@@ -40,7 +41,9 @@ export interface PrompterTestContext {
   readonly intros: string[]
   readonly layer: Layer.Layer<Prompter>
   readonly logs: LogEntry[]
+  readonly messages: string[]
   readonly multiselectCalls: unknown[]
+  readonly notes: Array<{ readonly message: string; readonly title: string }>
   readonly outros: string[]
   readonly spinnerEntries: SpinnerEntry[]
 }
@@ -119,7 +122,9 @@ export function createPrompterTestContext(options?: {
   const confirmCalls: prompts.ConfirmOptions[] = []
   const intros: string[] = []
   const logs: LogEntry[] = []
+  const messages: string[] = []
   const multiselectCalls: unknown[] = []
+  const notes: Array<{ readonly message: string; readonly title: string }> = []
   const outros: string[] = []
   const spinnerEntries: SpinnerEntry[] = []
   let promptIndex = 0
@@ -171,6 +176,10 @@ export function createPrompterTestContext(options?: {
             logs.push({ level: "warning", message })
           }),
       },
+      message: (message) =>
+        Effect.sync(() => {
+          messages.push(message)
+        }),
       multiselect: <T>(config: prompts.MultiSelectOptions<T>) =>
         Effect.gen(function* () {
           if (shouldCancelPrompt()) {
@@ -180,6 +189,10 @@ export function createPrompterTestContext(options?: {
           multiselectCalls.push(config)
           // SAFETY: each test queues multiselect responses matching the option type of the prompt it triggers.
           return shiftResponse(multiselectResponses, "multiselect") as T[]
+        }),
+      note: (message, title) =>
+        Effect.sync(() => {
+          notes.push({ message, title })
         }),
       outro: (message) =>
         Effect.sync(() => {
@@ -213,7 +226,9 @@ export function createPrompterTestContext(options?: {
         ),
     }),
     logs,
+    messages,
     multiselectCalls,
+    notes,
     outros,
     spinnerEntries,
   }
@@ -288,6 +303,10 @@ export function runCommand(
     TestConsole.layer,
     makeQuietTerminalLayer(),
     Stdio.layerTest({}),
+    Layer.succeed(TerminalCapabilities)({
+      copyToClipboard: () => Effect.void,
+      isInteractive: Effect.succeed(false),
+    }),
     failingSpawnerLayer
   ) as TestLayer
 

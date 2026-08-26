@@ -11,6 +11,7 @@ import {
 } from "#commands/__tests__/command-test-helpers.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
@@ -21,7 +22,8 @@ function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
         NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
         Prompter.layer,
         runner.layer,
-        DependencyInstaller.layer
+        DependencyInstaller.layer,
+        TerminalCapabilities.layer
       )
     ),
     Effect.exit

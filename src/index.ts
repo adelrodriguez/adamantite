@@ -11,6 +11,7 @@ import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 const version = getPackageVersion()
@@ -35,7 +36,8 @@ const program = Effect.gen(function* () {
       NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
       Prompter.layer,
       CommandRunner.layer,
-      DependencyInstaller.layer
+      DependencyInstaller.layer,
+      TerminalCapabilities.layer
     )
   )
 )

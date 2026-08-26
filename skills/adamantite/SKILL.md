@@ -1,10 +1,10 @@
 ---
 name: adamantite
-description: Configures and maintains Adamantite linting, formatting, type-safety, analysis, editor, and CI tooling in TypeScript projects. Use when initializing Adamantite, running its checks, repairing a broken or drifted setup, or updating and migrating an existing installation.
+description: Configures and maintains Adamantite linting, formatting, type-safety, analysis, editor, and CI tooling in TypeScript projects. Use when initializing Adamantite, running its checks, updating managed dependencies, or following Doctor findings in an existing installation.
 metadata:
   type: core
   library: adamantite
-  library_version: "0.34.0"
+  library_version: "0.37.0"
 sources:
   - "adelrodriguez/adamantite:src/cli.ts"
   - "adelrodriguez/adamantite:src/commands/*.ts"
@@ -72,42 +72,34 @@ bun run analyze -- -- --directory packages/app
 
 ## Diagnose and repair
 
-Start with the read-only assessment:
+Run the read-only assessment:
 
 ```shell
 adamantite doctor
 ```
 
-If it reports safe automatic actions, apply them and reassess:
+Follow each finding. Doctor supplies the current state, the goal criteria, reference
+content when needed, and the verification command. In an interactive terminal, Doctor
+offers to copy the combined Markdown prompt. In a non-interactive run, Doctor prints
+Markdown directly. Findings produce a repair prompt and exit 1. Assessment warnings alone
+produce a warning report and exit 0. Run `adamantite doctor` again until it exits 0.
 
-```shell
-adamantite doctor --fix
-adamantite doctor
-```
-
-`doctor --fix` is the mutating repair dispatcher. It installs or updates managed packages,
-creates or updates supported configs, and runs known migrations. Manual-fix findings remain
-report-only; follow their instructions instead of overwriting custom configuration.
-
-## Update and migrate
+## Update
 
 For an existing installation, run:
 
 ```shell
 adamantite update
-adamantite doctor --fix
 adamantite doctor
 ```
 
-`update` runs applicable legacy migrations and updates Adamantite-managed dependencies. It
-may leave supported config creation, config updates, or manual work to `doctor --fix`.
-Migrations restore affected files if they fail; still review the resulting diff and run the
-project's tests after any mutation.
+`update` updates Adamantite-managed dependencies. It then reports any remaining doctor
+findings. Follow those findings and review the resulting diff.
 
 ## Decision guide
 
 - New target project: `init`, then run the configured checks.
-- Suspected drift or broken setup: `doctor`, then `doctor --fix` if appropriate.
+- Suspected drift or broken setup: run `doctor` and follow its findings.
 - Existing project upgrading Adamantite: `update`, then the doctor sequence.
 - Code-quality failure: choose `check`, `format --check`, `analyze`, or `monorepo` based on
   the failing subsystem; do not reinitialize the project.

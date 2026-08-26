@@ -22,18 +22,6 @@
       "version": "0.22.14"
     },
     {
-      "name": "effect",
-      "registry": "npm",
-      "source": {
-        "directory": "packages/effect",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/Effect-TS/effect"
-      },
-      "tracking": "dependency",
-      "version": "4.0.0-rc.108"
-    },
-    {
       "name": "@changesets/cli",
       "registry": "npm",
       "source": {
@@ -70,6 +58,18 @@
       "version": "4.1.10"
     },
     {
+      "name": "@clack/prompts",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/prompts",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/bombshell-dev/clack"
+      },
+      "tracking": "dependency",
+      "version": "1.7.0"
+    },
+    {
       "name": "@effect/vitest",
       "registry": "npm",
       "source": {
@@ -79,7 +79,19 @@
         "url": "https://github.com/Effect-TS/effect"
       },
       "tracking": "dependency",
-      "version": "4.0.0-rc.108"
+      "version": "4.0.0-rc.112"
+    },
+    {
+      "name": "effect",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/effect",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/effect"
+      },
+      "tracking": "dependency",
+      "version": "4.0.0-rc.112"
     }
   ]
 }

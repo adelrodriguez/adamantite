@@ -4,8 +4,16 @@ import {
   serializeTsObjectLiteral,
   serializeTsPropertyKey,
 } from "#lib/shared/json.ts"
+import { inspectRequiredPresetConfig } from "#lib/workspace/tooling/preset-config.ts"
 
 const NESTED_MERGE_KEYS = new Set(["sortImports", "sortPackageJson", "sortTailwindcss"])
+
+export function inspectRequiredOxfmtConfig(content: string) {
+  return inspectRequiredPresetConfig(content, {
+    moduleName: "adamantite/format",
+    presetName: "Adamantite format",
+  })
+}
 
 function getSerializedObjectBody(raw: string) {
   const lines = raw.split("\n")

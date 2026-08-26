@@ -9,8 +9,10 @@ import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type:
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 import {
   detectToolingConfig,
-  getConfigActions,
+  getConfigFindings,
   getPackageActions,
+  getPackageFindings,
+  type RequiredConfigInspection,
 } from "#lib/workspace/tooling/config.ts"
 import {
   getOxlintPresetNames,
@@ -45,46 +47,47 @@ export default defineIntegration({
       }
 
       const state = yield* detect(cwd)
-      const actions = [
-        ...getPackageActions(
-          packageJson,
-          { name: "oxlint", version: VERSION },
-          "the managed lint scripts"
-        ),
-        ...getConfigActions(state, {
-          configFile: CONFIG_FILE,
-          migrationId: "legacy-oxlint-json",
-          toolName: "oxlint",
-        }),
-      ]
+      const packageActions = getPackageActions(
+        packageJson,
+        { name: "oxlint", version: VERSION },
+        "the managed lint scripts"
+      )
 
       const activeConfig = state.active
+      let inspection: RequiredConfigInspection | undefined
 
       if (activeConfig?.format === "ts") {
         const content = yield* readFile(activeConfig.path)
         const patch = inspectRequiredOxlintConfig(content)
 
-        if (patch.kind === "patchable") {
-          actions.push({
-            description: "Update `oxlint.config.ts` with Adamantite's required options.",
-            path: CONFIG_FILE,
-            type: "update_config",
-          })
-        }
-
-        if (patch.kind === "manual") {
-          actions.push({
-            description:
-              "Manually update `oxlint.config.ts` with Adamantite's required options; Adamantite cannot patch the current file shape safely.",
-            path: CONFIG_FILE,
-            type: "manual_fix",
-          })
-        }
+        inspection =
+          patch.kind === "configured"
+            ? { kind: "configured" }
+            : {
+                kind: "invalid",
+                reason:
+                  patch.kind === "manual"
+                    ? patch.reason
+                    : "The required Oxlint options are missing or set to false.",
+              }
       }
 
+      const configContent = toOxlintTsConfigContent({}, getOxlintPresetNames())
+
       return {
-        actions,
         applicable: true,
+        findings: [
+          ...getPackageFindings(packageActions, "oxlint"),
+          ...getConfigFindings(state, {
+            configContent,
+            configFile: CONFIG_FILE,
+            inspection,
+            invalidGoal:
+              "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting.",
+            toolName: "oxlint",
+          }),
+        ],
+        packageActions,
         warnings: state.warnings,
       } satisfies IntegrationAssessment
     }),

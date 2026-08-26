@@ -29,24 +29,18 @@ A managed integration for a package and its configuration, such as Oxlint, Oxfmt
 Sherif, or Tsgolint.
 _Avoid_: Dependency adapter
 
-**Migration**:
-A one-time transition for legacy state that falls outside the normal managed integration
-lifecycle.
-_Avoid_: Update, fix
-
 **Managed script**:
 A `package.json` script whose command is owned by Adamantite.
 _Avoid_: User script, package command
 
 **Assessment**:
-A read-only classification of the current state of a managed integration and the action,
-if any, needed to reach the latest supported state.
+A read-only classification of a managed integration against its latest supported state.
 _Avoid_: Check result, diagnostic
 
-**Manual fix**:
-An assessment that Adamantite reports but does not apply because automatic mutation could
-overwrite unsupported or custom project state.
-_Avoid_: Automatic fix
+**Finding**:
+A detected difference between the current state and the latest supported state. It states
+the current state, the goal criteria, and repair constraints.
+_Avoid_: Action, diagnostic, manual fix
 
 ## Integration lifecycle
 
@@ -64,15 +58,11 @@ Rewrite an existing supported configuration into the latest supported shape.
 _Avoid_: Migration, dependency update
 
 **Assess**:
-Classify package drift, missing configuration, supported configuration updates, manual
-work, and known migrations without changing the target project.
-_Avoid_: Doctor fix, migration
+Classify package drift and managed configuration differences without changing the target
+project.
+_Avoid_: Fix, update
 
 **Doctor**:
-Report assessments for Adamantite-managed integrations.
-_Avoid_: Check, update
-
-**Doctor fix**:
-Apply safe assessment actions through integration creation, integration updates, package
-installation, and migrations. Manual fixes remain report-only.
-_Avoid_: Update command, fix command
+Report findings for Adamantite-managed integrations and provide one combined repair
+prompt.
+_Avoid_: Check, fix, update

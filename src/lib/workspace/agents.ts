@@ -62,7 +62,7 @@ function getAgentsSection({ packageManager, scripts }: WriteAgentsGuidanceOption
           ...selectedScriptGuidance,
         ]
       : []),
-    "- Use `adamantite doctor` to inspect managed setup and `adamantite doctor --fix` for safe local fixes.",
+    "- Run `adamantite doctor` and follow its findings to repair managed setup.",
   ].join("\n")
 
   return [ADAMANTITE_AGENTS_START_MARKER, "", body, "", ADAMANTITE_AGENTS_END_MARKER, ""].join("\n")

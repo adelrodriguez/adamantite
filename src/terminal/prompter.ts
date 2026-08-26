@@ -16,9 +16,11 @@ interface PrompterService {
     readonly success: (message: string) => Effect.Effect<void>
     readonly warning: (message: string) => Effect.Effect<void>
   }
+  readonly message: (message: string) => Effect.Effect<void>
   readonly multiselect: <T>(
     options: p.MultiSelectOptions<T>
   ) => Effect.Effect<T[], OperationCancelled>
+  readonly note: (message: string, title: string) => Effect.Effect<void>
   readonly outro: (message: string) => Effect.Effect<void>
   readonly withSpinner: <A, E, R>(
     run: (spinner: {
@@ -68,6 +70,10 @@ export class Prompter extends Context.Service<Prompter, PrompterService>()("Prom
             p.log.warning(message)
           }),
       },
+      message: (message) =>
+        Effect.sync(() => {
+          p.log.message(message, { spacing: 0, withGuide: false })
+        }),
       multiselect: <T>(options: p.MultiSelectOptions<T>) =>
         Effect.promise(() => p.multiselect(options)).pipe(
           Effect.filterOrFail(
@@ -75,6 +81,10 @@ export class Prompter extends Context.Service<Prompter, PrompterService>()("Prom
             () => new OperationCancelled({})
           )
         ),
+      note: (message, title) =>
+        Effect.sync(() => {
+          p.note(message, title)
+        }),
       outro: (message) =>
         Effect.sync(() => {
           p.outro(message)

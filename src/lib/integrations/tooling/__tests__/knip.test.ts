@@ -6,6 +6,7 @@ import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 
 const ROOT = "/project"
 
@@ -126,21 +127,16 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: "Create `knip.config.ts` for `knip`.",
-              path: "knip.config.ts",
-              type: "create_config",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "missing-knip-config" }],
+          packageActions: [],
           warnings: [],
         })
       })
     )
 
-    it.effect("report a migration when a legacy config is active", () =>
+    it.effect("report a finding when a legacy config is active", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "knip.json": JSON.stringify({ entry: ["src/index.ts"] }, null, 2),
@@ -162,15 +158,10 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: "Migrate legacy `knip.json` to `knip.config.ts`.",
-              migrationId: "legacy-knip-json",
-              type: "run_migration",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "legacy-knip-config" }],
+          packageActions: [],
           warnings: [],
         })
       })
@@ -179,8 +170,7 @@ describe("knip", () => {
     it.effect("report healthy when package and managed config are present", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.config.ts":
-            'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = {}\n\nexport default config\n',
+          "knip.config.ts": toKnipTsConfigContent(),
           "package.json": JSON.stringify(
             {
               devDependencies: {
@@ -200,8 +190,9 @@ describe("knip", () => {
         const result = yield* runAssess(files)
 
         expect(result).toEqual({
-          actions: [],
           applicable: true,
+          findings: [],
+          packageActions: [],
           warnings: [],
         })
       })

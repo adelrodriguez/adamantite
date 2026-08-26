@@ -238,21 +238,16 @@ describe("oxlint", () => {
 
         const result = yield* runAssess(oxlint, files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: "Create `oxlint.config.ts` for `oxlint`.",
-              path: "oxlint.config.ts",
-              type: "create_config",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "missing-oxlint-config" }],
+          packageActions: [],
           warnings: [],
         })
       })
     )
 
-    it.effect("report a migration when a legacy config is active", () =>
+    it.effect("report a finding when a legacy config is active", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           ".oxlintrc.json": JSON.stringify({ rules: { semi: "error" } }, null, 2),
@@ -274,15 +269,10 @@ describe("oxlint", () => {
 
         const result = yield* runAssess(oxlint, files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: "Migrate legacy `.oxlintrc.json` to `oxlint.config.ts`.",
-              migrationId: "legacy-oxlint-json",
-              type: "run_migration",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "legacy-oxlint-config" }],
+          packageActions: [],
           warnings: [],
         })
       })
@@ -320,8 +310,9 @@ describe("oxlint", () => {
         const result = yield* runAssess(oxlint, files)
 
         expect(result).toEqual({
-          actions: [],
           applicable: true,
+          findings: [],
+          packageActions: [],
           warnings: [],
         })
       })
@@ -357,21 +348,16 @@ describe("oxlint", () => {
 
         const result = yield* runAssess(oxlint, files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: "Update `oxlint.config.ts` with Adamantite's required options.",
-              path: "oxlint.config.ts",
-              type: "update_config",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "invalid-oxlint-config" }],
+          packageActions: [],
           warnings: [],
         })
       })
     )
 
-    it.effect("report a manual fix when managed check config cannot be patched safely", () =>
+    it.effect("report a finding when the managed check config has an unsupported shape", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "oxlint.config.ts": [
@@ -400,16 +386,10 @@ describe("oxlint", () => {
 
         const result = yield* runAssess(oxlint, files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description:
-                "Manually update `oxlint.config.ts` with Adamantite's required options; Adamantite cannot patch the current file shape safely.",
-              path: "oxlint.config.ts",
-              type: "manual_fix",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: "invalid-oxlint-config" }],
+          packageActions: [],
           warnings: [],
         })
       })
@@ -462,16 +442,10 @@ describe("tsgolint", () => {
 
         const result = yield* runAssess(tsgolint, files)
 
-        expect(result).toEqual({
-          actions: [
-            {
-              description: `Install \`${tsgolint.name}@${tsgolint.version}\` for the managed lint scripts.`,
-              package: tsgolint.name,
-              targetVersion: tsgolint.version,
-              type: "install_package",
-            },
-          ],
+        expect(result).toMatchObject({
           applicable: true,
+          findings: [{ id: `missing-${tsgolint.name}` }],
+          packageActions: [{ package: tsgolint.name, type: "install_package" }],
           warnings: [],
         })
       })
@@ -499,8 +473,9 @@ describe("tsgolint", () => {
         const result = yield* runAssess(tsgolint, files)
 
         expect(result).toEqual({
-          actions: [],
           applicable: true,
+          findings: [],
+          packageActions: [],
           warnings: [],
         })
       })

@@ -551,9 +551,87 @@ describe("checkIsMonorepo", () => {
   })
 
   describe("when workspace files are present", () => {
-    it.effect("return true when pnpm-workspace.yaml exists", () =>
+    it.effect("return true when pnpm-workspace.yaml defines packages", () =>
       Effect.gen(function* () {
         const files = makeFiles({ "pnpm-workspace.yaml": "packages:\n  - 'packages/*'" })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(true)
+      })
+    )
+
+    it.effect("return true when pnpm workspace content starts with a byte-order mark", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ name: "test-package" }),
+          "pnpm-workspace.yaml": "\uFEFFpackages:\n  - 'packages/*'\n",
+        })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(true)
+      })
+    )
+
+    it.effect("return true when pnpm quotes the packages key", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ name: "test-package" }),
+          "pnpm-workspace.yaml": "\"packages\":\n  - 'packages/*'\n",
+        })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(true)
+      })
+    )
+
+    it.effect("return false when pnpm-workspace.yaml does not define packages", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ name: "test-package" }),
+          "pnpm-workspace.yaml": "allowBuilds:\n  msgpackr-extract: false\n",
+        })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(false)
+      })
+    )
+
+    it.effect("return false when pnpm declares an empty package list with a comment", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ name: "test-package" }),
+          "pnpm-workspace.yaml": "packages: [] # no workspace packages\n",
+        })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(false)
+      })
+    )
+
+    it.effect("return false when pnpm declares an empty multiline flow sequence", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ name: "test-package" }),
+          "pnpm-workspace.yaml": "packages: [\n]\n",
+        })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(false)
+      })
+    )
+
+    it.effect("return true when pnpm declares packages in a multiline flow sequence", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ name: "test-package" }),
+          "pnpm-workspace.yaml": "packages: [\n  'packages/*',\n]\n",
+        })
 
         const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
 
@@ -572,6 +650,46 @@ describe("checkIsMonorepo", () => {
         const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
 
         expect(result).toBe(true)
+      })
+    )
+
+    it.effect("return true when package.json has workspace packages in object form", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          name: "test-package",
+          workspaces: { packages: ["packages/*"] },
+        }
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(true)
+      })
+    )
+
+    it.effect("return false when package.json has no workspace packages in object form", () =>
+      Effect.gen(function* () {
+        const packageJson: PackageJson = {
+          name: "test-package",
+          workspaces: { packages: [] },
+        }
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(false)
+      })
+    )
+
+    it.effect("return false when package.json has no workspace packages", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ name: "test-package", workspaces: [] }),
+        })
+
+        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe(false)
       })
     )
   })

@@ -4,6 +4,14 @@ import {
   serializeTsObjectLiteral,
   serializeTsPropertyKey,
 } from "#lib/shared/json.ts"
+import { inspectRequiredPresetConfig } from "#lib/workspace/tooling/preset-config.ts"
+
+export function inspectRequiredKnipConfig(content: string) {
+  return inspectRequiredPresetConfig(content, {
+    moduleName: "adamantite/analyze",
+    presetName: "Adamantite analyze",
+  })
+}
 
 export function toKnipTsConfigContent(config: JsonObject = {}) {
   const configEntries = Object.entries(config).map(([key, value]) => {

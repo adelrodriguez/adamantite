@@ -161,7 +161,7 @@ describe("init", () => {
         expect(prompter.logs).toContainEqual({
           level: "info",
           message:
-            "Legacy `.oxlintrc.json` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest oxlint config.",
+            "Legacy `.oxlintrc.json` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest oxlint config.",
         })
 
         const oxlintConfig = files.read(".oxlintrc.json")
@@ -200,7 +200,7 @@ describe("init", () => {
         expect(prompter.logs).toContainEqual({
           level: "info",
           message:
-            "Legacy `.oxfmtrc.json` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest oxfmt config.",
+            "Legacy `.oxfmtrc.json` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest oxfmt config.",
         })
 
         const oxfmtConfig = files.read(".oxfmtrc.json")
@@ -239,7 +239,7 @@ describe("init", () => {
         expect(prompter.logs).toContainEqual({
           level: "info",
           message:
-            "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest knip config.",
+            "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest knip config.",
         })
 
         const knipConfig = files.read("knip.jsonc")
@@ -276,12 +276,12 @@ describe("init", () => {
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message:
-            "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth when migration is needed.",
+            "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth in its findings.",
         })
         expect(prompter.logs).toContainEqual({
           level: "info",
           message:
-            "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor --fix` to migrate it to the latest knip config.",
+            "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest knip config.",
         })
         expect(files.exists("knip.json")).toBe(true)
         expect(files.exists("knip.jsonc")).toBe(true)
@@ -1024,7 +1024,7 @@ describe("init", () => {
         expect(agents).toContain("Run `bun run format` after editing files")
         expect(agents).toContain("Run `bun run check` to catch lint and type issues")
         expect(agents).toContain("Run `bun run analyze` after changing dependencies")
-        expect(agents).toContain("adamantite doctor --fix")
+        expect(agents).toContain("adamantite doctor")
         expect(agents).not.toContain("adamantite fix")
         expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
         expect(agents.endsWith("\n")).toBe(true)

@@ -111,7 +111,7 @@ function setupToolConfig<E, R>(
 
     if (outcome.legacyConfig) {
       yield* prompter.log.info(
-        `Legacy \`${outcome.legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor --fix\` to migrate it to the latest ${tool.name} config.`
+        `Legacy \`${outcome.legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor\` and follow its findings to migrate it to the latest ${tool.name} config.`
       )
     }
   })
@@ -508,6 +508,7 @@ const validateInitOptions = Effect.fn("validateInitOptions")(function* (
 })
 
 const nonInteractive = Flag.boolean("non-interactive").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("Configure without prompts; requires at least one --script")
 )
 
@@ -529,24 +530,29 @@ const editors = Flag.choice("editor", INIT_EDITORS).pipe(
 )
 
 const typescript = Flag.boolean("typescript").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("Configure the TypeScript preset; requires --script check or fix")
 )
 
 const installExtensions = Flag.boolean("install-extensions").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("Install recommended extensions; requires at least one --editor")
 )
 
 const githubActions = Flag.boolean("github-actions").pipe(
+  Flag.withDefault(false),
   Flag.withDescription(
     "Configure CI; requires a compatible script and bun, deno, npm, pnpm, or yarn"
   )
 )
 
 const agents = Flag.boolean("agents").pipe(
+  Flag.withDefault(false),
   Flag.withDescription("Add Adamantite guidance to AGENTS.md")
 )
 
 const overwriteScripts = Flag.boolean("overwrite-scripts").pipe(
+  Flag.withDefault(false),
   Flag.withDescription(
     "Replace existing package scripts that conflict with Adamantite's managed commands"
   )

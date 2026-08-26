@@ -32,8 +32,8 @@ and Sherif so humans and coding agents can use the same project workflow.
   and Vue, test runners like Jest and Vitest, Node.js, and stricter opt-in rule sets.
 - **Project setup**: Create package scripts, configuration files, editor settings, and CI
   through an interactive or non-interactive initializer.
-- **Setup maintenance**: Assess managed integrations with `doctor`, apply safe fixes, and
-  migrate older Adamantite configurations.
+- **Setup maintenance**: Assess managed integrations with `doctor`, update managed
+  dependencies, and give humans or agents repair instructions.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
 - **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`.

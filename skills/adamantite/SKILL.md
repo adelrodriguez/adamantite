@@ -1,6 +1,6 @@
 ---
 name: adamantite
-description: Configures and maintains Adamantite linting, formatting, type-safety, analysis, editor, and CI tooling in TypeScript projects. Use when initializing Adamantite, running its checks, repairing a broken or drifted setup, or updating and migrating an existing installation.
+description: Configures and maintains Adamantite linting, formatting, type-safety, analysis, editor, and CI tooling in TypeScript projects. Use when initializing Adamantite, running its checks, updating managed dependencies, or following Doctor findings in an existing installation.
 metadata:
   type: core
   library: adamantite

@@ -59,13 +59,12 @@ unversioned registry data.
 Doctor owns the interaction and passes normalized callbacks to the agent client:
 
 ```ts
-const agents = yield * CodingAgents
-const availableAgents = yield * agents.available()
-const agent = yield * chooseAgent(availableAgents)
+Effect.gen(function* () {
+  const agents = yield* CodingAgents
+  const availableAgents = yield* agents.available()
+  const agent = yield* chooseAgent(availableAgents)
 
-const result =
-  yield *
-  agents.run({
+  const result = yield* agents.run({
     agent,
     cwd,
     prompt: renderFindingsPrompt(findings, version),
@@ -73,7 +72,8 @@ const result =
     onProgress: renderAgentProgress,
   })
 
-const remainingFindings = yield * collectCurrentFindings()
+  const remainingFindings = yield* collectCurrentFindings()
+})
 ```
 
 `doctor.ts` knows the selected agent, repair prompt, progress text, and user decisions. It

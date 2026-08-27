@@ -155,9 +155,9 @@ function getConfigObjectExpression(declaration: ExportDefaultDeclaration["declar
   }
 
   if (
-    declaration.type !== "CallExpression" ||
-    declaration.callee.type !== "Identifier" ||
-    declaration.callee.name !== "defineConfig"
+    declaration.type !== "CallExpression"
+    || declaration.callee.type !== "Identifier"
+    || declaration.callee.name !== "defineConfig"
   ) {
     return Option.none<ObjectExpression>()
   }

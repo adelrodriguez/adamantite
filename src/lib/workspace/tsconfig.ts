@@ -82,9 +82,9 @@ export default defineIntegration({
 
       const config = yield* parseJson(content.value, configPath)
       const configured =
-        Predicate.isObject(config) &&
-        (config.extends === PRESET_EXTENDS ||
-          (Array.isArray(config.extends) && config.extends.includes(PRESET_EXTENDS)))
+        Predicate.isObject(config)
+        && (config.extends === PRESET_EXTENDS
+          || (Array.isArray(config.extends) && config.extends.includes(PRESET_EXTENDS)))
 
       return {
         applicable: true,

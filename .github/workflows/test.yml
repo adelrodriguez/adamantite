@@ -1,4 +1,4 @@
-name: CI
+name: test
 
 on:
   pull_request:
@@ -82,16 +82,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: check
-            command: pnpm run check
-          - name: format
-            command: pnpm run format --check
-          - name: test
+          - name: unit
             command: pnpm run test
-          - name: analyze
-            command: pnpm run analyze
-          - name: build
-            command: pnpm run test:build
+          - name: e2e
+            command: pnpm run test:dist
 
     steps:
       - name: Checkout

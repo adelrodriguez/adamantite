@@ -1,6 +1,6 @@
 // The "keep shared action versions aligned" test compares generated output
-// against this repository's committed `.github/workflows/ci.yml`, so that one
-// reference read uses the real filesystem.
+// against this repository's committed workflow files, so those reference
+// reads use the real filesystem.
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
@@ -223,7 +223,7 @@ describe("github", () => {
       })
     )
 
-    it.effect("keep shared action versions aligned with this repository's CI workflow", () =>
+    it.effect("keep shared action versions aligned with this repository's test workflow", () =>
       Effect.gen(function* () {
         const files = makeFiles()
 
@@ -236,12 +236,24 @@ describe("github", () => {
 
         const generatedWorkflow = files.read(WORKFLOW_PATH)
         const referenceWorkflow = readFileSync(
-          join(process.cwd(), ".github/workflows/ci.yml"),
+          join(process.cwd(), ".github/workflows/test.yml"),
           "utf8"
         )
 
         for (const action of ["actions/checkout", "actions/setup-node", "oven-sh/setup-bun"]) {
           expect(getActionReference(generatedWorkflow, action)).toBe(
+            getActionReference(referenceWorkflow, action)
+          )
+        }
+
+        // The quality workflow pins the same actions independently; keep it from drifting.
+        const qualityWorkflow = readFileSync(
+          join(process.cwd(), ".github/workflows/quality.yml"),
+          "utf8"
+        )
+
+        for (const action of ["actions/checkout", "actions/setup-node", "pnpm/action-setup"]) {
+          expect(getActionReference(qualityWorkflow, action)).toBe(
             getActionReference(referenceWorkflow, action)
           )
         }

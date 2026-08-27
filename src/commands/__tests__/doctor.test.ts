@@ -443,6 +443,7 @@ describe("doctor", () => {
         expect.objectContaining({
           args: [handoffPrompt],
           command: "claude",
+          detached: false,
           stderr: "inherit",
           stdin: "inherit",
           stdout: "inherit",

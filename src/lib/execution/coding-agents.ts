@@ -87,10 +87,12 @@ const ignoreSigint = () => {
   // Doctor stays alive; the agent in the foreground process group handles the signal.
 }
 
-// While the agent owns the terminal, Ctrl-C is the agent's to handle. Both processes
-// share the foreground process group, so without this shield the same SIGINT that the
-// agent treats as "clear the input line" would also interrupt Doctor's runtime, whose
-// spawner finalizer then kills the agent's process group mid-edit.
+// While the agent owns the terminal, Ctrl-C is the agent's to handle. The session is
+// spawned with `detached: false` so the agent joins Doctor's foreground process group
+// (the platform spawner would otherwise start it in a new session on POSIX, cutting it
+// off from terminal-generated SIGINT and SIGWINCH). Sharing the group means the same
+// SIGINT also reaches Doctor's runtime, whose spawner finalizer would kill the agent
+// mid-edit — this shield discards it for the duration of the session.
 const shieldSigintDuring = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.acquireUseRelease(
     Effect.sync(() => {
@@ -124,6 +126,7 @@ export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: strin
         args: agent.seedArguments(handoffPrompt),
         command: agent.command,
         cwd,
+        detached: false,
         stderr: "inherit",
         stdin: "inherit",
         stdout: "inherit",

@@ -51,11 +51,13 @@ flowchart TD
 `assess` and `doctor` are always read-only. Each finding contains the current state, the
 goal criteria, and optional reference content or notes. The agent or the human changes the
 target project. A later Doctor run confirms whether the project reached the goal state.
-Interactive Doctor runs render findings as terminal notes, then offer to hand off to a
-supported coding agent CLI (Claude Code or Codex) or to copy the combined Markdown
-prompt. A handoff hands the terminal to the agent CLI with inherited stdio and a one-line
-seed prompt that tells the agent to run Doctor itself; Adamantite passes no provider
-permission, sandbox, or trust flags, and reassesses once after the agent session ends.
+Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
+installed coding agent CLI or to copy the combined Markdown prompt. Installation is
+detected by probing each supported CLI with `--version`; only agents found on `PATH`
+appear in the menu. A handoff hands the terminal to the agent CLI with inherited stdio
+and a per-agent seed argument that tells the agent to run Doctor itself; Adamantite
+passes no provider permission, sandbox, or trust flags, and reassesses once after the
+agent session ends.
 The agent's exit code is ignored: only the reassessment decides success. Non-interactive runs
 print the Markdown prompt directly when findings remain. If an assessment reports only
 warnings, a non-interactive run prints a Markdown warning report and exits 0.

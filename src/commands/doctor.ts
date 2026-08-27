@@ -7,6 +7,7 @@ import {
   type CodingAgent,
   checkWorkingTreeState,
   codingAgents,
+  detectInstalledAgents,
   handoffPrompt,
 } from "#lib/execution/coding-agents.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -161,11 +162,27 @@ export default Command.make("doctor", { fix }).pipe(
 
       yield* printFindings(findings)
 
+      const installedAgents = yield* prompter.withSpinner(() => detectInstalledAgents(cwd), {
+        start: "Checking for installed coding agents...",
+        success: (agents) =>
+          agents.length === 0
+            ? "No supported coding agent CLI was found on PATH."
+            : `Found ${agents.map((agent) => agent.name).join(", ")}.`,
+      })
+
+      if (installedAgents.length === 0) {
+        yield* prompter.log.info(
+          `Doctor can hand findings off when one of these CLIs is installed: ${codingAgents
+            .map((agent) => `\`${agent.command}\``)
+            .join(", ")}.`
+        )
+      }
+
       const prompt = renderFindingsPrompt(findings, version, warnings)
       const action = yield* prompter.select<ResolveAction>({
         message: "How do you want to resolve these findings?",
         options: [
-          ...codingAgents.map((agent) => ({
+          ...installedAgents.map((agent) => ({
             label: `Hand off to ${agent.name}`,
             value: agent,
           })),
@@ -211,7 +228,7 @@ export default Command.make("doctor", { fix }).pipe(
 
       const started = yield* runner
         .run({
-          args: [handoffPrompt],
+          args: agent.seedArguments(handoffPrompt),
           command: agent.command,
           cwd,
           stderr: "inherit",

@@ -12,6 +12,7 @@ import { CliNotFound } from "#lib/shared/errors.ts"
 import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import {
+  type RunnerTestContext,
   createPrompterTestContext,
   createRunnerTestContext,
   runCommand,
@@ -28,7 +29,19 @@ function makeInteractiveTerminalLayer() {
   })
 }
 
-const claudeAgent: CodingAgent = { command: "claude", id: "claude", name: "Claude Code" }
+const claudeAgent: CodingAgent = {
+  command: "claude",
+  id: "claude",
+  name: "Claude Code",
+  seedArguments: (prompt) => [prompt],
+}
+
+const geminiAgent: CodingAgent = {
+  command: "gemini",
+  id: "gemini",
+  name: "Gemini CLI",
+  seedArguments: (prompt) => ["-i", prompt],
+}
 
 function makeFindingsFixture() {
   return createFileSystemTestContext({
@@ -39,6 +52,42 @@ function makeFindingsFixture() {
       }),
     },
   })
+}
+
+interface HandoffRunnerOptions {
+  readonly agentExit?: number | "not-found"
+  readonly gitExit?: number
+  readonly installedCommands?: readonly string[]
+  readonly onAgentRun?: () => void
+}
+
+// Dispatches on the invocation shape: `--version` probes answer installation,
+// `git` answers the working-tree check, and everything else is the agent spawn.
+function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
+  const installed = options.installedCommands ?? ["claude", "codex"]
+
+  return createRunnerTestContext({
+    implementation: (invocation) =>
+      Effect.suspend(() => {
+        if (invocation.args[0] === "--version") {
+          return installed.includes(invocation.command)
+            ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
+            : Effect.fail(new CliNotFound({ command: invocation.command }))
+        }
+        if (invocation.command === "git") {
+          return Effect.succeed(ChildProcessSpawner.ExitCode(options.gitExit ?? 0))
+        }
+        if (options.agentExit === "not-found") {
+          return Effect.fail(new CliNotFound({ command: invocation.command }))
+        }
+        options.onAgentRun?.()
+        return Effect.succeed(ChildProcessSpawner.ExitCode(options.agentExit ?? 0))
+      }),
+  })
+}
+
+function nonProbeInvocations(runner: RunnerTestContext) {
+  return runner.invocations.filter((invocation) => invocation.args[0] !== "--version")
 }
 
 describe("doctor", () => {
@@ -285,6 +334,7 @@ describe("doctor", () => {
         confirmResponses: [true],
         selectResponses: ["copy"],
       })
+      const runner = makeHandoffRunner()
       const interactive = Layer.succeed(TerminalCapabilities)({
         copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
         isInteractive: Effect.succeed(true),
@@ -292,7 +342,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, interactive],
+        layers: [prompter.layer, runner.layer, interactive],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -340,7 +390,7 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const prompter = createPrompterTestContext({ selectResponses: ["done"] })
-      const runner = createRunnerTestContext()
+      const runner = makeHandoffRunner()
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
@@ -349,7 +399,7 @@ describe("doctor", () => {
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.confirmCalls).toEqual([])
-      expect(runner.invocations).toEqual([])
+      expect(nonProbeInvocations(runner)).toEqual([])
       expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
     })
   )
@@ -358,16 +408,12 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const prompter = createPrompterTestContext({ selectResponses: [claudeAgent] })
-      const runner = createRunnerTestContext({
-        implementation: (options) =>
-          Effect.sync(() => {
-            if (options.command === "claude") {
-              files.write("knip.config.ts", toKnipTsConfigContent())
-              // A nonzero agent exit must not matter: reassessment is the oracle.
-              return ChildProcessSpawner.ExitCode(1)
-            }
-            return ChildProcessSpawner.ExitCode(0)
-          }),
+      // A nonzero agent exit must not matter: reassessment is the oracle.
+      const runner = makeHandoffRunner({
+        agentExit: 1,
+        onAgentRun: () => {
+          files.write("knip.config.ts", toKnipTsConfigContent())
+        },
       })
 
       const exit = yield* runCommand(doctorCommand, [], {
@@ -376,7 +422,7 @@ describe("doctor", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
+      expect(nonProbeInvocations(runner)).toEqual([
         expect.objectContaining({
           args: ["diff", "--quiet", "HEAD"],
           command: "git",
@@ -391,7 +437,7 @@ describe("doctor", () => {
           stdout: "inherit",
         }),
       ])
-      expect(runner.invocations[1]?.args[0]).not.toContain("knip")
+      expect(nonProbeInvocations(runner)[1]?.args[0]).not.toContain("knip")
       expect(prompter.logs).toContainEqual({
         level: "info",
         message: "Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
@@ -411,7 +457,7 @@ describe("doctor", () => {
         confirmResponses: [false],
         selectResponses: [claudeAgent],
       })
-      const runner = createRunnerTestContext([0, 0])
+      const runner = makeHandoffRunner()
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
@@ -438,12 +484,8 @@ describe("doctor", () => {
         confirmResponses: [false],
         selectResponses: [claudeAgent],
       })
-      const runner = createRunnerTestContext({
-        implementation: (options) =>
-          options.command === "claude"
-            ? Effect.fail(new CliNotFound({ command: "claude" }))
-            : Effect.succeed(ChildProcessSpawner.ExitCode(0)),
-      })
+      // Installed at menu time, gone at spawn time: the race the fallback covers.
+      const runner = makeHandoffRunner({ agentExit: "not-found" })
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
@@ -470,7 +512,7 @@ describe("doctor", () => {
         confirmResponses: [false, false],
         selectResponses: [claudeAgent],
       })
-      const runner = createRunnerTestContext([1])
+      const runner = makeHandoffRunner({ gitExit: 1 })
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
@@ -487,8 +529,8 @@ describe("doctor", () => {
         initialValue: false,
         message: "Hand off to Claude Code anyway?",
       })
-      expect(runner.invocations).toHaveLength(1)
-      expect(runner.invocations[0]?.command).toBe("git")
+      expect(nonProbeInvocations(runner)).toHaveLength(1)
+      expect(nonProbeInvocations(runner)[0]?.command).toBe("git")
       expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
     })
   )
@@ -500,15 +542,11 @@ describe("doctor", () => {
         confirmResponses: [true],
         selectResponses: [claudeAgent],
       })
-      const runner = createRunnerTestContext({
-        implementation: (options) =>
-          Effect.sync(() => {
-            if (options.command === "git") {
-              return ChildProcessSpawner.ExitCode(128)
-            }
-            files.write("knip.config.ts", toKnipTsConfigContent())
-            return ChildProcessSpawner.ExitCode(0)
-          }),
+      const runner = makeHandoffRunner({
+        gitExit: 128,
+        onAgentRun: () => {
+          files.write("knip.config.ts", toKnipTsConfigContent())
+        },
       })
 
       const exit = yield* runCommand(doctorCommand, [], {
@@ -530,7 +568,7 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const prompter = createPrompterTestContext({ cancelAtPromptIndex: 1 })
-      const runner = createRunnerTestContext()
+      const runner = makeHandoffRunner()
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
@@ -539,8 +577,76 @@ describe("doctor", () => {
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.cancels).toEqual(["Doctor was cancelled. The findings remain."])
-      expect(runner.invocations).toEqual([])
+      expect(nonProbeInvocations(runner)).toEqual([])
       expect(prompter.outros).toEqual([])
+    })
+  )
+
+  it.effect("offer only the copy actions when no agent CLI is installed", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false],
+        selectResponses: ["copy"],
+      })
+      const runner = makeHandoffRunner({ installedCommands: [] })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message:
+          "Doctor can hand findings off when one of these CLIs is installed: `claude`, `codex`, `cursor-agent`, `gemini`, `grok`, `opencode`.",
+      })
+      expect(prompter.selectCalls).toEqual([
+        expect.objectContaining({
+          options: [
+            expect.objectContaining({
+              label: "Copy the Markdown prompt for a coding agent",
+              value: "copy",
+            }),
+            expect.objectContaining({ label: "Do nothing", value: "done" }),
+          ],
+        }),
+      ])
+      expect(prompter.spinnerEntries).toContainEqual({
+        message: "No supported coding agent CLI was found on PATH.",
+        type: "stop",
+      })
+    })
+  )
+
+  it.effect("seed agents that need a flag with their own arguments", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({ selectResponses: [geminiAgent] })
+      const runner = makeHandoffRunner({
+        installedCommands: ["gemini"],
+        onAgentRun: () => {
+          files.write("knip.config.ts", toKnipTsConfigContent())
+        },
+      })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(nonProbeInvocations(runner)[1]).toEqual(
+        expect.objectContaining({
+          args: ["-i", handoffPrompt],
+          command: "gemini",
+        })
+      )
+      expect(prompter.spinnerEntries).toContainEqual({
+        message: "Found Gemini CLI.",
+        type: "stop",
+      })
     })
   )
 })

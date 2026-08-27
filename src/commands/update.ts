@@ -5,14 +5,12 @@ import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
 import * as Command from "effect/unstable/cli/Command"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
-import { assessManagedIntegrations, managedIntegrations } from "#lib/integrations/managed.ts"
+import { assessProject } from "#lib/integrations/assessment.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
-import { collectFindings } from "#lib/shared/findings.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printFindings } from "#terminal/findings.ts"
@@ -67,8 +65,8 @@ export default Command.make("update").pipe(
       yield* prompter.intro("💠 adamantite update")
 
       const packageJson = yield* readPackageJson(cwd)
-      const assessments = yield* collectApplicableAssessments(managedIntegrations, cwd, packageJson)
-      const packageActions = assessments.flatMap(({ assessment }) => assessment.packageActions)
+      const assessment = yield* assessProject(cwd, packageJson)
+      const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
       const updates: PackageUpdate[] = [
         ...packageActions.map((action) => ({
@@ -105,19 +103,13 @@ export default Command.make("update").pipe(
         yield* prompter.log.success("Dependencies updated successfully.")
       }
 
-      const finalState =
-        updates.length === 0
-          ? {
-              findings: collectFindings(assessments),
-              warnings: assessments.flatMap(({ assessment }) => assessment.warnings),
-            }
-          : yield* assessManagedIntegrations(cwd)
+      const finalAssessment = updates.length === 0 ? assessment : yield* assessProject(cwd)
 
-      for (const warning of finalState.warnings) {
+      for (const warning of finalAssessment.warnings) {
         yield* prompter.log.warning(warning)
       }
 
-      const findings = finalState.findings
+      const findings = finalAssessment.findings
 
       if (findings.length > 0) {
         yield* printFindings(findings)

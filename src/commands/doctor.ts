@@ -10,9 +10,8 @@ import {
   detectInstalledAgents,
   runAgentSession,
 } from "#lib/execution/coding-agents.ts"
-import { assessManagedIntegrations } from "#lib/integrations/managed.ts"
+import { assessProject, renderAssessmentMarkdown } from "#lib/integrations/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
-import { renderAssessmentWarnings, renderFindingsPrompt } from "#lib/shared/findings.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
@@ -88,15 +87,15 @@ export default Command.make("doctor", { fix }).pipe(
         })
       }
 
-      const { assessments, findings, warnings } = yield* assessManagedIntegrations(cwd)
+      const assessment = yield* assessProject(cwd)
 
       if (isInteractive) {
-        for (const warning of warnings) {
+        for (const warning of assessment.warnings) {
           yield* prompter.log.warning(warning)
         }
       }
 
-      if (assessments.length === 0) {
+      if (assessment.applicableIntegrations.length === 0) {
         if (isInteractive) {
           yield* prompter.log.success("No applicable integrations found.")
           yield* prompter.outro("✅ Doctor completed successfully!")
@@ -104,18 +103,18 @@ export default Command.make("doctor", { fix }).pipe(
         return
       }
 
-      if (findings.length === 0) {
+      if (assessment.findings.length === 0) {
         if (isInteractive) {
           yield* prompter.log.success("No issues found.")
           yield* prompter.outro("✅ Doctor completed successfully!")
-        } else if (warnings.length > 0) {
-          yield* prompter.message(renderAssessmentWarnings(warnings, version))
+        } else if (assessment.warnings.length > 0) {
+          yield* prompter.message(renderAssessmentMarkdown(assessment, version))
         }
         return
       }
 
       if (!isInteractive) {
-        yield* prompter.message(renderFindingsPrompt(findings, version, warnings))
+        yield* prompter.message(renderAssessmentMarkdown(assessment, version))
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -138,7 +137,7 @@ export default Command.make("doctor", { fix }).pipe(
           }
         })
 
-      yield* printFindings(findings)
+      yield* printFindings(assessment.findings)
 
       const installedAgents = yield* prompter.withSpinner(() => detectInstalledAgents(cwd), {
         start: "Checking for installed coding agents...",
@@ -156,7 +155,7 @@ export default Command.make("doctor", { fix }).pipe(
         )
       }
 
-      const prompt = renderFindingsPrompt(findings, version, warnings)
+      const prompt = renderAssessmentMarkdown(assessment, version)
       const action = yield* prompter.select<ResolveAction>({
         message: "How do you want to resolve these findings?",
         options: [
@@ -220,7 +219,7 @@ export default Command.make("doctor", { fix }).pipe(
         return yield* failWithFindings
       }
 
-      const after = yield* assessManagedIntegrations(cwd)
+      const after = yield* assessProject(cwd)
 
       if (after.findings.length === 0) {
         yield* prompter.log.success(`All findings were resolved by ${agent.name}.`)
@@ -229,10 +228,10 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       yield* prompter.log.warning(
-        `${after.findings.length} of ${findings.length} findings remain after the ${agent.name} session.`
+        `${after.findings.length} of ${assessment.findings.length} findings remain after the ${agent.name} session.`
       )
       yield* printFindings(after.findings)
-      yield* offerPromptCopy(renderFindingsPrompt(after.findings, version, after.warnings))
+      yield* offerPromptCopy(renderAssessmentMarkdown(after, version))
       return yield* failWithFindings
     }).pipe(
       Effect.catchTag("OperationCancelled", () =>

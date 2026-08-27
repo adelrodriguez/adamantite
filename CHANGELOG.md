@@ -1,5 +1,43 @@
 # adamantite
 
+## 0.38.0
+
+### Minor Changes
+
+- [#397](https://github.com/adelrodriguez/adamantite/pull/397) [`8381104`](https://github.com/adelrodriguez/adamantite/commit/8381104aea6a2e6d2dfbc1a434dbb299ad9ac331) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let interactive `adamantite doctor` hand findings off to an installed coding agent:
+  Claude Code, Codex, Cursor, Gemini CLI, Grok Build, or OpenCode. Doctor detects
+  installed agents by probing each CLI and only offers the ones on `PATH`, then starts the
+  selected agent in the terminal with a one-line seed prompt that tells the agent to run
+  Doctor itself, so the agent's own UI owns permissions, trust, and authentication and no
+  findings content appears in process arguments. Doctor warns before handing off a working
+  tree that is not known to be clean, reassesses once after the agent session ends, and
+  exits 0 only when no findings remain — the agent's exit code is ignored. The agent runs
+  in Doctor's process group and Doctor ignores Ctrl-C while the agent owns the terminal,
+  so terminal signals reach only the agent. When an agent fails to start, the Markdown
+  prompt copy remains available. Non-interactive output is unchanged.
+
+- [#396](https://github.com/adelrodriguez/adamantite/pull/396) [`5428bdd`](https://github.com/adelrodriguez/adamantite/commit/5428bddf3228319e5be42ca5a5fd7f2b03bdf423) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Format binary and ternary operators at the start of continuation lines
+
+  The format preset now sets `experimentalOperatorPosition: "start"`, so multiline conditions place `&&`, `||`, `??`, and ternary operators at the beginning of the wrapped line instead of the end. The managed oxfmt version moves to 0.65.0, which supports the option. Expect a one-time reformat of multiline expressions the next time you run `format`.
+
+- [#393](https://github.com/adelrodriguez/adamantite/pull/393) [`af18c34`](https://github.com/adelrodriguez/adamantite/commit/af18c346d0e7a2efa35d511d2850bb50282831ce) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Make `adamantite doctor` emit verifiable repair findings and prompts instead of mutating projects. Interactive runs show formatted findings and offer to copy one Markdown prompt. Non-interactive runs print Markdown directly so a calling agent can follow it, including assessment warnings that explain why a finding is absent. Warning-only runs still exit 0. `update` now only updates managed dependencies. Keep `doctor --fix` as a one-release error stub, remove the deprecated `typecheck` alias, and require `pnpm-workspace.yaml` to define packages before treating a project as a monorepo.
+
+  Align the pinned Effect packages on `4.0.0-rc.112` so the published CLI installs one compatible runtime.
+
+### Patch Changes
+
+- [#386](https://github.com/adelrodriguez/adamantite/pull/386) [`e78de64`](https://github.com/adelrodriguez/adamantite/commit/e78de6400b9494a10f677c180b2f0037adbb50dc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Fix `serializeTsObjectLiteral` corrupting keys that contain a double quote and dropping own `__proto__` keys
+
+  The key-unquoting regex matched escaped quotes inside serialized keys, so migrating a knip or oxfmt config with a quote-containing key produced a `*.config.ts` file with invalid syntax. It also unquoted `__proto__`, which an object literal treats as prototype assignment; the migration path never hits this because `parseJson` strips `__proto__`, but any direct caller would lose the key. Quote-containing keys now stay quoted, and `__proto__` keys are emitted as computed properties (`["__proto__"]:`) so they survive as own properties.
+
+- [#395](https://github.com/adelrodriguez/adamantite/pull/395) [`62cd29a`](https://github.com/adelrodriguez/adamantite/commit/62cd29a12ca3ce4ad48b012d00053934d42c8f03) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Emit `oxlint.config.ts` with sorted keys so a fresh `adamantite check` passes
+
+  The core preset enables `sort-keys`, but `adamantite init` generated the config with its keys in `options`, `ignorePatterns`, `extends` order, so running the managed `check` script in a freshly initialized project immediately failed on the file init had just written. The generator now sorts the top-level keys and the keys inside `options` in the order the rule expects. Caught by the new `test:smoke` script, which runs the built CLI's `init` against a real fixture project and then executes the real oxlint, oxfmt, and knip binaries on the result.
+
+- [#386](https://github.com/adelrodriguez/adamantite/pull/386) [`e78de64`](https://github.com/adelrodriguez/adamantite/commit/e78de6400b9494a10f677c180b2f0037adbb50dc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Fix knip and oxfmt migrations writing non-identifier config keys as bare identifiers
+
+  The config writers interpolated keys directly into the generated `*.config.ts`, so a legal knip key such as `lint-staged` or a rule name containing punctuation produced invalid TypeScript. Keys are now emitted through `serializeTsPropertyKey`, which quotes non-identifier keys and writes `__proto__` as a computed property.
+
 ## 0.37.0
 
 ### Minor Changes

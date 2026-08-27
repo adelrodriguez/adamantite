@@ -84,7 +84,7 @@ jobs:
         include:
           - name: unit
             command: pnpm run test
-          - name: build
+          - name: integration
             command: pnpm run test:dist
 
     steps:

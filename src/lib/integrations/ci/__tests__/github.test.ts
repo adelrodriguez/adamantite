@@ -252,7 +252,7 @@ describe("github", () => {
           "utf8"
         )
 
-        for (const action of ["actions/checkout", "actions/setup-node"]) {
+        for (const action of ["actions/checkout", "actions/setup-node", "pnpm/action-setup"]) {
           expect(getActionReference(qualityWorkflow, action)).toBe(
             getActionReference(referenceWorkflow, action)
           )

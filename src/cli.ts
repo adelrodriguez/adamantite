@@ -49,9 +49,9 @@ export const runCli = Effect.fn("runCli")(function* (args: readonly string[], ve
   const activeCommand = commandArguments.find((argument) => commandNames.has(argument))
 
   if (
-    forwardedArguments.length > 0 &&
-    activeCommand !== undefined &&
-    !passthroughCommandNames.has(activeCommand)
+    forwardedArguments.length > 0
+    && activeCommand !== undefined
+    && !passthroughCommandNames.has(activeCommand)
   ) {
     return yield* new PassthroughNotSupported({ command: activeCommand })
   }

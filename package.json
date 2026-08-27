@@ -59,7 +59,7 @@
   "scripts": {
     "analyze": "knip",
     "build": "tsdown",
-    "bump:deps": "pnpm update --interactive",
+    "bump:deps": "pnpm update --interactive --latest",
     "check": "oxlint",
     "dev": "tsdown --watch",
     "fix": "oxlint --fix",
@@ -78,22 +78,22 @@
     "@effect/platform-node": "4.0.0-rc.112",
     "defu": "6.1.7",
     "effect": "4.0.0-rc.112",
-    "esrap": "2.3.2",
+    "esrap": "2.3.6",
     "jsonc-parser": "3.3.1",
     "nypm": "0.6.9",
-    "oxc-parser": "^0.144.0"
+    "oxc-parser": "^0.147.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "1.0.0",
-    "@changesets/cli": "3.0.0",
+    "@changesets/cli": "3.0.1",
     "@effect/vitest": "4.0.0-rc.112",
-    "@tanstack/intent": "0.3.6",
+    "@tanstack/intent": "0.3.7",
     "@types/figlet": "1.7.0",
     "@types/node": "22.20.1",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "figlet": "1.11.4",
     "knip": "6.32.2",
-    "oxfmt": "0.63.0",
+    "oxfmt": "0.65.0",
     "oxlint": "1.79.0",
     "oxlint-tsgolint": "7.0.2001",
     "sherif": "1.13.0",
@@ -101,7 +101,7 @@
     "type-fest": "5.8.0",
     "typescript": "7.0.2",
     "unplugin-macros": "0.23.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
     "typescript": ">=7"

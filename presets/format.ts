@@ -6,6 +6,7 @@ const config: FormatConfig = {
   bracketSpacing: true,
   embeddedLanguageFormatting: "auto",
   endOfLine: "lf",
+  experimentalOperatorPosition: "start",
   htmlWhitespaceSensitivity: "css",
   insertFinalNewline: true,
   jsdoc: {

@@ -495,9 +495,9 @@ const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   }
 
   if (
-    options.githubActions &&
-    context.nonInteractive &&
-    !checkIsSupportedPackageManager(context.packageManager)
+    options.githubActions
+    && context.nonInteractive
+    && !checkIsSupportedPackageManager(context.packageManager)
   ) {
     return yield* new InvalidInitOptions({
       reason: `\`--github-actions\` does not support the detected package manager \`${context.packageManager}\`. Use bun, deno, npm, pnpm, or yarn.`,
@@ -776,8 +776,8 @@ export default Command.make("init", {
       }
 
       if (
-        !options.nonInteractive &&
-        Array.some(
+        !options.nonInteractive
+        && Array.some(
           [
             options.scripts.length > 0,
             options.presets.length > 0,

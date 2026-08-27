@@ -196,8 +196,8 @@ export function createFileSystemTestContext(options?: {
         if (directories.has(target)) {
           const prefix = `${target}/`
           const hasEntries =
-            [...files.keys()].some((file) => file.startsWith(prefix)) ||
-            [...directories].some((directory) => directory.startsWith(prefix))
+            [...files.keys()].some((file) => file.startsWith(prefix))
+            || [...directories].some((directory) => directory.startsWith(prefix))
 
           if (hasEntries && !removeOptions?.recursive) {
             return Effect.fail(makeSystemError("BadResource", "remove", path))

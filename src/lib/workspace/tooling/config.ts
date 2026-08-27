@@ -267,8 +267,8 @@ export function getConfigFindings(
     findings.push({
       currentState: `\`${options.configFile}\` does not meet Adamantite's required shape. ${options.inspection.reason}`,
       goal: [
-        options.invalidGoal ??
-          `Update \`${options.configFile}\` so it includes the required Adamantite preset while preserving project-specific settings.`,
+        options.invalidGoal
+          ?? `Update \`${options.configFile}\` so it includes the required Adamantite preset while preserving project-specific settings.`,
       ],
       id: `invalid-${options.toolName}-config`,
       integration: options.toolName,

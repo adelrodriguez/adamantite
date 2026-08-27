@@ -70,8 +70,8 @@ export default Command.make("doctor", { fix }).pipe(
       const initialPackageJson = yield* readPackageJson(cwd)
 
       if (
-        !initialPackageJson.devDependencies?.adamantite &&
-        !initialPackageJson.dependencies?.adamantite
+        !initialPackageJson.devDependencies?.adamantite
+        && !initialPackageJson.dependencies?.adamantite
       ) {
         const message =
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."

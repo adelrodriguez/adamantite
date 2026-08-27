@@ -62,8 +62,8 @@ export const detectInstalledAgents = (cwd: string) =>
 // The findings themselves stay out of the seed prompt: the agent reads them by
 // running non-interactive `adamantite doctor`, so nothing sensitive lands in argv.
 export const handoffPrompt =
-  "Run `adamantite doctor` and resolve every finding it reports. " +
-  "Rerun `adamantite doctor` until it exits 0."
+  "Run `adamantite doctor` and resolve every finding it reports. "
+  + "Rerun `adamantite doctor` until it exits 0."
 
 // Lives here instead of lib/shared/errors.ts because it carries the CodingAgent,
 // and shared must not depend on execution.

@@ -55,8 +55,8 @@ target project. A later Doctor run confirms whether the project reached the goal
 Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
 installed coding agent CLI or to copy the combined Markdown prompt. Installation is
 detected by probing each supported CLI's version command, bounded by a timeout; only
-agents that run it successfully
-appear in the menu. A handoff hands the terminal to the agent CLI with inherited stdio
+agents whose probe command starts appear in the menu. A handoff hands the terminal to
+the agent CLI with inherited stdio
 and a per-agent seed argument that tells the agent to run Doctor itself; Adamantite
 passes no provider permission, sandbox, or trust flags, and reassesses once after the
 agent session ends.

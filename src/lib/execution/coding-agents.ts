@@ -1,3 +1,4 @@
+import process from "node:process"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
@@ -75,22 +76,52 @@ export class AgentSessionFailed extends Data.TaggedError("AgentSessionFailed")<{
   readonly reason: "not-found" | "spawn-failed"
 }> {}
 
+const ignoreSigint = () => {
+  // Doctor stays alive; the agent in the foreground process group handles the signal.
+}
+
+// While the agent owns the terminal, Ctrl-C is the agent's to handle. Both processes
+// share the foreground process group, so without this shield the same SIGINT that the
+// agent treats as "clear the input line" would also interrupt Doctor's runtime, whose
+// spawner finalizer then kills the agent's process group mid-edit.
+const shieldSigintDuring = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  Effect.acquireUseRelease(
+    Effect.sync(() => {
+      const previous = process.listeners("SIGINT")
+      process.removeAllListeners("SIGINT")
+      // With no listener at all, Node's default SIGINT behavior kills the process.
+      process.on("SIGINT", ignoreSigint)
+      return previous
+    }),
+    () => effect,
+    (previous) =>
+      Effect.sync(() => {
+        process.removeAllListeners("SIGINT")
+        for (const listener of previous) {
+          process.on("SIGINT", listener)
+        }
+      })
+  )
+
 /**
  * Hands the terminal to the agent with inherited stdio, seeded to run Doctor itself. Resolves when
  * the session ends; the agent's exit code is deliberately discarded because only a reassessment can
- * judge whether the findings were repaired.
+ * judge whether the findings were repaired. Doctor ignores SIGINT for the duration of the session
+ * so a Ctrl-C reaches only the agent.
  */
 export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: string }) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
-    yield* runner.run({
-      args: agent.seedArguments(handoffPrompt),
-      command: agent.command,
-      cwd,
-      stderr: "inherit",
-      stdin: "inherit",
-      stdout: "inherit",
-    })
+    yield* shieldSigintDuring(
+      runner.run({
+        args: agent.seedArguments(handoffPrompt),
+        command: agent.command,
+        cwd,
+        stderr: "inherit",
+        stdin: "inherit",
+        stdout: "inherit",
+      })
+    )
   }).pipe(
     Effect.asVoid,
     Effect.mapError(

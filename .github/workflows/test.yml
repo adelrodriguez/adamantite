@@ -82,9 +82,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: test
+          - name: unit
             command: pnpm run test
-          - name: dist
+          - name: build
             command: pnpm run test:dist
 
     steps:

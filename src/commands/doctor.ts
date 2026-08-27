@@ -8,26 +8,13 @@ import {
   checkWorkingTreeState,
   codingAgents,
   detectInstalledAgents,
-  handoffPrompt,
+  runAgentSession,
 } from "#lib/execution/coding-agents.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
-import github from "#lib/integrations/ci/github.ts"
-import zed from "#lib/integrations/editors/zed.ts"
-import knip from "#lib/integrations/tooling/knip.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
-import oxlint from "#lib/integrations/tooling/oxlint.ts"
-import sherif from "#lib/integrations/tooling/sherif.ts"
-import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
+import { assessManagedIntegrations } from "#lib/integrations/managed.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
-import {
-  collectFindings,
-  renderAssessmentWarnings,
-  renderFindingsPrompt,
-} from "#lib/shared/findings.ts"
+import { renderAssessmentWarnings, renderFindingsPrompt } from "#lib/shared/findings.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import tsconfig from "#lib/workspace/tsconfig.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
@@ -38,7 +25,6 @@ const fix = Flag.boolean("fix").pipe(
   Flag.withDescription("Removed. Run doctor and follow its findings")
 )
 
-const integrations = [knip, oxfmt, oxlint, sherif, tsgolint, tsconfig, github, zed] as const
 const version = getPackageVersion()
 
 type ResolveAction = CodingAgent | "copy" | "done"
@@ -102,15 +88,7 @@ export default Command.make("doctor", { fix }).pipe(
         })
       }
 
-      // Re-reads package.json so a post-handoff assessment sees the agent's edits.
-      const assess = Effect.gen(function* () {
-        const packageJson = yield* readPackageJson(cwd)
-        const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
-        const warnings = assessments.flatMap(({ assessment }) => assessment.warnings)
-        return { assessments, findings: collectFindings(assessments), warnings }
-      })
-
-      const { assessments, findings, warnings } = yield* assess
+      const { assessments, findings, warnings } = yield* assessManagedIntegrations(cwd)
 
       if (isInteractive) {
         for (const warning of warnings) {
@@ -201,8 +179,6 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       const agent = action
-      const runner = yield* CommandRunner
-
       const treeState = yield* checkWorkingTreeState(cwd)
 
       if (treeState !== "clean") {
@@ -226,38 +202,25 @@ export default Command.make("doctor", { fix }).pipe(
         `Handing the terminal to ${agent.name}. Exit the agent to return to Doctor.`
       )
 
-      const started = yield* runner
-        .run({
-          args: agent.seedArguments(handoffPrompt),
-          command: agent.command,
-          cwd,
-          stderr: "inherit",
-          stdin: "inherit",
-          stdout: "inherit",
-        })
-        .pipe(
-          Effect.as(true),
-          Effect.catchTag("CliNotFound", () =>
-            prompter.log
-              .error(
-                `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
-              )
-              .pipe(Effect.as(false))
-          ),
-          Effect.catch((error) =>
-            prompter.log
-              .error(`Failed to start ${agent.name}: ${error.message}`)
-              .pipe(Effect.as(false))
-          )
+      const started = yield* runAgentSession({ agent, cwd }).pipe(
+        Effect.as(true),
+        Effect.catchTag("AgentSessionFailed", (error) =>
+          prompter.log
+            .error(
+              error.reason === "not-found"
+                ? `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
+                : `Failed to start ${agent.name}.`
+            )
+            .pipe(Effect.as(false))
         )
+      )
 
       if (!started) {
         yield* offerPromptCopy(prompt)
         return yield* failWithFindings
       }
 
-      // The agent's exit code is not the oracle; only reassessment decides success.
-      const after = yield* assess
+      const after = yield* assessManagedIntegrations(cwd)
 
       if (after.findings.length === 0) {
         yield* prompter.log.success(`All findings were resolved by ${agent.name}.`)

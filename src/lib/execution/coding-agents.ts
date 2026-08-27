@@ -1,3 +1,4 @@
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -63,6 +64,40 @@ export const detectInstalledAgents = (cwd: string) =>
 export const handoffPrompt =
   "Run `adamantite doctor` and resolve every finding it reports. " +
   "Rerun `adamantite doctor` until it exits 0."
+
+// Lives here instead of lib/shared/errors.ts because it carries the CodingAgent,
+// and shared must not depend on execution.
+export class AgentSessionFailed extends Data.TaggedError("AgentSessionFailed")<{
+  readonly agent: CodingAgent
+  readonly reason: "not-found" | "spawn-failed"
+}> {}
+
+/**
+ * Hands the terminal to the agent with inherited stdio, seeded to run Doctor itself. Resolves when
+ * the session ends; the agent's exit code is deliberately discarded because only a reassessment can
+ * judge whether the findings were repaired.
+ */
+export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: string }) =>
+  Effect.gen(function* () {
+    const runner = yield* CommandRunner
+    yield* runner.run({
+      args: agent.seedArguments(handoffPrompt),
+      command: agent.command,
+      cwd,
+      stderr: "inherit",
+      stdin: "inherit",
+      stdout: "inherit",
+    })
+  }).pipe(
+    Effect.asVoid,
+    Effect.mapError(
+      (error) =>
+        new AgentSessionFailed({
+          agent,
+          reason: error._tag === "CliNotFound" ? "not-found" : "spawn-failed",
+        })
+    )
+  )
 
 export type WorkingTreeState = "clean" | "dirty" | "unknown"
 

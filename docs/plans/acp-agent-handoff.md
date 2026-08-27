@@ -1,5 +1,11 @@
 # Plan: ACP agent handoff
 
+> **Status: deferred (2026-08-26).** Interactive handoff shipped as a TTY handoff
+> instead: Doctor spawns the agent CLI with inherited stdio and a one-line seed prompt,
+> and reassesses after the session ends (see ADR 0002). This plan stays as the design of
+> record for an ACP integration, which only becomes worthwhile for non-TTY hosts or
+> agents that ship no CLI.
+
 ## Goal
 
 Let a person pass Doctor findings to Codex or Claude from an interactive Adamantite run

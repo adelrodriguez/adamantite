@@ -3,6 +3,13 @@ import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import {
+  type CodingAgent,
+  checkWorkingTreeState,
+  codingAgents,
+  handoffPrompt,
+} from "#lib/execution/coding-agents.ts"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
@@ -33,6 +40,8 @@ const fix = Flag.boolean("fix").pipe(
 const integrations = [knip, oxfmt, oxlint, sherif, tsgolint, tsconfig, github, zed] as const
 const version = getPackageVersion()
 
+type ResolveAction = CodingAgent | "copy" | "done"
+
 export default Command.make("doctor", { fix }).pipe(
   Command.withDescription("Assess Adamantite-managed integrations in the current project"),
   Command.withHandler(({ fix }) =>
@@ -46,6 +55,16 @@ export default Command.make("doctor", { fix }).pipe(
         yield* printTitle()
         yield* prompter.intro("💠 adamantite doctor")
       }
+
+      const failWithFindings = Effect.gen(function* () {
+        if (isInteractive) {
+          yield* prompter.outro("⚠️ Doctor found issues.")
+        }
+        return yield* new CommandFailed({
+          command: "doctor",
+          exitCode: ChildProcessSpawner.ExitCode(1),
+        })
+      })
 
       if (fix) {
         const message =
@@ -62,9 +81,12 @@ export default Command.make("doctor", { fix }).pipe(
         })
       }
 
-      const packageJson = yield* readPackageJson(cwd)
+      const initialPackageJson = yield* readPackageJson(cwd)
 
-      if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
+      if (
+        !initialPackageJson.devDependencies?.adamantite &&
+        !initialPackageJson.dependencies?.adamantite
+      ) {
         const message =
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
         if (isInteractive) {
@@ -79,16 +101,21 @@ export default Command.make("doctor", { fix }).pipe(
         })
       }
 
-      const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
-      const warnings = assessments.flatMap(({ assessment }) => assessment.warnings)
+      // Re-reads package.json so a post-handoff assessment sees the agent's edits.
+      const assess = Effect.gen(function* () {
+        const packageJson = yield* readPackageJson(cwd)
+        const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
+        const warnings = assessments.flatMap(({ assessment }) => assessment.warnings)
+        return { assessments, findings: collectFindings(assessments), warnings }
+      })
+
+      const { assessments, findings, warnings } = yield* assess
 
       if (isInteractive) {
         for (const warning of warnings) {
           yield* prompter.log.warning(warning)
         }
       }
-
-      const findings = collectFindings(assessments)
 
       if (assessments.length === 0) {
         if (isInteractive) {
@@ -108,36 +135,136 @@ export default Command.make("doctor", { fix }).pipe(
         return
       }
 
-      const prompt = renderFindingsPrompt(findings, version, warnings)
+      if (!isInteractive) {
+        yield* prompter.message(renderFindingsPrompt(findings, version, warnings))
+        return yield* new CommandFailed({
+          command: "doctor",
+          exitCode: ChildProcessSpawner.ExitCode(1),
+        })
+      }
 
-      if (isInteractive) {
-        yield* printFindings(findings)
-        yield* prompter.log.info(
-          "To hand off these findings, start a coding agent in this project and ask it to run `adamantite doctor`."
-        )
-        const shouldCopyPrompt = yield* prompter.confirm({
-          initialValue: true,
-          message: "Copy the Markdown prompt for a coding agent?",
+      const offerPromptCopy = (promptText: string) =>
+        Effect.gen(function* () {
+          const shouldCopyPrompt = yield* prompter.confirm({
+            initialValue: true,
+            message: "Copy the Markdown prompt for a coding agent?",
+          })
+
+          if (shouldCopyPrompt) {
+            yield* prompter.message(promptText)
+            yield* terminal.copyToClipboard(promptText)
+            yield* prompter.log.success(
+              "The Markdown prompt was printed and sent to the terminal clipboard."
+            )
+          }
         })
 
-        if (shouldCopyPrompt) {
-          yield* prompter.message(prompt)
-          yield* terminal.copyToClipboard(prompt)
-          yield* prompter.log.success(
-            "The Markdown prompt was printed and sent to the terminal clipboard."
-          )
-        }
-      } else {
-        yield* prompter.message(prompt)
+      yield* printFindings(findings)
+
+      const prompt = renderFindingsPrompt(findings, version, warnings)
+      const action = yield* prompter.select<ResolveAction>({
+        message: "How do you want to resolve these findings?",
+        options: [
+          ...codingAgents.map((agent) => ({
+            label: `Hand off to ${agent.name}`,
+            value: agent,
+          })),
+          { label: "Copy the Markdown prompt for a coding agent", value: "copy" as const },
+          { label: "Do nothing", value: "done" as const },
+        ],
+      })
+
+      if (action === "done") {
+        return yield* failWithFindings
       }
 
-      if (isInteractive) {
-        yield* prompter.outro("⚠️ Doctor found issues.")
+      if (action === "copy") {
+        yield* offerPromptCopy(prompt)
+        return yield* failWithFindings
       }
-      return yield* new CommandFailed({
-        command: "doctor",
-        exitCode: ChildProcessSpawner.ExitCode(1),
-      })
-    })
+
+      const agent = action
+      const runner = yield* CommandRunner
+
+      const treeState = yield* checkWorkingTreeState(cwd)
+
+      if (treeState !== "clean") {
+        yield* prompter.log.warning(
+          treeState === "dirty"
+            ? "The Git working tree has uncommitted changes. The agent will edit files on top of them."
+            : "Doctor could not confirm a clean Git working tree. The agent will edit files without a checkpoint to return to."
+        )
+        const proceed = yield* prompter.confirm({
+          initialValue: false,
+          message: `Hand off to ${agent.name} anyway?`,
+        })
+
+        if (!proceed) {
+          yield* offerPromptCopy(prompt)
+          return yield* failWithFindings
+        }
+      }
+
+      yield* prompter.log.info(
+        `Handing the terminal to ${agent.name}. Exit the agent to return to Doctor.`
+      )
+
+      const started = yield* runner
+        .run({
+          args: [handoffPrompt],
+          command: agent.command,
+          cwd,
+          stderr: "inherit",
+          stdin: "inherit",
+          stdout: "inherit",
+        })
+        .pipe(
+          Effect.as(true),
+          Effect.catchTag("CliNotFound", () =>
+            prompter.log
+              .error(
+                `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
+              )
+              .pipe(Effect.as(false))
+          ),
+          Effect.catch((error) =>
+            prompter.log
+              .error(`Failed to start ${agent.name}: ${error.message}`)
+              .pipe(Effect.as(false))
+          )
+        )
+
+      if (!started) {
+        yield* offerPromptCopy(prompt)
+        return yield* failWithFindings
+      }
+
+      // The agent's exit code is not the oracle; only reassessment decides success.
+      const after = yield* assess
+
+      if (after.findings.length === 0) {
+        yield* prompter.log.success(`All findings were resolved by ${agent.name}.`)
+        yield* prompter.outro("✅ Doctor completed successfully!")
+        return
+      }
+
+      yield* prompter.log.warning(
+        `${after.findings.length} of ${findings.length} findings remain after the ${agent.name} session.`
+      )
+      yield* printFindings(after.findings)
+      yield* offerPromptCopy(renderFindingsPrompt(after.findings, version, after.warnings))
+      return yield* failWithFindings
+    }).pipe(
+      Effect.catchTag("OperationCancelled", () =>
+        Effect.gen(function* () {
+          const prompter = yield* Prompter
+          yield* prompter.cancel("Doctor was cancelled. The findings remain.")
+          return yield* new CommandFailed({
+            command: "doctor",
+            exitCode: ChildProcessSpawner.ExitCode(1),
+          })
+        })
+      )
+    )
   )
 )

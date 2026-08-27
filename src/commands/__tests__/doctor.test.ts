@@ -3,12 +3,19 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
+import { type CodingAgent, handoffPrompt } from "#lib/execution/coding-agents.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
+import { CliNotFound } from "#lib/shared/errors.ts"
 import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
-import { createPrompterTestContext, runCommand } from "./command-test-helpers.ts"
+import {
+  createPrompterTestContext,
+  createRunnerTestContext,
+  runCommand,
+} from "./command-test-helpers.ts"
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -18,6 +25,19 @@ function makeInteractiveTerminalLayer() {
   return Layer.succeed(TerminalCapabilities)({
     copyToClipboard: () => Effect.void,
     isInteractive: Effect.succeed(true),
+  })
+}
+
+const claudeAgent: CodingAgent = { command: "claude", id: "claude", name: "Claude Code" }
+
+function makeFindingsFixture() {
+  return createFileSystemTestContext({
+    files: {
+      "package.json": manifest({
+        devDependencies: { adamantite: "1.0.0", knip: knip.version },
+        scripts: { analyze: "adamantite analyze" },
+      }),
+    },
   })
 }
 
@@ -259,16 +279,12 @@ describe("doctor", () => {
 
   it.effect("show formatted findings and copy the Markdown prompt", () =>
     Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          "package.json": manifest({
-            devDependencies: { adamantite: "1.0.0", knip: knip.version },
-            scripts: { analyze: "adamantite analyze" },
-          }),
-        },
-      })
+      const files = makeFindingsFixture()
       const copied: string[] = []
-      const prompter = createPrompterTestContext({ confirmResponses: [true] })
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true],
+        selectResponses: ["copy"],
+      })
       const interactive = Layer.succeed(TerminalCapabilities)({
         copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
         isInteractive: Effect.succeed(true),
@@ -288,11 +304,20 @@ describe("doctor", () => {
           title: "1. Missing knip configuration",
         }),
       ])
-      expect(prompter.logs).toContainEqual({
-        level: "info",
-        message:
-          "To hand off these findings, start a coding agent in this project and ask it to run `adamantite doctor`.",
-      })
+      expect(prompter.selectCalls).toEqual([
+        expect.objectContaining({
+          message: "How do you want to resolve these findings?",
+          options: [
+            expect.objectContaining({ label: "Hand off to Claude Code" }),
+            expect.objectContaining({ label: "Hand off to Codex" }),
+            expect.objectContaining({
+              label: "Copy the Markdown prompt for a coding agent",
+              value: "copy",
+            }),
+            expect.objectContaining({ label: "Do nothing", value: "done" }),
+          ],
+        }),
+      ])
       expect(prompter.confirmCalls).toContainEqual({
         initialValue: true,
         message: "Copy the Markdown prompt for a coding agent?",
@@ -307,6 +332,215 @@ describe("doctor", () => {
         level: "success",
         message: "The Markdown prompt was printed and sent to the terminal clipboard.",
       })
+      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+    })
+  )
+
+  it.effect("fail without prompting further when the user chooses to do nothing", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({ selectResponses: ["done"] })
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.confirmCalls).toEqual([])
+      expect(runner.invocations).toEqual([])
+      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+    })
+  )
+
+  it.effect("hand off to an agent and succeed when reassessment finds no issues", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({ selectResponses: [claudeAgent] })
+      const runner = createRunnerTestContext({
+        implementation: (options) =>
+          Effect.sync(() => {
+            if (options.command === "claude") {
+              files.write("knip.config.ts", toKnipTsConfigContent())
+              // A nonzero agent exit must not matter: reassessment is the oracle.
+              return ChildProcessSpawner.ExitCode(1)
+            }
+            return ChildProcessSpawner.ExitCode(0)
+          }),
+      })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations).toEqual([
+        expect.objectContaining({
+          args: ["diff", "--quiet", "HEAD"],
+          command: "git",
+          stderr: "ignore",
+          stdout: "ignore",
+        }),
+        expect.objectContaining({
+          args: [handoffPrompt],
+          command: "claude",
+          stderr: "inherit",
+          stdin: "inherit",
+          stdout: "inherit",
+        }),
+      ])
+      expect(runner.invocations[1]?.args[0]).not.toContain("knip")
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message: "Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
+      })
+      expect(prompter.logs).toContainEqual({
+        level: "success",
+        message: "All findings were resolved by Claude Code.",
+      })
+      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+    })
+  )
+
+  it.effect("report surviving findings and fail when the agent repairs nothing", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false],
+        selectResponses: [claudeAgent],
+      })
+      const runner = createRunnerTestContext([0, 0])
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message: "1 of 1 findings remain after the Claude Code session.",
+      })
+      expect(prompter.confirmCalls).toContainEqual({
+        initialValue: true,
+        message: "Copy the Markdown prompt for a coding agent?",
+      })
+      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+    })
+  )
+
+  it.effect("fall back to the prompt copy offer when the agent CLI is missing", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false],
+        selectResponses: [claudeAgent],
+      })
+      const runner = createRunnerTestContext({
+        implementation: (options) =>
+          options.command === "claude"
+            ? Effect.fail(new CliNotFound({ command: "claude" }))
+            : Effect.succeed(ChildProcessSpawner.ExitCode(0)),
+      })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "error",
+        message: "`claude` was not found on PATH. Install Claude Code or copy the prompt instead.",
+      })
+      expect(prompter.confirmCalls).toContainEqual({
+        initialValue: true,
+        message: "Copy the Markdown prompt for a coding agent?",
+      })
+      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+    })
+  )
+
+  it.effect("require confirmation for a dirty working tree and stop when declined", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false, false],
+        selectResponses: [claudeAgent],
+      })
+      const runner = createRunnerTestContext([1])
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "The Git working tree has uncommitted changes. The agent will edit files on top of them.",
+      })
+      expect(prompter.confirmCalls).toContainEqual({
+        initialValue: false,
+        message: "Hand off to Claude Code anyway?",
+      })
+      expect(runner.invocations).toHaveLength(1)
+      expect(runner.invocations[0]?.command).toBe("git")
+      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+    })
+  )
+
+  it.effect("hand off after confirming an unknown working tree state", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({
+        confirmResponses: [true],
+        selectResponses: [claudeAgent],
+      })
+      const runner = createRunnerTestContext({
+        implementation: (options) =>
+          Effect.sync(() => {
+            if (options.command === "git") {
+              return ChildProcessSpawner.ExitCode(128)
+            }
+            files.write("knip.config.ts", toKnipTsConfigContent())
+            return ChildProcessSpawner.ExitCode(0)
+          }),
+      })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "warning",
+        message:
+          "Doctor could not confirm a clean Git working tree. The agent will edit files without a checkpoint to return to.",
+      })
+      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+    })
+  )
+
+  it.effect("fail and record the cancellation when the resolve prompt is cancelled", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({ cancelAtPromptIndex: 1 })
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.cancels).toEqual(["Doctor was cancelled. The findings remain."])
+      expect(runner.invocations).toEqual([])
+      expect(prompter.outros).toEqual([])
     })
   )
 })

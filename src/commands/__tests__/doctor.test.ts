@@ -3,7 +3,9 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as PlatformError from "effect/PlatformError"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
 import { type CodingAgent, handoffPrompt } from "#lib/execution/coding-agents.ts"
@@ -31,14 +33,18 @@ function makeInteractiveTerminalLayer() {
 
 const claudeAgent: CodingAgent = {
   command: "claude",
-  id: "claude",
   name: "Claude Code",
+  seedArguments: (prompt) => [prompt],
+}
+
+const codexAgent: CodingAgent = {
+  command: "codex",
+  name: "Codex",
   seedArguments: (prompt) => [prompt],
 }
 
 const geminiAgent: CodingAgent = {
   command: "gemini",
-  id: "gemini",
   name: "Gemini CLI",
   seedArguments: (prompt) => ["-i", prompt],
 }
@@ -55,10 +61,14 @@ function makeFindingsFixture() {
 }
 
 interface HandoffRunnerOptions {
-  readonly agentExit?: number | "not-found"
+  readonly agentExit?: number | "not-found" | "spawn-error"
   readonly gitExit?: number
   readonly installedCommands?: readonly string[]
   readonly onAgentRun?: () => void
+}
+
+function isProbe(invocation: { readonly args: string[] }) {
+  return invocation.args[0] === "--version" || invocation.args[0] === "version"
 }
 
 // Dispatches on the invocation shape: `--version` probes answer installation,
@@ -68,8 +78,8 @@ function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
 
   return createRunnerTestContext({
     implementation: (invocation) =>
-      Effect.suspend(() => {
-        if (invocation.args[0] === "--version") {
+      Effect.suspend((): Effect.Effect<ChildProcessSpawner.ExitCode, CommandFailedLike> => {
+        if (isProbe(invocation)) {
           return installed.includes(invocation.command)
             ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
             : Effect.fail(new CliNotFound({ command: invocation.command }))
@@ -80,6 +90,16 @@ function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
         if (options.agentExit === "not-found") {
           return Effect.fail(new CliNotFound({ command: invocation.command }))
         }
+        if (options.agentExit === "spawn-error") {
+          return Effect.fail(
+            PlatformError.systemError({
+              _tag: "PermissionDenied",
+              method: "spawn",
+              module: "FileSystem",
+              pathOrDescriptor: invocation.command,
+            })
+          )
+        }
         options.onAgentRun?.()
         return Effect.succeed(ChildProcessSpawner.ExitCode(options.agentExit ?? 0))
       }),
@@ -87,7 +107,7 @@ function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
 }
 
 function nonProbeInvocations(runner: RunnerTestContext) {
-  return runner.invocations.filter((invocation) => invocation.args[0] !== "--version")
+  return runner.invocations.filter((invocation) => !isProbe(invocation))
 }
 
 describe("doctor", () => {
@@ -496,6 +516,33 @@ describe("doctor", () => {
       expect(prompter.logs).toContainEqual({
         level: "error",
         message: "`claude` was not found on PATH. Install Claude Code or copy the prompt instead.",
+      })
+      expect(prompter.confirmCalls).toContainEqual({
+        initialValue: true,
+        message: "Copy the Markdown prompt for a coding agent?",
+      })
+      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+    })
+  )
+
+  it.effect("surface the spawn failure detail and fall back to the copy offer", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const prompter = createPrompterTestContext({
+        confirmResponses: [false],
+        selectResponses: [codexAgent],
+      })
+      const runner = makeHandoffRunner({ agentExit: "spawn-error" })
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "error",
+        message: expect.stringContaining("Failed to start Codex:"),
       })
       expect(prompter.confirmCalls).toContainEqual({
         initialValue: true,

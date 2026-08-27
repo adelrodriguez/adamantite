@@ -12,7 +12,7 @@ reference, as in `array.map(parseInt)` — are worth the workaround cost.
 - Code in this repository, and in target projects that use Effect or similar functional
   libraries, must satisfy the rule with `pipe(x, Option.some)` in place of
   `Option.some(reference)`, and the curried data-last `Effect.forEach(fn)` inside
-  `pipe(...)` in place of `Effect.forEach(data, fn)`. See `src/lib/shared/assessment.ts`
+  `pipe(...)` in place of `Effect.forEach(data, fn)`. See `src/lib/integrations/assessment.ts`
   for the precedent.
 - Removal or downgrade of the rule is a preset behavior change that ships to consumers
   and requires a changeset.

@@ -208,7 +208,7 @@ export default Command.make("doctor", { fix }).pipe(
             .error(
               error.reason === "not-found"
                 ? `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
-                : `Failed to start ${agent.name}.`
+                : `Failed to start ${agent.name}: ${error.cause.message}`
             )
             .pipe(Effect.as(false))
         )

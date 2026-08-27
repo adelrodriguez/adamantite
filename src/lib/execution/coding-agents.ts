@@ -1,12 +1,17 @@
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 
 export interface CodingAgent {
   readonly command: string
-  readonly id: "claude" | "codex" | "cursor" | "gemini" | "grok" | "opencode"
   readonly name: string
+  /**
+   * Arguments for the installation probe. Defaults to `--version`; Grok Build only documents a
+   * `version` subcommand.
+   */
+  readonly probeArguments?: readonly string[]
   /**
    * Arguments that start the CLI's interactive session seeded with the prompt. OpenCode only
    * pre-fills its input box, so that handoff needs one Enter press.
@@ -15,27 +20,23 @@ export interface CodingAgent {
 }
 
 export const codingAgents: readonly CodingAgent[] = [
-  { command: "claude", id: "claude", name: "Claude Code", seedArguments: (prompt) => [prompt] },
-  { command: "codex", id: "codex", name: "Codex", seedArguments: (prompt) => [prompt] },
-  { command: "cursor-agent", id: "cursor", name: "Cursor", seedArguments: (prompt) => [prompt] },
+  { command: "claude", name: "Claude Code", seedArguments: (prompt) => [prompt] },
+  { command: "codex", name: "Codex", seedArguments: (prompt) => [prompt] },
+  { command: "cursor-agent", name: "Cursor", seedArguments: (prompt) => [prompt] },
+  { command: "gemini", name: "Gemini CLI", seedArguments: (prompt) => ["-i", prompt] },
   {
-    command: "gemini",
-    id: "gemini",
-    name: "Gemini CLI",
-    seedArguments: (prompt) => ["-i", prompt],
+    command: "grok",
+    name: "Grok Build",
+    probeArguments: ["version"],
+    seedArguments: (prompt) => [prompt],
   },
-  { command: "grok", id: "grok", name: "Grok Build", seedArguments: (prompt) => [prompt] },
-  {
-    command: "opencode",
-    id: "opencode",
-    name: "OpenCode",
-    seedArguments: (prompt) => ["--prompt", prompt],
-  },
+  { command: "opencode", name: "OpenCode", seedArguments: (prompt) => ["--prompt", prompt] },
 ]
 
-// "It spawned" is the installation check: the probe ignores output and exit codes,
-// so a CLI that prints its version oddly or exits nonzero still counts as installed.
-// Only a spawn failure (the command is not on PATH) removes an agent from the menu.
+// "It spawned and exited" is the installation check: the probe ignores output and exit
+// codes, so a CLI that prints its version oddly or exits nonzero still counts as
+// installed. Any failure to run — the command missing from PATH, a permission or
+// resource error, or a probe that hangs past the timeout — reads as not installed.
 export const detectInstalledAgents = (cwd: string) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
@@ -44,13 +45,14 @@ export const detectInstalledAgents = (cwd: string) =>
       (agent) =>
         runner
           .run({
-            args: ["--version"],
+            args: [...(agent.probeArguments ?? ["--version"])],
             command: agent.command,
             cwd,
             stderr: "ignore",
             stdout: "ignore",
           })
           .pipe(
+            Effect.timeout("10 seconds"),
             Effect.as(agent),
             Effect.catch(() => Effect.succeed(null))
           ),
@@ -62,13 +64,14 @@ export const detectInstalledAgents = (cwd: string) =>
 // The findings themselves stay out of the seed prompt: the agent reads them by
 // running non-interactive `adamantite doctor`, so nothing sensitive lands in argv.
 export const handoffPrompt =
-  "Run `adamantite doctor` and resolve every finding it reports. "
+  "Run `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, "
+  + "if it is not on PATH — and resolve every finding it reports. "
   + "Rerun `adamantite doctor` until it exits 0."
 
-// Lives here instead of lib/shared/errors.ts because it carries the CodingAgent,
+// Lives here instead of lib/shared/errors.ts because it carries the runner failure,
 // and shared must not depend on execution.
 export class AgentSessionFailed extends Data.TaggedError("AgentSessionFailed")<{
-  readonly agent: CodingAgent
+  readonly cause: CommandFailedLike
   readonly reason: "not-found" | "spawn-failed"
 }> {}
 
@@ -93,13 +96,13 @@ export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: strin
     Effect.mapError(
       (error) =>
         new AgentSessionFailed({
-          agent,
+          cause: error,
           reason: error._tag === "CliNotFound" ? "not-found" : "spawn-failed",
         })
     )
   )
 
-export type WorkingTreeState = "clean" | "dirty" | "unknown"
+type WorkingTreeState = "clean" | "dirty" | "unknown"
 
 // Exit codes only: CommandRunner cannot capture output, and `git diff --quiet HEAD`
 // answers cleanly through them (0 clean, 1 dirty, anything else no usable answer).

@@ -42,10 +42,9 @@ export default Command.make("doctor", { fix }).pipe(
         yield* prompter.intro("💠 adamantite doctor")
       }
 
+      // Only reachable on the interactive path: the non-interactive branch fails earlier.
       const failWithFindings = Effect.gen(function* () {
-        if (isInteractive) {
-          yield* prompter.outro("⚠️ Doctor found issues.")
-        }
+        yield* prompter.outro("⚠️ Doctor found issues.")
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -173,7 +172,12 @@ export default Command.make("doctor", { fix }).pipe(
       }
 
       if (action === "copy") {
-        yield* offerPromptCopy(prompt)
+        // The select already carried the intent; copy without asking again.
+        yield* prompter.message(prompt)
+        yield* terminal.copyToClipboard(prompt)
+        yield* prompter.log.success(
+          "The Markdown prompt was printed and sent to the terminal clipboard."
+        )
         return yield* failWithFindings
       }
 

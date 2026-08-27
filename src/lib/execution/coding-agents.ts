@@ -20,6 +20,13 @@ export interface CodingAgent {
   readonly seedArguments: (prompt: string) => string[]
 }
 
+// Contract provenance (2026-08-27) — the seed and probe forms are third-party CLI
+// contracts and can drift per vendor; re-verify an entry when its CLI majors:
+// - claude, codex: positional interactive seed and `--version` per vendor docs,
+//   confirmed against locally installed CLIs.
+// - grok: `[PROMPT]` interactive seed and the `version` subcommand confirmed against
+//   the shipped binary, grok 1.0.5 (5115b46bc9).
+// - cursor-agent, gemini, opencode: forms from first-party docs; smoke test pending.
 export const codingAgents: readonly CodingAgent[] = [
   { command: "claude", name: "Claude Code", seedArguments: (prompt) => [prompt] },
   { command: "codex", name: "Codex", seedArguments: (prompt) => [prompt] },

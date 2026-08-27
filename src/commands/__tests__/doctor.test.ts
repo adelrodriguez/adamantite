@@ -8,7 +8,7 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
-import { type CodingAgent, handoffPrompt } from "#lib/execution/coding-agents.ts"
+import { type CodingAgent, codingAgents, handoffPrompt } from "#lib/execution/coding-agents.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
@@ -31,23 +31,20 @@ function makeInteractiveTerminalLayer() {
   })
 }
 
-const claudeAgent: CodingAgent = {
-  command: "claude",
-  name: "Claude Code",
-  seedArguments: (prompt) => [prompt],
+// Drawn from the shipped catalog so a changed seed or probe form fails these tests.
+function agentByCommand(command: string): CodingAgent {
+  const agent = codingAgents.find((candidate) => candidate.command === command)
+
+  if (!agent) {
+    throw new Error(`No coding agent in the catalog with command \`${command}\``)
+  }
+
+  return agent
 }
 
-const codexAgent: CodingAgent = {
-  command: "codex",
-  name: "Codex",
-  seedArguments: (prompt) => [prompt],
-}
-
-const geminiAgent: CodingAgent = {
-  command: "gemini",
-  name: "Gemini CLI",
-  seedArguments: (prompt) => ["-i", prompt],
-}
+const claudeAgent = agentByCommand("claude")
+const codexAgent = agentByCommand("codex")
+const geminiAgent = agentByCommand("gemini")
 
 function makeFindingsFixture() {
   return createFileSystemTestContext({
@@ -350,10 +347,7 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const copied: string[] = []
-      const prompter = createPrompterTestContext({
-        confirmResponses: [true],
-        selectResponses: ["copy"],
-      })
+      const prompter = createPrompterTestContext({ selectResponses: ["copy"] })
       const runner = makeHandoffRunner()
       const interactive = Layer.succeed(TerminalCapabilities)({
         copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
@@ -388,10 +382,7 @@ describe("doctor", () => {
           ],
         }),
       ])
-      expect(prompter.confirmCalls).toContainEqual({
-        initialValue: true,
-        message: "Copy the Markdown prompt for a coding agent?",
-      })
+      expect(prompter.confirmCalls).toEqual([])
       expect(copied).toHaveLength(1)
       expect(copied[0]).toContain("# Adamantite doctor findings")
       expect(copied[0]).toContain("Do not suppress or work around checks")

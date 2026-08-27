@@ -13,7 +13,11 @@ function run(command: string, args: string[], options: { cwd: string; env?: Node
       cwd: options.cwd,
       encoding: "utf8",
       env: options.env ?? process.env,
+      // A dependency install can exceed Node's 1 MiB default and would surface as a
+      // misleading generic failure; a stuck install should fail here, not eat the CI job.
+      maxBuffer: 64 * 1024 * 1024,
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: 5 * 60 * 1000,
     })
   } catch (error) {
     // SAFETY: execFileSync errors carry the child process's captured stdout and stderr.
@@ -92,6 +96,10 @@ try {
   }
 
   run("npm", ["install", "--save-dev", join(packDirectory, tarball)], { cwd: fixture })
+
+  // Prove the swap took: a silent no-op would validate the published presets instead of
+  // this checkout's, which is the one thing the tarball install exists to prevent.
+  assertFileContains(join(fixture, "package.json"), '"adamantite": "file:')
 
   assertFileContains(join(fixture, "oxlint.config.ts"), "adamantite/lint")
   assertFileContains(join(fixture, "oxfmt.config.ts"), "adamantite/format")

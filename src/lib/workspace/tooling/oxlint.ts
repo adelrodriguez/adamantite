@@ -48,7 +48,8 @@ function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
 
-// Matches the core preset's `sort-keys` configuration: ascending and case-sensitive.
+// Matches the core preset's `sort-keys` configuration (ascending, case-sensitive) except its
+// `natural: true` digit handling, which only diverges for keys with digit runs.
 const byEntryKey = Order.mapInput(Order.String, (entry: readonly [string, unknown]) => entry[0])
 
 // Oxlint does not merge `ignorePatterns` from extended configs, so the generated config

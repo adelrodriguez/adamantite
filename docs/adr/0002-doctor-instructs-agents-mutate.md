@@ -36,8 +36,15 @@ The decisions:
   exit 1. Assessment warnings alone produce a warning report and exit 0.
 - Direct Claude Code and Codex CLI invocation was removed on 2026-08-25. Their prompt,
   permission, sandbox, and trust flags changed independently and made the integration
-  brittle. A future direct handoff will use ACP; see
-  [`docs/plans/acp-agent-handoff.md`](../plans/acp-agent-handoff.md).
+  brittle. Headless CLI driving stays rejected for that reason.
+- Interactive handoff returned on 2026-08-26 as a TTY handoff: Doctor spawns the agent
+  CLI interactively with inherited stdio and a one-line seed prompt that tells the agent
+  to run Doctor itself. The agent's own UI owns permissions, trust, and authentication,
+  so Adamantite passes no provider flags and never sees the repair session. Doctor
+  reassesses once after the session ends; the agent's exit code is ignored. An ACP-based
+  handoff was designed and rejected for this release: it only pays off for non-TTY hosts
+  or agents without a CLI. The full plan lived at `docs/plans/acp-agent-handoff.md` and
+  was removed on 2026-08-27; recover it from Git history if ACP becomes relevant.
 - `AGENTS.md` and the shipped skill slim to "run `adamantite doctor` and follow its
   instructions"; instructions exist only in doctor's output.
 

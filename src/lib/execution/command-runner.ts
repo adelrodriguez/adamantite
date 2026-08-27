@@ -10,6 +10,11 @@ export interface CommandRunOptions {
   readonly args: string[]
   readonly command: string
   readonly cwd?: string
+  /**
+   * The platform spawner defaults to a new session on POSIX. Pass `false` to keep the child in this
+   * process's group so terminal-generated signals reach it.
+   */
+  readonly detached?: boolean
   readonly stderr?: "ignore" | "inherit"
   readonly stdin?: "ignore" | "inherit"
   readonly stdout?: "ignore" | "inherit"
@@ -34,6 +39,7 @@ export class CommandRunner extends Context.Service<
       args,
       command,
       cwd,
+      detached,
       stderr = "inherit",
       stdin = "ignore",
       stdout = "inherit",
@@ -42,6 +48,7 @@ export class CommandRunner extends Context.Service<
         Effect.gen(function* () {
           const handle = yield* ChildProcess.make(command, args, {
             cwd,
+            detached,
             stderr,
             stdin,
             stdout,

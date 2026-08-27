@@ -22,19 +22,20 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Module seams
 
-| Module         | Responsibility                                                                         |
-| -------------- | -------------------------------------------------------------------------------------- |
-| `commands`     | Define one CLI workflow and render its user-facing result.                             |
-| `execution`    | Run child commands and carry forwarded arguments to them.                              |
-| `integrations` | Detect and maintain supported tooling, editor, workspace, and CI state.                |
-| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state. |
-| `shared`       | Define assessments, errors, filesystem helpers, and JSON helpers.                      |
-| `terminal`     | Prompt the user and render the CLI title.                                              |
-| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                          |
+| Module         | Responsibility                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `commands`     | Define one CLI workflow and render its user-facing result.                                                   |
+| `execution`    | Run child commands, define coding-agent handoff, and carry forwarded arguments.                              |
+| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess the project against the managed ideal. |
+| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                       |
+| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                         |
+| `terminal`     | Prompt the user and render the CLI title.                                                                    |
+| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                |
 
 Integration modules export only the integration itself as a default export.
-`src/lib/integrations/base.ts` is the shared infrastructure exception. Reusable behavior
-belongs in a nearby workspace or shared module instead of a named integration export.
+`src/lib/integrations/base.ts` and `src/lib/integrations/assessment.ts` are the shared
+infrastructure exceptions. Reusable behavior belongs in a nearby workspace or shared
+module instead of a named integration export.
 
 ## Integration lifecycle
 
@@ -51,8 +52,15 @@ flowchart TD
 `assess` and `doctor` are always read-only. Each finding contains the current state, the
 goal criteria, and optional reference content or notes. The agent or the human changes the
 target project. A later Doctor run confirms whether the project reached the goal state.
-Interactive Doctor runs render findings as terminal notes, explain that a coding agent can
-run Doctor directly, and offer to copy the combined Markdown prompt. Non-interactive runs
+Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
+installed coding agent CLI or to copy the combined Markdown prompt. Installation is
+detected by probing each supported CLI's version command, bounded by a timeout; only
+agents whose probe command starts appear in the menu. A handoff hands the terminal to
+the agent CLI with inherited stdio
+and a per-agent seed argument that tells the agent to run Doctor itself; Adamantite
+passes no provider permission, sandbox, or trust flags, and reassesses once after the
+agent session ends.
+The agent's exit code is ignored: only the reassessment decides success. Non-interactive runs
 print the Markdown prompt directly when findings remain. If an assessment reports only
 warnings, a non-interactive run prints a Markdown warning report and exits 0.
 
@@ -85,8 +93,8 @@ presets/
 src/
   commands/         CLI workflows
   lib/
-    execution/      child command runs and forwarded arguments
-    integrations/   tooling, editor, and CI adapters
+    execution/      child command runs, coding-agent handoff, forwarded arguments
+    integrations/   tooling, editor, and CI adapters; project assessment
     shared/         cross-cutting types and helpers
     workspace/      target-project state and file operations
   terminal/         user prompting and title output

@@ -5,23 +5,18 @@ import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
 import * as Command from "effect/unstable/cli/Command"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
-import github from "#lib/integrations/ci/github.ts"
-import zed from "#lib/integrations/editors/zed.ts"
+import { assessProject } from "#lib/integrations/assessment.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { collectApplicableAssessments } from "#lib/shared/assessment.ts"
-import { collectFindings } from "#lib/shared/findings.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
-import tsconfig from "#lib/workspace/tsconfig.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 
-const integrations = [oxlint, tsgolint, oxfmt, sherif, knip, tsconfig, github, zed] as const
 const knownPackages = [
   oxlint,
   tsgolint,
@@ -70,8 +65,8 @@ export default Command.make("update").pipe(
       yield* prompter.intro("💠 adamantite update")
 
       const packageJson = yield* readPackageJson(cwd)
-      const assessments = yield* collectApplicableAssessments(integrations, cwd, packageJson)
-      const packageActions = assessments.flatMap(({ assessment }) => assessment.packageActions)
+      const assessment = yield* assessProject(cwd, packageJson)
+      const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
       const updates: PackageUpdate[] = [
         ...packageActions.map((action) => ({
@@ -108,22 +103,13 @@ export default Command.make("update").pipe(
         yield* prompter.log.success("Dependencies updated successfully.")
       }
 
-      const finalAssessments =
-        updates.length === 0
-          ? assessments
-          : yield* readPackageJson(cwd).pipe(
-              Effect.flatMap((updatedPackageJson) =>
-                collectApplicableAssessments(integrations, cwd, updatedPackageJson)
-              )
-            )
+      const finalAssessment = updates.length === 0 ? assessment : yield* assessProject(cwd)
 
-      for (const { assessment } of finalAssessments) {
-        for (const warning of assessment.warnings) {
-          yield* prompter.log.warning(warning)
-        }
+      for (const warning of finalAssessment.warnings) {
+        yield* prompter.log.warning(warning)
       }
 
-      const findings = collectFindings(finalAssessments)
+      const findings = finalAssessment.findings
 
       if (findings.length > 0) {
         yield* printFindings(findings)

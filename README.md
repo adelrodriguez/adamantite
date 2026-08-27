@@ -172,10 +172,21 @@ adamantite doctor
 ```
 
 In an interactive terminal, Doctor presents each finding as formatted text and offers to
-copy one combined Markdown repair prompt. A coding agent can also run `adamantite doctor`
-in the target project to receive Markdown directly. In a non-interactive run, Doctor
-prints the combined repair prompt and exits 1 when findings remain. If only assessment
-warnings remain, Doctor prints a Markdown warning report and exits 0.
+hand off to an installed coding agent, or to copy one combined Markdown repair prompt. A
+handoff starts the selected agent CLI in the terminal with a short seed prompt; the agent
+runs `adamantite doctor` itself to read the findings and edits the project under its own
+permission and trust flow. When the agent session ends, Doctor reassesses and exits 0
+only when no findings remain. Doctor detects installed agents by probing each supported
+CLI — Claude Code (`claude`), Codex (`codex`), Cursor (`cursor-agent`), Gemini CLI
+(`gemini`), Grok Build (`grok`), and OpenCode (`opencode`) — and lists only the ones
+found on `PATH`. It warns before starting an agent on a working tree that is not known
+to be clean. OpenCode pre-fills its input with the seed prompt, so that handoff needs
+one Enter press to start.
+
+A coding agent can also run `adamantite doctor` in the target project to receive Markdown
+directly. In a non-interactive run, Doctor prints the combined repair prompt and exits 1
+when findings remain. If only assessment warnings remain, Doctor prints a Markdown
+warning report and exits 0.
 
 ### `adamantite update`
 

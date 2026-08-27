@@ -2,6 +2,7 @@ import type { JsonObject, JsonValue } from "type-fest"
 import * as Array from "effect/Array"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
+import * as Order from "effect/Order"
 import * as Predicate from "effect/Predicate"
 import { print as printAst } from "esrap"
 import ts from "esrap/languages/ts"
@@ -47,6 +48,9 @@ function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
 
+// Matches the core preset's `sort-keys` configuration: ascending and case-sensitive.
+const byEntryKey = Order.mapInput(Order.String, (entry: readonly [string, unknown]) => entry[0])
+
 // Oxlint does not merge `ignorePatterns` from extended configs, so the generated config
 // hoists the core preset's patterns to the root, appending any project-specific patterns.
 function serializeIgnorePatterns(ignorePatterns: JsonValue | undefined) {
@@ -81,19 +85,13 @@ export function toOxlintTsConfigContent(
     ...passthroughExtends.map((item) => JSON.stringify(item)),
   ]
 
+  const mergedOptions: JsonObject = Predicate.isObject(options) ? { ...options } : {}
+  mergedOptions.respectEslintDisableDirectives = true
+  mergedOptions.typeAware = true
+  mergedOptions.typeCheck = true
+
   const serializedOptions = JSON.stringify(
-    Predicate.isObject(options)
-      ? {
-          ...options,
-          respectEslintDisableDirectives: true,
-          typeAware: true,
-          typeCheck: true,
-        }
-      : {
-          respectEslintDisableDirectives: true,
-          typeAware: true,
-          typeCheck: true,
-        },
+    Object.fromEntries(Array.sort(Object.entries(mergedOptions), byEntryKey)),
     null,
     2
   )
@@ -101,12 +99,15 @@ export function toOxlintTsConfigContent(
     ([key, value]): [string, string] => [key, JSON.stringify(value, null, 2)]
   )
   const serializedExtends = `[${allExtends.join(", ")}]`
-  const body = [
-    ["options", serializedOptions],
-    ["ignorePatterns", serializeIgnorePatterns(ignorePatterns)],
-    ...serializedConfigEntries,
+  // The core preset enables `sort-keys`, so the generated config must emit its own keys in
+  // sorted order or a fresh `adamantite check` fails on the file init just wrote.
+  const entries: Array<[string, string]> = [
     ["extends", serializedExtends],
+    ["ignorePatterns", serializeIgnorePatterns(ignorePatterns)],
+    ["options", serializedOptions],
+    ...serializedConfigEntries,
   ]
+  const body = Array.sort(entries, byEntryKey)
     .map(([key, value]) => `  ${key}: ${value},`)
     .join("\n")
 

@@ -223,7 +223,7 @@ describe("github", () => {
       })
     )
 
-    it.effect("keep shared action versions aligned with this repository's CI workflow", () =>
+    it.effect("keep shared action versions aligned with this repository's test workflow", () =>
       Effect.gen(function* () {
         const files = makeFiles()
 
@@ -236,7 +236,7 @@ describe("github", () => {
 
         const generatedWorkflow = files.read(WORKFLOW_PATH)
         const referenceWorkflow = readFileSync(
-          join(process.cwd(), ".github/workflows/ci.yml"),
+          join(process.cwd(), ".github/workflows/test.yml"),
           "utf8"
         )
 

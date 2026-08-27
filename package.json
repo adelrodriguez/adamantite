@@ -66,8 +66,10 @@
     "format": "oxfmt",
     "release": "changeset publish",
     "test": "vitest run",
-    "test:build": "pnpm run build && node scripts/test-build.ts",
+    "test:build": "node scripts/test-build.ts",
     "test:coverage": "vitest run --coverage",
+    "test:dist": "pnpm run build && pnpm run test:build && pnpm run test:smoke",
+    "test:smoke": "node scripts/test-smoke.ts",
     "test:watch": "vitest",
     "version": "changeset version"
   },

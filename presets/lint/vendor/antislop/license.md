@@ -1,7 +1,7 @@
 # anti-slop license
 
 The bundled `plugin.mjs` is a build of
-[anti-slop](https://github.com/dmmulroy/anti-slop) at commit 446268e5d15baa968eaec669ff65358d36ae6259,
+[anti-slop](https://github.com/dmmulroy/anti-slop) at commit e8c4880471b23ab7f216fba7b27d173a6ef07d4c,
 with its dependencies (MIT) inlined.
 
 MIT License

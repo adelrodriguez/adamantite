@@ -1,5 +1,5 @@
 // Vendored build of the anti-slop oxlint plugin.
-// Source: https://github.com/dmmulroy/anti-slop (MIT) at commit 446268e5d15baa968eaec669ff65358d36ae6259.
+// Source: https://github.com/dmmulroy/anti-slop (MIT) at commit e8c4880471b23ab7f216fba7b27d173a6ef07d4c.
 // Its dependencies (MIT) are inlined so this file is self-contained.
 // See license.md for the full license text.
 //
@@ -433,6 +433,182 @@ const noConditionalEmptyObjectSpreadRule = defineRule({
 	}
 });
 //#endregion
+//#region src/shared/lexical-type-parameters.ts
+function isNode$1(value) {
+	return typeof value === "object" && value !== null && "type" in value && typeof value.type === "string";
+}
+function collectInferTypeParameterNames(node, visitorKeys, names) {
+	if (node.type === "TSInferType") names.add(node.typeParameter.name.name);
+	const record = node;
+	for (const key of visitorKeys[node.type] ?? []) {
+		const value = record[key];
+		if (isNode$1(value)) {
+			collectInferTypeParameterNames(value, visitorKeys, names);
+			continue;
+		}
+		if (!Array.isArray(value)) continue;
+		for (const child of value) if (isNode$1(child)) collectInferTypeParameterNames(child, visitorKeys, names);
+	}
+}
+/** Collect type binders that are in scope at a node and can shadow module aliases. */
+function lexicalTypeParameterNames(node, visitorKeys) {
+	const names = /* @__PURE__ */ new Set();
+	let descendant = node;
+	let current = node;
+	while (current !== null && current.type !== "Program") {
+		if ("typeParameters" in current) for (const parameter of current.typeParameters?.params ?? []) names.add(parameter.name.name);
+		if (current.type === "TSMappedType" && (descendant === current.nameType || descendant === current.typeAnnotation)) names.add(current.key.name);
+		if (current.type === "TSConditionalType" && descendant === current.trueType) collectInferTypeParameterNames(current.extendsType, visitorKeys, names);
+		descendant = current;
+		current = current.parent;
+	}
+	return names;
+}
+//#endregion
+//#region src/shared/type-alias-resolution.ts
+const environmentsByProgram = /* @__PURE__ */ new WeakMap();
+function isNode(value) {
+	return typeof value === "object" && value !== null && "type" in value && typeof value.type === "string";
+}
+function enclosingTypeScope(node) {
+	let current = node.parent;
+	while (current !== null) {
+		if (current.type === "Program" || current.type === "BlockStatement" || current.type === "TSModuleBlock" || current.type === "StaticBlock" || current.type === "SwitchStatement") return current;
+		current = current.parent;
+	}
+	return node;
+}
+function declaredTypeBinding(node) {
+	if (node.type === "TSTypeAliasDeclaration") return {
+		alias: node,
+		name: node.id.name
+	};
+	if (node.type === "TSInterfaceDeclaration" || node.type === "TSEnumDeclaration" || node.type === "ClassDeclaration" || node.type === "ClassExpression") return node.id === null ? null : {
+		alias: null,
+		name: node.id.name
+	};
+	if (node.type === "ImportSpecifier" || node.type === "ImportDefaultSpecifier" || node.type === "ImportNamespaceSpecifier") return {
+		alias: null,
+		name: node.local.name
+	};
+	return null;
+}
+function collectTypeBindings(node, visitorKeys, bindingsByName, aliases) {
+	const declared = declaredTypeBinding(node);
+	if (declared !== null) {
+		const bindings = bindingsByName.get(declared.name) ?? [];
+		bindings.push({
+			...declared,
+			scope: enclosingTypeScope(node)
+		});
+		bindingsByName.set(declared.name, bindings);
+		if (declared.alias !== null) aliases.push(declared.alias);
+	}
+	const fields = node;
+	for (const key of visitorKeys[node.type] ?? []) {
+		const value = fields[key];
+		if (isNode(value)) {
+			collectTypeBindings(value, visitorKeys, bindingsByName, aliases);
+			continue;
+		}
+		if (!Array.isArray(value)) continue;
+		for (const child of value) if (isNode(child)) collectTypeBindings(child, visitorKeys, bindingsByName, aliases);
+	}
+}
+/** Collect every lexical type alias and competing type binding in a program. */
+function createTypeAliasEnvironment(program, visitorKeys) {
+	const cached = environmentsByProgram.get(program);
+	if (cached !== void 0) return cached;
+	const bindingsByName = /* @__PURE__ */ new Map();
+	const aliases = [];
+	collectTypeBindings(program, visitorKeys, bindingsByName, aliases);
+	const environment = {
+		aliases,
+		bindingsByName,
+		visitorKeys
+	};
+	environmentsByProgram.set(program, environment);
+	return environment;
+}
+function ancestorDistance(ancestor, node) {
+	let current = node;
+	let distance = 0;
+	while (current !== null) {
+		if (current === ancestor) return distance;
+		current = current.parent;
+		distance += 1;
+	}
+	return null;
+}
+function nearestTypeBindings(name, use, environment) {
+	const candidates = environment.bindingsByName.get(name) ?? [];
+	let nearestDistance = Number.POSITIVE_INFINITY;
+	let nearest = [];
+	for (const candidate of candidates) {
+		const distance = ancestorDistance(candidate.scope, use);
+		if (distance === null || distance > nearestDistance) continue;
+		if (distance === nearestDistance) {
+			nearest.push(candidate);
+			continue;
+		}
+		nearestDistance = distance;
+		nearest = [candidate];
+	}
+	return nearest;
+}
+/** Resolve the nearest visible alias with this name, respecting lexical shadowing. */
+function visibleTypeAlias(name, use, environment) {
+	if (lexicalTypeParameterNames(use, environment.visitorKeys).has(name)) return null;
+	const bindings = nearestTypeBindings(name, use, environment);
+	return bindings.length === 1 ? bindings[0]?.alias ?? null : null;
+}
+/** Return whether a local declaration shadows a built-in type at this use. */
+function hasVisibleTypeBinding(name, use, environment) {
+	return lexicalTypeParameterNames(use, environment.visitorKeys).has(name) || nearestTypeBindings(name, use, environment).length > 0;
+}
+function typeReferenceName$3(type) {
+	return type.typeName.type === "Identifier" ? type.typeName.name : null;
+}
+function aliasSubstitutions(alias, reference, base) {
+	const parameters = alias.typeParameters?.params ?? [];
+	const arguments_ = reference.typeArguments?.params ?? [];
+	const next = new Map(base);
+	for (const [index, parameter] of parameters.entries()) {
+		const explicitArgument = arguments_[index];
+		const argument = explicitArgument ?? parameter.default;
+		if (argument === null || argument === void 0) return null;
+		const argumentSubstitutions = explicitArgument === void 0 ? next : base;
+		next.set(parameter.name.name, {
+			type: argument,
+			substitutions: new Map(argumentSubstitutions)
+		});
+	}
+	return next;
+}
+/** Match a type after resolving visible aliases and substituting their type parameters. */
+function resolvedTypeMatches(type, environment, matcher) {
+	const evaluate = (current, substitutions, resolvingAliases) => {
+		if (current.type === "TSTypeReference") {
+			const name = typeReferenceName$3(current);
+			if (name !== null) {
+				const substitution = substitutions.get(name);
+				if (substitution !== void 0 && !current.typeArguments?.params.length) return evaluate(substitution.type, substitution.substitutions, resolvingAliases);
+				const alias = visibleTypeAlias(name, current, environment);
+				if (alias !== null && !resolvingAliases.has(alias)) {
+					const nextSubstitutions = aliasSubstitutions(alias, current, substitutions);
+					if (nextSubstitutions !== null) {
+						const nextResolving = new Set(resolvingAliases);
+						nextResolving.add(alias);
+						return evaluate(alias.typeAnnotation, nextSubstitutions, nextResolving);
+					}
+				}
+			}
+		}
+		return matcher(current, (child) => evaluate(child, substitutions, resolvingAliases));
+	};
+	return evaluate(type, /* @__PURE__ */ new Map(), /* @__PURE__ */ new Set());
+}
+//#endregion
 //#region src/shared/dictionary-types.ts
 const BUILT_INS = /* @__PURE__ */ new Set([
 	"Record",
@@ -453,48 +629,25 @@ const TRANSPARENT_WRAPPERS = /* @__PURE__ */ new Set([
 function declaredStatement(statement) {
 	return statement.type === "ExportNamedDeclaration" || statement.type === "ExportDefaultDeclaration" ? statement.declaration ?? null : statement;
 }
-function createTypeEnvironment(program) {
-	const aliases = /* @__PURE__ */ new Map();
+function createTypeEnvironment(program, visitorKeys) {
 	const interfaces = /* @__PURE__ */ new Map();
-	const shadowedBuiltIns = /* @__PURE__ */ new Set();
 	for (const statement of program.body) {
 		const declaration = declaredStatement(statement);
-		if (declaration?.type === "ImportDeclaration") {
-			for (const specifier of declaration.specifiers) if (BUILT_INS.has(specifier.local.name)) shadowedBuiltIns.add(specifier.local.name);
-			continue;
-		}
-		if (declaration?.type === "TSTypeAliasDeclaration") {
-			if (aliases.get(declaration.id.name) === void 0) aliases.set(declaration.id.name, declaration);
-			else shadowedBuiltIns.add(declaration.id.name);
-			if (BUILT_INS.has(declaration.id.name)) shadowedBuiltIns.add(declaration.id.name);
-			continue;
-		}
-		if (declaration?.type === "TSInterfaceDeclaration") {
-			const declarations = interfaces.get(declaration.id.name) ?? [];
-			declarations.push(declaration);
-			interfaces.set(declaration.id.name, declarations);
-			if (BUILT_INS.has(declaration.id.name)) shadowedBuiltIns.add(declaration.id.name);
-			continue;
-		}
-		if (declaration?.type === "TSEnumDeclaration") {
-			if (BUILT_INS.has(declaration.id.name)) shadowedBuiltIns.add(declaration.id.name);
-			continue;
-		}
-		if ((declaration?.type === "ClassDeclaration" || declaration?.type === "FunctionDeclaration") && declaration.id !== null) {
-			if (BUILT_INS.has(declaration.id.name)) shadowedBuiltIns.add(declaration.id.name);
-		}
+		if (declaration?.type !== "TSInterfaceDeclaration") continue;
+		const declarations = interfaces.get(declaration.id.name) ?? [];
+		declarations.push(declaration);
+		interfaces.set(declaration.id.name, declarations);
 	}
 	return {
-		aliases,
 		interfaces,
-		shadowedBuiltIns
+		typeAliases: createTypeAliasEnvironment(program, visitorKeys)
 	};
 }
 function typeReferenceName$2(type) {
 	return type.typeName.type === "Identifier" ? type.typeName.name : null;
 }
-function isBuiltIn(name, environment) {
-	return BUILT_INS.has(name) && !environment.shadowedBuiltIns.has(name);
+function isBuiltIn(name, use, environment) {
+	return BUILT_INS.has(name) && !hasVisibleTypeBinding(name, use, environment.typeAliases);
 }
 function isUnappliedReferenceTo(type, name) {
 	const unwrapped = unwrapTransparentType(type);
@@ -556,7 +709,7 @@ function unsafeDirectValue(type, environment, substitutions, resolvingAliases) {
 	if (unwrapped.type !== "TSTypeReference") return null;
 	const name = typeReferenceName$2(unwrapped);
 	if (name === null) return null;
-	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, environment)) {
+	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
 		const wrapped = unwrapped.typeArguments?.params[0];
 		return wrapped === void 0 ? null : unsafeDirectValue(wrapped, environment, substitutions, resolvingAliases);
 	}
@@ -564,8 +717,8 @@ function unsafeDirectValue(type, environment, substitutions, resolvingAliases) {
 	if (substitution !== void 0) return isUnappliedReferenceTo(substitution, name) ? null : unsafeDirectValue(substitution, environment, substitutions, resolvingAliases);
 	const interfaceDeclarations = environment.interfaces.get(name);
 	if (interfaceDeclarations !== void 0) return isEffectivelyEmptyInterface(interfaceDeclarations) ? "empty-object" : null;
-	const alias = environment.aliases.get(name);
-	if (alias === void 0 || resolvingAliases.has(name)) return null;
+	const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases);
+	if (alias === null || resolvingAliases.has(name)) return null;
 	const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
 	if (nextSubstitutions === null) return null;
 	const nextResolving = new Set(resolvingAliases);
@@ -587,23 +740,23 @@ function dictionaryValueTypes(type, environment, substitutions, resolvingAliases
 	if (name === null) return [];
 	const substitution = substitutions.get(name);
 	if (substitution !== void 0) return isUnappliedReferenceTo(substitution, name) ? [] : dictionaryValueTypes(substitution, environment, substitutions, resolvingAliases);
-	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, environment)) {
+	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
 		const wrapped = unwrapped.typeArguments?.params[0];
 		return wrapped === void 0 ? [] : dictionaryValueTypes(wrapped, environment, substitutions, resolvingAliases);
 	}
-	if (name === "Record" && isBuiltIn(name, environment)) {
+	if (name === "Record" && isBuiltIn(name, unwrapped, environment)) {
 		const value = unwrapped.typeArguments?.params[1] ?? null;
 		return value === null ? [] : [{
 			type: value,
 			substitutions
 		}];
 	}
-	if ((name === "Pick" || name === "Omit") && isBuiltIn(name, environment)) {
+	if ((name === "Pick" || name === "Omit") && isBuiltIn(name, unwrapped, environment)) {
 		const source = unwrapped.typeArguments?.params[0];
 		return source === void 0 ? [] : dictionaryValueTypes(source, environment, substitutions, resolvingAliases);
 	}
-	const alias = environment.aliases.get(name);
-	if (alias === void 0 || resolvingAliases.has(name)) return [];
+	const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases);
+	if (alias === null || resolvingAliases.has(name)) return [];
 	const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
 	if (nextSubstitutions === null) return [];
 	const nextResolving = new Set(resolvingAliases);
@@ -627,9 +780,6 @@ function classifyUnsafeDictionary(type, environment) {
 	}
 	return null;
 }
-function resolvesToDictionary(type, environment, substitutions, resolvingAliases) {
-	return dictionaryValueTypes(type, environment, substitutions, resolvingAliases).length > 0;
-}
 function classifyWideningTarget(type, environment) {
 	const unwrapped = unwrapTransparentType(type);
 	if (unwrapped.type === "TSUnknownKeyword") return { kind: "unknown" };
@@ -639,31 +789,40 @@ function classifyWideningTarget(type, environment) {
 	if (unwrapped.type !== "TSTypeReference") return null;
 	const name = typeReferenceName$2(unwrapped);
 	if (name === null) return null;
-	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, environment)) {
+	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
 		const wrapped = unwrapped.typeArguments?.params[0];
 		return wrapped === void 0 ? null : classifyWideningTarget(wrapped, environment);
 	}
-	if (name === "Record" && isBuiltIn(name, environment)) return { kind: "open dictionary" };
-	const alias = environment.aliases.get(name);
-	if (alias === void 0) return null;
+	if (name === "Record" && isBuiltIn(name, unwrapped, environment)) return hasBroadRecordKey(unwrapped, environment, /* @__PURE__ */ new Map()) ? { kind: "open dictionary" } : null;
+	const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases);
+	if (alias === null) return null;
 	if ((alias.typeParameters?.params.length ?? 0) > 0) {
 		const substitutions = aliasSubstitution(alias, unwrapped, /* @__PURE__ */ new Map());
-		return substitutions !== null && resolvesToDictionary(alias.typeAnnotation, environment, substitutions, /* @__PURE__ */ new Set([name])) ? { kind: "generic container" } : null;
+		return (substitutions === null ? null : classifyAliasBroadTarget(alias.typeAnnotation, environment, substitutions, /* @__PURE__ */ new Set([name])))?.kind === "open dictionary" ? { kind: "generic container" } : null;
 	}
 	const substitutions = aliasSubstitution(alias, unwrapped, /* @__PURE__ */ new Map());
 	if (substitutions === null) return null;
 	return classifyAliasBroadTarget(alias.typeAnnotation, environment, substitutions, /* @__PURE__ */ new Set([name]));
 }
-function isBroadMappedKey(type, environment, substitutions) {
+function hasBroadRecordKey(type, environment, substitutions) {
+	const key = type.typeArguments?.params[0];
+	return key === void 0 || isBroadMappedKey(key, environment, substitutions);
+}
+function isBroadMappedKey(type, environment, substitutions, visitedAliases = /* @__PURE__ */ new Set()) {
 	const unwrapped = unwrapTransparentType(type);
 	if (unwrapped.type === "TSStringKeyword" || unwrapped.type === "TSNumberKeyword" || unwrapped.type === "TSSymbolKeyword") return true;
-	if (unwrapped.type === "TSUnionType") return unwrapped.types.every((member) => isBroadMappedKey(member, environment, substitutions));
+	if (unwrapped.type === "TSUnionType") return unwrapped.types.some((member) => isBroadMappedKey(member, environment, substitutions, visitedAliases));
 	if (unwrapped.type !== "TSTypeReference") return false;
 	const name = typeReferenceName$2(unwrapped);
 	if (name === null) return false;
 	const substitution = substitutions.get(name);
-	if (substitution !== void 0 && !isUnappliedReferenceTo(substitution, name)) return isBroadMappedKey(substitution, environment, substitutions);
-	return name === "PropertyKey" && isBuiltIn(name, environment);
+	if (substitution !== void 0 && !isUnappliedReferenceTo(substitution, name)) return isBroadMappedKey(substitution, environment, substitutions, visitedAliases);
+	if (name === "PropertyKey" && isBuiltIn(name, unwrapped, environment)) return true;
+	const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases);
+	if (alias === null || (alias.typeParameters?.params.length ?? 0) > 0 || visitedAliases.has(name)) return false;
+	const nextVisited = new Set(visitedAliases);
+	nextVisited.add(name);
+	return isBroadMappedKey(alias.typeAnnotation, environment, substitutions, nextVisited);
 }
 function classifyAliasBroadTarget(type, environment, substitutions, resolvingAliases) {
 	const unwrapped = unwrapTransparentType(type);
@@ -676,13 +835,13 @@ function classifyAliasBroadTarget(type, environment, substitutions, resolvingAli
 	if (name === null) return null;
 	const substitution = substitutions.get(name);
 	if (substitution !== void 0) return isUnappliedReferenceTo(substitution, name) ? null : classifyAliasBroadTarget(substitution, environment, substitutions, resolvingAliases);
-	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, environment)) {
+	if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
 		const wrapped = unwrapped.typeArguments?.params[0];
 		return wrapped === void 0 ? null : classifyAliasBroadTarget(wrapped, environment, substitutions, resolvingAliases);
 	}
-	if (name === "Record" && isBuiltIn(name, environment)) return { kind: "open dictionary" };
-	const alias = environment.aliases.get(name);
-	if (alias === void 0 || resolvingAliases.has(name)) return null;
+	if (name === "Record" && isBuiltIn(name, unwrapped, environment)) return hasBroadRecordKey(unwrapped, environment, substitutions) ? { kind: "open dictionary" } : null;
+	const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases);
+	if (alias === null || resolvingAliases.has(name)) return null;
 	const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions);
 	if (nextSubstitutions === null) return null;
 	const nextResolving = new Set(resolvingAliases);
@@ -694,6 +853,31 @@ function isKnownEvidenceExpression(expression) {
 	while (current.type === "ParenthesizedExpression" || current.type === "TSAsExpression" || current.type === "TSTypeAssertion" || current.type === "TSNonNullExpression" || current.type === "TSSatisfiesExpression") current = current.expression;
 	if (current.type === "ObjectExpression") return true;
 	return current.type === "ArrayExpression" || current.type === "ArrowFunctionExpression" || current.type === "ClassExpression" || current.type === "FunctionExpression" || current.type === "NewExpression" || current.type === "Literal" || current.type === "TemplateLiteral" || current.type === "UnaryExpression";
+}
+//#endregion
+//#region src/shared/function-parameters.ts
+/** Return whether a type is or contains TypeScript's absorbing unknown top type. */
+function containsUnknownType(type) {
+	if (type.type === "TSUnknownKeyword") return true;
+	if (type.type === "TSParenthesizedType") return containsUnknownType(type.typeAnnotation);
+	return type.type === "TSUnionType" && type.types.some(containsUnknownType);
+}
+/** Return the TypeScript annotation attached to a function parameter or its wrapped binding. */
+function functionParameterTypeAnnotation(parameter) {
+	if (parameter.type === "TSParameterProperty") return functionParameterTypeAnnotation(parameter.parameter);
+	if (parameter.type === "RestElement") return parameter.typeAnnotation ?? functionParameterTypeAnnotation(parameter.argument);
+	if (parameter.type === "AssignmentPattern") return parameter.typeAnnotation ?? functionParameterTypeAnnotation(parameter.left);
+	return parameter.typeAnnotation;
+}
+/** Return only a function parameter's local binding, excluding its annotation and default value. */
+function functionParameterBindingName(parameter, sourceCode) {
+	if (parameter.type === "TSParameterProperty") return functionParameterBindingName(parameter.parameter, sourceCode);
+	if (parameter.type === "AssignmentPattern") return functionParameterBindingName(parameter.left, sourceCode);
+	if (parameter.type === "RestElement") return functionParameterBindingName(parameter.argument, sourceCode);
+	if (parameter.type === "Identifier") return parameter.name;
+	const sourceText = sourceCode.getText(parameter);
+	const annotationStart = parameter.typeAnnotation?.start;
+	return annotationStart === void 0 ? sourceText : sourceText.slice(0, annotationStart - parameter.start).trimEnd();
 }
 //#endregion
 //#region src/rules/no-known-value-widening.ts
@@ -729,6 +913,61 @@ function hasKnownEvidence(sourceCode, expression, visitedVariables = /* @__PURE_
 	if (declarator === null || declarator.init === null || !isStableConstVariable(variable, declarator)) return false;
 	visitedVariables.add(variable);
 	return hasKnownEvidence(sourceCode, declarator.init, visitedVariables);
+}
+function isFunctionExpression(node) {
+	return node.type === "ArrowFunctionExpression" || node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "TSDeclareFunction" || node.type === "TSEmptyBodyFunctionExpression";
+}
+function localFunctionForCall(sourceCode, callee) {
+	const unwrapped = unwrapExpression(callee);
+	if (isFunctionExpression(unwrapped)) return unwrapped;
+	if (unwrapped.type !== "Identifier") return null;
+	const variable = resolveVariable$2(sourceCode, unwrapped);
+	if (variable === null || variable.defs.length !== 1) return null;
+	const [definition] = variable.defs;
+	if (definition === void 0) return null;
+	if (definition.type === "FunctionName" && isFunctionExpression(definition.node)) return definition.node;
+	if (definition.type !== "Variable" || definition.node.type !== "VariableDeclarator") return null;
+	const initializer = definition.node.init;
+	if (initializer === null) return null;
+	const unwrappedInitializer = unwrapExpression(initializer);
+	return isFunctionExpression(unwrappedInitializer) ? unwrappedInitializer : null;
+}
+function variableTypeAnnotation(sourceCode, variable) {
+	if (variable.defs.length !== 1) return null;
+	const [definition] = variable.defs;
+	if (definition === void 0) return null;
+	if (definition.type === "Variable" && definition.node.type === "VariableDeclarator" && definition.node.id.type === "Identifier") return definition.node.id.typeAnnotation ?? null;
+	if (definition.type !== "Parameter" || !isFunctionExpression(definition.node)) return null;
+	const parameter = definition.node.params.find((candidate) => functionParameterBindingName(candidate, sourceCode) === variable.name);
+	return parameter === void 0 ? null : functionParameterTypeAnnotation(parameter) ?? null;
+}
+function hasInformativeType(type, environment) {
+	return classifyUnsafeDictionaryValue(type, environment) === null;
+}
+function hasKnownCallArgumentEvidence(sourceCode, expression, environment, visitedVariables = /* @__PURE__ */ new Set()) {
+	if (expression.type === "ParenthesizedExpression" || expression.type === "TSNonNullExpression") return hasKnownCallArgumentEvidence(sourceCode, expression.expression, environment, visitedVariables);
+	if (expression.type === "TSAsExpression" || expression.type === "TSTypeAssertion") return hasInformativeType(expression.typeAnnotation, environment);
+	if (expression.type === "TSSatisfiesExpression") return hasKnownCallArgumentEvidence(sourceCode, expression.expression, environment, visitedVariables);
+	if (expression.type === "CallExpression") {
+		const returnType = localFunctionForCall(sourceCode, expression.callee)?.returnType?.typeAnnotation;
+		return returnType !== void 0 && hasInformativeType(returnType, environment);
+	}
+	if (expression.type !== "Identifier") return isKnownEvidenceExpression(expression);
+	const variable = resolveVariable$2(sourceCode, expression);
+	if (variable === null || visitedVariables.has(variable)) return false;
+	const annotation = variableTypeAnnotation(sourceCode, variable);
+	if (annotation !== null) return hasInformativeType(annotation.typeAnnotation, environment);
+	const declarator = variableDeclarator$1(variable);
+	if (declarator === null || declarator.init === null || !isStableConstVariable(variable, declarator)) return false;
+	visitedVariables.add(variable);
+	return hasKnownCallArgumentEvidence(sourceCode, declarator.init, environment, visitedVariables);
+}
+function typePredicateSubjectIndex(sourceCode, owner) {
+	const predicate = owner.returnType?.typeAnnotation;
+	if (predicate?.type !== "TSTypePredicate" || predicate.parameterName.type !== "Identifier") return null;
+	const predicateParameterName = predicate.parameterName.name;
+	const index = owner.params.findIndex((parameter) => functionParameterBindingName(parameter, sourceCode) === predicateParameterName);
+	return index === -1 ? null : index;
 }
 function annotationTarget(annotation, environment) {
 	return annotation === null || annotation === void 0 ? null : classifyWideningTarget(annotation.typeAnnotation, environment);
@@ -789,7 +1028,7 @@ const noKnownValueWideningRule = defineRule({
 		const targetFromAnnotation = (annotation) => environment === null ? null : annotationTarget(annotation, environment);
 		return {
 			Program(node) {
-				environment = createTypeEnvironment(node);
+				environment = createTypeEnvironment(node, context.sourceCode.visitorKeys);
 			},
 			VariableDeclarator(node) {
 				if (node.init === null || node.id.type !== "Identifier") return;
@@ -810,6 +1049,27 @@ const noKnownValueWideningRule = defineRule({
 				const declarator = variableDeclarator$1(variable);
 				if (declarator === null || declarator.id.type !== "Identifier") return;
 				reportFlow(node.right, targetFromAnnotation(declarator.id.typeAnnotation), `binding \`${declarator.id.name}\``);
+			},
+			CallExpression(node) {
+				if (environment === null) return;
+				const owner = localFunctionForCall(context.sourceCode, node.callee);
+				if (owner === null) return;
+				const parameterIndex = typePredicateSubjectIndex(context.sourceCode, owner);
+				if (parameterIndex === null) return;
+				const parameter = owner.params[parameterIndex];
+				const argument = node.arguments[parameterIndex];
+				if (parameter === void 0 || argument === void 0 || argument.type === "SpreadElement") return;
+				const parameterAnnotation = functionParameterTypeAnnotation(parameter);
+				if (parameterAnnotation === null || parameterAnnotation === void 0 || !containsUnknownType(parameterAnnotation.typeAnnotation)) return;
+				if (!hasKnownCallArgumentEvidence(context.sourceCode, argument, environment)) return;
+				context.report({
+					node: argument,
+					messageId: "widening",
+					data: {
+						subject: `argument for parameter \`${functionParameterBindingName(parameter, context.sourceCode)}\` of \`${functionName(context.sourceCode, owner)}\``,
+						target: "unknown"
+					}
+				});
 			},
 			ReturnStatement(node) {
 				if (node.argument === null) return;
@@ -888,48 +1148,7 @@ const noModuleMockingRule = defineRule({
 	}
 });
 //#endregion
-//#region src/shared/lexical-type-parameters.ts
-function isNode(value) {
-	return typeof value === "object" && value !== null && "type" in value && typeof value.type === "string";
-}
-function collectInferTypeParameterNames(node, visitorKeys, names) {
-	if (node.type === "TSInferType") names.add(node.typeParameter.name.name);
-	const record = node;
-	for (const key of visitorKeys[node.type] ?? []) {
-		const value = record[key];
-		if (isNode(value)) {
-			collectInferTypeParameterNames(value, visitorKeys, names);
-			continue;
-		}
-		if (!Array.isArray(value)) continue;
-		for (const child of value) if (isNode(child)) collectInferTypeParameterNames(child, visitorKeys, names);
-	}
-}
-/** Collect type binders that are in scope at a node and can shadow module aliases. */
-function lexicalTypeParameterNames(node, visitorKeys) {
-	const names = /* @__PURE__ */ new Set();
-	let descendant = node;
-	let current = node;
-	while (current !== null && current.type !== "Program") {
-		if ("typeParameters" in current) for (const parameter of current.typeParameters?.params ?? []) names.add(parameter.name.name);
-		if (current.type === "TSMappedType" && (descendant === current.nameType || descendant === current.typeAnnotation)) names.add(current.key.name);
-		if (current.type === "TSConditionalType" && descendant === current.trueType) collectInferTypeParameterNames(current.extendsType, visitorKeys, names);
-		descendant = current;
-		current = current.parent;
-	}
-	return names;
-}
-//#endregion
 //#region src/rules/no-object-parameters.ts
-function parameterAnnotation$1(parameter) {
-	if (parameter.type === "TSParameterProperty") return parameterAnnotation$1(parameter.parameter);
-	if (parameter.type === "RestElement") return parameter.typeAnnotation ?? parameterAnnotation$1(parameter.argument);
-	if (parameter.type === "AssignmentPattern") return parameter.typeAnnotation ?? parameter.left.typeAnnotation;
-	return parameter.typeAnnotation;
-}
-function parameterName$1(parameter, sourceCode) {
-	return parameter.type === "Identifier" ? parameter.name : sourceCode.getText(parameter).replace(/\s*:\s*object\s*$/u, "");
-}
 /** Ban the broad object type on function inputs, including local aliases to object. */
 const noObjectParametersRule = defineRule({
 	meta: {
@@ -938,38 +1157,27 @@ const noObjectParametersRule = defineRule({
 		messages: { objectParameter: "Parameter `{{parameter}}` uses the broad `object` type. Accept a named owner type; parse external input at its boundary before calling this function." }
 	},
 	createOnce(context) {
-		const aliases = /* @__PURE__ */ new Map();
-		const resolvesToObject = (type, shadowedAliases, visited = /* @__PURE__ */ new Set()) => {
-			if (type.type === "TSObjectKeyword") return true;
-			if (type.type === "TSParenthesizedType") return resolvesToObject(type.typeAnnotation, shadowedAliases, visited);
-			if (type.type === "TSUnionType") return type.types.some((member) => resolvesToObject(member, shadowedAliases, visited));
-			if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier" || type.typeArguments !== null && type.typeArguments !== void 0 && type.typeArguments.params.length > 0 || visited.has(type.typeName.name) || shadowedAliases.has(type.typeName.name)) return false;
-			const alias = aliases.get(type.typeName.name);
-			if (alias === void 0) return false;
-			const nextVisited = new Set(visited);
-			nextVisited.add(type.typeName.name);
-			return resolvesToObject(alias, shadowedAliases, nextVisited);
-		};
+		let environment = null;
+		const resolvesToObject = (type) => environment !== null && resolvedTypeMatches(type, environment, (resolved, matches) => {
+			if (resolved.type === "TSObjectKeyword") return true;
+			if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation);
+			return resolved.type === "TSUnionType" && resolved.types.some(matches);
+		});
 		const checkParameters = (node) => {
-			const shadowedAliases = lexicalTypeParameterNames(node, context.sourceCode.visitorKeys);
 			for (const parameter of node.params) {
-				const annotation = parameterAnnotation$1(parameter);
+				const annotation = functionParameterTypeAnnotation(parameter);
 				if (annotation === null || annotation === void 0) continue;
-				if (!resolvesToObject(annotation.typeAnnotation, shadowedAliases)) continue;
+				if (!resolvesToObject(annotation.typeAnnotation)) continue;
 				context.report({
 					node: annotation.typeAnnotation,
 					messageId: "objectParameter",
-					data: { parameter: parameterName$1(parameter, context.sourceCode) }
+					data: { parameter: functionParameterBindingName(parameter, context.sourceCode) }
 				});
 			}
 		};
 		return {
 			Program(node) {
-				aliases.clear();
-				for (const statement of node.body) {
-					const declaration = statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-					if (declaration?.type === "TSTypeAliasDeclaration" && (declaration.typeParameters === null || declaration.typeParameters === void 0)) aliases.set(declaration.id.name, declaration.typeAnnotation);
-				}
+				environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys);
 			},
 			ArrowFunctionExpression: checkParameters,
 			FunctionDeclaration: checkParameters,
@@ -1059,6 +1267,19 @@ function isInsideTypeGuard(node) {
 	}
 	return false;
 }
+/** Return whether typeof safely probes for the existence of a possibly absent binding. */
+function isExistenceProbe(node) {
+	const parent = node.parent;
+	if (parent.type !== "BinaryExpression") return false;
+	if (![
+		"===",
+		"!==",
+		"==",
+		"!="
+	].includes(parent.operator)) return false;
+	const other = parent.left === node ? parent.right : parent.left;
+	return other.type === "Literal" && other.value === "undefined";
+}
 /** Disallow runtime typeof checks that narrow unparsed values instead of decoding them. */
 const noRuntimeTypeofRule = defineRule({
 	meta: {
@@ -1076,7 +1297,7 @@ const noRuntimeTypeofRule = defineRule({
 		return { UnaryExpression(node) {
 			const option = context.options?.[0];
 			const allowInTypeGuards = typeof option === "object" && option !== null && !Array.isArray(option) && option.allowInTypeGuards === true;
-			if (node.operator === "typeof" && (!allowInTypeGuards || !isInsideTypeGuard(node))) context.report({
+			if (node.operator === "typeof" && !isExistenceProbe(node) && (!allowInTypeGuards || !isInsideTypeGuard(node))) context.report({
 				node,
 				messageId: "runtimeTypeof"
 			});
@@ -1089,6 +1310,12 @@ const FORBIDDEN_SYMBOL_NAME = "shape";
 function containsForbiddenSymbolName(name) {
 	return name.toLowerCase().includes(FORBIDDEN_SYMBOL_NAME);
 }
+/** Return whether an identifier names a statically accessed member owned by another value. */
+function isBorrowedMemberName(node) {
+	const parent = node.parent;
+	if (parent === null || parent.type !== "MemberExpression") return false;
+	return parent.property === node && parent.computed === false;
+}
 /** Ban the case-insensitive substring "shape" in every JavaScript and TypeScript symbol name. */
 const noForbiddenTermInSymbolNamesRule = defineRule({
 	meta: {
@@ -1098,7 +1325,7 @@ const noForbiddenTermInSymbolNamesRule = defineRule({
 	},
 	createOnce(context) {
 		const reportForbiddenSymbolName = (node) => {
-			if (!containsForbiddenSymbolName(node.name)) return;
+			if (!containsForbiddenSymbolName(node.name) || isBorrowedMemberName(node)) return;
 			context.report({
 				node,
 				messageId: "forbiddenSymbolName",
@@ -1114,32 +1341,25 @@ const noForbiddenTermInSymbolNamesRule = defineRule({
 });
 //#endregion
 //#region src/rules/no-unknown-parameters.ts
-function parameterAnnotation(parameter) {
-	if (parameter.type === "TSParameterProperty") return parameterAnnotation(parameter.parameter);
-	if (parameter.type === "RestElement") return parameter.typeAnnotation ?? parameterAnnotation(parameter.argument);
-	if (parameter.type === "AssignmentPattern") return parameter.typeAnnotation ?? parameter.left.typeAnnotation;
-	return parameter.typeAnnotation;
-}
-function parameterName(parameter, sourceText) {
-	if (parameter.type === "TSParameterProperty") return parameterName(parameter.parameter, sourceText);
-	if (parameter.type === "AssignmentPattern") return parameterName(parameter.left, sourceText);
-	if (parameter.type === "RestElement") return parameterName(parameter.argument, sourceText);
-	return parameter.type === "Identifier" ? parameter.name : sourceText.replace(/\s*:\s*unknown\s*$/u, "");
+function isTypePredicateSubject(owner, parameterName) {
+	const predicate = owner.returnType?.typeAnnotation;
+	return predicate?.type === "TSTypePredicate" && predicate.parameterName.type === "Identifier" && predicate.parameterName.name === parameterName;
 }
 /** Disallow unknown inputs except explicitly named error-cause enrichment. */
 const noUnknownParametersRule = defineRule({
 	meta: {
 		type: "problem",
-		docs: { description: "Disallow explicitly unknown function parameters except `cause`; decode unknown input at its I/O boundary instead." },
+		docs: { description: "Disallow explicitly unknown function parameters except `cause` and type-predicate subjects; decode unknown input at its I/O boundary instead." },
 		messages: { unknownParameter: "Parameter `{{parameter}}` leaves input unparsed. Accept a named domain type; run the expected schema or parser at the I/O boundary before calling this function." }
 	},
 	createOnce(context) {
 		const checkParameters = (node) => {
 			for (const parameter of node.params) {
-				const annotation = parameterAnnotation(parameter);
-				if (annotation?.typeAnnotation.type !== "TSUnknownKeyword") continue;
-				const name = parameterName(parameter, context.sourceCode.getText(parameter));
-				if (name === "cause") continue;
+				const annotation = functionParameterTypeAnnotation(parameter);
+				if (annotation === null || annotation === void 0) continue;
+				if (!containsUnknownType(annotation.typeAnnotation)) continue;
+				const name = functionParameterBindingName(parameter, context.sourceCode);
+				if (name === "cause" || isTypePredicateSubject(node, name)) continue;
 				context.report({
 					node: annotation.typeAnnotation,
 					messageId: "unknownParameter",
@@ -1163,11 +1383,6 @@ const noUnknownParametersRule = defineRule({
 });
 //#endregion
 //#region src/rules/no-unknown-returns.ts
-function referencedAliasName$1(type) {
-	if (type.type === "TSParenthesizedType") return referencedAliasName$1(type.typeAnnotation);
-	if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier") return null;
-	return type.typeArguments === null || type.typeArguments === void 0 || type.typeArguments.params.length === 0 ? type.typeName.name : null;
-}
 /** Ban function contracts that return unknown instead of a parsed domain type. */
 const noUnknownReturnsRule = defineRule({
 	meta: {
@@ -1176,27 +1391,19 @@ const noUnknownReturnsRule = defineRule({
 		messages: { unknownReturn: "This function exposes `unknown` to its caller. Parse the value at its boundary and return a named domain type." }
 	},
 	createOnce(context) {
-		const aliases = /* @__PURE__ */ new Map();
-		const resolvesToUnknown = (type, shadowedAliases, visited = /* @__PURE__ */ new Set()) => {
-			if (type.type === "TSUnknownKeyword") return true;
-			if (type.type === "TSParenthesizedType") return resolvesToUnknown(type.typeAnnotation, shadowedAliases, visited);
-			if (type.type === "TSUnionType") return type.types.some((member) => resolvesToUnknown(member, shadowedAliases, visited));
-			if (type.type === "TSTypeReference" && type.typeName.type === "Identifier" && (type.typeName.name === "Promise" || type.typeName.name === "PromiseLike")) {
-				const value = type.typeArguments?.params[0];
-				return value !== void 0 && resolvesToUnknown(value, shadowedAliases, visited);
-			}
-			const name = referencedAliasName$1(type);
-			if (name === null || visited.has(name) || shadowedAliases.has(name)) return false;
-			const alias = aliases.get(name);
-			if (alias === void 0 || alias.typeParameters !== null && alias.typeParameters !== void 0) return false;
-			const nextVisited = new Set(visited);
-			nextVisited.add(name);
-			return resolvesToUnknown(alias.typeAnnotation, shadowedAliases, nextVisited);
-		};
+		let environment = null;
+		const resolvesToUnknown = (type) => environment !== null && resolvedTypeMatches(type, environment, (resolved, matches) => {
+			if (resolved.type === "TSUnknownKeyword") return true;
+			if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation);
+			if (resolved.type === "TSUnionType") return resolved.types.some(matches);
+			if (resolved.type !== "TSTypeReference" || resolved.typeName.type !== "Identifier" || resolved.typeName.name !== "Promise" && resolved.typeName.name !== "PromiseLike") return false;
+			const value = resolved.typeArguments?.params[0];
+			return value !== void 0 && matches(value);
+		});
 		const checkReturnType = (node) => {
 			const annotation = node.returnType;
 			if (annotation === null || annotation === void 0) return;
-			if (!resolvesToUnknown(annotation.typeAnnotation, lexicalTypeParameterNames(node, context.sourceCode.visitorKeys))) return;
+			if (!resolvesToUnknown(annotation.typeAnnotation)) return;
 			context.report({
 				node: annotation.typeAnnotation,
 				messageId: "unknownReturn"
@@ -1204,11 +1411,7 @@ const noUnknownReturnsRule = defineRule({
 		};
 		return {
 			Program(node) {
-				aliases.clear();
-				for (const statement of node.body) {
-					const declaration = statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-					if (declaration?.type === "TSTypeAliasDeclaration") aliases.set(declaration.id.name, declaration);
-				}
+				environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys);
 			},
 			ArrowFunctionExpression: checkReturnType,
 			FunctionDeclaration: checkReturnType,
@@ -1225,11 +1428,6 @@ const noUnknownReturnsRule = defineRule({
 });
 //#endregion
 //#region src/rules/no-unknown-type-aliases.ts
-function referencedAliasName(type) {
-	if (type.type === "TSParenthesizedType") return referencedAliasName(type.typeAnnotation);
-	if (type.type !== "TSTypeReference" || type.typeName.type !== "Identifier") return null;
-	return type.typeArguments === null || type.typeArguments === void 0 || type.typeArguments.params.length === 0 ? type.typeName.name : null;
-}
 /** Ban named aliases that merely conceal TypeScript's unknown top type. */
 const noUnknownTypeAliasesRule = defineRule({
 	meta: {
@@ -1238,33 +1436,25 @@ const noUnknownTypeAliasesRule = defineRule({
 		messages: { unknownAlias: "Type alias `{{alias}}` hides `unknown`. Keep `unknown` explicit at the parsing boundary or on an allowed `cause` field; otherwise use the parsed owner type." }
 	},
 	createOnce(context) {
-		const aliases = /* @__PURE__ */ new Map();
-		const resolvesToUnknown = (type, visited = /* @__PURE__ */ new Set()) => {
-			if (type.type === "TSUnknownKeyword") return true;
-			if (type.type === "TSParenthesizedType") return resolvesToUnknown(type.typeAnnotation, visited);
-			const name = referencedAliasName(type);
-			if (name === null || visited.has(name)) return false;
-			const alias = aliases.get(name);
-			if (alias === void 0 || alias.typeParameters !== null && alias.typeParameters !== void 0) return false;
-			const nextVisited = new Set(visited);
-			nextVisited.add(name);
-			return resolvesToUnknown(alias.typeAnnotation, nextVisited);
-		};
-		return { Program(node) {
-			aliases.clear();
-			for (const statement of node.body) {
-				const declaration = statement.type === "ExportNamedDeclaration" ? statement.declaration : statement;
-				if (declaration?.type === "TSTypeAliasDeclaration") aliases.set(declaration.id.name, declaration);
-			}
-			for (const alias of aliases.values()) {
-				if (!resolvesToUnknown(alias.typeAnnotation, /* @__PURE__ */ new Set([alias.id.name]))) continue;
+		let environment = null;
+		const resolvesToUnknown = (type) => environment !== null && resolvedTypeMatches(type, environment, (resolved, matches) => {
+			if (resolved.type === "TSUnknownKeyword") return true;
+			if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation);
+			return resolved.type === "TSUnionType" && resolved.types.some(matches);
+		});
+		return {
+			Program(node) {
+				environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys);
+			},
+			TSTypeAliasDeclaration(node) {
+				if (!resolvesToUnknown(node.typeAnnotation)) return;
 				context.report({
-					node: alias.id,
+					node: node.id,
 					messageId: "unknownAlias",
-					data: { alias: alias.id.name }
+					data: { alias: node.id.name }
 				});
 			}
-		} };
+		};
 	}
 });
 //#endregion
@@ -1325,9 +1515,20 @@ function isInsideTypeAliasDeclaration(node) {
 function isPlainAliasConsumerUse(node, environment) {
 	if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false;
 	const name = typeReferenceName$1(node);
-	return name !== null && environment.aliases.has(name) && !isInsideTypeAliasDeclaration(node);
+	return name !== null && visibleTypeAlias(name, node, environment.typeAliases) !== null && !isInsideTypeAliasDeclaration(node);
+}
+function isInsideTypeParameterConstraint(node) {
+	let child = node;
+	let parent = child.parent;
+	while (parent !== null && parent.type !== "Program") {
+		if (parent.type === "TSTypeParameter" && parent.constraint === child) return true;
+		child = parent;
+		parent = child.parent;
+	}
+	return false;
 }
 function shouldReportType(node, environment) {
+	if (isInsideTypeParameterConstraint(node)) return false;
 	if (isPlainAliasConsumerUse(node, environment)) return false;
 	if (classifyUnsafeDictionary(node, environment) === null) return false;
 	let current = node.parent;
@@ -1361,7 +1562,7 @@ const noUnsafeDictionaryTypeRule = defineRule({
 		};
 		return {
 			Program(node) {
-				environment = createTypeEnvironment(node);
+				environment = createTypeEnvironment(node, context.sourceCode.visitorKeys);
 			},
 			TSTypeReference: reportIfUnsafe,
 			TSTypeLiteral: reportIfUnsafe,
@@ -1565,6 +1766,7 @@ const noWidenThenAssertRule = defineRule({
 });
 //#endregion
 //#region src/rules/require-safety-comment-for-type-assertion.ts
+const DEFAULT_SAFETY_MARKERS = ["SAFETY"];
 const commentOwnerKinds = /* @__PURE__ */ new Set([
 	"ExpressionStatement",
 	"PropertyDefinition",
@@ -1575,11 +1777,29 @@ const commentOwnerKinds = /* @__PURE__ */ new Set([
 function isConstAssertion(node) {
 	return node.typeAnnotation.type === "TSTypeReference" && node.typeAnnotation.typeName.type === "Identifier" && node.typeAnnotation.typeName.name === "const";
 }
-function hasSafetyComment(sourceCode, node) {
+function configuredSafetyMarkers(option) {
+	if (typeof option !== "object" || option === null || !("markers" in option)) return DEFAULT_SAFETY_MARKERS;
+	const configured = option.markers;
+	if (!Array.isArray(configured)) return DEFAULT_SAFETY_MARKERS;
+	const markers = configured.flatMap((marker) => typeof marker === "string" && marker.trim().length > 0 ? [marker.trim()] : []);
+	return markers.length > 0 ? markers : DEFAULT_SAFETY_MARKERS;
+}
+function markerPattern(markers) {
+	const alternation = markers.map((marker) => marker.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`)).join("|");
+	return new RegExp(String.raw`(?:^|[^\p{L}\p{N}_])(?:${alternation})\s*:\s*\S`, "u");
+}
+function hasSafetyJustificationBefore(sourceCode, owner, assertion, pattern) {
+	return sourceCode.getCommentsBefore(owner).some((comment) => comment.end <= assertion.start && pattern.test(comment.value));
+}
+function hasSafetyComment(sourceCode, node, pattern) {
 	let current = node;
 	while (true) {
-		if (sourceCode.getCommentsBefore(current).some((comment) => comment.end <= node.start && /\bSAFETY\s*:/u.test(comment.value))) return true;
-		if (commentOwnerKinds.has(current.type) || current.parent.type === "Program") return false;
+		if (hasSafetyJustificationBefore(sourceCode, current, node, pattern)) return true;
+		if (commentOwnerKinds.has(current.type)) {
+			const exportDeclaration = current.parent;
+			return exportDeclaration.type === "ExportNamedDeclaration" && exportDeclaration.declaration === current && hasSafetyJustificationBefore(sourceCode, exportDeclaration, node, pattern);
+		}
+		if (current.parent.type === "Program") return false;
 		current = current.parent;
 	}
 }
@@ -1607,14 +1827,35 @@ const antiSlopPlugin = eslintCompatPlugin({
 			meta: {
 				type: "problem",
 				docs: { description: "Require a nearby SAFETY comment for every TypeScript type assertion except const assertions." },
-				messages: { missingSafetyComment: "This type assertion has no `SAFETY:` justification. State the checked invariant immediately before the assertion or its containing statement." }
+				messages: { missingSafetyComment: "This type assertion has no `{{marker}}:` justification. State the checked invariant immediately before the assertion or its containing statement." },
+				schema: [{
+					type: "object",
+					properties: { markers: {
+						type: "array",
+						items: {
+							type: "string",
+							minLength: 1
+						},
+						minItems: 1,
+						uniqueItems: true
+					} },
+					additionalProperties: false
+				}],
+				defaultOptions: [{ markers: ["SAFETY"] }]
 			},
 			createOnce(context) {
+				const patterns = /* @__PURE__ */ new Map();
 				const checkAssertion = (node) => {
-					if (isConstAssertion(node) || hasSafetyComment(context.sourceCode, node)) return;
+					if (isConstAssertion(node)) return;
+					const markers = configuredSafetyMarkers(context.options?.[0]);
+					const patternKey = markers.join("\0");
+					const pattern = patterns.get(patternKey) ?? markerPattern(markers);
+					patterns.set(patternKey, pattern);
+					if (hasSafetyComment(context.sourceCode, node, pattern)) return;
 					context.report({
 						node,
-						messageId: "missingSafetyComment"
+						messageId: "missingSafetyComment",
+						data: { marker: markers[0] ?? DEFAULT_SAFETY_MARKERS[0] }
 					});
 				};
 				return {

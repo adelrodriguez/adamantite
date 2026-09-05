@@ -14,6 +14,7 @@ The relaxations, where previously reported code is now accepted:
 
 - `no-runtime-typeof` now allows every `typeof x === "undefined"` comparison, not only existence probes such as `typeof document === "undefined"`. Comparisons against any other type string are still reported.
 - `no-unknown-parameters` allows `unknown` on the exact subject of a type predicate.
+- `no-known-value-widening` no longer flags finite-key `Record` targets such as `Record<"a" | "b", T>`.
 - `no-shape-in-symbol-names` allows static member reads such as Zod's `schema.shape`.
 - `no-unsafe-dictionary-type` allows generic constraints such as `T extends Record<string, unknown>`.
 - `require-safety-comment-for-type-assertion` recognizes comments above exported declarations and accepts a `markers` option for alternative prefixes.

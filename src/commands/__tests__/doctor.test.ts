@@ -299,7 +299,7 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("keep --fix parseable with a replacement error", () =>
+  it.effect("reject --fix as an unknown option", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: { "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }) },
@@ -313,33 +313,10 @@ describe("doctor", () => {
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toEqual([])
-      expect(prompter.messages).toEqual([
-        "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria.",
-      ])
-      expect(prompter.outros).toEqual([])
-    })
-  )
-
-  it.effect("show the removed-fix failure in an interactive terminal", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }) },
-      })
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, ["--fix"], {
-        files,
-        layers: [prompter.layer, makeInteractiveTerminalLayer()],
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "error",
-        message:
-          "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria.",
-      })
       expect(prompter.messages).toEqual([])
-      expect(prompter.outros).toEqual(["❌ Doctor did not run"])
+      expect(prompter.outros).toEqual([])
+      expect(prompter.intros).toEqual([])
+      expect(prompter.notes).toEqual([])
     })
   )
 

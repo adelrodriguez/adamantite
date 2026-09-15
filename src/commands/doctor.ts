@@ -1,7 +1,6 @@
 import process from "node:process"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
-import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import {
   type CodingAgent,
@@ -19,18 +18,13 @@ import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 
-const fix = Flag.Boolean("fix").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Removed. Run doctor and follow its findings")
-)
+type ResolveAction = CodingAgent | "copy" | "done"
 
 const version = getPackageVersion()
 
-type ResolveAction = CodingAgent | "copy" | "done"
-
-export default Command.make("doctor", { fix }).pipe(
+export default Command.make("doctor").pipe(
   Command.withDescription("Assess Adamantite-managed integrations in the current project"),
-  Command.withHandler(({ fix }) =>
+  Command.withHandler(() =>
     Effect.gen(function* () {
       const cwd = process.cwd()
       const prompter = yield* Prompter
@@ -50,21 +44,6 @@ export default Command.make("doctor", { fix }).pipe(
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
       })
-
-      if (fix) {
-        const message =
-          "`doctor --fix` has been removed. Run `adamantite doctor` and follow the reported goal criteria."
-        if (isInteractive) {
-          yield* prompter.log.error(message)
-          yield* prompter.outro("❌ Doctor did not run")
-        } else {
-          yield* prompter.message(message)
-        }
-        return yield* new CommandFailed({
-          command: "doctor",
-          exitCode: ChildProcessSpawner.ExitCode(1),
-        })
-      }
 
       const initialPackageJson = yield* readPackageJson(cwd)
 

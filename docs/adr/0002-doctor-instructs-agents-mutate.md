@@ -11,8 +11,8 @@ The decisions:
 - Init keeps deterministic `create()` and its write paths; templating into empty space
   is reliable and must not require an agent. Doctor never writes files. `update` writes
   managed dependency changes only.
-- `doctor --fix` is removed (stubbed with a pointer error for one release; removal is
-  tracked in [#394](https://github.com/adelrodriguez/adamantite/issues/394)). `update`
+- `doctor --fix` is removed (see
+  [#394](https://github.com/adelrodriguez/adamantite/issues/394)). `update`
   survives, scoped to dependency bumps, then runs doctor's assess-and-render pipeline;
   it keeps exiting 0 while findings remain, so doctor stays the only CI gate.
 - Migrations are not ported one-to-one. Doctor assesses each managed surface against
@@ -60,5 +60,5 @@ The decisions:
   inspection (phase 2 covers zed, vscode, the GitHub workflow, and tsconfig).
 - Atomicity moves from `runMigration` snapshots to git hygiene; the Markdown prompt
   surfaces the clean-tree requirement.
-- CI scripts calling `doctor --fix` break on the next minor; the stub error and a
-  changeset document the replacement.
+- CI scripts that call `doctor --fix` fail with an unknown-option error. Run
+  `adamantite doctor` and follow the reported goal criteria instead.

@@ -107,3 +107,12 @@ jobs:
 
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}
+
+      - name: Upload failed unit test report
+        if: failure() && matrix.name == 'unit'
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-report
+          path: .vitest/index.html
+          include-hidden-files: true
+          retention-days: 7

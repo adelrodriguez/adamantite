@@ -4,9 +4,8 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
-import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
+import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import * as Generators from "#__tests__/generators.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
 const ROOT = "/project"
@@ -294,14 +293,25 @@ function readExtends(files: FileSystemTestContext): string[] {
 describe("tsconfig update properties", () => {
   const PRESET = "adamantite/typescript"
 
-  const userExtends = Generators.oneOf(
-    Arbitrary.Constant(null),
-    Generators.choose(PRESET, "@tsconfig/node22/tsconfig.json", "./base.json"),
-    Generators.subset(["@tsconfig/node22/tsconfig.json", "./base.json", PRESET, "./other.json"])
-  )
-  const userConfig = Arbitrary.all({
-    compilerOptions: Generators.choose({ strict: true }, { module: "esnext", strict: false }, {}),
-    include: Generators.choose(["src/**/*"], ["src", "test"]),
+  const userExtends = Schema.Union([
+    Schema.Null,
+    Schema.Literals([PRESET, "@tsconfig/node22/tsconfig.json", "./base.json"]),
+    Schema.mutable(
+      Schema.UniqueArray(
+        Schema.Literals(["@tsconfig/node22/tsconfig.json", "./base.json", PRESET, "./other.json"])
+      ).check(Schema.isMaxLength(4))
+    ),
+  ])
+  const userConfig = Schema.Struct({
+    compilerOptions: Schema.Union([
+      Schema.Struct({ strict: Schema.Literal(true) }),
+      Schema.Struct({ module: Schema.Literal("esnext"), strict: Schema.Literal(false) }),
+      Schema.Struct({}),
+    ]),
+    include: Schema.Union([
+      Schema.mutable(Schema.Tuple([Schema.Literal("src/**/*")])),
+      Schema.mutable(Schema.Tuple([Schema.Literal("src"), Schema.Literal("test")])),
+    ]),
   })
 
   it.effect.prop(

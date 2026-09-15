@@ -6,9 +6,7 @@ import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
-import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import * as Generators from "#__tests__/generators.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
 const ROOT = "/project"
@@ -248,17 +246,17 @@ describe("NodeVersionResolver", () => {
     })
   )
 
-  const nodeLine = Arbitrary.all([
-    Generators.choose("", "  ", "\t"),
-    Generators.choose("node", "nodejs"),
-    Generators.choose(" ", "  ", "\t"),
-    Generators.choose("22.19.0", "22", "lts/iron"),
-    Generators.choose("", "  ", " # pinned"),
-  ]).pipe(Arbitrary.map((parts) => parts.join("")))
+  const nodeLine = Schema.TemplateLiteral([
+    Schema.Literals(["", "  ", "\t"]),
+    Schema.Literals(["node", "nodejs"]),
+    Schema.Literals([" ", "  ", "\t"]),
+    Schema.Literals(["22.19.0", "22", "lts/iron"]),
+    Schema.Literals(["", "  ", " # pinned"]),
+  ])
   // Lines the parser must ignore: comments, other tools, node-prefixed tool names, and bare
   // `node` entries without a version. The `node # pinned` shapes stay inert only when comments
   // are stripped before matching, so they keep the comment handling load-bearing.
-  const inertLine = Generators.choose(
+  const inertLine = Schema.Literals([
     "",
     "# pinned tools",
     "  # node 22.19.0",
@@ -269,16 +267,16 @@ describe("NodeVersionResolver", () => {
     "node",
     "nodejs",
     "node-canvas 1.0.0",
-    "gonode 1.0.0"
-  )
+    "gonode 1.0.0",
+  ])
 
   it.effect.prop(
     "detect a .tool-versions node entry regardless of surrounding noise",
     {
-      hasNode: Arbitrary.schema(Schema.Boolean),
-      lines: Generators.array(inertLine, { maxLength: 8 }),
+      hasNode: Schema.Boolean,
+      lines: Schema.mutable(Schema.Array(inertLine).check(Schema.isMaxLength(8))),
       node: nodeLine,
-      position: Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 8, minimum: 0 }))),
+      position: Schema.Int.check(Schema.isBetween({ maximum: 8, minimum: 0 })),
     },
     ({ hasNode, lines, node, position }) =>
       Effect.gen(function* () {
@@ -297,38 +295,49 @@ describe("NodeVersionResolver", () => {
     { arbitrary: { runs: 200 } }
   )
 
-  const versionFileContent = Generators.choose(
-    { content: "22.19.0\n", valid: true },
-    { content: "22\n", valid: true },
-    { content: "", valid: false },
-    { content: "   \n", valid: false }
-  )
-  const toolVersionsContent = Generators.choose(
-    { content: "nodejs 22.19.0\n", valid: true },
-    { content: "node 22\n", valid: true },
-    { content: "python 3.12.0\n", valid: false },
-    { content: "# only comments\n", valid: false }
-  )
-  const packageJsonContent = Generators.choose(
-    { content: JSON.stringify({ engines: { node: ">=22" }, name: "pkg" }), valid: true },
-    { content: JSON.stringify({ name: "pkg", volta: { node: "22.19.0" } }), valid: true },
-    {
-      content: JSON.stringify({
-        devEngines: { runtime: { name: "node", version: "22" } },
-        name: "pkg",
-      }),
-      valid: true,
-    },
-    { content: JSON.stringify({ name: "pkg" }), valid: false }
-  )
+  const versionFileContent = Schema.Union([
+    Schema.Struct({ content: Schema.Literal("22.19.0\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal("22\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal(""), valid: Schema.Literal(false) }),
+    Schema.Struct({ content: Schema.Literal("   \n"), valid: Schema.Literal(false) }),
+  ])
+  const toolVersionsContent = Schema.Union([
+    Schema.Struct({ content: Schema.Literal("nodejs 22.19.0\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal("node 22\n"), valid: Schema.Literal(true) }),
+    Schema.Struct({ content: Schema.Literal("python 3.12.0\n"), valid: Schema.Literal(false) }),
+    Schema.Struct({ content: Schema.Literal("# only comments\n"), valid: Schema.Literal(false) }),
+  ])
+  const packageJsonContent = Schema.Union([
+    Schema.Struct({
+      content: Schema.Literal(JSON.stringify({ engines: { node: ">=22" }, name: "pkg" })),
+      valid: Schema.Literal(true),
+    }),
+    Schema.Struct({
+      content: Schema.Literal(JSON.stringify({ name: "pkg", volta: { node: "22.19.0" } })),
+      valid: Schema.Literal(true),
+    }),
+    Schema.Struct({
+      content: Schema.Literal(
+        JSON.stringify({
+          devEngines: { runtime: { name: "node", version: "22" } },
+          name: "pkg",
+        })
+      ),
+      valid: Schema.Literal(true),
+    }),
+    Schema.Struct({
+      content: Schema.Literal(JSON.stringify({ name: "pkg" })),
+      valid: Schema.Literal(false),
+    }),
+  ])
 
   it.effect.prop(
     "resolve the highest-precedence valid declaration for any file combination",
     {
-      nodeVersion: Generators.nullable(versionFileContent),
-      nvmrc: Generators.nullable(versionFileContent),
-      packageJson: Generators.nullable(packageJsonContent),
-      toolVersions: Generators.nullable(toolVersionsContent),
+      nodeVersion: Schema.Union([...versionFileContent.members, Schema.Null]),
+      nvmrc: Schema.Union([...versionFileContent.members, Schema.Null]),
+      packageJson: Schema.Union([...packageJsonContent.members, Schema.Null]),
+      toolVersions: Schema.Union([...toolVersionsContent.members, Schema.Null]),
     },
     ({ nodeVersion, nvmrc, packageJson, toolVersions }) =>
       Effect.gen(function* () {
@@ -363,35 +372,52 @@ describe("NodeVersionResolver", () => {
     { arbitrary: { runs: 200 } }
   )
 
-  const nonEmptyVersion = Generators.choose("22.19.0", ">=22", "lts/*")
-  const declaringManifest = Generators.oneOf(
-    nonEmptyVersion.pipe(Arbitrary.map((node) => ({ volta: { node } }))),
-    nonEmptyVersion.pipe(Arbitrary.map((node) => ({ engines: { node } }))),
-    Arbitrary.all([Generators.choose("node", "Node", "NODE"), nonEmptyVersion]).pipe(
-      Arbitrary.map(([name, version]) => ({ devEngines: { runtime: { name, version } } }))
-    ),
-    nonEmptyVersion.pipe(
-      Arbitrary.map((version) => ({
-        devEngines: {
-          runtime: [
-            { name: "deno", version: "2.0.0" },
-            { name: "node", version },
-          ],
-        },
-      }))
-    )
-  )
-  const nonDeclaringManifest = Generators.choose(
-    {},
-    { engines: {} },
-    { engines: { node: "" } },
-    { volta: {} },
-    { volta: { node: "" } },
-    { devEngines: {} },
-    { devEngines: { runtime: { name: "bun", version: "1.2.0" } } },
-    { devEngines: { runtime: { name: "node" } } },
-    { devEngines: { runtime: [{ name: "deno", version: "2.0.0" }] } }
-  )
+  const nonEmptyVersion = Schema.Literals(["22.19.0", ">=22", "lts/*"])
+  const declaringManifest = Schema.Union([
+    Schema.Struct({ volta: Schema.Struct({ node: nonEmptyVersion }) }),
+    Schema.Struct({ engines: Schema.Struct({ node: nonEmptyVersion }) }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.Struct({
+          name: Schema.Literals(["node", "Node", "NODE"]),
+          version: nonEmptyVersion,
+        }),
+      }),
+    }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.Tuple([
+          Schema.Struct({ name: Schema.Literal("deno"), version: Schema.Literal("2.0.0") }),
+          Schema.Struct({ name: Schema.Literal("node"), version: nonEmptyVersion }),
+        ]),
+      }),
+    }),
+  ])
+  const nonDeclaringManifest = Schema.Union([
+    Schema.Struct({}),
+    Schema.Struct({ engines: Schema.Struct({}) }),
+    Schema.Struct({ engines: Schema.Struct({ node: Schema.Literal("") }) }),
+    Schema.Struct({ volta: Schema.Struct({}) }),
+    Schema.Struct({ volta: Schema.Struct({ node: Schema.Literal("") }) }),
+    Schema.Struct({ devEngines: Schema.Struct({}) }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.Struct({ name: Schema.Literal("bun"), version: Schema.Literal("1.2.0") }),
+      }),
+    }),
+    Schema.Struct({
+      devEngines: Schema.Struct({ runtime: Schema.Struct({ name: Schema.Literal("node") }) }),
+    }),
+    Schema.Struct({
+      devEngines: Schema.Struct({
+        runtime: Schema.mutable(
+          Schema.Tuple([
+            Schema.Struct({ name: Schema.Literal("deno"), version: Schema.Literal("2.0.0") }),
+          ])
+        ),
+      }),
+    }),
+  ])
 
   it.effect.prop(
     "recognize every supported package.json declaration shape",
@@ -423,7 +449,7 @@ describe("NodeVersionResolver", () => {
 
   it.effect.prop(
     "resolve without failing for arbitrary package.json JSON",
-    { value: Generators.jsonValue({ maxDepth: 3 }) },
+    { value: Schema.MutableJson },
     ({ value }) =>
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": JSON.stringify(value) })

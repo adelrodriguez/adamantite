@@ -1,6 +1,6 @@
 import { describe, expect, it, test } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
-import * as Generators from "#__tests__/generators.ts"
+import * as Schema from "effect/Schema"
 import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   MANAGED_SCRIPT_COMMANDS,
@@ -39,8 +39,10 @@ describe("CI workflow entries", () => {
   const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
   const PACKAGE_MANAGERS: SupportedPackageManager[] = ["bun", "deno", "npm", "pnpm", "yarn"]
 
-  const packageManager = Generators.choose(...PACKAGE_MANAGERS)
-  const scripts = Generators.subset(ALL_SCRIPTS)
+  const packageManager = Schema.Literals([...PACKAGE_MANAGERS])
+  const scripts = Schema.mutable(
+    Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
+  )
 
   it.prop(
     "agree with hasCICompatibleScripts for every package manager and script subset",
@@ -72,7 +74,15 @@ describe("CI workflow entries", () => {
 
   it.prop(
     "never lose an entry when more scripts are requested",
-    { extra: Generators.subset(ALL_SCRIPTS), packageManager, scripts },
+    {
+      extra: Schema.mutable(
+        Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(
+          Schema.isMaxLength(ALL_SCRIPTS.length)
+        )
+      ),
+      packageManager,
+      scripts,
+    },
     ({ extra, packageManager: manager, scripts: selected }) => {
       const baseline = getCIWorkflowEntries(manager, selected)
       const expanded = getCIWorkflowEntries(manager, [...selected, ...extra])

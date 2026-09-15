@@ -5,9 +5,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
 import * as Schema from "effect/Schema"
-import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import * as Generators from "#__tests__/generators.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
@@ -234,12 +232,14 @@ describe("writeAgentsGuidance", () => {
     "fix:monorepo",
   ]
   const guidanceOptions = {
-    packageManager: Generators.choose("bun", "deno", "npm", "pnpm", "yarn"),
-    scripts: Generators.subset(ALL_SCRIPTS),
+    packageManager: Schema.Literals(["bun", "deno", "npm", "pnpm", "yarn"]),
+    scripts: Schema.mutable(
+      Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
+    ),
   }
   // Marker-free so generated content cannot collide with the managed block by accident.
-  const markerFreeContent = Arbitrary.schema(Schema.String.check(Schema.isMaxLength(200))).pipe(
-    Arbitrary.filter((content) => !content.includes("ADAMANTITE"))
+  const markerFreeContent = Schema.String.check(Schema.isMaxLength(200)).check(
+    Schema.makeFilter((content) => !content.includes("ADAMANTITE"))
   )
 
   it.effect.prop(
@@ -320,7 +320,7 @@ describe("writeAgentsGuidance", () => {
       ...guidanceOptions,
       prefix: markerFreeContent,
       suffix: markerFreeContent,
-      variant: Generators.choose("start-only", "end-only", "end-before-start"),
+      variant: Schema.Literals(["start-only", "end-only", "end-before-start"]),
     },
     ({ packageManager, prefix, scripts, suffix, variant }) =>
       Effect.gen(function* () {

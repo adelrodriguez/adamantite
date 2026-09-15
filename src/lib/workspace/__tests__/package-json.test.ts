@@ -1,8 +1,6 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it, test } from "@effect/vitest"
 import * as Schema from "effect/Schema"
-import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
-import * as Generators from "#__tests__/generators.ts"
 import {
   getConflictingScripts,
   getManagedScripts,
@@ -78,20 +76,19 @@ describe("script management", () => {
   // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
   const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
 
-  const requestedScripts = Generators.subset(ALL_SCRIPTS)
-  const scriptCommand = Generators.oneOf(
-    Generators.choose(...Object.values(MANAGED_SCRIPT_COMMANDS)),
-    Generators.choose("", "tsc && eslint .", "prettier --write ."),
-    Arbitrary.schema(Schema.String)
+  const requestedScripts = Schema.mutable(
+    Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
   )
-  const manifestScripts = Generators.dictionary(
-    Generators.oneOf(Generators.choose(...ALL_SCRIPTS), Generators.choose("build", "dev", "test")),
-    scriptCommand,
-    { maxKeys: 9 }
-  )
-  const manifest = manifestScripts.pipe(
-    Arbitrary.map((scripts): PackageJson => ({ name: "fixture", scripts }))
-  )
+  const scriptCommand = Schema.Union([
+    Schema.Literals(Object.values(MANAGED_SCRIPT_COMMANDS)),
+    Schema.Literals(["", "tsc && eslint .", "prettier --write ."]),
+    Schema.String,
+  ])
+  const manifestScripts = Schema.Record(
+    Schema.Union([Schema.Literals([...ALL_SCRIPTS]), Schema.Literals(["build", "dev", "test"])]),
+    Schema.optionalKey(scriptCommand)
+  ).check(Schema.isMaxProperties(9))
+  const manifest = Schema.Struct({ name: Schema.Literal("fixture"), scripts: manifestScripts })
 
   it.prop(
     "never report a script as both managed and conflicting",
@@ -114,11 +111,11 @@ describe("script management", () => {
       const conflicts = getConflictingScripts(packageJson, requested)
 
       for (const conflict of conflicts) {
-        expect(conflict.command).toBe(packageJson.scripts?.[conflict.script])
+        expect(conflict.command).toBe(packageJson.scripts[conflict.script])
       }
 
       const expectedConflicting = requested.filter((script) => {
-        const command = packageJson.scripts?.[script]
+        const command = packageJson.scripts[script]
 
         return (
           command !== undefined && command !== "" && command !== MANAGED_SCRIPT_COMMANDS[script]

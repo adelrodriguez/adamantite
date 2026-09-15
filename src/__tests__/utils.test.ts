@@ -10,9 +10,7 @@ import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
-import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import * as Generators from "#__tests__/generators.ts"
 import {
   mergeConfig,
   parseJson,
@@ -37,8 +35,6 @@ function someKey(value: JsonValue, predicate: (key: string) => boolean): boolean
 
   return false
 }
-
-const jsonValueArbitrary = Generators.jsonValue({ maxDepth: 4 })
 
 // Evaluates through a data: URI module import instead of `new Function` so the oracle stays
 // within the repo's no-eval lint policy without disable comments.
@@ -235,8 +231,8 @@ describe("parseJson", () => {
   it.effect.prop(
     "round-trip any JSON value without __proto__ keys through JSON.stringify",
     {
-      value: jsonValueArbitrary.pipe(
-        Arbitrary.filter((value) => !someKey(value, (key) => key === "__proto__"))
+      value: Schema.MutableJson.check(
+        Schema.makeFilter((value) => !someKey(value, (key) => key === "__proto__"))
       ),
     },
     ({ value }) =>
@@ -250,7 +246,7 @@ describe("parseJson", () => {
 
   it.effect.prop(
     "resolve to success or FailedToParseFile for arbitrary input, never a defect",
-    { content: Arbitrary.schema(Schema.String) },
+    { content: Schema.String },
     ({ content }) =>
       Effect.gen(function* () {
         const result = yield* Effect.result(parseJson(content))
@@ -327,19 +323,17 @@ describe("mergeConfig", () => {
   // defu drops `__proto__`/`constructor` keys and null-valued keys from its first argument, and
   // concatenates arrays on conflicts, so these algebraic properties hold on array-free, null-free
   // configs with plain keys.
-  const jsonPrimitive = Generators.oneOf(
-    Arbitrary.schema(Schema.String),
-    Arbitrary.schema(Schema.Int),
-    Arbitrary.schema(Schema.Boolean)
+  const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean])
+  const plainKey = Schema.String.check(
+    Schema.makeFilter((key) => key !== "__proto__" && key !== "constructor")
   )
-  const plainKey = Arbitrary.schema(Schema.String).pipe(
-    Arbitrary.filter((key) => key !== "__proto__" && key !== "constructor")
-  )
-  const arrayFreeConfig = Generators.dictionary(
+  const arrayFreeConfig = Schema.Record(
     plainKey,
-    Generators.oneOf(jsonPrimitive, Generators.dictionary(plainKey, jsonPrimitive, { maxKeys: 4 })),
-    { maxKeys: 8 }
-  )
+    Schema.Union([
+      jsonPrimitive,
+      Schema.Record(plainKey, jsonPrimitive).check(Schema.isMaxProperties(4)),
+    ])
+  ).check(Schema.isMaxProperties(8))
 
   it.effect.prop(
     "treat the empty object as the identity on both sides",
@@ -467,7 +461,7 @@ describe("serializeTsObjectLiteral", () => {
 
   it.effect.prop(
     "evaluate back to the original value for any JSON value",
-    { value: jsonValueArbitrary },
+    { value: Schema.MutableJson },
     ({ value }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -481,23 +475,24 @@ describe("serializeTsObjectLiteral", () => {
 
   // Focused generator for the risky surface: identifier-like keys next to string values full of
   // quotes, backslashes, colons, and braces that the key-unquoting regex could corrupt.
-  const trickyString = Generators.array(
-    Generators.choose('"', "\\", ":", "\n", " ", "a", "$", "_", "{", "}", "'", "`"),
-    { maxLength: 12 }
-  ).pipe(Arbitrary.map((chars) => chars.join("")))
-  const trickyKey = Generators.oneOf(
-    Generators.choose("enabled", "entry", "$schema", "_private", "a1", "__proto__"),
-    trickyString
-  )
-  const trickyObject = Generators.dictionary(
+  const trickyString = Schema.String.check(Schema.isPattern(/^["\\:\n a$_{}'`]{0,12}$/))
+  const trickyKey = Schema.TemplateLiteral([
+    Schema.Union([
+      Schema.Literals(["enabled", "entry", "$schema", "_private", "a1", "__proto__"]),
+      trickyString,
+    ]),
+  ])
+  const trickyObject = Schema.Record(
     trickyKey,
-    Generators.oneOf(trickyString, Generators.dictionary(trickyKey, trickyString, { maxKeys: 3 })),
-    { maxKeys: 6 }
-  )
+    Schema.Union([
+      trickyString,
+      Schema.Record(trickyKey, trickyString).check(Schema.isMaxProperties(3)),
+    ])
+  ).check(Schema.isMaxProperties(6))
 
   it.effect.prop(
     "never corrupt string values that look like keys, at any indentation",
-    { indentation: Generators.choose<number | string>(0, 2, 4, "\t"), value: trickyObject },
+    { indentation: Schema.Literals([0, 2, 4, "\t"]), value: trickyObject },
     ({ indentation, value }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -517,7 +512,7 @@ describe("serializeTsPropertyKey", () => {
 
   it.effect.prop(
     "emit a property name that evaluates back to the original key",
-    { key: Arbitrary.schema(Schema.String) },
+    { key: Schema.String },
     ({ key }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -810,21 +805,20 @@ describe("normalizeDependencyVersion", () => {
   // The input domain is real dependency specifiers: optional whitespace padding, an optional
   // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
   // valid specifiers and are out of scope.
-  const version = Arbitrary.all([
-    Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))),
-    Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))),
-    Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))),
-    Generators.nullable(Generators.choose("-alpha", "-beta.1", "-rc.0")),
-  ]).pipe(
-    Arbitrary.map(
-      ([major, minor, patch, prerelease]) => `${major}.${minor}.${patch}${prerelease ?? ""}`
-    )
-  )
+  const versionNumber = Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))
+  const version = Schema.TemplateLiteral([
+    versionNumber,
+    ".",
+    versionNumber,
+    ".",
+    versionNumber,
+    Schema.Literals(["", "-alpha", "-beta.1", "-rc.0"]),
+  ])
   const specifierParts = {
-    padding: Generators.choose("", " ", "  ", "\t"),
-    rangePrefix: Generators.choose("", "^", "~"),
+    padding: Schema.Literals(["", " ", "  ", "\t"]),
+    rangePrefix: Schema.Literals(["", "^", "~"]),
     version,
-    workspacePrefix: Generators.choose("", "workspace:"),
+    workspacePrefix: Schema.Literals(["", "workspace:"]),
   }
 
   it.prop(

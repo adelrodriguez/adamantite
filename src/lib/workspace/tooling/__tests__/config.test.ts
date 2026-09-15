@@ -7,7 +7,6 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import * as Generators from "#__tests__/generators.ts"
 import {
   detectToolingConfig,
   getConfigFindings,
@@ -147,13 +146,13 @@ describe("detectToolingConfig", () => {
   it.effect.prop(
     "follow ts > jsonc > json precedence for every combination of present files",
     {
-      hasJson: Arbitrary.schema(Schema.Boolean),
-      hasJsonc: Arbitrary.schema(Schema.Boolean),
-      hasTs: Arbitrary.schema(Schema.Boolean),
-      legacyOrder: Generators.choose<string[]>(
-        ["tool.json", "tool.jsonc"],
-        ["tool.jsonc", "tool.json"]
-      ),
+      hasJson: Schema.Boolean,
+      hasJsonc: Schema.Boolean,
+      hasTs: Schema.Boolean,
+      legacyOrder: Schema.Union([
+        Schema.mutable(Schema.Tuple([Schema.Literal("tool.json"), Schema.Literal("tool.jsonc")])),
+        Schema.mutable(Schema.Tuple([Schema.Literal("tool.jsonc"), Schema.Literal("tool.json")])),
+      ]),
     },
     ({ hasJson, hasJsonc, hasTs, legacyOrder }) =>
       Effect.gen(function* () {
@@ -230,22 +229,27 @@ describe("getPackageActions", () => {
     ).toEqual([])
   })
 
-  const specifier = Arbitrary.all([
-    Generators.choose("", "workspace:"),
-    Generators.choose("", "^", "~"),
-    Generators.choose("1.2.3", "1.0.0", "2.4.6-beta.1"),
-  ]).pipe(
-    Arbitrary.map(([workspacePrefix, rangePrefix, version]) => ({
-      version,
-      written: `${workspacePrefix}${rangePrefix}${version}`,
-    }))
+  const specifier = Arbitrary.schema(
+    Schema.NullOr(
+      Schema.Tuple([
+        Schema.Literals(["", "workspace:"]),
+        Schema.Literals(["", "^", "~"]),
+        Schema.Literals(["1.2.3", "1.0.0", "2.4.6-beta.1"]),
+      ])
+    )
+  ).pipe(
+    Arbitrary.map((parts) => {
+      if (parts === null) return null
+      const [workspacePrefix, rangePrefix, version] = parts
+      return { version, written: `${workspacePrefix}${rangePrefix}${version}` }
+    })
   )
 
   it.prop(
     "classify any manifest into exactly one of match, install, or update",
     {
-      field: Generators.choose("dependencies", "devDependencies"),
-      installed: Generators.nullable(specifier),
+      field: Schema.Literals(["dependencies", "devDependencies"]),
+      installed: specifier,
     },
     ({ field, installed }) => {
       const manifest = installed === null ? {} : { [field]: { tool: installed.written } }

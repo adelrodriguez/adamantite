@@ -1,5 +1,6 @@
 import type * as Layer from "effect/Layer"
 import { dirname, resolve } from "node:path"
+import * as ByteSize from "effect/ByteSize"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
@@ -64,7 +65,7 @@ function makeFileInfo(type: FileSystem.File.Type, size: number): FileSystem.File
     mtime: Option.none(),
     nlink: Option.none(),
     rdev: Option.none(),
-    size: FileSystem.Size(size),
+    size: ByteSize.bytes(size),
     type,
     uid: Option.none(),
   }

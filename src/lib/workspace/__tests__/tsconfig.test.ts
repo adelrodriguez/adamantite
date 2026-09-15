@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
-import { FastCheck } from "effect/testing"
+import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
@@ -293,18 +293,25 @@ function readExtends(files: FileSystemTestContext): string[] {
 describe("tsconfig update properties", () => {
   const PRESET = "adamantite/typescript"
 
-  const userExtends = FastCheck.oneof(
-    FastCheck.constant(null),
-    FastCheck.constantFrom(PRESET, "@tsconfig/node22/tsconfig.json", "./base.json"),
-    FastCheck.subarray(["@tsconfig/node22/tsconfig.json", "./base.json", PRESET, "./other.json"])
-  )
-  const userConfig = FastCheck.record({
-    compilerOptions: FastCheck.constantFrom(
-      { strict: true },
-      { module: "esnext", strict: false },
-      {}
+  const userExtends = Schema.Union([
+    Schema.Null,
+    Schema.Literals([PRESET, "@tsconfig/node22/tsconfig.json", "./base.json"]),
+    Schema.mutable(
+      Schema.UniqueArray(
+        Schema.Literals(["@tsconfig/node22/tsconfig.json", "./base.json", PRESET, "./other.json"])
+      ).check(Schema.isMaxLength(4))
     ),
-    include: FastCheck.constantFrom(["src/**/*"], ["src", "test"]),
+  ])
+  const userConfig = Schema.Struct({
+    compilerOptions: Schema.Union([
+      Schema.Struct({ strict: Schema.Literal(true) }),
+      Schema.Struct({ module: Schema.Literal("esnext"), strict: Schema.Literal(false) }),
+      Schema.Struct({}),
+    ]),
+    include: Schema.Union([
+      Schema.mutable(Schema.Tuple([Schema.Literal("src/**/*")])),
+      Schema.mutable(Schema.Tuple([Schema.Literal("src"), Schema.Literal("test")])),
+    ]),
   })
 
   it.effect.prop(
@@ -332,7 +339,7 @@ describe("tsconfig update properties", () => {
         expect(parsed.compilerOptions).toEqual(config.compilerOptions)
         expect(parsed.include).toEqual(config.include)
       }),
-    { fastCheck: { numRuns: 150 } }
+    { arbitrary: { runs: 150 } }
   )
 
   it.effect.prop(
@@ -349,6 +356,6 @@ describe("tsconfig update properties", () => {
         yield* tsconfig.update(ROOT).pipe(provideFiles(files))
         expect(files.read("tsconfig.json")).toBe(afterFirst)
       }),
-    { fastCheck: { numRuns: 150 } }
+    { arbitrary: { runs: 150 } }
   )
 })

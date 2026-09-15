@@ -7,7 +7,7 @@ import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
-const files = Argument.file("files", { mustExist: true }).pipe(
+const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to lint (optional)"),
   Argument.variadic()
 )

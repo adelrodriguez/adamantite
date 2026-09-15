@@ -8,12 +8,12 @@ import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
-const files = Argument.file("files", { mustExist: true }).pipe(
+const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to format (optional)"),
   Argument.variadic()
 )
 
-const check = Flag.boolean("check").pipe(
+const check = Flag.Boolean("check").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Check if files are formatted without writing")
 )

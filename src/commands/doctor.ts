@@ -19,7 +19,7 @@ import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 
-const fix = Flag.boolean("fix").pipe(
+const fix = Flag.Boolean("fix").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Removed. Run doctor and follow its findings")
 )

@@ -11,6 +11,7 @@ dist
 # code coverage
 coverage
 *.lcov
+.vitest/
 
 # logs
 logs

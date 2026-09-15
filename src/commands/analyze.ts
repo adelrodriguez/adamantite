@@ -7,12 +7,12 @@ import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
-const fix = Flag.boolean("fix").pipe(
+const fix = Flag.Boolean("fix").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Automatically fix issues")
 )
 
-const strict = Flag.boolean("strict").pipe(
+const strict = Flag.Boolean("strict").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Enable strict mode")
 )

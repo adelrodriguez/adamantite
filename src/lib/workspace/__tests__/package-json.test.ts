@@ -1,6 +1,6 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it, test } from "@effect/vitest"
-import { FastCheck } from "effect/testing"
+import * as Schema from "effect/Schema"
 import {
   getConflictingScripts,
   getManagedScripts,
@@ -76,21 +76,19 @@ describe("script management", () => {
   // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
   const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
 
-  const requestedScripts = FastCheck.subarray(ALL_SCRIPTS)
-  const scriptCommand = FastCheck.oneof(
-    FastCheck.constantFrom(...Object.values(MANAGED_SCRIPT_COMMANDS)),
-    FastCheck.constantFrom("", "tsc && eslint .", "prettier --write ."),
-    FastCheck.string()
+  const requestedScripts = Schema.mutable(
+    Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
   )
-  const manifestScripts = FastCheck.dictionary(
-    FastCheck.oneof(
-      FastCheck.constantFrom<string>(...ALL_SCRIPTS),
-      FastCheck.constantFrom("build", "dev", "test")
-    ),
-    scriptCommand,
-    { maxKeys: 9 }
-  )
-  const manifest = manifestScripts.map((scripts): PackageJson => ({ name: "fixture", scripts }))
+  const scriptCommand = Schema.Union([
+    Schema.Literals(Object.values(MANAGED_SCRIPT_COMMANDS)),
+    Schema.Literals(["", "tsc && eslint .", "prettier --write ."]),
+    Schema.String,
+  ])
+  const manifestScripts = Schema.Record(
+    Schema.Union([Schema.Literals([...ALL_SCRIPTS]), Schema.Literals(["build", "dev", "test"])]),
+    Schema.optionalKey(scriptCommand)
+  ).check(Schema.isMaxProperties(9))
+  const manifest = Schema.Struct({ name: Schema.Literal("fixture"), scripts: manifestScripts })
 
   it.prop(
     "never report a script as both managed and conflicting",
@@ -103,7 +101,7 @@ describe("script management", () => {
         expect(managed).not.toContain(conflict.script)
       }
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.prop(
@@ -113,11 +111,11 @@ describe("script management", () => {
       const conflicts = getConflictingScripts(packageJson, requested)
 
       for (const conflict of conflicts) {
-        expect(conflict.command).toBe(packageJson.scripts?.[conflict.script])
+        expect(conflict.command).toBe(packageJson.scripts[conflict.script])
       }
 
       const expectedConflicting = requested.filter((script) => {
-        const command = packageJson.scripts?.[script]
+        const command = packageJson.scripts[script]
 
         return (
           command !== undefined && command !== "" && command !== MANAGED_SCRIPT_COMMANDS[script]
@@ -125,7 +123,7 @@ describe("script management", () => {
       })
       expect(conflicts.map((conflict) => conflict.script)).toEqual(expectedConflicting)
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.prop(
@@ -145,6 +143,6 @@ describe("script management", () => {
         expect(managed).toContain(script)
       }
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 })

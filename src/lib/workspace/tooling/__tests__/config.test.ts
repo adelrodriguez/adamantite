@@ -4,7 +4,8 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import { FastCheck } from "effect/testing"
+import * as Schema from "effect/Schema"
+import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   detectToolingConfig,
@@ -145,13 +146,13 @@ describe("detectToolingConfig", () => {
   it.effect.prop(
     "follow ts > jsonc > json precedence for every combination of present files",
     {
-      hasJson: FastCheck.boolean(),
-      hasJsonc: FastCheck.boolean(),
-      hasTs: FastCheck.boolean(),
-      legacyOrder: FastCheck.constantFrom<string[]>(
-        ["tool.json", "tool.jsonc"],
-        ["tool.jsonc", "tool.json"]
-      ),
+      hasJson: Schema.Boolean,
+      hasJsonc: Schema.Boolean,
+      hasTs: Schema.Boolean,
+      legacyOrder: Schema.Union([
+        Schema.mutable(Schema.Tuple([Schema.Literal("tool.json"), Schema.Literal("tool.jsonc")])),
+        Schema.mutable(Schema.Tuple([Schema.Literal("tool.jsonc"), Schema.Literal("tool.json")])),
+      ]),
     },
     ({ hasJson, hasJsonc, hasTs, legacyOrder }) =>
       Effect.gen(function* () {
@@ -191,7 +192,7 @@ describe("detectToolingConfig", () => {
         const hasWarnings = expectedActive !== null && expectedLegacy.length > 0
         expect(state.warnings.length > 0).toBe(hasWarnings)
       }),
-    { fastCheck: { numRuns: 100 } }
+    { arbitrary: { runs: 100 } }
   )
 })
 
@@ -228,20 +229,27 @@ describe("getPackageActions", () => {
     ).toEqual([])
   })
 
-  const specifier = FastCheck.tuple(
-    FastCheck.constantFrom("", "workspace:"),
-    FastCheck.constantFrom("", "^", "~"),
-    FastCheck.constantFrom("1.2.3", "1.0.0", "2.4.6-beta.1")
-  ).map(([workspacePrefix, rangePrefix, version]) => ({
-    version,
-    written: `${workspacePrefix}${rangePrefix}${version}`,
-  }))
+  const specifier = Arbitrary.schema(
+    Schema.NullOr(
+      Schema.Tuple([
+        Schema.Literals(["", "workspace:"]),
+        Schema.Literals(["", "^", "~"]),
+        Schema.Literals(["1.2.3", "1.0.0", "2.4.6-beta.1"]),
+      ])
+    )
+  ).pipe(
+    Arbitrary.map((parts) => {
+      if (parts === null) return null
+      const [workspacePrefix, rangePrefix, version] = parts
+      return { version, written: `${workspacePrefix}${rangePrefix}${version}` }
+    })
+  )
 
   it.prop(
     "classify any manifest into exactly one of match, install, or update",
     {
-      field: FastCheck.constantFrom("dependencies", "devDependencies"),
-      installed: FastCheck.option(specifier),
+      field: Schema.Literals(["dependencies", "devDependencies"]),
+      installed: specifier,
     },
     ({ field, installed }) => {
       const manifest = installed === null ? {} : { [field]: { tool: installed.written } }
@@ -263,7 +271,7 @@ describe("getPackageActions", () => {
         ])
       }
     },
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 })
 

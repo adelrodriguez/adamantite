@@ -8,8 +8,8 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
-import { FastCheck } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   mergeConfig,
@@ -35,9 +35,6 @@ function someKey(value: JsonValue, predicate: (key: string) => boolean): boolean
 
   return false
 }
-
-// SAFETY: fast-check's JsonValue and type-fest's JsonValue describe the same JSON data shapes.
-const jsonValueArbitrary = FastCheck.jsonValue({ maxDepth: 4 }).map((value) => value as JsonValue)
 
 // Evaluates through a data: URI module import instead of `new Function` so the oracle stays
 // within the repo's no-eval lint policy without disable comments.
@@ -234,7 +231,9 @@ describe("parseJson", () => {
   it.effect.prop(
     "round-trip any JSON value without __proto__ keys through JSON.stringify",
     {
-      value: jsonValueArbitrary.filter((value) => !someKey(value, (key) => key === "__proto__")),
+      value: Schema.MutableJson.check(
+        Schema.makeFilter((value) => !someKey(value, (key) => key === "__proto__"))
+      ),
     },
     ({ value }) =>
       Effect.gen(function* () {
@@ -242,12 +241,12 @@ describe("parseJson", () => {
 
         expect(JSON.stringify(parsed)).toBe(JSON.stringify(value))
       }),
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.effect.prop(
     "resolve to success or FailedToParseFile for arbitrary input, never a defect",
-    { content: FastCheck.string() },
+    { content: Schema.String },
     ({ content }) =>
       Effect.gen(function* () {
         const result = yield* Effect.result(parseJson(content))
@@ -256,7 +255,7 @@ describe("parseJson", () => {
           expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
         }
       }),
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 })
 
@@ -324,17 +323,17 @@ describe("mergeConfig", () => {
   // defu drops `__proto__`/`constructor` keys and null-valued keys from its first argument, and
   // concatenates arrays on conflicts, so these algebraic properties hold on array-free, null-free
   // configs with plain keys.
-  const jsonPrimitive = FastCheck.oneof(
-    FastCheck.string(),
-    FastCheck.integer(),
-    FastCheck.boolean()
+  const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean])
+  const plainKey = Schema.String.check(
+    Schema.makeFilter((key) => key !== "__proto__" && key !== "constructor")
   )
-  const plainKey = FastCheck.string().filter((key) => key !== "__proto__" && key !== "constructor")
-  const arrayFreeConfig = FastCheck.dictionary(
+  const arrayFreeConfig = Schema.Record(
     plainKey,
-    FastCheck.oneof(jsonPrimitive, FastCheck.dictionary(plainKey, jsonPrimitive, { maxKeys: 4 })),
-    { maxKeys: 8 }
-  )
+    Schema.Union([
+      jsonPrimitive,
+      Schema.Record(plainKey, jsonPrimitive).check(Schema.isMaxProperties(4)),
+    ])
+  ).check(Schema.isMaxProperties(8))
 
   it.effect.prop(
     "treat the empty object as the identity on both sides",
@@ -344,7 +343,7 @@ describe("mergeConfig", () => {
         expect(yield* mergeConfig(config, {})).toEqual(config)
         expect(yield* mergeConfig({}, config)).toEqual(config)
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 
   it.effect.prop(
@@ -354,7 +353,7 @@ describe("mergeConfig", () => {
       Effect.gen(function* () {
         expect(yield* mergeConfig(config, config)).toEqual(config)
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 
   it.effect.prop(
@@ -378,7 +377,7 @@ describe("mergeConfig", () => {
           }
         }
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 })
 
@@ -462,7 +461,7 @@ describe("serializeTsObjectLiteral", () => {
 
   it.effect.prop(
     "evaluate back to the original value for any JSON value",
-    { value: jsonValueArbitrary },
+    { value: Schema.MutableJson },
     ({ value }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -471,28 +470,29 @@ describe("serializeTsObjectLiteral", () => {
 
         expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
       }),
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   // Focused generator for the risky surface: identifier-like keys next to string values full of
   // quotes, backslashes, colons, and braces that the key-unquoting regex could corrupt.
-  const trickyString = FastCheck.array(
-    FastCheck.constantFrom('"', "\\", ":", "\n", " ", "a", "$", "_", "{", "}", "'", "`"),
-    { maxLength: 12 }
-  ).map((chars) => chars.join(""))
-  const trickyKey = FastCheck.oneof(
-    FastCheck.constantFrom("enabled", "entry", "$schema", "_private", "a1", "__proto__"),
-    trickyString
-  )
-  const trickyObject = FastCheck.dictionary(
+  const trickyString = Schema.String.check(Schema.isPattern(/^["\\:\n a$_{}'`]{0,12}$/))
+  const trickyKey = Schema.TemplateLiteral([
+    Schema.Union([
+      Schema.Literals(["enabled", "entry", "$schema", "_private", "a1", "__proto__"]),
+      trickyString,
+    ]),
+  ])
+  const trickyObject = Schema.Record(
     trickyKey,
-    FastCheck.oneof(trickyString, FastCheck.dictionary(trickyKey, trickyString, { maxKeys: 3 })),
-    { maxKeys: 6 }
-  )
+    Schema.Union([
+      trickyString,
+      Schema.Record(trickyKey, trickyString).check(Schema.isMaxProperties(3)),
+    ])
+  ).check(Schema.isMaxProperties(6))
 
   it.effect.prop(
     "never corrupt string values that look like keys, at any indentation",
-    { indentation: FastCheck.constantFrom<number | string>(0, 2, 4, "\t"), value: trickyObject },
+    { indentation: Schema.Literals([0, 2, 4, "\t"]), value: trickyObject },
     ({ indentation, value }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -501,7 +501,7 @@ describe("serializeTsObjectLiteral", () => {
 
         expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
       }),
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 })
 
@@ -512,7 +512,7 @@ describe("serializeTsPropertyKey", () => {
 
   it.effect.prop(
     "emit a property name that evaluates back to the original key",
-    { key: FastCheck.string() },
+    { key: Schema.String },
     ({ key }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -521,7 +521,7 @@ describe("serializeTsPropertyKey", () => {
 
         expect(JSON.stringify(evaluated)).toBe(JSON.stringify({ [key]: 1 }))
       }),
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 })
 
@@ -805,17 +805,20 @@ describe("normalizeDependencyVersion", () => {
   // The input domain is real dependency specifiers: optional whitespace padding, an optional
   // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
   // valid specifiers and are out of scope.
-  const version = FastCheck.tuple(
-    FastCheck.nat({ max: 99 }),
-    FastCheck.nat({ max: 99 }),
-    FastCheck.nat({ max: 99 }),
-    FastCheck.option(FastCheck.constantFrom("-alpha", "-beta.1", "-rc.0"))
-  ).map(([major, minor, patch, prerelease]) => `${major}.${minor}.${patch}${prerelease ?? ""}`)
+  const versionNumber = Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))
+  const version = Schema.TemplateLiteral([
+    versionNumber,
+    ".",
+    versionNumber,
+    ".",
+    versionNumber,
+    Schema.Literals(["", "-alpha", "-beta.1", "-rc.0"]),
+  ])
   const specifierParts = {
-    padding: FastCheck.constantFrom("", " ", "  ", "\t"),
-    rangePrefix: FastCheck.constantFrom("", "^", "~"),
+    padding: Schema.Literals(["", " ", "  ", "\t"]),
+    rangePrefix: Schema.Literals(["", "^", "~"]),
     version,
-    workspacePrefix: FastCheck.constantFrom("", "workspace:"),
+    workspacePrefix: Schema.Literals(["", "workspace:"]),
   }
 
   it.prop(
@@ -826,7 +829,7 @@ describe("normalizeDependencyVersion", () => {
 
       expect(normalizeDependencyVersion(specifier)).toBe(versionCore)
     },
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 
   it.prop(
@@ -839,6 +842,6 @@ describe("normalizeDependencyVersion", () => {
 
       expect(normalizeDependencyVersion(once)).toBe(once)
     },
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 })

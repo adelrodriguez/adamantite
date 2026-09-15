@@ -1,3 +1,4 @@
+import process from "node:process"
 import { Macros } from "unplugin-macros"
 import { defineConfig } from "vitest/config"
 
@@ -8,5 +9,7 @@ export default defineConfig({
       provider: "v8",
     },
     include: ["src/**/*.test.ts"],
+    isolate: false,
+    reporters: process.env.CI ? ["default", ["html", { singleFile: true }]] : undefined,
   },
 })

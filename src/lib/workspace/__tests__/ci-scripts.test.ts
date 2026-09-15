@@ -1,6 +1,6 @@
 import { describe, expect, it, test } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
-import { FastCheck } from "effect/testing"
+import * as Generators from "#__tests__/generators.ts"
 import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   MANAGED_SCRIPT_COMMANDS,
@@ -39,8 +39,8 @@ describe("CI workflow entries", () => {
   const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
   const PACKAGE_MANAGERS: SupportedPackageManager[] = ["bun", "deno", "npm", "pnpm", "yarn"]
 
-  const packageManager = FastCheck.constantFrom(...PACKAGE_MANAGERS)
-  const scripts = FastCheck.subarray(ALL_SCRIPTS)
+  const packageManager = Generators.choose(...PACKAGE_MANAGERS)
+  const scripts = Generators.subset(ALL_SCRIPTS)
 
   it.prop(
     "agree with hasCICompatibleScripts for every package manager and script subset",
@@ -53,7 +53,7 @@ describe("CI workflow entries", () => {
         expect(entry.command).toContain(manager)
       }
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.prop(
@@ -67,12 +67,12 @@ describe("CI workflow entries", () => {
       expect(new Set(entries.map((entry) => entry.name)).size).toBe(entries.length)
       expect(entries.length).toBeLessThanOrEqual(selected.length)
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.prop(
     "never lose an entry when more scripts are requested",
-    { extra: FastCheck.subarray(ALL_SCRIPTS), packageManager, scripts },
+    { extra: Generators.subset(ALL_SCRIPTS), packageManager, scripts },
     ({ extra, packageManager: manager, scripts: selected }) => {
       const baseline = getCIWorkflowEntries(manager, selected)
       const expanded = getCIWorkflowEntries(manager, [...selected, ...extra])
@@ -82,6 +82,6 @@ describe("CI workflow entries", () => {
         expect(expandedNames).toContain(entry.name)
       }
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 })

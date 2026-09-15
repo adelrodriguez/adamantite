@@ -5,8 +5,10 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
 import * as Result from "effect/Result"
-import { FastCheck } from "effect/testing"
+import * as Schema from "effect/Schema"
+import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import * as Generators from "#__tests__/generators.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
 const ROOT = "/project"
@@ -246,17 +248,17 @@ describe("NodeVersionResolver", () => {
     })
   )
 
-  const nodeLine = FastCheck.tuple(
-    FastCheck.constantFrom("", "  ", "\t"),
-    FastCheck.constantFrom("node", "nodejs"),
-    FastCheck.constantFrom(" ", "  ", "\t"),
-    FastCheck.constantFrom("22.19.0", "22", "lts/iron"),
-    FastCheck.constantFrom("", "  ", " # pinned")
-  ).map((parts) => parts.join(""))
+  const nodeLine = Arbitrary.all([
+    Generators.choose("", "  ", "\t"),
+    Generators.choose("node", "nodejs"),
+    Generators.choose(" ", "  ", "\t"),
+    Generators.choose("22.19.0", "22", "lts/iron"),
+    Generators.choose("", "  ", " # pinned"),
+  ]).pipe(Arbitrary.map((parts) => parts.join("")))
   // Lines the parser must ignore: comments, other tools, node-prefixed tool names, and bare
   // `node` entries without a version. The `node # pinned` shapes stay inert only when comments
   // are stripped before matching, so they keep the comment handling load-bearing.
-  const inertLine = FastCheck.constantFrom(
+  const inertLine = Generators.choose(
     "",
     "# pinned tools",
     "  # node 22.19.0",
@@ -273,10 +275,10 @@ describe("NodeVersionResolver", () => {
   it.effect.prop(
     "detect a .tool-versions node entry regardless of surrounding noise",
     {
-      hasNode: FastCheck.boolean(),
-      lines: FastCheck.array(inertLine, { maxLength: 8 }),
+      hasNode: Arbitrary.schema(Schema.Boolean),
+      lines: Generators.array(inertLine, { maxLength: 8 }),
       node: nodeLine,
-      position: FastCheck.nat({ max: 8 }),
+      position: Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 8, minimum: 0 }))),
     },
     ({ hasNode, lines, node, position }) =>
       Effect.gen(function* () {
@@ -292,22 +294,22 @@ describe("NodeVersionResolver", () => {
           hasNode ? { _tag: "File", path: ".tool-versions" } : { _tag: "Version", value: "lts/*" }
         )
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 
-  const versionFileContent = FastCheck.constantFrom(
+  const versionFileContent = Generators.choose(
     { content: "22.19.0\n", valid: true },
     { content: "22\n", valid: true },
     { content: "", valid: false },
     { content: "   \n", valid: false }
   )
-  const toolVersionsContent = FastCheck.constantFrom(
+  const toolVersionsContent = Generators.choose(
     { content: "nodejs 22.19.0\n", valid: true },
     { content: "node 22\n", valid: true },
     { content: "python 3.12.0\n", valid: false },
     { content: "# only comments\n", valid: false }
   )
-  const packageJsonContent = FastCheck.constantFrom(
+  const packageJsonContent = Generators.choose(
     { content: JSON.stringify({ engines: { node: ">=22" }, name: "pkg" }), valid: true },
     { content: JSON.stringify({ name: "pkg", volta: { node: "22.19.0" } }), valid: true },
     {
@@ -323,10 +325,10 @@ describe("NodeVersionResolver", () => {
   it.effect.prop(
     "resolve the highest-precedence valid declaration for any file combination",
     {
-      nodeVersion: FastCheck.option(versionFileContent),
-      nvmrc: FastCheck.option(versionFileContent),
-      packageJson: FastCheck.option(packageJsonContent),
-      toolVersions: FastCheck.option(toolVersionsContent),
+      nodeVersion: Generators.nullable(versionFileContent),
+      nvmrc: Generators.nullable(versionFileContent),
+      packageJson: Generators.nullable(packageJsonContent),
+      toolVersions: Generators.nullable(toolVersionsContent),
     },
     ({ nodeVersion, nvmrc, packageJson, toolVersions }) =>
       Effect.gen(function* () {
@@ -358,26 +360,28 @@ describe("NodeVersionResolver", () => {
                 : { _tag: "Version", value: "lts/*" }
         expect(source).toEqual(expected)
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 
-  const nonEmptyVersion = FastCheck.constantFrom("22.19.0", ">=22", "lts/*")
-  const declaringManifest = FastCheck.oneof(
-    nonEmptyVersion.map((node) => ({ volta: { node } })),
-    nonEmptyVersion.map((node) => ({ engines: { node } })),
-    FastCheck.tuple(FastCheck.constantFrom("node", "Node", "NODE"), nonEmptyVersion).map(
-      ([name, version]) => ({ devEngines: { runtime: { name, version } } })
+  const nonEmptyVersion = Generators.choose("22.19.0", ">=22", "lts/*")
+  const declaringManifest = Generators.oneOf(
+    nonEmptyVersion.pipe(Arbitrary.map((node) => ({ volta: { node } }))),
+    nonEmptyVersion.pipe(Arbitrary.map((node) => ({ engines: { node } }))),
+    Arbitrary.all([Generators.choose("node", "Node", "NODE"), nonEmptyVersion]).pipe(
+      Arbitrary.map(([name, version]) => ({ devEngines: { runtime: { name, version } } }))
     ),
-    nonEmptyVersion.map((version) => ({
-      devEngines: {
-        runtime: [
-          { name: "deno", version: "2.0.0" },
-          { name: "node", version },
-        ],
-      },
-    }))
+    nonEmptyVersion.pipe(
+      Arbitrary.map((version) => ({
+        devEngines: {
+          runtime: [
+            { name: "deno", version: "2.0.0" },
+            { name: "node", version },
+          ],
+        },
+      }))
+    )
   )
-  const nonDeclaringManifest = FastCheck.constantFrom(
+  const nonDeclaringManifest = Generators.choose(
     {},
     { engines: {} },
     { engines: { node: "" } },
@@ -400,7 +404,7 @@ describe("NodeVersionResolver", () => {
 
         expect(source).toEqual({ _tag: "File", path: "package.json" })
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 
   it.effect.prop(
@@ -414,12 +418,12 @@ describe("NodeVersionResolver", () => {
 
         expect(source).toEqual({ _tag: "Version", value: "lts/*" })
       }),
-    { fastCheck: { numRuns: 100 } }
+    { arbitrary: { runs: 100 } }
   )
 
   it.effect.prop(
     "resolve without failing for arbitrary package.json JSON",
-    { value: FastCheck.jsonValue({ maxDepth: 3 }) },
+    { value: Generators.jsonValue({ maxDepth: 3 }) },
     ({ value }) =>
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": JSON.stringify(value) })
@@ -428,6 +432,6 @@ describe("NodeVersionResolver", () => {
 
         expect(["File", "Version"]).toContain(source._tag)
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 })

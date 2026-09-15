@@ -1,6 +1,8 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it, test } from "@effect/vitest"
-import { FastCheck } from "effect/testing"
+import * as Schema from "effect/Schema"
+import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
+import * as Generators from "#__tests__/generators.ts"
 import {
   getConflictingScripts,
   getManagedScripts,
@@ -76,21 +78,20 @@ describe("script management", () => {
   // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
   const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
 
-  const requestedScripts = FastCheck.subarray(ALL_SCRIPTS)
-  const scriptCommand = FastCheck.oneof(
-    FastCheck.constantFrom(...Object.values(MANAGED_SCRIPT_COMMANDS)),
-    FastCheck.constantFrom("", "tsc && eslint .", "prettier --write ."),
-    FastCheck.string()
+  const requestedScripts = Generators.subset(ALL_SCRIPTS)
+  const scriptCommand = Generators.oneOf(
+    Generators.choose(...Object.values(MANAGED_SCRIPT_COMMANDS)),
+    Generators.choose("", "tsc && eslint .", "prettier --write ."),
+    Arbitrary.schema(Schema.String)
   )
-  const manifestScripts = FastCheck.dictionary(
-    FastCheck.oneof(
-      FastCheck.constantFrom<string>(...ALL_SCRIPTS),
-      FastCheck.constantFrom("build", "dev", "test")
-    ),
+  const manifestScripts = Generators.dictionary(
+    Generators.oneOf(Generators.choose(...ALL_SCRIPTS), Generators.choose("build", "dev", "test")),
     scriptCommand,
     { maxKeys: 9 }
   )
-  const manifest = manifestScripts.map((scripts): PackageJson => ({ name: "fixture", scripts }))
+  const manifest = manifestScripts.pipe(
+    Arbitrary.map((scripts): PackageJson => ({ name: "fixture", scripts }))
+  )
 
   it.prop(
     "never report a script as both managed and conflicting",
@@ -103,7 +104,7 @@ describe("script management", () => {
         expect(managed).not.toContain(conflict.script)
       }
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.prop(
@@ -125,7 +126,7 @@ describe("script management", () => {
       })
       expect(conflicts.map((conflict) => conflict.script)).toEqual(expectedConflicting)
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.prop(
@@ -145,6 +146,6 @@ describe("script management", () => {
         expect(managed).toContain(script)
       }
     },
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 })

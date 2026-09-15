@@ -4,8 +4,10 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as PlatformError from "effect/PlatformError"
-import { FastCheck } from "effect/testing"
+import * as Schema from "effect/Schema"
+import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import * as Generators from "#__tests__/generators.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
@@ -232,12 +234,12 @@ describe("writeAgentsGuidance", () => {
     "fix:monorepo",
   ]
   const guidanceOptions = {
-    packageManager: FastCheck.constantFrom("bun", "deno", "npm", "pnpm", "yarn"),
-    scripts: FastCheck.subarray(ALL_SCRIPTS),
+    packageManager: Generators.choose("bun", "deno", "npm", "pnpm", "yarn"),
+    scripts: Generators.subset(ALL_SCRIPTS),
   }
   // Marker-free so generated content cannot collide with the managed block by accident.
-  const markerFreeContent = FastCheck.string({ maxLength: 200 }).filter(
-    (content) => !content.includes("ADAMANTITE")
+  const markerFreeContent = Arbitrary.schema(Schema.String.check(Schema.isMaxLength(200))).pipe(
+    Arbitrary.filter((content) => !content.includes("ADAMANTITE"))
   )
 
   it.effect.prop(
@@ -268,7 +270,7 @@ describe("writeAgentsGuidance", () => {
           expect(agents).toContain(`${packageManager} `)
         }
       }),
-    { fastCheck: { numRuns: 150 } }
+    { arbitrary: { runs: 150 } }
   )
 
   it.effect.prop(
@@ -285,7 +287,7 @@ describe("writeAgentsGuidance", () => {
         expect(result).toBe("updated")
         expect(files.read("AGENTS.md")).toBe(afterFirst)
       }),
-    { fastCheck: { numRuns: 150 } }
+    { arbitrary: { runs: 150 } }
   )
 
   it.effect.prop(
@@ -309,7 +311,7 @@ describe("writeAgentsGuidance", () => {
         expect(agents.endsWith(suffix) || agents.endsWith(`${suffix}\n`)).toBe(true)
         expect(agents.endsWith("\n")).toBe(true)
       }),
-    { fastCheck: { numRuns: 150 } }
+    { arbitrary: { runs: 150 } }
   )
 
   it.effect.prop(
@@ -318,7 +320,7 @@ describe("writeAgentsGuidance", () => {
       ...guidanceOptions,
       prefix: markerFreeContent,
       suffix: markerFreeContent,
-      variant: FastCheck.constantFrom("start-only", "end-only", "end-before-start"),
+      variant: Generators.choose("start-only", "end-only", "end-before-start"),
     },
     ({ packageManager, prefix, scripts, suffix, variant }) =>
       Effect.gen(function* () {
@@ -335,6 +337,6 @@ describe("writeAgentsGuidance", () => {
         expect(result).toBe("malformed")
         expect(files.read("AGENTS.md")).toBe(existing)
       }),
-    { fastCheck: { numRuns: 150 } }
+    { arbitrary: { runs: 150 } }
   )
 })

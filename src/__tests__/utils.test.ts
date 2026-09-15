@@ -8,9 +8,11 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
-import { FastCheck } from "effect/testing"
+import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import * as Generators from "#__tests__/generators.ts"
 import {
   mergeConfig,
   parseJson,
@@ -36,8 +38,7 @@ function someKey(value: JsonValue, predicate: (key: string) => boolean): boolean
   return false
 }
 
-// SAFETY: fast-check's JsonValue and type-fest's JsonValue describe the same JSON data shapes.
-const jsonValueArbitrary = FastCheck.jsonValue({ maxDepth: 4 }).map((value) => value as JsonValue)
+const jsonValueArbitrary = Generators.jsonValue({ maxDepth: 4 })
 
 // Evaluates through a data: URI module import instead of `new Function` so the oracle stays
 // within the repo's no-eval lint policy without disable comments.
@@ -234,7 +235,9 @@ describe("parseJson", () => {
   it.effect.prop(
     "round-trip any JSON value without __proto__ keys through JSON.stringify",
     {
-      value: jsonValueArbitrary.filter((value) => !someKey(value, (key) => key === "__proto__")),
+      value: jsonValueArbitrary.pipe(
+        Arbitrary.filter((value) => !someKey(value, (key) => key === "__proto__"))
+      ),
     },
     ({ value }) =>
       Effect.gen(function* () {
@@ -242,12 +245,12 @@ describe("parseJson", () => {
 
         expect(JSON.stringify(parsed)).toBe(JSON.stringify(value))
       }),
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   it.effect.prop(
     "resolve to success or FailedToParseFile for arbitrary input, never a defect",
-    { content: FastCheck.string() },
+    { content: Arbitrary.schema(Schema.String) },
     ({ content }) =>
       Effect.gen(function* () {
         const result = yield* Effect.result(parseJson(content))
@@ -256,7 +259,7 @@ describe("parseJson", () => {
           expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
         }
       }),
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 })
 
@@ -324,15 +327,17 @@ describe("mergeConfig", () => {
   // defu drops `__proto__`/`constructor` keys and null-valued keys from its first argument, and
   // concatenates arrays on conflicts, so these algebraic properties hold on array-free, null-free
   // configs with plain keys.
-  const jsonPrimitive = FastCheck.oneof(
-    FastCheck.string(),
-    FastCheck.integer(),
-    FastCheck.boolean()
+  const jsonPrimitive = Generators.oneOf(
+    Arbitrary.schema(Schema.String),
+    Arbitrary.schema(Schema.Int),
+    Arbitrary.schema(Schema.Boolean)
   )
-  const plainKey = FastCheck.string().filter((key) => key !== "__proto__" && key !== "constructor")
-  const arrayFreeConfig = FastCheck.dictionary(
+  const plainKey = Arbitrary.schema(Schema.String).pipe(
+    Arbitrary.filter((key) => key !== "__proto__" && key !== "constructor")
+  )
+  const arrayFreeConfig = Generators.dictionary(
     plainKey,
-    FastCheck.oneof(jsonPrimitive, FastCheck.dictionary(plainKey, jsonPrimitive, { maxKeys: 4 })),
+    Generators.oneOf(jsonPrimitive, Generators.dictionary(plainKey, jsonPrimitive, { maxKeys: 4 })),
     { maxKeys: 8 }
   )
 
@@ -344,7 +349,7 @@ describe("mergeConfig", () => {
         expect(yield* mergeConfig(config, {})).toEqual(config)
         expect(yield* mergeConfig({}, config)).toEqual(config)
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 
   it.effect.prop(
@@ -354,7 +359,7 @@ describe("mergeConfig", () => {
       Effect.gen(function* () {
         expect(yield* mergeConfig(config, config)).toEqual(config)
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 
   it.effect.prop(
@@ -378,7 +383,7 @@ describe("mergeConfig", () => {
           }
         }
       }),
-    { fastCheck: { numRuns: 200 } }
+    { arbitrary: { runs: 200 } }
   )
 })
 
@@ -471,28 +476,28 @@ describe("serializeTsObjectLiteral", () => {
 
         expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
       }),
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 
   // Focused generator for the risky surface: identifier-like keys next to string values full of
   // quotes, backslashes, colons, and braces that the key-unquoting regex could corrupt.
-  const trickyString = FastCheck.array(
-    FastCheck.constantFrom('"', "\\", ":", "\n", " ", "a", "$", "_", "{", "}", "'", "`"),
+  const trickyString = Generators.array(
+    Generators.choose('"', "\\", ":", "\n", " ", "a", "$", "_", "{", "}", "'", "`"),
     { maxLength: 12 }
-  ).map((chars) => chars.join(""))
-  const trickyKey = FastCheck.oneof(
-    FastCheck.constantFrom("enabled", "entry", "$schema", "_private", "a1", "__proto__"),
+  ).pipe(Arbitrary.map((chars) => chars.join("")))
+  const trickyKey = Generators.oneOf(
+    Generators.choose("enabled", "entry", "$schema", "_private", "a1", "__proto__"),
     trickyString
   )
-  const trickyObject = FastCheck.dictionary(
+  const trickyObject = Generators.dictionary(
     trickyKey,
-    FastCheck.oneof(trickyString, FastCheck.dictionary(trickyKey, trickyString, { maxKeys: 3 })),
+    Generators.oneOf(trickyString, Generators.dictionary(trickyKey, trickyString, { maxKeys: 3 })),
     { maxKeys: 6 }
   )
 
   it.effect.prop(
     "never corrupt string values that look like keys, at any indentation",
-    { indentation: FastCheck.constantFrom<number | string>(0, 2, 4, "\t"), value: trickyObject },
+    { indentation: Generators.choose<number | string>(0, 2, 4, "\t"), value: trickyObject },
     ({ indentation, value }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -501,7 +506,7 @@ describe("serializeTsObjectLiteral", () => {
 
         expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
       }),
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 })
 
@@ -512,7 +517,7 @@ describe("serializeTsPropertyKey", () => {
 
   it.effect.prop(
     "emit a property name that evaluates back to the original key",
-    { key: FastCheck.string() },
+    { key: Arbitrary.schema(Schema.String) },
     ({ key }) =>
       Effect.gen(function* () {
         const evaluated = yield* Effect.promise(() =>
@@ -521,7 +526,7 @@ describe("serializeTsPropertyKey", () => {
 
         expect(JSON.stringify(evaluated)).toBe(JSON.stringify({ [key]: 1 }))
       }),
-    { fastCheck: { numRuns: 300 } }
+    { arbitrary: { runs: 300 } }
   )
 })
 
@@ -805,17 +810,21 @@ describe("normalizeDependencyVersion", () => {
   // The input domain is real dependency specifiers: optional whitespace padding, an optional
   // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
   // valid specifiers and are out of scope.
-  const version = FastCheck.tuple(
-    FastCheck.nat({ max: 99 }),
-    FastCheck.nat({ max: 99 }),
-    FastCheck.nat({ max: 99 }),
-    FastCheck.option(FastCheck.constantFrom("-alpha", "-beta.1", "-rc.0"))
-  ).map(([major, minor, patch, prerelease]) => `${major}.${minor}.${patch}${prerelease ?? ""}`)
+  const version = Arbitrary.all([
+    Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))),
+    Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))),
+    Arbitrary.schema(Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))),
+    Generators.nullable(Generators.choose("-alpha", "-beta.1", "-rc.0")),
+  ]).pipe(
+    Arbitrary.map(
+      ([major, minor, patch, prerelease]) => `${major}.${minor}.${patch}${prerelease ?? ""}`
+    )
+  )
   const specifierParts = {
-    padding: FastCheck.constantFrom("", " ", "  ", "\t"),
-    rangePrefix: FastCheck.constantFrom("", "^", "~"),
+    padding: Generators.choose("", " ", "  ", "\t"),
+    rangePrefix: Generators.choose("", "^", "~"),
     version,
-    workspacePrefix: FastCheck.constantFrom("", "workspace:"),
+    workspacePrefix: Generators.choose("", "workspace:"),
   }
 
   it.prop(
@@ -826,7 +835,7 @@ describe("normalizeDependencyVersion", () => {
 
       expect(normalizeDependencyVersion(specifier)).toBe(versionCore)
     },
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 
   it.prop(
@@ -839,6 +848,6 @@ describe("normalizeDependencyVersion", () => {
 
       expect(normalizeDependencyVersion(once)).toBe(once)
     },
-    { fastCheck: { numRuns: 500 } }
+    { arbitrary: { runs: 500 } }
   )
 })

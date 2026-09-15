@@ -9,22 +9,22 @@ import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 
-const files = Argument.file("files", { mustExist: true }).pipe(
+const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to fix (optional)"),
   Argument.variadic()
 )
 
-const suggested = Flag.boolean("suggested").pipe(
+const suggested = Flag.Boolean("suggested").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Apply suggested fixes")
 )
 
-const dangerous = Flag.boolean("dangerous").pipe(
+const dangerous = Flag.Boolean("dangerous").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Apply dangerous fixes")
 )
 
-const all = Flag.boolean("all").pipe(
+const all = Flag.Boolean("all").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Apply all fixes, including suggested and dangerous fixes")
 )

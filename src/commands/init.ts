@@ -507,51 +507,51 @@ const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   return options
 })
 
-const nonInteractive = Flag.boolean("non-interactive").pipe(
+const nonInteractive = Flag.Boolean("non-interactive").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Configure without prompts; requires at least one --script")
 )
 
-const scripts = Flag.choice("script", INIT_SCRIPTS).pipe(
+const scripts = Flag.Literals("script", INIT_SCRIPTS).pipe(
   Flag.atMost(INIT_SCRIPTS.length),
   Flag.withDescription(
     "Package script to configure; repeatable and required in non-interactive mode. Monorepo scripts require a detected monorepo"
   )
 )
 
-const presets = Flag.choice("preset", INIT_PRESETS).pipe(
+const presets = Flag.Literals("preset", INIT_PRESETS).pipe(
   Flag.atMost(INIT_PRESETS.length),
   Flag.withDescription("Oxlint preset to configure; repeatable and requires --script check or fix")
 )
 
-const editors = Flag.choice("editor", INIT_EDITORS).pipe(
+const editors = Flag.Literals("editor", INIT_EDITORS).pipe(
   Flag.atMost(INIT_EDITORS.length),
   Flag.withDescription("Editor to configure; may be specified multiple times")
 )
 
-const typescript = Flag.boolean("typescript").pipe(
+const typescript = Flag.Boolean("typescript").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Configure the TypeScript preset; requires --script check or fix")
 )
 
-const installExtensions = Flag.boolean("install-extensions").pipe(
+const installExtensions = Flag.Boolean("install-extensions").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Install recommended extensions; requires at least one --editor")
 )
 
-const githubActions = Flag.boolean("github-actions").pipe(
+const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
     "Configure CI; requires a compatible script and bun, deno, npm, pnpm, or yarn"
   )
 )
 
-const agents = Flag.boolean("agents").pipe(
+const agents = Flag.Boolean("agents").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Add Adamantite guidance to AGENTS.md")
 )
 
-const overwriteScripts = Flag.boolean("overwrite-scripts").pipe(
+const overwriteScripts = Flag.Boolean("overwrite-scripts").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
     "Replace existing package scripts that conflict with Adamantite's managed commands"

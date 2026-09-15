@@ -16,8 +16,8 @@ export function oneOf<A extends readonly unknown[]>(
 }
 
 export function nullable<A>(value: Arbitrary.Arbitrary<A>): Arbitrary.Arbitrary<A | null> {
-  return Arbitrary.schema(Schema.Boolean).pipe(
-    Arbitrary.flatMap((present) => (present ? value : Arbitrary.Constant(null)))
+  return choose(0, 1, 2, 3, 4).pipe(
+    Arbitrary.flatMap((choice) => (choice === 0 ? Arbitrary.Constant(null) : value))
   )
 }
 
@@ -39,9 +39,9 @@ export function subset<A>(values: readonly A[]): Arbitrary.Arbitrary<A[]> {
 export function dictionary<A>(
   key: Arbitrary.Arbitrary<string>,
   value: Arbitrary.Arbitrary<A>,
-  options?: { readonly maxKeys: number }
+  options: { readonly maxKeys: number }
 ): Arbitrary.Arbitrary<Record<string, A>> {
-  return array(Arbitrary.all([key, value]), { maxLength: options?.maxKeys ?? 10 }).pipe(
+  return array(Arbitrary.all([key, value]), { maxLength: options.maxKeys }).pipe(
     Arbitrary.map((entries) => Object.fromEntries(entries))
   )
 }

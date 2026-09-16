@@ -27,7 +27,7 @@ export default Command.make("check", { files }).pipe(
             command: oxlint.name,
           }),
         ],
-        { mode: "result" }
+        { concurrency: 1, mode: "result" }
       ).pipe(
         Effect.map((results) => Result.all(results)),
         Effect.flatMap((result) => Effect.fromResult(result))

@@ -2,11 +2,9 @@ import * as Effect from "effect/Effect"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
-import { CommandFailed } from "#lib/shared/errors.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to format (optional)"),
@@ -32,14 +30,10 @@ export default Command.make("format", { check, files }).pipe(
 
       args.push(...files, ...forwardedArguments)
 
-      const exitCode = yield* runner.run({
+      yield* runner.run({
         args,
         command: oxfmt.name,
       })
-
-      if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-        yield* new CommandFailed({ command: oxfmt.name, exitCode })
-      }
     })
   )
 )

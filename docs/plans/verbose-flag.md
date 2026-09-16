@@ -45,7 +45,7 @@ cannot read a flag. Apply verbosity only at the effect edges:
   `error.cause` chain with indentation. Do not hand-roll cause-chain walking or stack
   formatting. If per-line control is needed for the clack gutter, build the output from
   `Cause.prettyErrors` instead, which returns the individual `Error` instances.
-- `CommandRunner.run` and `DependencyInstaller.addDevDependencies`. Verbose: log the
+- `CommandRunner.exitCode` and `DependencyInstaller.addDevDependencies`. Verbose: log the
   command before execution.
 
 ### Flag wiring

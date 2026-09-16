@@ -22,13 +22,15 @@ describe("runAgentSession", () => {
       process.on("SIGINT", sentinel)
 
       let listenersDuringRun: unknown[] = []
-      const runner = Layer.succeed(CommandRunner)({
-        run: () =>
+      const runner = Layer.succeed(
+        CommandRunner,
+        CommandRunner.make(() =>
           Effect.sync(() => {
             listenersDuringRun = process.listeners("SIGINT")
             return ChildProcessSpawner.ExitCode(0)
-          }),
-      })
+          })
+        )
+      )
       const spawner = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
         ChildProcessSpawner.make(() =>
           Effect.die("runAgentSession tests stub CommandRunner instead of spawning processes")

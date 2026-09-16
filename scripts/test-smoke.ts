@@ -117,7 +117,7 @@ try {
     PATH: `${join(fixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
   }
 
-  for (const command of ["check", "format", "analyze"]) {
+  for (const command of ["fix", "check", "format", "analyze"]) {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }

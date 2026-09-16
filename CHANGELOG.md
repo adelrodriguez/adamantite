@@ -1,5 +1,15 @@
 # adamantite
 
+## 0.40.0
+
+### Minor Changes
+
+- [#410](https://github.com/adelrodriguez/adamantite/pull/410) [`489b0a8`](https://github.com/adelrodriguez/adamantite/commit/489b0a89bff12bb0429e632c70e85577ae9d873d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove the `doctor --fix` compatibility stub. `adamantite doctor --fix` now fails as an unknown option. Run `adamantite doctor` and follow the reported goal criteria.
+
+### Patch Changes
+
+- [#412](https://github.com/adelrodriguez/adamantite/pull/412) [`26bba66`](https://github.com/adelrodriguez/adamantite/commit/26bba66edd08928c3af9b61632151258a6273680) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update the managed `oxlint` version to 1.83.0. Run `adamantite update` to pick it up; no config change is necessary. Includes React 19.3 support in `react/jsx-no-useless-fragment` and `react/no-unknown-property`.
+
 ## 0.39.0
 
 ### Minor Changes

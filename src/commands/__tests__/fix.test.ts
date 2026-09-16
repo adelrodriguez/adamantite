@@ -9,7 +9,7 @@ import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("fix", () => {
   describe("default invocation", () => {
-    it.effect("always include the fix flag", () =>
+    it.effect("lint before formatting", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
@@ -20,6 +20,10 @@ describe("fix", () => {
           {
             args: ["--fix"],
             command: "oxlint",
+          },
+          {
+            args: ["--write"],
+            command: "oxfmt",
           },
         ])
       })
@@ -79,7 +83,16 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual(["--fix", join(files.root, "index.ts")])
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--fix", join(files.root, "index.ts")],
+            command: "oxlint",
+          },
+          {
+            args: ["--write", join(files.root, "index.ts")],
+            command: "oxfmt",
+          },
+        ])
       })
     )
   })
@@ -95,25 +108,43 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual([
-          "--fix",
-          "--fix-dangerously",
-          "--deny-warnings",
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--fix", "--fix-dangerously", "--deny-warnings"],
+            command: "oxlint",
+          },
+          {
+            args: ["--write"],
+            command: "oxfmt",
+          },
         ])
       })
     )
   })
 
   describe("error handling", () => {
-    it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
+    it.effect("run formatting after linting fails and report the first failure", () =>
       Effect.gen(function* () {
-        const runner = createRunnerTestContext([1])
+        const runner = createRunnerTestContext([1, 2])
 
         const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed" })
+        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxlint", exitCode: 1 })
+        expect(runner.invocations).toHaveLength(2)
+      })
+    )
+
+    it.effect("report a formatting failure after linting succeeds", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext([0, 2])
+
+        const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
       })
     )
   })

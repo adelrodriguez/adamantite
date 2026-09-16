@@ -9,7 +9,7 @@ import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("check", () => {
   describe("default invocation", () => {
-    it.effect("run oxlint with config-driven linting and type checking by default", () =>
+    it.effect("check formatting before linting", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
@@ -17,6 +17,10 @@ describe("check", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toEqual([
+          {
+            args: ["--check"],
+            command: "oxfmt",
+          },
           {
             args: [],
             command: "oxlint",
@@ -42,6 +46,10 @@ describe("check", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toEqual([
           {
+            args: ["--check", join(files.root, "index.ts")],
+            command: "oxfmt",
+          },
+          {
             args: [join(files.root, "index.ts")],
             command: "oxlint",
           },
@@ -65,24 +73,31 @@ describe("check", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual([
-          join(files.root, "index.ts"),
-          "--deny-warnings",
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--check", join(files.root, "index.ts")],
+            command: "oxfmt",
+          },
+          {
+            args: [join(files.root, "index.ts"), "--deny-warnings"],
+            command: "oxlint",
+          },
         ])
       })
     )
   })
 
   describe("error handling", () => {
-    it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
+    it.effect("run lint after formatting fails and report the first failure", () =>
       Effect.gen(function* () {
-        const runner = createRunnerTestContext([2])
+        const runner = createRunnerTestContext([2, 3])
 
         const exit = yield* runCommand(checkCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed" })
+        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
+        expect(runner.invocations).toHaveLength(2)
       })
     )
   })

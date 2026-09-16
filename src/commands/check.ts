@@ -1,8 +1,9 @@
 import * as Effect from "effect/Effect"
+import * as Result from "effect/Result"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { runCommandSteps } from "#lib/execution/run-command-steps.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 
@@ -16,11 +17,21 @@ export default Command.make("check", { files }).pipe(
   Command.withHandler(({ files }) =>
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
+      const runner = yield* CommandRunner
 
-      yield* runCommandSteps([
-        { args: ["--check", ...files], command: oxfmt.name },
-        { args: [...files, ...forwardedArguments], command: oxlint.name },
-      ])
+      yield* Effect.all(
+        [
+          runner.runOrFail({ args: ["--check", ...files], command: oxfmt.name }),
+          runner.runOrFail({
+            args: [...files, ...forwardedArguments],
+            command: oxlint.name,
+          }),
+        ],
+        { mode: "result" }
+      ).pipe(
+        Effect.map((results) => Result.all(results)),
+        Effect.flatMap((result) => Effect.fromResult(result))
+      )
     })
   )
 )

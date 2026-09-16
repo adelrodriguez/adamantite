@@ -95,8 +95,9 @@ export function createRunnerTestContext(
 
   return {
     invocations,
-    layer: Layer.succeed(CommandRunner)({
-      run: (options) =>
+    layer: Layer.succeed(
+      CommandRunner,
+      CommandRunner.make((options) =>
         Effect.gen(function* () {
           invocations.push({
             ...options,
@@ -106,8 +107,9 @@ export function createRunnerTestContext(
             return yield* implementation(options)
           }
           return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
-        }),
-    }),
+        })
+      )
+    ),
   }
 }
 

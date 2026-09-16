@@ -1,10 +1,11 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Result from "effect/Result"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { runCommandSteps } from "#lib/execution/run-command-steps.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 
@@ -33,6 +34,7 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
   Command.withHandler(({ all, dangerous, files, suggested }) =>
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
+      const runner = yield* CommandRunner
       const targets = Array.dedupe(files)
       const args = Array.dedupe([
         "--fix",
@@ -41,10 +43,19 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
         ...targets,
       ])
 
-      yield* runCommandSteps([
-        { args: [...args, ...forwardedArguments], command: oxlint.name },
-        { args: ["--write", ...targets], command: oxfmt.name },
-      ])
+      yield* Effect.all(
+        [
+          runner.runOrFail({
+            args: [...args, ...forwardedArguments],
+            command: oxlint.name,
+          }),
+          runner.runOrFail({ args: ["--write", ...targets], command: oxfmt.name }),
+        ],
+        { mode: "result" }
+      ).pipe(
+        Effect.map((results) => Result.all(results)),
+        Effect.flatMap((result) => Effect.fromResult(result))
+      )
     })
   )
 )

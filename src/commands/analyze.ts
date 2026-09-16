@@ -39,7 +39,7 @@ export default Command.make("analyze", { fix, strict }).pipe(
 
       args.push(...forwardedArguments)
 
-      yield* runner.runOrFail({
+      yield* runner.run({
         args,
         command: knip.name,
       })

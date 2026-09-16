@@ -2,9 +2,8 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { Script } from "#lib/workspace/package-json.ts"
-import { type CommandFailedLike, CommandRunner } from "#lib/execution/command-runner.ts"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { defineIntegration } from "#lib/integrations/base.ts"
 import {
   FailedToInstallExtension,
@@ -79,22 +78,21 @@ export default defineIntegration({
 
       for (const extension of extensions) {
         const runner = yield* CommandRunner
-        const exitCode = yield* runner
+        yield* runner
           .run({
             args: ["--install-extension", extension],
             command: "code",
           })
           .pipe(
-            Effect.mapError((cause: CommandFailedLike) =>
+            Effect.mapError((cause) =>
               cause._tag === "CliNotFound" && cause.command === "code"
                 ? new VscodeCliNotFound({ cause })
-                : new FailedToInstallExtension({ cause, extension })
+                : new FailedToInstallExtension({
+                    cause: cause._tag === "CommandFailed" ? cause.exitCode : cause,
+                    extension,
+                  })
             )
           )
-
-        if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-          return yield* new FailedToInstallExtension({ cause: exitCode, extension })
-        }
       }
     }),
   files,

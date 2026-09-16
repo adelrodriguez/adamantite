@@ -17,7 +17,7 @@ export default Command.make("monorepo", { fix }).pipe(
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
       const args = fix ? ["--fix", ...forwardedArguments] : [...forwardedArguments]
-      yield* runner.runOrFail({
+      yield* runner.run({
         args,
         command: sherif.name,
         stdin: "inherit",

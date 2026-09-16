@@ -23,14 +23,14 @@ export interface CommandRunOptions {
 export type CommandFailedLike = CliNotFound | PlatformError.PlatformError
 
 interface CommandRunnerService {
-  readonly run: (
+  readonly exitCode: (
     options: CommandRunOptions
   ) => Effect.Effect<
     ChildProcessSpawner.ExitCode,
     CommandFailedLike,
     ChildProcessSpawner.ChildProcessSpawner
   >
-  readonly runOrFail: (
+  readonly run: (
     options: CommandRunOptions
   ) => Effect.Effect<
     void,
@@ -39,7 +39,7 @@ interface CommandRunnerService {
   >
 }
 
-const run = Effect.fn("CommandRunner.run")(function* ({
+const exitCode = Effect.fn("CommandRunner.exitCode")(function* ({
   args,
   command,
   cwd,
@@ -70,18 +70,18 @@ const run = Effect.fn("CommandRunner.run")(function* ({
 export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerService>()(
   "CommandRunner"
 ) {
-  static make(run: CommandRunnerService["run"]): CommandRunnerService {
+  static make(exitCode: CommandRunnerService["exitCode"]): CommandRunnerService {
     return {
-      run,
-      runOrFail: Effect.fn("CommandRunner.runOrFail")(function* (options) {
-        const exitCode = yield* run(options)
+      exitCode,
+      run: Effect.fn("CommandRunner.run")(function* (options) {
+        const code = yield* exitCode(options)
 
-        if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
-          yield* new CommandFailed({ command: options.command, exitCode })
+        if (code !== ChildProcessSpawner.ExitCode(0)) {
+          yield* new CommandFailed({ command: options.command, exitCode: code })
         }
       }),
     }
   }
 
-  static readonly layer = Layer.succeed(this)(this.make(run))
+  static readonly layer = Layer.succeed(this)(this.make(exitCode))
 }

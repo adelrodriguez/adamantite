@@ -21,8 +21,8 @@ export default Command.make("check", { files }).pipe(
 
       yield* Effect.all(
         [
-          runner.runOrFail({ args: ["--check", ...files], command: oxfmt.name }),
-          runner.runOrFail({
+          runner.run({ args: ["--check", ...files], command: oxfmt.name }),
+          runner.run({
             args: [...files, ...forwardedArguments],
             command: oxlint.name,
           }),

@@ -30,7 +30,7 @@ export default Command.make("format", { check, files }).pipe(
 
       args.push(...files, ...forwardedArguments)
 
-      yield* runner.runOrFail({
+      yield* runner.run({
         args,
         command: oxfmt.name,
       })

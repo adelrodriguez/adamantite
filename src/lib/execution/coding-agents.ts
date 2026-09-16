@@ -52,7 +52,7 @@ export const detectInstalledAgents = (cwd: string) =>
       codingAgents,
       (agent) =>
         runner
-          .run({
+          .exitCode({
             args: [...(agent.probeArguments ?? ["--version"])],
             command: agent.command,
             cwd,
@@ -122,7 +122,7 @@ export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: strin
   Effect.gen(function* () {
     const runner = yield* CommandRunner
     yield* shieldSigintDuring(
-      runner.run({
+      runner.exitCode({
         args: agent.seedArguments(handoffPrompt),
         command: agent.command,
         cwd,
@@ -151,7 +151,7 @@ type WorkingTreeState = "clean" | "dirty" | "unknown"
 export const checkWorkingTreeState = (cwd: string) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
-    const exitCode = yield* runner.run({
+    const exitCode = yield* runner.exitCode({
       args: ["diff", "--quiet", "HEAD"],
       command: "git",
       cwd,

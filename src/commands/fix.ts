@@ -45,11 +45,11 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
 
       yield* Effect.all(
         [
-          runner.runOrFail({
+          runner.run({
             args: [...args, ...forwardedArguments],
             command: oxlint.name,
           }),
-          runner.runOrFail({ args: ["--write", ...targets], command: oxfmt.name }),
+          runner.run({ args: ["--write", ...targets], command: oxfmt.name }),
         ],
         { concurrency: 1, mode: "result" }
       ).pipe(

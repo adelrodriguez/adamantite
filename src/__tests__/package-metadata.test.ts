@@ -13,7 +13,7 @@ describe("package metadata", () => {
     expect(packageJson.main).toBe("dist/presets/lint/core.js")
     expect(packageJson.devDependencies?.typescript).toBe("7.0.2")
     expect(packageJson.peerDependencies?.typescript).toBe(">=7")
-    expect(packageJson.packageManager).toBe("pnpm@12.0.0-rc.6")
+    expect(packageJson.packageManager).toBe("pnpm@12.4.2")
     expect(packageJson.engines?.bun).toBe(">=1.0.0")
     expect(packageJson.exports).toMatchObject({
       "./analyze": {

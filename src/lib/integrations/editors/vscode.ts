@@ -68,7 +68,7 @@ export default defineIntegration({
     Effect.gen(function* () {
       const extensions: string[] = []
 
-      if (scripts.includes("check") || scripts.includes("fix") || scripts.includes("format")) {
+      if (scripts.includes("check") || scripts.includes("fix")) {
         extensions.push("oxc.oxc-vscode")
       }
 

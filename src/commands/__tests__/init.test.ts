@@ -64,7 +64,7 @@ describe("init", () => {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
           confirmResponses: [true, false, false, false],
-          multiselectResponses: [["check", "format", "analyze"], ["react"], ["vscode"]],
+          multiselectResponses: [["check", "analyze"], ["react"], ["vscode"]],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -74,6 +74,9 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.multiselectCalls[0]).toMatchObject({
+          options: expect.not.arrayContaining([expect.objectContaining({ value: "format" })]),
+        })
         expect(installer.calls).toEqual([
           {
             options: { silent: true, workspace: false },
@@ -91,7 +94,6 @@ describe("init", () => {
         expect(packageJson.scripts).toEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
-          format: "adamantite format",
         })
 
         const oxlintConfig = files.read("oxlint.config.ts")
@@ -184,8 +186,8 @@ describe("init", () => {
         })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
-          multiselectResponses: [["format"], []],
+          confirmResponses: [false, false, false],
+          multiselectResponses: [["check"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -437,7 +439,7 @@ describe("init", () => {
 
         const prompter = createPrompterTestContext({
           confirmResponses: [true, false, false, false],
-          multiselectResponses: [["check", "format"], [], ["vscode"]],
+          multiselectResponses: [["check"], [], ["vscode"]],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -476,8 +478,8 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["format"], ["zed"]],
+          confirmResponses: [false, false, false, false],
+          multiselectResponses: [["check"], [], ["zed"]],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -490,18 +492,21 @@ describe("init", () => {
         expect(installer.calls).toEqual([
           {
             options: { silent: true, workspace: false },
-            packages: ["adamantite", `oxfmt@${oxfmt.version}`],
+            packages: [
+              "adamantite",
+              `oxlint@${oxlint.version}`,
+              `oxlint-tsgolint@${tsgolint.version}`,
+              `oxfmt@${oxfmt.version}`,
+            ],
           },
         ])
 
         const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toEqual({
-          format: "adamantite format",
-        })
+        expect(packageJson.scripts).toEqual({ check: "adamantite check" })
 
         expect(files.exists("oxfmt.config.ts")).toBe(true)
         expect(files.exists(".zed/settings.json")).toBe(true)
-        expect(files.exists("oxlint.config.ts")).toBe(false)
+        expect(files.exists("oxlint.config.ts")).toBe(true)
         expect(files.exists("tsconfig.json")).toBe(false)
         expect(files.exists("knip.config.ts")).toBe(false)
         expect(files.exists(".vscode/settings.json")).toBe(false)
@@ -522,8 +527,6 @@ describe("init", () => {
             "--non-interactive",
             "--script",
             "check",
-            "--script",
-            "format",
             "--script",
             "analyze",
             "--preset",
@@ -558,7 +561,6 @@ describe("init", () => {
         expect(packageJson.scripts).toEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
-          format: "adamantite format",
         })
         expect(files.exists("oxlint.config.ts")).toBe(true)
         expect(files.exists("oxfmt.config.ts")).toBe(true)
@@ -570,31 +572,42 @@ describe("init", () => {
       })
     )
 
-    it.effect("treat omitted boolean flags as false and deduplicate repeated selections", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
+    it.effect.each(["check", "fix"])(
+      "configure only $0 and deduplicate repeated selections",
+      (script) =>
+        Effect.gen(function* () {
+          const files = createInitTestContext()
+          const prompter = createPrompterTestContext()
+          const installer = createDependencyInstallerTestContext()
 
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "format", "--script", "format"],
-          { files, layers: [prompter.layer, installer.layer] }
-        )
+          const exit = yield* runCommand(
+            initCommand,
+            ["--non-interactive", "--script", script, "--script", script],
+            { files, layers: [prompter.layer, installer.layer] }
+          )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls).toEqual([])
-        expect(prompter.multiselectCalls).toEqual([])
-        expect(installer.calls).toEqual([
-          {
-            options: { silent: true, workspace: false },
-            packages: ["adamantite", `oxfmt@${oxfmt.version}`],
-          },
-        ])
-        expect(files.exists("tsconfig.json")).toBe(false)
-        expect(files.exists("AGENTS.md")).toBe(false)
-        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-      })
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(prompter.confirmCalls).toEqual([])
+          expect(prompter.multiselectCalls).toEqual([])
+          expect(installer.calls).toEqual([
+            {
+              options: { silent: true, workspace: false },
+              packages: [
+                "adamantite",
+                `oxlint@${oxlint.version}`,
+                `oxlint-tsgolint@${tsgolint.version}`,
+                `oxfmt@${oxfmt.version}`,
+              ],
+            },
+          ])
+          expect(files.exists("oxfmt.config.ts")).toBe(true)
+          expect(readJson(files, "package.json").scripts).toEqual({
+            [script]: `adamantite ${script}`,
+          })
+          expect(files.exists("tsconfig.json")).toBe(false)
+          expect(files.exists("AGENTS.md")).toBe(false)
+          expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
+        })
     )
 
     it.effect("configure every available script in a monorepo", () =>
@@ -612,8 +625,6 @@ describe("init", () => {
             "check",
             "--script",
             "fix",
-            "--script",
-            "format",
             "--script",
             "check:monorepo",
             "--script",
@@ -646,29 +657,34 @@ describe("init", () => {
           "check:monorepo": "adamantite monorepo",
           fix: "adamantite fix",
           "fix:monorepo": "adamantite monorepo --fix",
-          format: "adamantite format",
         })
       })
     )
 
     it.effect.each([
       {
+        args: ["--non-interactive", "--script", "format"],
+        name: "the legacy format script",
+        reason:
+          "The `format` script is no longer available in init. Select `check` or `fix` instead.",
+      },
+      {
         args: ["--non-interactive"],
         name: "a missing script",
         reason: "Select at least one script with `--script <name>`.",
       },
       {
-        args: ["--non-interactive", "--script", "format", "--preset", "react"],
+        args: ["--non-interactive", "--script", "analyze", "--preset", "react"],
         name: "a preset without linting",
         reason: "`--preset` requires the `check` or `fix` script.",
       },
       {
-        args: ["--non-interactive", "--script", "format", "--typescript"],
+        args: ["--non-interactive", "--script", "analyze", "--typescript"],
         name: "TypeScript without linting",
         reason: "`--typescript` requires the `check` or `fix` script.",
       },
       {
-        args: ["--non-interactive", "--script", "format", "--install-extensions"],
+        args: ["--non-interactive", "--script", "analyze", "--install-extensions"],
         name: "extension installation without an editor",
         reason: "`--install-extensions` requires at least one `--editor`.",
       },
@@ -988,14 +1004,15 @@ describe("init", () => {
 
         const exit = yield* runCommand(
           initCommand,
-          ["--non-interactive", "--script", "check:monorepo", "--script", "format", "--agents"],
+          ["--non-interactive", "--script", "check:monorepo", "--script", "check", "--agents"],
           { files, layers: [prompter.layer, installer.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
 
         const agents = files.read("AGENTS.md")
-        expect(agents).toContain("Run `bun run format` after editing files")
+        expect(agents).toContain("adamantite check")
+        expect(agents).not.toContain("adamantite format")
         expect(agents).not.toContain("check:monorepo")
       })
     )
@@ -1007,7 +1024,7 @@ describe("init", () => {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false, true],
-          multiselectResponses: [["check", "format", "analyze"], [], []],
+          multiselectResponses: [["check", "analyze"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1021,8 +1038,8 @@ describe("init", () => {
         const agents = files.read("AGENTS.md")
         expect(agents).toContain(ADAMANTITE_AGENTS_START_MARKER)
         expect(agents).toContain("## Adamantite")
-        expect(agents).toContain("Run `bun run format` after editing files")
-        expect(agents).toContain("Run `bun run check` to catch lint and type issues")
+        expect(agents).not.toContain("adamantite format")
+        expect(agents).toContain("Run `bun run check` to catch formatting, lint, and type issues")
         expect(agents).toContain("Run `bun run analyze` after changing dependencies")
         expect(agents).toContain("adamantite doctor")
         expect(agents).not.toContain("adamantite fix")
@@ -1035,8 +1052,8 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, true],
-          multiselectResponses: [["format"], []],
+          confirmResponses: [false, false, true],
+          multiselectResponses: [["check"], [], []],
         })
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: { name: "npm" },
@@ -1050,7 +1067,7 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
 
         const agents = files.read("AGENTS.md")
-        expect(agents).toContain("Run `npm run format` after editing files")
+        expect(agents).toContain("Run `npm run check` to catch formatting, lint, and type issues")
       })
     )
 
@@ -1060,8 +1077,8 @@ describe("init", () => {
         const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, true],
-          multiselectResponses: [["format"], []],
+          confirmResponses: [false, false, true],
+          multiselectResponses: [["check"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1117,8 +1134,8 @@ describe("init", () => {
           const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
           const prompter = createPrompterTestContext({
-            confirmResponses: [false, true],
-            multiselectResponses: [["format"], []],
+            confirmResponses: [false, false, true],
+            multiselectResponses: [["check"], [], []],
           })
           const installer = createDependencyInstallerTestContext()
 
@@ -1145,8 +1162,8 @@ describe("init", () => {
           const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
           const prompter = createPrompterTestContext({
-            confirmResponses: [false, true],
-            multiselectResponses: [["format"], []],
+            confirmResponses: [false, false, true],
+            multiselectResponses: [["check"], [], []],
           })
           const installer = createDependencyInstallerTestContext()
 
@@ -1171,8 +1188,8 @@ describe("init", () => {
         const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
-          multiselectResponses: [["format"], []],
+          confirmResponses: [false, false, false],
+          multiselectResponses: [["check"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1193,8 +1210,8 @@ describe("init", () => {
         const files = createInitTestContext({ "AGENTS.md/placeholder": "" })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, true],
-          multiselectResponses: [["format"], []],
+          confirmResponses: [false, false, true],
+          multiselectResponses: [["check"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1222,9 +1239,9 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          cancelAtPromptIndex: 4,
-          confirmResponses: [false],
-          multiselectResponses: [["format"], []],
+          cancelAtPromptIndex: 6,
+          confirmResponses: [false, false],
+          multiselectResponses: [["check"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1281,8 +1298,8 @@ describe("init", () => {
         })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
-          multiselectResponses: [["format"], []],
+          confirmResponses: [false, false, false],
+          multiselectResponses: [["check"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1355,7 +1372,7 @@ describe("init", () => {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
           confirmResponses: [true, true, true, false],
-          multiselectResponses: [["check", "format"], ["react"], ["zed"]],
+          multiselectResponses: [["check"], ["react"], ["zed"]],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1383,9 +1400,9 @@ describe("init", () => {
         const workflow = files.read(workflowPath)
         expect(workflow).toContain("oven-sh/setup-bun@v2")
         expect(workflow).toContain("name: check")
-        expect(workflow).toContain("name: format")
+        expect(workflow).not.toContain("name: format")
         expect(workflow).toContain("command: bun run check")
-        expect(workflow).toContain("command: bun run format --check")
+        expect(workflow).not.toContain("command: bun run format --check")
       })
     )
 
@@ -1449,6 +1466,7 @@ describe("init", () => {
               "adamantite",
               `oxlint@${oxlint.version}`,
               `oxlint-tsgolint@${tsgolint.version}`,
+              `oxfmt@${oxfmt.version}`,
             ],
           },
         ])
@@ -1479,8 +1497,8 @@ describe("init", () => {
     it.effect("continue successfully and show the exit code when the extension install fails", () =>
       Effect.gen(function* () {
         const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false],
-          multiselectResponses: [["format"], ["vscode"]],
+          confirmResponses: [false, true, false, false],
+          multiselectResponses: [["check"], [], ["vscode"]],
         })
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext({
@@ -1514,8 +1532,8 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false],
-          multiselectResponses: [["format"], ["vscode"]],
+          confirmResponses: [false, true, false, false],
+          multiselectResponses: [["check"], [], ["vscode"]],
         })
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext({

@@ -17,7 +17,7 @@ interface WriteAgentsGuidanceOptions {
   readonly scripts: Script[]
 }
 
-function getScriptGuidance(packageManager: PackageManagerName, script: Script) {
+function getScriptGuidance(packageManager: PackageManagerName, script: Exclude<Script, "format">) {
   const command = runScriptCommand(packageManager, script)
   const directCommand = MANAGED_SCRIPT_COMMANDS[script]
 
@@ -25,21 +25,18 @@ function getScriptGuidance(packageManager: PackageManagerName, script: Script) {
     case "analyze":
       return `- Run \`${command}\` after changing dependencies, imports, or exports. Direct command: \`${directCommand}\`.`
     case "check":
-      return `- Run \`${command}\` to catch lint and type issues. Direct command: \`${directCommand}\`.`
+      return `- Run \`${command}\` to catch formatting, lint, and type issues. Direct command: \`${directCommand}\`.`
     case "check:monorepo":
       return `- Run \`${command}\` to check monorepo package consistency. Direct command: \`${directCommand}\`.`
     case "fix":
-      return `- Run \`${command}\` to apply safe lint fixes. Direct command: \`${directCommand}\`.`
+      return `- Run \`${command}\` to apply safe lint fixes and format code. Direct command: \`${directCommand}\`.`
     case "fix:monorepo":
       return `- Run \`${command}\` to fix monorepo package consistency. Direct command: \`${directCommand}\`.`
-    case "format":
-      return `- Run \`${command}\` after editing files. Direct command: \`${directCommand}\`.`
   }
 }
 
 function getAgentsSection({ packageManager, scripts }: WriteAgentsGuidanceOptions) {
-  const scriptOrder: Script[] = [
-    "format",
+  const scriptOrder: Array<Exclude<Script, "format">> = [
     "check",
     "fix",
     "analyze",

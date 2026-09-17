@@ -22,12 +22,12 @@ non-interactive setup. Setup flags require `--non-interactive`, and at least one
 `--script` is required:
 
 ```shell
-npx adamantite init --non-interactive --script check --script fix --script format --typescript --agents
+npx adamantite init --non-interactive --script check --script fix --typescript --agents
 ```
 
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
-- Scripts: `check`, `fix`, `format`, `analyze`, `check:monorepo`, `fix:monorepo`
+- Scripts: `check`, `fix`, `analyze`, `check:monorepo`, `fix:monorepo`
 - Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`; editors:
   `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
@@ -55,8 +55,8 @@ adamantite analyze
 adamantite monorepo
 ```
 
-- Use `check` for read-only lint and type-error validation.
-- Use `fix` for automatic oxlint fixes. Add `--suggested`, `--dangerous`, or `--all` only
+- Use `check` for read-only formatting, lint, and type-error validation.
+- Use `fix` for automatic Oxlint fixes followed by Oxfmt formatting. Add `--suggested`, `--dangerous`, or `--all` only
   with explicit permission after reviewing their impact.
 - Use `format` to write formatting changes and `format --check` for read-only CI checks.
 - Use `analyze` for unused dependencies, exports, and files. `analyze --fix` may remove

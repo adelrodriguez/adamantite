@@ -13,8 +13,8 @@ describe("hasCICompatibleScripts", () => {
     expect(hasCICompatibleScripts(["check"])).toBe(true)
   })
 
-  test("return true when the format script is present", () => {
-    expect(hasCICompatibleScripts(["format"])).toBe(true)
+  test("return false when only the legacy format script is present", () => {
+    expect(hasCICompatibleScripts(["format"])).toBe(false)
   })
 
   test("return true when the check:monorepo script is present", () => {

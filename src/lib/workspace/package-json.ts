@@ -35,7 +35,7 @@ export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
   })
 
 /**
- * Available scripts that can be added to package.json during initialization.
+ * Managed script names, including the legacy format script.
  */
 export type Script = "check" | "fix" | "format" | "check:monorepo" | "fix:monorepo" | "analyze"
 

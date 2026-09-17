@@ -10,7 +10,7 @@ export default defineConfigTooling({
   },
   inspectConfig: inspectRequiredOxfmtConfig,
   name: "oxfmt",
-  purpose: "the managed `format` script",
-  scripts: ["format"],
+  purpose: "the managed `check` and `fix` scripts",
+  scripts: ["check", "fix"],
   version: getDependencyVersion("oxfmt"),
 })

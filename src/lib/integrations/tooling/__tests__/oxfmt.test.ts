@@ -81,7 +81,7 @@ describe("oxfmt", () => {
   })
 
   describe("assess", () => {
-    it.effect("report not applicable when the managed format script is absent", () =>
+    it.effect("report not applicable when only the legacy format script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "package.json": JSON.stringify(
@@ -90,6 +90,7 @@ describe("oxfmt", () => {
                 oxfmt: oxfmt.version,
               },
               name: "test-project",
+              scripts: { format: "adamantite format" },
               version: "1.0.0",
             },
             null,
@@ -106,7 +107,7 @@ describe("oxfmt", () => {
       })
     )
 
-    it.effect("report missing managed config when the managed format script exists", () =>
+    it.effect("report missing managed config when the managed check script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "package.json": JSON.stringify(
@@ -116,7 +117,7 @@ describe("oxfmt", () => {
               },
               name: "test-project",
               scripts: {
-                format: "adamantite format",
+                check: "adamantite check",
               },
               version: "1.0.0",
             },
@@ -136,7 +137,7 @@ describe("oxfmt", () => {
       })
     )
 
-    it.effect("report healthy when managed format script and config exist", () =>
+    it.effect("report healthy when managed check script and config exist", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "oxfmt.config.ts": toOxfmtTsConfigContent(),
@@ -147,7 +148,7 @@ describe("oxfmt", () => {
               },
               name: "test-project",
               scripts: {
-                format: "adamantite format",
+                check: "adamantite check",
               },
               version: "1.0.0",
             },
@@ -167,14 +168,14 @@ describe("oxfmt", () => {
       })
     )
 
-    it.effect("report missing package when managed format script exists", () =>
+    it.effect("report missing package when managed fix script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "package.json": JSON.stringify(
             {
               name: "test-project",
               scripts: {
-                format: "adamantite format",
+                fix: "adamantite fix",
               },
               version: "1.0.0",
             },

@@ -49,8 +49,6 @@ Use the scripts written by `init` when available. Otherwise invoke the CLI direc
 ```shell
 adamantite check
 adamantite fix
-adamantite format
-adamantite format --check
 adamantite analyze
 adamantite monorepo
 ```
@@ -58,7 +56,8 @@ adamantite monorepo
 - Use `check` for read-only formatting, lint, and type-error validation.
 - Use `fix` for automatic Oxlint fixes followed by Oxfmt formatting. Add `--suggested`, `--dangerous`, or `--all` only
   with explicit permission after reviewing their impact.
-- Use `format` to write formatting changes and `format --check` for read-only CI checks.
+- Do not use `format`. It is deprecated and the next release removes it. `fix` writes formatting changes and `check`
+  verifies formatting for read-only CI checks.
 - Use `analyze` for unused dependencies, exports, and files. `analyze --fix` may remove
   files, so inspect findings before using it.
 - Use `monorepo` to inspect workspace dependency consistency and `monorepo --fix` to fix it.
@@ -102,6 +101,6 @@ findings. Follow those findings and review the resulting diff.
 - New target project: `init`, then run the configured checks.
 - Suspected drift or broken setup: run `doctor` and follow its findings.
 - Existing project upgrading Adamantite: `update`, then the doctor sequence.
-- Code-quality failure: choose `check`, `format --check`, `analyze`, or `monorepo` based on
+- Code-quality failure: choose `check`, `analyze`, or `monorepo` based on
   the failing subsystem; do not reinitialize the project.
 - Unknown option or behavior: run `adamantite <command> --help` before guessing.

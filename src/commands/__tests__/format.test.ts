@@ -26,6 +26,24 @@ describe("format", () => {
     )
   })
 
+  describe("deprecation", () => {
+    it.effect("print a deprecation warning on stderr and still run oxfmt", () =>
+      Effect.gen(function* () {
+        const errorLines: unknown[] = []
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(formatCommand, [], { errorLines, layers: [runner.layer] })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toHaveLength(1)
+        expect(errorLines).toHaveLength(1)
+        expect(errorLines[0]).toContain("`adamantite format` is deprecated")
+        expect(errorLines[0]).toContain("`adamantite fix`")
+        expect(errorLines[0]).toContain("`adamantite check`")
+      })
+    )
+  })
+
   describe("check mode", () => {
     it.effect("add the check flag when requested", () =>
       Effect.gen(function* () {

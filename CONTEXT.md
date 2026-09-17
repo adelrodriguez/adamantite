@@ -33,6 +33,11 @@ _Avoid_: Dependency adapter
 A `package.json` script whose command is owned by Adamantite.
 _Avoid_: User script, package command
 
+**Legacy format command**:
+The deprecated `adamantite format` command and its managed `format` script. `check`
+verifies formatting and `fix` applies it.
+_Avoid_: Format command as a current workflow
+
 **Assessment**:
 A read-only classification of a managed integration against its latest supported state.
 _Avoid_: Check result, diagnostic

@@ -133,7 +133,7 @@ const nonInteractive = Flag.Boolean("non-interactive").pipe(
 const scripts = Flag.Literals("script", INIT_SCRIPTS).pipe(
   Flag.atMost(INIT_SCRIPTS.length),
   Flag.withDescription(
-    "Package script to configure; repeatable and required in non-interactive mode. Monorepo scripts require a detected monorepo"
+    "Package script to configure; repeatable and required in non-interactive mode. Monorepo scripts require a detected monorepo. The legacy format value is rejected; select check or fix instead"
   )
 )
 

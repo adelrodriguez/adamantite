@@ -77,7 +77,6 @@ npx adamantite init \
   --non-interactive \
   --script check \
   --script fix \
-  --script format \
   --script analyze \
   --preset react \
   --editor vscode \
@@ -89,7 +88,7 @@ npx adamantite init \
 
 Available setup values:
 
-- Scripts: `check`, `fix`, `format`, `analyze`, `check:monorepo`, and `fix:monorepo`.
+- Scripts: `check`, `fix`, `analyze`, `check:monorepo`, and `fix:monorepo`.
 - Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, and `node`.
 - Editors: `vscode` and `zed`.
 
@@ -114,7 +113,7 @@ Run `adamantite --help` or `adamantite <command> --help` for the complete CLI re
 
 ### `adamantite check`
 
-Find lint and type errors without changing files:
+Find formatting, lint, and type errors without changing files:
 
 ```sh
 adamantite check
@@ -123,7 +122,7 @@ adamantite check src
 
 ### `adamantite fix`
 
-Apply safe Oxlint fixes. Suggested and dangerous fixes require explicit flags:
+Apply safe Oxlint fixes, then format the files with Oxfmt. Suggested and dangerous fixes require explicit flags:
 
 ```sh
 adamantite fix

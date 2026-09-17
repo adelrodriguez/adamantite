@@ -299,6 +299,7 @@ const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawne
 )
 
 export interface RunCommandOptions {
+  readonly errorLines?: unknown[]
   readonly files?: FileSystemTestContext
   readonly forwardedArguments?: readonly string[]
   readonly layers?: TestLayer[]
@@ -336,6 +337,11 @@ export function runCommand(
     // discharge the requirement channel statically; the merged layers supply
     // every service the command uses at runtime.
     Command.runWith(command, { version: "test" })(args).pipe(
+      Effect.ensuring(
+        Effect.gen(function* () {
+          options.errorLines?.push(...(yield* TestConsole.errorLines))
+        })
+      ),
       Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
       Effect.provide(providedLayer)
     ) as Effect.Effect<void, unknown>

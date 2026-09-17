@@ -72,7 +72,9 @@ warns the user and points to `adamantite doctor`.
 
 ## Command boundaries
 
-- `check`, `fix`, and `format` run Oxlint or Oxfmt.
+- `check` and `fix` run Oxfmt and Oxlint.
+- `format` is a deprecated stub that warns on stderr, then runs Oxfmt. The next release
+  removes it.
 - `analyze` runs Knip.
 - `monorepo` runs Sherif.
 - `init` creates selected integrations and managed scripts.

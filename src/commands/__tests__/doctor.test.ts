@@ -254,6 +254,59 @@ describe("doctor", () => {
     })
   )
 
+  it.effect("report the legacy format script and workflow step until both are removed", () =>
+    Effect.gen(function* () {
+      const agentsGuidance = [
+        "# AGENTS.md",
+        "",
+        "## Adamantite",
+        "",
+        "- Run `pnpm run format` after editing files. Direct command: `adamantite format`.",
+        "",
+      ].join("\n")
+      const legacy = createFileSystemTestContext({
+        files: {
+          ".github/workflows/adamantite.yml": "steps:\n  - run: pnpm run format --check\n",
+          "AGENTS.md": agentsGuidance,
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0" },
+            scripts: { format: "adamantite format" },
+          }),
+        },
+      })
+      const legacyPrompter = createPrompterTestContext()
+
+      const legacyExit = yield* runCommand(doctorCommand, [], {
+        files: legacy,
+        layers: [legacyPrompter.layer],
+      })
+
+      expect(Exit.isFailure(legacyExit)).toBe(true)
+      expect(legacyPrompter.messages).toHaveLength(1)
+      expect(legacyPrompter.messages[0]).toContain("Legacy format script")
+      expect(legacyPrompter.messages[0]).toContain("Legacy format workflow step")
+      expect(legacyPrompter.messages[0]).toContain("## 2.")
+      expect(legacyPrompter.messages[0]).not.toContain("## 3.")
+
+      const migrated = createFileSystemTestContext({
+        files: {
+          ".github/workflows/adamantite.yml": "steps:\n  - run: pnpm run lint\n",
+          "AGENTS.md": agentsGuidance,
+          "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+        },
+      })
+      const migratedPrompter = createPrompterTestContext()
+
+      const migratedExit = yield* runCommand(doctorCommand, [], {
+        files: migrated,
+        layers: [migratedPrompter.layer],
+      })
+
+      expect(Exit.isSuccess(migratedExit)).toBe(true)
+      expect(migratedPrompter.messages).toEqual([])
+    })
+  )
+
   it.effect("report success when managed state meets the oracle", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

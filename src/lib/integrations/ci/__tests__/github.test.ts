@@ -163,6 +163,80 @@ describe("github", () => {
       })
     )
 
+    it.effect("report a legacy format step in a generated matrix entry", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "matrix:",
+            "  include:",
+            "    - name: check",
+            "      command: pnpm run check",
+            "    - name: format",
+            "      command: pnpm run format --check",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          applicable: true,
+          findings: [{ id: "legacy-format-workflow-step" }],
+        })
+      })
+    )
+
+    it.effect("report a legacy format step that passes --check through npm", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "steps:",
+            "  - run: |",
+            "      npm run check",
+            "      npm run format -- --check",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [{ id: "legacy-format-workflow-step" }],
+        })
+      })
+    )
+
+    it.effect("report a legacy format step together with an outdated workflow", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: 'node-version: "22"\nrun: pnpm run format --check\n',
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [{ id: "outdated-adamantite-workflow" }, { id: "legacy-format-workflow-step" }],
+        })
+      })
+    )
+
+    it.effect("ignore a format command that does not pass --check", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "# pnpm run format --check",
+            "steps:",
+            "  - run: pnpm run check",
+            "  - run: pnpm run format",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [],
+        })
+      })
+    )
+
     it.effect("warn when an off-ideal workflow cannot be regenerated", () =>
       Effect.gen(function* () {
         const files = makeFiles({ [WORKFLOW_PATH]: 'node-version: "22"\n' })

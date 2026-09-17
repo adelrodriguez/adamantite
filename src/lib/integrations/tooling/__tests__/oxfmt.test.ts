@@ -81,16 +81,75 @@ describe("oxfmt", () => {
   })
 
   describe("assess", () => {
-    it.effect("report not applicable when only the legacy format script exists", () =>
+    it.effect("report only the legacy format script when no other managed script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              name: "test-project",
+              scripts: { format: "adamantite format" },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              goal: ["Remove the `format` script from `package.json`."],
+              id: "legacy-format-script",
+              notes: expect.arrayContaining([expect.stringContaining("`AGENTS.md`")]),
+            },
+          ],
+          packageActions: [],
+          warnings: [],
+        })
+      })
+    )
+
+    it.effect("report the legacy format script next to the managed check script", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxfmt.config.ts": toOxfmtTsConfigContent(),
           "package.json": JSON.stringify(
             {
               devDependencies: {
                 oxfmt: oxfmt.version,
               },
               name: "test-project",
-              scripts: { format: "adamantite format" },
+              scripts: {
+                check: "adamantite check",
+                format: "adamantite format",
+              },
+              version: "1.0.0",
+            },
+            null,
+            2
+          ),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [{ id: "legacy-format-script" }],
+          packageActions: [],
+        })
+      })
+    )
+
+    it.effect("ignore a format script that Adamantite does not manage", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify(
+            {
+              name: "test-project",
+              scripts: { format: "prettier --write ." },
               version: "1.0.0",
             },
             null,

@@ -3,7 +3,11 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
-import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type Finding,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
@@ -17,6 +21,8 @@ const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
 const BLOCK_SCALAR_REGEX = /^[>|](?:[1-9][+-]?|[+-][1-9]?)?(?:\s+#.*)?$/
 const CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
+const FORMAT_CHECK_COMMAND_REGEX =
+  /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+format|deno(?:\s+(?!task\b)\S+)*\s+task\s+format)(?:\s+--)?\s+--check\b/
 const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
 
 interface WorkflowOptions {
@@ -24,7 +30,7 @@ interface WorkflowOptions {
   scripts: Script[]
 }
 
-function hasCheckCommand(content: string): boolean {
+function hasWorkflowCommand(content: string, commandRegex: RegExp): boolean {
   const lines = content.split("\n")
 
   for (const [index, line] of lines.entries()) {
@@ -37,7 +43,7 @@ function hasCheckCommand(content: string): boolean {
     const indentation = match[1]?.length ?? 0
     const command = (match[2] ?? "").trim()
 
-    if (CHECK_COMMAND_REGEX.test(command)) {
+    if (commandRegex.test(command)) {
       return true
     }
 
@@ -58,7 +64,7 @@ function hasCheckCommand(content: string): boolean {
         break
       }
 
-      if (CHECK_COMMAND_REGEX.test(trimmed)) {
+      if (commandRegex.test(trimmed)) {
         return true
       }
     }
@@ -177,6 +183,17 @@ ${getSetupSteps(source)[packageManager]}
   return `${workflow}\n`
 }
 
+const legacyFormatStepFinding: Finding = {
+  currentState: "The workflow still runs the legacy `format` script with `--check`.",
+  goal: ["Remove the workflow step or matrix entry that runs the `format` script with `--check`."],
+  id: "legacy-format-workflow-step",
+  integration: "github",
+  notes: [
+    "The managed `check` script verifies formatting. Preserve unrelated workflow jobs and project-specific settings.",
+  ],
+  title: "Legacy format workflow step",
+}
+
 const files = [{ path: ".github/workflows/adamantite.yml", type: "ci" }] as const
 
 const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
@@ -209,12 +226,15 @@ export default defineIntegration({
       const managedScripts = getManagedScripts(packageJson)
       const hasHardcodedNodeVersion = HARDCODED_NODE_VERSION_REGEX.test(content.value)
       const isMissingCheckCommand =
-        managedScripts.includes("check") && !hasCheckCommand(content.value)
+        managedScripts.includes("check") && !hasWorkflowCommand(content.value, CHECK_COMMAND_REGEX)
+      const legacyFindings = hasWorkflowCommand(content.value, FORMAT_CHECK_COMMAND_REGEX)
+        ? [legacyFormatStepFinding]
+        : []
 
       if (!hasHardcodedNodeVersion && !isMissingCheckCommand) {
         return {
           applicable: true,
-          findings: [],
+          findings: legacyFindings,
           packageActions: [],
           warnings: [],
         } satisfies IntegrationAssessment
@@ -223,7 +243,7 @@ export default defineIntegration({
       if (!hasCICompatibleScripts(managedScripts)) {
         return {
           applicable: true,
-          findings: [],
+          findings: legacyFindings,
           packageActions: [],
           warnings: [
             "No CI-compatible managed scripts were found, so the GitHub Actions workflow cannot be regenerated.",
@@ -237,7 +257,7 @@ export default defineIntegration({
       if (!detectedPackageManager) {
         return {
           applicable: true,
-          findings: [],
+          findings: legacyFindings,
           packageActions: [],
           warnings: [
             "Could not detect a package manager, so the GitHub Actions workflow cannot be regenerated.",
@@ -248,7 +268,7 @@ export default defineIntegration({
       if (!checkIsSupportedPackageManager(detectedPackageManager.name)) {
         return {
           applicable: true,
-          findings: [],
+          findings: legacyFindings,
           packageActions: [],
           warnings: [
             `\`${detectedPackageManager.name}\` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow cannot be regenerated.`,
@@ -279,6 +299,7 @@ export default defineIntegration({
             ],
             title: "Outdated Adamantite workflow",
           },
+          ...legacyFindings,
         ],
         packageActions: [],
         warnings: [],

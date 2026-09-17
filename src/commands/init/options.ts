@@ -71,6 +71,13 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
+  if (options.scripts.includes("format")) {
+    return yield* new InvalidInitOptions({
+      reason:
+        "The `format` script is no longer available in init. Select `check` or `fix` instead.",
+    })
+  }
+
   const hasOxlint = options.scripts.includes("check") || options.scripts.includes("fix")
   const hasMonorepoScript =
     options.scripts.includes("check:monorepo") || options.scripts.includes("fix:monorepo")

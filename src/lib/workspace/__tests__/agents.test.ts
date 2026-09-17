@@ -41,7 +41,7 @@ describe("writeAgentsGuidance", () => {
 
       const result = yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
-        scripts: ["format", "check"],
+        scripts: ["fix", "check"],
       })
 
       expect(result).toBe("updated")
@@ -49,8 +49,8 @@ describe("writeAgentsGuidance", () => {
       const agents = files.read("AGENTS.md")
       expect(agents).toContain(ADAMANTITE_AGENTS_START_MARKER)
       expect(agents).toContain("## Adamantite")
-      expect(agents).toContain("Run `bun run format` after editing files")
-      expect(agents).toContain("Run `bun run check` to catch lint and type issues")
+      expect(agents).toContain("Run `bun run fix` to apply safe lint fixes and format code")
+      expect(agents).toContain("Run `bun run check` to catch formatting, lint, and type issues")
       expect(agents).not.toContain("adamantite analyze")
       expect(agents).toContain(
         "Run `adamantite doctor` and follow its findings to repair managed setup.\n\n<!-- ADAMANTITE:END -->"
@@ -75,7 +75,7 @@ describe("writeAgentsGuidance", () => {
 
       const result = yield* writeAgentsGuidance(ROOT, {
         packageManager: "bun",
-        scripts: ["format"],
+        scripts: ["fix"],
       }).pipe(Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer)), Effect.result)
 
       expect(result._tag).toBe("Failure")
@@ -96,14 +96,14 @@ describe("writeAgentsGuidance", () => {
 
       const result = yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
-        scripts: ["format"],
+        scripts: ["fix"],
       })
 
       expect(result).toBe("updated")
 
       const agents = files.read("AGENTS.md")
       expect(agents.startsWith(`${existingAgents}\n${ADAMANTITE_AGENTS_START_MARKER}\n`)).toBe(true)
-      expect(agents).toContain("Run `bun run format` after editing files")
+      expect(agents).toContain("Run `bun run fix` to apply safe lint fixes and format code")
     })
   )
 
@@ -114,7 +114,7 @@ describe("writeAgentsGuidance", () => {
 
       const result = yield* runWriteAgentsGuidance(files, {
         packageManager: "bun",
-        scripts: ["format"],
+        scripts: ["fix"],
       })
 
       expect(result).toBe("updated")
@@ -165,7 +165,7 @@ describe("writeAgentsGuidance", () => {
 
         const result = yield* runWriteAgentsGuidance(files, {
           packageManager: "bun",
-          scripts: ["format"],
+          scripts: ["fix"],
         })
 
         expect(result).toBe("malformed")
@@ -182,7 +182,7 @@ describe("writeAgentsGuidance", () => {
 
         const result = yield* runWriteAgentsGuidance(files, {
           packageManager: "bun",
-          scripts: ["format"],
+          scripts: ["fix"],
         })
 
         expect(result).toBe("malformed")
@@ -215,11 +215,11 @@ describe("writeAgentsGuidance", () => {
 
       yield* runWriteAgentsGuidance(files, {
         packageManager: "npm",
-        scripts: ["format"],
+        scripts: ["fix"],
       })
 
       const agents = files.read("AGENTS.md")
-      expect(agents).toContain("Run `npm run format` after editing files")
+      expect(agents).toContain("Run `npm run fix` to apply safe lint fixes and format code")
     })
   )
 
@@ -263,10 +263,10 @@ describe("writeAgentsGuidance", () => {
         // invoke the selected package manager.
         for (const script of ALL_SCRIPTS) {
           expect(agents.includes(`Direct command: \`${MANAGED_SCRIPT_COMMANDS[script]}\`.`)).toBe(
-            scripts.includes(script)
+            script !== "format" && scripts.includes(script)
           )
         }
-        if (scripts.length > 0) {
+        if (scripts.some((script) => script !== "format")) {
           expect(agents).toContain(`${packageManager} `)
         }
       }),

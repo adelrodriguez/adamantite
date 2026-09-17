@@ -23,18 +23,13 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     options: [
       {
         hint: "recommended",
-        label: "check - find issues and type errors using oxlint",
+        label: "check - check formatting, lint issues, and type errors",
         value: "check",
       },
       {
         hint: "recommended",
-        label: "fix - fix code issues using oxlint",
+        label: "fix - apply safe lint fixes and format code",
         value: "fix",
-      },
-      {
-        hint: "recommended",
-        label: "format - code formatting using oxfmt",
-        value: "format",
       },
       {
         disabled: !isMonorepo,

@@ -4,12 +4,10 @@ import type { Script, SupportedPackageManager } from "#lib/workspace/package-jso
 interface CIScriptEntry {
   readonly script: Script
   readonly name: string
-  readonly args?: string[]
 }
 
 const ciScriptEntries: readonly CIScriptEntry[] = [
   { name: "check", script: "check" },
-  { args: ["--check"], name: "format", script: "format" },
   { name: "monorepo", script: "check:monorepo" },
   { name: "analyze", script: "analyze" },
 ]
@@ -23,7 +21,7 @@ export function getCIWorkflowEntries(packageManager: SupportedPackageManager, sc
     }
 
     workflowEntries.push({
-      command: runScriptCommand(packageManager, entry.script, { args: entry.args }),
+      command: runScriptCommand(packageManager, entry.script),
       name: entry.name,
     })
   }

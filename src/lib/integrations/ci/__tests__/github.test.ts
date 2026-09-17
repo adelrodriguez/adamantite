@@ -353,11 +353,11 @@ describe("github", () => {
 
         const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("name: check")
-        expect(content).toContain("name: format")
+        expect(content).not.toContain("name: format")
         expect(content).toContain("name: monorepo")
         expect(content).toContain("command:")
-        expect(content).toContain("format")
-        expect(content).toContain("--check")
+        expect(content).not.toContain("format")
+        expect(content).not.toContain("--check")
       })
     )
 

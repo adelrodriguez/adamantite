@@ -38,7 +38,7 @@ export default Command.make("init", initCommandOptions).pipe(
     },
     {
       command:
-        "adamantite init --non-interactive --script check --script format --preset react --editor vscode --typescript --install-extensions --github-actions --agents",
+        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript --install-extensions --github-actions --agents",
       description: "Configure a React project with VS Code, TypeScript, CI, and agent guidance",
     },
     {
@@ -114,7 +114,6 @@ export default Command.make("init", initCommandOptions).pipe(
       const shouldAddAgentsGuidance = initOptions.agents
 
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
-      const hasOxfmt = selectedScripts.includes("format")
       const hasSherif =
         selectedScripts.includes("check:monorepo") || selectedScripts.includes("fix:monorepo")
       const hasKnip = selectedScripts.includes("analyze")
@@ -124,12 +123,9 @@ export default Command.make("init", initCommandOptions).pipe(
       if (hasOxlint) {
         dependencies.push(
           `${oxlint.name}@${oxlint.version}`,
-          `${tsgolint.name}@${tsgolint.version}`
+          `${tsgolint.name}@${tsgolint.version}`,
+          `${oxfmt.name}@${oxfmt.version}`
         )
-      }
-
-      if (hasOxfmt) {
-        dependencies.push(`${oxfmt.name}@${oxfmt.version}`)
       }
 
       if (hasSherif) {
@@ -142,11 +138,8 @@ export default Command.make("init", initCommandOptions).pipe(
 
       yield* installDependencies(cwd, dependencies)
 
-      if (hasOxfmt) {
-        yield* setupToolConfig(cwd, oxfmt, oxfmt.create(cwd))
-      }
-
       if (hasOxlint) {
+        yield* setupToolConfig(cwd, oxfmt, oxfmt.create(cwd))
         yield* setupToolConfig(cwd, oxlint, oxlint.create(cwd, presets))
       }
 

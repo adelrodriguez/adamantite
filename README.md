@@ -52,7 +52,6 @@ and agent guidance. After setup, use the scripts written to `package.json`:
 ```sh
 bun run check
 bun run fix
-bun run format
 bun run analyze
 ```
 

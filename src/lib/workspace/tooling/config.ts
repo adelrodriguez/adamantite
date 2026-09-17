@@ -330,6 +330,11 @@ export function defineConfigTooling(options: {
   readonly configContent: () => string
   readonly configFiles: ToolingConfigFiles
   readonly inspectConfig: (content: string) => RequiredConfigInspection
+  /**
+   * A retired managed script. While it is present, the integration stays applicable and reports the
+   * finding so the script gets removed.
+   */
+  readonly legacyScript?: { readonly finding: Finding; readonly script: Script }
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
@@ -346,11 +351,23 @@ export function defineConfigTooling(options: {
   return defineIntegration({
     assess: (cwd: string, packageJson: PackageJson) =>
       Effect.gen(function* () {
+        const legacyFindings =
+          options.legacyScript && checkHasManagedScript(packageJson, [options.legacyScript.script])
+            ? [options.legacyScript.finding]
+            : []
+
         if (!checkHasManagedScript(packageJson, options.scripts)) {
-          return {
-            applicable: false,
-            warnings: [],
-          } satisfies IntegrationAssessment
+          return legacyFindings.length > 0
+            ? ({
+                applicable: true,
+                findings: legacyFindings,
+                packageActions: [],
+                warnings: [],
+              } satisfies IntegrationAssessment)
+            : ({
+                applicable: false,
+                warnings: [],
+              } satisfies IntegrationAssessment)
         }
 
         const state = yield* detect(cwd)
@@ -371,6 +388,7 @@ export function defineConfigTooling(options: {
               inspection,
               toolName: options.name,
             }),
+            ...legacyFindings,
           ],
           packageActions,
           warnings: state.warnings,

@@ -9,6 +9,20 @@ export default defineConfigTooling({
     legacyConfigs: [".oxfmtrc.json", ".oxfmtrc.jsonc"],
   },
   inspectConfig: inspectRequiredOxfmtConfig,
+  legacyScript: {
+    finding: {
+      currentState: "The legacy managed `format` script is present in `package.json`.",
+      goal: ["Remove the `format` script from `package.json`."],
+      id: "legacy-format-script",
+      integration: "oxfmt",
+      notes: [
+        "The managed `check` script verifies formatting and the managed `fix` script applies it.",
+        "Doctor does not assess `AGENTS.md`. Remove the `format` line from its Adamantite section.",
+      ],
+      title: "Legacy format script",
+    },
+    script: "format",
+  },
   name: "oxfmt",
   purpose: "the managed `check` and `fix` scripts",
   scripts: ["check", "fix"],

@@ -32,19 +32,9 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         value: "fix",
       },
       {
-        disabled: !isMonorepo,
-        hint: isMonorepo ? undefined : "available for monorepo projects",
-        label: "check:monorepo - check for monorepo-specific issues using Sherif",
-        value: "check:monorepo",
-      },
-      {
-        disabled: !isMonorepo,
-        hint: isMonorepo ? undefined : "available for monorepo projects",
-        label: "fix:monorepo - fix monorepo-specific issues using Sherif",
-        value: "fix:monorepo",
-      },
-      {
-        label: "analyze - find unused dependencies, exports, and files using knip",
+        label: isMonorepo
+          ? "analyze - check monorepo consistency using Sherif and find unused dependencies, exports, and files using knip"
+          : "analyze - find unused dependencies, exports, and files using knip",
         value: "analyze",
       },
     ],

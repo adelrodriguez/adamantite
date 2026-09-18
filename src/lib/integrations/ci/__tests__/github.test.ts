@@ -421,14 +421,15 @@ describe("github", () => {
         yield* github
           .create(ROOT, {
             packageManager: "bun",
-            scripts: ["check", "format", "check:monorepo"],
+            scripts: ["check", "format", "check:monorepo", "analyze"],
           })
           .pipe(provideFallback(files))
 
         const content = files.read(WORKFLOW_PATH)
         expect(content).toContain("name: check")
         expect(content).not.toContain("name: format")
-        expect(content).toContain("name: monorepo")
+        expect(content).toContain("name: analyze")
+        expect(content).not.toContain("monorepo")
         expect(content).toContain("command:")
         expect(content).not.toContain("format")
         expect(content).not.toContain("--check")

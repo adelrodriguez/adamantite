@@ -8,7 +8,6 @@ interface CIScriptEntry {
 
 const ciScriptEntries: readonly CIScriptEntry[] = [
   { name: "check", script: "check" },
-  { name: "monorepo", script: "check:monorepo" },
   { name: "analyze", script: "analyze" },
 ]
 

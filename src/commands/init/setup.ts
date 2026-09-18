@@ -153,7 +153,7 @@ export const addScripts = (
 
     if (conflicts.length > 0) {
       yield* prompter.log.info(
-        "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite monorepo -- --ignore-dependency tailwindcss`."
+        "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite analyze -- --directory packages/app`."
       )
     }
 
@@ -349,12 +349,13 @@ export const setupGitHubActions = (
 export const setupAgentsGuidance = (
   cwd: string,
   packageManager: PackageManagerName,
-  scripts: Script[]
+  scripts: Script[],
+  isMonorepo: boolean
 ) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const result = yield* prompter
-      .withSpinner(() => writeAgentsGuidance(cwd, { packageManager, scripts }), {
+      .withSpinner(() => writeAgentsGuidance(cwd, { isMonorepo, packageManager, scripts }), {
         failure: "Failed to update AGENTS.md.",
         start: "Updating AGENTS.md...",
         success: "AGENTS.md check complete.",

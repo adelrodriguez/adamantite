@@ -40,6 +40,7 @@ describe("writeAgentsGuidance", () => {
       const files = makeFiles()
 
       const result = yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
         packageManager: "bun",
         scripts: ["fix", "check"],
       })
@@ -74,6 +75,7 @@ describe("writeAgentsGuidance", () => {
       })
 
       const result = yield* writeAgentsGuidance(ROOT, {
+        isMonorepo: false,
         packageManager: "bun",
         scripts: ["fix"],
       }).pipe(Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer)), Effect.result)
@@ -95,6 +97,7 @@ describe("writeAgentsGuidance", () => {
       const files = makeFiles({ "AGENTS.md": existingAgents })
 
       const result = yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
         packageManager: "bun",
         scripts: ["fix"],
       })
@@ -113,6 +116,7 @@ describe("writeAgentsGuidance", () => {
       const files = makeFiles({ "AGENTS.md": existingAgents })
 
       const result = yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
         packageManager: "bun",
         scripts: ["fix"],
       })
@@ -140,6 +144,7 @@ describe("writeAgentsGuidance", () => {
       })
 
       const result = yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
         packageManager: "bun",
         scripts: ["analyze"],
       })
@@ -164,6 +169,7 @@ describe("writeAgentsGuidance", () => {
         const files = makeFiles({ "AGENTS.md": existingAgents })
 
         const result = yield* runWriteAgentsGuidance(files, {
+          isMonorepo: false,
           packageManager: "bun",
           scripts: ["fix"],
         })
@@ -181,6 +187,7 @@ describe("writeAgentsGuidance", () => {
         const files = makeFiles({ "AGENTS.md": existingAgents })
 
         const result = yield* runWriteAgentsGuidance(files, {
+          isMonorepo: false,
           packageManager: "bun",
           scripts: ["fix"],
         })
@@ -195,17 +202,41 @@ describe("writeAgentsGuidance", () => {
       const files = makeFiles()
 
       yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
         packageManager: "bun",
         scripts: ["fix", "check:monorepo", "fix:monorepo"],
       })
 
       const agents = files.read("AGENTS.md")
       expect(agents).toContain("Direct command: `adamantite fix`")
-      expect(agents).toContain("Direct command: `adamantite monorepo`")
-      expect(agents).toContain("Direct command: `adamantite monorepo --fix`")
+      expect(agents).not.toContain("monorepo")
       expect(agents).not.toContain("adamantite format")
       expect(agents).not.toContain("adamantite check`")
       expect(agents).not.toContain("adamantite analyze")
+    })
+  )
+
+  it.effect("mention monorepo checks in the analyze guidance only in a monorepo", () =>
+    Effect.gen(function* () {
+      const files = makeFiles()
+
+      yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
+        packageManager: "bun",
+        scripts: ["analyze"],
+      })
+
+      expect(files.read("AGENTS.md")).not.toContain("monorepo")
+
+      yield* runWriteAgentsGuidance(files, {
+        isMonorepo: true,
+        packageManager: "bun",
+        scripts: ["analyze"],
+      })
+
+      const agents = files.read("AGENTS.md")
+      expect(agents).toContain("It also checks monorepo package consistency.")
+      expect(agents).toContain("Direct command: `adamantite analyze`")
     })
   )
 
@@ -214,6 +245,7 @@ describe("writeAgentsGuidance", () => {
       const files = makeFiles()
 
       yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
         packageManager: "npm",
         scripts: ["fix"],
       })
@@ -231,7 +263,13 @@ describe("writeAgentsGuidance", () => {
     "check:monorepo",
     "fix:monorepo",
   ]
+  const UNGUIDED_SCRIPTS: ReadonlySet<Script> = new Set<Script>([
+    "format",
+    "check:monorepo",
+    "fix:monorepo",
+  ])
   const guidanceOptions = {
+    isMonorepo: Schema.Boolean,
     packageManager: Schema.Literals(["bun", "deno", "npm", "pnpm", "yarn"]),
     scripts: Schema.mutable(
       Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
@@ -245,11 +283,11 @@ describe("writeAgentsGuidance", () => {
   it.effect.prop(
     "preserve marker-free content verbatim and append exactly one managed block",
     { ...guidanceOptions, existing: markerFreeContent },
-    ({ existing, packageManager, scripts }) =>
+    ({ existing, isMonorepo, packageManager, scripts }) =>
       Effect.gen(function* () {
         const files = makeFiles({ "AGENTS.md": existing })
 
-        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+        const result = yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
 
         expect(result).toBe("updated")
 
@@ -263,10 +301,10 @@ describe("writeAgentsGuidance", () => {
         // invoke the selected package manager.
         for (const script of ALL_SCRIPTS) {
           expect(agents.includes(`Direct command: \`${MANAGED_SCRIPT_COMMANDS[script]}\`.`)).toBe(
-            script !== "format" && scripts.includes(script)
+            !UNGUIDED_SCRIPTS.has(script) && scripts.includes(script)
           )
         }
-        if (scripts.some((script) => script !== "format")) {
+        if (scripts.some((script) => !UNGUIDED_SCRIPTS.has(script))) {
           expect(agents).toContain(`${packageManager} `)
         }
       }),
@@ -276,14 +314,14 @@ describe("writeAgentsGuidance", () => {
   it.effect.prop(
     "write the same content no matter how often it runs",
     { ...guidanceOptions, existing: markerFreeContent },
-    ({ existing, packageManager, scripts }) =>
+    ({ existing, isMonorepo, packageManager, scripts }) =>
       Effect.gen(function* () {
         const files = makeFiles({ "AGENTS.md": existing })
 
-        yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+        yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
         const afterFirst = files.read("AGENTS.md")
 
-        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+        const result = yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
         expect(result).toBe("updated")
         expect(files.read("AGENTS.md")).toBe(afterFirst)
       }),
@@ -293,12 +331,12 @@ describe("writeAgentsGuidance", () => {
   it.effect.prop(
     "replace only the managed block, keeping surrounding content intact",
     { ...guidanceOptions, prefix: markerFreeContent, suffix: markerFreeContent },
-    ({ packageManager, prefix, scripts, suffix }) =>
+    ({ isMonorepo, packageManager, prefix, scripts, suffix }) =>
       Effect.gen(function* () {
         const existing = `${prefix}${ADAMANTITE_AGENTS_START_MARKER}\nOLD-CONTENT-SENTINEL\n${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
         const files = makeFiles({ "AGENTS.md": existing })
 
-        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+        const result = yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
 
         expect(result).toBe("updated")
 
@@ -322,7 +360,7 @@ describe("writeAgentsGuidance", () => {
       suffix: markerFreeContent,
       variant: Schema.Literals(["start-only", "end-only", "end-before-start"]),
     },
-    ({ packageManager, prefix, scripts, suffix, variant }) =>
+    ({ isMonorepo, packageManager, prefix, scripts, suffix, variant }) =>
       Effect.gen(function* () {
         const existing =
           variant === "start-only"
@@ -332,7 +370,7 @@ describe("writeAgentsGuidance", () => {
               : `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
         const files = makeFiles({ "AGENTS.md": existing })
 
-        const result = yield* runWriteAgentsGuidance(files, { packageManager, scripts })
+        const result = yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
 
         expect(result).toBe("malformed")
         expect(files.read("AGENTS.md")).toBe(existing)

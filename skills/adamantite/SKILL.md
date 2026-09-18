@@ -71,11 +71,14 @@ adamantite analyze
 - Do not use `monorepo`. It is deprecated and the next release removes it. Use `analyze`, or
   `analyze --only monorepo` to run only Sherif.
 
-To pass arguments to Knip, Oxlint, Oxfmt, or Sherif, place them after `--`:
+To pass arguments to Knip, Oxlint, or Sherif, place them after `--`. For `check` and `fix` they
+go to Oxlint. For `analyze` they go to Knip, or to the stage that `--only` selects, so a Sherif
+flag needs `--only monorepo`. For a permanent Sherif setting, use the `sherif` field instead.
 
 ```shell
 adamantite check src -- --deny-warnings
 bun run analyze -- -- --directory packages/app
+adamantite analyze --only monorepo -- --ignore-package package-a
 ```
 
 ## Diagnose and repair

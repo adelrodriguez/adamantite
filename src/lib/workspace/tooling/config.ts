@@ -54,7 +54,14 @@ export interface ToolingConfigFiles {
 
 export type RequiredConfigInspection =
   | { readonly kind: "configured" }
-  | { readonly kind: "invalid"; readonly reason: string }
+  | {
+      /**
+       * The repair to make. Defaults to adding the required preset.
+       */
+      readonly goal?: string
+      readonly kind: "invalid"
+      readonly reason: string
+    }
 
 function getConfigFormat(file: string): ToolingConfigFormat {
   if (file.endsWith(".jsonc")) {
@@ -269,6 +276,7 @@ export function getConfigFindings(
       currentState: `\`${options.configFile}\` does not meet Adamantite's required shape. ${options.inspection.reason}`,
       goal: [
         options.invalidGoal
+          ?? options.inspection.goal
           ?? `Update \`${options.configFile}\` so it includes the required Adamantite preset while preserving project-specific settings.`,
       ],
       id: `invalid-${options.toolName}-config`,
@@ -296,7 +304,7 @@ export function definePackageTooling(options: {
   /**
    * Managed scripts that need the package only in a detected monorepo.
    */
-  readonly monorepoScripts?: readonly Script[]
+  readonly monorepoOnlyScripts?: readonly Script[]
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
@@ -307,7 +315,7 @@ export function definePackageTooling(options: {
       Effect.gen(function* () {
         const isApplicable =
           checkHasManagedScript(packageJson, options.scripts)
-          || (checkHasManagedScript(packageJson, options.monorepoScripts ?? [])
+          || (checkHasManagedScript(packageJson, options.monorepoOnlyScripts ?? [])
             && (yield* checkIsMonorepo(cwd)))
 
         if (!isApplicable) {

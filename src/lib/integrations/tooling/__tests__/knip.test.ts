@@ -144,6 +144,51 @@ describe("knip", () => {
       })
     )
 
+    it.effect("report a sherif entry that sits outside ignoreDependencies", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent().replace(
+            "const config: KnipConfig = analyze",
+            'const config: KnipConfig = { ...analyze, ignoreDependencies: ["@internal/*"], ignoreBinaries: ["sherif"] }'
+          ),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).toEqual([
+          expect.objectContaining({
+            goal: [expect.stringContaining('Add `"sherif"` to `ignoreDependencies`')],
+            id: "invalid-knip-config",
+          }),
+        ])
+      })
+    )
+
+    it.effect("accept a regular expression that ignores sherif", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent().replace(
+            "const config: KnipConfig = analyze",
+            "const config: KnipConfig = { ...analyze, ignoreDependencies: [/^sherif$/] }"
+          ),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).toEqual([])
+      })
+    )
+
     it.effect("accept a monorepo config that ignores sherif", () =>
       Effect.gen(function* () {
         const files = makeFiles({

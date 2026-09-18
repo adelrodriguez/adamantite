@@ -7,7 +7,9 @@ import {
 } from "#lib/shared/json.ts"
 import { inspectRequiredPresetConfig } from "#lib/workspace/tooling/preset-config.ts"
 
-const SHERIF_IGNORE_REGEX = /ignoreDependencies[\s\S]*?["'`]sherif["'`]/u
+// Bounded by the array's closing bracket, so a Sherif entry in a later property does not count.
+// Matches a string or a regular expression entry, which Knip both accepts.
+const SHERIF_IGNORE_REGEX = /ignoreDependencies\s*:\s*\[[^\]]*?sherif/u
 
 /**
  * In a monorepo the config must also ignore Sherif: `adamantite analyze` runs it, and Knip has no
@@ -29,6 +31,7 @@ export function inspectRequiredKnipConfig(
   return SHERIF_IGNORE_REGEX.test(content)
     ? inspection
     : {
+        goal: 'Add `"sherif"` to `ignoreDependencies` in `knip.config.ts` and keep the other settings.',
         kind: "invalid",
         reason:
           'The file must set `ignoreDependencies: ["sherif"]`, because Knip cannot see that `adamantite analyze` runs Sherif in a monorepo.',

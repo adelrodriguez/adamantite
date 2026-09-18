@@ -122,6 +122,45 @@ describe("knip", () => {
       })
     )
 
+    it.effect("report a monorepo config that does not ignore sherif", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent(),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).toEqual([
+          expect.objectContaining({
+            currentState: expect.stringContaining('ignoreDependencies: ["sherif"]'),
+            id: "invalid-knip-config",
+          }),
+        ])
+      })
+    )
+
+    it.effect("accept a monorepo config that ignores sherif", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent({ ignoreDependencies: ["sherif"] }),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).toEqual([])
+      })
+    )
+
     it.effect("report missing managed config when the managed analyze script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({

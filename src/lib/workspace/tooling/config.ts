@@ -293,15 +293,24 @@ function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Scrip
  * Tsgolint).
  */
 export function definePackageTooling(options: {
+  /**
+   * Managed scripts that need the package only in a detected monorepo.
+   */
+  readonly monorepoScripts?: readonly Script[]
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
   readonly version: string
 }) {
   return defineIntegration({
-    assess: (_cwd: string, packageJson: PackageJson) =>
-      Effect.sync(() => {
-        if (!checkHasManagedScript(packageJson, options.scripts)) {
+    assess: (cwd: string, packageJson: PackageJson) =>
+      Effect.gen(function* () {
+        const isApplicable =
+          checkHasManagedScript(packageJson, options.scripts)
+          || (checkHasManagedScript(packageJson, options.monorepoScripts ?? [])
+            && (yield* checkIsMonorepo(cwd)))
+
+        if (!isApplicable) {
           return {
             applicable: false,
             warnings: [],
@@ -334,7 +343,10 @@ export function defineConfigTooling(options: {
    */
   readonly configContent: (workspace: { readonly isMonorepo: boolean }) => string
   readonly configFiles: ToolingConfigFiles
-  readonly inspectConfig: (content: string) => RequiredConfigInspection
+  readonly inspectConfig: (
+    content: string,
+    workspace: { readonly isMonorepo: boolean }
+  ) => RequiredConfigInspection
   /**
    * A retired managed script. While it is present, the integration stays applicable and reports the
    * finding so the script gets removed.
@@ -377,10 +389,11 @@ export function defineConfigTooling(options: {
 
         const state = yield* detect(cwd)
         const packageActions = getPackageActions(packageJson, options, options.purpose)
-        const configContent = options.configContent({ isMonorepo: yield* checkIsMonorepo(cwd) })
+        const workspace = { isMonorepo: yield* checkIsMonorepo(cwd) }
+        const configContent = options.configContent(workspace)
         const inspection =
           state.active?.format === "ts"
-            ? options.inspectConfig(yield* readFile(state.active.path))
+            ? options.inspectConfig(yield* readFile(state.active.path), workspace)
             : undefined
 
         return {

@@ -1,9 +1,11 @@
+import type * as FileSystem from "effect/FileSystem"
 import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
+import type { IntegrationAssessment } from "#lib/integrations/base.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
@@ -19,9 +21,15 @@ function provideFiles(files: FileSystemTestContext) {
   return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
 }
 
+// The explicit return type unifies the two `assess` signatures, which differ in their literals.
 function runAssess(integration: typeof oxlint | typeof tsgolint, files: FileSystemTestContext) {
   return readPackageJson(ROOT).pipe(
-    Effect.flatMap((packageJson) => integration.assess(ROOT, packageJson)),
+    Effect.flatMap(
+      (
+        packageJson
+      ): Effect.Effect<IntegrationAssessment, unknown, FileSystem.FileSystem | Path.Path> =>
+        integration.assess(ROOT, packageJson)
+    ),
     provideFiles(files)
   )
 }

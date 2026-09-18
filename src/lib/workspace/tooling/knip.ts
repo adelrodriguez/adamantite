@@ -1,4 +1,5 @@
 import type { JsonObject } from "type-fest"
+import type { RequiredConfigInspection } from "#lib/workspace/tooling/config.ts"
 import {
   checkIsJsonObject,
   serializeTsObjectLiteral,
@@ -6,11 +7,32 @@ import {
 } from "#lib/shared/json.ts"
 import { inspectRequiredPresetConfig } from "#lib/workspace/tooling/preset-config.ts"
 
-export function inspectRequiredKnipConfig(content: string) {
-  return inspectRequiredPresetConfig(content, {
+const SHERIF_IGNORE_REGEX = /ignoreDependencies[\s\S]*?["'`]sherif["'`]/u
+
+/**
+ * In a monorepo the config must also ignore Sherif: `adamantite analyze` runs it, and Knip has no
+ * plugin that sees that reference, so it reports Sherif as an unused devDependency.
+ */
+export function inspectRequiredKnipConfig(
+  content: string,
+  workspace: { readonly isMonorepo: boolean }
+): RequiredConfigInspection {
+  const inspection = inspectRequiredPresetConfig(content, {
     moduleName: "adamantite/analyze",
     presetName: "Adamantite analyze",
   })
+
+  if (inspection.kind !== "configured" || !workspace.isMonorepo) {
+    return inspection
+  }
+
+  return SHERIF_IGNORE_REGEX.test(content)
+    ? inspection
+    : {
+        kind: "invalid",
+        reason:
+          'The file must set `ignoreDependencies: ["sherif"]`, because Knip cannot see that `adamantite analyze` runs Sherif in a monorepo.',
+      }
 }
 
 export function toKnipTsConfigContent(config: JsonObject = {}) {

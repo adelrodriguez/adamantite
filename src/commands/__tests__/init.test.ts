@@ -292,6 +292,29 @@ describe("init", () => {
     )
   })
 
+  describe("sherif for analyze", () => {
+    it.effect("install sherif with the analyze script in a monorepo", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({ "package.json": monorepoPackageJson })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "analyze"], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls[0]?.packages).toEqual([
+          "adamantite",
+          `sherif@${sherif.version}`,
+          `knip@${knip.version}`,
+        ])
+        expect(files.read("knip.config.ts")).toContain('"sherif"')
+      })
+    )
+  })
+
   describe("workspace installation", () => {
     it.effect("use workspace installation when the project is a monorepo", () =>
       Effect.gen(function* () {

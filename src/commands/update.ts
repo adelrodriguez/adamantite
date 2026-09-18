@@ -15,7 +15,6 @@ import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
-import { printTitle } from "#terminal/title.ts"
 
 const knownPackages = [
   oxlint,
@@ -61,7 +60,6 @@ export default Command.make("update").pipe(
       const prompter = yield* Prompter
       const dependencyInstaller = yield* DependencyInstaller
 
-      yield* printTitle()
       yield* prompter.intro("💠 adamantite update")
 
       const packageJson = yield* readPackageJson(cwd)

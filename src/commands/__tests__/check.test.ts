@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import { stripVTControlCharacters } from "node:util"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -20,11 +21,30 @@ describe("check", () => {
           {
             args: ["--check"],
             command: "oxfmt",
+            title: "✨ Checking formatting",
           },
           {
             args: [],
             command: "oxlint",
+            title: "🔍 Linting",
           },
+        ])
+      })
+    )
+  })
+
+  describe("output", () => {
+    it.effect("print a heading before each tool", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+        const logLines: unknown[] = []
+
+        yield* runCommand(checkCommand, [], { layers: [runner.layer], logLines })
+
+        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toEqual([
+          "✨ Checking formatting · adamantite (oxfmt)",
+          "",
+          "🔍 Linting · adamantite (oxlint)",
         ])
       })
     )
@@ -48,10 +68,12 @@ describe("check", () => {
           {
             args: ["--check", join(files.root, "index.ts")],
             command: "oxfmt",
+            title: "✨ Checking formatting",
           },
           {
             args: [join(files.root, "index.ts")],
             command: "oxlint",
+            title: "🔍 Linting",
           },
         ])
       })
@@ -77,10 +99,12 @@ describe("check", () => {
           {
             args: ["--check", join(files.root, "index.ts")],
             command: "oxfmt",
+            title: "✨ Checking formatting",
           },
           {
             args: [join(files.root, "index.ts"), "--deny-warnings"],
             command: "oxlint",
+            title: "🔍 Linting",
           },
         ])
       })

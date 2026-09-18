@@ -18,6 +18,7 @@ describe("analyze", () => {
           {
             args: [],
             command: "knip",
+            title: "🧹 Analyzing unused code",
           },
         ])
       })

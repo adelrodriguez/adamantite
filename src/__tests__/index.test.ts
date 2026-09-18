@@ -54,6 +54,7 @@ describe("adamantite", () => {
               "src",
             ],
             command: "knip",
+            title: "🧹 Analyzing unused code",
           },
         ])
       })

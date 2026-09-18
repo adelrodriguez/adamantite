@@ -31,15 +31,7 @@ describe("runAgentSession", () => {
           })
         )
       )
-      const spawner = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
-        ChildProcessSpawner.make(() =>
-          Effect.die("runAgentSession tests stub CommandRunner instead of spawning processes")
-        )
-      )
-
-      yield* runAgentSession({ agent: claudeAgent, cwd: "/project" }).pipe(
-        Effect.provide(Layer.mergeAll(runner, spawner))
-      )
+      yield* runAgentSession({ agent: claudeAgent, cwd: "/project" }).pipe(Effect.provide(runner))
 
       const listenersAfterRun = process.listeners("SIGINT")
       process.removeListener("SIGINT", sentinel)

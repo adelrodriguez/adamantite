@@ -292,12 +292,6 @@ function makeQuietTerminalLayer() {
   )
 }
 
-const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
-  ChildProcessSpawner.make(() =>
-    Effect.die("Command tests must stub CommandRunner instead of spawning processes")
-  )
-)
-
 export interface RunCommandOptions {
   readonly errorLines?: unknown[]
   readonly files?: FileSystemTestContext
@@ -325,8 +319,7 @@ export function runCommand(
     Layer.succeed(TerminalCapabilities)({
       copyToClipboard: () => Effect.void,
       isInteractive: Effect.succeed(false),
-    }),
-    failingSpawnerLayer
+    })
   ) as TestLayer
 
   for (const layer of options.layers ?? []) {

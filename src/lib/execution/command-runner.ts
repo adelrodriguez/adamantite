@@ -34,28 +34,16 @@ export type CommandFailedLike = CliNotFound | PlatformError.PlatformError
 interface CommandRunnerService {
   readonly exitCode: (
     options: CommandRunOptions
-  ) => Effect.Effect<
-    ChildProcessSpawner.ExitCode,
-    CommandFailedLike,
-    ChildProcessSpawner.ChildProcessSpawner
-  >
+  ) => Effect.Effect<ChildProcessSpawner.ExitCode, CommandFailedLike>
   readonly run: (
     options: CommandRunOptions
-  ) => Effect.Effect<
-    void,
-    CommandFailed | CommandFailedLike,
-    ChildProcessSpawner.ChildProcessSpawner
-  >
+  ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
   /**
    * Runs every step in order, even after one fails, then fails with the first failure.
    */
   readonly runAll: (
     steps: readonly CommandRunOptions[]
-  ) => Effect.Effect<
-    void,
-    CommandFailed | CommandFailedLike,
-    ChildProcessSpawner.ChildProcessSpawner
-  >
+  ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
 }
 
 const printHeading = (title: string, command: string) =>
@@ -132,5 +120,15 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
     }
   }
 
-  static readonly layer = Layer.succeed(this)(this.make(exitCode))
+  static readonly layer = Layer.effect(this)(
+    Effect.gen(function* () {
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+
+      return CommandRunner.make((options) =>
+        exitCode(options).pipe(
+          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
+        )
+      )
+    })
+  )
 }

@@ -209,7 +209,29 @@ describe("knip", () => {
       })
     )
 
-    it.effect("accept a monorepo config that ignores sherif", () =>
+    it.effect("report the preset list when the named import is missing", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent({}, { isMonorepo: true }).replace(
+            "import analyze, { ignoreDependencies } from",
+            "import analyze from"
+          ),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).toEqual([
+          expect.objectContaining({ id: "invalid-knip-config" }),
+        ])
+      })
+    )
+
+    it.effect("accept a monorepo config that ignores sherif by reference", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "knip.config.ts": toKnipTsConfigContent({}, { isMonorepo: true }),

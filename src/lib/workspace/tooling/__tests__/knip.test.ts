@@ -44,4 +44,10 @@ describe("toKnipTsConfigContent", () => {
       '  ignoreDependencies: [...ignoreDependencies.monorepo, "tailwindcss"],'
     )
   })
+
+  test("sort the generated entries so the file passes the sort-keys rule", () => {
+    const content = toKnipTsConfigContent({ entry: ["src/index.ts"] }, { isMonorepo: true })
+
+    expect(content.indexOf("  entry:")).toBeLessThan(content.indexOf("  ignoreDependencies:"))
+  })
 })

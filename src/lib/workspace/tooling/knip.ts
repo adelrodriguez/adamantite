@@ -1,4 +1,6 @@
 import type { JsonObject, JsonValue } from "type-fest"
+import * as Array from "effect/Array"
+import * as Order from "effect/Order"
 import * as Predicate from "effect/Predicate"
 import type { RequiredConfigInspection } from "#lib/workspace/tooling/config.ts"
 import {
@@ -11,10 +13,25 @@ import { ignoreDependencies as presetIgnoreDependencies } from "#presets/analyze
 
 const NOT_A_MONOREPO = { isMonorepo: false }
 
+const byEntryKey = Order.mapInput(Order.String, (entry: readonly [string, string]) => entry[0])
+
 // Bounded by the array's closing bracket, so a Sherif entry in a later property does not count.
-// Matches the preset's list, or a string or regular expression entry, which Knip both accepts.
-const MONOREPO_IGNORE_REGEX =
-  /ignoreDependencies\s*:\s*(?:ignoreDependencies\.monorepo|\[[^\]]*?(?:ignoreDependencies\.monorepo|sherif))/u
+// Matches a string or a regular expression entry, which Knip both accepts.
+const SHERIF_ENTRY_REGEX = /ignoreDependencies\s*:\s*\[[^\]]*?sherif/u
+
+// The preset's list, alone or spread into the array. It needs the named import: without it the
+// config passes this check and then throws a ReferenceError when Knip loads it.
+const PRESET_LIST_REGEX =
+  /ignoreDependencies\s*:\s*(?:ignoreDependencies\.monorepo|\[[^\]]*?ignoreDependencies\.monorepo)/u
+const PRESET_LIST_IMPORT_REGEX =
+  /import\s[^;]*?\{[^}]*\bignoreDependencies\b[^}]*\}\s*from\s*["']adamantite\/analyze["']/u
+
+function checkIgnoresSherif(content: string) {
+  return (
+    SHERIF_ENTRY_REGEX.test(content)
+    || (PRESET_LIST_REGEX.test(content) && PRESET_LIST_IMPORT_REGEX.test(content))
+  )
+}
 
 /**
  * In a monorepo the config must also ignore Sherif: `adamantite analyze` runs it, and Knip has no
@@ -33,7 +50,7 @@ export function inspectRequiredKnipConfig(
     return inspection
   }
 
-  return MONOREPO_IGNORE_REGEX.test(content)
+  return checkIgnoresSherif(content)
     ? inspection
     : {
         goal: "Set `ignoreDependencies: ignoreDependencies.monorepo` in `knip.config.ts`, with the named `ignoreDependencies` import from `adamantite/analyze`, and keep the other settings.",
@@ -62,24 +79,31 @@ export function toKnipTsConfigContent(
 ) {
   const { ignoreDependencies, ...configWithoutIgnores } = config
   const entries: JsonObject = workspace.isMonorepo ? configWithoutIgnores : config
-  const configEntries = Object.entries(entries).map(([key, value]) => {
+  const serializedEntries = Object.entries(entries).map(([key, value]): [string, string] => {
     if (key === "rules" && checkIsJsonObject(value)) {
       const rulesEntries = Object.entries(value).map(
         ([ruleName, ruleValue]) =>
           `    ${serializeTsPropertyKey(ruleName)}: ${serializeTsObjectLiteral(ruleValue, { continuationIndent: "    ", indentation: "    " })},`
       )
 
-      return ["  rules: {", "    ...analyze.rules,", ...rulesEntries, "  },"].join("\n")
+      return [key, ["  rules: {", "    ...analyze.rules,", ...rulesEntries, "  },"].join("\n")]
     }
 
-    return `  ${serializeTsPropertyKey(key)}: ${serializeTsObjectLiteral(value, { continuationIndent: "  " })},`
+    return [
+      key,
+      `  ${serializeTsPropertyKey(key)}: ${serializeTsObjectLiteral(value, { continuationIndent: "  " })},`,
+    ]
   })
 
   if (workspace.isMonorepo) {
-    configEntries.unshift(
-      `  ignoreDependencies: ${serializeIgnoreDependencies(ignoreDependencies)},`
-    )
+    serializedEntries.push([
+      "ignoreDependencies",
+      `  ignoreDependencies: ${serializeIgnoreDependencies(ignoreDependencies)},`,
+    ])
   }
+
+  // The lint preset turns on `sort-keys`, so the generated file must pass `adamantite check`.
+  const configEntries = Array.sort(serializedEntries, byEntryKey).map(([, line]) => line)
 
   if (configEntries.length === 0) {
     return [

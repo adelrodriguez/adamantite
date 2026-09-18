@@ -1,20 +1,10 @@
 import type * as Duration from "effect/Duration"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as Struct from "effect/Struct"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { CapturedCommandResult, CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-
-export const CODING_AGENTS_IDS = [
-  "claude",
-  "codex",
-  "cursor",
-  "gemini",
-  "grok",
-  "opencode",
-] as const
-
-export type CodingAgentId = (typeof CODING_AGENTS_IDS)[number]
 
 export type PermissionProfile =
   | { readonly kind: "files"; readonly timeout: Duration.Input }
@@ -31,17 +21,12 @@ interface HeadlessCommand {
   readonly profileEnforced: boolean
 }
 
-export interface CodingAgent {
-  readonly command: string
-  readonly id: CodingAgentId
+interface CodingAgentContract {
+  readonly commands: readonly string[]
   readonly minimumVersion: string
   readonly name: string
   readonly probeArguments: readonly string[]
   readonly toHeadlessCommand: (prompt: string, profile: PermissionProfile) => HeadlessCommand
-}
-
-interface CodingAgentContract extends Omit<CodingAgent, "command"> {
-  readonly commands: readonly string[]
 }
 
 const fileTools = ["Read", "Edit", "Write"]
@@ -71,10 +56,9 @@ function openCodePermission(profile: PermissionProfile): string {
 // Contract provenance (2026-09-16): these headless forms and permission flags were checked against
 // Claude Code 2.1.272, Codex 0.154.0, Grok Build 1.0.30, and OpenCode 1.18.31. Gemini and Cursor
 // use their first-party documentation. Recheck an entry when its CLI reaches a new major version.
-const contracts: readonly CodingAgentContract[] = [
-  {
+const CODING_AGENT_CONTRACTS = {
+  claude: {
     commands: ["claude"],
-    id: "claude",
     minimumVersion: "2.1.272",
     name: "Claude Code",
     probeArguments: ["--version"],
@@ -92,9 +76,8 @@ const contracts: readonly CodingAgentContract[] = [
       profileEnforced: true,
     }),
   },
-  {
+  codex: {
     commands: ["codex"],
-    id: "codex",
     minimumVersion: "0.154.0",
     name: "Codex",
     probeArguments: ["--version"],
@@ -103,9 +86,8 @@ const contracts: readonly CodingAgentContract[] = [
       profileEnforced: false,
     }),
   },
-  {
+  cursor: {
     commands: ["agent", "cursor-agent"],
-    id: "cursor",
     minimumVersion: "2026.09",
     name: "Cursor",
     probeArguments: ["--version"],
@@ -114,9 +96,8 @@ const contracts: readonly CodingAgentContract[] = [
       profileEnforced: false,
     }),
   },
-  {
+  gemini: {
     commands: ["gemini"],
-    id: "gemini",
     minimumVersion: "0.8.0",
     name: "Gemini CLI",
     probeArguments: ["--version"],
@@ -137,9 +118,8 @@ const contracts: readonly CodingAgentContract[] = [
       profileEnforced: true,
     }),
   },
-  {
+  grok: {
     commands: ["grok"],
-    id: "grok",
     minimumVersion: "1.0.30",
     name: "Grok Build",
     probeArguments: ["version"],
@@ -156,9 +136,8 @@ const contracts: readonly CodingAgentContract[] = [
       profileEnforced: true,
     }),
   },
-  {
+  opencode: {
     commands: ["opencode"],
-    id: "opencode",
     minimumVersion: "1.18.31",
     name: "OpenCode",
     probeArguments: ["--version"],
@@ -168,12 +147,25 @@ const contracts: readonly CodingAgentContract[] = [
       profileEnforced: true,
     }),
   },
-]
+} satisfies Record<string, CodingAgentContract>
 
-function withCommand(contract: CodingAgentContract, command: string): CodingAgent {
+export type CodingAgentId = keyof typeof CODING_AGENT_CONTRACTS
+
+export interface CodingAgent extends Omit<CodingAgentContract, "commands"> {
+  readonly command: string
+  readonly id: CodingAgentId
+}
+
+export const CODING_AGENTS_IDS = Struct.keys(CODING_AGENT_CONTRACTS)
+
+function withCommand(
+  id: CodingAgentId,
+  contract: CodingAgentContract,
+  command: string
+): CodingAgent {
   return {
     command,
-    id: contract.id,
+    id,
     minimumVersion: contract.minimumVersion,
     name: contract.name,
     probeArguments: contract.probeArguments,
@@ -181,18 +173,14 @@ function withCommand(contract: CodingAgentContract, command: string): CodingAgen
   }
 }
 
-export const codingAgents: readonly CodingAgent[] = contracts.map((contract) =>
-  withCommand(contract, contract.commands[0] ?? contract.id)
+export const codingAgents: readonly CodingAgent[] = CODING_AGENTS_IDS.map((id) =>
+  withCommand(id, CODING_AGENT_CONTRACTS[id], CODING_AGENT_CONTRACTS[id].commands[0] ?? id)
 )
 
 export function getCodingAgent(id: CodingAgentId): CodingAgent {
-  const contract = contracts.find((candidate) => candidate.id === id)
+  const contract = CODING_AGENT_CONTRACTS[id]
 
-  if (contract === undefined) {
-    throw new Error(`Unknown coding agent: ${id}`)
-  }
-
-  return withCommand(contract, contract.commands[0] ?? contract.id)
+  return withCommand(id, contract, contract.commands[0] ?? id)
 }
 
 // A probe counts as installed when it starts, regardless of its exit code. Missing commands,
@@ -201,9 +189,10 @@ export const detectInstalledAgents = (cwd: string) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
     const probes = yield* Effect.forEach(
-      contracts,
-      (contract) =>
+      CODING_AGENTS_IDS,
+      (id) =>
         Effect.gen(function* () {
+          const contract = CODING_AGENT_CONTRACTS[id]
           for (const command of contract.commands) {
             const started = yield* runner
               .capture({ args: [...contract.probeArguments], command, cwd, timeout: "10 seconds" })
@@ -213,13 +202,13 @@ export const detectInstalledAgents = (cwd: string) =>
               )
 
             if (started) {
-              return withCommand(contract, command)
+              return withCommand(id, contract, command)
             }
           }
 
           return null
         }),
-      { concurrency: contracts.length }
+      { concurrency: CODING_AGENTS_IDS.length }
     )
     return probes.filter((agent) => agent !== null)
   })

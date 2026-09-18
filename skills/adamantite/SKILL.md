@@ -27,20 +27,20 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
-- Scripts: `check`, `fix`, `analyze`, `check:monorepo`, `fix:monorepo`
+- Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
+  The legacy `check:monorepo` and `fix:monorepo` values are rejected.
 - Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`; editors:
   `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
 
 Only select options supported by the project. Presets and TypeScript require `check` or
-`fix`; extension installation requires an editor; monorepo scripts require a detected
-monorepo; `--github-actions` requires a CI-compatible script and a supported package
+`fix`; extension installation requires an editor; `--github-actions` requires a CI-compatible script and a supported package
 manager (bun, deno, npm, pnpm, or yarn). Omitted boolean flags are disabled.
 
 Existing package scripts whose commands differ from Adamantite's are kept and reported,
 not replaced; pass `--overwrite-scripts` to replace them. Custom flags can be forwarded
-to the Adamantite command after `--`, e.g. `adamantite monorepo -- --ignore-dependency tailwindcss`.
+to the Adamantite command after `--`, e.g. `adamantite analyze -- --directory packages/app`.
 
 ## Daily workflow
 
@@ -50,7 +50,6 @@ Use the scripts written by `init` when available. Otherwise invoke the CLI direc
 adamantite check
 adamantite fix
 adamantite analyze
-adamantite monorepo
 ```
 
 - Use `check` for read-only formatting, lint, and type-error validation.
@@ -63,7 +62,13 @@ adamantite monorepo
   `analyze --only unused` runs one stage. `analyze --fix` may remove files, so inspect
   findings before using it. Sherif refuses to fix when `CI` is set, so in a monorepo
   `analyze --fix` fails there; use `analyze --only unused --fix` for the Knip fixes.
-- Use `monorepo` to inspect workspace dependency consistency and `monorepo --fix` to fix it.
+- In a monorepo, `analyze --fix` needs a terminal when Sherif must choose between versions.
+  Without a terminal, set `"sherif": { "select": "highest" }` in the root `package.json`, or
+  use `analyze --only unused --fix` to skip Sherif.
+- `analyze` runs Sherif without flags. Put Sherif exceptions in the `sherif` field of the root
+  `package.json` (camelCase CLI options, e.g. `"ignoreDependency": ["tailwindcss"]`).
+- Do not use `monorepo`. It is deprecated and the next release removes it. Use `analyze`, or
+  `analyze --only monorepo` to run only Sherif.
 
 To pass arguments to Knip, Oxlint, Oxfmt, or Sherif, place them after `--`:
 
@@ -104,6 +109,5 @@ findings. Follow those findings and review the resulting diff.
 - New target project: `init`, then run the configured checks.
 - Suspected drift or broken setup: run `doctor` and follow its findings.
 - Existing project upgrading Adamantite: `update`, then the doctor sequence.
-- Code-quality failure: choose `check`, `analyze`, or `monorepo` based on
-  the failing subsystem; do not reinitialize the project.
+- Code-quality failure: choose `check` or `analyze` based on the failing subsystem; do not reinitialize the project.
 - Unknown option or behavior: run `adamantite <command> --help` before guessing.

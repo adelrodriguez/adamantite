@@ -226,6 +226,24 @@ describe("github", () => {
       })
     )
 
+    it.effect("report a legacy step that runs the fix:monorepo script", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "steps:",
+            "  - run: pnpm run check",
+            "  - run: npm run fix:monorepo",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [{ id: "legacy-monorepo-workflow-step" }],
+        })
+      })
+    )
+
     it.effect("not report a monorepo step for the analyze command", () =>
       Effect.gen(function* () {
         const files = makeFiles({

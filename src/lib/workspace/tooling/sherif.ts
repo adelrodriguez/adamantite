@@ -1,4 +1,5 @@
 import type { PackageJson } from "type-fest"
+import * as Array from "effect/Array"
 import type { Finding } from "#lib/integrations/base.ts"
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
@@ -11,8 +12,9 @@ interface SherifOption {
 }
 
 /**
- * Sherif CLI flags and the camelCase keys of the `sherif` field that replace them. `--fix` is not a
- * project setting, so it has no key.
+ * Sherif CLI flags and the camelCase keys of the `sherif` field that replace them. `--fix` is left
+ * out on purpose: `adamantite analyze` selects fix mode per invocation, and a stored `fix: true`
+ * makes a plain `analyze` change files.
  */
 const SHERIF_OPTIONS: ReadonlyMap<string, SherifOption> = new Map([
   ["--fail-on-warnings", { key: "failOnWarnings", takesValue: false }],
@@ -99,12 +101,14 @@ export function getLegacyMonorepoScriptFindings(packageJson: PackageJson): Findi
           : [
               "Adopt the managed `analyze` script with `adamantite init --non-interactive --script analyze`. It runs Sherif in a detected monorepo.",
             ]),
-        ...legacyScripts.flatMap((script) => getSettingGoals(script)),
+        // Paired scripts usually carry the same flags; one goal per setting is enough.
+        ...Array.dedupe(legacyScripts.flatMap((script) => getSettingGoals(script))),
         ...legacyScripts.map(({ name }) => `Remove the \`${name}\` script from \`package.json\`.`),
       ],
       id: "legacy-monorepo-scripts",
       integration: "sherif",
       notes: [
+        "`adamantite analyze` replaces `check:monorepo`, and `adamantite analyze --fix` replaces `fix:monorepo`. `adamantite analyze --only monorepo` runs only Sherif.",
         "`adamantite analyze` runs Sherif without flags. Sherif reads project exceptions from the `sherif` field of the root `package.json`, with the CLI options in camelCase: `ignoreDependency`, `ignoreRule`, `ignorePackage`, `select`, `noInstall`, and `failOnWarnings`.",
         "Doctor does not assess `AGENTS.md`. Remove the lines that mention the monorepo scripts from its Adamantite section.",
       ],

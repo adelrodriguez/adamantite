@@ -1,6 +1,6 @@
 import { resolve } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
-import { parseOxlintDiagnostics } from "#lib/workspace/tooling/oxlint-diagnostics.ts"
+import { parseOxlintDiagnostics } from "#lib/agent-repair/oxlint.ts"
 
 describe("parseOxlintDiagnostics", () => {
   it("parse the JSON reporter shape", () => {
@@ -27,5 +27,11 @@ describe("parseOxlintDiagnostics", () => {
         url: "https://oxc.rs/rule",
       },
     ])
+  })
+
+  it("reject malformed reporter output at the input boundary", () => {
+    expect(() => parseOxlintDiagnostics('{"diagnostics":[{"code":4}]}', "/project")).toThrow(
+      "could not parse"
+    )
   })
 })

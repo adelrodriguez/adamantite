@@ -22,17 +22,11 @@ const agentCommands = {
   opencode: ["opencode"],
 } as const
 
-type AgentName = keyof typeof agentCommands
-
 const repoRoot = join(import.meta.dirname, "..")
 const cliPath = join(repoRoot, "bin", "adamantite")
 
-function isAgentName(value: string): value is AgentName {
-  return Object.hasOwn(agentCommands, value)
-}
-
-function findInstalledCommand(agent: AgentName): string | null {
-  for (const command of agentCommands[agent]) {
+function findInstalledCommand(commands: readonly string[]): string | null {
+  for (const command of commands) {
     const result = spawnSync(command, [command === "grok" ? "version" : "--version"], {
       stdio: "ignore",
       timeout: 10_000,
@@ -57,11 +51,12 @@ function runAdamantite(cwd: string, env: NodeJS.ProcessEnv, args: string[]) {
 }
 
 const requested = process.argv.slice(2).find((argument) => argument !== "--")
-if (requested === undefined || !isAgentName(requested)) {
+const commands = Object.entries(agentCommands).find(([name]) => name === requested)?.[1]
+if (requested === undefined || commands === undefined) {
   throw new Error(`Usage: pnpm test:agents -- <${Object.keys(agentCommands).join("|")}>`)
 }
 
-const installedCommand = findInstalledCommand(requested)
+const installedCommand = findInstalledCommand(commands)
 if (installedCommand === null) {
   console.info(`SKIP ${requested}: no supported command was found on PATH.`)
   process.exit(0)

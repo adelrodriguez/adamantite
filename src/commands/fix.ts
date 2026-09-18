@@ -12,20 +12,20 @@ import {
   detectInstalledAgents,
   getCodingAgent,
   runHeadlessSession,
-} from "#lib/execution/coding-agents.ts"
+} from "#lib/agent-repair/driver.ts"
+import { runRepairLoop } from "#lib/agent-repair/loop.ts"
+import {
+  collectOxlintDiagnostics,
+  type OxlintDiagnostic,
+  verifyOxlintFile,
+} from "#lib/agent-repair/oxlint.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { runRepairLoop } from "#lib/execution/repair-loop.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import {
-  collectOxlintDiagnostics,
-  type OxlintDiagnostic,
-  verifyOxlintFile,
-} from "#lib/workspace/tooling/oxlint-diagnostics.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printItemStatuses } from "#terminal/item-status.ts"
 import { Prompter } from "#terminal/prompter.ts"

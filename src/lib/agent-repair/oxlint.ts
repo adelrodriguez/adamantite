@@ -1,6 +1,5 @@
 import { isAbsolute, resolve } from "node:path"
 import * as Effect from "effect/Effect"
-import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
@@ -18,73 +17,49 @@ export interface OxlintDiagnostic {
   readonly url?: string
 }
 
-function isJsonObject(value: Schema.Json | undefined): value is Schema.JsonObject {
-  return value !== undefined && Schema.is(Schema.JsonObject)(value)
-}
+const OxlintOutput = Schema.Struct({
+  diagnostics: Schema.Array(Schema.JsonObject),
+})
 
-function isJsonArray(value: Schema.Json | undefined): value is readonly Schema.Json[] {
-  return value !== undefined && Schema.is(Schema.Array(Schema.Json))(value)
-}
-
-function optionalString(value: Schema.Json | undefined): string | undefined {
-  return Predicate.isString(value) ? value : undefined
-}
-
-function parseDiagnostic(value: Schema.Json, cwd: string): OxlintDiagnostic | null {
-  if (!isJsonObject(value)) {
-    return null
-  }
-
-  const labels = value["labels"]
-  const firstLabel = isJsonArray(labels) ? labels[0] : undefined
-  const span = isJsonObject(firstLabel) ? firstLabel["span"] : undefined
-  const filename = value["filename"]
-  const message = value["message"]
-  const rule = value["code"]
-
-  if (
-    !Predicate.isString(filename)
-    || !Predicate.isString(message)
-    || !Predicate.isString(rule)
-    || !isJsonObject(span)
-    || !Predicate.isNumber(span["line"])
-    || !Predicate.isNumber(span["column"])
-  ) {
-    return null
-  }
-
-  return {
-    column: span["column"],
-    file: isAbsolute(filename) ? filename : resolve(cwd, filename),
-    help: optionalString(value["help"]),
-    line: span["line"],
-    message,
-    raw: value,
-    rule,
-    url: optionalString(value["url"]),
-  }
-}
+const OxlintDiagnosticFields = Schema.Struct({
+  code: Schema.String,
+  filename: Schema.String,
+  help: Schema.optionalKey(Schema.String),
+  labels: Schema.NonEmptyArray(
+    Schema.Struct({
+      span: Schema.Struct({
+        column: Schema.Number,
+        line: Schema.Number,
+      }),
+    })
+  ),
+  message: Schema.String,
+  url: Schema.optionalKey(Schema.String),
+})
 
 export function parseOxlintDiagnostics(output: string, cwd: string): OxlintDiagnostic[] {
-  let parsed: Schema.Json
-
   try {
-    parsed = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))(output)
+    const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintOutput))(output)
+    return parsed.diagnostics.map((raw) => {
+      const diagnostic = Schema.decodeUnknownSync(OxlintDiagnosticFields)(raw)
+      const span = diagnostic.labels[0].span
+
+      return {
+        column: span.column,
+        file: isAbsolute(diagnostic.filename)
+          ? diagnostic.filename
+          : resolve(cwd, diagnostic.filename),
+        help: diagnostic.help,
+        line: span.line,
+        message: diagnostic.message,
+        raw,
+        rule: diagnostic.code,
+        url: diagnostic.url,
+      }
+    })
   } catch (error) {
     throw new InvalidToolOutput({ cause: error, command: oxlint.name })
   }
-
-  if (!isJsonObject(parsed) || !isJsonArray(parsed["diagnostics"])) {
-    throw new InvalidToolOutput({ command: oxlint.name })
-  }
-
-  const diagnostics = parsed["diagnostics"].map((value) => parseDiagnostic(value, cwd))
-
-  if (diagnostics.some((diagnostic) => diagnostic === null)) {
-    throw new InvalidToolOutput({ command: oxlint.name })
-  }
-
-  return diagnostics.filter((diagnostic) => diagnostic !== null)
 }
 
 export const collectOxlintDiagnostics = Effect.fn("collectOxlintDiagnostics")(function* ({

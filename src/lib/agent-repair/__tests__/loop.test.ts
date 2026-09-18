@@ -4,7 +4,7 @@ import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { runRepairLoop } from "#lib/execution/repair-loop.ts"
+import { runRepairLoop } from "#lib/agent-repair/loop.ts"
 
 interface Item {
   readonly id: string

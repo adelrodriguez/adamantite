@@ -13,8 +13,8 @@ import {
   detectInstalledAgents,
   getCodingAgent,
   runHeadlessSession,
-} from "#lib/execution/coding-agents.ts"
-import { runRepairLoop } from "#lib/execution/repair-loop.ts"
+} from "#lib/agent-repair/driver.ts"
+import { runRepairLoop } from "#lib/agent-repair/loop.ts"
 import { assessProject, renderAssessmentMarkdown } from "#lib/integrations/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }

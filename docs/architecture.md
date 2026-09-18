@@ -24,8 +24,9 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 | Module         | Responsibility                                                                                               |
 | -------------- | ------------------------------------------------------------------------------------------------------------ |
+| `agent-repair` | Drive coding agents, parse tool diagnostics, and verify bounded repair attempts.                             |
 | `commands`     | Define one CLI workflow and render its user-facing result.                                                   |
-| `execution`    | Run child commands, drive coding agents headlessly, and carry forwarded arguments.                           |
+| `execution`    | Run child commands and carry forwarded arguments.                                                            |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess the project against the managed ideal. |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                       |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                         |
@@ -92,7 +93,8 @@ presets/
 src/
   commands/         CLI workflows
   lib/
-    execution/      child command runs, headless agent driving, forwarded arguments
+    agent-repair/   headless agent contracts, repair loop, tool diagnostic adapters
+    execution/      child command runs and forwarded arguments
     integrations/   tooling, editor, and CI adapters; project assessment
     shared/         cross-cutting types and helpers
     workspace/      target-project state and file operations

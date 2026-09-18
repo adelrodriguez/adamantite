@@ -1,6 +1,5 @@
 import { resolve } from "node:path"
 import * as Effect from "effect/Effect"
-import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
@@ -27,19 +26,52 @@ export interface SherifDiagnostic {
   readonly type: "sherif"
 }
 
-function isJsonObject(value: Schema.Json | undefined): value is Schema.JsonObject {
-  return value !== undefined && Schema.is(Schema.JsonObject)(value)
-}
+const KnipIssue = Schema.Struct({
+  col: Schema.optionalKey(Schema.Number),
+  kind: Schema.optionalKey(Schema.String),
+  line: Schema.optionalKey(Schema.Number),
+  name: Schema.String,
+  namespace: Schema.optionalKey(Schema.String),
+  pos: Schema.optionalKey(Schema.Number),
+  specifier: Schema.optionalKey(Schema.String),
+})
 
-function isJsonArray(value: Schema.Json | undefined): value is readonly Schema.Json[] {
-  return value !== undefined && Schema.is(Schema.Array(Schema.Json))(value)
-}
+const KnipIssues = Schema.Array(KnipIssue)
+const NestedKnipIssues = Schema.Array(KnipIssues)
+
+const KnipOutput = Schema.Struct({
+  issues: Schema.Array(
+    Schema.Struct({
+      binaries: Schema.optionalKey(KnipIssues),
+      catalog: Schema.optionalKey(KnipIssues),
+      catalogReferences: Schema.optionalKey(KnipIssues),
+      cycles: Schema.optionalKey(NestedKnipIssues),
+      dependencies: Schema.optionalKey(KnipIssues),
+      devDependencies: Schema.optionalKey(KnipIssues),
+      duplicates: Schema.optionalKey(NestedKnipIssues),
+      enumMembers: Schema.optionalKey(KnipIssues),
+      exports: Schema.optionalKey(KnipIssues),
+      file: Schema.String,
+      files: Schema.optionalKey(KnipIssues),
+      namespaceMembers: Schema.optionalKey(KnipIssues),
+      nsExports: Schema.optionalKey(KnipIssues),
+      nsTypes: Schema.optionalKey(KnipIssues),
+      optionalPeerDependencies: Schema.optionalKey(KnipIssues),
+      owners: Schema.optionalKey(KnipIssues),
+      types: Schema.optionalKey(KnipIssues),
+      unlisted: Schema.optionalKey(KnipIssues),
+      unresolved: Schema.optionalKey(KnipIssues),
+    })
+  ),
+})
 
 const KNIP_ISSUE_TYPES = [
   "binaries",
   "catalog",
   "catalogReferences",
+  "cycles",
   "dependencies",
+  "devDependencies",
   "duplicates",
   "enumMembers",
   "exports",
@@ -47,62 +79,39 @@ const KNIP_ISSUE_TYPES = [
   "namespaceMembers",
   "nsExports",
   "nsTypes",
+  "optionalPeerDependencies",
   "types",
   "unlisted",
   "unresolved",
 ] as const
 
-function optionalNumber(value: Schema.Json | undefined): number | undefined {
-  return Predicate.isNumber(value) ? value : undefined
-}
-
-function issueMessage(value: Schema.Json): string {
-  if (isJsonObject(value) && Predicate.isString(value["name"])) {
-    return value["name"]
-  }
-  if (Predicate.isString(value)) {
-    return value
-  }
-  return JSON.stringify(value)
-}
-
 export function parseKnipDiagnostics(output: string, cwd: string): KnipDiagnostic[] {
-  let parsed: Schema.Json
   try {
-    parsed = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Json))(output)
+    const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(KnipOutput))(output)
+    const diagnostics: KnipDiagnostic[] = []
+
+    for (const group of parsed.issues) {
+      const file = resolve(cwd, group.file)
+      for (const type of KNIP_ISSUE_TYPES) {
+        const values = group[type]?.flat() ?? []
+        for (const value of values) {
+          diagnostics.push({
+            column: value.col,
+            file,
+            line: value.line,
+            message: value.name,
+            raw: value,
+            stage: "unused",
+            type,
+          })
+        }
+      }
+    }
+
+    return diagnostics
   } catch (error) {
     throw new InvalidToolOutput({ cause: error, command: knip.name })
   }
-
-  if (!isJsonObject(parsed) || !isJsonArray(parsed["issues"])) {
-    throw new InvalidToolOutput({ command: knip.name })
-  }
-
-  const diagnostics: KnipDiagnostic[] = []
-  for (const group of parsed["issues"]) {
-    if (!isJsonObject(group) || !Predicate.isString(group["file"])) {
-      throw new InvalidToolOutput({ command: knip.name })
-    }
-    const file = resolve(cwd, group["file"])
-    for (const type of KNIP_ISSUE_TYPES) {
-      const values = group[type]
-      if (!isJsonArray(values)) {
-        continue
-      }
-      for (const value of values) {
-        diagnostics.push({
-          column: isJsonObject(value) ? optionalNumber(value["col"]) : undefined,
-          file,
-          line: isJsonObject(value) ? optionalNumber(value["line"]) : undefined,
-          message: issueMessage(value),
-          raw: value,
-          stage: "unused",
-          type,
-        })
-      }
-    }
-  }
-  return diagnostics
 }
 
 export const collectKnipDiagnostics = Effect.fn("collectKnipDiagnostics")(function* ({

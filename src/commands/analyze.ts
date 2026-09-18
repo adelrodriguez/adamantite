@@ -6,27 +6,27 @@ import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import {
+  type AnalyzeDiagnostic,
+  applyKnipFixes,
+  collectKnipDiagnostics,
+  collectSherifDiagnostics,
+} from "#lib/agent-repair/analyze.ts"
+import {
   type CodingAgent,
   codingAgentIds,
   detectInstalledAgents,
   getCodingAgent,
   runHeadlessSession,
-} from "#lib/execution/coding-agents.ts"
+} from "#lib/agent-repair/driver.ts"
+import { type RepairWorkUnit, runRepairLoop } from "#lib/agent-repair/loop.ts"
 import { type CommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { type RepairWorkUnit, runRepairLoop } from "#lib/execution/repair-loop.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import { CliNotFound, CommandFailed, InvalidAnalyzeOptions } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import {
-  type AnalyzeDiagnostic,
-  applyKnipFixes,
-  collectKnipDiagnostics,
-  collectSherifDiagnostics,
-} from "#lib/workspace/tooling/analyze-diagnostics.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printItemStatuses } from "#terminal/item-status.ts"
 import { Prompter } from "#terminal/prompter.ts"

@@ -8,7 +8,7 @@ import {
   detectInstalledAgents,
   type PermissionProfile,
   runHeadlessSession,
-} from "#lib/execution/coding-agents.ts"
+} from "#lib/agent-repair/driver.ts"
 import { type CapturedCommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 

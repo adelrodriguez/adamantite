@@ -1,139 +1,270 @@
-import process from "node:process"
+import type * as Duration from "effect/Duration"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
+import type { CapturedCommandResult, CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
+
+export const codingAgentIds = ["claude", "codex", "cursor", "gemini", "grok", "opencode"] as const
+
+export type CodingAgentId = (typeof codingAgentIds)[number]
+
+export type PermissionProfile =
+  | { readonly kind: "files"; readonly timeout: Duration.Input }
+  | {
+      readonly exactCommands?: readonly string[]
+      readonly kind: "files-and-shell"
+      readonly shellPrefixes: readonly string[]
+      readonly timeout: Duration.Input
+    }
+
+interface HeadlessCommand {
+  readonly args: readonly string[]
+  readonly env?: Readonly<Record<string, string>>
+  readonly profileEnforced: boolean
+}
 
 export interface CodingAgent {
   readonly command: string
+  readonly id: CodingAgentId
+  readonly minimumVersion: string
   readonly name: string
-  /**
-   * Arguments for the installation probe. Defaults to `--version`; Grok Build only documents a
-   * `version` subcommand.
-   */
-  readonly probeArguments?: readonly string[]
-  /**
-   * Arguments that start the CLI's interactive session seeded with the prompt. OpenCode only
-   * pre-fills its input box, so that handoff needs one Enter press.
-   */
-  readonly seedArguments: (prompt: string) => string[]
+  readonly probeArguments: readonly string[]
+  readonly toHeadlessCommand: (prompt: string, profile: PermissionProfile) => HeadlessCommand
 }
 
-// Contract provenance (2026-08-27) — the seed and probe forms are third-party CLI
-// contracts and can drift per vendor; re-verify an entry when its CLI majors:
-// - claude, codex: positional interactive seed and `--version` per vendor docs,
-//   confirmed against locally installed CLIs.
-// - grok: `[PROMPT]` interactive seed and the `version` subcommand confirmed against
-//   the shipped binary, grok 1.0.5 (5115b46bc9).
-// - cursor-agent, gemini, opencode: forms from first-party docs; smoke test pending.
-export const codingAgents: readonly CodingAgent[] = [
-  { command: "claude", name: "Claude Code", seedArguments: (prompt) => [prompt] },
-  { command: "codex", name: "Codex", seedArguments: (prompt) => [prompt] },
-  { command: "cursor-agent", name: "Cursor", seedArguments: (prompt) => [prompt] },
-  { command: "gemini", name: "Gemini CLI", seedArguments: (prompt) => ["-i", prompt] },
+interface CodingAgentContract extends Omit<CodingAgent, "command"> {
+  readonly commands: readonly string[]
+}
+
+const fileTools = ["Read", "Edit", "Write"]
+
+function shellTools(profile: PermissionProfile): string[] {
+  return profile.kind === "files-and-shell"
+    ? [
+        ...profile.shellPrefixes.map((prefix) => `Bash(${prefix} *)`),
+        ...(profile.exactCommands ?? []).map((command) => `Bash(${command})`),
+      ]
+    : []
+}
+
+function openCodePermission(profile: PermissionProfile): string {
+  const bash =
+    profile.kind === "files"
+      ? "deny"
+      : Object.fromEntries([
+          ["*", "deny"],
+          ...profile.shellPrefixes.map((prefix) => [`${prefix} *`, "allow"]),
+          ...(profile.exactCommands ?? []).map((command) => [command, "allow"]),
+        ])
+
+  return JSON.stringify({ permission: { bash, edit: "allow", webfetch: "deny" } })
+}
+
+// Contract provenance (2026-09-16): these headless forms and permission flags were checked against
+// Claude Code 2.1.272, Codex 0.154.0, Grok Build 1.0.30, and OpenCode 1.18.31. Gemini and Cursor
+// use their first-party documentation. Recheck an entry when its CLI reaches a new major version.
+const contracts: readonly CodingAgentContract[] = [
   {
-    command: "grok",
+    commands: ["claude"],
+    id: "claude",
+    minimumVersion: "2.1.272",
+    name: "Claude Code",
+    probeArguments: ["--version"],
+    toHeadlessCommand: (prompt, profile) => ({
+      args: [
+        "-p",
+        prompt,
+        "--permission-prompts",
+        "none",
+        "--permission-mode",
+        "acceptEdits",
+        "--allowedTools",
+        [...fileTools, ...shellTools(profile)].join(" "),
+      ],
+      profileEnforced: true,
+    }),
+  },
+  {
+    commands: ["codex"],
+    id: "codex",
+    minimumVersion: "0.154.0",
+    name: "Codex",
+    probeArguments: ["--version"],
+    toHeadlessCommand: (prompt) => ({
+      args: ["exec", "--sandbox", "workspace-write", prompt],
+      profileEnforced: false,
+    }),
+  },
+  {
+    commands: ["agent", "cursor-agent"],
+    id: "cursor",
+    minimumVersion: "2026.09",
+    name: "Cursor",
+    probeArguments: ["--version"],
+    toHeadlessCommand: (prompt) => ({
+      args: ["-p", prompt, "--trust", "--force"],
+      profileEnforced: false,
+    }),
+  },
+  {
+    commands: ["gemini"],
+    id: "gemini",
+    minimumVersion: "0.8.0",
+    name: "Gemini CLI",
+    probeArguments: ["--version"],
+    toHeadlessCommand: (prompt, profile) => ({
+      args: [
+        "-p",
+        prompt,
+        "--approval-mode",
+        "auto_edit",
+        "--allowed-tools",
+        [
+          "read_file",
+          "write_file",
+          "replace",
+          ...shellTools(profile).map((tool) => `ShellTool(${tool.slice(5, -1)})`),
+        ].join(","),
+      ],
+      profileEnforced: true,
+    }),
+  },
+  {
+    commands: ["grok"],
+    id: "grok",
+    minimumVersion: "1.0.30",
     name: "Grok Build",
     probeArguments: ["version"],
-    seedArguments: (prompt) => [prompt],
+    toHeadlessCommand: (prompt, profile) => ({
+      args: [
+        "-p",
+        prompt,
+        "--permission-mode",
+        "acceptEdits",
+        "--sandbox",
+        "workspace",
+        ...shellTools(profile).flatMap((tool) => ["--allow", tool]),
+      ],
+      profileEnforced: true,
+    }),
   },
-  { command: "opencode", name: "OpenCode", seedArguments: (prompt) => ["--prompt", prompt] },
+  {
+    commands: ["opencode"],
+    id: "opencode",
+    minimumVersion: "1.18.31",
+    name: "OpenCode",
+    probeArguments: ["--version"],
+    toHeadlessCommand: (prompt, profile) => ({
+      args: ["run", prompt],
+      env: { OPENCODE_CONFIG_CONTENT: openCodePermission(profile) },
+      profileEnforced: true,
+    }),
+  },
 ]
 
-// "It spawned and exited" is the installation check: the probe ignores output and exit
-// codes, so a CLI that prints its version oddly or exits nonzero still counts as
-// installed. Any failure to run — the command missing from PATH, a permission or
-// resource error, or a probe that hangs past the timeout — reads as not installed.
+function withCommand(contract: CodingAgentContract, command: string): CodingAgent {
+  return {
+    command,
+    id: contract.id,
+    minimumVersion: contract.minimumVersion,
+    name: contract.name,
+    probeArguments: contract.probeArguments,
+    toHeadlessCommand: contract.toHeadlessCommand,
+  }
+}
+
+export const codingAgents: readonly CodingAgent[] = contracts.map((contract) =>
+  withCommand(contract, contract.commands[0] ?? contract.id)
+)
+
+export function getCodingAgent(id: CodingAgentId): CodingAgent {
+  const contract = contracts.find((candidate) => candidate.id === id)
+
+  if (contract === undefined) {
+    throw new Error(`Unknown coding agent: ${id}`)
+  }
+
+  return withCommand(contract, contract.commands[0] ?? contract.id)
+}
+
+// A probe counts as installed when it starts, regardless of its exit code. Missing commands,
+// spawn failures, and probes that exceed ten seconds do not count.
 export const detectInstalledAgents = (cwd: string) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
     const probes = yield* Effect.forEach(
-      codingAgents,
-      (agent) =>
-        runner
-          .exitCode({
-            args: [...(agent.probeArguments ?? ["--version"])],
-            command: agent.command,
-            cwd,
-            stderr: "ignore",
-            stdout: "ignore",
-          })
-          .pipe(
-            Effect.timeout("10 seconds"),
-            Effect.as(agent),
-            Effect.catch(() => Effect.succeed(null))
-          ),
-      { concurrency: codingAgents.length }
+      contracts,
+      (contract) =>
+        Effect.gen(function* () {
+          for (const command of contract.commands) {
+            const started = yield* runner
+              .capture({ args: [...contract.probeArguments], command, cwd, timeout: "10 seconds" })
+              .pipe(
+                Effect.as(true),
+                Effect.catch(() => Effect.succeed(false))
+              )
+
+            if (started) {
+              return withCommand(contract, command)
+            }
+          }
+
+          return null
+        }),
+      { concurrency: contracts.length }
     )
     return probes.filter((agent) => agent !== null)
   })
 
-// The findings themselves stay out of the seed prompt: the agent reads them by
-// running non-interactive `adamantite doctor`, so nothing sensitive lands in argv.
-export const handoffPrompt =
-  "Run `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, "
-  + "if it is not on PATH — and resolve every finding it reports. "
-  + "Rerun `adamantite doctor` until it exits 0."
-
-// Lives here instead of lib/shared/errors.ts because it carries the runner failure,
-// and shared must not depend on execution.
 export class AgentSessionFailed extends Data.TaggedError("AgentSessionFailed")<{
   readonly cause: CommandFailedLike
   readonly reason: "not-found" | "spawn-failed"
 }> {}
 
-const ignoreSigint = () => {
-  // Doctor stays alive; the agent in the foreground process group handles the signal.
+export type HeadlessSessionResult = CapturedCommandResult & {
+  readonly minimumVersion: string
+  readonly profileEnforced: boolean
 }
 
-// While the agent owns the terminal, Ctrl-C is the agent's to handle. The session is
-// spawned with `detached: false` so the agent joins Doctor's foreground process group
-// (the platform spawner would otherwise start it in a new session on POSIX, cutting it
-// off from terminal-generated SIGINT and SIGWINCH). Sharing the group means the same
-// SIGINT also reaches Doctor's runtime, whose spawner finalizer would kill the agent
-// mid-edit — this shield discards it for the duration of the session.
-const shieldSigintDuring = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.acquireUseRelease(
-    Effect.sync(() => {
-      const previous = process.listeners("SIGINT")
-      process.removeAllListeners("SIGINT")
-      // With no listener at all, Node's default SIGINT behavior kills the process.
-      process.on("SIGINT", ignoreSigint)
-      return previous
-    }),
-    () => effect,
-    (previous) =>
-      Effect.sync(() => {
-        process.removeAllListeners("SIGINT")
-        for (const listener of previous) {
-          process.on("SIGINT", listener)
-        }
-      })
-  )
-
-/**
- * Hands the terminal to the agent with inherited stdio, seeded to run Doctor itself. Resolves when
- * the session ends; the agent's exit code is deliberately discarded because only a reassessment can
- * judge whether the findings were repaired. Doctor ignores SIGINT for the duration of the session
- * so a Ctrl-C reaches only the agent.
- */
-export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: string }) =>
+export const runHeadlessSession = ({
+  agent,
+  cwd,
+  profile,
+  prompt,
+}: {
+  readonly agent: CodingAgent
+  readonly cwd: string
+  readonly profile: PermissionProfile
+  readonly prompt: string
+}) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
-    yield* shieldSigintDuring(
-      runner.exitCode({
-        args: agent.seedArguments(handoffPrompt),
-        command: agent.command,
+    const command = agent.toHeadlessCommand(prompt, profile)
+    const run = (commandName: string) =>
+      runner.capture({
+        args: [...command.args],
+        captureStdout: false,
+        command: commandName,
         cwd,
-        detached: false,
-        stderr: "inherit",
-        stdin: "inherit",
-        stdout: "inherit",
+        env: command.env,
+        stderrLimitBytes: 64 * 1024,
+        timeout: profile.timeout,
       })
+    const result = yield* run(agent.command).pipe(
+      Effect.catchTag("CliNotFound", (error) =>
+        agent.id === "cursor" && agent.command === "agent"
+          ? run("cursor-agent")
+          : Effect.fail(error)
+      )
     )
+
+    return {
+      ...result,
+      minimumVersion: agent.minimumVersion,
+      profileEnforced: command.profileEnforced,
+    } satisfies HeadlessSessionResult
   }).pipe(
-    Effect.asVoid,
     Effect.mapError(
       (error) =>
         new AgentSessionFailed({
@@ -143,27 +274,21 @@ export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: strin
     )
   )
 
-type WorkingTreeState = "clean" | "dirty" | "unknown"
+export type WorkingTreeState = "clean" | "dirty" | "unknown"
 
-// Exit codes only: CommandRunner cannot capture output, and `git diff --quiet HEAD`
-// answers cleanly through them (0 clean, 1 dirty, anything else no usable answer).
-// Untracked-only trees read as clean; the handoff confirmation copy accepts that.
 export const checkWorkingTreeState = (cwd: string) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
-    const exitCode = yield* runner.exitCode({
-      args: ["diff", "--quiet", "HEAD"],
+    const result = yield* runner.capture({
+      args: ["status", "--porcelain"],
       command: "git",
       cwd,
-      stderr: "ignore",
-      stdout: "ignore",
+      timeout: "10 seconds",
     })
 
-    if (exitCode === ChildProcessSpawner.ExitCode(0)) {
-      return "clean" as const
+    if (result.status !== "exited" || result.exitCode !== ChildProcessSpawner.ExitCode(0)) {
+      return "unknown" as const
     }
-    if (exitCode === ChildProcessSpawner.ExitCode(1)) {
-      return "dirty" as const
-    }
-    return "unknown" as const
+
+    return result.stdout.length === 0 ? ("clean" as const) : ("dirty" as const)
   }).pipe(Effect.catch(() => Effect.succeed<WorkingTreeState>("unknown")))

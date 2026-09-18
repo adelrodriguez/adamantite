@@ -127,7 +127,13 @@ adamantite fix
 adamantite fix --suggested
 adamantite fix --dangerous
 adamantite fix --all
+adamantite fix --agent claude
 ```
+
+`fix --agent` gives each Oxlint diagnostic that remains after autofix to the selected coding agent,
+one file at a time. Adamantite formats and lints the file after each attempt. It allows three
+five-minute attempts and exits 1 if any diagnostic remains. The agent receives file tools only.
+Codex and Cursor cannot enforce that profile, so Adamantite prints a warning for them.
 
 ### `adamantite analyze`
 
@@ -141,6 +147,7 @@ adamantite analyze --strict
 adamantite analyze --fix
 adamantite analyze --only unused
 adamantite analyze --only monorepo --fix -- --select highest
+adamantite analyze --agent claude
 ```
 
 - The `monorepo` stage (Sherif) runs first, and only in a detected monorepo. The `unused`
@@ -162,6 +169,10 @@ adamantite analyze --only monorepo --fix -- --select highest
 - Use `--fix` locally, not in CI. Sherif refuses to fix in a CI environment (for example when
   `CI` is set), so `analyze --fix` fails there in a monorepo. CI runs `adamantite analyze`
   without `--fix`.
+- `--agent` repairs findings that automatic fixes do not clear. Agent mode runs Sherif without
+  `--fix`, applies Knip's built-in fixes, then gives the remaining work to the selected agent. It
+  composes with `--only` and `--strict`. Adamantite runs the package-manager install if the agent
+  changes dependency versions.
 
 ### `adamantite doctor`
 
@@ -170,19 +181,22 @@ the current state, the goal state, and how to verify the repair.
 
 ```sh
 adamantite doctor
+adamantite doctor --agent claude
+adamantite doctor --agent claude --allow-dirty
 ```
 
 In an interactive terminal, Doctor presents each finding as formatted text and offers to
-hand off to an installed coding agent, or to copy one combined Markdown repair prompt. A
-handoff starts the selected agent CLI in the terminal with a short seed prompt; the agent
-runs `adamantite doctor` itself to read the findings and edits the project under its own
-permission and trust flow. When the agent session ends, Doctor reassesses and exits 0
-only when no findings remain. Doctor detects installed agents by probing each supported
-CLI — Claude Code (`claude`), Codex (`codex`), Cursor (`cursor-agent`), Gemini CLI
-(`gemini`), Grok Build (`grok`), and OpenCode (`opencode`) — and lists only the ones
-found on `PATH`. It warns before starting an agent on a working tree that is not known
-to be clean. OpenCode pre-fills its input with the seed prompt, so that handoff needs
-one Enter press to start.
+run an installed coding agent headlessly, or to copy one combined Markdown repair prompt. Doctor
+gives the agent a temporary file with the findings, reassesses after each attempt, and retries up to
+three times. Each attempt has a ten-minute timeout. Doctor detects Claude Code (`claude`), Codex
+(`codex`), Cursor (`agent` or `cursor-agent`), Gemini CLI (`gemini`), Grok Build (`grok`), and
+OpenCode (`opencode`). `--agent <name>` selects one without a prompt.
+
+Doctor permits file edits and only the Doctor and Update shell commands needed for verification and
+managed package updates. Legacy configuration findings add exact delete commands for their paths.
+Codex uses its workspace sandbox, and Cursor runs unscoped. Adamantite warns for both. Doctor asks
+before editing a dirty tree in a terminal. A non-interactive run must pass `--allow-dirty` when the
+tree is dirty or its state is unknown.
 
 A coding agent can also run `adamantite doctor` in the target project to receive Markdown
 directly. In a non-interactive run, Doctor prints the combined repair prompt and exits 1
@@ -218,8 +232,8 @@ bun run analyze -- -- --directory packages/app
 npm run analyze -- -- --directory packages/app
 ```
 
-`init`, `doctor`, and `update` do not forward arguments because they do not invoke one
-underlying CLI.
+`init`, `doctor`, and `update` do not forward arguments. Agent mode consumes the same forwarded
+arguments as its owning Fix or Analyze stage.
 
 ## Presets
 

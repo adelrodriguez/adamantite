@@ -66,6 +66,7 @@
     "format": "oxfmt",
     "release": "changeset publish",
     "test": "vitest run",
+    "test:agents": "pnpm run build && node scripts/test-agent-smoke.ts",
     "test:build": "node scripts/test-build.ts",
     "test:coverage": "vitest run --coverage",
     "test:dist": "pnpm run build && pnpm run test:build && pnpm run test:smoke",

@@ -92,6 +92,40 @@
       },
       "tracking": "dependency",
       "version": "5.0.1"
+    },
+    {
+      "name": "@effect/platform-node",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/platform/node",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/effect"
+      },
+      "tracking": "manual",
+      "version": "4.0.0-rc.115"
+    },
+    {
+      "name": "@effect/platform-node-shared",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/platform/node-shared",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/effect"
+      },
+      "tracking": "manual",
+      "version": "4.0.0-rc.115"
+    },
+    {
+      "name": "oxlint",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxlint/-/oxlint-1.83.0.tgz"
+      },
+      "tracking": "manual",
+      "version": "1.83.0"
     }
   ]
 }

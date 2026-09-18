@@ -3,11 +3,79 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("fix", () => {
+  describe("agent mode", () => {
+    it.effect("repair surviving diagnostics one file at a time", () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            "package.json": JSON.stringify({
+              devDependencies: { "oxlint-tsgolint": "0.0.0" },
+            }),
+          },
+        })
+        let report = 0
+        const runner = createRunnerTestContext({
+          captureImplementation: (options) =>
+            Effect.sync(() => {
+              if (options.command === "claude") {
+                expect(options.args.join(" ")).toContain(
+                  `Edit only ${join(files.root, "index.ts")}`
+                )
+                return {
+                  exitCode: ChildProcessSpawner.ExitCode(0),
+                  status: "exited" as const,
+                  stderr: "",
+                  stdout: "",
+                }
+              }
+              report += 1
+              return {
+                exitCode: ChildProcessSpawner.ExitCode(report === 1 ? 1 : 0),
+                status: "exited" as const,
+                stderr: "",
+                stdout: JSON.stringify({
+                  diagnostics:
+                    report === 1
+                      ? [
+                          {
+                            code: "eslint(no-console)",
+                            filename: "index.ts",
+                            labels: [{ span: { column: 1, line: 1 } }],
+                            message: "Unexpected console statement.",
+                          },
+                        ]
+                      : [],
+                }),
+              }
+            }),
+          exitCodes: [1, 0, 1, 0],
+        })
+
+        const exit = yield* runCommand(fixCommand, ["--agent", "claude"], {
+          files,
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(
+          runner.invocations.filter((invocation) => invocation.command === "claude")
+        ).toHaveLength(1)
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({
+            args: expect.arrayContaining(["--type-aware", "--format", "json"]),
+            command: "oxlint",
+          })
+        )
+      })
+    )
+  })
+
   describe("default invocation", () => {
     it.effect("lint before formatting", () =>
       Effect.gen(function* () {

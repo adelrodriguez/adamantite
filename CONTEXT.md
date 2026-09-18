@@ -42,6 +42,16 @@ A detected difference between the current state and the latest supported state. 
 the current state, the goal criteria, and repair constraints.
 _Avoid_: Action, diagnostic, manual fix
 
+**Permission profile**:
+The file and shell operations that Adamantite allows a headless coding agent to use during one
+repair attempt.
+_Avoid_: Sandbox, trust mode
+
+**Repair loop**:
+Run a coding agent against a bounded set of findings, verify the result with the owning detector,
+and retry with the findings that remain.
+_Avoid_: Migration, autofix
+
 ## Integration lifecycle
 
 **Detect**:
@@ -63,6 +73,6 @@ project.
 _Avoid_: Fix, update
 
 **Doctor**:
-Report findings for Adamantite-managed integrations and provide one combined repair
-prompt.
+Report findings for Adamantite-managed integrations and optionally drive a coding agent through a
+repair loop. Doctor's own assessment stays read-only.
 _Avoid_: Check, fix, update

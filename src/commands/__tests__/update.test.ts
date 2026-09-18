@@ -132,7 +132,8 @@ describe("update", () => {
       )
       expect(prompter.logs).toContainEqual({
         level: "info",
-        message: "Run `adamantite doctor` to get the combined Markdown repair prompt.",
+        message:
+          "Run `adamantite doctor --agent <name>` for verified repair, or `adamantite doctor` to get the combined Markdown prompt.",
       })
     })
   )

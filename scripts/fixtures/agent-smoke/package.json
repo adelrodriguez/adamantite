@@ -1,0 +1,9 @@
+{
+  "name": "adamantite-agent-smoke",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "adamantite check",
+    "fix": "adamantite fix"
+  }
+}

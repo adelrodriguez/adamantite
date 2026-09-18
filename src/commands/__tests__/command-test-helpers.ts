@@ -11,6 +11,8 @@ import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
+  type CapturedCommandResult,
+  type CapturedCommandRunOptions,
   type CommandFailedLike,
   type CommandRunOptions,
   CommandRunner,
@@ -86,6 +88,10 @@ export function createRunnerTestContext(
     | number[]
     | {
         readonly exitCodes?: number[]
+        readonly captureImplementation?: (
+          options: CapturedCommandRunOptions
+        ) => Effect.Effect<CapturedCommandResult, CommandFailedLike>
+        readonly captureResults?: CapturedCommandResult[]
         readonly implementation?: (
           options: CommandRunOptions
         ) => Effect.Effect<ChildProcessSpawner.ExitCode, CommandFailedLike>
@@ -94,22 +100,48 @@ export function createRunnerTestContext(
   const remainingExitCodes = [...(Array.isArray(options) ? options : (options.exitCodes ?? [0]))]
   const invocations: CommandRunOptions[] = []
   const implementation = Array.isArray(options) ? undefined : options.implementation
+  const captureImplementation = Array.isArray(options) ? undefined : options.captureImplementation
+  const captureResults = [
+    ...(Array.isArray(options)
+      ? []
+      : (options.captureResults ?? [
+          {
+            exitCode: ChildProcessSpawner.ExitCode(0),
+            status: "exited" as const,
+            stderr: "",
+            stdout: "",
+          },
+        ])),
+  ]
 
   return {
     invocations,
     layer: Layer.succeed(
       CommandRunner,
-      CommandRunner.make((options) =>
-        Effect.gen(function* () {
-          invocations.push({
-            ...options,
-            args: [...options.args],
+      CommandRunner.make(
+        (options) =>
+          Effect.gen(function* () {
+            invocations.push({ ...options, args: [...options.args] })
+            if (implementation) {
+              return yield* implementation(options)
+            }
+            return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
+          }),
+        (options) =>
+          Effect.gen(function* () {
+            invocations.push({ ...options, args: [...options.args] })
+            if (captureImplementation) {
+              return yield* captureImplementation(options)
+            }
+            return (
+              captureResults.shift() ?? {
+                exitCode: ChildProcessSpawner.ExitCode(0),
+                status: "exited" as const,
+                stderr: "",
+                stdout: "",
+              }
+            )
           })
-          if (implementation) {
-            return yield* implementation(options)
-          }
-          return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
-        })
       )
     ),
   }
@@ -335,6 +367,7 @@ function makeDefaultLayer(files: FileSystemTestContext) {
       copyToClipboard: () => Effect.void,
       isInteractive: Effect.succeed(false),
     }),
+    createPrompterTestContext().layer,
     failingSpawnerLayer,
     unexpectedRunnerLayer,
     unexpectedInstallerLayer

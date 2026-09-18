@@ -55,6 +55,8 @@ adamantite analyze
 - Use `check` for read-only formatting, lint, and type-error validation.
 - Use `fix` for automatic Oxlint fixes followed by Oxfmt formatting. Add `--suggested`, `--dangerous`, or `--all` only
   with explicit permission after reviewing their impact.
+- Use `fix --agent <name>` to repair diagnostics that Oxlint cannot fix. Adamantite gives the agent
+  one file at a time and verifies each attempt with Oxlint and Oxfmt.
 - Use `analyze` for unused dependencies, exports, and files. In a monorepo it first checks
   workspace dependency consistency with Sherif. `analyze --only monorepo` or
   `analyze --only unused` runs one stage. `analyze --fix` may remove files, so inspect
@@ -65,6 +67,8 @@ adamantite analyze
   use `analyze --only unused --fix` to skip Sherif.
 - `analyze` runs Sherif without flags. Put Sherif exceptions in the `sherif` field of the root
   `package.json` (camelCase CLI options, e.g. `"ignoreDependency": ["tailwindcss"]`).
+- Use `analyze --agent <name>` for remaining Sherif and Knip findings. Agent mode keeps Sherif
+  report-only, applies Knip's built-in fixes first, and supports `--only` and `--strict`.
 
 To pass arguments to Knip, Oxlint, or Sherif, place them after `--`. For `check` and `fix` they
 go to Oxlint. For `analyze` they go to Knip, or to the stage that `--only` selects, so a Sherif
@@ -85,11 +89,12 @@ adamantite doctor
 ```
 
 Follow each finding. Doctor supplies the current state, the goal criteria, reference
-content when needed, and the verification command. In an interactive terminal, Doctor
-offers to hand off to an installed coding agent CLI, or to copy the combined Markdown prompt. In a
-non-interactive run — the path an agent uses — Doctor prints Markdown directly. Findings
-produce a repair prompt and exit 1. Assessment warnings alone produce a warning report
-and exit 0. Run `adamantite doctor` again until it exits 0.
+content when needed, and the verification command. Run `doctor --agent <name>` to let Adamantite
+drive a supported agent headlessly, verify its edits, and retry. In an interactive terminal, Doctor
+can prompt for an installed agent or copy the combined Markdown prompt. A non-interactive run
+without `--agent` prints Markdown directly. Pass `--allow-dirty` for a non-interactive agent run on
+a dirty tree or when Git state cannot be confirmed. Findings produce a repair prompt and exit 1.
+Assessment warnings alone produce a warning report and exit 0.
 
 ## Update
 

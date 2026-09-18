@@ -1,5 +1,8 @@
 # Doctor instructs; agents mutate
 
+Status: Superseded in part by [ADR 0003](0003-doctor-drives-agents-headlessly.md), which replaces the
+interactive terminal handoff and the rejection of headless CLI driving.
+
 Migrations and doctor's fix machinery encoded transformations between enumerated states
 and grew brittler with every legacy state discovered. We decided (2026-08-20) to make
 `adamantite doctor` assess-and-instruct only: the CLI deterministically detects broken

@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import analyzeCommand from "#commands/analyze.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
@@ -18,6 +19,100 @@ const sherifStep = { command: "sherif", stdin: "inherit", title: "📦 Analyzing
 const knipStep = { command: "knip", stdin: "ignore", title: "🧹 Analyzing unused code" }
 
 describe("analyze", () => {
+  describe("agent mode", () => {
+    it.effect("run Knip fix before repairing and verify the edited file", () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({ files: { "package.json": "{}" } })
+        let knipReport = 0
+        const runner = createRunnerTestContext({
+          captureImplementation: (options) =>
+            Effect.sync(() => {
+              if (options.command === "claude") {
+                return {
+                  exitCode: ChildProcessSpawner.ExitCode(0),
+                  status: "exited" as const,
+                  stderr: "",
+                  stdout: "",
+                }
+              }
+              knipReport += 1
+              return {
+                exitCode: ChildProcessSpawner.ExitCode(knipReport < 3 ? 1 : 0),
+                status: "exited" as const,
+                stderr: "",
+                stdout: JSON.stringify({
+                  issues:
+                    knipReport < 3
+                      ? [
+                          {
+                            dependencies: [],
+                            exports: [{ col: 1, line: 1, name: "unused" }],
+                            file: "src/index.ts",
+                          },
+                        ]
+                      : [],
+                }),
+              }
+            }),
+          exitCodes: [1],
+        })
+
+        const exit = yield* runCommand(analyzeCommand, ["--agent", "claude"], {
+          files,
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({
+            args: ["--fix", "--allow-remove-files"],
+            command: "knip",
+          })
+        )
+      })
+    )
+
+    it.effect("keep Sherif report-only under an agent", () =>
+      Effect.gen(function* () {
+        const files = createMonorepoFiles()
+        let sherifReport = 0
+        const runner = createRunnerTestContext({
+          captureImplementation: (options) =>
+            Effect.sync(() => {
+              if (options.command === "claude") {
+                return {
+                  exitCode: ChildProcessSpawner.ExitCode(0),
+                  status: "exited" as const,
+                  stderr: "",
+                  stdout: "",
+                }
+              }
+              sherifReport += 1
+              return {
+                exitCode: ChildProcessSpawner.ExitCode(sherifReport === 1 ? 1 : 0),
+                status: "exited" as const,
+                stderr: "",
+                stdout: sherifReport === 1 ? "Version mismatch" : "",
+              }
+            }),
+        })
+
+        const exit = yield* runCommand(
+          analyzeCommand,
+          ["--agent", "claude", "--only", "monorepo"],
+          { files, layers: [runner.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(
+          runner.invocations
+            .filter((invocation) => invocation.command === "sherif")
+            .every((invocation) => !invocation.args.includes("--fix"))
+        ).toBe(true)
+      })
+    )
+  })
+
   describe("default invocation", () => {
     it.effect("run knip with no flags by default", () =>
       Effect.gen(function* () {

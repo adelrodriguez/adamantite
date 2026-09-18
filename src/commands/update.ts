@@ -110,7 +110,7 @@ export default Command.make("update").pipe(
       if (findings.length > 0) {
         yield* printFindings(findings)
         yield* prompter.log.info(
-          "Run `adamantite doctor` to get the combined Markdown repair prompt."
+          "Run `adamantite doctor --agent <name>` for verified repair, or `adamantite doctor` to get the combined Markdown prompt."
         )
       }
 

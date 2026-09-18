@@ -25,7 +25,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | Module         | Responsibility                                                                                               |
 | -------------- | ------------------------------------------------------------------------------------------------------------ |
 | `commands`     | Define one CLI workflow and render its user-facing result.                                                   |
-| `execution`    | Run child commands, define coding-agent handoff, and carry forwarded arguments.                              |
+| `execution`    | Run child commands, drive coding agents headlessly, and carry forwarded arguments.                           |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess the project against the managed ideal. |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                       |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                         |
@@ -54,17 +54,13 @@ goal criteria, and optional reference content or notes. The agent or the human c
 target project. A later Doctor run confirms whether the project reached the goal state.
 Tooling config generators produce only the current setup for `init` and Doctor reference
 content. They do not convert existing configs or generate patches.
-Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
-installed coding agent CLI or to copy the combined Markdown prompt. Installation is
-detected by probing each supported CLI's version command, bounded by a timeout; only
-agents whose probe command starts appear in the menu. A handoff hands the terminal to
-the agent CLI with inherited stdio
-and a per-agent seed argument that tells the agent to run Doctor itself; Adamantite
-passes no provider permission, sandbox, or trust flags, and reassesses once after the
-agent session ends.
-The agent's exit code is ignored: only the reassessment decides success. Non-interactive runs
-print the Markdown prompt directly when findings remain. If an assessment reports only
-warnings, a non-interactive run prints a Markdown warning report and exits 0.
+Interactive Doctor runs render findings, then offer a supported coding agent or a copy of the
+combined Markdown prompt. Doctor drives the selected agent headlessly with a permission profile,
+reassesses the project, and retries up to three times. Each attempt reads its current findings from
+a temporary file. The detector result decides success, including after an agent failure or timeout.
+Non-interactive Doctor runs print Markdown when findings remain unless `--agent` selects an agent.
+If an assessment reports only warnings, a non-interactive run prints a Markdown warning report and
+exits 0.
 
 Package drift also stays structured so that `update` can install current managed package
 versions. Doctor renders package drift as findings that tell the user to run `update`.
@@ -75,7 +71,9 @@ warns the user and points to `adamantite doctor`.
 ## Command boundaries
 
 - `check` and `fix` run Oxfmt and Oxlint.
+- `fix --agent` repairs Oxlint diagnostics that remain after autofix, one file at a time.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
+- `analyze --agent` runs Sherif report-only and applies Knip's built-in fixes before agent repair.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
 - `update` updates managed dependencies, then emits any remaining doctor findings.
@@ -94,7 +92,7 @@ presets/
 src/
   commands/         CLI workflows
   lib/
-    execution/      child command runs, coding-agent handoff, forwarded arguments
+    execution/      child command runs, headless agent driving, forwarded arguments
     integrations/   tooling, editor, and CI adapters; project assessment
     shared/         cross-cutting types and helpers
     workspace/      target-project state and file operations

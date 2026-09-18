@@ -54,7 +54,7 @@ describe("writeAgentsGuidance", () => {
       expect(agents).toContain("Run `bun run check` to catch formatting, lint, and type issues")
       expect(agents).not.toContain("adamantite analyze")
       expect(agents).toContain(
-        "Run `adamantite doctor` and follow its findings to repair managed setup.\n\n<!-- ADAMANTITE:END -->"
+        "Run `adamantite doctor` to assess managed setup. Use `adamantite doctor --agent <name>` for verified headless repair.\n\n<!-- ADAMANTITE:END -->"
       )
       expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
       expect(agents.endsWith("\n")).toBe(true)

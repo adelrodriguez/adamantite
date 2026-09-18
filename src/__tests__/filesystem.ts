@@ -88,6 +88,7 @@ export function createFileSystemTestContext(options?: {
   const files = new Map<string, string>()
   const directories = new Set<string>([root])
   const readOnlyPaths = new Set<string>()
+  let tempIndex = 0
 
   // Register every ancestor so strict parent-directory checks pass for roots.
   for (let current = root; dirname(current) !== current; current = dirname(current)) {
@@ -120,6 +121,27 @@ export function createFileSystemTestContext(options?: {
     const target = normalize(path)
     addDirectoryRecursive(dirname(target))
     files.set(target, content)
+  }
+
+  function makeTempDirectoryPath(options?: { readonly prefix?: string }) {
+    tempIndex += 1
+    const target = normalize(`${options?.prefix ?? "tmp"}${tempIndex}`)
+    addDirectoryRecursive(target)
+    return target
+  }
+
+  function removeDirectoryRecursive(target: string) {
+    const prefix = `${target}/`
+    for (const file of files.keys()) {
+      if (file.startsWith(prefix)) {
+        files.delete(file)
+      }
+    }
+    for (const directory of directories) {
+      if (directory === target || directory.startsWith(prefix)) {
+        directories.delete(directory)
+      }
+    }
   }
 
   for (const [path, content] of Object.entries(options?.files ?? {})) {
@@ -162,8 +184,15 @@ export function createFileSystemTestContext(options?: {
         directories.add(target)
         return Effect.void
       }),
-    makeTempDirectory: makeUnimplemented("makeTempDirectory"),
-    makeTempDirectoryScoped: makeUnimplemented("makeTempDirectoryScoped"),
+    makeTempDirectory: (options) => Effect.sync(() => makeTempDirectoryPath(options)),
+    makeTempDirectoryScoped: (options) =>
+      Effect.acquireRelease(
+        Effect.sync(() => makeTempDirectoryPath(options)),
+        (target) =>
+          Effect.sync(() => {
+            removeDirectoryRecursive(target)
+          })
+      ),
     makeTempFile: makeUnimplemented("makeTempFile"),
     makeTempFileScoped: makeUnimplemented("makeTempFileScoped"),
     open: makeUnimplemented("open"),
@@ -204,16 +233,7 @@ export function createFileSystemTestContext(options?: {
             return Effect.fail(makeSystemError("BadResource", "remove", path))
           }
 
-          for (const file of files.keys()) {
-            if (file.startsWith(prefix)) {
-              files.delete(file)
-            }
-          }
-          for (const directory of directories) {
-            if (directory === target || directory.startsWith(prefix)) {
-              directories.delete(directory)
-            }
-          }
+          removeDirectoryRecursive(target)
           return Effect.void
         }
 

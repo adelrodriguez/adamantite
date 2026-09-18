@@ -54,7 +54,7 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
           ...selectedScriptGuidance,
         ]
       : []),
-    "- Run `adamantite doctor` and follow its findings to repair managed setup.",
+    "- Run `adamantite doctor` to assess managed setup. Use `adamantite doctor --agent <name>` for verified headless repair.",
   ].join("\n")
 
   return [ADAMANTITE_AGENTS_START_MARKER, "", body, "", ADAMANTITE_AGENTS_END_MARKER, ""].join("\n")

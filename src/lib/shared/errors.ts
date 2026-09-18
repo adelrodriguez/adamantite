@@ -185,6 +185,15 @@ export class InvalidInitOptions extends Data.TaggedError("InvalidInitOptions")<{
   }
 }
 
+export class InvalidToolOutput extends Data.TaggedError("InvalidToolOutput")<{
+  cause?: unknown
+  command: string
+}> {
+  override get message() {
+    return `Command \`${this.command}\` returned output Adamantite could not parse.${formatCauseDetail(this.cause)}`
+  }
+}
+
 export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
   cause?: unknown
 }> {

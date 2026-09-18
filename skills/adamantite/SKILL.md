@@ -34,9 +34,10 @@ Repeat `--script`, `--preset`, and `--editor` for multiple values. Available val
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
 
-Only select options supported by the project. Presets and TypeScript require `check` or
-`fix`; extension installation requires an editor; `--github-actions` requires a CI-compatible script and a supported package
-manager (bun, deno, npm, pnpm, or yarn). Omitted boolean flags are disabled.
+Only select options supported by the project. Presets and TypeScript require `check` or `fix`;
+extension installation requires an editor; `--github-actions` requires a CI-compatible script
+and a supported package manager (bun, deno, npm, pnpm, or yarn). Omitted boolean flags are
+disabled.
 
 Existing package scripts whose commands differ from Adamantite's are kept and reported,
 not replaced; pass `--overwrite-scripts` to replace them. Custom flags can be forwarded
@@ -109,5 +110,6 @@ findings. Follow those findings and review the resulting diff.
 - New target project: `init`, then run the configured checks.
 - Suspected drift or broken setup: run `doctor` and follow its findings.
 - Existing project upgrading Adamantite: `update`, then the doctor sequence.
-- Code-quality failure: choose `check` or `analyze` based on the failing subsystem; do not reinitialize the project.
+- Code-quality failure: choose `check` or `analyze` based on the failing subsystem; do not
+  reinitialize the project.
 - Unknown option or behavior: run `adamantite <command> --help` before guessing.

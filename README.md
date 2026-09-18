@@ -91,7 +91,8 @@ Available setup values:
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
-requires an editor. GitHub Actions requires a compatible script and a supported package manager. Omitted boolean flags are disabled.
+requires an editor. GitHub Actions requires a compatible script and a supported package
+manager. Omitted boolean flags are disabled.
 
 Existing package scripts whose commands differ from Adamantite's are kept and reported
 instead of being replaced. The interactive initializer asks before overwriting them; in

@@ -8,7 +8,7 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import type { Finding } from "#lib/integrations/base.ts"
 import {
   type CodingAgent,
-  codingAgentIds,
+  CODING_AGENTS_IDS,
   checkWorkingTreeState,
   detectInstalledAgents,
   getCodingAgent,
@@ -28,7 +28,7 @@ type ResolveAction = CodingAgent | "copy" | "done"
 
 const version = getPackageVersion()
 
-const agent = Flag.Literals("agent", codingAgentIds).pipe(
+const agent = Flag.Literals("agent", CODING_AGENTS_IDS).pipe(
   Flag.optional,
   Flag.withDescription("Repair findings with a supported coding agent")
 )

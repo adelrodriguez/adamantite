@@ -8,7 +8,7 @@ import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import {
   type CodingAgent,
-  codingAgentIds,
+  CODING_AGENTS_IDS,
   detectInstalledAgents,
   getCodingAgent,
   runHeadlessSession,
@@ -50,7 +50,7 @@ const all = Flag.Boolean("all").pipe(
   Flag.withDescription("Apply all fixes, including suggested and dangerous fixes")
 )
 
-const agent = Flag.Literals("agent", codingAgentIds).pipe(
+const agent = Flag.Literals("agent", CODING_AGENTS_IDS).pipe(
   Flag.optional,
   Flag.withDescription("Repair lint diagnostics with a supported coding agent")
 )

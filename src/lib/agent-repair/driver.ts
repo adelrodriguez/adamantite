@@ -5,9 +5,16 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import type { CapturedCommandResult, CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 
-export const codingAgentIds = ["claude", "codex", "cursor", "gemini", "grok", "opencode"] as const
+export const CODING_AGENTS_IDS = [
+  "claude",
+  "codex",
+  "cursor",
+  "gemini",
+  "grok",
+  "opencode",
+] as const
 
-export type CodingAgentId = (typeof codingAgentIds)[number]
+export type CodingAgentId = (typeof CODING_AGENTS_IDS)[number]
 
 export type PermissionProfile =
   | { readonly kind: "files"; readonly timeout: Duration.Input }

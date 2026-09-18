@@ -13,7 +13,7 @@ import {
 } from "#lib/agent-repair/analyze.ts"
 import {
   type CodingAgent,
-  codingAgentIds,
+  CODING_AGENTS_IDS,
   detectInstalledAgents,
   getCodingAgent,
   runHeadlessSession,
@@ -78,7 +78,7 @@ const only = Flag.Literals("only", ["monorepo", "unused"]).pipe(
     "Run one stage: `monorepo` (sherif, monorepos only) or `unused` (knip). Arguments after `--` go to that stage"
   )
 )
-const agent = Flag.Literals("agent", codingAgentIds).pipe(
+const agent = Flag.Literals("agent", CODING_AGENTS_IDS).pipe(
   Flag.optional,
   Flag.withDescription("Repair remaining analysis findings with a supported coding agent")
 )

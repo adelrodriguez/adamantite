@@ -36,6 +36,7 @@ describe("adamantite", () => {
               "src",
             ],
             command: "knip",
+            stdin: "ignore",
             title: "🧹 Analyzing unused code",
           },
         ])

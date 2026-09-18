@@ -60,7 +60,7 @@ describe("oxfmt", () => {
   describe("create", () => {
     it.effect("create oxfmt.config.ts with the correct config", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
+        const files = makeFiles({ "package.json": "{}" })
 
         yield* oxfmt.create(ROOT).pipe(provideFiles(files))
 

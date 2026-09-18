@@ -3,7 +3,10 @@ import { defineConfigTooling } from "#lib/workspace/tooling/config.ts"
 import { inspectRequiredKnipConfig, toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 
 export default defineConfigTooling({
-  configContent: () => toKnipTsConfigContent(),
+  // `adamantite analyze` runs Sherif in a monorepo, and Knip has no plugin that sees that
+  // reference, so it reports Sherif as an unused devDependency.
+  configContent: ({ isMonorepo }) =>
+    toKnipTsConfigContent(isMonorepo ? { ignoreDependencies: ["sherif"] } : {}),
   configFiles: {
     config: "knip.config.ts",
     legacyConfigs: ["knip.json", "knip.jsonc"],

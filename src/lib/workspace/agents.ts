@@ -30,9 +30,7 @@ function getScriptGuidance(
 
   switch (script) {
     case "analyze":
-      return isMonorepo
-        ? `- Run \`${command}\` after changing dependencies, imports, or exports. It also checks monorepo package consistency. Direct command: \`${directCommand}\`.`
-        : `- Run \`${command}\` after changing dependencies, imports, or exports. Direct command: \`${directCommand}\`.`
+      return `- Run \`${command}\` after changing dependencies, imports, or exports.${isMonorepo ? " It also checks monorepo package consistency." : ""} Direct command: \`${directCommand}\`.`
     case "check":
       return `- Run \`${command}\` to catch formatting, lint, and type issues. Direct command: \`${directCommand}\`.`
     case "fix":

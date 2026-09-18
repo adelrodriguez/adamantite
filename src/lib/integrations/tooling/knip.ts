@@ -3,7 +3,7 @@ import { defineConfigTooling } from "#lib/workspace/tooling/config.ts"
 import { inspectRequiredKnipConfig, toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 
 export default defineConfigTooling({
-  configContent: (workspace) => toKnipTsConfigContent({}, workspace),
+  configContent: toKnipTsConfigContent,
   configFiles: {
     config: "knip.config.ts",
     legacyConfigs: ["knip.json", "knip.jsonc"],

@@ -6,14 +6,7 @@ import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { checkIsSupportedPackageManager, type Script } from "#lib/workspace/package-json.ts"
 
-const INIT_SCRIPTS = [
-  "check",
-  "fix",
-  "format",
-  "check:monorepo",
-  "fix:monorepo",
-  "analyze",
-] as const satisfies readonly Script[]
+const INIT_SCRIPTS = ["check", "fix", "analyze"] as const satisfies readonly Script[]
 
 const INIT_PRESETS = ["react", "nextjs", "vue", "jest", "vitest", "node", "antislop"] as const
 
@@ -70,20 +63,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  if (options.scripts.includes("format")) {
-    return yield* new InvalidInitOptions({
-      reason:
-        "The `format` script is no longer available in init. Select `check` or `fix` instead.",
-    })
-  }
-
-  if (options.scripts.includes("check:monorepo") || options.scripts.includes("fix:monorepo")) {
-    return yield* new InvalidInitOptions({
-      reason:
-        "The `check:monorepo` and `fix:monorepo` scripts are no longer available in init. Select `analyze` instead; it runs Sherif in a detected monorepo.",
-    })
-  }
-
   const hasOxlint = options.scripts.includes("check") || options.scripts.includes("fix")
 
   if (options.presets.length > 0 && !hasOxlint) {
@@ -131,7 +110,7 @@ const nonInteractive = Flag.Boolean("non-interactive").pipe(
 const scripts = Flag.Literals("script", INIT_SCRIPTS).pipe(
   Flag.atMost(INIT_SCRIPTS.length),
   Flag.withDescription(
-    "Package script to configure; repeatable and required in non-interactive mode. The legacy format value is rejected; select check or fix instead. The legacy check:monorepo and fix:monorepo values are rejected; select analyze instead"
+    "Package script to configure; repeatable and required in non-interactive mode"
   )
 )
 

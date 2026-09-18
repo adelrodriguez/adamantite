@@ -98,9 +98,9 @@ describe("init", () => {
 
         const oxlintConfig = files.read("oxlint.config.ts")
         expect(oxlintConfig).toContain('import react from "adamantite/lint/react"')
-        expect(oxlintConfig).toContain('"respectEslintDisableDirectives": true')
-        expect(oxlintConfig).toContain('"typeAware": true')
-        expect(oxlintConfig).toContain('"typeCheck": true')
+        expect(oxlintConfig).toContain("respectEslintDisableDirectives: true")
+        expect(oxlintConfig).toContain("typeAware: true")
+        expect(oxlintConfig).toContain("typeCheck: true")
 
         const oxfmtConfig = files.read("oxfmt.config.ts")
         expect(oxfmtConfig).toContain('import { defineConfig } from "oxfmt"')
@@ -742,12 +742,6 @@ describe("init", () => {
 
     it.effect.each([
       {
-        args: ["--non-interactive", "--script", "format"],
-        name: "the legacy format script",
-        reason:
-          "The `format` script is no longer available in init. Select `check` or `fix` instead.",
-      },
-      {
         args: ["--non-interactive"],
         name: "a missing script",
         reason: "Select at least one script with `--script <name>`.",
@@ -773,19 +767,7 @@ describe("init", () => {
         reason: "`--github-actions` requires a CI-compatible script.",
       },
       {
-        args: ["--non-interactive", "--script", "check:monorepo"],
-        name: "the legacy check:monorepo script",
-        reason:
-          "The `check:monorepo` and `fix:monorepo` scripts are no longer available in init. Select `analyze` instead; it runs Sherif in a detected monorepo.",
-      },
-      {
-        args: ["--non-interactive", "--script", "analyze", "--script", "fix:monorepo"],
-        name: "the legacy fix:monorepo script",
-        reason:
-          "The `check:monorepo` and `fix:monorepo` scripts are no longer available in init. Select `analyze` instead; it runs Sherif in a detected monorepo.",
-      },
-      {
-        args: ["--script", "format"],
+        args: ["--script", "check"],
         name: "setup flags without non-interactive mode",
         reason: "Setup flags require `--non-interactive`.",
       },

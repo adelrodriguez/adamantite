@@ -204,7 +204,7 @@ describe("writeAgentsGuidance", () => {
       yield* runWriteAgentsGuidance(files, {
         isMonorepo: false,
         packageManager: "bun",
-        scripts: ["fix", "check:monorepo", "fix:monorepo"],
+        scripts: ["fix"],
       })
 
       const agents = files.read("AGENTS.md")
@@ -255,19 +255,7 @@ describe("writeAgentsGuidance", () => {
     })
   )
 
-  const ALL_SCRIPTS: Script[] = [
-    "format",
-    "check",
-    "fix",
-    "analyze",
-    "check:monorepo",
-    "fix:monorepo",
-  ]
-  const UNGUIDED_SCRIPTS: ReadonlySet<Script> = new Set<Script>([
-    "format",
-    "check:monorepo",
-    "fix:monorepo",
-  ])
+  const ALL_SCRIPTS: Script[] = ["check", "fix", "analyze"]
   const guidanceOptions = {
     isMonorepo: Schema.Boolean,
     packageManager: Schema.Literals(["bun", "deno", "npm", "pnpm", "yarn"]),
@@ -301,10 +289,10 @@ describe("writeAgentsGuidance", () => {
         // invoke the selected package manager.
         for (const script of ALL_SCRIPTS) {
           expect(agents.includes(`Direct command: \`${MANAGED_SCRIPT_COMMANDS[script]}\`.`)).toBe(
-            !UNGUIDED_SCRIPTS.has(script) && scripts.includes(script)
+            scripts.includes(script)
           )
         }
-        if (scripts.some((script) => !UNGUIDED_SCRIPTS.has(script))) {
+        if (scripts.length > 0) {
           expect(agents).toContain(`${packageManager} `)
         }
       }),

@@ -28,7 +28,6 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
-  The legacy `check:monorepo` and `fix:monorepo` values are rejected.
 - Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`; editors:
   `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
@@ -56,8 +55,6 @@ adamantite analyze
 - Use `check` for read-only formatting, lint, and type-error validation.
 - Use `fix` for automatic Oxlint fixes followed by Oxfmt formatting. Add `--suggested`, `--dangerous`, or `--all` only
   with explicit permission after reviewing their impact.
-- Do not use `format`. It is deprecated and the next release removes it. `fix` writes formatting changes and `check`
-  verifies formatting for read-only CI checks.
 - Use `analyze` for unused dependencies, exports, and files. In a monorepo it first checks
   workspace dependency consistency with Sherif. `analyze --only monorepo` or
   `analyze --only unused` runs one stage. `analyze --fix` may remove files, so inspect
@@ -68,8 +65,6 @@ adamantite analyze
   use `analyze --only unused --fix` to skip Sherif.
 - `analyze` runs Sherif without flags. Put Sherif exceptions in the `sherif` field of the root
   `package.json` (camelCase CLI options, e.g. `"ignoreDependency": ["tailwindcss"]`).
-- Do not use `monorepo`. It is deprecated and the next release removes it. Use `analyze`, or
-  `analyze --only monorepo` to run only Sherif.
 
 To pass arguments to Knip, Oxlint, or Sherif, place them after `--`. For `check` and `fix` they
 go to Oxlint. For `analyze` they go to Knip, or to the stage that `--only` selects, so a Sherif

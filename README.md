@@ -86,7 +86,7 @@ npx adamantite init \
 Available setup values:
 
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
-  Sherif. The legacy `check:monorepo` and `fix:monorepo` values are rejected.
+  Sherif.
 - Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, and `node`.
 - Editors: `vscode` and `zed`.
 
@@ -129,11 +129,6 @@ adamantite fix --dangerous
 adamantite fix --all
 ```
 
-### `adamantite format` (deprecated)
-
-`adamantite format` is deprecated and prints a warning. The next release removes it. Use
-`adamantite fix` to apply formatting and `adamantite check` to verify formatting.
-
 ### `adamantite analyze`
 
 Find unused dependencies, exports, and files with Knip. In a detected monorepo, `analyze`
@@ -167,13 +162,6 @@ adamantite analyze --only monorepo --fix -- --select highest
 - Use `--fix` locally, not in CI. Sherif refuses to fix in a CI environment (for example when
   `CI` is set), so `analyze --fix` fails there in a monorepo. CI runs `adamantite analyze`
   without `--fix`.
-
-### `adamantite monorepo` (deprecated)
-
-`adamantite monorepo` is deprecated and prints a warning with the replacement command. The
-next release removes it. Use `adamantite analyze`, or `adamantite analyze --only monorepo`
-to run only Sherif. `adamantite doctor` reports the legacy `check:monorepo` and
-`fix:monorepo` scripts and says how to remove them.
 
 ### `adamantite doctor`
 

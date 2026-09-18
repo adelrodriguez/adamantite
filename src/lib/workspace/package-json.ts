@@ -34,10 +34,7 @@ export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
     yield* writeJsonFile(path.join(cwd, "package.json"), packageJson)
   })
 
-/**
- * Managed script names, including the legacy format script.
- */
-export type Script = "check" | "fix" | "format" | "check:monorepo" | "fix:monorepo" | "analyze"
+export type Script = keyof typeof MANAGED_SCRIPT_COMMANDS
 
 /**
  * Package managers Adamantite supports for CI workflow generation. A subset of nypm's
@@ -58,11 +55,8 @@ export function checkIsSupportedPackageManager(
 export const MANAGED_SCRIPT_COMMANDS = {
   analyze: "adamantite analyze",
   check: "adamantite check",
-  "check:monorepo": "adamantite monorepo",
   fix: "adamantite fix",
-  "fix:monorepo": "adamantite monorepo --fix",
-  format: "adamantite format",
-} as const satisfies Record<Script, string>
+} as const
 
 export function getManagedScripts(packageJson: PackageJson): Script[] {
   const scripts = packageJson.scripts ?? {}

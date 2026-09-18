@@ -1,9 +1,7 @@
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
-import { FileNotFound, UnsupportedConfigState } from "#lib/shared/errors.ts"
 import { readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
@@ -15,7 +13,6 @@ import {
   type RequiredConfigInspection,
 } from "#lib/workspace/tooling/config.ts"
 import {
-  getOxlintPresetNames,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/workspace/tooling/oxlint.ts"
@@ -58,21 +55,10 @@ export default defineIntegration({
 
       if (activeConfig?.format === "ts") {
         const content = yield* readFile(activeConfig.path)
-        const patch = inspectRequiredOxlintConfig(content)
-
-        inspection =
-          patch.kind === "configured"
-            ? { kind: "configured" }
-            : {
-                kind: "invalid",
-                reason:
-                  patch.kind === "manual"
-                    ? patch.reason
-                    : "The required Oxlint options are missing or set to false.",
-              }
+        inspection = inspectRequiredOxlintConfig(content)
       }
 
-      const configContent = toOxlintTsConfigContent({}, getOxlintPresetNames())
+      const configContent = toOxlintTsConfigContent()
 
       return {
         applicable: true,
@@ -95,7 +81,7 @@ export default defineIntegration({
   create: (cwd: string, presets: string[] = []) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      const payload = toOxlintTsConfigContent({}, getOxlintPresetNames(presets))
+      const payload = toOxlintTsConfigContent(presets)
 
       yield* writeFile(path.join(cwd, CONFIG_FILE), payload)
     }),
@@ -103,28 +89,5 @@ export default defineIntegration({
   files,
   kind: "tooling",
   name: "oxlint",
-  update: (cwd: string) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-      const configPath = path.join(cwd, CONFIG_FILE)
-
-      if (!(yield* fs.exists(configPath))) {
-        return yield* new FileNotFound({ path: CONFIG_FILE })
-      }
-
-      const content = yield* readFile(configPath)
-      const patch = inspectRequiredOxlintConfig(content)
-
-      if (patch.kind === "configured") {
-        return
-      }
-
-      if (patch.kind === "manual") {
-        return yield* new UnsupportedConfigState({ path: CONFIG_FILE, reason: patch.reason })
-      }
-
-      yield* writeFile(configPath, patch.updatedContent)
-    }),
   version: VERSION,
 })

@@ -11,12 +11,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import {
-  mergeConfig,
-  parseJson,
-  serializeTsObjectLiteral,
-  serializeTsPropertyKey,
-} from "#lib/shared/json.ts"
+import { mergeConfig, parseJson } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printTitle } from "#terminal/title.ts"
@@ -34,16 +29,6 @@ function someKey(value: JsonValue, predicate: (key: string) => boolean): boolean
   }
 
   return false
-}
-
-// Evaluates through a data: URI module import instead of `new Function` so the oracle stays
-// within the repo's no-eval lint policy without disable comments.
-async function evaluateTsLiteral(serialized: string): Promise<JsonValue> {
-  const uri = `data:text/javascript,export default (${encodeURIComponent(serialized)})`
-  // SAFETY: the module evaluates a serialized JSON value, so its default export is a JsonValue.
-  const module = (await import(/* @vite-ignore */ uri)) as { default: JsonValue }
-
-  return module.default
 }
 
 function makeFiles(files?: Record<string, string>) {
@@ -378,150 +363,6 @@ describe("mergeConfig", () => {
         }
       }),
     { arbitrary: { runs: 200 } }
-  )
-})
-
-describe("serializeTsObjectLiteral", () => {
-  it("serialize objects as TypeScript object literals", () => {
-    const result = serializeTsObjectLiteral({
-      enabled: true,
-      nested: {
-        count: 2,
-      },
-    })
-
-    expect(result).toBe(`{
-  enabled: true,
-  nested: {
-    count: 2
-  }
-}`)
-  })
-
-  it("keep non-identifier keys quoted", () => {
-    const result = serializeTsObjectLiteral({
-      "foo-bar": true,
-      validKey: false,
-    })
-
-    expect(result).toBe(`{
-  "foo-bar": true,
-  validKey: false
-}`)
-  })
-
-  it("indent continuation lines when embedding multiline values", () => {
-    const result = serializeTsObjectLiteral(
-      {
-        nested: {
-          flag: true,
-        },
-      },
-      { continuationIndent: "  " }
-    )
-
-    expect(result).toBe(`{
-    nested: {
-      flag: true
-    }
-  }`)
-  })
-
-  it("support custom indentation strings", () => {
-    const result = serializeTsObjectLiteral(
-      {
-        nested: {
-          flag: true,
-        },
-      },
-      { indentation: "    " }
-    )
-
-    expect(result).toBe(`{
-    nested: {
-        flag: true
-    }
-}`)
-  })
-
-  it("round-trip keys that contain a double quote (#385)", async () => {
-    const value = { '"A': null }
-    const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))
-
-    expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
-  })
-
-  it("keep own __proto__ keys as own properties (#385)", async () => {
-    // SAFETY: JSON.parse creates `__proto__` as an own property, unlike an object literal.
-    const value = JSON.parse('{"__proto__": {"polluted": true}}') as JsonValue
-    const evaluated = await evaluateTsLiteral(serializeTsObjectLiteral(value))
-
-    expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
-  })
-
-  it.effect.prop(
-    "evaluate back to the original value for any JSON value",
-    { value: Schema.MutableJson },
-    ({ value }) =>
-      Effect.gen(function* () {
-        const evaluated = yield* Effect.promise(() =>
-          evaluateTsLiteral(serializeTsObjectLiteral(value))
-        )
-
-        expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
-      }),
-    { arbitrary: { runs: 300 } }
-  )
-
-  // Focused generator for the risky surface: identifier-like keys next to string values full of
-  // quotes, backslashes, colons, and braces that the key-unquoting regex could corrupt.
-  const trickyString = Schema.String.check(Schema.isPattern(/^["\\:\n a$_{}'`]{0,12}$/))
-  const trickyKey = Schema.TemplateLiteral([
-    Schema.Union([
-      Schema.Literals(["enabled", "entry", "$schema", "_private", "a1", "__proto__"]),
-      trickyString,
-    ]),
-  ])
-  const trickyObject = Schema.Record(
-    trickyKey,
-    Schema.Union([
-      trickyString,
-      Schema.Record(trickyKey, trickyString).check(Schema.isMaxProperties(3)),
-    ])
-  ).check(Schema.isMaxProperties(6))
-
-  it.effect.prop(
-    "never corrupt string values that look like keys, at any indentation",
-    { indentation: Schema.Literals([0, 2, 4, "\t"]), value: trickyObject },
-    ({ indentation, value }) =>
-      Effect.gen(function* () {
-        const evaluated = yield* Effect.promise(() =>
-          evaluateTsLiteral(serializeTsObjectLiteral(value, { indentation }))
-        )
-
-        expect(JSON.stringify(evaluated)).toBe(JSON.stringify(value))
-      }),
-    { arbitrary: { runs: 500 } }
-  )
-})
-
-describe("serializeTsPropertyKey", () => {
-  it("emit __proto__ as a computed property name", () => {
-    expect(serializeTsPropertyKey("__proto__")).toBe('["__proto__"]')
-  })
-
-  it.effect.prop(
-    "emit a property name that evaluates back to the original key",
-    { key: Schema.String },
-    ({ key }) =>
-      Effect.gen(function* () {
-        const evaluated = yield* Effect.promise(() =>
-          evaluateTsLiteral(`{ ${serializeTsPropertyKey(key)}: 1 }`)
-        )
-
-        expect(JSON.stringify(evaluated)).toBe(JSON.stringify({ [key]: 1 }))
-      }),
-    { arbitrary: { runs: 300 } }
   )
 })
 

@@ -9,9 +9,7 @@ import analyzeCommand from "#commands/analyze.ts"
 import checkCommand from "#commands/check.ts"
 import doctorCommand from "#commands/doctor.ts"
 import fixCommand from "#commands/fix.ts"
-import formatCommand from "#commands/format.ts"
 import initCommand from "#commands/init/index.ts"
-import monorepoCommand from "#commands/monorepo.ts"
 import updateCommand from "#commands/update.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import { PassthroughNotSupported } from "#lib/shared/errors.ts"
@@ -20,22 +18,14 @@ import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
-const passthroughCommands = [
-  analyzeCommand,
-  checkCommand,
-  fixCommand,
-  formatCommand,
-  monorepoCommand,
-] as const
+const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
 const commands = [
   analyzeCommand,
   checkCommand,
   doctorCommand,
   fixCommand,
-  formatCommand,
   initCommand,
-  monorepoCommand,
   updateCommand,
 ] as const
 const commandNames: ReadonlySet<string> = new Set(commands.map((command) => command.name))

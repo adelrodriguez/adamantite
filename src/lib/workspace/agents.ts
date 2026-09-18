@@ -12,8 +12,6 @@ const AGENTS_NAME = "AGENTS.md"
 export const ADAMANTITE_AGENTS_START_MARKER = "<!-- ADAMANTITE:START -->"
 export const ADAMANTITE_AGENTS_END_MARKER = "<!-- ADAMANTITE:END -->"
 
-type GuidedScript = Exclude<Script, "format" | "check:monorepo" | "fix:monorepo">
-
 interface WriteAgentsGuidanceOptions {
   readonly isMonorepo: boolean
   readonly packageManager: PackageManagerName
@@ -22,7 +20,7 @@ interface WriteAgentsGuidanceOptions {
 
 function getScriptGuidance(
   packageManager: PackageManagerName,
-  script: GuidedScript,
+  script: Script,
   isMonorepo: boolean
 ) {
   const command = runScriptCommand(packageManager, script)
@@ -39,7 +37,7 @@ function getScriptGuidance(
 }
 
 function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGuidanceOptions) {
-  const scriptOrder: GuidedScript[] = ["check", "fix", "analyze"]
+  const scriptOrder: Script[] = ["check", "fix", "analyze"]
 
   const selectedScriptGuidance = scriptOrder
     .filter((script) => scripts.includes(script))

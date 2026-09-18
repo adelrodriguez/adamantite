@@ -104,7 +104,7 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
   "CommandRunner"
 ) {
   static make(exitCode: CommandRunnerService["exitCode"]): CommandRunnerService {
-    const run: CommandRunnerService["run"] = Effect.fn("CommandRunner.run")(function* (options) {
+    const run = Effect.fn("CommandRunner.run")(function* (options: CommandRunOptions) {
       if (options.title !== undefined) {
         yield* printHeading(options.title, options.command)
       }

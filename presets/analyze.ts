@@ -13,10 +13,11 @@ function declaresSherif(): boolean {
   try {
     // SAFETY: only the presence of the `sherif` key is read, and a parse failure is caught.
     const manifest = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as {
+      dependencies?: Record<string, string>
       devDependencies?: Record<string, string>
     }
 
-    return manifest.devDependencies?.["sherif"] !== undefined
+    return (manifest.dependencies?.["sherif"] ?? manifest.devDependencies?.["sherif"]) !== undefined
   } catch {
     return false
   }

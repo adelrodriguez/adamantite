@@ -89,9 +89,12 @@ export default Command.make("analyze", { fix, only, strict }).pipe(
         })
       }
 
-      // Outside a project there is no monorepo to analyze; Knip reports the missing manifest.
+      // Without a usable manifest there is no monorepo to analyze; Knip reports the manifest.
       const isMonorepo = yield* checkIsMonorepo().pipe(
-        Effect.catchTag("FailedToReadFile", () => Effect.succeed(false))
+        Effect.catchTags({
+          FailedToParseFile: () => Effect.succeed(false),
+          FailedToReadFile: () => Effect.succeed(false),
+        })
       )
 
       if (selected === "monorepo" && !isMonorepo) {

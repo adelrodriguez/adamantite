@@ -151,6 +151,20 @@ describe("analyze", () => {
       })
     )
 
+    it.effect("leave a malformed package.json for knip to report", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(analyzeCommand, [], {
+          files: createFileSystemTestContext({ files: { "package.json": "{" } }),
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([{ ...knipStep, args: [] }])
+      })
+    )
+
     it.effect("apply --fix to both stages and --strict to knip only", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()

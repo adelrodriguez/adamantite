@@ -1,33 +1,15 @@
-import * as NodeServices from "@effect/platform-node/NodeServices"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
-import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
-import { runCli } from "#cli.ts"
+import { makeAppLayer, runCli } from "#cli.ts"
 import {
   createRunnerTestContext,
   type RunnerTestContext,
 } from "#commands/__tests__/command-test-helpers.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
-import { Prompter } from "#terminal/prompter.ts"
 
 function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
-  return runCli(args, "test").pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        NodeServices.layer,
-        NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
-        Prompter.layer,
-        runner.layer,
-        DependencyInstaller.layer,
-        TerminalCapabilities.layer
-      )
-    ),
-    Effect.exit
-  )
+  return runCli(args, "test").pipe(Effect.provide(makeAppLayer(runner.layer)), Effect.exit)
 }
 
 describe("adamantite", () => {

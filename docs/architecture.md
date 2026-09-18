@@ -52,6 +52,8 @@ flowchart TD
 `assess` and `doctor` are always read-only. Each finding contains the current state, the
 goal criteria, and optional reference content or notes. The agent or the human changes the
 target project. A later Doctor run confirms whether the project reached the goal state.
+Tooling config generators produce only the current setup for `init` and Doctor reference
+content. They do not convert existing configs or generate patches.
 Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
 installed coding agent CLI or to copy the combined Markdown prompt. Installation is
 detected by probing each supported CLI's version command, bounded by a timeout; only
@@ -73,11 +75,7 @@ warns the user and points to `adamantite doctor`.
 ## Command boundaries
 
 - `check` and `fix` run Oxfmt and Oxlint.
-- `format` is a deprecated stub that warns on stderr, then runs Oxfmt. The next release
-  removes it.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
-- `monorepo` is a deprecated stub that warns on stderr, then runs Sherif. The next release
-  removes it.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
 - `update` updates managed dependencies, then emits any remaining doctor findings.

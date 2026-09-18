@@ -13,6 +13,34 @@ function runCliWithRunner(args: readonly string[], runner: RunnerTestContext) {
 }
 
 describe("adamantite", () => {
+  it.effect.each(["format", "monorepo"])("reject the removed %s command", (command) =>
+    Effect.gen(function* () {
+      const runner = createRunnerTestContext()
+      const exit = yield* runCliWithRunner([command], runner)
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      const error = Option.getOrThrow(Exit.findErrorOption(exit))
+      expect(error._tag).toBe("ShowHelp")
+      expect(runner.invocations).toEqual([])
+    })
+  )
+
+  it.effect.each(["format", "check:monorepo", "fix:monorepo"])(
+    "reject the removed %s init script",
+    (script) =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+        const exit = yield* runCliWithRunner(
+          ["init", "--non-interactive", "--script", script],
+          runner
+        )
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(Option.getOrThrow(Exit.findErrorOption(exit))._tag).toBe("ShowHelp")
+        expect(runner.invocations).toEqual([])
+      })
+  )
+
   describe("passthrough arguments", () => {
     it.effect("forward every argument after the first separator to the selected command", () =>
       Effect.gen(function* () {

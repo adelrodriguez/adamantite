@@ -195,7 +195,10 @@ describe("knip", () => {
     it.effect("accept a monorepo config that ignores sherif by name", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent({ ignoreDependencies: ["sherif"] }),
+          "knip.config.ts": toKnipTsConfigContent().replace(
+            "const config: KnipConfig = analyze",
+            'const config: KnipConfig = { ...analyze, ignoreDependencies: ["sherif"] }'
+          ),
           "package.json": JSON.stringify({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
@@ -212,7 +215,7 @@ describe("knip", () => {
     it.effect("report the preset list when the named import is missing", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent({}, { isMonorepo: true }).replace(
+          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true }).replace(
             "import analyze, { ignoreDependencies } from",
             "import analyze from"
           ),
@@ -234,7 +237,7 @@ describe("knip", () => {
     it.effect("accept a monorepo config that ignores sherif by reference", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent({}, { isMonorepo: true }),
+          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true }),
           "package.json": JSON.stringify({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },

@@ -4,7 +4,6 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as Result from "effect/Result"
 import type { IntegrationAssessment } from "#lib/integrations/base.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
@@ -94,9 +93,9 @@ describe("oxlint", () => {
         const content = files.read("oxlint.config.ts")
         expect(content).toContain('import { defineConfig } from "oxlint"')
         expect(content).toContain('import core from "adamantite/lint"')
-        expect(content).toContain('"respectEslintDisableDirectives": true')
-        expect(content).toContain('"typeAware": true')
-        expect(content).toContain('"typeCheck": true')
+        expect(content).toContain("respectEslintDisableDirectives: true")
+        expect(content).toContain("typeAware: true")
+        expect(content).toContain("typeCheck: true")
         expect(content).toContain("ignorePatterns: core.ignorePatterns")
         expect(content).toContain("extends: [core]")
       })
@@ -112,89 +111,6 @@ describe("oxlint", () => {
         expect(content).toContain('import core from "adamantite/lint"')
         expect(content).toContain('import antislop from "adamantite/lint/antislop"')
         expect(content).toContain("extends: [core, antislop]")
-      })
-    )
-  })
-
-  describe("update", () => {
-    it.effect("patch oxlint.config.ts when type-aware options are missing", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "oxlint.config.ts": [
-            'import { defineConfig } from "oxlint"',
-            'import core from "adamantite/lint"',
-            "",
-            "export default defineConfig({",
-            "  extends: [core],",
-            "})",
-            "",
-          ].join("\n"),
-        })
-
-        yield* oxlint.update(ROOT).pipe(provideFiles(files))
-
-        const content = files.read("oxlint.config.ts")
-        expect(content).toContain("respectEslintDisableDirectives: true")
-        expect(content).toContain("typeAware: true")
-        expect(content).toContain("typeCheck: true")
-        expect(content).toContain("extends: [core]")
-      })
-    )
-
-    it.effect(
-      "leave oxlint.config.ts unchanged when type-aware options are already configured",
-      () =>
-        Effect.gen(function* () {
-          const originalContent = [
-            'import { defineConfig } from "oxlint"',
-            'import core from "adamantite/lint"',
-            "",
-            "export default defineConfig({",
-            '  options: { "respectEslintDisableDirectives": true, "typeAware": true, "typeCheck": true },',
-            "  extends: [core],",
-            "})",
-            "",
-          ].join("\n")
-          const files = makeFiles({ "oxlint.config.ts": originalContent })
-
-          yield* oxlint.update(ROOT).pipe(provideFiles(files))
-
-          expect(files.read("oxlint.config.ts")).toBe(originalContent)
-        })
-    )
-
-    it.effect("return FileNotFound when no oxlint config exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* Effect.result(oxlint.update(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FileNotFound" })
-        }
-      })
-    )
-
-    it.effect("fail when oxlint.config.ts cannot be patched safely", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "oxlint.config.ts": [
-            'import { defineConfig } from "oxlint"',
-            "",
-            "export default defineConfig({",
-            "  options: getOptions(),",
-            "})",
-            "",
-          ].join("\n"),
-        })
-
-        const result = yield* Effect.result(oxlint.update(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "UnsupportedConfigState" })
-        }
       })
     )
   })

@@ -348,7 +348,7 @@ describe("github", () => {
         yield* github
           .create(ROOT, {
             packageManager: "bun",
-            scripts: ["check", "format"],
+            scripts: ["check", "fix"],
           })
           .pipe(provideFallback(files))
 
@@ -498,7 +498,7 @@ describe("github", () => {
         yield* github
           .create(ROOT, {
             packageManager: "bun",
-            scripts: ["check", "format", "check:monorepo", "analyze"],
+            scripts: ["check", "fix", "analyze"],
           })
           .pipe(provideFallback(files))
 
@@ -520,7 +520,7 @@ describe("github", () => {
         yield* github
           .create(ROOT, {
             packageManager: "bun",
-            scripts: ["fix", "fix:monorepo"],
+            scripts: ["fix"],
           })
           .pipe(provideFallback(files))
 

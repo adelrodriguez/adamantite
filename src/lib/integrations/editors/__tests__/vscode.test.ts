@@ -28,10 +28,10 @@ describe("vscode", () => {
     })
   )
 
-  it.effect("skip Oxc for the legacy format script", () =>
+  it.effect("skip extensions when no scripts are selected", () =>
     Effect.gen(function* () {
       const runner = createRunnerTestContext()
-      yield* vscode.extension(["format"]).pipe(Effect.provide(runner.layer))
+      yield* vscode.extension([]).pipe(Effect.provide(runner.layer))
       expect(runner.invocations).toEqual([])
     })
   )

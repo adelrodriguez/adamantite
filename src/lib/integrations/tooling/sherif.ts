@@ -4,10 +4,9 @@ import { getLegacyMonorepoScriptFindings } from "#lib/workspace/tooling/sherif.t
 
 export default definePackageTooling({
   legacyFindings: getLegacyMonorepoScriptFindings,
-  // `adamantite analyze` runs Sherif in a detected monorepo.
-  monorepoOnlyScripts: ["analyze"],
+  monorepoOnly: true,
   name: "sherif",
-  purpose: "the managed `analyze` script in a monorepo and the managed monorepo scripts",
-  scripts: ["check:monorepo", "fix:monorepo"],
+  purpose: "the managed `analyze` script in a monorepo",
+  scripts: ["analyze"],
   version: getDependencyVersion("sherif"),
 })

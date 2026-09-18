@@ -10,7 +10,6 @@ import {
   FailedToParseFile,
   FailedToReadFile,
   FailedToWriteFile,
-  FileNotFound,
 } from "#lib/shared/errors.ts"
 
 function createParseErrors(count: number): ParseError[] {
@@ -188,7 +187,6 @@ describe("errors", () => {
   describe("tags", () => {
     test("preserve tagged error names", () => {
       expect(new CliNotFound({ command: "oxlint" })._tag).toBe("CliNotFound")
-      expect(new FileNotFound({ path: "/foo" })._tag).toBe("FileNotFound")
     })
   })
 })

@@ -89,7 +89,7 @@ describe("sherif", () => {
       })
     )
 
-    it.effect("report missing package when the managed monorepo check script exists", () =>
+    it.effect("report retired scripts without installing an unused package", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "package.json": JSON.stringify(
@@ -109,8 +109,8 @@ describe("sherif", () => {
 
         expect(result).toMatchObject({
           applicable: true,
-          findings: [{ id: "missing-sherif" }, { id: "legacy-monorepo-scripts" }],
-          packageActions: [{ package: sherif.name, type: "install_package" }],
+          findings: [{ id: "legacy-monorepo-scripts" }],
+          packageActions: [],
           warnings: [],
         })
       })

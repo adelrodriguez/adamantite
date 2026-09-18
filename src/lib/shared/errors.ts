@@ -159,12 +159,6 @@ export class FailedToWriteFile extends Data.TaggedError("FailedToWriteFile")<{
   }
 }
 
-export class FileNotFound extends Data.TaggedError("FileNotFound")<{ path?: string }> {
-  override get message() {
-    return this.path ? `File not found: \`${this.path}\`.` : "File not found."
-  }
-}
-
 export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")<{
   path?: string
 }> {
@@ -188,18 +182,6 @@ export class InvalidInitOptions extends Data.TaggedError("InvalidInitOptions")<{
 }> {
   override get message() {
     return `Invalid init options. ${this.reason}`
-  }
-}
-
-export class UnsupportedConfigState extends Data.TaggedError("UnsupportedConfigState")<{
-  path?: string
-  reason?: string
-}> {
-  override get message() {
-    const target = this.path ? `\`${this.path}\`` : "the target config file"
-    const detail = this.reason ? ` ${this.reason}` : ""
-
-    return `Unsupported config state in ${target}.${detail}`
   }
 }
 

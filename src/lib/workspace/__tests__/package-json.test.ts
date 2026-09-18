@@ -13,16 +13,16 @@ describe("getConflictingScripts", () => {
     const conflicts = getConflictingScripts(
       {
         scripts: {
-          "check:monorepo": "sherif --ignore-dependency tailwindcss",
-          "fix:monorepo": "sherif --fix --ignore-dependency tailwindcss",
+          analyze: "sherif --ignore-dependency tailwindcss",
+          fix: "sherif --fix --ignore-dependency tailwindcss",
         },
       },
-      ["check:monorepo", "fix:monorepo"]
+      ["analyze", "fix"]
     )
 
     expect(conflicts).toEqual([
-      { command: "sherif --ignore-dependency tailwindcss", script: "check:monorepo" },
-      { command: "sherif --fix --ignore-dependency tailwindcss", script: "fix:monorepo" },
+      { command: "sherif --ignore-dependency tailwindcss", script: "analyze" },
+      { command: "sherif --fix --ignore-dependency tailwindcss", script: "fix" },
     ])
   })
 
@@ -31,10 +31,10 @@ describe("getConflictingScripts", () => {
       {
         scripts: {
           check: "adamantite check",
-          format: "adamantite format",
+          fix: "adamantite fix",
         },
       },
-      ["check", "format"]
+      ["check", "fix"]
     )
 
     expect(conflicts).toEqual([])
@@ -47,7 +47,7 @@ describe("getConflictingScripts", () => {
           check: "",
         },
       },
-      ["check", "format"]
+      ["check", "fix"]
     )
 
     expect(conflicts).toEqual([])
@@ -62,17 +62,32 @@ describe("getConflictingScripts", () => {
       {
         scripts: {
           check: "tsc && eslint .",
-          format: "prettier --write .",
+          fix: "prettier --write .",
         },
       },
-      ["format"]
+      ["fix"]
     )
 
-    expect(conflicts).toEqual([{ command: "prettier --write .", script: "format" }])
+    expect(conflicts).toEqual([{ command: "prettier --write .", script: "fix" }])
   })
 })
 
 describe("script management", () => {
+  test("exclude retired commands from managed scripts", () => {
+    expect(
+      getManagedScripts({
+        scripts: {
+          analyze: "adamantite analyze",
+          check: "adamantite check",
+          "check:monorepo": "adamantite monorepo",
+          fix: "adamantite fix",
+          "fix:monorepo": "adamantite monorepo --fix",
+          format: "adamantite format",
+        },
+      })
+    ).toEqual(["analyze", "check", "fix"])
+  })
+
   // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
   const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
 

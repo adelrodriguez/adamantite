@@ -307,9 +307,9 @@ export function definePackageTooling(options: {
    */
   readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   /**
-   * Managed scripts that need the package only in a detected monorepo.
+   * Whether the package is required only in a detected monorepo.
    */
-  readonly monorepoOnlyScripts?: readonly Script[]
+  readonly monorepoOnly?: boolean
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
@@ -320,8 +320,7 @@ export function definePackageTooling(options: {
       Effect.gen(function* () {
         const isApplicable =
           checkHasManagedScript(packageJson, options.scripts)
-          || (checkHasManagedScript(packageJson, options.monorepoOnlyScripts ?? [])
-            && (yield* checkIsMonorepo(cwd)))
+          && (!options.monorepoOnly || (yield* checkIsMonorepo(cwd)))
 
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 
@@ -370,10 +369,10 @@ export function defineConfigTooling(options: {
     workspace: { readonly isMonorepo: boolean }
   ) => RequiredConfigInspection
   /**
-   * A retired managed script. While it is present, the integration stays applicable and reports the
-   * finding so the script gets removed.
+   * Findings for retired managed scripts. While any exist, the integration stays applicable and
+   * reports them so the scripts get removed.
    */
-  readonly legacyScript?: { readonly finding: Finding; readonly script: Script }
+  readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
@@ -390,10 +389,7 @@ export function defineConfigTooling(options: {
   return defineIntegration({
     assess: (cwd: string, packageJson: PackageJson) =>
       Effect.gen(function* () {
-        const legacyFindings =
-          options.legacyScript && checkHasManagedScript(packageJson, [options.legacyScript.script])
-            ? [options.legacyScript.finding]
-            : []
+        const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 
         if (!checkHasManagedScript(packageJson, options.scripts)) {
           return legacyFindings.length > 0

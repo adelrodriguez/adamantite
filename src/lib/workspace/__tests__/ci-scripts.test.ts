@@ -13,20 +13,12 @@ describe("hasCICompatibleScripts", () => {
     expect(hasCICompatibleScripts(["check"])).toBe(true)
   })
 
-  test("return false when only the legacy format script is present", () => {
-    expect(hasCICompatibleScripts(["format"])).toBe(false)
-  })
-
-  test("return false when only the legacy check:monorepo script is present", () => {
-    expect(hasCICompatibleScripts(["check:monorepo"])).toBe(false)
-  })
-
   test("return true when the analyze script is present", () => {
     expect(hasCICompatibleScripts(["analyze"])).toBe(true)
   })
 
   test("return false when only fix scripts are present", () => {
-    expect(hasCICompatibleScripts(["fix", "fix:monorepo"])).toBe(false)
+    expect(hasCICompatibleScripts(["fix"])).toBe(false)
   })
 
   test("return false for an empty array", () => {
@@ -34,7 +26,7 @@ describe("hasCICompatibleScripts", () => {
   })
 
   test("return true when CI and non-CI scripts are mixed", () => {
-    expect(hasCICompatibleScripts(["fix", "check", "fix:monorepo"])).toBe(true)
+    expect(hasCICompatibleScripts(["fix", "check"])).toBe(true)
   })
 })
 

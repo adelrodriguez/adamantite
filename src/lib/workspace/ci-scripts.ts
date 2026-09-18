@@ -1,33 +1,15 @@
 import { runScriptCommand } from "nypm"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 
-interface CIScriptEntry {
-  readonly script: Script
-  readonly name: string
-}
-
-const ciScriptEntries: readonly CIScriptEntry[] = [
-  { name: "check", script: "check" },
-  { name: "analyze", script: "analyze" },
-]
+const CI_SCRIPTS = ["check", "analyze"] as const satisfies readonly Script[]
 
 export function getCIWorkflowEntries(packageManager: SupportedPackageManager, scripts: Script[]) {
-  const workflowEntries: Array<{ name: string; command: string }> = []
-
-  for (const entry of ciScriptEntries) {
-    if (!scripts.includes(entry.script)) {
-      continue
-    }
-
-    workflowEntries.push({
-      command: runScriptCommand(packageManager, entry.script),
-      name: entry.name,
-    })
-  }
-
-  return workflowEntries
+  return CI_SCRIPTS.filter((script) => scripts.includes(script)).map((script) => ({
+    command: runScriptCommand(packageManager, script),
+    name: script,
+  }))
 }
 
 export function hasCICompatibleScripts(scripts: Script[]): boolean {
-  return ciScriptEntries.some((entry) => scripts.includes(entry.script))
+  return CI_SCRIPTS.some((script) => scripts.includes(script))
 }

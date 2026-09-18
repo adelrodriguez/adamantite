@@ -114,9 +114,12 @@ export default Command.make("init", initCommandOptions).pipe(
       const shouldAddAgentsGuidance = initOptions.agents
 
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
-      const hasSherif =
-        selectedScripts.includes("check:monorepo") || selectedScripts.includes("fix:monorepo")
       const hasKnip = selectedScripts.includes("analyze")
+      // `adamantite analyze` runs Sherif in a monorepo.
+      const hasSherif =
+        selectedScripts.includes("check:monorepo")
+        || selectedScripts.includes("fix:monorepo")
+        || (hasKnip && isMonorepo)
 
       const dependencies = ["adamantite"]
 

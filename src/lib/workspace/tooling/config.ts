@@ -54,7 +54,14 @@ export interface ToolingConfigFiles {
 
 export type RequiredConfigInspection =
   | { readonly kind: "configured" }
-  | { readonly kind: "invalid"; readonly reason: string }
+  | {
+      /**
+       * The repair to make. Defaults to adding the required preset.
+       */
+      readonly goal?: string
+      readonly kind: "invalid"
+      readonly reason: string
+    }
 
 function getConfigFormat(file: string): ToolingConfigFormat {
   if (file.endsWith(".jsonc")) {
@@ -269,6 +276,7 @@ export function getConfigFindings(
       currentState: `\`${options.configFile}\` does not meet Adamantite's required shape. ${options.inspection.reason}`,
       goal: [
         options.invalidGoal
+          ?? options.inspection.goal
           ?? `Update \`${options.configFile}\` so it includes the required Adamantite preset while preserving project-specific settings.`,
       ],
       id: `invalid-${options.toolName}-config`,
@@ -293,15 +301,24 @@ function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Scrip
  * Tsgolint).
  */
 export function definePackageTooling(options: {
+  /**
+   * Managed scripts that need the package only in a detected monorepo.
+   */
+  readonly monorepoOnlyScripts?: readonly Script[]
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
   readonly version: string
 }) {
   return defineIntegration({
-    assess: (_cwd: string, packageJson: PackageJson) =>
-      Effect.sync(() => {
-        if (!checkHasManagedScript(packageJson, options.scripts)) {
+    assess: (cwd: string, packageJson: PackageJson) =>
+      Effect.gen(function* () {
+        const isApplicable =
+          checkHasManagedScript(packageJson, options.scripts)
+          || (checkHasManagedScript(packageJson, options.monorepoOnlyScripts ?? [])
+            && (yield* checkIsMonorepo(cwd)))
+
+        if (!isApplicable) {
           return {
             applicable: false,
             warnings: [],
@@ -334,7 +351,10 @@ export function defineConfigTooling(options: {
    */
   readonly configContent: (workspace: { readonly isMonorepo: boolean }) => string
   readonly configFiles: ToolingConfigFiles
-  readonly inspectConfig: (content: string) => RequiredConfigInspection
+  readonly inspectConfig: (
+    content: string,
+    workspace: { readonly isMonorepo: boolean }
+  ) => RequiredConfigInspection
   /**
    * A retired managed script. While it is present, the integration stays applicable and reports the
    * finding so the script gets removed.
@@ -377,10 +397,11 @@ export function defineConfigTooling(options: {
 
         const state = yield* detect(cwd)
         const packageActions = getPackageActions(packageJson, options, options.purpose)
-        const configContent = options.configContent({ isMonorepo: yield* checkIsMonorepo(cwd) })
+        const workspace = { isMonorepo: yield* checkIsMonorepo(cwd) }
+        const configContent = options.configContent(workspace)
         const inspection =
           state.active?.format === "ts"
-            ? options.inspectConfig(yield* readFile(state.active.path))
+            ? options.inspectConfig(yield* readFile(state.active.path), workspace)
             : undefined
 
         return {

@@ -123,12 +123,6 @@ const npmVersion = run("npm", ["--version"], { cwd: repoRoot }).trim()
 const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
 const monorepoFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-monorepo-"))
-// SAFETY: the repository's package.json pins every managed tool in devDependencies.
-const sherifVersion = (
-  JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as {
-    devDependencies: Record<string, string>
-  }
-).devDependencies["sherif"]
 
 try {
   writeFileSync(
@@ -233,17 +227,11 @@ try {
     [cliPath, "init", "--non-interactive", "--script", "check", "--script", "analyze"],
     { cwd: monorepoFixture }
   )
-  run(
-    "pnpm",
-    [
-      "add",
-      "--save-dev",
-      "--workspace-root",
-      join(packDirectory, tarball),
-      `sherif@${sherifVersion}`,
-    ],
-    { cwd: monorepoFixture }
-  )
+  run("pnpm", ["add", "--save-dev", "--workspace-root", join(packDirectory, tarball)], {
+    cwd: monorepoFixture,
+  })
+  // Init installs Sherif with the `analyze` script in a monorepo.
+  assertFileContains(join(monorepoFixture, "package.json"), '"sherif"')
   assertFileContains(join(monorepoFixture, "package.json"), '"adamantite": "file:')
 
   const monorepoEnv = {

@@ -50,6 +50,40 @@ describe("sherif", () => {
       })
     )
 
+    it.effect("report missing package for a managed analyze script in a monorepo", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({
+            name: "test-project",
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable).toBe(true)
+        expect(result.applicable && result.packageActions).toEqual([
+          expect.objectContaining({ package: "sherif", type: "install_package" }),
+        ])
+      })
+    )
+
+    it.effect("report not applicable for a managed analyze script outside a monorepo", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({
+            name: "test-project",
+            scripts: { analyze: "adamantite analyze" },
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toEqual({ applicable: false, warnings: [] })
+      })
+    )
+
     it.effect("report missing package when the managed monorepo check script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({

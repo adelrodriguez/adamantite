@@ -3,13 +3,11 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 
 const ROOT = "/project"
-const spawner = ChildProcessSpawner.make(() => Effect.die("Unexpected process spawn"))
 
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
@@ -23,12 +21,7 @@ describe("vscode", () => {
   it.effect.each(["check", "fix"] as const)("install Oxc for the %s script", (script) =>
     Effect.gen(function* () {
       const runner = createRunnerTestContext()
-      yield* vscode
-        .extension([script])
-        .pipe(
-          Effect.provide(runner.layer),
-          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
-        )
+      yield* vscode.extension([script]).pipe(Effect.provide(runner.layer))
       expect(runner.invocations).toMatchObject([
         { args: ["--install-extension", "oxc.oxc-vscode"], command: "code" },
       ])
@@ -38,12 +31,7 @@ describe("vscode", () => {
   it.effect("skip Oxc for the legacy format script", () =>
     Effect.gen(function* () {
       const runner = createRunnerTestContext()
-      yield* vscode
-        .extension(["format"])
-        .pipe(
-          Effect.provide(runner.layer),
-          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
-        )
+      yield* vscode.extension(["format"]).pipe(Effect.provide(runner.layer))
       expect(runner.invocations).toEqual([])
     })
   )

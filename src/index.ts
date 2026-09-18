@@ -35,7 +35,7 @@ const program = Effect.gen(function* () {
       NodeServices.layer,
       NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
       Prompter.layer,
-      CommandRunner.layer,
+      CommandRunner.layer.pipe(Layer.provide(NodeServices.layer)),
       DependencyInstaller.layer,
       TerminalCapabilities.layer
     )

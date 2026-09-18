@@ -310,7 +310,9 @@ describe("init", () => {
           `sherif@${sherif.version}`,
           `knip@${knip.version}`,
         ])
-        expect(files.read("knip.config.ts")).toContain('"sherif"')
+        expect(files.read("knip.config.ts")).toContain(
+          "ignoreDependencies: ignoreDependencies.monorepo"
+        )
       })
     )
   })

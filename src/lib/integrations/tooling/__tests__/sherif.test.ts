@@ -268,7 +268,9 @@ describe("sherif", () => {
                 "Remove the `fix:monorepo` script from `package.json`.",
               ],
               notes: expect.arrayContaining([
-                expect.stringContaining("`adamantite analyze --fix` replaces `fix:monorepo`"),
+                expect.stringContaining(
+                  "`adamantite analyze --only monorepo --fix` replaces `fix:monorepo`"
+                ),
               ]),
             },
           ],

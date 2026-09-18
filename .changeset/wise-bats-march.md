@@ -7,4 +7,5 @@ a `check:monorepo` or `fix:monorepo` script and any script whose command starts 
 `adamantite monorepo`. The finding tells you to move custom Sherif flags into the `sherif`
 field of the root `package.json` and to remove the script. When the project has no managed
 `analyze` script, the finding also tells you to adopt `analyze`. The GitHub integration
-reports a workflow step that runs `check:monorepo` or `adamantite monorepo`.
+reports a workflow step that runs `check:monorepo`, `fix:monorepo`, or
+`adamantite monorepo`.

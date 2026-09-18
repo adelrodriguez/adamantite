@@ -11,7 +11,7 @@ import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
@@ -58,7 +58,6 @@ export default Command.make("update").pipe(
     Effect.gen(function* () {
       const cwd = process.cwd()
       const prompter = yield* Prompter
-      const dependencyInstaller = yield* DependencyInstaller
 
       yield* prompter.intro("💠 adamantite update")
 
@@ -87,10 +86,9 @@ export default Command.make("update").pipe(
 
         yield* prompter.withSpinner(
           () =>
-            dependencyInstaller.addDevDependencies(
-              updates.map((dependency) => `${dependency.name}@${dependency.targetVersion}`),
+            addRootDevDependencies(
               cwd,
-              { silent: true }
+              updates.map((dependency) => `${dependency.name}@${dependency.targetVersion}`)
             ),
           {
             failure: "Failed to update dependencies",

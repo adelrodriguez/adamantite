@@ -9,8 +9,7 @@ import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
+import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import {
   getConflictingScripts,
   readPackageJson,
@@ -24,24 +23,12 @@ import { Prompter } from "#terminal/prompter.ts"
 
 export const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
-    const dependencyInstaller = yield* DependencyInstaller
     const prompter = yield* Prompter
-    yield* prompter.withSpinner(
-      () =>
-        Effect.gen(function* () {
-          const isMonorepo = yield* checkIsMonorepo(cwd)
-
-          yield* dependencyInstaller.addDevDependencies(packages, cwd, {
-            silent: true,
-            workspace: isMonorepo,
-          })
-        }),
-      {
-        failure: "Failed to install dependencies.",
-        start: "Installing dependencies...",
-        success: "Dependencies installed.",
-      }
-    )
+    yield* prompter.withSpinner(() => addRootDevDependencies(cwd, packages), {
+      failure: "Failed to install dependencies.",
+      start: "Installing dependencies...",
+      success: "Dependencies installed.",
+    })
   })
 
 export function setupToolConfig<E, R>(

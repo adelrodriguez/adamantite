@@ -343,6 +343,31 @@ describe("init", () => {
       })
     )
 
+    for (const { name, workspace } of [
+      { name: "npm", workspace: false },
+      { name: "pnpm", workspace: true },
+      { name: "yarn", workspace: true },
+      { name: "bun", workspace: true },
+    ] as const) {
+      it.effect(`install at the monorepo root with ${name}`, () =>
+        Effect.gen(function* () {
+          const files = createInitTestContext({ "package.json": monorepoPackageJson })
+          const prompter = createPrompterTestContext()
+          const installer = createDependencyInstallerTestContext({
+            detectedPackageManager: { name },
+          })
+
+          const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+            files,
+            layers: [prompter.layer, installer.layer],
+          })
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(installer.calls.map((call) => call.options)).toEqual([{ silent: true, workspace }])
+        })
+      )
+    }
+
     it.effect("not install Sherif for analyze outside a monorepo", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()

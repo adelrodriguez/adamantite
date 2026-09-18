@@ -91,7 +91,10 @@ describe("knip", () => {
 
         const content = files.read("knip.config.ts")
         expect(content).toContain("...analyze,")
-        expect(content).toContain('  ignoreDependencies: [\n    "sherif"\n  ],')
+        expect(content).toContain(
+          'import analyze, { ignoreDependencies } from "adamantite/analyze"'
+        )
+        expect(content).toContain("  ignoreDependencies: ignoreDependencies.monorepo,")
       })
     )
   })
@@ -137,7 +140,7 @@ describe("knip", () => {
 
         expect(result.applicable && result.findings).toEqual([
           expect.objectContaining({
-            currentState: expect.stringContaining('ignoreDependencies: ["sherif"]'),
+            currentState: expect.stringContaining("ignoreDependencies.monorepo"),
             id: "invalid-knip-config",
           }),
         ])
@@ -162,7 +165,7 @@ describe("knip", () => {
 
         expect(result.applicable && result.findings).toEqual([
           expect.objectContaining({
-            goal: [expect.stringContaining('Add `"sherif"` to `ignoreDependencies`')],
+            goal: [expect.stringContaining("ignoreDependencies: ignoreDependencies.monorepo")],
             id: "invalid-knip-config",
           }),
         ])
@@ -189,10 +192,27 @@ describe("knip", () => {
       })
     )
 
-    it.effect("accept a monorepo config that ignores sherif", () =>
+    it.effect("accept a monorepo config that ignores sherif by name", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "knip.config.ts": toKnipTsConfigContent({ ignoreDependencies: ["sherif"] }),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).toEqual([])
+      })
+    )
+
+    it.effect("accept a monorepo config that ignores sherif", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent({}, { isMonorepo: true }),
           "package.json": JSON.stringify({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },

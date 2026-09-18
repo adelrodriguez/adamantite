@@ -32,4 +32,16 @@ describe("toKnipTsConfigContent", () => {
     expect(content).toContain('  "lint-staged": {')
     expect(content).toContain('    "no-such/rule": "off",')
   })
+
+  test("add the monorepo ignores by reference and keep extra ignores", () => {
+    const content = toKnipTsConfigContent(
+      { ignoreDependencies: ["sherif", "tailwindcss"] },
+      { isMonorepo: true }
+    )
+
+    expect(content).toContain('import analyze, { ignoreDependencies } from "adamantite/analyze"')
+    expect(content).toContain(
+      '  ignoreDependencies: [...ignoreDependencies.monorepo, "tailwindcss"],'
+    )
+  })
 })

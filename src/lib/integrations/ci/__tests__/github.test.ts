@@ -185,6 +185,83 @@ describe("github", () => {
       })
     )
 
+    it.effect("report a legacy monorepo step in a generated matrix entry", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "matrix:",
+            "  include:",
+            "    - name: check",
+            "      command: pnpm run check",
+            "    - name: monorepo",
+            "      command: pnpm run check:monorepo",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          applicable: true,
+          findings: [{ id: "legacy-monorepo-workflow-step" }],
+        })
+      })
+    )
+
+    it.effect("report a legacy step that runs adamantite monorepo directly", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "steps:",
+            "  - run: |",
+            "      pnpm run check",
+            "      pnpm exec adamantite monorepo -- -i react",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [{ id: "legacy-monorepo-workflow-step" }],
+        })
+      })
+    )
+
+    it.effect("report a legacy step that runs the fix:monorepo script", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "steps:",
+            "  - run: pnpm run check",
+            "  - run: npm run fix:monorepo",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [{ id: "legacy-monorepo-workflow-step" }],
+        })
+      })
+    )
+
+    it.effect("not report a monorepo step for the analyze command", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "steps:",
+            "  - run: pnpm run check",
+            "  - run: pnpm exec adamantite analyze --only monorepo",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [],
+        })
+      })
+    )
+
     it.effect("report a legacy format step that passes --check through npm", () =>
       Effect.gen(function* () {
         const files = makeFiles({

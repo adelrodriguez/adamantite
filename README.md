@@ -158,8 +158,11 @@ adamantite analyze --only monorepo --fix -- --select highest
   monorepo and with `--strict`.
 - Arguments after `--` go to Knip, or to the stage that `--only` selects.
 - A Sherif fix that must choose between versions prompts in a terminal. Without a terminal,
-  pass `-- --select highest` or set `"sherif": { "select": "highest" }` in the root
-  `package.json`.
+  set `"sherif": { "select": "highest" }` in the root `package.json`, or run
+  `adamantite analyze --only monorepo --fix -- --select highest`.
+- Use `--fix` locally, not in CI. Sherif refuses to fix in a CI environment (for example when
+  `CI` is set), so `analyze --fix` fails there in a monorepo. CI runs `adamantite analyze`
+  without `--fix`.
 
 ### `adamantite monorepo`
 

@@ -1,6 +1,5 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Result from "effect/Result"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
@@ -43,19 +42,14 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
         ...targets,
       ])
 
-      yield* Effect.all(
-        [
-          runner.run({
-            args: [...args, ...forwardedArguments],
-            command: oxlint.name,
-          }),
-          runner.run({ args: ["--write", ...targets], command: oxfmt.name }),
-        ],
-        { concurrency: 1, mode: "result" }
-      ).pipe(
-        Effect.map((results) => Result.all(results)),
-        Effect.flatMap((result) => Effect.fromResult(result))
-      )
+      yield* runner.runAll([
+        {
+          args: [...args, ...forwardedArguments],
+          command: oxlint.name,
+          title: "🔧 Fixing lint issues",
+        },
+        { args: ["--write", ...targets], command: oxfmt.name, title: "✨ Formatting" },
+      ])
     })
   )
 )

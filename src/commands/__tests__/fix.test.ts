@@ -20,10 +20,12 @@ describe("fix", () => {
           {
             args: ["--fix"],
             command: "oxlint",
+            title: "🔧 Fixing lint issues",
           },
           {
             args: ["--write"],
             command: "oxfmt",
+            title: "✨ Formatting",
           },
         ])
       })
@@ -87,10 +89,12 @@ describe("fix", () => {
           {
             args: ["--fix", join(files.root, "index.ts")],
             command: "oxlint",
+            title: "🔧 Fixing lint issues",
           },
           {
             args: ["--write", join(files.root, "index.ts")],
             command: "oxfmt",
+            title: "✨ Formatting",
           },
         ])
       })
@@ -112,10 +116,12 @@ describe("fix", () => {
           {
             args: ["--fix", "--fix-dangerously", "--deny-warnings"],
             command: "oxlint",
+            title: "🔧 Fixing lint issues",
           },
           {
             args: ["--write"],
             command: "oxfmt",
+            title: "✨ Formatting",
           },
         ])
       })

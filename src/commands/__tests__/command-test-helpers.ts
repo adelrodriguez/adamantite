@@ -303,6 +303,7 @@ export interface RunCommandOptions {
   readonly files?: FileSystemTestContext
   readonly forwardedArguments?: readonly string[]
   readonly layers?: TestLayer[]
+  readonly logLines?: unknown[]
 }
 
 export function runCommand(
@@ -340,6 +341,7 @@ export function runCommand(
       Effect.ensuring(
         Effect.gen(function* () {
           options.errorLines?.push(...(yield* TestConsole.errorLines))
+          options.logLines?.push(...(yield* TestConsole.logLines))
         })
       ),
       Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),

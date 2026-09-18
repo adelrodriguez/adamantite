@@ -1,5 +1,4 @@
 import * as Effect from "effect/Effect"
-import * as Result from "effect/Result"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -19,19 +18,14 @@ export default Command.make("check", { files }).pipe(
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
 
-      yield* Effect.all(
-        [
-          runner.run({ args: ["--check", ...files], command: oxfmt.name }),
-          runner.run({
-            args: [...files, ...forwardedArguments],
-            command: oxlint.name,
-          }),
-        ],
-        { concurrency: 1, mode: "result" }
-      ).pipe(
-        Effect.map((results) => Result.all(results)),
-        Effect.flatMap((result) => Effect.fromResult(result))
-      )
+      yield* runner.runAll([
+        { args: ["--check", ...files], command: oxfmt.name, title: "✨ Checking formatting" },
+        {
+          args: [...files, ...forwardedArguments],
+          command: oxlint.name,
+          title: "🔍 Linting",
+        },
+      ])
     })
   )
 )

@@ -1,7 +1,11 @@
 import type * as PlatformError from "effect/PlatformError"
+import process from "node:process"
+import { styleText } from "node:util"
+import * as Console from "effect/Console"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Result from "effect/Result"
 import * as ChildProcess from "effect/unstable/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { CliNotFound, CommandFailed } from "#lib/shared/errors.ts"
@@ -18,6 +22,11 @@ export interface CommandRunOptions {
   readonly stderr?: "ignore" | "inherit"
   readonly stdin?: "ignore" | "inherit"
   readonly stdout?: "ignore" | "inherit"
+  /**
+   * What the command is doing, such as `"✨ Checking formatting"`. When set, `run` prints it as a
+   * heading above the command's inherited output.
+   */
+  readonly title?: string
 }
 
 export type CommandFailedLike = CliNotFound | PlatformError.PlatformError
@@ -37,7 +46,29 @@ interface CommandRunnerService {
     CommandFailed | CommandFailedLike,
     ChildProcessSpawner.ChildProcessSpawner
   >
+  /**
+   * Runs every step in order, even after one fails, then fails with the first failure.
+   */
+  readonly runAll: (
+    steps: readonly CommandRunOptions[]
+  ) => Effect.Effect<
+    void,
+    CommandFailed | CommandFailedLike,
+    ChildProcessSpawner.ChildProcessSpawner
+  >
 }
+
+const printHeading = (title: string, command: string) =>
+  Console.log(`${styleText("bold", title)} ${styleText("dim", `· adamantite (${command})`)}`)
+
+/**
+ * Oxlint and Oxfmt load TypeScript configs through Node, which warns about every typeless
+ * `package.json` it reparses as ESM. The warning is noise for users who cannot act on it.
+ */
+const quietNodeOptions = () =>
+  [process.env["NODE_OPTIONS"], "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON"]
+    .filter(Boolean)
+    .join(" ")
 
 const exitCode = Effect.fn("CommandRunner.exitCode")(function* ({
   args,
@@ -53,6 +84,8 @@ const exitCode = Effect.fn("CommandRunner.exitCode")(function* ({
       const handle = yield* ChildProcess.make(command, args, {
         cwd,
         detached,
+        env: { NODE_OPTIONS: quietNodeOptions() },
+        extendEnv: true,
         stderr,
         stdin,
         stdout,
@@ -71,14 +104,30 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
   "CommandRunner"
 ) {
   static make(exitCode: CommandRunnerService["exitCode"]): CommandRunnerService {
+    const run: CommandRunnerService["run"] = Effect.fn("CommandRunner.run")(function* (options) {
+      if (options.title !== undefined) {
+        yield* printHeading(options.title, options.command)
+      }
+
+      const code = yield* exitCode(options)
+
+      if (code !== ChildProcessSpawner.ExitCode(0)) {
+        yield* new CommandFailed({ command: options.command, exitCode: code })
+      }
+    })
+
     return {
       exitCode,
-      run: Effect.fn("CommandRunner.run")(function* (options) {
-        const code = yield* exitCode(options)
+      run,
+      runAll: Effect.fn("CommandRunner.runAll")(function* (steps) {
+        const results = yield* Effect.all(
+          steps.map((step, index) =>
+            index === 0 ? run(step) : Effect.andThen(Console.log(""), run(step))
+          ),
+          { concurrency: 1, mode: "result" }
+        )
 
-        if (code !== ChildProcessSpawner.ExitCode(0)) {
-          yield* new CommandFailed({ command: options.command, exitCode: code })
-        }
+        yield* Effect.fromResult(Result.all(results))
       }),
     }
   }

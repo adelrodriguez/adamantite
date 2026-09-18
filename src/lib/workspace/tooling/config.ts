@@ -369,8 +369,8 @@ export function defineConfigTooling(options: {
     workspace: { readonly isMonorepo: boolean }
   ) => RequiredConfigInspection
   /**
-   * A retired managed script. While it is present, the integration stays applicable and reports the
-   * finding so the script gets removed.
+   * Findings for retired managed scripts. While any exist, the integration stays applicable and
+   * reports them so the scripts get removed.
    */
   readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   readonly name: string

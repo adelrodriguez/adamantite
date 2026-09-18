@@ -16,7 +16,6 @@ import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
-import { printTitle } from "#terminal/title.ts"
 
 type ResolveAction = CodingAgent | "copy" | "done"
 
@@ -32,7 +31,6 @@ export default Command.make("doctor").pipe(
       const isInteractive = yield* terminal.isInteractive
 
       if (isInteractive) {
-        yield* printTitle()
         yield* prompter.intro("💠 adamantite doctor")
       }
 

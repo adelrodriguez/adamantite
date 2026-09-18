@@ -53,6 +53,19 @@ function runExpectingFailure(
   return { output, status: result.status }
 }
 
+/**
+ * Sherif refuses to fix inside a CI environment, which it detects from these variables.
+ */
+function withoutCiVariables(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(
+    Object.entries(env).filter(
+      ([name]) =>
+        !["BUILD_NUMBER", "CI", "CI_NAME", "CONTINUOUS_INTEGRATION", "RUN_ID"].includes(name)
+        && !name.startsWith("GITHUB_")
+    )
+  )
+}
+
 function assertIncludes(output: string, expected: string) {
   if (!output.includes(expected)) {
     throw new Error(`Expected output to contain ${JSON.stringify(expected)}, received:\n${output}`)
@@ -269,7 +282,7 @@ try {
       "highest",
       "--no-install",
     ],
-    { cwd: monorepoFixture, env: monorepoEnv }
+    { cwd: monorepoFixture, env: withoutCiVariables(monorepoEnv) }
   )
 
   if (fixOutput.includes("(knip)")) {

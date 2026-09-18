@@ -1,63 +1,91 @@
 import process from "node:process"
 import type { PackageJson } from "type-fest"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import { CODING_AGENT_IDS, runHeadlessSession } from "#lib/agent-repair/driver.ts"
+import { type KnipDiagnostic, collectKnipDiagnostics } from "#lib/agent-repair/knip.ts"
+import { type RepairAttempt, runRepairLoop } from "#lib/agent-repair/loop.ts"
+import { type SherifDiagnostic, collectSherifDiagnostics } from "#lib/agent-repair/sherif.ts"
 import {
-  type AnalyzeDiagnostic,
-  applyKnipFixes,
-  collectKnipDiagnostics,
-  collectSherifDiagnostics,
-} from "#lib/agent-repair/analyze.ts"
-import {
-  type CodingAgent,
-  CODING_AGENTS_IDS,
-  detectInstalledAgents,
-  getCodingAgent,
-  runHeadlessSession,
-} from "#lib/agent-repair/driver.ts"
-import { type RepairWorkUnit, runRepairLoop } from "#lib/agent-repair/loop.ts"
-import { type CommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
+  type CommandFailedLike,
+  type CommandRunOptions,
+  CommandRunner,
+} from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
-import { CliNotFound, CommandFailed, InvalidAnalyzeOptions } from "#lib/shared/errors.ts"
+import {
+  CliNotFound,
+  CommandFailed,
+  InvalidAnalyzeOptions,
+  type InvalidToolOutput,
+} from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
+import {
+  printRepairNotes,
+  requireCodingAgent,
+  warnUnenforcedPermissions,
+} from "#terminal/coding-agent.ts"
 import { printItemStatuses } from "#terminal/item-status.ts"
-import { Prompter } from "#terminal/prompter.ts"
 
-type StageName = "monorepo" | "unused"
-type AnalyzeUnit =
-  | { readonly stage: "monorepo" }
-  | { readonly file: string; readonly stage: "unused" }
+type AnalyzeDiagnostic = KnipDiagnostic | SherifDiagnostic
 
 interface Stage {
+  readonly collect: (options: {
+    readonly args: readonly string[]
+    readonly cwd: string
+  }) => Effect.Effect<
+    readonly AnalyzeDiagnostic[],
+    CommandFailedLike | InvalidToolOutput,
+    CommandRunner
+  >
   readonly command: string
   readonly fixArguments: readonly string[]
-  readonly name: StageName
+  /**
+   * Run the tool's own fix before the agent. Sherif stays report-only under an agent.
+   */
+  readonly fixBeforeAgent: boolean
+  readonly name: "monorepo" | "unused"
+  /**
+   * Repair each file in its own agent session. Otherwise one session repairs the project.
+   */
+  readonly perFile: boolean
   readonly stdin: NonNullable<CommandRunOptions["stdin"]>
   readonly strictArguments: readonly string[]
   readonly title: string
 }
 
+interface RepairUnit {
+  readonly file: string | null
+  readonly items: readonly AnalyzeDiagnostic[]
+  readonly stage: Stage
+}
+
 const STAGES: readonly Stage[] = [
   {
+    collect: collectSherifDiagnostics,
     command: sherif.name,
     fixArguments: ["--fix"],
+    fixBeforeAgent: false,
     name: "monorepo",
+    perFile: false,
     stdin: "inherit",
     strictArguments: [],
     title: "📦 Analyzing the monorepo",
   },
   {
+    collect: collectKnipDiagnostics,
     command: knip.name,
     fixArguments: ["--fix", "--allow-remove-files"],
+    fixBeforeAgent: true,
     name: "unused",
+    perFile: true,
     stdin: "ignore",
     strictArguments: ["--production", "--strict"],
     title: "🧹 Analyzing unused code",
@@ -78,23 +106,10 @@ const only = Flag.Literals("only", ["monorepo", "unused"]).pipe(
     "Run one stage: `monorepo` (sherif, monorepos only) or `unused` (knip). Arguments after `--` go to that stage"
   )
 )
-const agent = Flag.Literals("agent", CODING_AGENTS_IDS).pipe(
+const agent = Flag.Literals("agent", CODING_AGENT_IDS).pipe(
   Flag.optional,
   Flag.withDescription("Repair remaining analysis findings with a supported coding agent")
 )
-
-function groupUnusedDiagnostics(diagnostics: readonly AnalyzeDiagnostic[]) {
-  const groups = new Map<string, AnalyzeDiagnostic[]>()
-  for (const diagnostic of diagnostics) {
-    if (diagnostic.stage !== "unused") {
-      continue
-    }
-    const group = groups.get(diagnostic.file) ?? []
-    group.push(diagnostic)
-    groups.set(diagnostic.file, group)
-  }
-  return groups
-}
 
 function dependencySnapshot(packageJson: PackageJson): string {
   return JSON.stringify({
@@ -105,24 +120,34 @@ function dependencySnapshot(packageJson: PackageJson): string {
   })
 }
 
-function errorMessage(error: Error): string {
-  return error.message
+function diagnosticKey(diagnostic: AnalyzeDiagnostic): string {
+  return `${diagnostic.type}\0${diagnostic.message}`
 }
 
-function diagnosticKey(diagnostic: AnalyzeDiagnostic): string {
-  return `${diagnostic.stage}\0${diagnostic.type}\0${diagnostic.message}`
+function diagnosticLabel(diagnostic: AnalyzeDiagnostic): string {
+  return `${diagnostic.type}: ${diagnostic.message}`
+}
+
+function toRepairUnits(stage: Stage, items: readonly AnalyzeDiagnostic[]): RepairUnit[] {
+  if (stage.perFile) {
+    return Object.entries(Array.groupBy(items, (item) => item.file)).map(([file, group]) => ({
+      file,
+      items: group,
+      stage,
+    }))
+  }
+
+  return items.length > 0 ? [{ file: null, items, stage }] : []
 }
 
 function renderAnalyzePrompt(
-  unit: AnalyzeUnit,
-  items: readonly AnalyzeDiagnostic[],
-  payloadPath: string,
-  attempt: number
+  unit: RepairUnit,
+  { attempt, items, payloadPath }: RepairAttempt<AnalyzeDiagnostic>
 ): string {
-  const scope = unit.stage === "monorepo" ? "the project" : `only ${unit.file}`
+  const scope = unit.file === null ? "the project" : `only ${unit.file}`
   return [
     `Repair ${scope} for the analysis findings in ${payloadPath}.`,
-    ...items.map((item, index) => `${index + 1}. ${item.type}: ${item.message}`),
+    ...items.map((item, index) => `${index + 1}. ${diagnosticLabel(item)}`),
     "Make minimal changes. Do not add suppressions, change analysis configuration, or make unrelated edits.",
     ...(attempt > 1
       ? ["The previous approach did not resolve every finding. Try a different repair."]
@@ -138,16 +163,26 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
   Command.withDescription(
     "Find monorepo issues using sherif, then unused dependencies, exports, and files using knip"
   ),
+  Command.withExamples([
+    {
+      command: "adamantite analyze -- --directory packages/app",
+      description: "Run knip from a specific directory",
+    },
+    {
+      command: "adamantite analyze --only monorepo --fix -- --select highest",
+      description: "Fix only the monorepo issues and use the highest version on a mismatch",
+    },
+    {
+      command: "adamantite analyze --agent claude",
+      description: "Repair the findings that remain after Knip's fixes with Claude Code",
+    },
+  ]),
   Command.withHandler(({ agent: requestedAgent, fix, only, strict }) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
-      const terminal = yield* TerminalCapabilities
-      const prompter = yield* Prompter
       const selected = Option.getOrUndefined(only)
-      const requested = Option.getOrUndefined(requestedAgent)
-      const isInteractive = yield* terminal.isInteractive
       const isMonorepo = yield* checkIsMonorepo().pipe(
         Effect.catchTags({
           FailedToParseFile: () => Effect.succeed(false),
@@ -172,14 +207,14 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
         selected === undefined ? stage.name === "unused" || isMonorepo : stage.name === selected
       )
       const forwardedStage = selected ?? "unused"
+      const stageArguments = (stage: Stage) => [
+        ...(strict ? stage.strictArguments : []),
+        ...(stage.name === forwardedStage ? forwardedArguments : []),
+      ]
 
-      if (requested === undefined && !isInteractive) {
+      if (Option.isNone(requestedAgent)) {
         const steps = stages.map((stage) => ({
-          args: [
-            ...(fix ? stage.fixArguments : []),
-            ...(strict ? stage.strictArguments : []),
-            ...(stage.name === forwardedStage ? forwardedArguments : []),
-          ],
+          args: [...(fix ? stage.fixArguments : []), ...stageArguments(stage)],
           command: stage.command,
           stdin: stage.stdin,
           title: stage.title,
@@ -196,182 +231,99 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
         )
       }
 
-      const collectStage = (stage: Stage) =>
-        stage.name === "monorepo"
-          ? collectSherifDiagnostics({
-              cwd,
-              forwardedArguments: stage.name === forwardedStage ? forwardedArguments : [],
-            })
-          : collectKnipDiagnostics({
-              cwd,
-              forwardedArguments: stage.name === forwardedStage ? forwardedArguments : [],
-              strict,
-            })
-      let diagnostics = (yield* Effect.all(
-        stages.map((stage) => collectStage(stage)),
+      const chosenAgent = yield* requireCodingAgent(requestedAgent.value, cwd)
+      if (chosenAgent === null) {
+        return yield* failure()
+      }
+      yield* warnUnenforcedPermissions(chosenAgent, "the file-only permission profile")
+
+      const collect = (stage: Stage) => stage.collect({ args: stageArguments(stage), cwd })
+      const collectUnits = Effect.forEach(
+        stages,
+        (stage) => collect(stage).pipe(Effect.map((items) => toRepairUnits(stage, items))),
         { concurrency: 1 }
-      )).flat()
-      if (diagnostics.length === 0) {
+      ).pipe(Effect.map((units) => units.flat()))
+
+      for (const stage of stages.filter((candidate) => candidate.fixBeforeAgent)) {
+        yield* runner.exitCode({
+          args: [...stage.fixArguments, ...stageArguments(stage)],
+          command: stage.command,
+          cwd,
+          stderr: "ignore",
+          stdout: "ignore",
+        })
+      }
+
+      const units = yield* collectUnits
+      if (units.length === 0) {
         return
       }
 
-      let selectedAgent: CodingAgent
-      if (requested === undefined) {
-        const installed = yield* detectInstalledAgents(cwd)
-        const selection = yield* prompter.select<CodingAgent | null>({
-          message: "Analysis found issues. Repair them with an agent?",
-          options: [
-            ...installed.map((candidate) => ({ label: candidate.name, value: candidate })),
-            { label: "Do nothing", value: null },
-          ],
-        })
-        if (selection === null) {
-          return yield* failure()
-        }
-        selectedAgent = selection
-      } else {
-        selectedAgent = getCodingAgent(requested)
-      }
-
-      const chosenAgent = selectedAgent
-      if (chosenAgent.id === "codex" || chosenAgent.id === "cursor") {
-        yield* prompter.log.warning(
-          `${chosenAgent.name} cannot enforce the file-only permission profile. Review its edits before keeping them.`
-        )
-      }
-
-      if (stages.some((stage) => stage.name === "unused")) {
-        yield* applyKnipFixes({
-          cwd,
-          forwardedArguments: forwardedStage === "unused" ? forwardedArguments : [],
-          strict,
-        })
-        diagnostics = (yield* Effect.all(
-          stages.map((stage) => collectStage(stage)),
-          { concurrency: 1 }
-        )).flat()
-      }
-
-      const monorepoItems = diagnostics.filter((item) => item.stage === "monorepo")
-      const unusedGroups = groupUnusedDiagnostics(diagnostics)
-      const workUnits: Array<RepairWorkUnit<AnalyzeUnit, AnalyzeDiagnostic>> = [
-        ...(monorepoItems.length > 0
-          ? [{ items: monorepoItems, unit: { stage: "monorepo" as const } }]
-          : []),
-        ...[...unusedGroups].map(([file, items]) => ({
-          items,
-          unit: { file, stage: "unused" as const },
-        })),
-      ]
-
       yield* printItemStatuses(
-        diagnostics.map((item) => ({
-          label: `${item.type}: ${item.message}`,
-          status: "pending" as const,
-        }))
+        "pending",
+        units.flatMap((unit) => unit.items),
+        diagnosticLabel
       )
 
-      const results = yield* runRepairLoop({
-        attempts: 3,
-        key: diagnosticKey,
-        onInterrupt: (_unit, remaining) =>
-          printItemStatuses(
-            remaining.map((item) => ({
-              label: `${item.type}: ${item.message}`,
-              status: "failed" as const,
-            }))
-          ),
-        payloadExtension: "json",
-        renderPayload: (items) =>
-          JSON.stringify(
-            items.map((item) => item.raw),
-            null,
-            2
-          ),
-        renderPrompt: ({ attempt, items, payloadPath, unit }) =>
-          renderAnalyzePrompt(unit, items, payloadPath, attempt),
-        runAttempt: ({ prompt }) =>
-          Effect.gen(function* () {
-            const before = dependencySnapshot(yield* readPackageJson(cwd))
-            const outcome = yield* runHeadlessSession({
-              agent: chosenAgent,
-              cwd,
-              profile: { kind: "files", timeout: "5 minutes" },
-              prompt,
-            }).pipe(
-              Effect.map((session) =>
-                session.status === "timed-out"
-                  ? { kind: "timed-out" as const, note: "The agent attempt timed out." }
-                  : session.exitCode === ChildProcessSpawner.ExitCode(0)
-                    ? { kind: "completed" as const }
-                    : {
-                        kind: "failed" as const,
-                        note: session.stderr || `${chosenAgent.name} failed.`,
-                      }
-              ),
-              Effect.catchTag("AgentSessionFailed", (error) =>
-                Effect.succeed({
-                  kind: "failed" as const,
-                  note:
-                    error.reason === "not-found"
-                      ? `\`${chosenAgent.command}\` was not found. ${chosenAgent.name} ${chosenAgent.minimumVersion} or later is required.`
-                      : `Failed to start ${chosenAgent.name}: ${error.cause.message}`,
-                })
-              )
-            )
-            const after = dependencySnapshot(yield* readPackageJson(cwd))
-            if (after !== before) {
-              const installer = yield* DependencyInstaller
-              const packageManager = yield* installer.detectPackageManager(cwd)
-              if (packageManager === null) {
-                return {
-                  kind: "failed" as const,
-                  note: "The agent changed dependency versions, but no package manager was detected.",
-                }
-              }
-              const installError = yield* runner
-                .run({ args: ["install"], command: packageManager.name, cwd })
-                .pipe(
-                  Effect.as<string | null>(null),
-                  Effect.catch((error) => Effect.succeed(errorMessage(error)))
-                )
-              if (installError !== null) {
-                return { kind: "failed" as const, note: installError }
-              }
-            }
+      // The agent cannot run the package manager, so Adamantite installs its dependency changes.
+      const runAgent = (prompt: string) =>
+        Effect.gen(function* () {
+          const before = dependencySnapshot(yield* readPackageJson(cwd))
+          const outcome = yield* runHeadlessSession({
+            agent: chosenAgent,
+            cwd,
+            profile: { kind: "files", timeout: "5 minutes" },
+            prompt,
+          })
+          if (dependencySnapshot(yield* readPackageJson(cwd)) === before) {
             return outcome
-          }).pipe(
-            Effect.catch((error) =>
-              Effect.succeed({ kind: "failed" as const, note: errorMessage(error) })
-            )
-          ),
-        verify: (unit) =>
-          unit.stage === "monorepo"
-            ? collectSherifDiagnostics({
-                cwd,
-                forwardedArguments: forwardedStage === "monorepo" ? forwardedArguments : [],
-              })
-            : collectKnipDiagnostics({
-                cwd,
-                forwardedArguments: forwardedStage === "unused" ? forwardedArguments : [],
-                strict,
-              }).pipe(Effect.map((items) => items.filter((item) => item.file === unit.file))),
-        workUnits,
-      })
+          }
+
+          const installer = yield* DependencyInstaller
+          const packageManager = yield* installer.detectPackageManager(cwd)
+          if (packageManager === null) {
+            return {
+              note: "The agent changed dependency versions, but no package manager was detected.",
+            }
+          }
+
+          yield* runner.run({ args: ["install"], command: packageManager.name, cwd })
+          return outcome
+        }).pipe(Effect.catch((error) => Effect.succeed({ note: error.message })))
+
+      const results = yield* Effect.forEach(
+        units,
+        (unit) =>
+          runRepairLoop({
+            attempts: 3,
+            items: unit.items,
+            key: diagnosticKey,
+            onInterrupt: (remaining) => printItemStatuses("failed", remaining, diagnosticLabel),
+            payloadExtension: "json",
+            renderPayload: (items) =>
+              JSON.stringify(
+                items.map((item) => item.raw),
+                null,
+                2
+              ),
+            runAttempt: (attempt) => runAgent(renderAnalyzePrompt(unit, attempt)),
+            verify: collect(unit.stage).pipe(
+              Effect.map((items) =>
+                unit.file === null ? items : items.filter((item) => item.file === unit.file)
+              )
+            ),
+          }),
+        { concurrency: 1 }
+      )
 
       const remaining = results.flatMap((result) => [...result.still, ...result.introduced])
-      yield* printItemStatuses([
-        ...results.flatMap((result) =>
-          result.cleared.map((item) => ({
-            label: `${item.type}: ${item.message}`,
-            status: "done" as const,
-          }))
-        ),
-        ...remaining.map((item) => ({
-          label: `${item.type}: ${item.message}`,
-          status: "failed" as const,
-        })),
-      ])
+      yield* printItemStatuses(
+        "done",
+        results.flatMap((result) => result.cleared),
+        diagnosticLabel
+      )
+      yield* printItemStatuses("failed", remaining, diagnosticLabel)
+      yield* printRepairNotes(results)
       if (remaining.length > 0) {
         return yield* failure()
       }

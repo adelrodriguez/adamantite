@@ -6,7 +6,12 @@ import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
-import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
+import { CliNotFound } from "#lib/shared/errors.ts"
+import {
+  createPrompterTestContext,
+  createRunnerTestContext,
+  runCommand,
+} from "./command-test-helpers.ts"
 
 describe("fix", () => {
   describe("agent mode", () => {
@@ -23,6 +28,14 @@ describe("fix", () => {
         const runner = createRunnerTestContext({
           captureImplementation: (options) =>
             Effect.sync(() => {
+              if (options.args[0] === "--version") {
+                return {
+                  exitCode: ChildProcessSpawner.ExitCode(0),
+                  status: "exited" as const,
+                  stderr: "",
+                  stdout: "",
+                }
+              }
               if (options.command === "claude") {
                 expect(options.args.join(" ")).toContain(
                   `Edit only ${join(files.root, "index.ts")}`
@@ -63,15 +76,38 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(
-          runner.invocations.filter((invocation) => invocation.command === "claude")
-        ).toHaveLength(1)
+        expect(runner.invocations.filter((invocation) => invocation.args[0] === "-p")).toHaveLength(
+          1
+        )
         expect(runner.invocations).toContainEqual(
           expect.objectContaining({
             args: expect.arrayContaining(["--type-aware", "--format", "json"]),
             command: "oxlint",
           })
         )
+      })
+    )
+  })
+
+  describe("missing agent", () => {
+    it.effect("report a missing agent CLI before it changes a file", () =>
+      Effect.gen(function* () {
+        const prompter = createPrompterTestContext()
+        const runner = createRunnerTestContext({
+          captureImplementation: (options) =>
+            Effect.fail(new CliNotFound({ command: options.command })),
+        })
+
+        const exit = yield* runCommand(fixCommand, ["--agent", "claude"], {
+          layers: [prompter.layer, runner.layer],
+        })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        expect(prompter.logs).toContainEqual({
+          level: "error",
+          message: "`claude` was not found. Claude Code 2.1.272 or later is required.",
+        })
+        expect(runner.invocations.map((invocation) => invocation.command)).toEqual(["claude"])
       })
     )
   })

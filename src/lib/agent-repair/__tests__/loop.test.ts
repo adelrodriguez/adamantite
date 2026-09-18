@@ -19,34 +19,29 @@ describe("runRepairLoop", () => {
 
     return runRepairLoop({
       attempts: 2,
+      items: [{ id: "original" }],
       key: (item: Item) => item.id,
       payloadExtension: "json",
       renderPayload: (items) => JSON.stringify(items),
-      renderPrompt: ({ attempt, items, payloadPath: nextPath }) => {
-        payloadPath = nextPath
-        return `${attempt}:${items.map((item) => item.id).join(",")}`
-      },
-      runAttempt: ({ prompt }) =>
+      runAttempt: ({ attempt, items, payloadPath: nextPath }) =>
         Effect.sync(() => {
-          prompts.push(prompt)
-          return prompt.startsWith("1:")
-            ? { kind: "timed-out" as const }
-            : { kind: "completed" as const }
+          payloadPath = nextPath
+          prompts.push(`${attempt}:${items.map((item) => item.id).join(",")}`)
+          return attempt === 1 ? { note: "The agent attempt timed out." } : {}
         }),
-      verify: () =>
-        Effect.sync(() => {
-          verification += 1
-          return verification === 1 ? [{ id: "original" }, { id: "new" }] : [{ id: "new" }]
-        }),
-      workUnits: [{ items: [{ id: "original" }], unit: "project" }],
+      verify: Effect.sync(() => {
+        verification += 1
+        return verification === 1 ? [{ id: "original" }, { id: "new" }] : [{ id: "new" }]
+      }),
     }).pipe(
-      Effect.tap((results) =>
+      Effect.tap((result) =>
         Effect.sync(() => {
           expect(prompts).toEqual(["1:original", "2:original,new"])
-          expect(results[0]).toMatchObject({
+          expect(result).toMatchObject({
             attempts: 2,
             cleared: [{ id: "original" }],
             introduced: [{ id: "new" }],
+            notes: ["The agent attempt timed out."],
             still: [],
           })
         })
@@ -60,6 +55,31 @@ describe("runRepairLoop", () => {
     )
   })
 
+  it.effect("clear one of two items that share a key", () => {
+    const files = createFileSystemTestContext()
+
+    return runRepairLoop({
+      attempts: 1,
+      items: [{ id: "same" }, { id: "same" }],
+      key: (item: Item) => item.id,
+      payloadExtension: "json",
+      renderPayload: (items) => JSON.stringify(items),
+      runAttempt: () => Effect.succeed({}),
+      verify: Effect.succeed([{ id: "same" }]),
+    }).pipe(
+      Effect.tap((result) =>
+        Effect.sync(() => {
+          expect(result).toMatchObject({
+            cleared: [{ id: "same" }],
+            introduced: [],
+            still: [{ id: "same" }],
+          })
+        })
+      ),
+      Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+    )
+  })
+
   it.effect("verify once after cancellation", () => {
     const files = createFileSystemTestContext()
     let verifications = 0
@@ -67,17 +87,15 @@ describe("runRepairLoop", () => {
     return Effect.gen(function* () {
       const fiber = yield* runRepairLoop({
         attempts: 1,
+        items: [{ id: "item" }],
         key: (item: Item) => item.id,
-        payloadExtension: "txt",
+        payloadExtension: "json",
         renderPayload: () => "payload",
-        renderPrompt: () => "prompt",
         runAttempt: () => Effect.never,
-        verify: () =>
-          Effect.sync(() => {
-            verifications += 1
-            return []
-          }),
-        workUnits: [{ items: [{ id: "item" }], unit: "project" }],
+        verify: Effect.sync(() => {
+          verifications += 1
+          return []
+        }),
       }).pipe(Effect.forkChild)
 
       yield* Effect.yieldNow

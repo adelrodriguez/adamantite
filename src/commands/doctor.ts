@@ -8,10 +8,9 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import type { Finding } from "#lib/integrations/base.ts"
 import {
   type CodingAgent,
-  CODING_AGENTS_IDS,
+  CODING_AGENT_IDS,
   checkWorkingTreeState,
   detectInstalledAgents,
-  getCodingAgent,
   runHeadlessSession,
 } from "#lib/agent-repair/driver.ts"
 import { runRepairLoop } from "#lib/agent-repair/loop.ts"
@@ -20,15 +19,18 @@ import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
+import {
+  printRepairNotes,
+  requireCodingAgent,
+  warnUnenforcedPermissions,
+} from "#terminal/coding-agent.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { printItemStatuses } from "#terminal/item-status.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
-type ResolveAction = CodingAgent | "copy" | "done"
-
 const version = getPackageVersion()
 
-const agent = Flag.Literals("agent", CODING_AGENTS_IDS).pipe(
+const agent = Flag.Literals("agent", CODING_AGENT_IDS).pipe(
   Flag.optional,
   Flag.withDescription("Repair findings with a supported coding agent")
 )
@@ -40,6 +42,10 @@ const allowDirty = Flag.Boolean("allow-dirty").pipe(
 
 function failure() {
   return new CommandFailed({ command: "doctor", exitCode: ChildProcessSpawner.ExitCode(1) })
+}
+
+function findingLabel(finding: Finding): string {
+  return finding.title
 }
 
 function legacyDeleteCommands(cwd: string, findings: readonly Finding[]): string[] {
@@ -100,8 +106,8 @@ export default Command.make("doctor", { agent, allowDirty }).pipe(
       }
 
       const assessment = yield* assessProject(cwd)
-      for (const warning of assessment.warnings) {
-        if (isInteractive) {
+      if (isInteractive) {
+        for (const warning of assessment.warnings) {
           yield* prompter.log.warning(warning)
         }
       }
@@ -120,23 +126,16 @@ export default Command.make("doctor", { agent, allowDirty }).pipe(
         return
       }
 
-      const requested = Option.getOrUndefined(requestedAgent)
-      if (requested === undefined) {
-        switch (isInteractive) {
-          case false:
-            yield* prompter.message(renderAssessmentMarkdown(assessment, version))
-            return yield* failure()
-          case true:
-            break
-        }
+      if (Option.isNone(requestedAgent) && !isInteractive) {
+        yield* prompter.message(renderAssessmentMarkdown(assessment, version))
+        return yield* failure()
       }
 
       if (isInteractive) {
         yield* printFindings(assessment.findings)
       }
 
-      let selectedAgent: CodingAgent
-      if (requested === undefined) {
+      const selectAction = Effect.gen(function* () {
         const installed = yield* prompter.withSpinner(() => detectInstalledAgents(cwd), {
           start: "Checking for installed coding agents...",
           success: (agents) =>
@@ -144,7 +143,7 @@ export default Command.make("doctor", { agent, allowDirty }).pipe(
               ? "No supported coding agent CLI was found on PATH."
               : `Found ${agents.map((candidate) => candidate.name).join(", ")}.`,
         })
-        const action = yield* prompter.select<ResolveAction>({
+        return yield* prompter.select<CodingAgent | "copy" | null>({
           message: "How do you want to resolve these findings?",
           options: [
             ...installed.map((candidate) => ({
@@ -152,25 +151,24 @@ export default Command.make("doctor", { agent, allowDirty }).pipe(
               value: candidate,
             })),
             { label: "Copy the Markdown prompt for a coding agent", value: "copy" as const },
-            { label: "Do nothing", value: "done" as const },
+            { label: "Do nothing", value: null },
           ],
         })
+      })
+      const chosenAgent = Option.isSome(requestedAgent)
+        ? yield* requireCodingAgent(requestedAgent.value, cwd)
+        : yield* selectAction
 
-        if (action === "done") {
-          return yield* failure()
-        }
-        if (action === "copy") {
-          const markdown = renderAssessmentMarkdown(assessment, version)
-          yield* prompter.message(markdown)
-          yield* terminal.copyToClipboard(markdown)
-          return yield* failure()
-        }
-        selectedAgent = action
-      } else {
-        selectedAgent = getCodingAgent(requested)
+      if (chosenAgent === null) {
+        return yield* failure()
+      }
+      if (chosenAgent === "copy") {
+        const markdown = renderAssessmentMarkdown(assessment, version)
+        yield* prompter.message(markdown)
+        yield* terminal.copyToClipboard(markdown)
+        return yield* failure()
       }
 
-      const chosenAgent = selectedAgent
       const treeState = yield* checkWorkingTreeState(cwd)
       if (treeState !== "clean") {
         const warning =
@@ -196,28 +194,21 @@ export default Command.make("doctor", { agent, allowDirty }).pipe(
         }
       }
 
-      if (chosenAgent.id === "codex" || chosenAgent.id === "cursor") {
-        yield* prompter.log.warning(
-          `${chosenAgent.name} cannot enforce Doctor's command allowlist. Review its edits before keeping them.`
-        )
-      }
+      yield* warnUnenforcedPermissions(chosenAgent, "Doctor's command allowlist")
+      yield* printItemStatuses("pending", assessment.findings, findingLabel)
 
-      yield* printItemStatuses(
-        assessment.findings.map((finding) => ({ label: finding.title, status: "pending" as const }))
-      )
-
-      const [result] = yield* runRepairLoop({
+      const result = yield* runRepairLoop({
         attempts: 3,
-        key: (finding: Finding) => finding.id,
-        onInterrupt: (_unit, findings) =>
+        items: assessment.findings,
+        key: (finding) => finding.id,
+        onInterrupt: (findings) =>
           Effect.gen(function* () {
             yield* prompter.log.warning("The agent was interrupted. Doctor reassessed the project.")
             yield* printFindings(findings)
           }),
         payloadExtension: "md",
         renderPayload: (findings) => renderAssessmentMarkdown({ ...assessment, findings }, version),
-        renderPrompt: ({ attempt, payloadPath }) => promptForDoctorAttempt(payloadPath, attempt),
-        runAttempt: ({ prompt }) =>
+        runAttempt: ({ attempt, payloadPath }) =>
           runHeadlessSession({
             agent: chosenAgent,
             cwd,
@@ -227,49 +218,14 @@ export default Command.make("doctor", { agent, allowDirty }).pipe(
               shellPrefixes: doctorShellPrefixes(),
               timeout: "10 minutes",
             },
-            prompt,
-          }).pipe(
-            Effect.map((session) => {
-              if (session.status === "timed-out") {
-                return { kind: "timed-out" as const, note: "The agent attempt timed out." }
-              }
-              if (session.exitCode !== ChildProcessSpawner.ExitCode(0)) {
-                return {
-                  kind: "failed" as const,
-                  note:
-                    session.stderr || `${chosenAgent.name} exited with code ${session.exitCode}.`,
-                }
-              }
-              return { kind: "completed" as const }
-            }),
-            Effect.catchTag("AgentSessionFailed", (error) =>
-              Effect.succeed({
-                kind: "failed" as const,
-                note:
-                  error.reason === "not-found"
-                    ? `\`${chosenAgent.command}\` was not found. ${chosenAgent.name} ${chosenAgent.minimumVersion} or later is required.`
-                    : `Failed to start ${chosenAgent.name}: ${error.cause.message}`,
-              })
-            )
-          ),
-        verify: () => assessProject(cwd).pipe(Effect.map((next) => next.findings)),
-        workUnits: [{ items: assessment.findings, unit: cwd }],
+            prompt: promptForDoctorAttempt(payloadPath, attempt),
+          }),
+        verify: assessProject(cwd).pipe(Effect.map((next) => next.findings)),
       })
 
-      if (result === undefined) {
-        return yield* failure()
-      }
-
-      yield* printItemStatuses([
-        ...result.cleared.map((finding) => ({ label: finding.title, status: "done" as const })),
-        ...[...result.still, ...result.introduced].map((finding) => ({
-          label: finding.title,
-          status: "failed" as const,
-        })),
-      ])
-      for (const note of result.notes) {
-        yield* prompter.log.warning(note)
-      }
+      yield* printItemStatuses("done", result.cleared, findingLabel)
+      yield* printItemStatuses("failed", [...result.still, ...result.introduced], findingLabel)
+      yield* printRepairNotes([result])
 
       if (result.still.length === 0 && result.introduced.length === 0) {
         if (isInteractive) {

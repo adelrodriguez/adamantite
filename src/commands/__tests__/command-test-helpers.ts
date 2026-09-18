@@ -83,6 +83,13 @@ function shiftResponse<T>(queue: T[], kind: string): T {
   return response
 }
 
+const emptyCapture: CapturedCommandResult = {
+  exitCode: ChildProcessSpawner.ExitCode(0),
+  status: "exited",
+  stderr: "",
+  stdout: "",
+}
+
 export function createRunnerTestContext(
   options:
     | number[]
@@ -102,24 +109,23 @@ export function createRunnerTestContext(
   const implementation = Array.isArray(options) ? undefined : options.implementation
   const captureImplementation = Array.isArray(options) ? undefined : options.captureImplementation
   const captureResults = [
-    ...(Array.isArray(options)
-      ? []
-      : (options.captureResults ?? [
-          {
-            exitCode: ChildProcessSpawner.ExitCode(0),
-            status: "exited" as const,
-            stderr: "",
-            stdout: "",
-          },
-        ])),
+    ...(Array.isArray(options) ? [] : (options.captureResults ?? [emptyCapture])),
   ]
 
   return {
     invocations,
     layer: Layer.succeed(
       CommandRunner,
-      CommandRunner.make(
-        (options) =>
+      CommandRunner.make({
+        capture: (options) =>
+          Effect.gen(function* () {
+            invocations.push({ ...options, args: [...options.args] })
+            if (captureImplementation) {
+              return yield* captureImplementation(options)
+            }
+            return captureResults.shift() ?? emptyCapture
+          }),
+        exitCode: (options) =>
           Effect.gen(function* () {
             invocations.push({ ...options, args: [...options.args] })
             if (implementation) {
@@ -127,22 +133,7 @@ export function createRunnerTestContext(
             }
             return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
           }),
-        (options) =>
-          Effect.gen(function* () {
-            invocations.push({ ...options, args: [...options.args] })
-            if (captureImplementation) {
-              return yield* captureImplementation(options)
-            }
-            return (
-              captureResults.shift() ?? {
-                exitCode: ChildProcessSpawner.ExitCode(0),
-                status: "exited" as const,
-                stderr: "",
-                stdout: "",
-              }
-            )
-          })
-      )
+      })
     ),
   }
 }
@@ -334,9 +325,12 @@ const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawne
 // reach them pass their own layer, which takes precedence.
 const unexpectedRunnerLayer = Layer.succeed(
   CommandRunner,
-  CommandRunner.make((options) =>
-    Effect.die(`Unexpected \`${options.command}\` run: pass a runner layer to runCommand`)
-  )
+  CommandRunner.make({
+    capture: (options) =>
+      Effect.die(`Unexpected \`${options.command}\` capture: pass a runner layer to runCommand`),
+    exitCode: (options) =>
+      Effect.die(`Unexpected \`${options.command}\` run: pass a runner layer to runCommand`),
+  })
 )
 
 const unexpectedInstallerLayer = Layer.succeed(DependencyInstaller)({

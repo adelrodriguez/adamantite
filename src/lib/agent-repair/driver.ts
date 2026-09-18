@@ -1,9 +1,8 @@
 import type * as Duration from "effect/Duration"
-import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Struct from "effect/Struct"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import type { CapturedCommandResult, CommandFailedLike } from "#lib/execution/command-runner.ts"
+import type { RepairAttemptOutcome } from "#lib/agent-repair/loop.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 
 export type PermissionProfile =
@@ -18,14 +17,24 @@ export type PermissionProfile =
 interface HeadlessCommand {
   readonly args: readonly string[]
   readonly env?: Readonly<Record<string, string>>
-  readonly profileEnforced: boolean
 }
 
 interface CodingAgentContract {
+  /**
+   * Executable names, tried in order.
+   */
   readonly commands: readonly string[]
+  /**
+   * False when the CLI has no flags that restrict the agent to the permission profile.
+   */
+  readonly enforcesPermissions: boolean
   readonly minimumVersion: string
   readonly name: string
   readonly probeArguments: readonly string[]
+  /**
+   * Required in the probe output when another CLI can own one of the command names.
+   */
+  readonly probePattern?: RegExp
   readonly toHeadlessCommand: (prompt: string, profile: PermissionProfile) => HeadlessCommand
 }
 
@@ -37,6 +46,15 @@ function shellTools(profile: PermissionProfile): string[] {
         ...profile.shellPrefixes.map((prefix) => `Bash(${prefix} *)`),
         ...(profile.exactCommands ?? []).map((command) => `Bash(${command})`),
       ]
+    : []
+}
+
+// Gemini CLI matches a shell rule as a command prefix, so a rule has no wildcard.
+function geminiShellTools(profile: PermissionProfile): string[] {
+  return profile.kind === "files-and-shell"
+    ? [...profile.shellPrefixes, ...(profile.exactCommands ?? [])].map(
+        (command) => `run_shell_command(${command})`
+      )
     : []
 }
 
@@ -59,6 +77,7 @@ function openCodePermission(profile: PermissionProfile): string {
 const CODING_AGENT_CONTRACTS = {
   claude: {
     commands: ["claude"],
+    enforcesPermissions: true,
     minimumVersion: "2.1.272",
     name: "Claude Code",
     probeArguments: ["--version"],
@@ -73,31 +92,33 @@ const CODING_AGENT_CONTRACTS = {
         "--allowedTools",
         [...fileTools, ...shellTools(profile)].join(" "),
       ],
-      profileEnforced: true,
     }),
   },
   codex: {
     commands: ["codex"],
+    enforcesPermissions: false,
     minimumVersion: "0.154.0",
     name: "Codex",
     probeArguments: ["--version"],
     toHeadlessCommand: (prompt) => ({
       args: ["exec", "--sandbox", "workspace-write", prompt],
-      profileEnforced: false,
     }),
   },
   cursor: {
-    commands: ["agent", "cursor-agent"],
+    commands: ["cursor-agent", "agent"],
+    enforcesPermissions: false,
     minimumVersion: "2026.09",
     name: "Cursor",
     probeArguments: ["--version"],
+    // Other CLIs also install an `agent` command. Cursor versions are dates, such as `2026.09.12`.
+    probePattern: /^\d{4}\.\d{2}\./u,
     toHeadlessCommand: (prompt) => ({
       args: ["-p", prompt, "--trust", "--force"],
-      profileEnforced: false,
     }),
   },
   gemini: {
     commands: ["gemini"],
+    enforcesPermissions: true,
     minimumVersion: "0.8.0",
     name: "Gemini CLI",
     probeArguments: ["--version"],
@@ -108,18 +129,13 @@ const CODING_AGENT_CONTRACTS = {
         "--approval-mode",
         "auto_edit",
         "--allowed-tools",
-        [
-          "read_file",
-          "write_file",
-          "replace",
-          ...shellTools(profile).map((tool) => `ShellTool(${tool.slice(5, -1)})`),
-        ].join(","),
+        ["read_file", "write_file", "replace", ...geminiShellTools(profile)].join(","),
       ],
-      profileEnforced: true,
     }),
   },
   grok: {
     commands: ["grok"],
+    enforcesPermissions: true,
     minimumVersion: "1.0.30",
     name: "Grok Build",
     probeArguments: ["version"],
@@ -133,96 +149,74 @@ const CODING_AGENT_CONTRACTS = {
         "workspace",
         ...shellTools(profile).flatMap((tool) => ["--allow", tool]),
       ],
-      profileEnforced: true,
     }),
   },
   opencode: {
     commands: ["opencode"],
+    enforcesPermissions: true,
     minimumVersion: "1.18.31",
     name: "OpenCode",
     probeArguments: ["--version"],
     toHeadlessCommand: (prompt, profile) => ({
       args: ["run", prompt],
       env: { OPENCODE_CONFIG_CONTENT: openCodePermission(profile) },
-      profileEnforced: true,
     }),
   },
 } satisfies Record<string, CodingAgentContract>
 
 export type CodingAgentId = keyof typeof CODING_AGENT_CONTRACTS
 
-export interface CodingAgent extends Omit<CodingAgentContract, "commands"> {
-  readonly command: string
+export interface CodingAgent extends CodingAgentContract {
   readonly id: CodingAgentId
 }
 
-export const CODING_AGENTS_IDS = Struct.keys(CODING_AGENT_CONTRACTS)
-
-function withCommand(
-  id: CodingAgentId,
-  contract: CodingAgentContract,
-  command: string
-): CodingAgent {
-  return {
-    command,
-    id,
-    minimumVersion: contract.minimumVersion,
-    name: contract.name,
-    probeArguments: contract.probeArguments,
-    toHeadlessCommand: contract.toHeadlessCommand,
-  }
-}
-
-export const codingAgents: readonly CodingAgent[] = CODING_AGENTS_IDS.map((id) =>
-  withCommand(id, CODING_AGENT_CONTRACTS[id], CODING_AGENT_CONTRACTS[id].commands[0] ?? id)
-)
+export const CODING_AGENT_IDS = Struct.keys(CODING_AGENT_CONTRACTS)
 
 export function getCodingAgent(id: CodingAgentId): CodingAgent {
-  const contract = CODING_AGENT_CONTRACTS[id]
-
-  return withCommand(id, contract, contract.commands[0] ?? id)
+  return { ...CODING_AGENT_CONTRACTS[id], id }
 }
 
-// A probe counts as installed when it starts, regardless of its exit code. Missing commands,
-// spawn failures, and probes that exceed ten seconds do not count.
-export const detectInstalledAgents = (cwd: string) =>
+// A probe counts as installed when it starts and its output matches the probe pattern, regardless
+// of its exit code. Missing commands, spawn failures, and probes that exceed ten seconds do not
+// count. A detected agent keeps only the command that started.
+export const detectAgent = (id: CodingAgentId, cwd: string) =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
-    const probes = yield* Effect.forEach(
-      CODING_AGENTS_IDS,
-      (id) =>
-        Effect.gen(function* () {
-          const contract = CODING_AGENT_CONTRACTS[id]
-          for (const command of contract.commands) {
-            const started = yield* runner
-              .capture({ args: [...contract.probeArguments], command, cwd, timeout: "10 seconds" })
-              .pipe(
-                Effect.as(true),
-                Effect.catch(() => Effect.succeed(false))
-              )
+    const agent = getCodingAgent(id)
 
-            if (started) {
-              return withCommand(id, contract, command)
-            }
-          }
+    for (const command of agent.commands) {
+      const installed = yield* runner
+        .capture({ args: [...agent.probeArguments], command, cwd, timeout: "10 seconds" })
+        .pipe(
+          Effect.map(
+            (probe) =>
+              probe.status === "exited" && (agent.probePattern?.test(probe.stdout.trim()) ?? true)
+          ),
+          Effect.catch(() => Effect.succeed(false))
+        )
 
-          return null
-        }),
-      { concurrency: CODING_AGENTS_IDS.length }
-    )
-    return probes.filter((agent) => agent !== null)
+      if (installed) {
+        return { ...agent, commands: [command] } satisfies CodingAgent
+      }
+    }
+
+    return null
   })
 
-export class AgentSessionFailed extends Data.TaggedError("AgentSessionFailed")<{
-  readonly cause: CommandFailedLike
-  readonly reason: "not-found" | "spawn-failed"
-}> {}
+export const detectInstalledAgents = (cwd: string) =>
+  Effect.forEach(CODING_AGENT_IDS, (id) => detectAgent(id, cwd), {
+    concurrency: CODING_AGENT_IDS.length,
+  }).pipe(Effect.map((agents) => agents.filter((agent) => agent !== null)))
 
-export type HeadlessSessionResult = CapturedCommandResult & {
-  readonly minimumVersion: string
-  readonly profileEnforced: boolean
+export function renderAgentNotFound(agent: CodingAgent): string {
+  const commands = agent.commands.map((command) => `\`${command}\``).join(" or ")
+  return `${commands} was not found. ${agent.name} ${agent.minimumVersion} or later is required.`
 }
 
+/**
+ * Runs one headless agent session. The session never fails: a missing CLI, a spawn failure, a
+ * timeout, and a nonzero exit each become the note of the outcome.
+ */
 export const runHeadlessSession = ({
   agent,
   cwd,
@@ -233,40 +227,39 @@ export const runHeadlessSession = ({
   readonly cwd: string
   readonly profile: PermissionProfile
   readonly prompt: string
-}) =>
+}): Effect.Effect<RepairAttemptOutcome, never, CommandRunner> =>
   Effect.gen(function* () {
     const runner = yield* CommandRunner
-    const command = agent.toHeadlessCommand(prompt, profile)
-    const run = (commandName: string) =>
-      runner.capture({
-        args: [...command.args],
-        captureStdout: false,
-        command: commandName,
-        cwd,
-        env: command.env,
-        stderrLimitBytes: 64 * 1024,
-        timeout: profile.timeout,
-      })
-    const result = yield* run(agent.command).pipe(
-      Effect.catchTag("CliNotFound", (error) =>
-        agent.id === "cursor" && agent.command === "agent"
-          ? run("cursor-agent")
-          : Effect.fail(error)
-      )
-    )
+    const headless = agent.toHeadlessCommand(prompt, profile)
 
-    return {
-      ...result,
-      minimumVersion: agent.minimumVersion,
-      profileEnforced: command.profileEnforced,
-    } satisfies HeadlessSessionResult
-  }).pipe(
-    Effect.mapError(
-      (error) =>
-        new AgentSessionFailed({
-          cause: error,
-          reason: error._tag === "CliNotFound" ? "not-found" : "spawn-failed",
+    for (const command of agent.commands) {
+      const session = yield* runner
+        .capture({
+          args: [...headless.args],
+          captureStdout: false,
+          command,
+          cwd,
+          env: headless.env,
+          stderrLimitBytes: 64 * 1024,
+          timeout: profile.timeout,
         })
+        .pipe(Effect.catchTag("CliNotFound", () => Effect.succeed(null)))
+
+      if (session !== null) {
+        if (session.status === "timed-out") {
+          return { note: "The agent attempt timed out." }
+        }
+        if (session.exitCode !== ChildProcessSpawner.ExitCode(0)) {
+          return { note: session.stderr || `${agent.name} exited with code ${session.exitCode}.` }
+        }
+        return {}
+      }
+    }
+
+    return { note: renderAgentNotFound(agent) }
+  }).pipe(
+    Effect.catch((error) =>
+      Effect.succeed({ note: `Failed to start ${agent.name}: ${error.message}` })
     )
   )
 

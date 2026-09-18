@@ -16,7 +16,7 @@ import process from "node:process"
 const agentCommands = {
   claude: ["claude"],
   codex: ["codex"],
-  cursor: ["agent", "cursor-agent"],
+  cursor: ["cursor-agent", "agent"],
   gemini: ["gemini"],
   grok: ["grok"],
   opencode: ["opencode"],
@@ -58,8 +58,7 @@ if (requested === undefined || commands === undefined) {
 
 const installedCommand = findInstalledCommand(commands)
 if (installedCommand === null) {
-  console.info(`SKIP ${requested}: no supported command was found on PATH.`)
-  process.exit(0)
+  throw new Error(`${requested}: no supported command was found on PATH.`)
 }
 
 const rootManifest = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"))

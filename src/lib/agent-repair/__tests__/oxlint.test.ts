@@ -1,5 +1,6 @@
 import { resolve } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
 import { parseOxlintDiagnostics } from "#lib/agent-repair/oxlint.ts"
 
 describe("parseOxlintDiagnostics", () => {
@@ -13,7 +14,9 @@ describe("parseOxlintDiagnostics", () => {
       severity: "error",
       url: "https://oxc.rs/rule",
     }
-    const diagnostics = parseOxlintDiagnostics(JSON.stringify({ diagnostics: [raw] }), "/project")
+    const diagnostics = Effect.runSync(
+      parseOxlintDiagnostics(JSON.stringify({ diagnostics: [raw] }), "/project")
+    )
 
     expect(diagnostics).toEqual([
       {
@@ -29,9 +32,25 @@ describe("parseOxlintDiagnostics", () => {
     ])
   })
 
-  it("reject malformed reporter output at the input boundary", () => {
-    expect(() => parseOxlintDiagnostics('{"diagnostics":[{"code":4}]}', "/project")).toThrow(
-      "could not parse"
+  it("accept a parse error, which has no rule code", () => {
+    const raw = {
+      filename: "src/broken.ts",
+      labels: [{ label: "`}` expected", span: { column: 1, length: 0, line: 2, offset: 12 } }],
+      message: "Expected `}` but found `EOF`",
+      severity: "error",
+    }
+    const diagnostics = Effect.runSync(
+      parseOxlintDiagnostics(JSON.stringify({ diagnostics: [raw] }), "/project")
     )
+
+    expect(diagnostics).toMatchObject([{ line: 2, rule: "oxc(parse-error)" }])
+  })
+
+  it("reject malformed reporter output at the input boundary", () => {
+    const error = Effect.runSync(
+      Effect.flip(parseOxlintDiagnostics('{"diagnostics":[{"code":4}]}', "/project"))
+    )
+
+    expect(error.message).toContain("could not parse")
   })
 })

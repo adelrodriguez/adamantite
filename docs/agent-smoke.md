@@ -7,9 +7,9 @@ change.
 pnpm test:agents -- claude
 ```
 
-Replace `claude` with `codex`, `cursor`, `gemini`, `grok`, or `opencode`. The script skips the run
-when it cannot find the selected CLI. An installed CLI must finish without manual input and print
-these results:
+Replace `claude` with `codex`, `cursor`, `gemini`, `grok`, or `opencode`. The script fails when
+it cannot find the selected CLI. An installed CLI must finish without manual input and print these
+results:
 
 - `PASS doctor convergence`
 - `PASS doctor second run`

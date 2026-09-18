@@ -2,36 +2,27 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 
-export interface RepairAttemptContext<Unit, Item> {
+export interface RepairAttempt<Item> {
   readonly attempt: number
   readonly items: readonly Item[]
   readonly payloadPath: string
-  readonly unit: Unit
 }
 
-export type RepairAttemptOutcome =
-  | { readonly kind: "completed"; readonly note?: string }
-  | { readonly kind: "failed"; readonly note: string }
-  | { readonly kind: "timed-out"; readonly note?: string }
-
-export type RepairItemKey = string | number | symbol
-
-export interface RepairWorkUnit<Unit, Item> {
-  readonly items: readonly Item[]
-  readonly unit: Unit
+export interface RepairAttemptOutcome {
+  readonly note?: string
 }
 
-export interface RepairUnitResult<Unit, Item> {
+export interface RepairResult<Item> {
   readonly attempts: number
   readonly cleared: readonly Item[]
   readonly introduced: readonly Item[]
   readonly notes: readonly string[]
   readonly still: readonly Item[]
-  readonly unit: Unit
 }
 
+// The requirement parameters stay separate because TypeScript does not infer one parameter as the
+// union of the requirements of several callbacks.
 export interface RepairLoopOptions<
-  Unit,
   Item,
   E,
   RunRequirements,
@@ -39,110 +30,99 @@ export interface RepairLoopOptions<
   InterruptRequirements = never,
 > {
   readonly attempts: number
-  readonly concurrency?: number
-  readonly key: (item: Item) => RepairItemKey
+  readonly items: readonly Item[]
+  readonly key: (item: Item) => string
   readonly onInterrupt?: (
-    unit: Unit,
     remaining: readonly Item[]
   ) => Effect.Effect<void, never, InterruptRequirements>
-  readonly payloadExtension: "json" | "md" | "txt"
+  readonly payloadExtension: "json" | "md"
   readonly renderPayload: (items: readonly Item[]) => string
-  readonly renderPrompt: (context: RepairAttemptContext<Unit, Item>) => string
   readonly runAttempt: (
-    context: RepairAttemptContext<Unit, Item> & { readonly prompt: string }
+    attempt: RepairAttempt<Item>
   ) => Effect.Effect<RepairAttemptOutcome, never, RunRequirements>
-  readonly verify: (unit: Unit) => Effect.Effect<readonly Item[], E, VerifyRequirements>
-  readonly workUnits: ReadonlyArray<RepairWorkUnit<Unit, Item>>
+  readonly verify: Effect.Effect<readonly Item[], E, VerifyRequirements>
 }
 
+// Items can share a key, such as two identical diagnostics in one file. Each remaining item
+// accounts for one original item with the same key. The rest of the originals are cleared.
 function classify<Item>(
   original: readonly Item[],
   remaining: readonly Item[],
-  key: (item: Item) => RepairItemKey
+  key: (item: Item) => string
 ) {
-  const originalKeys = new Set(original.map((item) => key(item)))
-  const remainingKeys = new Set(remaining.map((item) => key(item)))
-
-  return {
-    cleared: original.filter((item) => !remainingKeys.has(key(item))),
-    introduced: remaining.filter((item) => !originalKeys.has(key(item))),
-    still: remaining.filter((item) => originalKeys.has(key(item))),
+  const unmatched = new Map<string, number>()
+  for (const item of original) {
+    unmatched.set(key(item), (unmatched.get(key(item)) ?? 0) + 1)
   }
+
+  const still: Item[] = []
+  const introduced: Item[] = []
+  for (const item of remaining) {
+    const count = unmatched.get(key(item)) ?? 0
+    if (count > 0) {
+      unmatched.set(key(item), count - 1)
+      still.push(item)
+    } else {
+      introduced.push(item)
+    }
+  }
+
+  const cleared: Item[] = []
+  for (const item of original) {
+    const count = unmatched.get(key(item)) ?? 0
+    if (count > 0) {
+      unmatched.set(key(item), count - 1)
+      cleared.push(item)
+    }
+  }
+
+  return { cleared, introduced, still }
 }
 
 export const runRepairLoop = Effect.fn("runRepairLoop")(function* <
-  Unit,
   Item,
   E,
   RunRequirements,
   VerifyRequirements,
   InterruptRequirements = never,
->(
-  options: RepairLoopOptions<
-    Unit,
-    Item,
-    E,
-    RunRequirements,
-    VerifyRequirements,
-    InterruptRequirements
-  >
-) {
+>(options: RepairLoopOptions<Item, E, RunRequirements, VerifyRequirements, InterruptRequirements>) {
   const fileSystem = yield* FileSystem.FileSystem
   const path = yield* Path.Path
 
   return yield* Effect.scoped(
     Effect.gen(function* () {
       const tempDirectory = yield* fileSystem.makeTempDirectoryScoped({ prefix: "adamantite-" })
+      const payloadPath = path.join(tempDirectory, `repair.${options.payloadExtension}`)
+      let remaining = options.items
+      let attempts = 0
+      const notes: string[] = []
 
-      return yield* Effect.forEach(
-        options.workUnits,
-        (workUnit, index) =>
-          Effect.gen(function* () {
-            const payloadPath = path.join(
-              tempDirectory,
-              `repair-${index + 1}.${options.payloadExtension}`
-            )
-            let remaining = workUnit.items
-            let attempts = 0
-            const notes: string[] = []
-
-            while (remaining.length > 0 && attempts < options.attempts) {
-              attempts += 1
-              yield* fileSystem.writeFileString(payloadPath, options.renderPayload(remaining))
-              const context = {
-                attempt: attempts,
-                items: remaining,
-                payloadPath,
-                unit: workUnit.unit,
-              }
-              const prompt = options.renderPrompt(context)
-              const outcome = yield* options.runAttempt({ ...context, prompt }).pipe(
-                Effect.onInterrupt(() =>
-                  options.verify(workUnit.unit).pipe(
-                    Effect.flatMap(
-                      (items) => options.onInterrupt?.(workUnit.unit, items) ?? Effect.void
-                    ),
-                    Effect.ignore
-                  )
-                )
+      while (remaining.length > 0 && attempts < options.attempts) {
+        attempts += 1
+        yield* fileSystem.writeFileString(payloadPath, options.renderPayload(remaining))
+        const outcome = yield* options
+          .runAttempt({ attempt: attempts, items: remaining, payloadPath })
+          .pipe(
+            Effect.onInterrupt(() =>
+              options.verify.pipe(
+                Effect.flatMap((items) => options.onInterrupt?.(items) ?? Effect.void),
+                Effect.ignore
               )
+            )
+          )
 
-              if (outcome.note !== undefined) {
-                notes.push(outcome.note)
-              }
+        if (outcome.note !== undefined) {
+          notes.push(outcome.note)
+        }
 
-              remaining = yield* options.verify(workUnit.unit)
-            }
+        remaining = yield* options.verify
+      }
 
-            return {
-              ...classify(workUnit.items, remaining, options.key),
-              attempts,
-              notes,
-              unit: workUnit.unit,
-            } satisfies RepairUnitResult<Unit, Item>
-          }),
-        { concurrency: options.concurrency ?? 1 }
-      )
+      return {
+        ...classify(options.items, remaining, options.key),
+        attempts,
+        notes,
+      } satisfies RepairResult<Item>
     })
   )
 })

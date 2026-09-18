@@ -1,18 +1,16 @@
 import * as Effect from "effect/Effect"
 import { Prompter } from "#terminal/prompter.ts"
 
-export interface ItemStatus {
-  readonly label: string
-  readonly status: "done" | "failed" | "pending"
-}
+const MARKERS = { done: "✓", failed: "✗", pending: "○" }
 
-export const printItemStatuses = Effect.fn("printItemStatuses")(function* (
-  items: readonly ItemStatus[]
+export const printItemStatuses = Effect.fn("printItemStatuses")(function* <Item>(
+  status: keyof typeof MARKERS,
+  items: readonly Item[],
+  label: (item: Item) => string
 ) {
   const prompter = yield* Prompter
 
   for (const item of items) {
-    const marker = item.status === "done" ? "✓" : item.status === "failed" ? "✗" : "○"
-    yield* prompter.message(`${marker} ${item.label}`)
+    yield* prompter.message(`${MARKERS[status]} ${label(item)}`)
   }
 })

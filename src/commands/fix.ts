@@ -6,14 +6,8 @@ import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import {
-  type CodingAgent,
-  CODING_AGENTS_IDS,
-  detectInstalledAgents,
-  getCodingAgent,
-  runHeadlessSession,
-} from "#lib/agent-repair/driver.ts"
-import { runRepairLoop } from "#lib/agent-repair/loop.ts"
+import { CODING_AGENT_IDS, runHeadlessSession } from "#lib/agent-repair/driver.ts"
+import { type RepairAttempt, runRepairLoop } from "#lib/agent-repair/loop.ts"
 import {
   collectOxlintDiagnostics,
   type OxlintDiagnostic,
@@ -26,9 +20,12 @@ import oxlint from "#lib/integrations/tooling/oxlint.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
+import {
+  printRepairNotes,
+  requireCodingAgent,
+  warnUnenforcedPermissions,
+} from "#terminal/coding-agent.ts"
 import { printItemStatuses } from "#terminal/item-status.ts"
-import { Prompter } from "#terminal/prompter.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to fix (optional)"),
@@ -50,7 +47,7 @@ const all = Flag.Boolean("all").pipe(
   Flag.withDescription("Apply all fixes, including suggested and dangerous fixes")
 )
 
-const agent = Flag.Literals("agent", CODING_AGENTS_IDS).pipe(
+const agent = Flag.Literals("agent", CODING_AGENT_IDS).pipe(
   Flag.optional,
   Flag.withDescription("Repair lint diagnostics with a supported coding agent")
 )
@@ -67,13 +64,15 @@ function renderDiagnosticPayload(diagnostics: readonly OxlintDiagnostic[]): stri
   )
 }
 
+function diagnosticLabel(diagnostic: OxlintDiagnostic): string {
+  return `${diagnostic.file}:${diagnostic.line} ${diagnostic.rule}`
+}
+
 function renderFixPrompt(
   file: string,
-  diagnostics: readonly OxlintDiagnostic[],
-  payloadPath: string,
-  attempt: number
+  { attempt, items, payloadPath }: RepairAttempt<OxlintDiagnostic>
 ): string {
-  const issues = diagnostics.map(
+  const issues = items.map(
     (diagnostic, index) =>
       `${index + 1}. ${diagnostic.line}:${diagnostic.column} ${diagnostic.rule}: ${diagnostic.message}`
   )
@@ -93,18 +92,6 @@ function failure() {
   return new CommandFailed({ command: "oxlint", exitCode: ChildProcessSpawner.ExitCode(1) })
 }
 
-function groupDiagnosticsByFile(diagnostics: readonly OxlintDiagnostic[]) {
-  const groups = new Map<string, OxlintDiagnostic[]>()
-
-  for (const diagnostic of diagnostics) {
-    const group = groups.get(diagnostic.file) ?? []
-    group.push(diagnostic)
-    groups.set(diagnostic.file, group)
-  }
-
-  return groups
-}
-
 export default Command.make("fix", { agent, all, dangerous, files, suggested }).pipe(
   Command.withDescription("Fix lint and formatting issues in code"),
   Command.withHandler(({ agent: requestedAgent, all, dangerous, files, suggested }) =>
@@ -112,151 +99,82 @@ export default Command.make("fix", { agent, all, dangerous, files, suggested }).
       const cwd = process.cwd()
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
-      const terminal = yield* TerminalCapabilities
-      const prompter = yield* Prompter
-      const isInteractive = yield* terminal.isInteractive
       const targets = Array.dedupe(files)
       const fixArguments = Array.dedupe([
         "--fix",
         ...(suggested || all ? ["--fix-suggestions"] : []),
         ...(dangerous || all ? ["--fix-dangerously"] : []),
       ])
-      const requested = Option.getOrUndefined(requestedAgent)
+      const steps = [
+        {
+          args: [...fixArguments, ...targets, ...forwardedArguments],
+          command: oxlint.name,
+          title: "🔧 Fixing lint issues",
+        },
+        { args: ["--write", ...targets], command: oxfmt.name, title: "✨ Formatting" },
+      ]
 
-      if (requested === undefined && !isInteractive) {
-        return yield* runner.runAll([
-          {
-            args: [...fixArguments, ...targets, ...forwardedArguments],
-            command: oxlint.name,
-            title: "🔧 Fixing lint issues",
-          },
-          { args: ["--write", ...targets], command: oxfmt.name, title: "✨ Formatting" },
-        ])
+      if (Option.isNone(requestedAgent)) {
+        return yield* runner.runAll(steps)
       }
 
-      yield* runner.exitCode({
-        args: [...fixArguments, ...targets, ...forwardedArguments],
-        command: oxlint.name,
+      const chosenAgent = yield* requireCodingAgent(requestedAgent.value, cwd)
+      if (chosenAgent === null) {
+        return yield* failure()
+      }
+      yield* warnUnenforcedPermissions(chosenAgent, "the file-only permission profile")
+
+      // The autofix pass exits 1 when diagnostics remain. The agent receives those diagnostics.
+      yield* runner.runAll(steps).pipe(Effect.catchTag("CommandFailed", () => Effect.void))
+
+      // Type-aware rules run when the project has tsgolint, so the agent also receives them.
+      const packageJson = yield* readPackageJson(cwd)
+      const typeAware =
+        packageJson.dependencies?.[tsgolint.name] !== undefined
+        || packageJson.devDependencies?.[tsgolint.name] !== undefined
+      const diagnostics = yield* collectOxlintDiagnostics({
         cwd,
+        forwardedArguments,
+        targets,
+        typeAware,
       })
-      yield* runner.run({
-        args: ["--write", ...targets],
-        command: oxfmt.name,
-        cwd,
-        title: "✨ Formatting",
-      })
-      const diagnostics = yield* collectOxlintDiagnostics({ cwd, forwardedArguments, targets })
 
       if (diagnostics.length === 0) {
         return
       }
 
-      let selectedAgent: CodingAgent
-      if (requested === undefined) {
-        const installed = yield* detectInstalledAgents(cwd)
-        const selection = yield* prompter.select<CodingAgent | null>({
-          message: "Oxlint found issues it could not fix. Repair them with an agent?",
-          options: [
-            ...installed.map((candidate) => ({ label: candidate.name, value: candidate })),
-            { label: "Do nothing", value: null },
-          ],
-        })
-        if (selection === null) {
-          return yield* failure()
-        }
-        selectedAgent = selection
-      } else {
-        selectedAgent = getCodingAgent(requested)
-      }
-
-      const chosenAgent = selectedAgent
-      if (chosenAgent.id === "codex" || chosenAgent.id === "cursor") {
-        yield* prompter.log.warning(
-          `${chosenAgent.name} cannot enforce the file-only permission profile. Review its edits before keeping them.`
-        )
-      }
-
-      const byFile = groupDiagnosticsByFile(diagnostics)
-      yield* printItemStatuses(
-        diagnostics.map((diagnostic) => ({
-          label: `${diagnostic.file}:${diagnostic.line} ${diagnostic.rule}`,
-          status: "pending" as const,
-        }))
+      yield* printItemStatuses("pending", diagnostics, diagnosticLabel)
+      const results = yield* Effect.forEach(
+        Object.entries(Array.groupBy(diagnostics, (diagnostic) => diagnostic.file)),
+        ([file, items]) =>
+          runRepairLoop({
+            attempts: 3,
+            items,
+            key: diagnosticKey,
+            onInterrupt: (remaining) => printItemStatuses("failed", remaining, diagnosticLabel),
+            payloadExtension: "json",
+            renderPayload: renderDiagnosticPayload,
+            runAttempt: (attempt) =>
+              runHeadlessSession({
+                agent: chosenAgent,
+                cwd,
+                profile: { kind: "files", timeout: "5 minutes" },
+                prompt: renderFixPrompt(file, attempt),
+              }),
+            verify: verifyOxlintFile({ cwd, file, fixArguments, forwardedArguments, typeAware }),
+          }),
+        { concurrency: 1 }
       )
-      const results = yield* runRepairLoop({
-        attempts: 3,
-        key: diagnosticKey,
-        onInterrupt: (file, remaining) =>
-          printItemStatuses(
-            remaining.map((diagnostic) => ({
-              label: `${file}:${diagnostic.line} ${diagnostic.rule}`,
-              status: "failed" as const,
-            }))
-          ),
-        payloadExtension: "json",
-        renderPayload: renderDiagnosticPayload,
-        renderPrompt: ({ attempt, items, payloadPath, unit }) =>
-          renderFixPrompt(unit, items, payloadPath, attempt),
-        runAttempt: ({ prompt }) =>
-          runHeadlessSession({
-            agent: chosenAgent,
-            cwd,
-            profile: { kind: "files", timeout: "5 minutes" },
-            prompt,
-          }).pipe(
-            Effect.map((session) =>
-              session.status === "timed-out"
-                ? { kind: "timed-out" as const, note: "The agent attempt timed out." }
-                : session.exitCode === ChildProcessSpawner.ExitCode(0)
-                  ? { kind: "completed" as const }
-                  : {
-                      kind: "failed" as const,
-                      note: session.stderr || `${chosenAgent.name} failed.`,
-                    }
-            ),
-            Effect.catchTag("AgentSessionFailed", (error) =>
-              Effect.succeed({
-                kind: "failed" as const,
-                note:
-                  error.reason === "not-found"
-                    ? `\`${chosenAgent.command}\` was not found. ${chosenAgent.name} ${chosenAgent.minimumVersion} or later is required.`
-                    : `Failed to start ${chosenAgent.name}: ${error.cause.message}`,
-              })
-            )
-          ),
-        verify: (file) => verifyOxlintFile({ cwd, file, fixArguments, forwardedArguments }),
-        workUnits: [...byFile].map(([file, items]) => ({ items, unit: file })),
-      })
 
-      const packageJson = yield* readPackageJson(cwd)
-      const hasTsgolint =
-        packageJson.dependencies?.[tsgolint.name] !== undefined
-        || packageJson.devDependencies?.[tsgolint.name] !== undefined
-      const typeAware = hasTsgolint
-        ? yield* collectOxlintDiagnostics({
-            cwd,
-            forwardedArguments,
-            targets,
-            typeAware: true,
-          })
-        : []
-      const remaining = [
-        ...results.flatMap((result) => [...result.still, ...result.introduced]),
-        ...typeAware,
-      ]
+      const remaining = results.flatMap((result) => [...result.still, ...result.introduced])
 
-      yield* printItemStatuses([
-        ...results.flatMap((result) =>
-          result.cleared.map((diagnostic) => ({
-            label: `${diagnostic.file}:${diagnostic.line} ${diagnostic.rule}`,
-            status: "done" as const,
-          }))
-        ),
-        ...remaining.map((diagnostic) => ({
-          label: `${diagnostic.file}:${diagnostic.line} ${diagnostic.rule}`,
-          status: "failed" as const,
-        })),
-      ])
+      yield* printItemStatuses(
+        "done",
+        results.flatMap((result) => result.cleared),
+        diagnosticLabel
+      )
+      yield* printItemStatuses("failed", remaining, diagnosticLabel)
+      yield* printRepairNotes(results)
 
       if (remaining.length > 0) {
         return yield* failure()

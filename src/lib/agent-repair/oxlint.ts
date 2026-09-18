@@ -1,4 +1,4 @@
-import { isAbsolute, resolve } from "node:path"
+import { resolve } from "node:path"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -17,12 +17,9 @@ export interface OxlintDiagnostic {
   readonly url?: string
 }
 
-const OxlintOutput = Schema.Struct({
-  diagnostics: Schema.Array(Schema.JsonObject),
-})
-
 const OxlintDiagnosticFields = Schema.Struct({
-  code: Schema.String,
+  // Parse errors and unused-directive reports have no rule code.
+  code: Schema.optionalKey(Schema.String),
   filename: Schema.String,
   help: Schema.optionalKey(Schema.String),
   labels: Schema.NonEmptyArray(
@@ -37,30 +34,40 @@ const OxlintDiagnosticFields = Schema.Struct({
   url: Schema.optionalKey(Schema.String),
 })
 
-export function parseOxlintDiagnostics(output: string, cwd: string): OxlintDiagnostic[] {
-  try {
-    const parsed = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintOutput))(output)
-    return parsed.diagnostics.map((raw) => {
-      const diagnostic = Schema.decodeUnknownSync(OxlintDiagnosticFields)(raw)
-      const span = diagnostic.labels[0].span
+const OxlintOutput = Schema.fromJsonString(
+  Schema.Struct({
+    diagnostics: Schema.Array(Schema.JsonObject),
+  })
+)
 
-      return {
-        column: span.column,
-        file: isAbsolute(diagnostic.filename)
-          ? diagnostic.filename
-          : resolve(cwd, diagnostic.filename),
-        help: diagnostic.help,
-        line: span.line,
-        message: diagnostic.message,
-        raw,
-        rule: diagnostic.code,
-        url: diagnostic.url,
-      }
-    })
-  } catch (error) {
-    throw new InvalidToolOutput({ cause: error, command: oxlint.name })
-  }
-}
+// Each diagnostic is decoded twice so that `raw` keeps the fields the schema does not name.
+export const parseOxlintDiagnostics = (output: string, cwd: string) =>
+  Schema.decodeUnknownEffect(OxlintOutput)(output).pipe(
+    Effect.flatMap((parsed) =>
+      Effect.forEach(
+        parsed.diagnostics,
+        (raw) =>
+          Schema.decodeUnknownEffect(OxlintDiagnosticFields)(raw).pipe(
+            Effect.map((diagnostic): OxlintDiagnostic => {
+              const span = diagnostic.labels[0].span
+
+              return {
+                column: span.column,
+                file: resolve(cwd, diagnostic.filename),
+                help: diagnostic.help,
+                line: span.line,
+                message: diagnostic.message,
+                raw,
+                rule: diagnostic.code ?? "oxc(parse-error)",
+                url: diagnostic.url,
+              }
+            })
+          ),
+        { concurrency: 1 }
+      )
+    ),
+    Effect.mapError((cause) => new InvalidToolOutput({ cause, command: oxlint.name }))
+  )
 
 export const collectOxlintDiagnostics = Effect.fn("collectOxlintDiagnostics")(function* ({
   cwd,
@@ -86,17 +93,7 @@ export const collectOxlintDiagnostics = Effect.fn("collectOxlintDiagnostics")(fu
     cwd,
   })
 
-  if (result.status === "timed-out") {
-    return yield* new InvalidToolOutput({ command: oxlint.name })
-  }
-
-  return yield* Effect.try({
-    catch: (cause) =>
-      cause instanceof InvalidToolOutput
-        ? cause
-        : new InvalidToolOutput({ cause, command: oxlint.name }),
-    try: () => parseOxlintDiagnostics(result.stdout, cwd),
-  })
+  return yield* parseOxlintDiagnostics(result.stdout, cwd)
 })
 
 export const verifyOxlintFile = Effect.fn("verifyOxlintFile")(function* ({
@@ -104,11 +101,13 @@ export const verifyOxlintFile = Effect.fn("verifyOxlintFile")(function* ({
   file,
   fixArguments,
   forwardedArguments,
+  typeAware,
 }: {
   readonly cwd: string
   readonly file: string
   readonly fixArguments: readonly string[]
   readonly forwardedArguments: readonly string[]
+  readonly typeAware: boolean
 }) {
   const runner = yield* CommandRunner
   yield* runner.exitCode({
@@ -118,11 +117,19 @@ export const verifyOxlintFile = Effect.fn("verifyOxlintFile")(function* ({
     stderr: "ignore",
     stdout: "ignore",
   })
-  yield* runner.run({ args: ["--write", file], command: oxfmt.name, cwd })
+  // Oxfmt fails on a file it cannot parse. Oxlint then reports the parse error as a diagnostic.
+  yield* runner.exitCode({
+    args: ["--write", file],
+    command: oxfmt.name,
+    cwd,
+    stderr: "ignore",
+    stdout: "ignore",
+  })
 
   return yield* collectOxlintDiagnostics({
     cwd,
     forwardedArguments,
     targets: [file],
+    typeAware,
   })
 })

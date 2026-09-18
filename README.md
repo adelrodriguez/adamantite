@@ -132,7 +132,8 @@ adamantite fix --agent claude
 
 `fix --agent` gives each Oxlint diagnostic that remains after autofix to the selected coding agent,
 one file at a time. Adamantite formats and lints the file after each attempt. It allows three
-five-minute attempts and exits 1 if any diagnostic remains. The agent receives file tools only.
+five-minute attempts and exits 1 if any diagnostic remains. In a project with `oxlint-tsgolint`,
+the diagnostics include the type-aware rules. The agent receives file tools only.
 Codex and Cursor cannot enforce that profile, so Adamantite prints a warning for them.
 
 ### `adamantite analyze`
@@ -189,8 +190,10 @@ In an interactive terminal, Doctor presents each finding as formatted text and o
 run an installed coding agent headlessly, or to copy one combined Markdown repair prompt. Doctor
 gives the agent a temporary file with the findings, reassesses after each attempt, and retries up to
 three times. Each attempt has a ten-minute timeout. Doctor detects Claude Code (`claude`), Codex
-(`codex`), Cursor (`agent` or `cursor-agent`), Gemini CLI (`gemini`), Grok Build (`grok`), and
-OpenCode (`opencode`). `--agent <name>` selects one without a prompt.
+(`codex`), Cursor (`cursor-agent` or `agent`), Gemini CLI (`gemini`), Grok Build (`grok`), and
+OpenCode (`opencode`). Doctor accepts an `agent` command as Cursor only when it prints a Cursor
+version, because other CLIs install the same name. `--agent <name>` selects one without a prompt.
+A command with `--agent` stops before it changes a file when it cannot find the CLI.
 
 Doctor permits file edits and only the Doctor and Update shell commands needed for verification and
 managed package updates. Legacy configuration findings add exact delete commands for their paths.

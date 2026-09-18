@@ -59,7 +59,7 @@ describe("doctor", () => {
       const runner = createRunnerTestContext({
         captureImplementation: (options) =>
           Effect.sync(() => {
-            if (options.command === "git") {
+            if (options.command === "git" || options.args[0] === "--version") {
               return success()
             }
             files.write("knip.config.ts", toKnipTsConfigContent())
@@ -76,8 +76,10 @@ describe("doctor", () => {
       expect(Exit.isSuccess(first)).toBe(true)
       expect(Exit.isSuccess(second)).toBe(true)
       expect(
-        runner.invocations.find((invocation) => invocation.command === "claude")?.args[0]
-      ).toBe("-p")
+        runner.invocations
+          .filter((invocation) => invocation.command === "claude")
+          .map((invocation) => invocation.args[0])
+      ).toEqual(["--version", "-p"])
     })
   )
 
@@ -85,7 +87,9 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const prompter = createPrompterTestContext()
-      const runner = createRunnerTestContext({ captureResults: [success(" M package.json\n")] })
+      const runner = createRunnerTestContext({
+        captureResults: [success("2.1.272 (Claude Code)\n"), success(" M package.json\n")],
+      })
 
       const exit = yield* runCommand(doctorCommand, ["--agent", "claude"], {
         files,
@@ -96,7 +100,7 @@ describe("doctor", () => {
       expect(prompter.messages).toContain(
         "The Git working tree has uncommitted changes. Pass --allow-dirty to let the agent edit it."
       )
-      expect(runner.invocations.map((invocation) => invocation.command)).toEqual(["git"])
+      expect(runner.invocations.map((invocation) => invocation.command)).toEqual(["claude", "git"])
     })
   )
 
@@ -106,6 +110,9 @@ describe("doctor", () => {
       const runner = createRunnerTestContext({
         captureImplementation: (options) =>
           Effect.sync(() => {
+            if (options.args[0] === "--version") {
+              return success()
+            }
             if (options.command === "git") {
               return success(" M package.json\n")
             }

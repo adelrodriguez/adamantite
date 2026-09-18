@@ -8,7 +8,6 @@ import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
-import * as Ref from "effect/Ref"
 import * as Result from "effect/Result"
 import * as Stream from "effect/Stream"
 import * as ChildProcess from "effect/unstable/process/ChildProcess"
@@ -104,123 +103,95 @@ function quietNodeOptions() {
     : `${existing} --disable-warning=MODULE_TYPELESS_PACKAGE_JSON`
 }
 
+type SpawnOptions = Pick<CommandRunOptions, "args" | "command" | "cwd" | "detached" | "env">
+
+const spawn = (
+  { args, command, cwd, detached, env }: SpawnOptions,
+  stdio: Pick<ChildProcess.CommandOptions, "forceKillAfter" | "stderr" | "stdin" | "stdout">
+) =>
+  ChildProcess.make(command, args, {
+    cwd,
+    detached,
+    env: { ...env, NODE_OPTIONS: quietNodeOptions() },
+    extendEnv: true,
+    ...stdio,
+  })
+
+const mapNotFound = (command: string) =>
+  Effect.mapError((cause: PlatformError.PlatformError) =>
+    cause.reason._tag === "NotFound" ? new CliNotFound({ command }) : cause
+  )
+
 const exitCode = Effect.fn("CommandRunner.exitCode")(function* ({
-  args,
-  command,
-  cwd,
-  detached,
-  env,
   stderr = "inherit",
   stdin = "ignore",
   stdout = "inherit",
+  ...options
 }: CommandRunOptions) {
   return yield* Effect.scoped(
     Effect.gen(function* () {
-      const handle = yield* ChildProcess.make(command, args, {
-        cwd,
-        detached,
-        env: { ...env, NODE_OPTIONS: quietNodeOptions() },
-        extendEnv: true,
-        stderr,
-        stdin,
-        stdout,
-      })
+      const handle = yield* spawn(options, { stderr, stdin, stdout })
 
       return yield* handle.exitCode
     })
-  ).pipe(
-    Effect.mapError((cause) =>
-      cause.reason._tag === "NotFound" ? new CliNotFound({ command }) : cause
-    )
-  )
+  ).pipe(mapNotFound(options.command))
 })
 
 const DEFAULT_STDERR_LIMIT_BYTES = 64 * 1024
 const FORCE_KILL_GRACE = "2 seconds"
 
-function appendTail(current: Uint8Array, chunk: Uint8Array, limit: number): Uint8Array {
-  if (limit === 0) {
-    return new Uint8Array()
-  }
-
-  return Buffer.concat([current, chunk]).subarray(-limit)
-}
-
 const capture = Effect.fn("CommandRunner.capture")(function* ({
-  args,
   captureStdout = true,
-  command,
-  cwd,
-  detached,
-  env,
   stderrLimitBytes = DEFAULT_STDERR_LIMIT_BYTES,
   stdin = "ignore",
   timeout,
+  ...options
 }: CapturedCommandRunOptions) {
   return yield* Effect.scoped(
     Effect.gen(function* () {
-      const handle = yield* ChildProcess.make(command, args, {
-        cwd,
-        detached,
-        env: { ...env, NODE_OPTIONS: quietNodeOptions() },
-        extendEnv: true,
+      const handle = yield* spawn(options, {
         forceKillAfter: FORCE_KILL_GRACE,
         stderr: "pipe",
         stdin,
         stdout: captureStdout ? "pipe" : "ignore",
       })
-      const stdoutChunks = yield* Ref.make<readonly Uint8Array[]>([])
-      const stderrTail = yield* Ref.make<Uint8Array>(new Uint8Array())
-      const stdoutFiber = yield* Stream.runForEach(handle.stdout, (chunk) =>
-        Ref.update(stdoutChunks, (chunks) => [...chunks, chunk])
-      ).pipe(Effect.forkScoped)
-      const stderrFiber = yield* Stream.runForEach(handle.stderr, (chunk) =>
-        Ref.update(stderrTail, (current) => appendTail(current, chunk, stderrLimitBytes))
-      ).pipe(Effect.forkScoped)
-      let completedCode: ChildProcessSpawner.ExitCode | null
-      if (timeout === undefined) {
-        completedCode = yield* handle.exitCode
-      } else {
-        const completed = yield* Effect.timeoutOption(handle.exitCode, timeout)
-        completedCode = Option.getOrNull(completed)
-      }
+      const stdoutFiber = yield* Stream.mkString(Stream.decodeText(handle.stdout)).pipe(
+        Effect.forkScoped
+      )
+      const stderrFiber = yield* handle.stderr.pipe(
+        Stream.runFold(
+          () => Buffer.alloc(0),
+          (tail, chunk) =>
+            stderrLimitBytes === 0 ? tail : Buffer.concat([tail, chunk]).subarray(-stderrLimitBytes)
+        ),
+        Effect.forkScoped
+      )
+      const completedCode =
+        timeout === undefined
+          ? yield* handle.exitCode
+          : Option.getOrNull(yield* Effect.timeoutOption(handle.exitCode, timeout))
 
       if (completedCode === null) {
         yield* handle.kill({ forceKillAfter: FORCE_KILL_GRACE })
       }
 
-      yield* Fiber.join(stdoutFiber)
-      yield* Fiber.join(stderrFiber)
-
-      const stdout = Buffer.concat(yield* Ref.get(stdoutChunks)).toString("utf8")
-      const stderr = Buffer.from(yield* Ref.get(stderrTail)).toString("utf8")
+      const stdout = yield* Fiber.join(stdoutFiber)
+      const stderr = (yield* Fiber.join(stderrFiber)).toString("utf8")
 
       return completedCode === null
         ? ({ exitCode: null, status: "timed-out", stderr, stdout } as const)
         : ({ exitCode: completedCode, status: "exited", stderr, stdout } as const)
     })
-  ).pipe(
-    Effect.mapError((cause) =>
-      cause.reason._tag === "NotFound" ? new CliNotFound({ command }) : cause
-    )
-  )
+  ).pipe(mapNotFound(options.command))
 })
 
 export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerService>()(
   "CommandRunner"
 ) {
-  static make(
-    exitCode: CommandRunnerService["exitCode"],
-    captureOutput: CommandRunnerService["capture"] = (options) =>
-      exitCode(options).pipe(
-        Effect.map((code) => ({
-          exitCode: code,
-          status: "exited" as const,
-          stderr: "",
-          stdout: "",
-        }))
-      )
-  ): CommandRunnerService {
+  static make({
+    capture,
+    exitCode,
+  }: Pick<CommandRunnerService, "capture" | "exitCode">): CommandRunnerService {
     const run = Effect.fn("CommandRunner.run")(function* (options: CommandRunOptions) {
       if (options.title !== undefined) {
         yield* printHeading(options.title, options.command)
@@ -240,7 +211,7 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
       )
 
     return {
-      capture: captureOutput,
+      capture,
       exitCode,
       run,
       runAll: Effect.fn("CommandRunner.runAll")(function* (steps) {
@@ -258,16 +229,16 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
 
-      return CommandRunner.make(
-        (options) =>
+      return CommandRunner.make({
+        capture: (options) =>
+          capture(options).pipe(
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
+          ),
+        exitCode: (options) =>
           exitCode(options).pipe(
             Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
           ),
-        (options) =>
-          capture(options).pipe(
-            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner)
-          )
-      )
+      })
     })
   )
 }

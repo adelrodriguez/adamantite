@@ -322,7 +322,7 @@ describe("init", () => {
 
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false],
-          multiselectResponses: [["check:monorepo"], []],
+          multiselectResponses: [["analyze"], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -335,9 +335,52 @@ describe("init", () => {
         expect(installer.calls).toEqual([
           {
             options: { silent: true, workspace: true },
-            packages: ["adamantite", `sherif@${sherif.version}`],
+            packages: ["adamantite", `sherif@${sherif.version}`, `knip@${knip.version}`],
           },
         ])
+      })
+    )
+
+    it.effect("not install Sherif for analyze outside a monorepo", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "analyze"], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls).toEqual([
+          {
+            options: { silent: true, workspace: false },
+            packages: ["adamantite", `knip@${knip.version}`],
+          },
+        ])
+      })
+    )
+
+    it.effect("say that analyze includes Sherif only in a monorepo", () =>
+      Effect.gen(function* () {
+        const getScriptPicker = Effect.fn(function* (packageJson?: string) {
+          const files = createInitTestContext(
+            packageJson === undefined ? undefined : { "package.json": packageJson }
+          )
+          const prompter = createPrompterTestContext({
+            confirmResponses: [false, false],
+            multiselectResponses: [["analyze"], []],
+          })
+          const installer = createDependencyInstallerTestContext()
+
+          yield* runCommand(initCommand, [], { files, layers: [prompter.layer, installer.layer] })
+
+          return JSON.stringify(prompter.multiselectCalls[0])
+        })
+
+        expect(yield* getScriptPicker(monorepoPackageJson)).toContain("analyze - check monorepo")
+        expect(yield* getScriptPicker()).not.toContain("Sherif")
       })
     )
   })
@@ -642,19 +685,7 @@ describe("init", () => {
 
         const exit = yield* runCommand(
           initCommand,
-          [
-            "--non-interactive",
-            "--script",
-            "check",
-            "--script",
-            "fix",
-            "--script",
-            "check:monorepo",
-            "--script",
-            "fix:monorepo",
-            "--script",
-            "analyze",
-          ],
+          ["--non-interactive", "--script", "check", "--script", "fix", "--script", "analyze"],
           { files, layers: [prompter.layer, installer.layer] }
         )
 
@@ -677,9 +708,7 @@ describe("init", () => {
         expect(packageJson.scripts).toEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
-          "check:monorepo": "adamantite monorepo",
           fix: "adamantite fix",
-          "fix:monorepo": "adamantite monorepo --fix",
         })
       })
     )
@@ -718,8 +747,15 @@ describe("init", () => {
       },
       {
         args: ["--non-interactive", "--script", "check:monorepo"],
-        name: "a monorepo script outside a monorepo",
-        reason: "Monorepo scripts can only be selected in a detected monorepo.",
+        name: "the legacy check:monorepo script",
+        reason:
+          "The `check:monorepo` and `fix:monorepo` scripts are no longer available in init. Select `analyze` instead; it runs Sherif in a detected monorepo.",
+      },
+      {
+        args: ["--non-interactive", "--script", "analyze", "--script", "fix:monorepo"],
+        name: "the legacy fix:monorepo script",
+        reason:
+          "The `check:monorepo` and `fix:monorepo` scripts are no longer available in init. Select `analyze` instead; it runs Sherif in a detected monorepo.",
       },
       {
         args: ["--script", "format"],
@@ -804,7 +840,7 @@ describe("init", () => {
       {
         name: "test-project",
         scripts: {
-          "check:monorepo": "sherif --ignore-dependency tailwindcss",
+          analyze: "knip --directory packages/app",
         },
         version: "1.0.0",
         workspaces: ["packages/*"],
@@ -824,7 +860,7 @@ describe("init", () => {
 
         const exit = yield* runCommand(
           initCommand,
-          ["--non-interactive", "--script", "check:monorepo", "--script", "fix:monorepo"],
+          ["--non-interactive", "--script", "analyze", "--script", "fix"],
           { files, layers: [prompter.layer, installer.layer] }
         )
 
@@ -836,19 +872,19 @@ describe("init", () => {
           scripts: Record<string, string>
         }
         expect(packageJson.scripts).toEqual({
-          "check:monorepo": "sherif --ignore-dependency tailwindcss",
-          "fix:monorepo": "adamantite monorepo --fix",
+          analyze: "knip --directory packages/app",
+          fix: "adamantite fix",
         })
 
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message:
-            "Kept existing `check:monorepo` script (`sherif --ignore-dependency tailwindcss`) instead of `adamantite monorepo`. Use `--overwrite-scripts` to replace it.",
+            "Kept existing `analyze` script (`knip --directory packages/app`) instead of `adamantite analyze`. Use `--overwrite-scripts` to replace it.",
         })
         expect(prompter.logs).toContainEqual({
           level: "info",
           message:
-            "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite monorepo -- --ignore-dependency tailwindcss`.",
+            "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite analyze -- --directory packages/app`.",
         })
       })
     )
@@ -864,14 +900,7 @@ describe("init", () => {
 
         const exit = yield* runCommand(
           initCommand,
-          [
-            "--non-interactive",
-            "--script",
-            "check:monorepo",
-            "--script",
-            "fix:monorepo",
-            "--overwrite-scripts",
-          ],
+          ["--non-interactive", "--script", "analyze", "--script", "fix", "--overwrite-scripts"],
           { files, layers: [prompter.layer, installer.layer] }
         )
 
@@ -882,8 +911,8 @@ describe("init", () => {
           scripts: Record<string, string>
         }
         expect(packageJson.scripts).toEqual({
-          "check:monorepo": "adamantite monorepo",
-          "fix:monorepo": "adamantite monorepo --fix",
+          analyze: "adamantite analyze",
+          fix: "adamantite fix",
         })
         expect(prompter.logs).not.toContainEqual(
           expect.objectContaining({ message: expect.stringContaining("Kept existing") })
@@ -1027,7 +1056,7 @@ describe("init", () => {
 
         const exit = yield* runCommand(
           initCommand,
-          ["--non-interactive", "--script", "check:monorepo", "--script", "check", "--agents"],
+          ["--non-interactive", "--script", "analyze", "--script", "check", "--agents"],
           { files, layers: [prompter.layer, installer.layer] }
         )
 
@@ -1036,7 +1065,7 @@ describe("init", () => {
         const agents = files.read("AGENTS.md")
         expect(agents).toContain("adamantite check")
         expect(agents).not.toContain("adamantite format")
-        expect(agents).not.toContain("check:monorepo")
+        expect(agents).not.toContain("analyze")
       })
     )
   })

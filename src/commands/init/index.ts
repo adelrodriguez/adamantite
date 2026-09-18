@@ -42,8 +42,8 @@ export default Command.make("init", initCommandOptions).pipe(
       description: "Configure a React project with VS Code, TypeScript, CI, and agent guidance",
     },
     {
-      command: "adamantite init --non-interactive --script check:monorepo",
-      description: "Configure monorepo checks in a detected monorepo",
+      command: "adamantite init --non-interactive --script analyze",
+      description: "Configure analysis; in a detected monorepo it includes Sherif",
     },
   ]),
   Command.withHandler((options) =>
@@ -101,7 +101,6 @@ export default Command.make("init", initCommandOptions).pipe(
         ? options
         : yield* collectInteractiveInitOptions(cwd, isMonorepo)
       const initOptions = yield* validateInitOptions(input, {
-        isMonorepo,
         nonInteractive: options.nonInteractive,
         packageManager: packageManager.name,
       })
@@ -116,10 +115,7 @@ export default Command.make("init", initCommandOptions).pipe(
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
       const hasKnip = selectedScripts.includes("analyze")
       // `adamantite analyze` runs Sherif in a monorepo.
-      const hasSherif =
-        selectedScripts.includes("check:monorepo")
-        || selectedScripts.includes("fix:monorepo")
-        || (hasKnip && isMonorepo)
+      const hasSherif = hasKnip && isMonorepo
 
       const dependencies = ["adamantite"]
 
@@ -156,7 +152,7 @@ export default Command.make("init", initCommandOptions).pipe(
       })
 
       if (shouldAddAgentsGuidance) {
-        yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts)
+        yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts, isMonorepo)
       }
 
       if (shouldSetupTypescript) {

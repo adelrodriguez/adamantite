@@ -12,41 +12,40 @@ const AGENTS_NAME = "AGENTS.md"
 export const ADAMANTITE_AGENTS_START_MARKER = "<!-- ADAMANTITE:START -->"
 export const ADAMANTITE_AGENTS_END_MARKER = "<!-- ADAMANTITE:END -->"
 
+type GuidedScript = Exclude<Script, "format" | "check:monorepo" | "fix:monorepo">
+
 interface WriteAgentsGuidanceOptions {
+  readonly isMonorepo: boolean
   readonly packageManager: PackageManagerName
   readonly scripts: Script[]
 }
 
-function getScriptGuidance(packageManager: PackageManagerName, script: Exclude<Script, "format">) {
+function getScriptGuidance(
+  packageManager: PackageManagerName,
+  script: GuidedScript,
+  isMonorepo: boolean
+) {
   const command = runScriptCommand(packageManager, script)
   const directCommand = MANAGED_SCRIPT_COMMANDS[script]
 
   switch (script) {
     case "analyze":
-      return `- Run \`${command}\` after changing dependencies, imports, or exports. Direct command: \`${directCommand}\`.`
+      return isMonorepo
+        ? `- Run \`${command}\` after changing dependencies, imports, or exports. It also checks monorepo package consistency. Direct command: \`${directCommand}\`.`
+        : `- Run \`${command}\` after changing dependencies, imports, or exports. Direct command: \`${directCommand}\`.`
     case "check":
       return `- Run \`${command}\` to catch formatting, lint, and type issues. Direct command: \`${directCommand}\`.`
-    case "check:monorepo":
-      return `- Run \`${command}\` to check monorepo package consistency. Direct command: \`${directCommand}\`.`
     case "fix":
       return `- Run \`${command}\` to apply safe lint fixes and format code. Direct command: \`${directCommand}\`.`
-    case "fix:monorepo":
-      return `- Run \`${command}\` to fix monorepo package consistency. Direct command: \`${directCommand}\`.`
   }
 }
 
-function getAgentsSection({ packageManager, scripts }: WriteAgentsGuidanceOptions) {
-  const scriptOrder: Array<Exclude<Script, "format">> = [
-    "check",
-    "fix",
-    "analyze",
-    "check:monorepo",
-    "fix:monorepo",
-  ]
+function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGuidanceOptions) {
+  const scriptOrder: GuidedScript[] = ["check", "fix", "analyze"]
 
   const selectedScriptGuidance = scriptOrder
     .filter((script) => scripts.includes(script))
-    .map((script) => getScriptGuidance(packageManager, script))
+    .map((script) => getScriptGuidance(packageManager, script, isMonorepo))
 
   const body = [
     "## Adamantite",

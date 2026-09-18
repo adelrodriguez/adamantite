@@ -45,7 +45,6 @@ export interface InitOptionsInput {
 }
 
 interface ValidateInitOptionsContext {
-  readonly isMonorepo: boolean
   readonly nonInteractive: boolean
   readonly packageManager: PackageManagerName
 }
@@ -78,15 +77,14 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  const hasOxlint = options.scripts.includes("check") || options.scripts.includes("fix")
-  const hasMonorepoScript =
-    options.scripts.includes("check:monorepo") || options.scripts.includes("fix:monorepo")
-
-  if (hasMonorepoScript && !context.isMonorepo) {
+  if (options.scripts.includes("check:monorepo") || options.scripts.includes("fix:monorepo")) {
     return yield* new InvalidInitOptions({
-      reason: "Monorepo scripts can only be selected in a detected monorepo.",
+      reason:
+        "The `check:monorepo` and `fix:monorepo` scripts are no longer available in init. Select `analyze` instead; it runs Sherif in a detected monorepo.",
     })
   }
+
+  const hasOxlint = options.scripts.includes("check") || options.scripts.includes("fix")
 
   if (options.presets.length > 0 && !hasOxlint) {
     return yield* new InvalidInitOptions({
@@ -133,7 +131,7 @@ const nonInteractive = Flag.Boolean("non-interactive").pipe(
 const scripts = Flag.Literals("script", INIT_SCRIPTS).pipe(
   Flag.atMost(INIT_SCRIPTS.length),
   Flag.withDescription(
-    "Package script to configure; repeatable and required in non-interactive mode. Monorepo scripts require a detected monorepo. The legacy format value is rejected; select check or fix instead"
+    "Package script to configure; repeatable and required in non-interactive mode. The legacy format value is rejected; select check or fix instead. The legacy check:monorepo and fix:monorepo values are rejected; select analyze instead"
   )
 )
 

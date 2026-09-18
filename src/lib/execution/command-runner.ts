@@ -39,10 +39,12 @@ interface CommandRunnerService {
     options: CommandRunOptions
   ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
   /**
-   * Runs every step in order, even after one fails, then fails with the first failure.
+   * Runs every step in order, even after one fails, then fails with the first failure. With
+   * `stopOnFailure`, a failed step skips the steps after it.
    */
   readonly runAll: (
-    steps: readonly CommandRunOptions[]
+    steps: readonly CommandRunOptions[],
+    options?: { readonly stopOnFailure?: boolean }
   ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
 }
 
@@ -107,13 +109,17 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
     return {
       exitCode,
       run,
-      runAll: Effect.fn("CommandRunner.runAll")(function* (steps) {
-        const results = yield* Effect.all(
-          steps.map((step, index) =>
-            index === 0 ? run(step) : Effect.andThen(Console.log(""), run(step))
-          ),
-          { concurrency: 1, mode: "result" }
+      runAll: Effect.fn("CommandRunner.runAll")(function* (steps, options) {
+        const sections = steps.map((step, index) =>
+          index === 0 ? run(step) : Effect.andThen(Console.log(""), run(step))
         )
+
+        if (options?.stopOnFailure) {
+          yield* Effect.all(sections, { concurrency: 1, discard: true })
+          return
+        }
+
+        const results = yield* Effect.all(sections, { concurrency: 1, mode: "result" })
 
         yield* Effect.fromResult(Result.all(results))
       }),

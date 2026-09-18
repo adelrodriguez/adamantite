@@ -58,8 +58,10 @@ adamantite monorepo
   with explicit permission after reviewing their impact.
 - Do not use `format`. It is deprecated and the next release removes it. `fix` writes formatting changes and `check`
   verifies formatting for read-only CI checks.
-- Use `analyze` for unused dependencies, exports, and files. `analyze --fix` may remove
-  files, so inspect findings before using it.
+- Use `analyze` for unused dependencies, exports, and files. In a monorepo it first checks
+  workspace dependency consistency with Sherif. `analyze --only monorepo` or
+  `analyze --only unused` runs one stage. `analyze --fix` may remove files, so inspect
+  findings before using it.
 - Use `monorepo` to inspect workspace dependency consistency and `monorepo --fix` to fix it.
 
 To pass arguments to Knip, Oxlint, Oxfmt, or Sherif, place them after `--`:

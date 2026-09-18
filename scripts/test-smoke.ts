@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
@@ -29,6 +29,61 @@ function run(command: string, args: string[], options: { cwd: string; env?: Node
   }
 }
 
+function runExpectingFailure(
+  command: string,
+  args: string[],
+  options: { cwd: string; env?: NodeJS.ProcessEnv }
+) {
+  const result = spawnSync(command, args, {
+    cwd: options.cwd,
+    encoding: "utf8",
+    env: options.env ?? process.env,
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5 * 60 * 1000,
+  })
+  const output = `${result.stdout}${result.stderr}`
+
+  if (result.status === 0 || result.status === null) {
+    throw new Error(
+      `Expected a non-zero exit from: ${command} ${args.join(" ")}\n--- output ---\n${output}`
+    )
+  }
+
+  return { output, status: result.status }
+}
+
+function assertIncludes(output: string, expected: string) {
+  if (!output.includes(expected)) {
+    throw new Error(`Expected output to contain ${JSON.stringify(expected)}, received:\n${output}`)
+  }
+}
+
+function writeWorkspacePackage(root: string, name: string, dependencyVersion: string) {
+  const directory = join(root, "packages", name)
+
+  mkdirSync(join(directory, "src"), { recursive: true })
+  writeFileSync(
+    join(directory, "package.json"),
+    JSON.stringify(
+      {
+        dependencies: { "is-number": dependencyVersion },
+        exports: "./src/index.ts",
+        name: `@adamantite-smoke/${name}`,
+        private: true,
+        type: "module",
+        version: "0.0.0",
+      },
+      null,
+      2
+    )
+  )
+  writeFileSync(
+    join(directory, "src", "index.ts"),
+    'import isNumber from "is-number"\n\nexport default function check(value: unknown): boolean {\n  return isNumber(value)\n}\n'
+  )
+}
+
 function assertFileContains(path: string, expected: string) {
   const content = readFileSync(path, "utf8")
 
@@ -45,6 +100,13 @@ function assertFileContains(path: string, expected: string) {
 const npmVersion = run("npm", ["--version"], { cwd: repoRoot }).trim()
 const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
+const monorepoFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-monorepo-"))
+// SAFETY: the repository's package.json pins every managed tool in devDependencies.
+const sherifVersion = (
+  JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as {
+    devDependencies: Record<string, string>
+  }
+).devDependencies["sherif"]
 
 try {
   writeFileSync(
@@ -119,12 +181,110 @@ try {
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
 
+  // The monorepo fixture uses pnpm: init installs at the workspace root there, and the
+  // pnpm-workspace.yaml that skips the msgpackr-extract build is what marks it as a monorepo.
+  const pnpmVersion = run("pnpm", ["--version"], { cwd: repoRoot }).trim()
+
+  writeFileSync(
+    join(monorepoFixture, "package.json"),
+    JSON.stringify(
+      {
+        name: "adamantite-smoke-monorepo",
+        packageManager: `pnpm@${pnpmVersion}`,
+        private: true,
+        version: "0.0.0",
+      },
+      null,
+      2
+    )
+  )
+  writeFileSync(
+    join(monorepoFixture, "pnpm-workspace.yaml"),
+    'packages:\n  - "packages/*"\nignoredBuiltDependencies:\n  - msgpackr-extract\n'
+  )
+  writeWorkspacePackage(monorepoFixture, "first", "7.0.0")
+  writeWorkspacePackage(monorepoFixture, "second", "6.0.0")
+
+  console.info("Running `adamantite init` against the monorepo fixture...")
+  run(
+    process.execPath,
+    [cliPath, "init", "--non-interactive", "--script", "check", "--script", "analyze"],
+    { cwd: monorepoFixture }
+  )
+  run(
+    "pnpm",
+    [
+      "add",
+      "--save-dev",
+      "--workspace-root",
+      join(packDirectory, tarball),
+      `sherif@${sherifVersion}`,
+    ],
+    { cwd: monorepoFixture }
+  )
+  assertFileContains(join(monorepoFixture, "package.json"), '"adamantite": "file:')
+
+  const monorepoEnv = {
+    ...process.env,
+    PATH: `${join(monorepoFixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
+  }
+
+  // Exit 0 proves Knip, under the preset defaults, reports neither `sherif` nor
+  // `oxlint-tsgolint` as an unused devDependency: no script or import references them.
+  console.info("Running `adamantite analyze --only unused` in the monorepo fixture...")
+  const unusedOutput = run(process.execPath, [cliPath, "analyze", "--only", "unused"], {
+    cwd: monorepoFixture,
+    env: monorepoEnv,
+  })
+
+  if (unusedOutput.includes("(sherif)")) {
+    throw new Error(`Expected \`--only unused\` not to run Sherif, received:\n${unusedOutput}`)
+  }
+
+  console.info("Running `adamantite analyze` against the version mismatch...")
+  const analysis = runExpectingFailure(process.execPath, [cliPath, "analyze"], {
+    cwd: monorepoFixture,
+    env: monorepoEnv,
+  })
+
+  if (analysis.status !== 1) {
+    throw new Error(`Expected \`analyze\` to exit 1, received ${analysis.status}`)
+  }
+
+  assertIncludes(analysis.output, "(sherif)")
+  assertIncludes(analysis.output, "multiple-dependency-versions")
+  assertIncludes(analysis.output, "(knip)")
+
+  console.info("Running `adamantite analyze --only monorepo --fix`...")
+  const fixOutput = run(
+    process.execPath,
+    [
+      cliPath,
+      "analyze",
+      "--only",
+      "monorepo",
+      "--fix",
+      "--",
+      "--select",
+      "highest",
+      "--no-install",
+    ],
+    { cwd: monorepoFixture, env: monorepoEnv }
+  )
+
+  if (fixOutput.includes("(knip)")) {
+    throw new Error(`Expected \`--only monorepo\` not to run Knip, received:\n${fixOutput}`)
+  }
+
+  assertFileContains(join(monorepoFixture, "packages", "second", "package.json"), '"7.0.0"')
+
   console.info("Smoke test passed: init output is accepted by the pinned tool versions.")
 } catch (error) {
-  console.info(`Fixture kept for debugging at: ${fixture}`)
+  console.info(`Fixtures kept for debugging at: ${fixture} and ${monorepoFixture}`)
   throw error
 } finally {
   rmSync(packDirectory, { force: true, recursive: true })
 }
 
 rmSync(fixture, { force: true, recursive: true })
+rmSync(monorepoFixture, { force: true, recursive: true })

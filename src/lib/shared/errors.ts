@@ -58,9 +58,15 @@ function formatParseErrors(errors: ParseError[] = []) {
     .join("\n")
 }
 
-export class CliNotFound extends Data.TaggedError("CliNotFound")<{ command: string }> {
+export class CliNotFound extends Data.TaggedError("CliNotFound")<{
+  command: string
+  /**
+   * How to install the command. Replaces the generic install advice.
+   */
+  hint?: string
+}> {
   override get message() {
-    return `Command \`${this.command}\` not found. Please install it and try again.`
+    return `Command \`${this.command}\` not found. ${this.hint ?? "Please install it and try again."}`
   }
 }
 
@@ -166,6 +172,14 @@ export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")
     const target = this.path ? `\`${this.path}\`` : "the target config file"
 
     return `Invalid config format in ${target}. The config must be a JSON object (for example: {}).`
+  }
+}
+
+export class InvalidAnalyzeOptions extends Data.TaggedError("InvalidAnalyzeOptions")<{
+  reason: string
+}> {
+  override get message() {
+    return `Invalid analyze options. ${this.reason}`
   }
 }
 

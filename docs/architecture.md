@@ -75,7 +75,7 @@ warns the user and points to `adamantite doctor`.
 - `check` and `fix` run Oxfmt and Oxlint.
 - `format` is a deprecated stub that warns on stderr, then runs Oxfmt. The next release
   removes it.
-- `analyze` runs Knip.
+- `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
 - `monorepo` runs Sherif.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.

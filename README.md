@@ -136,14 +136,30 @@ adamantite fix --all
 
 ### `adamantite analyze`
 
-Find unused dependencies, exports, and files with Knip. The `--fix` option can remove
+Find unused dependencies, exports, and files with Knip. In a detected monorepo, `analyze`
+first finds dependency consistency problems with Sherif. The `--fix` option can remove
 unused files, so review its effect before use.
 
 ```sh
 adamantite analyze
 adamantite analyze --strict
 adamantite analyze --fix
+adamantite analyze --only unused
+adamantite analyze --only monorepo --fix -- --select highest
 ```
+
+- The `monorepo` stage (Sherif) runs first, and only in a detected monorepo. The `unused`
+  stage (Knip) always runs.
+- Without `--fix`, both stages run and the exit code comes from the first failure. With
+  `--fix`, a Sherif failure skips Knip, because Knip must not remove code against a
+  dependency graph that Sherif did not repair.
+- `--fix` applies to each stage that runs. `--strict` applies to Knip only.
+- `--only monorepo` or `--only unused` runs one stage. `--only monorepo` fails outside a
+  monorepo and with `--strict`.
+- Arguments after `--` go to Knip, or to the stage that `--only` selects.
+- A Sherif fix that must choose between versions prompts in a terminal. Without a terminal,
+  pass `-- --select highest` or set `"sherif": { "select": "highest" }` in the root
+  `package.json`.
 
 ### `adamantite monorepo`
 

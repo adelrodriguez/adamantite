@@ -38,6 +38,11 @@ The deprecated `adamantite format` command and its managed `format` script. `che
 verifies formatting and `fix` applies it.
 _Avoid_: Format command as a current workflow
 
+**Legacy monorepo command**:
+The deprecated `adamantite monorepo` command and its managed `check:monorepo` and
+`fix:monorepo` scripts. `analyze` runs Sherif in a detected monorepo.
+_Avoid_: Monorepo command as a current workflow
+
 **Assessment**:
 A read-only classification of a managed integration against its latest supported state.
 _Avoid_: Check result, diagnostic

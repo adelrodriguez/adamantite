@@ -25,6 +25,41 @@ describe("monorepo", () => {
     )
   })
 
+  describe("deprecation", () => {
+    it.effect("print a deprecation warning on stderr and still run sherif", () =>
+      Effect.gen(function* () {
+        const errorLines: unknown[] = []
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(monorepoCommand, [], { errorLines, layers: [runner.layer] })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toHaveLength(1)
+        expect(errorLines).toEqual([
+          "Warning: `adamantite monorepo` is deprecated and will be removed in the next release. Use `adamantite analyze --only monorepo` instead.",
+        ])
+      })
+    )
+
+    it.effect("print the exact replacement for the invocation", () =>
+      Effect.gen(function* () {
+        const errorLines: unknown[] = []
+        const runner = createRunnerTestContext()
+
+        yield* runCommand(monorepoCommand, ["--fix"], {
+          errorLines,
+          forwardedArguments: ["--select", "highest"],
+          layers: [runner.layer],
+        })
+
+        expect(errorLines).toHaveLength(1)
+        expect(errorLines[0]).toContain(
+          "Use `adamantite analyze --only monorepo --fix -- --select highest` instead."
+        )
+      })
+    )
+  })
+
   describe("fix mode", () => {
     it.effect("add fix when requested", () =>
       Effect.gen(function* () {

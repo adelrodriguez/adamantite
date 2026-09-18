@@ -1,17 +1,12 @@
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
-import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
-import * as Layer from "effect/Layer"
 import * as Runtime from "effect/Runtime"
 import * as Stdio from "effect/Stdio"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import { runCli } from "#cli.ts"
+import { makeAppLayer, runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 const version = getPackageVersion()
@@ -30,16 +25,7 @@ const program = Effect.gen(function* () {
       Effect.as(ChildProcessSpawner.ExitCode(1))
     )
   ),
-  Effect.provide(
-    Layer.mergeAll(
-      NodeServices.layer,
-      NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
-      Prompter.layer,
-      CommandRunner.layer.pipe(Layer.provide(NodeServices.layer)),
-      DependencyInstaller.layer,
-      TerminalCapabilities.layer
-    )
-  )
+  Effect.provide(makeAppLayer(CommandRunner.layer))
 )
 
 NodeRuntime.runMain(program, {

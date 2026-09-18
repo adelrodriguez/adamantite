@@ -302,6 +302,11 @@ function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Scrip
  */
 export function definePackageTooling(options: {
   /**
+   * Findings for retired managed scripts. While any exist, the integration stays applicable and
+   * reports them so the scripts get removed.
+   */
+  readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
+  /**
    * Managed scripts that need the package only in a detected monorepo.
    */
   readonly monorepoOnlyScripts?: readonly Script[]
@@ -318,18 +323,27 @@ export function definePackageTooling(options: {
           || (checkHasManagedScript(packageJson, options.monorepoOnlyScripts ?? [])
             && (yield* checkIsMonorepo(cwd)))
 
+        const legacyFindings = options.legacyFindings?.(packageJson) ?? []
+
         if (!isApplicable) {
-          return {
-            applicable: false,
-            warnings: [],
-          } satisfies IntegrationAssessment
+          return legacyFindings.length > 0
+            ? ({
+                applicable: true,
+                findings: [...legacyFindings],
+                packageActions: [],
+                warnings: [],
+              } satisfies IntegrationAssessment)
+            : ({
+                applicable: false,
+                warnings: [],
+              } satisfies IntegrationAssessment)
         }
 
         const packageActions = getPackageActions(packageJson, options, options.purpose)
 
         return {
           applicable: true,
-          findings: getPackageFindings(packageActions, options.name),
+          findings: [...getPackageFindings(packageActions, options.name), ...legacyFindings],
           packageActions,
           warnings: [],
         } satisfies IntegrationAssessment

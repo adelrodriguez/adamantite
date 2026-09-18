@@ -23,6 +23,8 @@ const CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
 const FORMAT_CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+format|deno(?:\s+(?!task\b)\S+)*\s+task\s+format)(?:\s+--)?\s+--check\b/
+const MONOREPO_COMMAND_REGEX =
+  /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check:monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+check:monorepo|adamantite\s+monorepo)(?=\s|$)/
 const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
 
 interface WorkflowOptions {
@@ -194,6 +196,19 @@ const legacyFormatStepFinding: Finding = {
   title: "Legacy format workflow step",
 }
 
+const legacyMonorepoStepFinding: Finding = {
+  currentState:
+    "The workflow still runs the legacy `check:monorepo` script or `adamantite monorepo`.",
+  goal: [
+    "Remove the workflow step or matrix entry that runs `check:monorepo` or `adamantite monorepo`.",
+    "Make the workflow run the managed `analyze` script. It runs Sherif in a detected monorepo.",
+  ],
+  id: "legacy-monorepo-workflow-step",
+  integration: "github",
+  notes: ["Preserve unrelated workflow jobs and project-specific settings."],
+  title: "Legacy monorepo workflow step",
+}
+
 const files = [{ path: ".github/workflows/adamantite.yml", type: "ci" }] as const
 
 const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
@@ -227,9 +242,14 @@ export default defineIntegration({
       const hasHardcodedNodeVersion = HARDCODED_NODE_VERSION_REGEX.test(content.value)
       const isMissingCheckCommand =
         managedScripts.includes("check") && !hasWorkflowCommand(content.value, CHECK_COMMAND_REGEX)
-      const legacyFindings = hasWorkflowCommand(content.value, FORMAT_CHECK_COMMAND_REGEX)
-        ? [legacyFormatStepFinding]
-        : []
+      const legacyFindings = [
+        ...(hasWorkflowCommand(content.value, FORMAT_CHECK_COMMAND_REGEX)
+          ? [legacyFormatStepFinding]
+          : []),
+        ...(hasWorkflowCommand(content.value, MONOREPO_COMMAND_REGEX)
+          ? [legacyMonorepoStepFinding]
+          : []),
+      ]
 
       if (!hasHardcodedNodeVersion && !isMissingCheckCommand) {
         return {

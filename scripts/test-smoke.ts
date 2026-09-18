@@ -24,14 +24,19 @@ function spawn(command: string, args: string[], options: RunOptions) {
     timeout: 5 * 60 * 1000,
   })
 
-  // A failed launch or the timeout sets `error` and leaves the output empty.
+  const output = `--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`
+
+  // A failed launch sets `error` with no output; a timeout or a `maxBuffer` overrun sets it
+  // after the command already produced some.
   if (result.error) {
-    throw new Error(`Command did not run: ${command} ${args.join(" ")}`, { cause: result.error })
+    throw new Error(`Command did not finish: ${command} ${args.join(" ")}\n${output}`, {
+      cause: result.error,
+    })
   }
 
   return {
     description: `${command} ${args.join(" ")}`,
-    output: `--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`,
+    output,
     status: result.status,
     stdout: result.stdout,
   }

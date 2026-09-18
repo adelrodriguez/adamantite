@@ -60,7 +60,7 @@ describe("knip", () => {
   describe("create", () => {
     it.effect("create knip.config.ts with the preset config", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
+        const files = makeFiles({ "package.json": "{}" })
 
         yield* knip.create(ROOT).pipe(provideFiles(files))
 
@@ -76,6 +76,22 @@ describe("knip", () => {
         expect(content).toContain('import analyze from "adamantite/analyze"')
         expect(content).toContain("const config: KnipConfig = analyze")
         expect(content).toContain("export default config")
+      })
+    )
+  })
+
+  describe("create in a monorepo", () => {
+    it.effect("ignore sherif, which adamantite analyze runs without a reference knip can see", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
+        })
+
+        yield* knip.create(ROOT).pipe(provideFiles(files))
+
+        const content = files.read("knip.config.ts")
+        expect(content).toContain("...analyze,")
+        expect(content).toContain('  ignoreDependencies: [\n    "sherif"\n  ],')
       })
     )
   })

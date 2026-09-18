@@ -12,7 +12,6 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 type StageName = "monorepo" | "unused"
 
 interface Stage {
-  readonly checkArguments: readonly string[]
   readonly command: string
   readonly fixArguments: readonly string[]
   readonly name: StageName
@@ -26,7 +25,6 @@ interface Stage {
  */
 const STAGES: readonly Stage[] = [
   {
-    checkArguments: [],
     command: sherif.name,
     fixArguments: ["--fix"],
     name: "monorepo",
@@ -36,7 +34,6 @@ const STAGES: readonly Stage[] = [
     title: "📦 Analyzing the monorepo",
   },
   {
-    checkArguments: [],
     command: knip.name,
     fixArguments: ["--fix", "--allow-remove-files"],
     name: "unused",
@@ -83,12 +80,6 @@ export default Command.make("analyze", { fix, only, strict }).pipe(
       const runner = yield* CommandRunner
       const selected = Option.getOrUndefined(only)
 
-      if (selected === "monorepo" && strict) {
-        return yield* new InvalidAnalyzeOptions({
-          reason: "`--strict` applies to the unused stage. Remove it or `--only monorepo`.",
-        })
-      }
-
       // Without a usable manifest there is no monorepo to analyze; Knip reports the manifest.
       const isMonorepo = yield* checkIsMonorepo().pipe(
         Effect.catchTags({
@@ -97,10 +88,18 @@ export default Command.make("analyze", { fix, only, strict }).pipe(
         })
       )
 
-      if (selected === "monorepo" && !isMonorepo) {
-        return yield* new InvalidAnalyzeOptions({
-          reason: "`--only monorepo` needs a monorepo, and no monorepo was detected.",
-        })
+      if (selected === "monorepo") {
+        if (strict) {
+          return yield* new InvalidAnalyzeOptions({
+            reason: "`--strict` applies to the unused stage. Remove it or `--only monorepo`.",
+          })
+        }
+
+        if (!isMonorepo) {
+          return yield* new InvalidAnalyzeOptions({
+            reason: "`--only monorepo` needs a monorepo, and no monorepo was detected.",
+          })
+        }
       }
 
       const stages = STAGES.filter((stage) =>
@@ -108,34 +107,29 @@ export default Command.make("analyze", { fix, only, strict }).pipe(
       )
       const forwardedStage = selected ?? "unused"
 
+      const steps = stages.map((stage) => ({
+        args: [
+          ...(fix ? stage.fixArguments : []),
+          ...(strict ? stage.strictArguments : []),
+          ...(stage.name === forwardedStage ? forwardedArguments : []),
+        ],
+        command: stage.command,
+        stdin: stage.stdin,
+        title: stage.title,
+      }))
+
       // A failed Sherif fix means no install happened, and Knip would then delete from a stale
       // dependency graph.
-      yield* runner
-        .runAll(
-          stages.map((stage) => ({
-            args: [
-              ...(fix ? stage.fixArguments : stage.checkArguments),
-              ...(strict ? stage.strictArguments : []),
-              ...(stage.name === forwardedStage ? forwardedArguments : []),
-            ],
-            command: stage.command,
-            stdin: stage.stdin,
-            title: stage.title,
-          })),
-          { stopOnFailure: fix }
+      yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
+        Effect.mapError((error) =>
+          error._tag === "CliNotFound" && error.command === sherif.name
+            ? new CliNotFound({
+                command: error.command,
+                hint: "Run `adamantite update` to install it.",
+              })
+            : error
         )
-        .pipe(
-          Effect.catchTag("CliNotFound", (error) =>
-            Effect.fail(
-              error.command === sherif.name
-                ? new CliNotFound({
-                    command: error.command,
-                    hint: "Run `adamantite update` to install it.",
-                  })
-                : error
-            )
-          )
-        )
+      )
     })
   )
 )

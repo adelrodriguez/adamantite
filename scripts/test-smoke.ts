@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
@@ -7,50 +7,49 @@ import process from "node:process"
 const repoRoot = join(import.meta.dirname, "..")
 const cliPath = join(repoRoot, "bin", "adamantite")
 
-function run(command: string, args: string[], options: { cwd: string; env?: NodeJS.ProcessEnv }) {
-  try {
-    return execFileSync(command, args, {
-      cwd: options.cwd,
-      encoding: "utf8",
-      env: options.env ?? process.env,
-      // A dependency install can exceed Node's 1 MiB default and would surface as a
-      // misleading generic failure; a stuck install should fail here, not eat the CI job.
-      maxBuffer: 64 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 5 * 60 * 1000,
-    })
-  } catch (error) {
-    // SAFETY: execFileSync errors carry the child process's captured stdout and stderr.
-    const output = error as { stdout?: string; stderr?: string }
-    throw new Error(
-      `Command failed: ${command} ${args.join(" ")}\n--- stdout ---\n${output.stdout ?? ""}\n--- stderr ---\n${output.stderr ?? ""}`,
-      { cause: error }
-    )
-  }
+interface RunOptions {
+  readonly cwd: string
+  readonly env?: NodeJS.ProcessEnv
 }
 
-function runExpectingFailure(
-  command: string,
-  args: string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv }
-) {
+function spawn(command: string, args: string[], options: RunOptions) {
   const result = spawnSync(command, args, {
     cwd: options.cwd,
     encoding: "utf8",
     env: options.env ?? process.env,
+    // A dependency install can exceed Node's 1 MiB default and would surface as a
+    // misleading generic failure; a stuck install should fail here, not eat the CI job.
     maxBuffer: 64 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
     timeout: 5 * 60 * 1000,
   })
-  const output = `${result.stdout}${result.stderr}`
 
-  if (result.status === 0 || result.status === null) {
-    throw new Error(
-      `Expected a non-zero exit from: ${command} ${args.join(" ")}\n--- output ---\n${output}`
-    )
+  return {
+    description: `${command} ${args.join(" ")}`,
+    output: `--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}`,
+    status: result.status,
+    stdout: result.stdout,
+  }
+}
+
+function run(command: string, args: string[], options: RunOptions) {
+  const result = spawn(command, args, options)
+
+  if (result.status !== 0) {
+    throw new Error(`Command failed: ${result.description}\n${result.output}`)
   }
 
-  return { output, status: result.status }
+  return result.stdout
+}
+
+function runExpectingFailure(command: string, args: string[], options: RunOptions) {
+  const result = spawn(command, args, options)
+
+  if (result.status === 0 || result.status === null) {
+    throw new Error(`Expected a non-zero exit from: ${result.description}\n${result.output}`)
+  }
+
+  return { output: result.output, status: result.status }
 }
 
 /**

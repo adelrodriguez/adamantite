@@ -39,12 +39,16 @@ interface CommandRunnerService {
     options: CommandRunOptions
   ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
   /**
-   * Runs every step in order, even after one fails, then fails with the first failure. With
-   * `stopOnFailure`, a failed step skips the steps after it.
+   * Runs every step in order, even after one fails, then fails with the first failure.
    */
   readonly runAll: (
-    steps: readonly CommandRunOptions[],
-    options?: { readonly stopOnFailure?: boolean }
+    steps: readonly CommandRunOptions[]
+  ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
+  /**
+   * Runs the steps in order and stops at the first failure.
+   */
+  readonly runUntilFailure: (
+    steps: readonly CommandRunOptions[]
   ) => Effect.Effect<void, CommandFailed | CommandFailedLike>
 }
 
@@ -106,22 +110,22 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
       }
     })
 
+    // A blank line separates each step's output from the one before it.
+    const toSections = (steps: readonly CommandRunOptions[]) =>
+      steps.map((step, index) =>
+        index === 0 ? run(step) : Effect.andThen(Console.log(""), run(step))
+      )
+
     return {
       exitCode,
       run,
-      runAll: Effect.fn("CommandRunner.runAll")(function* (steps, options) {
-        const sections = steps.map((step, index) =>
-          index === 0 ? run(step) : Effect.andThen(Console.log(""), run(step))
-        )
-
-        if (options?.stopOnFailure) {
-          yield* Effect.all(sections, { concurrency: 1, discard: true })
-          return
-        }
-
-        const results = yield* Effect.all(sections, { concurrency: 1, mode: "result" })
+      runAll: Effect.fn("CommandRunner.runAll")(function* (steps) {
+        const results = yield* Effect.all(toSections(steps), { concurrency: 1, mode: "result" })
 
         yield* Effect.fromResult(Result.all(results))
+      }),
+      runUntilFailure: Effect.fn("CommandRunner.runUntilFailure")(function* (steps) {
+        yield* Effect.all(toSections(steps), { concurrency: 1, discard: true })
       }),
     }
   }

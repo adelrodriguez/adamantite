@@ -24,7 +24,7 @@ export function toKnipTsConfigContent(config: JsonObject = {}) {
       return ["  rules: {", "    ...analyze.rules,", ...rulesEntries, "  },"].join("\n")
     }
 
-    return `  ${serializeTsPropertyKey(key)}: ${serializeTsObjectLiteral(value)},`
+    return `  ${serializeTsPropertyKey(key)}: ${serializeTsObjectLiteral(value, { continuationIndent: "  " })},`
   })
 
   if (configEntries.length === 0) {

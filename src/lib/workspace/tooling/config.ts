@@ -14,6 +14,7 @@ import {
   type ToolingPackage,
 } from "#lib/integrations/base.ts"
 import { readFile, writeFile } from "#lib/shared/filesystem.ts"
+import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   getManagedScripts,
   normalizeDependencyVersion,
@@ -327,7 +328,11 @@ export function definePackageTooling(options: {
  * JSON predecessors (Knip, Oxfmt).
  */
 export function defineConfigTooling(options: {
-  readonly configContent: () => string
+  /**
+   * The config file content `init` writes and doctor findings reference. It can depend on the
+   * workspace shape.
+   */
+  readonly configContent: (workspace: { readonly isMonorepo: boolean }) => string
   readonly configFiles: ToolingConfigFiles
   readonly inspectConfig: (content: string) => RequiredConfigInspection
   /**
@@ -372,7 +377,7 @@ export function defineConfigTooling(options: {
 
         const state = yield* detect(cwd)
         const packageActions = getPackageActions(packageJson, options, options.purpose)
-        const configContent = options.configContent()
+        const configContent = options.configContent({ isMonorepo: yield* checkIsMonorepo(cwd) })
         const inspection =
           state.active?.format === "ts"
             ? options.inspectConfig(yield* readFile(state.active.path))
@@ -398,7 +403,10 @@ export function defineConfigTooling(options: {
     create: (cwd: string) =>
       Effect.gen(function* () {
         const path = yield* Path.Path
-        yield* writeFile(path.join(cwd, options.configFiles.config), options.configContent())
+        yield* writeFile(
+          path.join(cwd, options.configFiles.config),
+          options.configContent({ isMonorepo: yield* checkIsMonorepo(cwd) })
+        )
       }),
     detect,
     files,

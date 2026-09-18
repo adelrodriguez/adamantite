@@ -67,7 +67,9 @@ export interface RunnerTestContext {
   readonly layer: Layer.Layer<CommandRunner>
 }
 
-type TestLayer = Layer.Layer<never, unknown, unknown>
+// A layer's output type is contravariant, so `never` accepts every layer that neither fails nor
+// requires other services.
+type TestLayer = Layer.Layer<never>
 
 function shiftResponse<T>(queue: T[], kind: string): T {
   const response = queue.shift()
@@ -292,25 +294,38 @@ function makeQuietTerminalLayer() {
   )
 }
 
-export interface RunCommandOptions {
+const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
+  ChildProcessSpawner.make(() => Effect.die("Command tests must not spawn processes"))
+)
+
+// Commands require these services statically even on paths that never use them. Tests that do
+// reach them pass their own layer, which takes precedence.
+const unexpectedRunnerLayer = Layer.succeed(
+  CommandRunner,
+  CommandRunner.make((options) =>
+    Effect.die(`Unexpected \`${options.command}\` run: pass a runner layer to runCommand`)
+  )
+)
+
+const unexpectedInstallerLayer = Layer.succeed(DependencyInstaller)({
+  addDevDependencies: () =>
+    Effect.die("Unexpected dependency install: pass an installer layer to runCommand"),
+  detectPackageManager: () =>
+    Effect.die("Unexpected package manager detection: pass an installer layer to runCommand"),
+})
+
+export interface RunCommandOptions<Layers extends readonly TestLayer[]> {
   readonly errorLines?: unknown[]
   readonly files?: FileSystemTestContext
   readonly forwardedArguments?: readonly string[]
-  readonly layers?: TestLayer[]
+  readonly layers?: Layers
   readonly logLines?: unknown[]
 }
 
-export function runCommand(
-  command: Command.Command.Any,
-  args: readonly string[],
-  options: RunCommandOptions = {}
-) {
-  const files = options.files ?? createFileSystemTestContext()
+function makeDefaultLayer(files: FileSystemTestContext) {
   const platformLayer = Layer.mergeAll(files.layer, Path.layer)
 
-  // SAFETY: Layer's type parameters are invariant, so accumulating heterogeneous
-  // per-test layers in the merge loop below requires widening to TestLayer.
-  let providedLayer = Layer.mergeAll(
+  return Layer.mergeAll(
     platformLayer,
     NodeVersionResolver.layer.pipe(Layer.provide(platformLayer)),
     TestConsole.layer,
@@ -319,17 +334,34 @@ export function runCommand(
     Layer.succeed(TerminalCapabilities)({
       copyToClipboard: () => Effect.void,
       isInteractive: Effect.succeed(false),
-    })
-  ) as TestLayer
+    }),
+    failingSpawnerLayer,
+    unexpectedRunnerLayer,
+    unexpectedInstallerLayer
+  )
+}
 
-  for (const layer of options.layers ?? []) {
-    providedLayer = Layer.merge(providedLayer, layer)
-  }
+/**
+ * Runs a command against the default test services plus the given layers, which take precedence. A
+ * service the command needs that neither provides stays in the returned effect's requirements, so
+ * `it.effect` rejects the test at compile time.
+ */
+export function runCommand<
+  Name extends string,
+  Input,
+  ContextInput,
+  E,
+  R,
+  const Layers extends readonly TestLayer[] = [],
+>(
+  command: Command.Command<Name, Input, ContextInput, E, R>,
+  args: readonly string[],
+  options: RunCommandOptions<Layers> = {}
+) {
+  const files = options.files ?? createFileSystemTestContext()
+  const testLayer = Layer.mergeAll(makeDefaultLayer(files), ...(options.layers ?? []))
 
   return Effect.exit(
-    // SAFETY: TestLayer erases its outputs to unknown, so providing it cannot
-    // discharge the requirement channel statically; the merged layers supply
-    // every service the command uses at runtime.
     Command.runWith(command, { version: "test" })(args).pipe(
       Effect.ensuring(
         Effect.gen(function* () {
@@ -338,7 +370,7 @@ export function runCommand(
         })
       ),
       Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
-      Effect.provide(providedLayer)
-    ) as Effect.Effect<void, unknown>
+      Effect.provide(testLayer)
+    )
   )
 }

@@ -55,6 +55,27 @@ describe("update", () => {
     })
   )
 
+  it.effect("leave the adamantite package itself untouched", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": manifest({ devDependencies: { adamantite: "0.0.1", knip: "5.0.0" } }),
+        },
+      })
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toHaveLength(1)
+      expect(installer.calls[0]?.packages).toEqual([`knip@${knip.version}`])
+    })
+  )
+
   for (const { isMonorepo, name, workspace, workspaces } of [
     { isMonorepo: true, name: "npm", workspace: false, workspaces: ["packages/*"] },
     { isMonorepo: true, name: "pnpm", workspace: true, workspaces: ["packages/*"] },

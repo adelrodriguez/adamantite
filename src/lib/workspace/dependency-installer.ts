@@ -7,6 +7,7 @@ import {
   type PackageManagerName,
 } from "nypm"
 import { FailedToInstallDependency, NoPackageManager } from "#lib/shared/errors.ts"
+import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export interface DetectedPackageManager {
   readonly name: PackageManagerName
@@ -49,3 +50,27 @@ export class DependencyInstaller extends Context.Service<
     ),
   })
 }
+
+/**
+ * Nypm maps `workspace: true` to the flag that lets pnpm and Yarn 1 install at the workspace root.
+ * For npm it maps to `--workspaces`, which installs into every workspace package, and a plain npm
+ * install from the root already installs at the root.
+ */
+function needsWorkspaceRootFlag(
+  packageManager: PackageManagerName | undefined,
+  isMonorepo: boolean
+): boolean {
+  return isMonorepo && packageManager !== "npm"
+}
+
+export const addRootDevDependencies = (cwd: string, packages: string[]) =>
+  Effect.gen(function* () {
+    const dependencyInstaller = yield* DependencyInstaller
+    const isMonorepo = yield* checkIsMonorepo(cwd)
+    const packageManager = yield* dependencyInstaller.detectPackageManager(cwd)
+
+    yield* dependencyInstaller.addDevDependencies(packages, cwd, {
+      silent: true,
+      workspace: needsWorkspaceRootFlag(packageManager?.name, isMonorepo),
+    })
+  })

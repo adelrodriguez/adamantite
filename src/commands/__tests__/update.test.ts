@@ -55,6 +55,38 @@ describe("update", () => {
     })
   )
 
+  for (const { isMonorepo, name, workspace, workspaces } of [
+    { isMonorepo: true, name: "npm", workspace: false, workspaces: ["packages/*"] },
+    { isMonorepo: true, name: "pnpm", workspace: true, workspaces: ["packages/*"] },
+    { isMonorepo: true, name: "yarn", workspace: true, workspaces: ["packages/*"] },
+    { isMonorepo: false, name: "pnpm", workspace: false, workspaces: [] },
+  ] as const) {
+    it.effect(`update at the root with ${name} when monorepo is ${isMonorepo}`, () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            "package.json": manifest({
+              devDependencies: { knip: "5.0.0" },
+              workspaces: [...workspaces],
+            }),
+          },
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext({
+          detectedPackageManager: { name },
+        })
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls[0]?.options).toEqual({ silent: true, workspace })
+      })
+    )
+  }
+
   it.effect("keep findings informational", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

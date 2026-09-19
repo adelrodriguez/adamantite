@@ -1,5 +1,26 @@
 # adamantite
 
+## 0.42.0
+
+### Minor Changes
+
+- [#458](https://github.com/adelrodriguez/adamantite/pull/458) [`086adcf`](https://github.com/adelrodriguez/adamantite/commit/086adcff95f10c18efb677efa9204eca67b2526d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove the deprecated `adamantite format` and `adamantite monorepo` commands.
+
+  Update package scripts, CI workflows, and agent instructions to use these replacements:
+
+  - Replace `adamantite format --check` with `adamantite check`.
+  - Replace `adamantite format` with `adamantite fix`.
+  - Replace `adamantite monorepo` with `adamantite analyze --only monorepo`.
+  - Replace `adamantite monorepo --fix` with `adamantite analyze --only monorepo --fix`.
+
+  `check` and `fix` also run Oxlint. To run only the formatter, use `oxfmt --check` or `oxfmt` directly.
+
+  `init --script` now accepts only `check`, `fix`, and `analyze`. Run `adamantite doctor` to find retired scripts and workflow steps that still need updates.
+
+### Patch Changes
+
+- [#463](https://github.com/adelrodriguez/adamantite/pull/463) [`8974fa9`](https://github.com/adelrodriguez/adamantite/commit/8974fa9dfe776a97bc195df00546094e20f233fe) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Seed the `adamantite doctor` agent handoff with the combined Markdown repair prompt. The agent now starts with every finding instead of a one-line instruction to run Doctor itself.
+
 ## 0.41.0
 
 ### Minor Changes

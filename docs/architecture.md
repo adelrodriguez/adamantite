@@ -59,7 +59,7 @@ installed coding agent CLI or to copy the combined Markdown prompt. Installation
 detected by probing each supported CLI's version command, bounded by a timeout; only
 agents whose probe command starts appear in the menu. A handoff hands the terminal to
 the agent CLI with inherited stdio
-and a per-agent seed argument that tells the agent to run Doctor itself; Adamantite
+and a per-agent seed argument carrying the combined Markdown prompt; Adamantite
 passes no provider permission, sandbox, or trust flags, and reassesses once after the
 agent session ends.
 The agent's exit code is ignored: only the reassessment decides success. Non-interactive runs

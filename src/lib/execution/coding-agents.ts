@@ -1,6 +1,8 @@
 import process from "node:process"
+import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as Layer from "effect/Layer"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -41,40 +43,16 @@ export const codingAgents: readonly CodingAgent[] = [
   { command: "opencode", name: "OpenCode", seedArguments: (prompt) => ["--prompt", prompt] },
 ]
 
-// "It spawned and exited" is the installation check: the probe ignores output and exit
-// codes, so a CLI that prints its version oddly or exits nonzero still counts as
-// installed. Any failure to run — the command missing from PATH, a permission or
-// resource error, or a probe that hangs past the timeout — reads as not installed.
-export const detectInstalledAgents = (cwd: string) =>
-  Effect.gen(function* () {
-    const runner = yield* CommandRunner
-    const probes = yield* Effect.forEach(
-      codingAgents,
-      (agent) =>
-        runner
-          .exitCode({
-            args: [...(agent.probeArguments ?? ["--version"])],
-            command: agent.command,
-            cwd,
-            stderr: "ignore",
-            stdout: "ignore",
-          })
-          .pipe(
-            Effect.timeout("10 seconds"),
-            Effect.as(agent),
-            Effect.catch(() => Effect.succeed(null))
-          ),
-      { concurrency: codingAgents.length }
-    )
-    return probes.filter((agent) => agent !== null)
-  })
+export type WorkingTreeState = "clean" | "dirty" | "unknown"
 
-// The findings themselves stay out of the seed prompt: the agent reads them by
-// running non-interactive `adamantite doctor`, so nothing sensitive lands in argv.
-export const handoffPrompt =
-  "Run `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, "
-  + "if it is not on PATH — and resolve every finding it reports. "
-  + "Rerun `adamantite doctor` until it exits 0."
+export interface AgentSessionOptions {
+  readonly agent: CodingAgent
+  readonly cwd: string
+  /**
+   * Travels in the agent's argv, so other local processes can read it for the session.
+   */
+  readonly prompt: string
+}
 
 // Lives here instead of lib/shared/errors.ts because it carries the runner failure,
 // and shared must not depend on execution.
@@ -92,78 +70,112 @@ const ignoreSigint = () => {
 // (the platform spawner would otherwise start it in a new session on POSIX, cutting it
 // off from terminal-generated SIGINT and SIGWINCH). Sharing the group means the same
 // SIGINT also reaches Doctor's runtime, whose spawner finalizer would kill the agent
-// mid-edit — this shield discards it for the duration of the session.
-const shieldSigintDuring = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.acquireUseRelease(
+// mid-edit — this shield discards it until the enclosing scope closes.
+const sigintShield = Effect.acquireRelease(
+  Effect.sync(() => {
+    const previous = process.listeners("SIGINT")
+    process.removeAllListeners("SIGINT")
+    // With no listener at all, Node's default SIGINT behavior kills the process.
+    process.on("SIGINT", ignoreSigint)
+    return previous
+  }),
+  (previous) =>
     Effect.sync(() => {
-      const previous = process.listeners("SIGINT")
       process.removeAllListeners("SIGINT")
-      // With no listener at all, Node's default SIGINT behavior kills the process.
-      process.on("SIGINT", ignoreSigint)
-      return previous
-    }),
-    () => effect,
-    (previous) =>
-      Effect.sync(() => {
-        process.removeAllListeners("SIGINT")
-        for (const listener of previous) {
-          process.on("SIGINT", listener)
-        }
-      })
-  )
-
-/**
- * Hands the terminal to the agent with inherited stdio, seeded to run Doctor itself. Resolves when
- * the session ends; the agent's exit code is deliberately discarded because only a reassessment can
- * judge whether the findings were repaired. Doctor ignores SIGINT for the duration of the session
- * so a Ctrl-C reaches only the agent.
- */
-export const runAgentSession = ({ agent, cwd }: { agent: CodingAgent; cwd: string }) =>
-  Effect.gen(function* () {
-    const runner = yield* CommandRunner
-    yield* shieldSigintDuring(
-      runner.exitCode({
-        args: agent.seedArguments(handoffPrompt),
-        command: agent.command,
-        cwd,
-        detached: false,
-        stderr: "inherit",
-        stdin: "inherit",
-        stdout: "inherit",
-      })
-    )
-  }).pipe(
-    Effect.asVoid,
-    Effect.mapError(
-      (error) =>
-        new AgentSessionFailed({
-          cause: error,
-          reason: error._tag === "CliNotFound" ? "not-found" : "spawn-failed",
-        })
-    )
-  )
-
-type WorkingTreeState = "clean" | "dirty" | "unknown"
-
-// Exit codes only: CommandRunner cannot capture output, and `git diff --quiet HEAD`
-// answers cleanly through them (0 clean, 1 dirty, anything else no usable answer).
-// Untracked-only trees read as clean; the handoff confirmation copy accepts that.
-export const checkWorkingTreeState = (cwd: string) =>
-  Effect.gen(function* () {
-    const runner = yield* CommandRunner
-    const exitCode = yield* runner.exitCode({
-      args: ["diff", "--quiet", "HEAD"],
-      command: "git",
-      cwd,
-      stderr: "ignore",
-      stdout: "ignore",
+      for (const listener of previous) {
+        process.on("SIGINT", listener)
+      }
     })
+)
 
-    if (exitCode === ChildProcessSpawner.ExitCode(0)) {
-      return "clean" as const
-    }
-    if (exitCode === ChildProcessSpawner.ExitCode(1)) {
-      return "dirty" as const
-    }
-    return "unknown" as const
-  }).pipe(Effect.catch(() => Effect.succeed<WorkingTreeState>("unknown")))
+export class CodingAgents extends Context.Service<
+  CodingAgents,
+  {
+    /**
+     * The supported agents whose CLI starts on this machine, in menu order.
+     */
+    readonly detectInstalled: (cwd: string) => Effect.Effect<CodingAgent[]>
+    /**
+     * Hands the terminal to the agent with inherited stdio, seeded with the prompt. Resolves when
+     * the session ends; the agent's exit code is deliberately discarded because only a reassessment
+     * can judge whether the findings were repaired. Doctor ignores SIGINT for the duration of the
+     * session so a Ctrl-C reaches only the agent.
+     */
+    readonly runSession: (options: AgentSessionOptions) => Effect.Effect<void, AgentSessionFailed>
+    /**
+     * Untracked-only trees read as clean; the handoff confirmation copy accepts that.
+     */
+    readonly workingTreeState: (cwd: string) => Effect.Effect<WorkingTreeState>
+  }
+>()("CodingAgents") {
+  static readonly layer = Layer.effect(
+    this,
+    Effect.gen(function* () {
+      const runner = yield* CommandRunner
+
+      // "It spawned and exited" is the installation check: the probe ignores output and exit
+      // codes, so a CLI that prints its version oddly or exits nonzero still counts as
+      // installed. Any failure to run — the command missing from PATH, a permission or
+      // resource error, or a probe that hangs past the timeout — reads as not installed.
+      const isInstalled = (agent: CodingAgent, cwd: string) =>
+        runner
+          .exitCode({
+            args: [...(agent.probeArguments ?? ["--version"])],
+            command: agent.command,
+            cwd,
+            stderr: "ignore",
+            stdout: "ignore",
+          })
+          .pipe(Effect.timeout("10 seconds"), Effect.isSuccess)
+
+      return CodingAgents.of({
+        detectInstalled: Effect.fn("CodingAgents.detectInstalled")((cwd) =>
+          Effect.filter(codingAgents, (agent) => isInstalled(agent, cwd), {
+            concurrency: "unbounded",
+          })
+        ),
+        runSession: Effect.fn("CodingAgents.runSession")(
+          function* ({ agent, cwd, prompt }) {
+            yield* sigintShield
+            yield* runner.exitCode({
+              args: agent.seedArguments(prompt),
+              command: agent.command,
+              cwd,
+              detached: false,
+              stderr: "inherit",
+              stdin: "inherit",
+              stdout: "inherit",
+            })
+          },
+          Effect.scoped,
+          Effect.mapError(
+            (cause) =>
+              new AgentSessionFailed({
+                cause,
+                reason: cause._tag === "CliNotFound" ? "not-found" : "spawn-failed",
+              })
+          )
+        ),
+        // Exit codes only: CommandRunner cannot capture output, and `git diff --quiet HEAD`
+        // answers cleanly through them (0 clean, 1 dirty, anything else no usable answer).
+        workingTreeState: Effect.fn("CodingAgents.workingTreeState")(
+          function* (cwd) {
+            const exitCode = yield* runner.exitCode({
+              args: ["diff", "--quiet", "HEAD"],
+              command: "git",
+              cwd,
+              stderr: "ignore",
+              stdout: "ignore",
+            })
+
+            if (exitCode === ChildProcessSpawner.ExitCode(0)) {
+              return "clean"
+            }
+            return exitCode === ChildProcessSpawner.ExitCode(1) ? "dirty" : "unknown"
+          },
+          Effect.orElseSucceed((): WorkingTreeState => "unknown")
+        ),
+      })
+    })
+  )
+}

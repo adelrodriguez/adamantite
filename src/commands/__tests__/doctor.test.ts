@@ -8,7 +8,7 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
-import { type CodingAgent, codingAgents, handoffPrompt } from "#lib/execution/coding-agents.ts"
+import { type CodingAgent, codingAgents } from "#lib/execution/coding-agents.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
@@ -471,7 +471,7 @@ describe("doctor", () => {
           stdout: "ignore",
         }),
         expect.objectContaining({
-          args: [handoffPrompt],
+          args: [expect.stringContaining("# Adamantite doctor findings")],
           command: "claude",
           detached: false,
           stderr: "inherit",
@@ -479,7 +479,7 @@ describe("doctor", () => {
           stdout: "inherit",
         }),
       ])
-      expect(nonProbeInvocations(runner)[1]?.args[0]).not.toContain("knip")
+      expect(nonProbeInvocations(runner)[1]?.args[0]).toContain("knip")
       expect(prompter.logs).toContainEqual({
         level: "info",
         message: "Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
@@ -708,7 +708,7 @@ describe("doctor", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)[1]).toEqual(
         expect.objectContaining({
-          args: ["-i", handoffPrompt],
+          args: ["-i", expect.stringContaining("# Adamantite doctor findings")],
           command: "gemini",
         })
       )

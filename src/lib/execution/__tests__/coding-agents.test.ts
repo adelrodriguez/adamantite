@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import { type CodingAgent, runAgentSession } from "#lib/execution/coding-agents.ts"
+import { type CodingAgent, CodingAgents } from "#lib/execution/coding-agents.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 
 const claudeAgent: CodingAgent = {
@@ -16,7 +16,7 @@ const sentinel = () => {
   // Stands in for the runtime's SIGINT listener; only its identity matters.
 }
 
-describe("runAgentSession", () => {
+describe("CodingAgents.runSession", () => {
   it.effect("ignore SIGINT while the agent session runs and restore listeners afterwards", () =>
     Effect.gen(function* () {
       process.on("SIGINT", sentinel)
@@ -31,7 +31,10 @@ describe("runAgentSession", () => {
           })
         )
       )
-      yield* runAgentSession({ agent: claudeAgent, cwd: "/project" }).pipe(Effect.provide(runner))
+      yield* Effect.gen(function* () {
+        const agents = yield* CodingAgents
+        yield* agents.runSession({ agent: claudeAgent, cwd: "/project", prompt: "prompt" })
+      }).pipe(Effect.provide(CodingAgents.layer.pipe(Layer.provide(runner))))
 
       const listenersAfterRun = process.listeners("SIGINT")
       process.removeListener("SIGINT", sentinel)

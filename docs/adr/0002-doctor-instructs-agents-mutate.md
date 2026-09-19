@@ -45,6 +45,9 @@ The decisions:
   handoff was designed and rejected for this release: it only pays off for non-TTY hosts
   or agents without a CLI. The full plan lived at `docs/plans/acp-agent-handoff.md` and
   was removed on 2026-08-27; recover it from Git history if ACP becomes relevant.
+- Since 2026-09-19 the handoff seeds the agent with the combined Markdown repair prompt
+  instead of the one-line "run Doctor" prompt, so the agent starts on the findings
+  without a Doctor round trip. The prompt travels in the agent's argv.
 - Headless driving was tried again in September 2026 for Doctor, Fix, and Analyze, with
   one repair loop and a permission contract for each of six agent CLIs
   ([#422](https://github.com/adelrodriguez/adamantite/issues/422),

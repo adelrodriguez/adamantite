@@ -45,6 +45,19 @@ The decisions:
   handoff was designed and rejected for this release: it only pays off for non-TTY hosts
   or agents without a CLI. The full plan lived at `docs/plans/acp-agent-handoff.md` and
   was removed on 2026-08-27; recover it from Git history if ACP becomes relevant.
+- Headless driving was tried again in September 2026 for Doctor, Fix, and Analyze, with
+  one repair loop and a permission contract for each of six agent CLIs
+  ([#422](https://github.com/adelrodriguez/adamantite/issues/422),
+  [#461](https://github.com/adelrodriguez/adamantite/pull/461)). It was dropped on
+  2026-09-19 without a merge, mainly because it is not useful enough. A coding agent can
+  already run `adamantite doctor` or `adamantite fix` and repeat until the command exits
+  0, so bounded retries and a verified exit code add little. The cost was high: real CLI
+  runs found a defect in almost every contract while the exact-argument unit tests
+  stayed green. Claude Code's `acceptEdits` mode allowed `rm` outside the allowlist,
+  OpenCode could not read the payload file outside the project, Codex refused to run
+  outside a Git repository, and another CLI's `agent` command was accepted as Cursor.
+  Only a run of the real CLI finds such defects, and CI has no agent CLI. The TTY handoff
+  above stays the current design.
 - `AGENTS.md` and the shipped skill slim to "run `adamantite doctor` and follow its
   instructions"; instructions exist only in doctor's output.
 

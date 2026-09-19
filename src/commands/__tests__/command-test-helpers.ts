@@ -10,6 +10,7 @@ import { TestConsole } from "effect/testing"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { CodingAgents } from "#lib/execution/coding-agents.ts"
 import {
   type CommandFailedLike,
   type CommandRunOptions,
@@ -64,7 +65,10 @@ export interface DependencyInstallerTestContext {
 
 export interface RunnerTestContext {
   readonly invocations: CommandRunOptions[]
-  readonly layer: Layer.Layer<CommandRunner>
+  /**
+   * Also provides `CodingAgents` backed by this runner, so handoff spawns are recorded.
+   */
+  readonly layer: Layer.Layer<CodingAgents | CommandRunner>
 }
 
 // A layer's output type is contravariant, so `never` accepts every layer that neither fails nor
@@ -97,19 +101,23 @@ export function createRunnerTestContext(
 
   return {
     invocations,
-    layer: Layer.succeed(
-      CommandRunner,
-      CommandRunner.make((options) =>
-        Effect.gen(function* () {
-          invocations.push({
-            ...options,
-            args: [...options.args],
-          })
-          if (implementation) {
-            return yield* implementation(options)
-          }
-          return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
-        })
+    layer: CodingAgents.layer.pipe(
+      Layer.provideMerge(
+        Layer.succeed(
+          CommandRunner,
+          CommandRunner.make((options) =>
+            Effect.gen(function* () {
+              invocations.push({
+                ...options,
+                args: [...options.args],
+              })
+              if (implementation) {
+                return yield* implementation(options)
+              }
+              return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
+            })
+          )
+        )
       )
     ),
   }
@@ -337,6 +345,8 @@ function makeDefaultLayer(files: FileSystemTestContext) {
     }),
     failingSpawnerLayer,
     unexpectedRunnerLayer,
+    // Fresh, so this default does not memoize `CodingAgents` ahead of a test's runner layer.
+    Layer.fresh(CodingAgents.layer).pipe(Layer.provide(unexpectedRunnerLayer)),
     unexpectedInstallerLayer
   )
 }

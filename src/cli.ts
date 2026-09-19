@@ -11,6 +11,7 @@ import doctorCommand from "#commands/doctor.ts"
 import fixCommand from "#commands/fix.ts"
 import initCommand from "#commands/init/index.ts"
 import updateCommand from "#commands/update.ts"
+import { CodingAgents } from "#lib/execution/coding-agents.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
@@ -49,7 +50,7 @@ export const makeAppLayer = (
     NodeServices.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     Prompter.layer,
-    runner.pipe(Layer.provide(NodeServices.layer)),
+    CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
     DependencyInstaller.layer,
     TerminalCapabilities.layer
   )

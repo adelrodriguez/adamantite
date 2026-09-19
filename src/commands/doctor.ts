@@ -2,13 +2,7 @@ import process from "node:process"
 import * as Effect from "effect/Effect"
 import * as Command from "effect/unstable/cli/Command"
 import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
-import {
-  type CodingAgent,
-  checkWorkingTreeState,
-  codingAgents,
-  detectInstalledAgents,
-  runAgentSession,
-} from "#lib/execution/coding-agents.ts"
+import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import { assessProject, renderAssessmentMarkdown } from "#lib/integrations/assessment.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -26,6 +20,7 @@ export default Command.make("doctor").pipe(
   Command.withHandler(() =>
     Effect.gen(function* () {
       const cwd = process.cwd()
+      const agents = yield* CodingAgents
       const prompter = yield* Prompter
       const terminal = yield* TerminalCapabilities
       const isInteractive = yield* terminal.isInteractive
@@ -115,12 +110,12 @@ export default Command.make("doctor").pipe(
 
       yield* printFindings(assessment.findings)
 
-      const installedAgents = yield* prompter.withSpinner(() => detectInstalledAgents(cwd), {
+      const installedAgents = yield* prompter.withSpinner(() => agents.detectInstalled(cwd), {
         start: "Checking for installed coding agents...",
-        success: (agents) =>
-          agents.length === 0
+        success: (detected) =>
+          detected.length === 0
             ? "No supported coding agent CLI was found on PATH."
-            : `Found ${agents.map((agent) => agent.name).join(", ")}.`,
+            : `Found ${detected.map((agent) => agent.name).join(", ")}.`,
       })
 
       if (installedAgents.length === 0) {
@@ -159,7 +154,7 @@ export default Command.make("doctor").pipe(
       }
 
       const agent = action
-      const treeState = yield* checkWorkingTreeState(cwd)
+      const treeState = yield* agents.workingTreeState(cwd)
 
       if (treeState !== "clean") {
         yield* prompter.log.warning(
@@ -182,7 +177,7 @@ export default Command.make("doctor").pipe(
         `Handing the terminal to ${agent.name}. Exit the agent to return to Doctor.`
       )
 
-      const started = yield* runAgentSession({ agent, cwd }).pipe(
+      const started = yield* agents.runSession({ agent, cwd, prompt }).pipe(
         Effect.as(true),
         Effect.catchTag("AgentSessionFailed", (error) =>
           prompter.log

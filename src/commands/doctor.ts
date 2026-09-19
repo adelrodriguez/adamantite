@@ -112,10 +112,10 @@ export default Command.make("doctor").pipe(
 
       const installedAgents = yield* prompter.withSpinner(() => agents.detectInstalled(cwd), {
         start: "Checking for installed coding agents...",
-        success: (agents) =>
-          agents.length === 0
+        success: (detected) =>
+          detected.length === 0
             ? "No supported coding agent CLI was found on PATH."
-            : `Found ${agents.map((agent) => agent.name).join(", ")}.`,
+            : `Found ${detected.map((agent) => agent.name).join(", ")}.`,
       })
 
       if (installedAgents.length === 0) {

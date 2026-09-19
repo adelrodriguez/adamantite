@@ -480,6 +480,8 @@ describe("doctor", () => {
         }),
       ])
       expect(nonProbeInvocations(runner)[1]?.args[0]).toContain("knip")
+      // The seeded agent often cannot reach `adamantite` on PATH; the prompt must say how.
+      expect(nonProbeInvocations(runner)[1]?.args[0]).toContain("`npx` or `pnpm exec`")
       expect(prompter.logs).toContainEqual({
         level: "info",
         message: "Handing the terminal to Claude Code. Exit the agent to return to Doctor.",

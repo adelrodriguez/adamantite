@@ -179,7 +179,8 @@ function renderRepairPrompt(
     "",
     "## Verify",
     "",
-    "Run `adamantite doctor`. All findings above must be gone and it must exit 0.",
+    "Run `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, if it is not on PATH.",
+    "All findings above must be gone and it must exit 0.",
     "Do not suppress or work around checks; fix the underlying state.",
     "",
   ].join("\n")

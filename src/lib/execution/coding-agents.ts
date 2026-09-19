@@ -130,9 +130,11 @@ export class CodingAgents extends Context.Service<
 
       return CodingAgents.of({
         detectInstalled: Effect.fn("CodingAgents.detectInstalled")((cwd) =>
-          Effect.filter(codingAgents, (agent) => isInstalled(agent, cwd), {
+          // `Effect.filter` collects in completion order under concurrency; `forEach` keeps
+          // the registry order the menu depends on.
+          Effect.forEach(codingAgents, (agent) => isInstalled(agent, cwd), {
             concurrency: "unbounded",
-          })
+          }).pipe(Effect.map((installed) => codingAgents.filter((_, index) => installed[index])))
         ),
         runSession: Effect.fn("CodingAgents.runSession")(
           function* ({ agent, cwd, prompt }) {

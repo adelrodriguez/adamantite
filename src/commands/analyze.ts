@@ -1,6 +1,5 @@
 import process from "node:process"
 import type { PackageJson } from "type-fest"
-import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Command from "effect/unstable/cli/Command"
@@ -52,19 +51,9 @@ interface Stage {
    */
   readonly fixBeforeAgent: boolean
   readonly name: "monorepo" | "unused"
-  /**
-   * Repair each file in its own agent session. Otherwise one session repairs the project.
-   */
-  readonly perFile: boolean
   readonly stdin: NonNullable<CommandRunOptions["stdin"]>
   readonly strictArguments: readonly string[]
   readonly title: string
-}
-
-interface RepairUnit {
-  readonly file: string | null
-  readonly items: readonly AnalyzeDiagnostic[]
-  readonly stage: Stage
 }
 
 const STAGES: readonly Stage[] = [
@@ -74,7 +63,6 @@ const STAGES: readonly Stage[] = [
     fixArguments: ["--fix"],
     fixBeforeAgent: false,
     name: "monorepo",
-    perFile: false,
     stdin: "inherit",
     strictArguments: [],
     title: "📦 Analyzing the monorepo",
@@ -85,7 +73,6 @@ const STAGES: readonly Stage[] = [
     fixArguments: ["--fix", "--allow-remove-files"],
     fixBeforeAgent: true,
     name: "unused",
-    perFile: true,
     stdin: "ignore",
     strictArguments: ["--production", "--strict"],
     title: "🧹 Analyzing unused code",
@@ -94,7 +81,9 @@ const STAGES: readonly Stage[] = [
 
 const fix = Flag.Boolean("fix").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Automatically fix issues in every stage that runs")
+  Flag.withDescription(
+    "Automatically fix issues in every stage that runs. It has no effect with `--agent`"
+  )
 )
 const strict = Flag.Boolean("strict").pipe(
   Flag.withDefault(false),
@@ -108,7 +97,9 @@ const only = Flag.Literals("only", ["monorepo", "unused"]).pipe(
 )
 const agent = Flag.Literals("agent", CODING_AGENT_IDS).pipe(
   Flag.optional,
-  Flag.withDescription("Repair remaining analysis findings with a supported coding agent")
+  Flag.withDescription(
+    "Repair findings with a supported coding agent. Knip first applies its own fixes, which can delete unused files"
+  )
 )
 
 function dependencySnapshot(packageJson: PackageJson): string {
@@ -121,33 +112,21 @@ function dependencySnapshot(packageJson: PackageJson): string {
 }
 
 function diagnosticKey(diagnostic: AnalyzeDiagnostic): string {
-  return `${diagnostic.type}\0${diagnostic.message}`
+  return `${diagnostic.type}\0${diagnostic.file}\0${diagnostic.message}`
 }
 
 function diagnosticLabel(diagnostic: AnalyzeDiagnostic): string {
   return `${diagnostic.type}: ${diagnostic.message}`
 }
 
-function toRepairUnits(stage: Stage, items: readonly AnalyzeDiagnostic[]): RepairUnit[] {
-  if (stage.perFile) {
-    return Object.entries(Array.groupBy(items, (item) => item.file)).map(([file, group]) => ({
-      file,
-      items: group,
-      stage,
-    }))
-  }
-
-  return items.length > 0 ? [{ file: null, items, stage }] : []
-}
-
-function renderAnalyzePrompt(
-  unit: RepairUnit,
-  { attempt, items, payloadPath }: RepairAttempt<AnalyzeDiagnostic>
-): string {
-  const scope = unit.file === null ? "the project" : `only ${unit.file}`
+function renderAnalyzePrompt({
+  attempt,
+  items,
+  payloadPath,
+}: RepairAttempt<AnalyzeDiagnostic>): string {
   return [
-    `Repair ${scope} for the analysis findings in ${payloadPath}.`,
-    ...items.map((item, index) => `${index + 1}. ${diagnosticLabel(item)}`),
+    `Repair the project for the analysis findings in ${payloadPath}.`,
+    ...items.map((item, index) => `${index + 1}. ${diagnosticLabel(item)} in ${item.file}`),
     "Make minimal changes. Do not add suppressions, change analysis configuration, or make unrelated edits.",
     ...(attempt > 1
       ? ["The previous approach did not resolve every finding. Try a different repair."]
@@ -219,16 +198,7 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
           stdin: stage.stdin,
           title: stage.title,
         }))
-        return yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
-          Effect.mapError((error) =>
-            error._tag === "CliNotFound" && error.command === sherif.name
-              ? new CliNotFound({
-                  command: error.command,
-                  hint: "Run `adamantite update` to install it.",
-                })
-              : error
-          )
-        )
+        return yield* fix ? runner.runUntilFailure(steps) : runner.runAll(steps)
       }
 
       const chosenAgent = yield* requireCodingAgent(requestedAgent.value, cwd)
@@ -238,11 +208,11 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
       yield* warnUnenforcedPermissions(chosenAgent, "the file-only permission profile")
 
       const collect = (stage: Stage) => stage.collect({ args: stageArguments(stage), cwd })
-      const collectUnits = Effect.forEach(
+      const collectAll = Effect.forEach(
         stages,
-        (stage) => collect(stage).pipe(Effect.map((items) => toRepairUnits(stage, items))),
+        (stage) => collect(stage).pipe(Effect.map((items) => ({ items, stage }))),
         { concurrency: 1 }
-      ).pipe(Effect.map((units) => units.flat()))
+      )
 
       for (const stage of stages.filter((candidate) => candidate.fixBeforeAgent)) {
         yield* runner.exitCode({
@@ -254,16 +224,13 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
         })
       }
 
-      const units = yield* collectUnits
-      if (units.length === 0) {
+      const units = (yield* collectAll).filter((unit) => unit.items.length > 0)
+      const initial = units.flatMap((unit) => unit.items)
+      if (initial.length === 0) {
         return
       }
 
-      yield* printItemStatuses(
-        "pending",
-        units.flatMap((unit) => unit.items),
-        diagnosticLabel
-      )
+      yield* printItemStatuses("pending", initial, diagnosticLabel)
 
       // The agent cannot run the package manager, so Adamantite installs its dependency changes.
       const runAgent = (prompt: string) =>
@@ -291,6 +258,7 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
           return outcome
         }).pipe(Effect.catch((error) => Effect.succeed({ note: error.message })))
 
+      // One loop repairs one stage, so each attempt costs one run of the stage's tool.
       const results = yield* Effect.forEach(
         units,
         (unit) =>
@@ -306,20 +274,19 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
                 null,
                 2
               ),
-            runAttempt: (attempt) => runAgent(renderAnalyzePrompt(unit, attempt)),
-            verify: collect(unit.stage).pipe(
-              Effect.map((items) =>
-                unit.file === null ? items : items.filter((item) => item.file === unit.file)
-              )
-            ),
+            runAttempt: (attempt) => runAgent(renderAnalyzePrompt(attempt)),
+            verify: collect(unit.stage),
           }),
         { concurrency: 1 }
       )
 
-      const remaining = results.flatMap((result) => [...result.still, ...result.introduced])
+      // A repair in one stage can bring back a finding in a stage whose loop already ended. The
+      // final collection of every stage decides the exit code, so it agrees with a plain run.
+      const remaining = (yield* collectAll).flatMap((unit) => unit.items)
+      const remainingKeys = new Set(remaining.map((item) => diagnosticKey(item)))
       yield* printItemStatuses(
         "done",
-        results.flatMap((result) => result.cleared),
+        initial.filter((item) => !remainingKeys.has(diagnosticKey(item))),
         diagnosticLabel
       )
       yield* printItemStatuses("failed", remaining, diagnosticLabel)
@@ -327,6 +294,15 @@ export default Command.make("analyze", { agent, fix, only, strict }).pipe(
       if (remaining.length > 0) {
         return yield* failure()
       }
-    })
+    }).pipe(
+      Effect.mapError((error) =>
+        error._tag === "CliNotFound" && error.command === sherif.name
+          ? new CliNotFound({
+              command: error.command,
+              hint: "Run `adamantite update` to install it.",
+            })
+          : error
+      )
+    )
   )
 )

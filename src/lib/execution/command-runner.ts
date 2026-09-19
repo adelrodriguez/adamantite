@@ -175,8 +175,16 @@ const capture = Effect.fn("CommandRunner.capture")(function* ({
         yield* handle.kill({ forceKillAfter: FORCE_KILL_GRACE })
       }
 
-      const stdout = yield* Fiber.join(stdoutFiber)
-      const stderr = (yield* Fiber.join(stderrFiber)).toString("utf8")
+      // A pipe stays open while a process that left the group holds it, so the joins have a bound.
+      // The scope interrupts a fiber that does not finish.
+      const stdout = Option.getOrElse(
+        yield* Effect.timeoutOption(Fiber.join(stdoutFiber), FORCE_KILL_GRACE),
+        () => ""
+      )
+      const stderr = Option.getOrElse(
+        yield* Effect.timeoutOption(Fiber.join(stderrFiber), FORCE_KILL_GRACE),
+        () => Buffer.alloc(0)
+      ).toString("utf8")
 
       return completedCode === null
         ? ({ exitCode: null, status: "timed-out", stderr, stdout } as const)

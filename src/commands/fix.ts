@@ -56,6 +56,10 @@ function diagnosticKey(diagnostic: OxlintDiagnostic): string {
   return `${diagnostic.rule}\0${diagnostic.message}`
 }
 
+function fileDiagnosticKey(diagnostic: OxlintDiagnostic): string {
+  return `${diagnostic.file}\0${diagnosticKey(diagnostic)}`
+}
+
 function renderDiagnosticPayload(diagnostics: readonly OxlintDiagnostic[]): string {
   return JSON.stringify(
     diagnostics.map((diagnostic) => diagnostic.raw),
@@ -105,17 +109,19 @@ export default Command.make("fix", { agent, all, dangerous, files, suggested }).
         ...(suggested || all ? ["--fix-suggestions"] : []),
         ...(dangerous || all ? ["--fix-dangerously"] : []),
       ])
-      const steps = [
-        {
-          args: [...fixArguments, ...targets, ...forwardedArguments],
-          command: oxlint.name,
-          title: "🔧 Fixing lint issues",
-        },
-        { args: ["--write", ...targets], command: oxfmt.name, title: "✨ Formatting" },
-      ]
+      const lintStep = {
+        args: [...fixArguments, ...targets, ...forwardedArguments],
+        command: oxlint.name,
+        title: "🔧 Fixing lint issues",
+      }
+      const formatStep = {
+        args: ["--write", ...targets],
+        command: oxfmt.name,
+        title: "✨ Formatting",
+      }
 
       if (Option.isNone(requestedAgent)) {
-        return yield* runner.runAll(steps)
+        return yield* runner.runAll([lintStep, formatStep])
       }
 
       const chosenAgent = yield* requireCodingAgent(requestedAgent.value, cwd)
@@ -124,20 +130,18 @@ export default Command.make("fix", { agent, all, dangerous, files, suggested }).
       }
       yield* warnUnenforcedPermissions(chosenAgent, "the file-only permission profile")
 
-      // The autofix pass exits 1 when diagnostics remain. The agent receives those diagnostics.
-      yield* runner.runAll(steps).pipe(Effect.catchTag("CommandFailed", () => Effect.void))
+      // Oxlint exits 1 when diagnostics remain, and the agent receives those diagnostics. An Oxfmt
+      // failure still stops the run.
+      yield* runner.run(lintStep).pipe(Effect.catchTag("CommandFailed", () => Effect.void))
+      yield* runner.run(formatStep)
 
       // Type-aware rules run when the project has tsgolint, so the agent also receives them.
       const packageJson = yield* readPackageJson(cwd)
       const typeAware =
         packageJson.dependencies?.[tsgolint.name] !== undefined
         || packageJson.devDependencies?.[tsgolint.name] !== undefined
-      const diagnostics = yield* collectOxlintDiagnostics({
-        cwd,
-        forwardedArguments,
-        targets,
-        typeAware,
-      })
+      const collect = collectOxlintDiagnostics({ cwd, forwardedArguments, targets, typeAware })
+      const diagnostics = yield* collect
 
       if (diagnostics.length === 0) {
         return
@@ -166,11 +170,13 @@ export default Command.make("fix", { agent, all, dangerous, files, suggested }).
         { concurrency: 1 }
       )
 
-      const remaining = results.flatMap((result) => [...result.still, ...result.introduced])
-
+      // A repair in one file can cause a diagnostic in a different file. The final collection of
+      // every target decides the exit code, so it agrees with a plain run.
+      const remaining = yield* collect
+      const remainingKeys = new Set(remaining.map((diagnostic) => fileDiagnosticKey(diagnostic)))
       yield* printItemStatuses(
         "done",
-        results.flatMap((result) => result.cleared),
+        diagnostics.filter((diagnostic) => !remainingKeys.has(fileDiagnosticKey(diagnostic))),
         diagnosticLabel
       )
       yield* printItemStatuses("failed", remaining, diagnosticLabel)

@@ -50,4 +50,13 @@ describe("parseKnipDiagnostics", () => {
 
     expect(error.message).toContain("could not parse")
   })
+
+  it("reject a nested group where Knip sends a flat one", () => {
+    const output = JSON.stringify({
+      issues: [{ dependencies: [[{ name: "nested" }]], file: "package.json" }],
+    })
+    const error = Effect.runSync(Effect.flip(parseKnipDiagnostics(output, "/project")))
+
+    expect(error.message).toContain("could not parse")
+  })
 })

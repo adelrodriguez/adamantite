@@ -46,7 +46,10 @@ escalation.
 
 ## Consequences
 
-- Detector output, not an agent exit code, determines success.
+- Detector output, not an agent exit code, determines success. After the loops end, Fix and Analyze
+  run the detector on every target one more time, and that result decides the exit code.
+- Claude Code runs with `--permission-mode dontAsk`. A local test on 2.1.272 showed that
+  `acceptEdits` also approves `rm` and other filesystem commands outside the allowlist.
 - Agent retries are bounded. Timeout cleanup sends SIGTERM and then SIGKILL after a grace period.
 - A non-interactive dirty Doctor run needs `--allow-dirty`. Fix and Analyze keep their existing
   mutation policy.

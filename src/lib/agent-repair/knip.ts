@@ -27,27 +27,28 @@ const KnipIssue = Schema.Struct({
 
 const KnipIssues = Schema.Array(KnipIssue)
 
+const FlatGroup = Schema.optionalKey(KnipIssues)
 // Knip nests `cycles` and `duplicates` one level deeper than the other issue types.
-const KnipIssueGroup = Schema.optionalKey(Schema.Array(Schema.Union([KnipIssue, KnipIssues])))
+const NestedGroup = Schema.optionalKey(Schema.Array(KnipIssues))
 
 const KNIP_ISSUE_GROUPS = {
-  binaries: KnipIssueGroup,
-  catalog: KnipIssueGroup,
-  catalogReferences: KnipIssueGroup,
-  cycles: KnipIssueGroup,
-  dependencies: KnipIssueGroup,
-  devDependencies: KnipIssueGroup,
-  duplicates: KnipIssueGroup,
-  enumMembers: KnipIssueGroup,
-  exports: KnipIssueGroup,
-  files: KnipIssueGroup,
-  namespaceMembers: KnipIssueGroup,
-  nsExports: KnipIssueGroup,
-  nsTypes: KnipIssueGroup,
-  optionalPeerDependencies: KnipIssueGroup,
-  types: KnipIssueGroup,
-  unlisted: KnipIssueGroup,
-  unresolved: KnipIssueGroup,
+  binaries: FlatGroup,
+  catalog: FlatGroup,
+  catalogReferences: FlatGroup,
+  cycles: NestedGroup,
+  dependencies: FlatGroup,
+  devDependencies: FlatGroup,
+  duplicates: NestedGroup,
+  enumMembers: FlatGroup,
+  exports: FlatGroup,
+  files: FlatGroup,
+  namespaceMembers: FlatGroup,
+  nsExports: FlatGroup,
+  nsTypes: FlatGroup,
+  optionalPeerDependencies: FlatGroup,
+  types: FlatGroup,
+  unlisted: FlatGroup,
+  unresolved: FlatGroup,
 }
 
 const KnipOutput = Schema.fromJsonString(

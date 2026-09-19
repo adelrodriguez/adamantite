@@ -12,6 +12,10 @@ const encoder = new TextEncoder()
 
 function makeHandle(options: {
   readonly exitCode?: Effect.Effect<ChildProcessSpawner.ExitCode>
+  /**
+   * The pipes never close, as when a process that left the group still holds them.
+   */
+  readonly openPipes?: boolean
   readonly onKill?: (options: Parameters<ChildProcessSpawner.ChildProcessHandle["kill"]>[0]) => void
   readonly stderr?: string
   readonly stdout?: string
@@ -27,9 +31,9 @@ function makeHandle(options: {
         options.onKill?.(killOptions)
       }),
     pid: ChildProcessSpawner.ProcessId(1),
-    stderr: Stream.make(encoder.encode(options.stderr ?? "")),
+    stderr: options.openPipes ? Stream.never : Stream.make(encoder.encode(options.stderr ?? "")),
     stdin: Sink.drain,
-    stdout: Stream.make(encoder.encode(options.stdout ?? "")),
+    stdout: options.openPipes ? Stream.never : Stream.make(encoder.encode(options.stdout ?? "")),
     unref: Effect.succeed(Effect.void),
   })
 }
@@ -87,4 +91,16 @@ describe("CommandRunner.capture", () => {
       )
     )
   })
+
+  it.effect("return after the process exits when its pipes stay open", () =>
+    Effect.gen(function* () {
+      const runner = yield* CommandRunner
+      const fiber = yield* runner.capture({ args: [], command: "tool" }).pipe(Effect.forkChild)
+
+      yield* TestClock.adjust("4 seconds")
+      const result = yield* Fiber.join(fiber)
+
+      expect(result).toEqual({ exitCode: 0, status: "exited", stderr: "", stdout: "" })
+    }).pipe(Effect.provide(runnerLayer(makeHandle({ openPipes: true }))))
+  )
 })

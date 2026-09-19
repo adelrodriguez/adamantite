@@ -87,8 +87,10 @@ const CODING_AGENT_CONTRACTS = {
         prompt,
         "--permission-prompts",
         "none",
+        // `acceptEdits` also approves `rm`, `mv`, and other filesystem commands. `dontAsk` denies
+        // each tool that the allowlist does not name.
         "--permission-mode",
-        "acceptEdits",
+        "dontAsk",
         "--allowedTools",
         [...fileTools, ...shellTools(profile)].join(" "),
       ],

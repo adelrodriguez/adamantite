@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util"
 import * as Effect from "effect/Effect"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
@@ -9,7 +10,9 @@ export interface SherifDiagnostic {
   readonly type: "sherif"
 }
 
-// Sherif has no machine-readable reporter, so a failed run is one project-wide diagnostic.
+// Sherif has no machine-readable reporter, so a failed run is one project-wide diagnostic. The
+// message is constant, because it identifies the diagnostic between attempts. The report text
+// changes with each partial repair, so it stays in `raw`.
 export const collectSherifDiagnostics = Effect.fn("collectSherifDiagnostics")(function* ({
   args,
   cwd,
@@ -24,11 +27,11 @@ export const collectSherifDiagnostics = Effect.fn("collectSherifDiagnostics")(fu
     return []
   }
 
-  const output = `${result.stdout}\n${result.stderr}`.trim()
+  const output = stripVTControlCharacters(`${result.stdout}\n${result.stderr}`).trim()
   return [
     {
       file: cwd,
-      message: output || "Sherif reported monorepo consistency issues.",
+      message: "Sherif reported monorepo consistency issues.",
       raw: output,
       type: "sherif",
     },

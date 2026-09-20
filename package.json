@@ -99,6 +99,7 @@
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2001",
     "sherif": "1.13.0",
+    "tailwindcss": "4.3.3",
     "tsdown": "0.22.14",
     "type-fest": "5.8.0",
     "typescript": "7.0.2",

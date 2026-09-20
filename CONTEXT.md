@@ -11,8 +11,9 @@ or TypeScript.
 _Avoid_: Plugin, template
 
 **Vendored bundle**:
-Third-party code that Adamantite builds into the package at a pinned upstream commit
-because upstream does not publish to npm. Bundles ship inside the preset that owns them.
+Third-party code that Adamantite builds into the package at a pinned upstream commit,
+because upstream does not publish to npm or its package brings dependencies that Oxlint
+does not need. Bundles ship inside the preset that owns them.
 _Avoid_: Plugin, dependency
 
 **Target project**:

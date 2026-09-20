@@ -28,10 +28,15 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
-- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`; editors:
+- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`, `shadcn`; editors:
   `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
+
+The `shadcn` preset needs Tailwind v4. It finds components and the theme through
+`components.json`; in a project without that file, set `settings.shadcn` (for example
+`{ ui: "@/ds" }`) in `oxlint.config.ts`. It turns off the component-owned rules under
+`**/components/ui/**`; add the same override for another component directory.
 
 Only select options supported by the project. Presets and TypeScript require `check` or `fix`;
 extension installation requires an editor; `--github-actions` requires a CI-compatible script

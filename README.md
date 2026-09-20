@@ -239,19 +239,20 @@ underlying CLI.
 
 Adamantite publishes configuration that can also be consumed directly:
 
-| Export                     | Purpose                                                                                                                                                                                                                                                                 |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adamantite/lint`          | Core Oxlint rules.                                                                                                                                                                                                                                                      |
-| `adamantite/lint/react`    | React, JSX accessibility, and performance.                                                                                                                                                                                                                              |
-| `adamantite/lint/nextjs`   | Next.js rules.                                                                                                                                                                                                                                                          |
-| `adamantite/lint/vue`      | Vue rules.                                                                                                                                                                                                                                                              |
-| `adamantite/lint/node`     | Node.js rules.                                                                                                                                                                                                                                                          |
-| `adamantite/lint/jest`     | Jest rules.                                                                                                                                                                                                                                                             |
-| `adamantite/lint/vitest`   | Vitest rules.                                                                                                                                                                                                                                                           |
-| `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules. |
-| `adamantite/format`        | Oxfmt configuration.                                                                                                                                                                                                                                                    |
-| `adamantite/analyze`       | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo.                                                                                                                       |
-| `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                              |
+| Export                     | Purpose                                                                                                                                                                                                                                                                                         |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adamantite/lint`          | Core Oxlint rules.                                                                                                                                                                                                                                                                              |
+| `adamantite/lint/react`    | React, JSX accessibility, and performance.                                                                                                                                                                                                                                                      |
+| `adamantite/lint/nextjs`   | Next.js rules.                                                                                                                                                                                                                                                                                  |
+| `adamantite/lint/vue`      | Vue rules.                                                                                                                                                                                                                                                                                      |
+| `adamantite/lint/node`     | Node.js rules.                                                                                                                                                                                                                                                                                  |
+| `adamantite/lint/jest`     | Jest rules.                                                                                                                                                                                                                                                                                     |
+| `adamantite/lint/vitest`   | Vitest rules.                                                                                                                                                                                                                                                                                   |
+| `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                         |
+| `adamantite/lint/shadcn`   | Vendored [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
+| `adamantite/format`        | Oxfmt configuration.                                                                                                                                                                                                                                                                            |
+| `adamantite/analyze`       | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo.                                                                                                                                               |
+| `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                                                      |
 
 When consuming the lint presets directly, hoist the core preset's ignore patterns onto the
 root config. Oxlint does not merge `ignorePatterns` from extended configs, so without the
@@ -269,6 +270,31 @@ export default defineConfig({
 ```
 
 Configs generated by `adamantite init` include this automatically.
+
+### The shadcn preset
+
+`adamantite/lint/shadcn` needs Tailwind v4. It asks the Tailwind that your project installs
+which classes exist, so it needs no other package. It finds your components and theme
+through `components.json`. A project without that file must set `settings.shadcn` itself:
+
+```ts
+import { defineConfig } from "oxlint"
+import core from "adamantite/lint"
+import shadcn from "adamantite/lint/shadcn"
+
+export default defineConfig({
+  extends: [core, shadcn],
+  ignorePatterns: core.ignorePatterns,
+  settings: { shadcn: { ui: "@/ds" } },
+})
+```
+
+The preset allows layout classes such as `mt-4` and `w-[320px]` on components, and turns
+off `no-restyle`, `no-arbitrary-values`, and `require-static-classes` under
+`**/components/ui/**`, where components own their appearance. Add the same override for
+another component directory. See the
+[@shadcn/lint documentation](https://github.com/shadcn-ui/lint#settings) for settings,
+contracts, and custom messages.
 
 ## Requirements and boundaries
 

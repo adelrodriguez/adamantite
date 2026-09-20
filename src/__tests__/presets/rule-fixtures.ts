@@ -31,6 +31,11 @@ export interface RuleFixtureOptions {
    * Absolute path of the preset module that loads the plugin and enables its rules.
    */
   readonly presetPath: string
+  /**
+   * Absolute path of a directory whose content becomes the root of the linted project. Use it when
+   * the rules read project files, such as a theme stylesheet or component modules.
+   */
+  readonly projectDir?: string
 }
 
 export type RuleFixtureKind = "invalid" | "valid"
@@ -85,6 +90,11 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
 
   try {
     symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
+
+    if (options.projectDir !== undefined) {
+      cpSync(options.projectDir, tempDir, { recursive: true })
+    }
+
     cpSync(options.fixturesDir, join(tempDir, FIXTURES_DIRECTORY), { recursive: true })
     writeFileSync(
       join(tempDir, "oxlint.config.ts"),

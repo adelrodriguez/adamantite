@@ -33,6 +33,66 @@ describe("check", () => {
     )
   })
 
+  describe("stage flags", () => {
+    it.effect("run only linting when lint is requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, ["--lint"], {
+          forwardedArguments: ["--deny-warnings"],
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--deny-warnings"],
+            command: "oxlint",
+            title: "🔍 Linting",
+          },
+        ])
+      })
+    )
+
+    it.effect(
+      "run only the format check when format is requested and forward arguments to it",
+      () =>
+        Effect.gen(function* () {
+          const runner = createRunnerTestContext()
+
+          const exit = yield* runCommand(checkCommand, ["--format"], {
+            forwardedArguments: ["--no-error-on-unmatched-pattern"],
+            layers: [runner.layer],
+          })
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(runner.invocations).toEqual([
+            {
+              args: ["--check", "--no-error-on-unmatched-pattern"],
+              command: "oxfmt",
+              title: "✨ Checking formatting",
+            },
+          ])
+        })
+    )
+
+    it.effect("run both stages when lint and format are both requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, ["--lint", "--format"], {
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
+          "oxfmt",
+          "oxlint",
+        ])
+      })
+    )
+  })
+
   describe("output", () => {
     it.effect("print a heading before each tool", () =>
       Effect.gen(function* () {

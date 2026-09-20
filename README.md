@@ -118,6 +118,14 @@ adamantite check
 adamantite check src
 ```
 
+Use `--lint` or `--format` to run one step. Arguments after `--` go to Oxlint, or to Oxfmt
+with `--format`:
+
+```sh
+adamantite check --lint
+adamantite check --format
+```
+
 ### `adamantite fix`
 
 Apply safe Oxlint fixes, then format the files with Oxfmt. Suggested and dangerous fixes require explicit flags:
@@ -127,6 +135,14 @@ adamantite fix
 adamantite fix --suggested
 adamantite fix --dangerous
 adamantite fix --all
+```
+
+Use `--lint` or `--format` to run one step. Arguments after `--` go to Oxlint, or to Oxfmt
+with `--format`:
+
+```sh
+adamantite fix --lint
+adamantite fix --format
 ```
 
 ### `adamantite analyze`

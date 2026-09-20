@@ -52,9 +52,10 @@ adamantite fix
 adamantite analyze
 ```
 
-- Use `check` for read-only formatting, lint, and type-error validation.
+- Use `check` for read-only formatting, lint, and type-error validation. `check --lint` or `check --format` runs one
+  step.
 - Use `fix` for automatic Oxlint fixes followed by Oxfmt formatting. Add `--suggested`, `--dangerous`, or `--all` only
-  with explicit permission after reviewing their impact.
+  with explicit permission after reviewing their impact. `fix --lint` or `fix --format` runs one step.
 - Use `analyze` for unused dependencies, exports, and files. In a monorepo it first checks
   workspace dependency consistency with Sherif. `analyze --only monorepo` or
   `analyze --only unused` runs one stage. `analyze --fix` may remove files, so inspect

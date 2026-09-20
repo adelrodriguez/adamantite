@@ -7,6 +7,7 @@ import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import { InvalidFixOptions } from "#lib/shared/errors.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to fix (optional)"),
@@ -28,12 +29,32 @@ const all = Flag.Boolean("all").pipe(
   Flag.withDescription("Apply all fixes, including suggested and dangerous fixes")
 )
 
-export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
+const lint = Flag.Boolean("lint").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Fix only lint issues. Arguments after `--` go to Oxlint")
+)
+
+const format = Flag.Boolean("format").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Only format. Arguments after `--` go to Oxfmt")
+)
+
+export default Command.make("fix", { all, dangerous, files, format, lint, suggested }).pipe(
   Command.withDescription("Fix lint and formatting issues in code"),
-  Command.withHandler(({ all, dangerous, files, suggested }) =>
+  Command.withHandler(({ all, dangerous, files, format, lint, suggested }) =>
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
+      const formatOnly = format && !lint
+      const lintOnly = lint && !format
+
+      if (formatOnly && (all || dangerous || suggested)) {
+        return yield* new InvalidFixOptions({
+          reason:
+            "`--suggested`, `--dangerous`, and `--all` apply to lint fixes. Remove them or `--format`.",
+        })
+      }
+
       const targets = Array.dedupe(files)
       const args = Array.dedupe([
         "--fix",
@@ -43,12 +64,24 @@ export default Command.make("fix", { all, dangerous, files, suggested }).pipe(
       ])
 
       yield* runner.runAll([
-        {
-          args: [...args, ...forwardedArguments],
-          command: oxlint.name,
-          title: "🔧 Fixing lint issues",
-        },
-        { args: ["--write", ...targets], command: oxfmt.name, title: "✨ Formatting" },
+        ...(formatOnly
+          ? []
+          : [
+              {
+                args: [...args, ...forwardedArguments],
+                command: oxlint.name,
+                title: "🔧 Fixing lint issues",
+              },
+            ]),
+        ...(lintOnly
+          ? []
+          : [
+              {
+                args: ["--write", ...targets, ...(formatOnly ? forwardedArguments : [])],
+                command: oxfmt.name,
+                title: "✨ Formatting",
+              },
+            ]),
       ])
     })
   )

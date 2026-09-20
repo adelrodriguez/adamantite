@@ -71,6 +71,79 @@ describe("fix", () => {
     )
   })
 
+  describe("stage flags", () => {
+    it.effect("run only lint fixes when lint is requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, ["--lint", "--suggested"], {
+          forwardedArguments: ["--deny-warnings"],
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--fix", "--fix-suggestions", "--deny-warnings"],
+            command: "oxlint",
+            title: "🔧 Fixing lint issues",
+          },
+        ])
+      })
+    )
+
+    it.effect("run only formatting when format is requested and forward arguments to it", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, ["--format"], {
+          forwardedArguments: ["--no-error-on-unmatched-pattern"],
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--write", "--no-error-on-unmatched-pattern"],
+            command: "oxfmt",
+            title: "✨ Formatting",
+          },
+        ])
+      })
+    )
+
+    it.effect("run both stages when lint and format are both requested", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, ["--lint", "--format"], {
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
+          "oxlint",
+          "oxfmt",
+        ])
+      })
+    )
+
+    it.effect("reject lint fix modes when only formatting", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, ["--format", "--all"], {
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "InvalidFixOptions" })
+        expect(runner.invocations).toEqual([])
+      })
+    )
+  })
+
   describe("file arguments", () => {
     it.effect("deduplicate duplicate file arguments", () =>
       Effect.gen(function* () {

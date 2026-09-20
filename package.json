@@ -69,7 +69,9 @@
     "test:build": "node scripts/test-build.ts",
     "test:coverage": "vitest run --coverage",
     "test:dist": "pnpm run build && pnpm run test:build && pnpm run test:smoke",
+    "test:presets": "vitest run --project presets",
     "test:smoke": "node scripts/test-smoke.ts",
+    "test:unit": "vitest run --project unit",
     "test:watch": "vitest",
     "version": "changeset version"
   },

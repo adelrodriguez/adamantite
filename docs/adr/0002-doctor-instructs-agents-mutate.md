@@ -74,7 +74,10 @@ The decisions:
 - The oracle is only as strong as `assess`: any managed config without content-level
   inspection weakens the verification step, so new managed surfaces must ship with
   inspection (phase 2 covers zed, vscode, the GitHub workflow, and tsconfig).
-- Atomicity moves from `runMigration` snapshots to git hygiene; the Markdown prompt
-  surfaces the clean-tree requirement.
+- Atomicity moves from `runMigration` snapshots to git hygiene, which is the user's to
+  keep. Until 2026-09-20 Doctor checked the Git working tree before a handoff and the
+  Markdown prompt told the agent to confirm a clean tree; both were removed as friction,
+  because the user already chose the handoff and the agent edits under its own
+  permission flow. Adamantite provides no rollback.
 - CI scripts that call `doctor --fix` fail with an unknown-option error. Run
   `adamantite doctor` and follow the reported goal criteria instead.

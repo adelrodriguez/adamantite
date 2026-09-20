@@ -172,7 +172,6 @@ function renderRepairPrompt(
     "",
     `This project uses Adamantite ${adamantiteVersion} to manage linting, formatting, and type tooling.`,
     `\`adamantite doctor\` found ${findings.length} issue(s). Fix them so that \`adamantite doctor\` exits 0.`,
-    "Before editing, make sure the working tree is clean or the user has accepted the risk.",
     "",
     ...warningSection,
     sections.join("\n\n"),

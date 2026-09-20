@@ -36,7 +36,6 @@ describe("renderAssessmentMarkdown", () => {
 
     expect(prompt).toContain("# Adamantite doctor findings")
     expect(prompt).toContain("This project uses Adamantite 1.2.3")
-    expect(prompt).toContain("make sure the working tree is clean")
     expect(prompt).toContain("## 1. Missing tool configuration")
     expect(prompt).toContain("## Assessment warnings")
     expect(prompt).toContain("- Found two competing tool configurations.")

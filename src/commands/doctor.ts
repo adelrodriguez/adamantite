@@ -154,24 +154,6 @@ export default Command.make("doctor").pipe(
       }
 
       const agent = action
-      const treeState = yield* agents.workingTreeState(cwd)
-
-      if (treeState !== "clean") {
-        yield* prompter.log.warning(
-          treeState === "dirty"
-            ? "The Git working tree has uncommitted changes. The agent will edit files on top of them."
-            : "Doctor could not confirm a clean Git working tree. The agent will edit files without a checkpoint to return to."
-        )
-        const proceed = yield* prompter.confirm({
-          initialValue: false,
-          message: `Hand off to ${agent.name} anyway?`,
-        })
-
-        if (!proceed) {
-          yield* offerPromptCopy(prompt)
-          return yield* failWithFindings
-        }
-      }
 
       yield* prompter.log.info(
         `Handing the terminal to ${agent.name}. Exit the agent to return to Doctor.`

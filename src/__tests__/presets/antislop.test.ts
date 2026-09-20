@@ -1,54 +1,55 @@
-import { spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync, symlinkSync } from "node:fs"
-import { writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, test } from "@effect/vitest"
+import { beforeAll, describe, expect, test } from "@effect/vitest"
+import * as EffectArray from "effect/Array"
+import * as Order from "effect/Order"
 import antislop from "#presets/lint/antislop.ts"
 import antislopPlugin from "#presets/lint/vendor/antislop/plugin.mjs"
+import { lintRuleFixtures, listFixtureRules, type RuleFixtureCase } from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
+const FIXTURES_DIR = join(import.meta.dirname, "fixtures/antislop")
+const NAMESPACE = "anti-slop"
+
+const presetRules = Object.keys(antislop.rules ?? {})
+  .filter((name) => name.startsWith(`${NAMESPACE}/`))
+  .map((name) => name.slice(NAMESPACE.length + 1))
 
 describe("antislop preset", () => {
   test("enable exactly the rules the vendored plugin defines", () => {
-    const pluginRules = Object.keys(antislopPlugin.rules).map((name) => `anti-slop/${name}`)
-    const presetRules = Object.keys(antislop.rules ?? {}).filter((name) =>
-      name.startsWith("anti-slop/")
-    )
-
-    expect(new Set(presetRules)).toEqual(new Set(pluginRules))
+    expect(new Set(presetRules)).toEqual(new Set(Object.keys(antislopPlugin.rules)))
   })
 
-  test("report anti-slop diagnostics through extends", async () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "adamantite-antislop-test-"))
+  test("have fixtures for exactly the rules the preset enables", () => {
+    expect(listFixtureRules(FIXTURES_DIR)).toEqual(EffectArray.sort(presetRules, Order.String))
+  })
+})
 
-    try {
-      symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
-      await writeFile(
-        join(tempDir, "oxlint.config.ts"),
-        [
-          'import { defineConfig } from "oxlint"',
-          `import antislop from "${join(REPO_ROOT, "presets/lint/antislop.ts")}"`,
-          "",
-          "export default defineConfig({ extends: [antislop] })",
-          "",
-        ].join("\n")
-      )
-      await writeFile(
-        join(tempDir, "bad.ts"),
-        "export const value = JSON.parse('{}') as unknown as string\n"
-      )
+describe("antislop rule fixtures", () => {
+  let cases: RuleFixtureCase[] = []
 
-      const result = spawnSync(
-        join(REPO_ROOT, "node_modules/.bin/oxlint"),
-        ["-c", "oxlint.config.ts", "bad.ts"],
-        { cwd: tempDir, encoding: "utf8" }
-      )
+  beforeAll(() => {
+    cases = lintRuleFixtures({
+      fixturesDir: FIXTURES_DIR,
+      namespace: NAMESPACE,
+      presetPath: join(REPO_ROOT, "presets/lint/antislop.ts"),
+    })
+  })
 
-      expect(result.status).not.toBe(0)
-      expect(result.stdout).toContain("anti-slop(no-chained-type-assertions)")
-    } finally {
-      rmSync(tempDir, { force: true, recursive: true })
-    }
+  describe.each(listFixtureRules(FIXTURES_DIR))("%s", (rule) => {
+    test("report every invalid fixture", () => {
+      const invalid = cases.filter((entry) => entry.rule === rule && entry.kind === "invalid")
+      const missed = invalid.filter((entry) => entry.reportedLines.length === 0)
+
+      expect(invalid).not.toEqual([])
+      expect(missed.map((entry) => entry.file)).toEqual([])
+    })
+
+    test("report no valid fixture", () => {
+      const valid = cases.filter((entry) => entry.rule === rule && entry.kind === "valid")
+      const reported = valid.filter((entry) => entry.reportedLines.length > 0)
+
+      expect(valid).not.toEqual([])
+      expect(reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)).toEqual([])
+    })
   })
 })

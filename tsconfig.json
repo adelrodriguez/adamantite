@@ -9,5 +9,5 @@
     "types": ["node"]
   },
   "include": ["src", "presets/**/*.ts", "scripts", "*.config.ts"],
-  "exclude": [".packref", "dist", "node_modules"]
+  "exclude": [".packref", "dist", "node_modules", "src/__tests__/presets/fixtures"]
 }

@@ -118,3 +118,10 @@ are checked in with their license attribution, so target projects install nothin
 To update one, bump its pinned ref in the script's plugin list, re-run the script, review
 the upstream diff, and adjust the owning preset's rules if rules were added, removed, or
 renamed; each preset's drift test catches a mismatch.
+
+Each enabled rule of a bundle has `valid/` and `invalid/` fixtures under
+`src/__tests__/presets/fixtures/<preset>/<rule>/`, one case per file. The harness in
+`src/__tests__/presets/rule-fixtures.ts` lints them through the preset in one real Oxlint
+run, so a re-vendor that tightens or relaxes a rule fails the fixture of that case. Add
+fixtures when a rule is added, and move or change a fixture only when the upstream change
+is accepted.

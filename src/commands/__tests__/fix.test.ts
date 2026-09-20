@@ -72,11 +72,11 @@ describe("fix", () => {
   })
 
   describe("stage flags", () => {
-    it.effect("run only lint fixes when lint is requested", () =>
+    it.effect("run only the lint stage when selected", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommand(fixCommand, ["--lint", "--suggested"], {
+        const exit = yield* runCommand(fixCommand, ["--only", "lint", "--suggested"], {
           forwardedArguments: ["--deny-warnings"],
           layers: [runner.layer],
         })
@@ -92,11 +92,11 @@ describe("fix", () => {
       })
     )
 
-    it.effect("run only formatting when format is requested and forward arguments to it", () =>
+    it.effect("run only the format stage when selected and forward arguments to it", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommand(fixCommand, ["--format"], {
+        const exit = yield* runCommand(fixCommand, ["--only", "format"], {
           forwardedArguments: ["--no-error-on-unmatched-pattern"],
           layers: [runner.layer],
         })
@@ -112,27 +112,11 @@ describe("fix", () => {
       })
     )
 
-    it.effect("run both stages when lint and format are both requested", () =>
+    it.effect("reject lint fix modes with the format stage", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommand(fixCommand, ["--lint", "--format"], {
-          layers: [runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
-          "oxlint",
-          "oxfmt",
-        ])
-      })
-    )
-
-    it.effect("reject lint fix modes when only formatting", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(fixCommand, ["--format", "--all"], {
+        const exit = yield* runCommand(fixCommand, ["--only", "format", "--all"], {
           layers: [runner.layer],
         })
 

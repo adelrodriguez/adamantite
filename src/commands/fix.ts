@@ -1,5 +1,6 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
@@ -29,60 +30,60 @@ const all = Flag.Boolean("all").pipe(
   Flag.withDescription("Apply all fixes, including suggested and dangerous fixes")
 )
 
-const lint = Flag.Boolean("lint").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Fix only lint issues. Arguments after `--` go to Oxlint")
+const only = Flag.Literals("only", ["format", "lint"]).pipe(
+  Flag.optional,
+  Flag.withDescription(
+    "Run one stage: `format` (oxfmt) or `lint` (oxlint). Arguments after `--` go to that stage"
+  )
 )
 
-const format = Flag.Boolean("format").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Only format. Arguments after `--` go to Oxfmt")
-)
-
-export default Command.make("fix", { all, dangerous, files, format, lint, suggested }).pipe(
+export default Command.make("fix", { all, dangerous, files, only, suggested }).pipe(
   Command.withDescription("Fix lint and formatting issues in code"),
-  Command.withHandler(({ all, dangerous, files, format, lint, suggested }) =>
+  Command.withHandler(({ all, dangerous, files, only, suggested }) =>
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
-      const formatOnly = format && !lint
-      const lintOnly = lint && !format
+      const selected = Option.getOrUndefined(only)
 
-      if (formatOnly && (all || dangerous || suggested)) {
+      if (selected === "format" && (all || dangerous || suggested)) {
         return yield* new InvalidFixOptions({
           reason:
-            "`--suggested`, `--dangerous`, and `--all` apply to lint fixes. Remove them or `--format`.",
+            "`--suggested`, `--dangerous`, and `--all` apply to the lint stage. Remove them or `--only format`.",
         })
       }
 
       const targets = Array.dedupe(files)
-      const args = Array.dedupe([
-        "--fix",
-        ...(suggested || all ? ["--fix-suggestions"] : []),
-        ...(dangerous || all ? ["--fix-dangerously"] : []),
-        ...targets,
-      ])
+      const forwardedStage = selected ?? "lint"
 
-      yield* runner.runAll([
-        ...(formatOnly
-          ? []
-          : [
-              {
-                args: [...args, ...forwardedArguments],
-                command: oxlint.name,
-                title: "🔧 Fixing lint issues",
-              },
-            ]),
-        ...(lintOnly
-          ? []
-          : [
-              {
-                args: ["--write", ...targets, ...(formatOnly ? forwardedArguments : [])],
-                command: oxfmt.name,
-                title: "✨ Formatting",
-              },
-            ]),
-      ])
+      const stages = [
+        {
+          args: Array.dedupe([
+            "--fix",
+            ...(suggested || all ? ["--fix-suggestions"] : []),
+            ...(dangerous || all ? ["--fix-dangerously"] : []),
+            ...targets,
+          ]),
+          command: oxlint.name,
+          name: "lint",
+          title: "🔧 Fixing lint issues",
+        },
+        {
+          args: ["--write", ...targets],
+          command: oxfmt.name,
+          name: "format",
+          title: "✨ Formatting",
+        },
+      ]
+
+      yield* runner.runAll(
+        stages
+          .filter((stage) => selected === undefined || stage.name === selected)
+          .map((stage) => ({
+            args: [...stage.args, ...(stage.name === forwardedStage ? forwardedArguments : [])],
+            command: stage.command,
+            title: stage.title,
+          }))
+      )
     })
   )
 )

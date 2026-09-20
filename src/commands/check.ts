@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Argument from "effect/unstable/cli/Argument"
 import * as Command from "effect/unstable/cli/Command"
 import * as Flag from "effect/unstable/cli/Flag"
@@ -12,45 +13,41 @@ const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.variadic()
 )
 
-const lint = Flag.Boolean("lint").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Check only lint and type errors. Arguments after `--` go to Oxlint")
+const only = Flag.Literals("only", ["format", "lint"]).pipe(
+  Flag.optional,
+  Flag.withDescription(
+    "Run one stage: `format` (oxfmt) or `lint` (oxlint). Arguments after `--` go to that stage"
+  )
 )
 
-const format = Flag.Boolean("format").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Check only formatting. Arguments after `--` go to Oxfmt")
-)
-
-export default Command.make("check", { files, format, lint }).pipe(
+export default Command.make("check", { files, only }).pipe(
   Command.withDescription("Check formatting, code issues, and type errors"),
-  Command.withHandler(({ files, format, lint }) =>
+  Command.withHandler(({ files, only }) =>
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
-      const formatOnly = format && !lint
-      const lintOnly = lint && !format
+      const selected = Option.getOrUndefined(only)
+      const forwardedStage = selected ?? "lint"
 
-      yield* runner.runAll([
-        ...(lintOnly
-          ? []
-          : [
-              {
-                args: ["--check", ...files, ...(formatOnly ? forwardedArguments : [])],
-                command: oxfmt.name,
-                title: "✨ Checking formatting",
-              },
-            ]),
-        ...(formatOnly
-          ? []
-          : [
-              {
-                args: [...files, ...forwardedArguments],
-                command: oxlint.name,
-                title: "🔍 Linting",
-              },
-            ]),
-      ])
+      const stages = [
+        {
+          args: ["--check", ...files],
+          command: oxfmt.name,
+          name: "format",
+          title: "✨ Checking formatting",
+        },
+        { args: [...files], command: oxlint.name, name: "lint", title: "🔍 Linting" },
+      ]
+
+      yield* runner.runAll(
+        stages
+          .filter((stage) => selected === undefined || stage.name === selected)
+          .map((stage) => ({
+            args: [...stage.args, ...(stage.name === forwardedStage ? forwardedArguments : [])],
+            command: stage.command,
+            title: stage.title,
+          }))
+      )
     })
   )
 )

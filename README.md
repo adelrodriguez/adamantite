@@ -118,12 +118,12 @@ adamantite check
 adamantite check src
 ```
 
-Use `--lint` or `--format` to run one step. Arguments after `--` go to Oxlint, or to Oxfmt
-with `--format`:
+Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
+both run:
 
 ```sh
-adamantite check --lint
-adamantite check --format
+adamantite check --only lint
+adamantite check --only format
 ```
 
 ### `adamantite fix`
@@ -137,12 +137,12 @@ adamantite fix --dangerous
 adamantite fix --all
 ```
 
-Use `--lint` or `--format` to run one step. Arguments after `--` go to Oxlint, or to Oxfmt
-with `--format`:
+Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
+both run:
 
 ```sh
-adamantite fix --lint
-adamantite fix --format
+adamantite fix --only lint
+adamantite fix --only format
 ```
 
 ### `adamantite analyze`

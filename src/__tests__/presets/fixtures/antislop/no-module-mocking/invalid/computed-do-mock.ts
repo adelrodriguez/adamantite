@@ -1,0 +1,1 @@
+vi['doMock']('./user-store')

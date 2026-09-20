@@ -9,6 +9,8 @@ export default defineConfig({
     ...ignorePatterns,
     // Vendored plugin bundles are entirely generated; see scripts/vendor-plugins.ts.
     "presets/lint/vendor/",
+    // Rule fixtures break rules on purpose; see src/__tests__/presets/rule-fixtures.ts.
+    "src/__tests__/presets/fixtures/",
   ],
   options: {
     typeAware: true,

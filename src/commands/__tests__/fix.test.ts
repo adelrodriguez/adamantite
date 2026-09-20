@@ -71,6 +71,63 @@ describe("fix", () => {
     )
   })
 
+  describe("stage flags", () => {
+    it.effect("run only the lint stage when selected", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, ["--only", "lint", "--suggested"], {
+          forwardedArguments: ["--deny-warnings"],
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--fix", "--fix-suggestions", "--deny-warnings"],
+            command: "oxlint",
+            title: "🔧 Fixing lint issues",
+          },
+        ])
+      })
+    )
+
+    it.effect("run only the format stage when selected and forward arguments to it", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, ["--only", "format"], {
+          forwardedArguments: ["--no-error-on-unmatched-pattern"],
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--write", "--no-error-on-unmatched-pattern"],
+            command: "oxfmt",
+            title: "✨ Formatting",
+          },
+        ])
+      })
+    )
+
+    it.effect("reject lint fix modes with the format stage", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, ["--only", "format", "--all"], {
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "InvalidFixOptions" })
+        expect(runner.invocations).toEqual([])
+      })
+    )
+  })
+
   describe("file arguments", () => {
     it.effect("deduplicate duplicate file arguments", () =>
       Effect.gen(function* () {

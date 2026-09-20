@@ -118,6 +118,14 @@ adamantite check
 adamantite check src
 ```
 
+Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
+both run:
+
+```sh
+adamantite check --only lint
+adamantite check --only format
+```
+
 ### `adamantite fix`
 
 Apply safe Oxlint fixes, then format the files with Oxfmt. Suggested and dangerous fixes require explicit flags:
@@ -127,6 +135,14 @@ adamantite fix
 adamantite fix --suggested
 adamantite fix --dangerous
 adamantite fix --all
+```
+
+Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
+both run:
+
+```sh
+adamantite fix --only lint
+adamantite fix --only format
 ```
 
 ### `adamantite analyze`

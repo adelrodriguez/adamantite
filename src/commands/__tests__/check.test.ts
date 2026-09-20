@@ -33,6 +33,48 @@ describe("check", () => {
     )
   })
 
+  describe("stage flags", () => {
+    it.effect("run only the lint stage when selected", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, ["--only", "lint"], {
+          forwardedArguments: ["--deny-warnings"],
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--deny-warnings"],
+            command: "oxlint",
+            title: "🔍 Linting",
+          },
+        ])
+      })
+    )
+
+    it.effect("run only the format stage when selected and forward arguments to it", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, ["--only", "format"], {
+          forwardedArguments: ["--no-error-on-unmatched-pattern"],
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          {
+            args: ["--check", "--no-error-on-unmatched-pattern"],
+            command: "oxfmt",
+            title: "✨ Checking formatting",
+          },
+        ])
+      })
+    )
+  })
+
   describe("output", () => {
     it.effect("print a heading before each tool", () =>
       Effect.gen(function* () {

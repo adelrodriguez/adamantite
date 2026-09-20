@@ -177,6 +177,14 @@ export class InvalidAnalyzeOptions extends Data.TaggedError("InvalidAnalyzeOptio
   }
 }
 
+export class InvalidFixOptions extends Data.TaggedError("InvalidFixOptions")<{
+  reason: string
+}> {
+  override get message() {
+    return `Invalid fix options. ${this.reason}`
+  }
+}
+
 export class InvalidInitOptions extends Data.TaggedError("InvalidInitOptions")<{
   reason: string
 }> {

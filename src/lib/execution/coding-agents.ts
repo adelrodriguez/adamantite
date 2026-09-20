@@ -3,7 +3,6 @@ import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 
@@ -42,8 +41,6 @@ export const codingAgents: readonly CodingAgent[] = [
   },
   { command: "opencode", name: "OpenCode", seedArguments: (prompt) => ["--prompt", prompt] },
 ]
-
-export type WorkingTreeState = "clean" | "dirty" | "unknown"
 
 export interface AgentSessionOptions {
   readonly agent: CodingAgent
@@ -102,10 +99,6 @@ export class CodingAgents extends Context.Service<
      * session so a Ctrl-C reaches only the agent.
      */
     readonly runSession: (options: AgentSessionOptions) => Effect.Effect<void, AgentSessionFailed>
-    /**
-     * Untracked-only trees read as clean; the handoff confirmation copy accepts that.
-     */
-    readonly workingTreeState: (cwd: string) => Effect.Effect<WorkingTreeState>
   }
 >()("CodingAgents") {
   static readonly layer = Layer.effect(
@@ -157,25 +150,6 @@ export class CodingAgents extends Context.Service<
                 reason: cause._tag === "CliNotFound" ? "not-found" : "spawn-failed",
               })
           )
-        ),
-        // Exit codes only: CommandRunner cannot capture output, and `git diff --quiet HEAD`
-        // answers cleanly through them (0 clean, 1 dirty, anything else no usable answer).
-        workingTreeState: Effect.fn("CodingAgents.workingTreeState")(
-          function* (cwd) {
-            const exitCode = yield* runner.exitCode({
-              args: ["diff", "--quiet", "HEAD"],
-              command: "git",
-              cwd,
-              stderr: "ignore",
-              stdout: "ignore",
-            })
-
-            if (exitCode === ChildProcessSpawner.ExitCode(0)) {
-              return "clean"
-            }
-            return exitCode === ChildProcessSpawner.ExitCode(1) ? "dirty" : "unknown"
-          },
-          Effect.orElseSucceed((): WorkingTreeState => "unknown")
         ),
       })
     })

@@ -59,7 +59,6 @@ function makeFindingsFixture() {
 
 interface HandoffRunnerOptions {
   readonly agentExit?: number | "not-found" | "spawn-error"
-  readonly gitExit?: number
   readonly installedCommands?: readonly string[]
   readonly onAgentRun?: () => void
 }
@@ -69,7 +68,7 @@ function isProbe(invocation: { readonly args: string[] }) {
 }
 
 // Dispatches on the invocation shape: `--version` probes answer installation,
-// `git` answers the working-tree check, and everything else is the agent spawn.
+// and everything else is the agent spawn.
 function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
   const installed = options.installedCommands ?? ["claude", "codex"]
 
@@ -80,9 +79,6 @@ function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
           return installed.includes(invocation.command)
             ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
             : Effect.fail(new CliNotFound({ command: invocation.command }))
-        }
-        if (invocation.command === "git") {
-          return Effect.succeed(ChildProcessSpawner.ExitCode(options.gitExit ?? 0))
         }
         if (options.agentExit === "not-found") {
           return Effect.fail(new CliNotFound({ command: invocation.command }))
@@ -465,12 +461,6 @@ describe("doctor", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)).toEqual([
         expect.objectContaining({
-          args: ["diff", "--quiet", "HEAD"],
-          command: "git",
-          stderr: "ignore",
-          stdout: "ignore",
-        }),
-        expect.objectContaining({
           args: [expect.stringContaining("# Adamantite doctor findings")],
           command: "claude",
           detached: false,
@@ -479,9 +469,9 @@ describe("doctor", () => {
           stdout: "inherit",
         }),
       ])
-      expect(nonProbeInvocations(runner)[1]?.args[0]).toContain("knip")
+      expect(nonProbeInvocations(runner)[0]?.args[0]).toContain("knip")
       // The seeded agent often cannot reach `adamantite` on PATH; the prompt must say how.
-      expect(nonProbeInvocations(runner)[1]?.args[0]).toContain("`npx` or `pnpm exec`")
+      expect(nonProbeInvocations(runner)[0]?.args[0]).toContain("`npx` or `pnpm exec`")
       expect(prompter.logs).toContainEqual({
         level: "info",
         message: "Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
@@ -576,65 +566,6 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("require confirmation for a dirty working tree and stop when declined", () =>
-    Effect.gen(function* () {
-      const files = makeFindingsFixture()
-      const prompter = createPrompterTestContext({
-        confirmResponses: [false, false],
-        selectResponses: [claudeAgent],
-      })
-      const runner = makeHandoffRunner({ gitExit: 1 })
-
-      const exit = yield* runCommand(doctorCommand, [], {
-        files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "warning",
-        message:
-          "The Git working tree has uncommitted changes. The agent will edit files on top of them.",
-      })
-      expect(prompter.confirmCalls).toContainEqual({
-        initialValue: false,
-        message: "Hand off to Claude Code anyway?",
-      })
-      expect(nonProbeInvocations(runner)).toHaveLength(1)
-      expect(nonProbeInvocations(runner)[0]?.command).toBe("git")
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
-    })
-  )
-
-  it.effect("hand off after confirming an unknown working tree state", () =>
-    Effect.gen(function* () {
-      const files = makeFindingsFixture()
-      const prompter = createPrompterTestContext({
-        confirmResponses: [true],
-        selectResponses: [claudeAgent],
-      })
-      const runner = makeHandoffRunner({
-        gitExit: 128,
-        onAgentRun: () => {
-          files.write("knip.config.ts", toKnipTsConfigContent())
-        },
-      })
-
-      const exit = yield* runCommand(doctorCommand, [], {
-        files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "warning",
-        message:
-          "Doctor could not confirm a clean Git working tree. The agent will edit files without a checkpoint to return to.",
-      })
-      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
-    })
-  )
-
   it.effect("fail and record the cancellation when the resolve prompt is cancelled", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
@@ -708,7 +639,7 @@ describe("doctor", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(nonProbeInvocations(runner)[1]).toEqual(
+      expect(nonProbeInvocations(runner)[0]).toEqual(
         expect.objectContaining({
           args: ["-i", expect.stringContaining("# Adamantite doctor findings")],
           command: "gemini",

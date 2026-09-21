@@ -33,8 +33,9 @@ Use Changesets for versioning and changelog management. See
 
 ### Implementation plans
 
-Store active implementation plans in `docs/plans/`. Delete each plan when its work is
-complete. See `docs/plans/README.md`.
+Write an implementation plan into the GitHub issue that it serves. Update the issue body
+when the plan changes, so the issue stays the single record of the work. Do not add plan
+files to the repository. See `docs/agents/issue-tracker.md`.
 
 ## Repository rules
 

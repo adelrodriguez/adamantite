@@ -18,6 +18,13 @@ operations.
 
 Infer the repository from the Git remote when possible.
 
+## Implementation plans
+
+A plan lives in the body of the issue that it serves, not in a repository file. Put the
+decisions, the steps, and a task list there, and edit the body with
+`gh issue edit <number> --body-file <file>` when the plan changes. Use a comment only to
+record why a plan changed. If the work has no issue, create one for it.
+
 ## Pull requests as a request surface
 
 PRs as a request surface: no.

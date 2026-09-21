@@ -124,17 +124,10 @@ export default Command.make("init", initCommandOptions).pipe(
         dependencies.push(
           `${oxlint.name}@${oxlint.version}`,
           `${tsgolint.name}@${tsgolint.version}`,
-          `${oxfmt.name}@${oxfmt.version}`
-        )
-      }
-
-      // A preset with a managed plugin loads that plugin from the target project.
-      if (hasOxlint) {
-        const selectedPresets = new Set<string>(presets)
-
-        dependencies.push(
+          `${oxfmt.name}@${oxfmt.version}`,
+          // A preset with a managed plugin loads that plugin from the target project.
           ...managedPlugins
-            .filter((plugin) => selectedPresets.has(plugin.preset))
+            .filter((plugin) => presets.includes(plugin.preset))
             .map((plugin) => `${plugin.name}@${plugin.version}`)
         )
       }

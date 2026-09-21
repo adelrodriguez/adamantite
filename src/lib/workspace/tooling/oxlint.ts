@@ -35,6 +35,23 @@ type NamedObjectPropertyResult =
   | { readonly status: "invalid" }
   | { readonly status: "missing" }
 
+/**
+ * Every lint preset a target project can select besides core. Each one is published as
+ * `adamantite/lint/<preset>`.
+ */
+export const LINT_PRESETS = [
+  "react",
+  "nextjs",
+  "vue",
+  "jest",
+  "vitest",
+  "node",
+  "antislop",
+  "shadcn",
+] as const
+
+export type LintPreset = (typeof LINT_PRESETS)[number]
+
 function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
@@ -120,7 +137,7 @@ export function defineManagedPlugin(options: {
   /**
    * The lint preset that loads the plugin, such as `shadcn` for `adamantite/lint/shadcn`.
    */
-  readonly preset: string
+  readonly preset: LintPreset
   readonly version: string
 }) {
   return {

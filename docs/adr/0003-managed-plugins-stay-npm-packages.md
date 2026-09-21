@@ -45,6 +45,7 @@ A managed plugin has these parts:
   plugin is added in a separate step. If TypeScript is present only as Adamantite's
   auto-installed peer, `npm install @shadcn/lint` fails with `ERESOLVE` through the
   plugin's optional `@typescript-eslint/parser` peer. One `npm install` of Adamantite and
-  the plugin together works, and that is what `init` runs.
+  the plugin together works, and that is what `init` runs. A later version move through
+  `adamantite update` is a separate step, so it fails in the same project.
 - A plugin with native dependencies or a restrictive license can use this lane. It could
   not be vendored.

@@ -34,7 +34,8 @@ Repeat `--script`, `--preset`, and `--editor` for multiple values. Available val
   `--overwrite-scripts`
 
 The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
-at a pinned version and doctor and `update` keep in sync. It finds components and the theme through
+at a pinned version and doctor and `update` keep in sync. With npm, the project must list
+`typescript` in its own `package.json`, or adding or updating the plugin fails with `ERESOLVE`. It finds components and the theme through
 `components.json`. Without that file it looks in `components/ui` or `src/components/ui` and
 discovers the stylesheet that imports Tailwind; when components live elsewhere, set
 `settings.shadcn` (for example `{ ui: "@/ds" }`) in `oxlint.config.ts`. It turns off the component-owned rules under

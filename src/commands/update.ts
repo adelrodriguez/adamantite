@@ -9,7 +9,6 @@ import { assessProject } from "#lib/integrations/assessment.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
-import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
@@ -23,7 +22,6 @@ const knownPackages = [
   oxfmt,
   sherif,
   knip,
-  shadcnLint,
 ] as const satisfies readonly ToolingPackage[]
 
 interface PackageUpdate {

@@ -38,5 +38,13 @@ A managed plugin has these parts:
 - Upstream owns rule behaviour, so a managed plugin has no per-rule fixtures. Its preset
   test asserts that the enabled rule ids equal the plugin's exported `rules`, so an
   upstream rename fails the version bump.
+- The managed lane has an install cost too. `@shadcn/lint@0.1.5` holds `oxc-parser` 0.148
+  as an optional dependency and Adamantite holds 0.150, so a project that selects the
+  preset keeps two copies of the parser.
+- With npm, a target project must list `typescript` in its own `package.json` before the
+  plugin is added in a separate step. If TypeScript is present only as Adamantite's
+  auto-installed peer, `npm install @shadcn/lint` fails with `ERESOLVE` through the
+  plugin's optional `@typescript-eslint/parser` peer. One `npm install` of Adamantite and
+  the plugin together works, and that is what `init` runs.
 - A plugin with native dependencies or a restrictive license can use this lane. It could
   not be vendored.

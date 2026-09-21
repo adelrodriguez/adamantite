@@ -5,7 +5,9 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import updateCommand from "#commands/update.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
+import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
+import { toOxlintTsConfigContent } from "#lib/workspace/tooling/oxlint.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,
@@ -52,6 +54,50 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls[0]?.packages).toEqual([`knip@${knip.version}`])
       expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
+    })
+  )
+
+  it.effect("leave a managed plugin alone when the config does not import its preset", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": toOxlintTsConfigContent(["react"]),
+          "package.json": manifest({
+            devDependencies: { "@shadcn/lint": "0.1.0" },
+            scripts: { check: "adamantite check" },
+          }),
+        },
+      })
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      yield* runCommand(updateCommand, [], { files, layers: [prompter.layer, installer.layer] })
+
+      expect(installer.calls.flatMap((call) => call.packages)).not.toContain(
+        `@shadcn/lint@${shadcnLint.version}`
+      )
+    })
+  )
+
+  it.effect("update a managed plugin when the config imports its preset", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": toOxlintTsConfigContent(["shadcn"]),
+          "package.json": manifest({
+            devDependencies: { "@shadcn/lint": "0.1.0" },
+            scripts: { check: "adamantite check" },
+          }),
+        },
+      })
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      yield* runCommand(updateCommand, [], { files, layers: [prompter.layer, installer.layer] })
+
+      expect(installer.calls.flatMap((call) => call.packages)).toContain(
+        `@shadcn/lint@${shadcnLint.version}`
+      )
     })
   )
 

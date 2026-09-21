@@ -8,14 +8,16 @@ import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/integrations/assessment.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
-import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
-import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
+// Managed plugins stay out of this fallback: a plugin is updated only while its preset is imported,
+// which the assessment already covers.
 const knownPackages = [
   oxlint,
   tsgolint,

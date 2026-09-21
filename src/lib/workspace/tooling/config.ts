@@ -13,14 +13,13 @@ import {
   type PackageAction,
   type ToolingPackage,
 } from "#lib/integrations/base.ts"
-import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   getManagedScripts,
   normalizeDependencyVersion,
   type Script,
 } from "#lib/workspace/package-json.ts"
-import { getImportedLintPresets } from "#lib/workspace/tooling/oxlint.ts"
 
 export type ToolingConfigFormat = "ts" | "json" | "jsonc"
 
@@ -297,36 +296,20 @@ function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Scrip
   return scripts.some((script) => managedScripts.includes(script))
 }
 
-const OXLINT_CONFIG_FILE = "oxlint.config.ts"
-
-const checkImportsLintPreset = Effect.fn("checkImportsLintPreset")(function* (
-  cwd: string,
-  preset: string
-) {
-  const path = yield* Path.Path
-  const content = yield* readFileIfExists(path.join(cwd, OXLINT_CONFIG_FILE))
-
-  return Option.match(content, {
-    onNone: () => false,
-    onSome: (value) => getImportedLintPresets(value).includes(preset),
-  })
-})
-
 /**
- * A tooling integration that only manages a package version, with no config file (Sherif, Tsgolint,
- * and managed plugins such as `@shadcn/lint`).
+ * A tooling integration that only manages a package version, with no config file (Sherif and
+ * Tsgolint). Oxlint's managed plugins build on it through `defineManagedPlugin`.
  */
-export function definePackageTooling(options: {
+export function definePackageTooling<Error = never, Requirements = never>(options: {
   /**
    * Findings for retired managed scripts. While any exist, the integration stays applicable and
    * reports them so the scripts get removed.
    */
   readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   /**
-   * The lint preset that needs the package, such as `shadcn`. When set, the package is required
-   * only while `oxlint.config.ts` imports that preset.
+   * An extra condition for requiring the package, checked after the managed scripts.
    */
-  readonly lintPreset?: string
+  readonly isRequired?: (cwd: string) => Effect.Effect<boolean, Error, Requirements>
   /**
    * Whether the package is required only in a detected monorepo.
    */
@@ -342,8 +325,7 @@ export function definePackageTooling(options: {
         const isApplicable =
           checkHasManagedScript(packageJson, options.scripts)
           && (!options.monorepoOnly || (yield* checkIsMonorepo(cwd)))
-          && (options.lintPreset === undefined
-            || (yield* checkImportsLintPreset(cwd, options.lintPreset)))
+          && (options.isRequired === undefined || (yield* options.isRequired(cwd)))
 
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 

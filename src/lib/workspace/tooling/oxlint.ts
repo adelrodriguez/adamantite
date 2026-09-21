@@ -1,6 +1,8 @@
 import * as Array from "effect/Array"
+import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
+import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import {
   parseSync,
@@ -10,7 +12,11 @@ import {
   type Program,
   type PropertyKey,
 } from "oxc-parser"
-import type { RequiredConfigInspection } from "#lib/workspace/tooling/config.ts"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import {
+  definePackageTooling,
+  type RequiredConfigInspection,
+} from "#lib/workspace/tooling/config.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",
@@ -28,6 +34,23 @@ type NamedObjectPropertyResult =
   | { readonly status: "found"; readonly property: ObjectProperty }
   | { readonly status: "invalid" }
   | { readonly status: "missing" }
+
+/**
+ * Every lint preset a target project can select besides core. Each one is published as
+ * `adamantite/lint/<preset>`.
+ */
+export const LINT_PRESETS = [
+  "react",
+  "nextjs",
+  "vue",
+  "jest",
+  "vitest",
+  "node",
+  "antislop",
+  "shadcn",
+] as const
+
+export type LintPreset = (typeof LINT_PRESETS)[number]
 
 function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
@@ -88,6 +111,45 @@ export function getImportedLintPresets(content: string): string[] {
     ),
     Option.getOrElse((): string[] => [])
   )
+}
+
+const OXLINT_CONFIG_FILE = "oxlint.config.ts"
+
+const checkImportsLintPreset = Effect.fn("checkImportsLintPreset")(function* (
+  cwd: string,
+  preset: string
+) {
+  const path = yield* Path.Path
+  const content = yield* readFileIfExists(path.join(cwd, OXLINT_CONFIG_FILE))
+
+  return Option.match(content, {
+    onNone: () => false,
+    onSome: (value) => getImportedLintPresets(value).includes(preset),
+  })
+})
+
+/**
+ * A managed plugin: an Oxlint plugin package the target project installs for one lint preset. The
+ * package is required only while `oxlint.config.ts` imports that preset.
+ */
+export function defineManagedPlugin(options: {
+  readonly name: string
+  /**
+   * The lint preset that loads the plugin, such as `shadcn` for `adamantite/lint/shadcn`.
+   */
+  readonly preset: LintPreset
+  readonly version: string
+}) {
+  return {
+    ...definePackageTooling({
+      isRequired: (cwd) => checkImportsLintPreset(cwd, options.preset),
+      name: options.name,
+      purpose: `the \`adamantite/lint/${options.preset}\` preset`,
+      scripts: ["check", "fix"],
+      version: options.version,
+    }),
+    preset: options.preset,
+  }
 }
 
 function getStaticPropertyName(key: PropertyKey) {

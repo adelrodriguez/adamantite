@@ -5,24 +5,13 @@ import * as Flag from "effect/unstable/cli/Flag"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { checkIsSupportedPackageManager, type Script } from "#lib/workspace/package-json.ts"
+import { LINT_PRESETS, type LintPreset } from "#lib/workspace/tooling/oxlint.ts"
 
 const INIT_SCRIPTS = ["check", "fix", "analyze"] as const satisfies readonly Script[]
-
-const INIT_PRESETS = [
-  "react",
-  "nextjs",
-  "vue",
-  "jest",
-  "vitest",
-  "node",
-  "antislop",
-  "shadcn",
-] as const
 
 const INIT_EDITORS = ["vscode", "zed"] as const
 
 type InitEditor = (typeof INIT_EDITORS)[number]
-type InitPreset = (typeof INIT_PRESETS)[number]
 
 export interface InitOptions {
   readonly agents: boolean
@@ -30,7 +19,7 @@ export interface InitOptions {
   readonly githubActions: boolean
   readonly installExtensions: boolean
   readonly overwriteScripts: boolean
-  readonly presets: InitPreset[]
+  readonly presets: LintPreset[]
   readonly scripts: Script[]
   readonly typescript: boolean
 }
@@ -41,7 +30,7 @@ export interface InitOptionsInput {
   readonly githubActions: boolean
   readonly installExtensions: boolean
   readonly overwriteScripts: boolean
-  readonly presets: readonly InitPreset[]
+  readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
   readonly typescript: boolean
 }
@@ -123,8 +112,8 @@ const scripts = Flag.Literals("script", INIT_SCRIPTS).pipe(
   )
 )
 
-const presets = Flag.Literals("preset", INIT_PRESETS).pipe(
-  Flag.atMost(INIT_PRESETS.length),
+const presets = Flag.Literals("preset", LINT_PRESETS).pipe(
+  Flag.atMost(LINT_PRESETS.length),
   Flag.withDescription("Oxlint preset to configure; repeatable and requires --script check or fix")
 )
 

@@ -69,6 +69,27 @@ function parse(content: string) {
   )
 }
 
+const LINT_PRESET_PREFIX = "adamantite/lint/"
+
+/**
+ * The Adamantite lint presets that an `oxlint.config.ts` imports, such as `react` for
+ * `adamantite/lint/react`. The core preset is not listed. An unparsable config imports none.
+ */
+export function getImportedLintPresets(content: string): string[] {
+  return pipe(
+    parse(content),
+    Option.map((ast) =>
+      ast.body.flatMap((statement) =>
+        statement.type === "ImportDeclaration"
+        && statement.source.value.startsWith(LINT_PRESET_PREFIX)
+          ? [statement.source.value.slice(LINT_PRESET_PREFIX.length)]
+          : []
+      )
+    ),
+    Option.getOrElse((): string[] => [])
+  )
+}
+
 function getStaticPropertyName(key: PropertyKey) {
   if (key.type === "Identifier") {
     return pipe(key.name, Option.some)

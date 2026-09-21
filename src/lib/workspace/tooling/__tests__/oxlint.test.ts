@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@effect/vitest"
 import {
+  getImportedLintPresets,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/workspace/tooling/oxlint.ts"
@@ -65,5 +66,24 @@ describe("inspectRequiredOxlintConfig", () => {
       kind: "invalid",
       reason,
     })
+  })
+})
+
+describe("getImportedLintPresets", () => {
+  test("list the presets a generated config imports, without core", () => {
+    expect(getImportedLintPresets(toOxlintTsConfigContent(["react", "shadcn"]))).toEqual([
+      "react",
+      "shadcn",
+    ])
+  })
+
+  test("list no preset for a config with only the core preset", () => {
+    expect(getImportedLintPresets(toOxlintTsConfigContent())).toEqual([])
+  })
+
+  test("list no preset for a config that does not parse", () => {
+    expect(
+      getImportedLintPresets('import shadcn from "adamantite/lint/shadcn"\nexport default {')
+    ).toEqual([])
   })
 })

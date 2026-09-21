@@ -33,7 +33,8 @@ Repeat `--script`, `--preset`, and `--editor` for multiple values. Available val
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
 
-The `shadcn` preset needs Tailwind v4. It finds components and the theme through
+The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
+at a pinned version and doctor and `update` keep in sync. It finds components and the theme through
 `components.json`. Without that file it looks in `components/ui` or `src/components/ui` and
 discovers the stylesheet that imports Tailwind; when components live elsewhere, set
 `settings.shadcn` (for example `{ ui: "@/ds" }`) in `oxlint.config.ts`. It turns off the component-owned rules under

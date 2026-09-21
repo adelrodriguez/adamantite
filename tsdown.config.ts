@@ -27,15 +27,6 @@ export default defineConfig([
         ],
         to: "dist/presets/lint/vendor/antislop",
       },
-      {
-        from: [
-          "presets/lint/vendor/shadcn/plugin.mjs",
-          "presets/lint/vendor/shadcn/plugin.d.mts",
-          "presets/lint/vendor/shadcn/tailwind-worker.js",
-          "presets/lint/vendor/shadcn/license.md",
-        ],
-        to: "dist/presets/lint/vendor/shadcn",
-      },
     ],
     deps: { neverBundle: ["knip", "oxfmt", "oxlint"] },
     dts: { oxc: true },

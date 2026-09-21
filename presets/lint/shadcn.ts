@@ -3,33 +3,20 @@ import type { OxlintConfig } from "oxlint"
 // The shadcn plugin (https://github.com/shadcn-ui/lint) checks a Tailwind v4
 // design system: components keep their own appearance, colors and sizes come
 // from the theme, and every class is one Tailwind can generate. shadcn/ui is
-// not required. Upstream publishes @shadcn/lint to npm, but the package
-// declares ESLint and @typescript-eslint/parser as peers that only its ESLint
-// use needs, so Adamantite ships a self-contained bundled build in
-// vendor/shadcn/plugin.mjs — see vendor/shadcn/license.md for attribution and
-// scripts/vendor-plugins.ts for how it is regenerated. The plugin starts
-// vendor/shadcn/tailwind-worker.js, which loads the target project's own
-// Tailwind, and reads component files with the oxc-parser that Adamantite
-// depends on.
+// not required.
+//
+// @shadcn/lint is a managed plugin: it stays an npm package that the target
+// project installs. `adamantite init` installs the pinned version when this
+// preset is selected, and doctor and update keep it on that version. The bare
+// specifier makes Oxlint resolve the package from the target project, so the
+// preset needs no runtime API and works under every package manager.
 //
 // The plugin finds components and the theme through components.json. Without
 // that file it looks in components/ui or src/components/ui and discovers the
 // stylesheet that imports Tailwind. A project with components elsewhere sets
 // settings.shadcn.ui in its own config.
-//
-// The specifier is an absolute path computed from this module's location so
-// the bundled plugin loads regardless of how the consuming project resolves
-// packages. The vendor files sit at the same relative location in the source
-// tree and in the published dist tree. This module runs under whatever
-// runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs.
 const config: OxlintConfig = {
-  jsPlugins: [
-    {
-      name: "shadcn",
-      specifier: new URL("vendor/shadcn/plugin.mjs", import.meta.url).href,
-    },
-  ],
+  jsPlugins: ["@shadcn/lint"],
   overrides: [
     {
       // Upstream's setup for the component directory: components own their

@@ -1,4 +1,0 @@
-{
-  "aliases": { "components": "@/components", "ui": "@/components/ui" },
-  "tailwind": { "css": "app/globals.css" }
-}

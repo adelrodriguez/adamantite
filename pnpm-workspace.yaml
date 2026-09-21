@@ -1,0 +1,3 @@
+minimumReleaseAgeExclude:
+  - "@shadcn/lint@0.1.5"
+  - cn@0.3.2

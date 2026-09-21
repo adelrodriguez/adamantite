@@ -1,57 +1,109 @@
+import { spawnSync } from "node:child_process"
+import { cpSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { beforeAll, describe, expect, test } from "@effect/vitest"
-import * as EffectArray from "effect/Array"
-import * as Order from "effect/Order"
+import { plugin as shadcnPlugin } from "@shadcn/lint"
+import * as Schema from "effect/Schema"
 import shadcn from "#presets/lint/shadcn.ts"
-import shadcnPlugin from "#presets/lint/vendor/shadcn/plugin.mjs"
-import { lintRuleFixtures, listFixtureRules, type RuleFixtureCase } from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/shadcn")
-const PROJECT_DIR = join(import.meta.dirname, "fixtures/shadcn-project")
+const FIXTURES_DIR = join(import.meta.dirname, "fixtures/shadcn-overlap")
 const NAMESPACE = "shadcn"
 
 const presetRules = Object.keys(shadcn.rules ?? {})
   .filter((name) => name.startsWith(`${NAMESPACE}/`))
   .map((name) => name.slice(NAMESPACE.length + 1))
 
+const OxlintJsonOutput = Schema.Struct({
+  diagnostics: Schema.Array(
+    Schema.Struct({
+      code: Schema.optional(Schema.String),
+      filename: Schema.String,
+      labels: Schema.Array(Schema.Struct({ span: Schema.Struct({ line: Schema.Number }) })),
+    })
+  ),
+})
+
+const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
+
+/**
+ * Lint the overlap fixtures with the react and shadcn presets in one real Oxlint run. The plugin
+ * resolves from the repository's `node_modules`, as it does from a target project's.
+ */
+function lintOverlapFixtures() {
+  const tempDir = mkdtempSync(join(tmpdir(), "adamantite-shadcn-overlap-"))
+
+  try {
+    symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
+    cpSync(FIXTURES_DIR, join(tempDir, "fixtures"), { recursive: true })
+    writeFileSync(
+      join(tempDir, "oxlint.config.ts"),
+      [
+        'import { defineConfig } from "oxlint"',
+        `import react from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react.ts"))}`,
+        `import shadcn from ${JSON.stringify(join(REPO_ROOT, "presets/lint/shadcn.ts"))}`,
+        "",
+        "export default defineConfig({ extends: [react, shadcn] })",
+        "",
+      ].join("\n")
+    )
+
+    const result = spawnSync(
+      join(REPO_ROOT, "node_modules/.bin/oxlint"),
+      ["-c", "oxlint.config.ts", "-f", "json", "fixtures"],
+      { cwd: tempDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
+    )
+
+    if (result.error) {
+      throw result.error
+    }
+
+    try {
+      return decodeOxlintJsonOutput(result.stdout).diagnostics
+    } catch (error) {
+      throw new Error(`Oxlint did not print JSON diagnostics.\n${result.stdout}${result.stderr}`, {
+        cause: error,
+      })
+    }
+  } finally {
+    rmSync(tempDir, { force: true, recursive: true })
+  }
+}
+
 describe("shadcn preset", () => {
-  test("enable exactly the rules the vendored plugin defines", () => {
+  test("enable exactly the rules the managed plugin defines", () => {
     expect(new Set(presetRules)).toEqual(new Set(Object.keys(shadcnPlugin.rules)))
   })
 
-  test("have fixtures for exactly the rules the preset enables", () => {
-    expect(listFixtureRules(FIXTURES_DIR)).toEqual(EffectArray.sort(presetRules, Order.String))
+  test("load the plugin by its package name", () => {
+    expect(shadcn.jsPlugins).toEqual(["@shadcn/lint"])
   })
 })
 
-describe("shadcn rule fixtures", () => {
-  let cases: RuleFixtureCase[] = []
+describe("shadcn and react preset overlap", () => {
+  let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"] = []
 
   beforeAll(() => {
-    cases = lintRuleFixtures({
-      fixturesDir: FIXTURES_DIR,
-      namespace: NAMESPACE,
-      presetPath: join(REPO_ROOT, "presets/lint/shadcn.ts"),
-      projectDir: PROJECT_DIR,
-    })
+    diagnostics = lintOverlapFixtures()
   })
 
-  describe.each(listFixtureRules(FIXTURES_DIR))("%s", (rule) => {
-    test("report every invalid fixture", () => {
-      const invalid = cases.filter((entry) => entry.rule === rule && entry.kind === "invalid")
-      const missed = invalid.filter((entry) => entry.reportedLines.length === 0)
+  test("report the fixtures through the plugin", () => {
+    const codes = new Set(diagnostics.map((diagnostic) => diagnostic.code))
 
-      expect(invalid).not.toEqual([])
-      expect(missed.map((entry) => entry.file)).toEqual([])
-    })
+    expect(codes).toContain("shadcn(no-inline-styles)")
+    expect(codes).toContain("shadcn(no-raw-colors)")
+  })
 
-    test("report no valid fixture", () => {
-      const valid = cases.filter((entry) => entry.rule === rule && entry.kind === "valid")
-      const reported = valid.filter((entry) => entry.reportedLines.length > 0)
+  test("leave shadcn findings to the shadcn rules", () => {
+    const overlapping = diagnostics
+      .map((diagnostic) => diagnostic.code)
+      .filter(
+        (code) => code === "react(no-unknown-property)" || code === "react(style-prop-object)"
+      )
 
-      expect(valid).not.toEqual([])
-      expect(reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)).toEqual([])
-    })
+    // A string `style` prop is the one known overlap: react/style-prop-object reports the type
+    // of the value, and shadcn/no-inline-styles reports the inline style itself.
+    expect(overlapping).toEqual(["react(style-prop-object)"])
   })
 })

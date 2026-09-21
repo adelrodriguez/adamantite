@@ -61,6 +61,19 @@ jobs:
             exit 1
           fi
           grep "anti-slop(no-chained-type-assertions)" oxlint-output.txt
+          shadcn_lint_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['@shadcn/lint']")"
+          typescript_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.typescript")"
+          # A target project lists TypeScript itself. Without that entry, npm cannot add the plugin
+          # in a separate step: see ADR 0003.
+          npm install "typescript@${typescript_version}" "@shadcn/lint@${shadcn_lint_version}"
+          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import shadcn from "adamantite/lint/shadcn"' '' 'export default defineConfig({ extends: [shadcn] })' > oxlint.config.ts
+          printf '%s\n' 'export const Panel = () => <div style={{ padding: 16 }}>Panel</div>' > bad.tsx
+          if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.tsx > oxlint-output.txt 2>&1; then
+            echo "Expected shadcn diagnostics from the packaged preset and the managed plugin to fail the lint run"
+            cat oxlint-output.txt
+            exit 1
+          fi
+          grep "shadcn(no-inline-styles)" oxlint-output.txt
 
       - name: Setup minimum Bun
         uses: oven-sh/setup-bun@v2

@@ -9,6 +9,7 @@ import initCommand from "#commands/init/index.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
@@ -288,6 +289,45 @@ describe("init", () => {
         expect(files.exists("knip.json")).toBe(true)
         expect(files.exists("knip.jsonc")).toBe(true)
         expect(files.exists("knip.config.ts")).toBe(false)
+      })
+    )
+  })
+
+  describe("managed lint plugins", () => {
+    it.effect("install @shadcn/lint when the shadcn preset is selected", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({ "package.json": basePackageJson })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--preset", "shadcn"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls[0]?.packages).toContain(`@shadcn/lint@${shadcnLint.version}`)
+        expect(files.read("oxlint.config.ts")).toContain(
+          'import shadcn from "adamantite/lint/shadcn"'
+        )
+      })
+    )
+
+    it.effect("leave @shadcn/lint out when the shadcn preset is not selected", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({ "package.json": basePackageJson })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--preset", "react"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls[0]?.packages).not.toContain(`@shadcn/lint@${shadcnLint.version}`)
       })
     )
   })

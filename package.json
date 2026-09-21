@@ -82,12 +82,13 @@
     "effect": "4.0.0-rc.115",
     "jsonc-parser": "3.3.1",
     "nypm": "0.6.9",
-    "oxc-parser": "^0.147.0"
+    "oxc-parser": "0.150.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "1.0.0",
     "@changesets/cli": "3.0.1",
     "@effect/vitest": "4.0.0-rc.115",
+    "@shadcn/lint": "0.1.5",
     "@tanstack/intent": "0.3.7",
     "@types/figlet": "1.7.0",
     "@types/node": "22.20.1",

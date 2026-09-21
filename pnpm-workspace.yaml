@@ -1,0 +1,6 @@
+# pnpm 12 rejects packages younger than one day, even with a frozen lockfile. These two were
+# published on 2026-09-21. Delete this file after 2026-09-22; it has no other purpose, and it
+# must not gain a `packages` key, which would mark the repository as a monorepo.
+minimumReleaseAgeExclude:
+  - "@shadcn/lint@0.1.5"
+  - cn@0.3.2

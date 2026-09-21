@@ -15,6 +15,12 @@ Third-party code that Adamantite builds into the package at a pinned upstream co
 because upstream does not publish to npm. Bundles ship inside the preset that owns them.
 _Avoid_: Plugin, dependency
 
+**Managed plugin**:
+A third-party Oxlint plugin that stays an npm package in the target project. Adamantite
+pins its version, installs it when its preset is selected, and keeps it in sync through
+doctor and update.
+_Avoid_: Vendored bundle, dependency
+
 **Target project**:
 The project that Adamantite configures or checks.
 _Avoid_: Adamantite repository, consumer repository

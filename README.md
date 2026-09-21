@@ -239,19 +239,20 @@ underlying CLI.
 
 Adamantite publishes configuration that can also be consumed directly:
 
-| Export                     | Purpose                                                                                                                                                                                                                                                                 |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adamantite/lint`          | Core Oxlint rules.                                                                                                                                                                                                                                                      |
-| `adamantite/lint/react`    | React, JSX accessibility, and performance.                                                                                                                                                                                                                              |
-| `adamantite/lint/nextjs`   | Next.js rules.                                                                                                                                                                                                                                                          |
-| `adamantite/lint/vue`      | Vue rules.                                                                                                                                                                                                                                                              |
-| `adamantite/lint/node`     | Node.js rules.                                                                                                                                                                                                                                                          |
-| `adamantite/lint/jest`     | Jest rules.                                                                                                                                                                                                                                                             |
-| `adamantite/lint/vitest`   | Vitest rules.                                                                                                                                                                                                                                                           |
-| `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules. |
-| `adamantite/format`        | Oxfmt configuration.                                                                                                                                                                                                                                                    |
-| `adamantite/analyze`       | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo.                                                                                                                       |
-| `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                              |
+| Export                     | Purpose                                                                                                                                                                                                                                                                                |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adamantite/lint`          | Core Oxlint rules.                                                                                                                                                                                                                                                                     |
+| `adamantite/lint/react`    | React, JSX accessibility, and performance.                                                                                                                                                                                                                                             |
+| `adamantite/lint/nextjs`   | Next.js rules.                                                                                                                                                                                                                                                                         |
+| `adamantite/lint/vue`      | Vue rules.                                                                                                                                                                                                                                                                             |
+| `adamantite/lint/node`     | Node.js rules.                                                                                                                                                                                                                                                                         |
+| `adamantite/lint/jest`     | Jest rules.                                                                                                                                                                                                                                                                            |
+| `adamantite/lint/vitest`   | Vitest rules.                                                                                                                                                                                                                                                                          |
+| `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
+| `adamantite/lint/shadcn`   | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
+| `adamantite/format`        | Oxfmt configuration.                                                                                                                                                                                                                                                                   |
+| `adamantite/analyze`       | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo.                                                                                                                                      |
+| `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                                             |
 
 When consuming the lint presets directly, hoist the core preset's ignore patterns onto the
 root config. Oxlint does not merge `ignorePatterns` from extended configs, so without the
@@ -270,10 +271,43 @@ export default defineConfig({
 
 Configs generated by `adamantite init` include this automatically.
 
+### The shadcn preset
+
+`adamantite/lint/shadcn` needs Tailwind v4 and the `@shadcn/lint` package. `adamantite init`
+installs the pinned version when you select the preset, and `adamantite doctor` and
+`adamantite update` keep it on that version. If you add the preset by hand, install
+`@shadcn/lint` as a devDependency too. The plugin finds your components and theme
+through `components.json`. Without that file it looks for components in `components/ui`
+or `src/components/ui` and discovers the stylesheet that imports Tailwind. When your
+components live elsewhere, set `settings.shadcn.ui`:
+
+```ts
+import { defineConfig } from "oxlint"
+import core from "adamantite/lint"
+import shadcn from "adamantite/lint/shadcn"
+
+export default defineConfig({
+  extends: [core, shadcn],
+  ignorePatterns: core.ignorePatterns,
+  settings: { shadcn: { ui: "@/ds" } },
+})
+```
+
+The preset allows layout classes such as `mt-4` and `w-[320px]` on components, and turns
+off `no-restyle`, `no-arbitrary-values`, and `require-static-classes` under
+`**/components/ui/**`, where components own their appearance. Add the same override for
+another component directory. See the
+[@shadcn/lint documentation](https://github.com/shadcn-ui/lint#settings) for settings,
+contracts, and custom messages.
+
 ## Requirements and boundaries
 
 - Adamantite requires Bun 1.0 or later when run with Bun, or Node.js 22.19 or later when
   run with Node.js.
+- Adamantite requires TypeScript 7 or later. List `typescript` as a dependency in your own
+  `package.json`. Do not rely on the copy that a package manager installs for Adamantite's
+  peer dependency: npm cannot add or update a managed plugin such as `@shadcn/lint` in a
+  project that has no `typescript` entry of its own.
 - This repository uses pnpm and Node.js for development, but the CLI can configure
   projects that use Bun, Deno, npm, pnpm, or Yarn where the selected integration supports
   them.

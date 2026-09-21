@@ -6,6 +6,7 @@ import * as Command from "effect/unstable/cli/Command"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
@@ -125,6 +126,11 @@ export default Command.make("init", initCommandOptions).pipe(
           `${tsgolint.name}@${tsgolint.version}`,
           `${oxfmt.name}@${oxfmt.version}`
         )
+      }
+
+      // The shadcn preset loads `@shadcn/lint` from the target project.
+      if (hasOxlint && presets.includes("shadcn")) {
+        dependencies.push(`${shadcnLint.name}@${shadcnLint.version}`)
       }
 
       if (hasSherif) {

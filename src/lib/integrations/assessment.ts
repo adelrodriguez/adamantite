@@ -17,6 +17,7 @@ import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint.ts"
+import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
 import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -26,7 +27,17 @@ import tsconfig from "#lib/workspace/tsconfig.ts"
  * Every integration assessed against a project. The order fixes how findings are numbered in the
  * rendered output.
  */
-const managedIntegrations = [knip, oxfmt, oxlint, sherif, tsgolint, tsconfig, github, zed] as const
+const managedIntegrations = [
+  knip,
+  oxfmt,
+  oxlint,
+  shadcnLint,
+  sherif,
+  tsgolint,
+  tsconfig,
+  github,
+  zed,
+] as const
 
 type ApplicableAssessment = Extract<IntegrationAssessment, { readonly applicable: true }>
 

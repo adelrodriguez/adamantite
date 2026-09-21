@@ -28,10 +28,21 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
-- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`; editors:
+- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`, `shadcn`; editors:
   `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
+
+The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
+at a pinned version and doctor and `update` keep in sync. The plugin finds components and
+the theme through `components.json`. Without that file it looks in `components/ui` or
+`src/components/ui` and discovers the stylesheet that imports Tailwind; when components
+live elsewhere, set `settings.shadcn` (for example `{ ui: "@/ds" }`) in `oxlint.config.ts`.
+The preset turns off the component-owned rules under `**/components/ui/**`; add the same
+override for another component directory.
+
+Adamantite requires TypeScript 7 or later as a dependency in the project's own
+`package.json`. Without that entry, npm cannot add or update a managed plugin.
 
 Only select options supported by the project. Presets and TypeScript require `check` or `fix`;
 extension installation requires an editor; `--github-actions` requires a CI-compatible script

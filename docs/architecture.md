@@ -109,6 +109,16 @@ A tooling integration records the version that Adamantite installs in target pro
 When the corresponding dependency version in `package.json` increases, update the version
 in `src/lib/integrations/tooling` to match.
 
+## Managed plugins
+
+A preset can need a third-party Oxlint plugin that is published on npm, such as
+`@shadcn/lint` for the `shadcn` preset. The plugin stays an npm package in the target
+project. Its tooling integration in `src/lib/integrations/tooling/` uses
+`definePackageTooling` with the `lintPreset` option, so the package is required only while
+`oxlint.config.ts` imports the preset. The preset names the plugin by its bare package name
+in `jsPlugins`, and Oxlint resolves it from the target project. The pin is the devDependency
+version in `package.json`. See ADR 0003.
+
 ## Vendored bundles
 
 A preset can ship a vendored bundle of a third-party plugin whose upstream deliberately

@@ -72,16 +72,6 @@
       "version": "3.0.1"
     },
     {
-      "name": "oxc-parser",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.147.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "0.147.0"
-    },
-    {
       "name": "vitest",
       "registry": "npm",
       "source": {
@@ -92,6 +82,16 @@
       },
       "tracking": "dependency",
       "version": "5.0.1"
+    },
+    {
+      "name": "oxc-parser",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.150.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "0.150.0"
     }
   ]
 }

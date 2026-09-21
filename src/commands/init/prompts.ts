@@ -100,6 +100,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           label: "antislop",
           value: "antislop",
         },
+        {
+          hint: "Tailwind v4 design system: no restyled components, raw colors, arbitrary values, or unknown classes",
+          label: "shadcn",
+          value: "shadcn",
+        },
       ],
       required: false,
     })

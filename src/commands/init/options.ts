@@ -8,7 +8,16 @@ import { checkIsSupportedPackageManager, type Script } from "#lib/workspace/pack
 
 const INIT_SCRIPTS = ["check", "fix", "analyze"] as const satisfies readonly Script[]
 
-const INIT_PRESETS = ["react", "nextjs", "vue", "jest", "vitest", "node", "antislop"] as const
+const INIT_PRESETS = [
+  "react",
+  "nextjs",
+  "vue",
+  "jest",
+  "vitest",
+  "node",
+  "antislop",
+  "shadcn",
+] as const
 
 const INIT_EDITORS = ["vscode", "zed"] as const
 

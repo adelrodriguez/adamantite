@@ -78,11 +78,12 @@
   "dependencies": {
     "@clack/prompts": "1.7.0",
     "@effect/platform-node": "4.0.0-rc.115",
+    "@effect/platform-node-shared": "4.0.0-rc.115",
     "defu": "6.1.7",
     "effect": "4.0.0-rc.115",
     "jsonc-parser": "3.3.1",
     "nypm": "0.6.9",
-    "oxc-parser": "^0.147.0"
+    "oxc-parser": "0.147.0"
   },
   "devDependencies": {
     "@changesets/changelog-github": "1.0.0",

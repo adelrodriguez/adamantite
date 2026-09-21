@@ -185,7 +185,7 @@ importers:
         specifier: 0.6.9
         version: 0.6.9
       oxc-parser:
-        specifier: ^0.150.0
+        specifier: 0.150.0
         version: 0.150.0
     devDependencies:
       '@changesets/changelog-github':

@@ -83,7 +83,9 @@ jobs:
       matrix:
         include:
           - name: unit
-            command: pnpm run test
+            command: pnpm run test:unit
+          - name: presets
+            command: pnpm run test:presets
           - name: e2e
             command: pnpm run test:dist
 
@@ -108,11 +110,11 @@ jobs:
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}
 
-      - name: Upload failed unit test report
-        if: failure() && matrix.name == 'unit'
+      - name: Upload failed test report
+        if: failure() && matrix.name != 'e2e'
         uses: actions/upload-artifact@v7
         with:
-          name: unit-test-report
+          name: ${{ matrix.name }}-test-report
           path: .vitest/index.html
           include-hidden-files: true
           retention-days: 7

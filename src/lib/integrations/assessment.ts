@@ -16,10 +16,10 @@ import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
-import oxlint from "#lib/integrations/tooling/oxlint.ts"
-import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
+import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
+import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
-import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import tsconfig from "#lib/workspace/tsconfig.ts"
 
@@ -31,7 +31,7 @@ const managedIntegrations = [
   knip,
   oxfmt,
   oxlint,
-  shadcnLint,
+  ...managedPlugins,
   sherif,
   tsgolint,
   tsconfig,

@@ -5,7 +5,7 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import updateCommand from "#commands/update.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
-import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
+import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { toOxlintTsConfigContent } from "#lib/workspace/tooling/oxlint.ts"
 import {

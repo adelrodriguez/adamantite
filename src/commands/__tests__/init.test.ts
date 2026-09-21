@@ -8,10 +8,10 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import initCommand from "#commands/init/index.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
-import oxlint from "#lib/integrations/tooling/oxlint.ts"
-import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
+import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
+import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
-import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,

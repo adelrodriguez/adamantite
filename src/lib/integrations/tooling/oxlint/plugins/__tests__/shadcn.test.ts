@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
+import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { toOxlintTsConfigContent } from "#lib/workspace/tooling/oxlint.ts"
 

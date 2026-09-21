@@ -56,7 +56,12 @@ files to the repository. See `docs/agents/issue-tracker.md`.
 - Format suppressions as `@ts-expect-error - reason`. Prefer this form to casts that hide
   known third-party type mismatches.
 - Keep integration modules limited to their default integration export.
-  `src/lib/integrations/base.ts` is the shared infrastructure exception.
+  `src/lib/integrations/base.ts` is the shared infrastructure exception, and
+  `src/lib/integrations/tooling/oxlint/plugins/index.ts` exports the `managedPlugins`
+  registry.
+- Keep packages that belong to a host tool under that tool's folder: companion packages
+  beside it (`tooling/oxlint/tsgolint.ts`) and managed plugins in `plugins/`. Add a managed
+  plugin with `defineManagedPlugin` and register it in `managedPlugins`.
 - Keep reusable integration behavior in `src/lib/workspace` or `src/lib/shared`.
 - Keep `init` deterministic and independent from doctor assessment.
 - Keep `assess` and `doctor` read-only. Doctor reports current state, goal criteria, and

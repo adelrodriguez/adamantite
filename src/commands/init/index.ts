@@ -5,10 +5,10 @@ import * as Predicate from "effect/Predicate"
 import * as Command from "effect/unstable/cli/Command"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
-import oxlint from "#lib/integrations/tooling/oxlint.ts"
-import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
+import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
+import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
-import tsgolint from "#lib/integrations/tooling/tsgolint.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
@@ -128,9 +128,15 @@ export default Command.make("init", initCommandOptions).pipe(
         )
       }
 
-      // The shadcn preset loads `@shadcn/lint` from the target project.
-      if (hasOxlint && presets.includes("shadcn")) {
-        dependencies.push(`${shadcnLint.name}@${shadcnLint.version}`)
+      // A preset with a managed plugin loads that plugin from the target project.
+      if (hasOxlint) {
+        const selectedPresets = new Set<string>(presets)
+
+        dependencies.push(
+          ...managedPlugins
+            .filter((plugin) => selectedPresets.has(plugin.preset))
+            .map((plugin) => `${plugin.name}@${plugin.version}`)
+        )
       }
 
       if (hasSherif) {

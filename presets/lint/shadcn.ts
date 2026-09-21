@@ -12,8 +12,10 @@ import type { OxlintConfig } from "oxlint"
 // Tailwind, and reads component files with the oxc-parser that Adamantite
 // depends on.
 //
-// The plugin finds components and the theme through components.json. A
-// project without that file sets settings.shadcn in its own config.
+// The plugin finds components and the theme through components.json. Without
+// that file it looks in components/ui or src/components/ui and discovers the
+// stylesheet that imports Tailwind. A project with components elsewhere sets
+// settings.shadcn.ui in its own config.
 //
 // The specifier is an absolute path computed from this module's location so
 // the bundled plugin loads regardless of how the consuming project resolves

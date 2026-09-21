@@ -34,8 +34,9 @@ Repeat `--script`, `--preset`, and `--editor` for multiple values. Available val
   `--overwrite-scripts`
 
 The `shadcn` preset needs Tailwind v4. It finds components and the theme through
-`components.json`; in a project without that file, set `settings.shadcn` (for example
-`{ ui: "@/ds" }`) in `oxlint.config.ts`. It turns off the component-owned rules under
+`components.json`. Without that file it looks in `components/ui` or `src/components/ui` and
+discovers the stylesheet that imports Tailwind; when components live elsewhere, set
+`settings.shadcn` (for example `{ ui: "@/ds" }`) in `oxlint.config.ts`. It turns off the component-owned rules under
 `**/components/ui/**`; add the same override for another component directory.
 
 Only select options supported by the project. Presets and TypeScript require `check` or `fix`;

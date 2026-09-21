@@ -129,8 +129,9 @@ Each enabled rule of a bundle has `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<rule>/`, one case per file. The harness in
 `src/__tests__/presets/rule-fixtures.ts` lints them through the preset in one real Oxlint
 run, so a re-vendor that tightens or relaxes a rule fails the fixture of that case. Add
-A plugin that reads project files, such as the shadcn plugin, gets a sample project through
-the harness's `projectDir` option; it lives beside the rule fixtures as
-`fixtures/<preset>-project/`. Add
 fixtures when a rule is added, and move or change a fixture only when the upstream change
 is accepted.
+
+A plugin that reads project files, such as the shadcn plugin, gets a sample project through
+the harness's `projectDir` option; it lives beside the rule fixtures as
+`fixtures/<preset>-project/`.

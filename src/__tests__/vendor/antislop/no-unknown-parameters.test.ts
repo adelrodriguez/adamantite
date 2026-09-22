@@ -1,7 +1,14 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
 import antislop from "#presets/lint/vendor/antislop/plugin.mjs"
-import { testVendoredRule } from "../rule-tester.ts"
 
-testVendoredRule(antislop, "no-unknown-parameters", {
+RuleTester.describe = describe
+RuleTester.it = it
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+
+tester.run("no-unknown-parameters", antislop.rules["no-unknown-parameters"], {
   invalid: [
     {
       code: "export function parse({ value }: unknown = {}): void {}",

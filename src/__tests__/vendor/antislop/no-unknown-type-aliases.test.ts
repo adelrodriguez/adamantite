@@ -1,7 +1,14 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
 import antislop from "#presets/lint/vendor/antislop/plugin.mjs"
-import { testVendoredRule } from "../rule-tester.ts"
 
-testVendoredRule(antislop, "no-unknown-type-aliases", {
+RuleTester.describe = describe
+RuleTester.it = it
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+
+tester.run("no-unknown-type-aliases", antislop.rules["no-unknown-type-aliases"], {
   invalid: [
     {
       code: "type Identity<T> = T\nexport type Payload = Identity<unknown>",

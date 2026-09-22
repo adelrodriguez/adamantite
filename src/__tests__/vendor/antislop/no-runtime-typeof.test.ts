@@ -1,5 +1,12 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
 import antislop from "#presets/lint/vendor/antislop/plugin.mjs"
-import { testVendoredRule } from "../rule-tester.ts"
+
+RuleTester.describe = describe
+RuleTester.it = it
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
 
 const ALLOW_IN_TYPE_GUARDS = [{ allowInTypeGuards: true }]
 const TYPE_GUARD_FUNCTION =
@@ -9,7 +16,7 @@ const TYPE_GUARD_ARROW =
 const ASSERTION_FUNCTION =
   "export function assertString(value: unknown): asserts value is string {\n  if (typeof value !== 'string') throw new Error('not a string')\n}"
 
-testVendoredRule(antislop, "no-runtime-typeof", {
+tester.run("no-runtime-typeof", antislop.rules["no-runtime-typeof"], {
   invalid: [
     {
       code: TYPE_GUARD_FUNCTION,

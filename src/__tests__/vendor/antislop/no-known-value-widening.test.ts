@@ -1,10 +1,17 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
 import antislop from "#presets/lint/vendor/antislop/plugin.mjs"
-import { testVendoredRule } from "../rule-tester.ts"
+
+RuleTester.describe = describe
+RuleTester.it = it
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
 
 const COMMAND = "type Command = () => void\nconst startCommand: Command = () => {}\n"
 const IS_STRING = "function isString(value: unknown): value is string {\n  return true\n}\n"
 
-testVendoredRule(antislop, "no-known-value-widening", {
+tester.run("no-known-value-widening", antislop.rules["no-known-value-widening"], {
   invalid: [
     {
       code: `${COMMAND}type Index<T> = Record<string, T>\nexport const commands: Index<Command> = { start: startCommand }`,

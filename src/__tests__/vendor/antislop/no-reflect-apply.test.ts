@@ -1,7 +1,14 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
 import antislop from "#presets/lint/vendor/antislop/plugin.mjs"
-import { testVendoredRule } from "../rule-tester.ts"
 
-testVendoredRule(antislop, "no-reflect-apply", {
+RuleTester.describe = describe
+RuleTester.it = it
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+
+tester.run("no-reflect-apply", antislop.rules["no-reflect-apply"], {
   invalid: [
     {
       code: "declare const operation: () => number\nexport const value = Reflect['apply'](operation, undefined, [])",

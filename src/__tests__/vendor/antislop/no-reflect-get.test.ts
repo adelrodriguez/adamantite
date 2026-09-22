@@ -1,7 +1,14 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
 import antislop from "#presets/lint/vendor/antislop/plugin.mjs"
-import { testVendoredRule } from "../rule-tester.ts"
 
-testVendoredRule(antislop, "no-reflect-get", {
+RuleTester.describe = describe
+RuleTester.it = it
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+
+tester.run("no-reflect-get", antislop.rules["no-reflect-get"], {
   invalid: [
     {
       code: "declare const owner: { property: string }\nexport const value = Reflect['get'](owner, 'property')",

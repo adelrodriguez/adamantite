@@ -28,7 +28,9 @@ export default defineConfig([
         to: "dist/presets/lint/vendor/antislop",
       },
     ],
-    deps: { neverBundle: ["knip", "oxfmt", "oxlint"] },
+    // The first-party plugin imports only types from @oxlint/plugins. Keeping the package external
+    // leaves a type reference in its declarations instead of inlining Oxlint's AST types.
+    deps: { neverBundle: ["@oxlint/plugins", "knip", "oxfmt", "oxlint"] },
     dts: { oxc: true },
     entry: ["presets/**/*.ts"],
     fixedExtension: false,

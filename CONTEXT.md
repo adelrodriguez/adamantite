@@ -15,6 +15,12 @@ Third-party code that Adamantite builds into the package at a pinned upstream co
 because upstream does not publish to npm. Bundles ship inside the preset that owns them.
 _Avoid_: Plugin, dependency
 
+**First-party plugin**:
+Adamantite's own Oxlint plugin, under the `adamantite/*` rule namespace. It ships inside the
+package, and presets load it by file URL, so target projects install nothing extra. A rule
+in it is a first-party rule.
+_Avoid_: Vendored bundle, managed plugin, custom plugin
+
 **Managed plugin**:
 A third-party Oxlint plugin that stays an npm package in the target project. Adamantite
 pins its version, installs it when its preset is selected, and keeps it in sync through

@@ -71,6 +71,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react",
         },
         {
+          hint: "Strict React feature code: no state, effect, or memoization hooks outside hook modules, no type assertions",
+          label: "react-strict",
+          value: "react-strict",
+        },
+        {
           hint: "Next.js pitfalls around scripts, fonts, images, and document/head usage",
           label: "next.js",
           value: "nextjs",

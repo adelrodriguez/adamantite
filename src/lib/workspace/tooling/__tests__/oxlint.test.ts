@@ -73,6 +73,14 @@ describe("getImportedLintPresets", () => {
     ])
   })
 
+  test("import a hyphenated preset under a camel-case name", () => {
+    const content = toOxlintTsConfigContent(["react", "react-strict"])
+
+    expect(content).toContain('import reactStrict from "adamantite/lint/react-strict"')
+    expect(content).toContain("extends: [core, react, reactStrict],")
+    expect(getImportedLintPresets(content)).toEqual(["react", "react-strict"])
+  })
+
   test("list no preset for a config with only the core preset", () => {
     expect(getImportedLintPresets(toOxlintTsConfigContent())).toEqual([])
   })

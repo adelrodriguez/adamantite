@@ -28,10 +28,16 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
-- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`, `shadcn`; editors:
-  `vscode`, `zed`
+- Presets: `react`, `react-strict`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`, `shadcn`;
+  editors: `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
+
+The `react-strict` preset needs no extra package. Its `adamantite/no-react-state-hooks` rule
+reports React state, effect, and memoization hooks outside hook modules (`**/use*.{ts,tsx}`
+and `**/hooks/**`), and each message tells what to do instead. Do not move a hook call into
+a hook module only to silence the rule: follow the message. Set the rule's `allow` option
+when the project keeps hooks elsewhere. The preset also bans type assertions outside tests.
 
 The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
 at a pinned version and doctor and `update` keep in sync. The plugin finds components and

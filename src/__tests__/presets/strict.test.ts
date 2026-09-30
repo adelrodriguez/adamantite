@@ -1,37 +1,56 @@
 import { join } from "node:path"
+import type { OxlintConfig } from "oxlint"
 import { beforeAll, describe, expect, test } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
+import adamantitePlugin from "#presets/lint/plugin/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
-import packageJson from "../../../package.json" with { type: "json" }
+import strict from "#presets/lint/strict.ts"
 import { lintRuleFixtures, listFixtureRules, type RuleFixtureCase } from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/react-strict")
+const FIXTURES_DIR = join(import.meta.dirname, "fixtures/strict")
 const NAMESPACE = "adamantite"
 
-const presetRules = Object.keys(reactStrict.rules ?? {})
-  .filter((name) => name.startsWith(`${NAMESPACE}/`))
-  .map((name) => name.slice(NAMESPACE.length + 1))
+function getFirstPartyRules(rules: OxlintConfig["rules"]) {
+  return Object.keys(rules ?? {})
+    .filter((name) => name.startsWith(`${NAMESPACE}/`))
+    .map((name) => name.slice(NAMESPACE.length + 1))
+}
 
-describe("react-strict preset", () => {
+const presetRules = getFirstPartyRules(strict.rules)
+
+describe("strict preset", () => {
   test("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toEqual(EffectArray.sort(presetRules, Order.String))
   })
 
-  test("take the plugin types from the Oxlint version that runs the plugin", () => {
-    expect(packageJson.devDependencies["@oxlint/plugins"]).toBe(packageJson.devDependencies.oxlint)
+  test("ban type assertions outside tests", () => {
+    expect(strict.rules?.["typescript/consistent-type-assertions"]).toEqual([
+      "error",
+      { assertionStyle: "never" },
+    ])
   })
 })
 
-describe("react-strict rule fixtures", () => {
+describe("first-party plugin", () => {
+  test("have each rule enabled by exactly one of the strict and react-strict presets", () => {
+    const enabled = [...presetRules, ...getFirstPartyRules(reactStrict.rules)]
+
+    expect(EffectArray.sort(enabled, Order.String)).toEqual(
+      EffectArray.sort(Object.keys(adamantitePlugin.rules), Order.String)
+    )
+  })
+})
+
+describe("strict rule fixtures", () => {
   let cases: RuleFixtureCase[] = []
 
   beforeAll(() => {
     cases = lintRuleFixtures({
       fixturesDir: FIXTURES_DIR,
       namespace: NAMESPACE,
-      presetPath: join(REPO_ROOT, "presets/lint/react-strict.ts"),
+      presetPath: join(REPO_ROOT, "presets/lint/strict.ts"),
     })
   })
 

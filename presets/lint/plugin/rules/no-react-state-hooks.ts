@@ -1,10 +1,8 @@
-import type { Context, ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
-
-type OptionValue = Options[number]
-type OptionObject = Exclude<OptionValue, OptionValue[] | boolean | number | string | null>
+import type { Context, ESTree, Rule, Visitor } from "@oxlint/plugins"
+import { readStringArrayOption } from "../options.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs and imports types only.
+// runtime-neutral APIs and imports only types from packages.
 
 type MessageId = "banned" | "effect" | "externalStore" | "localState" | "memoization"
 
@@ -32,30 +30,6 @@ const DEFAULT_ALLOW: readonly string[] = [
 ]
 
 const REACT_MODULE = "react"
-
-function isString(value: OptionValue | undefined): value is string {
-  return typeof value === "string"
-}
-
-function isStringArray(value: OptionValue | undefined): value is string[] {
-  return Array.isArray(value) && value.every((entry) => isString(entry))
-}
-
-function isOptionObject(value: OptionValue | undefined): value is OptionObject {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
-function readStringArrayOption(options: Readonly<Options>, key: string) {
-  const [first] = options
-
-  if (!isOptionObject(first)) {
-    return
-  }
-
-  const value = first[key]
-
-  return isStringArray(value) ? value : undefined
-}
 
 function escapeRegExp(text: string) {
   return text.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`)

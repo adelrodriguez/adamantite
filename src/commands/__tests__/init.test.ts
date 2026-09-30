@@ -294,7 +294,7 @@ describe("init", () => {
     )
   })
 
-  it.effect("configure the react-strict preset without extra packages", () =>
+  it.effect("configure the first-party plugin presets without extra packages", () =>
     Effect.gen(function* () {
       const files = createInitTestContext({ "package.json": basePackageJson })
       const prompter = createPrompterTestContext()
@@ -302,7 +302,17 @@ describe("init", () => {
 
       const exit = yield* runCommand(
         initCommand,
-        ["--non-interactive", "--script", "check", "--preset", "react", "--preset", "react-strict"],
+        [
+          "--non-interactive",
+          "--script",
+          "check",
+          "--preset",
+          "react",
+          "--preset",
+          "react-strict",
+          "--preset",
+          "strict",
+        ],
         { files, layers: [prompter.layer, installer.layer] }
       )
 
@@ -310,8 +320,11 @@ describe("init", () => {
       expect(files.read("oxlint.config.ts")).toContain(
         'import reactStrict from "adamantite/lint/react-strict"'
       )
+      expect(files.read("oxlint.config.ts")).toContain(
+        'import strict from "adamantite/lint/strict"'
+      )
       expect(installer.calls[0]?.packages).toEqual(
-        expect.not.arrayContaining([expect.stringContaining("react-strict")])
+        expect.not.arrayContaining([expect.stringContaining("strict")])
       )
     })
   )

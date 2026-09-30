@@ -293,6 +293,28 @@ describe("init", () => {
     )
   })
 
+  it.effect("configure the react-strict preset without extra packages", () =>
+    Effect.gen(function* () {
+      const files = createInitTestContext({ "package.json": basePackageJson })
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = yield* runCommand(
+        initCommand,
+        ["--non-interactive", "--script", "check", "--preset", "react", "--preset", "react-strict"],
+        { files, layers: [prompter.layer, installer.layer] }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read("oxlint.config.ts")).toContain(
+        'import reactStrict from "adamantite/lint/react-strict"'
+      )
+      expect(installer.calls[0]?.packages).toEqual(
+        expect.not.arrayContaining([expect.stringContaining("react-strict")])
+      )
+    })
+  )
+
   describe("managed lint plugins", () => {
     it.effect("install @shadcn/lint when the shadcn preset is selected", () =>
       Effect.gen(function* () {

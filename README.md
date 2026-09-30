@@ -87,7 +87,8 @@ Available setup values:
 
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
-- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, and `node`.
+- Presets: `react`, `react-strict`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`,
+  and `shadcn`.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
@@ -239,20 +240,21 @@ underlying CLI.
 
 Adamantite publishes configuration that can also be consumed directly:
 
-| Export                     | Purpose                                                                                                                                                                                                                                                                                |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `adamantite/lint`          | Core Oxlint rules.                                                                                                                                                                                                                                                                     |
-| `adamantite/lint/react`    | React, JSX accessibility, and performance.                                                                                                                                                                                                                                             |
-| `adamantite/lint/nextjs`   | Next.js rules.                                                                                                                                                                                                                                                                         |
-| `adamantite/lint/vue`      | Vue rules.                                                                                                                                                                                                                                                                             |
-| `adamantite/lint/node`     | Node.js rules.                                                                                                                                                                                                                                                                         |
-| `adamantite/lint/jest`     | Jest rules.                                                                                                                                                                                                                                                                            |
-| `adamantite/lint/vitest`   | Vitest rules.                                                                                                                                                                                                                                                                          |
-| `adamantite/lint/antislop` | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
-| `adamantite/lint/shadcn`   | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
-| `adamantite/format`        | Oxfmt configuration.                                                                                                                                                                                                                                                                   |
-| `adamantite/analyze`       | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo.                                                                                                                                      |
-| `adamantite/typescript`    | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                                             |
+| Export                         | Purpose                                                                                                                                                                                                                                                                                |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `adamantite/lint`              | Core Oxlint rules.                                                                                                                                                                                                                                                                     |
+| `adamantite/lint/react`        | React, JSX accessibility, and performance.                                                                                                                                                                                                                                             |
+| `adamantite/lint/react-strict` | Opinions for React feature code: no state, effect, or memoization hooks outside hook modules, and no type assertions outside tests. See [the react-strict preset](#the-react-strict-preset).                                                                                           |
+| `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                         |
+| `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                             |
+| `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                         |
+| `adamantite/lint/jest`         | Jest rules.                                                                                                                                                                                                                                                                            |
+| `adamantite/lint/vitest`       | Vitest rules.                                                                                                                                                                                                                                                                          |
+| `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
+| `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
+| `adamantite/format`            | Oxfmt configuration.                                                                                                                                                                                                                                                                   |
+| `adamantite/analyze`           | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo.                                                                                                                                      |
+| `adamantite/typescript`        | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                                             |
 
 When consuming the lint presets directly, hoist the core preset's ignore patterns onto the
 root config. Oxlint does not merge `ignorePatterns` from extended configs, so without the
@@ -270,6 +272,45 @@ export default defineConfig({
 ```
 
 Configs generated by `adamantite init` include this automatically.
+
+### The react-strict preset
+
+`adamantite/lint/react-strict` keeps state and side effects out of React feature code. Use
+it together with `adamantite/lint/react`. It needs no extra package: the rules come from
+Adamantite's own Oxlint plugin, which ships inside the package.
+
+- `adamantite/no-react-state-hooks` reports calls to `useState`, `useReducer`, `useEffect`,
+  `useLayoutEffect`, `useSyncExternalStore`, `useMemo`, and `useCallback` imported from
+  `react`, including aliased imports and `React.useState(...)`. Each message tells what to
+  do instead: derive state from loader data or URL params, move side effects to loaders,
+  actions, or event handlers, and let the React Compiler memoize.
+- `typescript/consistent-type-assertions` bans type assertions. `as const` stays allowed,
+  and test files (`*.test.*`, `*.spec.*`, and `__tests__/`) keep the core preset's setting.
+
+Hooks stay allowed in hook modules: files that match `**/use[A-Z]*.{ts,tsx}`, `**/use-*.{ts,tsx}`, or `**/hooks/**`, such as `useCart.ts`
+or `use-cart.ts`. A file such as `userProfile.tsx` is feature code.
+Globs match paths relative to the working directory. Set `allow` to use another layout, and
+`hooks` to change the list of reported hooks:
+
+```ts
+import { defineConfig } from "oxlint"
+import core from "adamantite/lint"
+import react from "adamantite/lint/react"
+import reactStrict from "adamantite/lint/react-strict"
+
+export default defineConfig({
+  extends: [core, react, reactStrict],
+  ignorePatterns: core.ignorePatterns,
+  rules: {
+    "adamantite/no-react-state-hooks": [
+      "error",
+      { allow: ["src/state/**", "**/use[A-Z]*.{ts,tsx}"], hooks: ["useState", "useEffect"] },
+    ],
+  },
+})
+```
+
+Each option replaces its default list.
 
 ### The shadcn preset
 

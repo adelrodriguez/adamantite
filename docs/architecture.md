@@ -88,6 +88,8 @@ commands do not forward arguments because they coordinate multiple operations.
 ```text
 presets/
   lint/             published Oxlint presets
+    plugin/         first-party Oxlint plugin and its rules
+    vendor/         vendored plugin bundles
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
   tsconfig.json     published TypeScript preset
@@ -145,3 +147,23 @@ report line and column, and the effect of rule options. They run with the unit t
 generated `plugin.d.mts` names each rule, so a test addresses its rule without a cast. When
 a re-vendor moves a report or renames a message, update the case and record the accepted
 upstream change in the pull request.
+
+## First-party plugin
+
+Rules that no upstream plugin provides live in Adamantite's own Oxlint plugin under
+`presets/lint/plugin/`, with one module per rule in `rules/`. `index.ts` registers each
+rule under the `adamantite` namespace. Tsdown builds the plugin with the presets, so it
+ships at `dist/presets/lint/plugin/index.js`.
+
+A preset loads the plugin with a file URL from its own location, as the antislop preset
+loads its vendored bundle. The source tree has `plugin/index.ts` and the dist tree has
+`plugin/index.js`, so the preset takes the extension from its own module URL. Rule code
+runs under the runtime that executes Oxlint in the target project, so it uses only
+runtime-neutral APIs. It imports only types from `@oxlint/plugins`, a devDependency pinned
+to the Oxlint version. `presets/lint/plugin/tsconfig.json` lets the source import rule
+modules with their `.ts` extension, which Node.js needs to load the source plugin.
+
+Each rule has a `RuleTester` test under `src/__tests__/plugin/<rule>.test.ts` for messages,
+locations, and options, and `valid/` and `invalid/` fixtures under
+`src/__tests__/presets/fixtures/<preset>/<rule>/` that the preset test lints in one real
+Oxlint run.

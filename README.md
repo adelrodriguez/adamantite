@@ -87,7 +87,8 @@ Available setup values:
 
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
-- Presets: `react`, `nextjs`, `vue`, `jest`, `vitest`, and `node`.
+- Presets: `react`, `react-strict`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`,
+  and `shadcn`.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
@@ -286,7 +287,8 @@ Adamantite's own Oxlint plugin, which ships inside the package.
 - `typescript/consistent-type-assertions` bans type assertions. `as const` stays allowed,
   and test files (`*.test.*`, `*.spec.*`, and `__tests__/`) keep the core preset's setting.
 
-Hooks stay allowed in hook modules: files that match `**/use*.{ts,tsx}` or `**/hooks/**`.
+Hooks stay allowed in hook modules: files that match `**/use[A-Z]*.{ts,tsx}`, `**/use-*.{ts,tsx}`, or `**/hooks/**`, such as `useCart.ts`
+or `use-cart.ts`. A file such as `userProfile.tsx` is feature code.
 Globs match paths relative to the working directory. Set `allow` to use another layout, and
 `hooks` to change the list of reported hooks:
 
@@ -302,7 +304,7 @@ export default defineConfig({
   rules: {
     "adamantite/no-react-state-hooks": [
       "error",
-      { allow: ["src/state/**", "**/use*.{ts,tsx}"], hooks: ["useState", "useEffect"] },
+      { allow: ["src/state/**", "**/use[A-Z]*.{ts,tsx}"], hooks: ["useState", "useEffect"] },
     ],
   },
 })

@@ -67,8 +67,17 @@ tester.run("no-react-state-hooks", plugin.rules["no-react-state-hooks"], {
       filename: `${CWD}/src/hooks/useCounter.ts`,
       options: [{ allow: ["src/state/**"] }],
     },
+    {
+      code: 'import { useState } from "react"\nexport function UserProfile() {\n  return useState(0)\n}',
+      errors: [{ column: 9, data: { hook: "useState" }, line: 3, messageId: "localState" }],
+      filename: feature("userProfile.tsx"),
+    },
   ],
   valid: [
+    {
+      code: 'import { useState } from "react"\nexport function useCart() {\n  return useState(0)\n}',
+      filename: `${CWD}/src/features/use-cart.ts`,
+    },
     {
       code: 'import { useState } from "react"\nexport function useCounter() {\n  return useState(0)\n}',
       filename: `${CWD}/src/features/useCounter.ts`,
@@ -112,16 +121,27 @@ tester.run("no-react-state-hooks", plugin.rules["no-react-state-hooks"], {
 
 describe("globToRegExp", () => {
   it("matches the default allow globs", () => {
-    const hookModule = globToRegExp("**/use*.{ts,tsx}")
+    const hookModule = globToRegExp("**/use[A-Z]*.{ts,tsx}")
+    const kebabHookModule = globToRegExp("**/use-*.{ts,tsx}")
     const hooksDirectory = globToRegExp("**/hooks/**")
 
     expect(hookModule.test("useCart.ts")).toBe(true)
     expect(hookModule.test("src/cart/useCart.tsx")).toBe(true)
     expect(hookModule.test("src/cart/useCart.js")).toBe(false)
     expect(hookModule.test("src/user/Profile.tsx")).toBe(false)
+    expect(hookModule.test("src/features/userProfile.tsx")).toBe(false)
+    expect(kebabHookModule.test("src/cart/use-cart.ts")).toBe(true)
+    expect(kebabHookModule.test("src/features/user-profile.tsx")).toBe(false)
     expect(hooksDirectory.test("src/hooks/cart.ts")).toBe(true)
     expect(hooksDirectory.test("hooks/cart/index.ts")).toBe(true)
     expect(hooksDirectory.test("src/no-hooks/cart.ts")).toBe(false)
+  })
+
+  it("matches character classes and negated character classes", () => {
+    expect(globToRegExp("file-[0-9].ts").test("file-7.ts")).toBe(true)
+    expect(globToRegExp("file-[0-9].ts").test("file-a.ts")).toBe(false)
+    expect(globToRegExp("file-[!0-9].ts").test("file-a.ts")).toBe(true)
+    expect(globToRegExp("file-[!0-9].ts").test("file-7.ts")).toBe(false)
   })
 
   it("keeps a single star inside one path segment", () => {

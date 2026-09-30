@@ -28,8 +28,8 @@ const config: OxlintConfig = {
     },
   ],
   rules: {
-    // Hooks stay allowed in hook modules: `**/use*.{ts,tsx}` and `**/hooks/**`. A project with
-    // another layout sets the rule's `allow` option.
+    // Hooks stay allowed in hook modules: `**/use[A-Z]*.{ts,tsx}`, `**/use-*.{ts,tsx}`, and
+    // `**/hooks/**`. A project with another layout sets the rule's `allow` option.
     "adamantite/no-react-state-hooks": "error",
     // Validate or narrow a value instead of asserting its type. `as const` stays allowed.
     "typescript/consistent-type-assertions": ["error", { assertionStyle: "never" }],

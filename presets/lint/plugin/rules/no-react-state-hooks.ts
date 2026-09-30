@@ -21,10 +21,15 @@ const HOOK_MESSAGES: ReadonlyMap<string, MessageId> = new Map([
 const DEFAULT_HOOKS: readonly string[] = [...HOOK_MESSAGES.keys()]
 
 /**
- * Modules where hooks are permitted: hook modules such as `useCart.ts` and everything under a
- * `hooks` directory. Everything else is feature code.
+ * Modules where hooks are permitted: hook modules such as `useCart.ts` or `use-cart.ts`, and
+ * everything under a `hooks` directory. Everything else is feature code, including files such as
+ * `userProfile.tsx`.
  */
-const DEFAULT_ALLOW: readonly string[] = ["**/use*.{ts,tsx}", "**/hooks/**"]
+const DEFAULT_ALLOW: readonly string[] = [
+  "**/use[A-Z]*.{ts,tsx}",
+  "**/use-*.{ts,tsx}",
+  "**/hooks/**",
+]
 
 const REACT_MODULE = "react"
 
@@ -58,7 +63,7 @@ function escapeRegExp(text: string) {
 
 /**
  * Convert a glob to a regular expression that matches a whole path with forward slashes. Supports
- * `**`, `*`, `?`, and `{a,b}` alternation.
+ * `**`, `*`, `?`, `[a-z]` and `[!a-z]` character classes, and `{a,b}` alternation.
  */
 export function globToRegExp(glob: string): RegExp {
   let source = ""
@@ -82,6 +87,13 @@ export function globToRegExp(glob: string): RegExp {
     } else if (rest.startsWith("?")) {
       source += "[^/]"
       index += 1
+    } else if (rest.startsWith("[") && rest.indexOf("]") > 1) {
+      const end = rest.indexOf("]")
+      const negated = rest.startsWith("[!")
+      const characters = rest.slice(negated ? 2 : 1, end).replaceAll(/[\\^]/g, String.raw`\$&`)
+
+      source += `[${negated ? "^" : ""}${characters}]`
+      index += end + 1
     } else if (rest.startsWith("{") && rest.includes("}")) {
       const end = rest.indexOf("}")
       const alternatives = rest

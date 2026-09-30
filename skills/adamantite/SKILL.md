@@ -34,8 +34,8 @@ Repeat `--script`, `--preset`, and `--editor` for multiple values. Available val
   `--overwrite-scripts`
 
 The `react-strict` preset needs no extra package. Its `adamantite/no-react-state-hooks` rule
-reports React state, effect, and memoization hooks outside hook modules (`**/use*.{ts,tsx}`
-and `**/hooks/**`), and each message tells what to do instead. Do not move a hook call into
+reports React state, effect, and memoization hooks outside hook modules (`useCart.ts`,
+`use-cart.ts`, and files under `hooks/`), and each message tells what to do instead. Do not move a hook call into
 a hook module only to silence the rule: follow the message. Set the rule's `allow` option
 when the project keeps hooks elsewhere. The preset also bans type assertions outside tests.
 

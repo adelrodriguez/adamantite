@@ -43,7 +43,7 @@ when the project keeps hooks elsewhere. The preset also bans type assertions out
 The `react-doctor` preset requires the `react` preset and the `oxlint-plugin-react-doctor`
 package, which `init` installs at a pinned version and doctor and `update` keep in sync. It
 enables curated React Doctor rules for React state and effect misuse, such as
-`no-derived-useState` and `no-fetch-in-effect`, and adds to `react-strict`. The package has
+`no-effect-event-handler` and `no-fetch-in-effect`, and adds to `react-strict`. The package has
 a modified MIT license: using it as machine learning training data or selling it as a
 hosted product needs written permission from the copyright holder. Tell the user before you
 select the preset.

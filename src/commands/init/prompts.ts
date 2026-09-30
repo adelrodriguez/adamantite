@@ -76,7 +76,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react-strict",
         },
         {
-          hint: "React state and effect misuse, such as state copied from props and fetches in effects; requires react",
+          hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects; requires react",
           label: "react-doctor",
           value: "react-doctor",
         },

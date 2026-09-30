@@ -323,8 +323,7 @@ by hand, install `oxlint-plugin-react-doctor` as a devDependency too.
 
 The plugin exports more than 900 rules. The preset enables only rules that run on one file
 and that the native `react`, `react-hooks`, `jsx-a11y`, and `unicorn` rules do not already
-report. Examples are state copied from props (`no-derived-useState`), an effect that does
-the work of an event handler (`no-effect-event-handler`), data fetched in an effect
+report. Examples are an effect that does the work of an event handler (`no-effect-event-handler`), data fetched in an effect
 (`no-fetch-in-effect`), and state changed in place (`no-direct-state-mutation`). The
 TanStack Query and TanStack Start rules are not in this preset. See
 [ADR 0005](docs/adr/0005-curate-react-doctor-rules.md) for the criteria.

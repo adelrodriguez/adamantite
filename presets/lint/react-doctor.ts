@@ -1,8 +1,8 @@
 import type { OxlintConfig } from "oxlint"
 
 // React Doctor (https://github.com/millionco/react-doctor) reports specific misuse of React state
-// and effects: state copied from props, effects that do the work of an event handler, data fetched
-// in an effect, and state changed in place. Use it together with the react preset.
+// and effects: effects that do the work of an event handler, data fetched in an effect, and state
+// changed in place. Use it together with the react preset.
 //
 // oxlint-plugin-react-doctor is a managed plugin: it stays an npm package that the target project
 // installs. `adamantite init` installs the pinned version when this preset is selected, and doctor
@@ -16,9 +16,8 @@ import type { OxlintConfig } from "oxlint"
 const config: OxlintConfig = {
   jsPlugins: ["oxlint-plugin-react-doctor"],
   rules: {
-    // State: compute values while rendering and keep state changes pure.
+    // State: create new values instead of changing state in place, and keep updaters pure.
     "react-doctor/no-create-store-in-render": "error",
-    "react-doctor/no-derived-useState": "error",
     "react-doctor/no-direct-state-mutation": "error",
     "react-doctor/no-eager-new-in-use-state-initializer": "error",
     "react-doctor/no-impure-state-updater": "error",

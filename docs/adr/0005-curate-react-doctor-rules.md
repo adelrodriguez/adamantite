@@ -26,6 +26,9 @@ A rule is in the preset only when all of these conditions are true:
     `no-async-effect-callback`, which `react-hooks/exhaustive-deps` reports.
   - `effect-remove-listener-inline-handler`, which
     `unicorn/no-invalid-remove-event-listener` reports.
+- It does not report valid code. `no-derived-useState` reports every `useState(prop)`,
+  including editable state that uses the prop only as its initial value, such as a form
+  input. React allows that pattern, so the rule is not in the preset.
 - It reports its fixture. `effect-needs-cleanup`, `effect-listener-cleanup-mismatch`, and
   `no-promise-then-side-effect-in-effect-without-catch` did not report a simple case.
 - No other enabled rule reports the same defect. The preset keeps

@@ -1,7 +1,7 @@
 import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
+import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
-import * as Flag from "effect/unstable/cli/Flag"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { checkIsSupportedPackageManager, type Script } from "#lib/workspace/package-json.ts"

@@ -28,7 +28,8 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
-- Presets: `react`, `react-strict`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`, `shadcn`;
+- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `jest`, `vitest`, `node`,
+  `antislop`, `shadcn`;
   editors: `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
@@ -38,6 +39,14 @@ reports React state, effect, and memoization hooks outside hook modules (`useCar
 `use-cart.ts`, and files under `hooks/`), and each message tells what to do instead. Do not move a hook call into
 a hook module only to silence the rule: follow the message. Set the rule's `allow` option
 when the project keeps hooks elsewhere. The preset also bans type assertions outside tests.
+
+The `react-doctor` preset requires the `react` preset and the `oxlint-plugin-react-doctor`
+package, which `init` installs at a pinned version and doctor and `update` keep in sync. It
+enables curated React Doctor rules for React state and effect misuse, such as
+`no-effect-event-handler` and `no-fetch-in-effect`, and adds to `react-strict`. The package has
+a modified MIT license: using it as machine learning training data or selling it as a
+hosted product needs written permission from the copyright holder. Tell the user before you
+select the preset.
 
 The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
 at a pinned version and doctor and `update` keep in sync. The plugin finds components and

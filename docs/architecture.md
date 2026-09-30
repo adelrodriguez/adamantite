@@ -115,7 +115,8 @@ in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit u
 ## Managed plugins
 
 A preset can need a third-party Oxlint plugin that is published on npm, such as
-`@shadcn/lint` for the `shadcn` preset. The plugin stays an npm package in the target
+`@shadcn/lint` for the `shadcn` preset and `oxlint-plugin-react-doctor` for the
+`react-doctor` preset. The plugin stays an npm package in the target
 project. Its tooling integration lives in `src/lib/integrations/tooling/oxlint/plugins/`
 and is made with `defineManagedPlugin`, so the package is required only while
 `oxlint.config.ts` imports the preset. Register a new plugin in the `managedPlugins` list in

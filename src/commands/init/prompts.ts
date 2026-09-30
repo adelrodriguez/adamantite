@@ -76,6 +76,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react-strict",
         },
         {
+          hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects; requires react",
+          label: "react-doctor",
+          value: "react-doctor",
+        },
+        {
           hint: "Next.js pitfalls around scripts, fonts, images, and document/head usage",
           label: "next.js",
           value: "nextjs",
@@ -113,6 +118,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
       ],
       required: false,
     })
+
+    if (selectedPresets.includes("react-doctor") && !selectedPresets.includes("react")) {
+      selectedPresets = ["react", ...selectedPresets]
+      yield* prompter.log.info("Added the `react` preset, which `react-doctor` requires.")
+    }
   }
 
   const shouldSetupTypescript = hasOxlint

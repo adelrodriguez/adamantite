@@ -4,3 +4,4 @@
 - [ADR 0002: Doctor instructs; agents mutate](0002-doctor-instructs-agents-mutate.md)
 - [ADR 0003: Managed plugins stay npm packages](0003-managed-plugins-stay-npm-packages.md)
 - [ADR 0004: Ban React state, effect, and memoization hooks in feature code](0004-ban-react-state-hooks-in-feature-code.md)
+- [ADR 0005: Curate the react-doctor rules](0005-curate-react-doctor-rules.md)

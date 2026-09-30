@@ -87,8 +87,8 @@ Available setup values:
 
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
-- Presets: `react`, `react-strict`, `nextjs`, `vue`, `jest`, `vitest`, `node`, `antislop`,
-  and `shadcn`.
+- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `jest`, `vitest`,
+  `node`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
@@ -245,6 +245,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint`              | Core Oxlint rules.                                                                                                                                                                                                                                                                     |
 | `adamantite/lint/react`        | React, JSX accessibility, and performance.                                                                                                                                                                                                                                             |
 | `adamantite/lint/react-strict` | Opinions for React feature code: no state, effect, or memoization hooks outside hook modules, and no type assertions outside tests. See [the react-strict preset](#the-react-strict-preset).                                                                                           |
+| `adamantite/lint/react-doctor` | Curated [React Doctor](https://github.com/millionco/react-doctor) rules for React state and effect misuse. See [the react-doctor preset](#the-react-doctor-preset).                                                                                                                    |
 | `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                         |
@@ -311,6 +312,31 @@ export default defineConfig({
 ```
 
 Each option replaces its default list.
+
+### The react-doctor preset
+
+`adamantite/lint/react-doctor` reports specific misuse of React state and effects. Use it
+together with `adamantite/lint/react`. It needs the `oxlint-plugin-react-doctor` package.
+`adamantite init` installs the pinned version when you select the preset, and
+`adamantite doctor` and `adamantite update` keep it on that version. If you add the preset
+by hand, install `oxlint-plugin-react-doctor` as a devDependency too.
+
+The plugin exports more than 900 rules. The preset enables only rules that run on one file
+and that the native `react`, `react-hooks`, `jsx-a11y`, and `unicorn` rules do not already
+report. Examples are an effect that does the work of an event handler (`no-effect-event-handler`), data fetched in an effect
+(`no-fetch-in-effect`), and state changed in place (`no-direct-state-mutation`). The
+TanStack Query and TanStack Start rules are not in this preset. See
+[ADR 0005](docs/adr/0005-curate-react-doctor-rules.md) for the criteria.
+
+The preset works together with `adamantite/lint/react-strict`. React Doctor rules report
+specific misuse, and `react-strict` bans the hooks in feature code. Some React Doctor rules
+skip test files and fixtures by path, such as `__tests__/` and `*.test.tsx`.
+
+`oxlint-plugin-react-doctor` has a modified MIT license. It needs written permission from
+the copyright holder to use the software as machine learning training data, or to sell it
+as a hosted product. Read the
+[license](https://www.npmjs.com/package/oxlint-plugin-react-doctor?activeTab=code) before
+you select the preset.
 
 ### The shadcn preset
 

@@ -92,36 +92,6 @@ describe("check", () => {
     )
   })
 
-  describe("file arguments", () => {
-    it.effect("append file arguments", () =>
-      Effect.gen(function* () {
-        const files = createFileSystemTestContext({
-          files: { "index.ts": "export const value = 1\n" },
-        })
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(checkCommand, ["index.ts"], {
-          files,
-          layers: [runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
-          {
-            args: ["--check", join(files.root, "index.ts")],
-            command: "oxfmt",
-            title: "✨ Checking formatting",
-          },
-          {
-            args: [join(files.root, "index.ts")],
-            command: "oxlint",
-            title: "🔍 Linting",
-          },
-        ])
-      })
-    )
-  })
-
   describe("passthrough arguments", () => {
     it.effect("append arguments after file arguments", () =>
       Effect.gen(function* () {
@@ -163,7 +133,10 @@ describe("check", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
-        expect(runner.invocations).toHaveLength(2)
+        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
+          "oxfmt",
+          "oxlint",
+        ])
       })
     )
   })

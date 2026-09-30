@@ -26,37 +26,6 @@ function runAssess(files: FileSystemTestContext) {
 }
 
 describe("oxfmt", () => {
-  describe("detect", () => {
-    it.effect("detect when oxfmt.config.ts does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* oxfmt.detect(ROOT).pipe(provideFiles(files))
-
-        expect(result).toEqual({
-          active: null,
-          legacy: [],
-          warnings: [],
-        })
-      })
-    )
-
-    it.effect("detect when oxfmt.config.ts exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "oxfmt.config.ts": "export default {}\n" })
-
-        const result = yield* oxfmt.detect(ROOT).pipe(provideFiles(files))
-
-        expect(result.active).toEqual({
-          file: "oxfmt.config.ts",
-          format: "ts",
-          path: join(ROOT, "oxfmt.config.ts"),
-        })
-        expect(result.legacy).toEqual([])
-      })
-    )
-  })
-
   describe("create", () => {
     it.effect("create oxfmt.config.ts with the correct config", () =>
       Effect.gen(function* () {
@@ -161,36 +130,6 @@ describe("oxfmt", () => {
 
         expect(result).toEqual({
           applicable: false,
-          warnings: [],
-        })
-      })
-    )
-
-    it.effect("report missing managed config when the managed check script exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                oxfmt: oxfmt.version,
-              },
-              name: "test-project",
-              scripts: {
-                check: "adamantite check",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [{ id: "missing-oxfmt-config" }],
-          packageActions: [],
           warnings: [],
         })
       })

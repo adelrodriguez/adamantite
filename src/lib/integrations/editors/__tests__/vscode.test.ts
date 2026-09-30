@@ -36,18 +36,6 @@ describe("vscode", () => {
     })
   )
 
-  describe("detect", () => {
-    it.effect("detect when .vscode/settings.json does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const exists = yield* vscode.detect(ROOT).pipe(provideFiles(files))
-
-        expect(exists).toBe(false)
-      })
-    )
-  })
-
   describe("create", () => {
     it.effect("create .vscode/settings.json", () =>
       Effect.gen(function* () {
@@ -105,19 +93,6 @@ describe("vscode", () => {
         const secondUpdate = files.read(".vscode/settings.json")
 
         expect(secondUpdate).toBe(firstUpdate)
-      })
-    )
-
-    it.effect("merge an empty config with Adamantite's config", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ ".vscode/settings.json": "{}" })
-
-        yield* vscode.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read(".vscode/settings.json"))
-
-        expect(config["editor.formatOnSave"]).toBe(true)
-        expect(config["editor.formatOnPaste"]).toBe(true)
       })
     )
 

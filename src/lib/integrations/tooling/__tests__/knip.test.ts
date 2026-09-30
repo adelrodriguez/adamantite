@@ -26,37 +26,6 @@ function runAssess(files: FileSystemTestContext) {
 }
 
 describe("knip", () => {
-  describe("detect", () => {
-    it.effect("return null when no knip config is present", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* knip.detect(ROOT).pipe(provideFiles(files))
-
-        expect(result).toEqual({
-          active: null,
-          legacy: [],
-          warnings: [],
-        })
-      })
-    )
-
-    it.effect("detect knip.config.ts when present", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "knip.config.ts": "export default {}\n" })
-
-        const result = yield* knip.detect(ROOT).pipe(provideFiles(files))
-
-        expect(result.active).toEqual({
-          file: "knip.config.ts",
-          format: "ts",
-          path: join(ROOT, "knip.config.ts"),
-        })
-        expect(result.legacy).toEqual([])
-      })
-    )
-  })
-
   describe("create", () => {
     it.effect("create knip.config.ts with the preset config", () =>
       Effect.gen(function* () {

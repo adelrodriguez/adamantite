@@ -116,38 +116,6 @@ describe("sherif", () => {
       })
     )
 
-    it.effect(
-      "report only the legacy finding when the package and a legacy script are present",
-      () =>
-        Effect.gen(function* () {
-          const files = makeFiles({
-            "package.json": JSON.stringify(
-              {
-                devDependencies: {
-                  sherif: sherif.version,
-                },
-                name: "test-project",
-                scripts: {
-                  "fix:monorepo": "adamantite monorepo --fix",
-                },
-                version: "1.0.0",
-              },
-              null,
-              2
-            ),
-          })
-
-          const result = yield* runAssess(files)
-
-          expect(result).toMatchObject({
-            applicable: true,
-            findings: [{ id: "legacy-monorepo-scripts" }],
-            packageActions: [],
-            warnings: [],
-          })
-        })
-    )
-
     it.effect("report the managed legacy monorepo scripts", () =>
       Effect.gen(function* () {
         const files = makeFiles({

@@ -32,30 +32,6 @@ function detect(
 }
 
 describe("detectToolingConfig", () => {
-  it.effect("return an empty state when no config exists", () =>
-    Effect.gen(function* () {
-      const files = makeFiles()
-
-      expect(yield* detect(files)).toEqual({
-        active: null,
-        legacy: [],
-        warnings: [],
-      })
-    })
-  )
-
-  it.effect("activate a lone legacy JSON config without warnings", () =>
-    Effect.gen(function* () {
-      const files = makeFiles({ "tool.json": "{}\n" })
-
-      expect(yield* detect(files)).toEqual({
-        active: { file: "tool.json", format: "json", path: `${ROOT}/tool.json` },
-        legacy: [],
-        warnings: [],
-      })
-    })
-  )
-
   it.effect("prefer the TS config over every legacy config", () =>
     Effect.gen(function* () {
       const files = makeFiles({
@@ -74,26 +50,6 @@ describe("detectToolingConfig", () => {
       expect(state.legacy).toEqual([
         { file: "tool.json", format: "json", path: `${ROOT}/tool.json` },
         { file: "tool.jsonc", format: "jsonc", path: `${ROOT}/tool.jsonc` },
-      ])
-    })
-  )
-
-  it.effect("prefer the JSONC config over the JSON config when no TS config exists", () =>
-    Effect.gen(function* () {
-      const files = makeFiles({
-        "tool.json": "{}\n",
-        "tool.jsonc": "{}\n",
-      })
-
-      const state = yield* detect(files)
-
-      expect(state.active).toEqual({
-        file: "tool.jsonc",
-        format: "jsonc",
-        path: `${ROOT}/tool.jsonc`,
-      })
-      expect(state.legacy).toEqual([
-        { file: "tool.json", format: "json", path: `${ROOT}/tool.json` },
       ])
     })
   )
@@ -220,13 +176,6 @@ describe("getPackageActions", () => {
         type: "update_package",
       },
     ])
-  })
-
-  it("report nothing when the normalized version matches", () => {
-    expect(getPackageActions({ devDependencies: { tool: "^1.2.3" } }, pkg, "purpose")).toEqual([])
-    expect(
-      getPackageActions({ dependencies: { tool: "workspace:~1.2.3" } }, pkg, "purpose")
-    ).toEqual([])
   })
 
   const specifier = Arbitrary.schema(

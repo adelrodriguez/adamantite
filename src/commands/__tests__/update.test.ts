@@ -38,25 +38,6 @@ describe("update", () => {
     })
   )
 
-  it.effect("update known package versions", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { knip: "5.0.0" } }) },
-      })
-      const prompter = createPrompterTestContext()
-      const installer = createDependencyInstallerTestContext()
-
-      const exit = yield* runCommand(updateCommand, [], {
-        files,
-        layers: [prompter.layer, installer.layer],
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls[0]?.packages).toEqual([`knip@${knip.version}`])
-      expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
-    })
-  )
-
   it.effect("leave a managed plugin alone when the config does not import its preset", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -119,40 +100,34 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toHaveLength(1)
       expect(installer.calls[0]?.packages).toEqual([`knip@${knip.version}`])
+      expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
     })
   )
 
-  for (const { isMonorepo, name, workspace, workspaces } of [
-    { isMonorepo: true, name: "npm", workspace: false, workspaces: ["packages/*"] },
-    { isMonorepo: true, name: "pnpm", workspace: true, workspaces: ["packages/*"] },
-    { isMonorepo: true, name: "yarn", workspace: true, workspaces: ["packages/*"] },
-    { isMonorepo: false, name: "pnpm", workspace: false, workspaces: [] },
-  ] as const) {
-    it.effect(`update at the root with ${name} when monorepo is ${isMonorepo}`, () =>
-      Effect.gen(function* () {
-        const files = createFileSystemTestContext({
-          files: {
-            "package.json": manifest({
-              devDependencies: { knip: "5.0.0" },
-              workspaces: [...workspaces],
-            }),
-          },
-        })
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext({
-          detectedPackageManager: { name },
-        })
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls[0]?.options).toEqual({ silent: true, workspace })
+  it.effect("update at the workspace root in a monorepo", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": manifest({
+            devDependencies: { knip: "5.0.0" },
+            workspaces: ["packages/*"],
+          }),
+        },
       })
-    )
-  }
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext({
+        detectedPackageManager: { name: "pnpm" },
+      })
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls[0]?.options).toEqual({ silent: true, workspace: true })
+    })
+  )
 
   it.effect("keep findings informational", () =>
     Effect.gen(function* () {

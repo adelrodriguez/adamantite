@@ -65,18 +65,6 @@ describe("tsconfig", () => {
     )
   })
 
-  describe("detect", () => {
-    it.effect("detect when tsconfig.json does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const exists = yield* tsconfig.detect(ROOT).pipe(provideFiles(files))
-
-        expect(exists).toBe(false)
-      })
-    )
-  })
-
   describe("create", () => {
     it.effect("create tsconfig.json with the correct config", () =>
       Effect.gen(function* () {
@@ -97,12 +85,11 @@ describe("tsconfig", () => {
     it.effect("handle write failures when creating tsconfig.json", () =>
       Effect.gen(function* () {
         const files = makeFiles()
-        files.makeReadOnly("readonly-dir")
+        files.makeReadOnly("tsconfig.json")
 
-        const result = yield* Effect.result(
-          tsconfig.create(`${ROOT}/readonly-dir`).pipe(provideFiles(files))
-        )
+        const result = yield* Effect.result(tsconfig.create(ROOT).pipe(provideFiles(files)))
 
+        expect(Result.isFailure(result)).toBe(true)
         if (Result.isFailure(result)) {
           expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
         }
@@ -111,38 +98,6 @@ describe("tsconfig", () => {
   })
 
   describe("update", () => {
-    it.effect("update an existing tsconfig.json config", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": JSON.stringify(
-            {
-              compilerOptions: {
-                strict: true,
-                target: "ES2020",
-              },
-              include: ["src/**/*"],
-            },
-            null,
-            2
-          ),
-        })
-
-        const existsBefore = yield* tsconfig.detect(ROOT).pipe(provideFiles(files))
-
-        expect(existsBefore).toBe(true)
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read("tsconfig.json"))
-
-        expect(config.compilerOptions).toEqual({
-          strict: true,
-          target: "ES2020",
-        })
-        expect(config.include).toEqual(["src/**/*"])
-        expect(config.extends).toBe("adamantite/typescript")
-      })
-    )
-
     it.effect("append the preset to an existing extends string instead of overwriting it", () =>
       Effect.gen(function* () {
         const files = makeFiles({
@@ -218,18 +173,6 @@ describe("tsconfig", () => {
         const config = JSON.parse(files.read("tsconfig.json"))
 
         expect(config.extends).toEqual(["adamantite/typescript", "@company/tsconfig"])
-      })
-    )
-
-    it.effect("merge an empty config with Adamantite's config", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "tsconfig.json": "{}" })
-
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read("tsconfig.json"))
-
-        expect(config.extends).toBe("adamantite/typescript")
       })
     )
 

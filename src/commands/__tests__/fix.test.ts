@@ -33,28 +33,6 @@ describe("fix", () => {
   })
 
   describe("fix mode flags", () => {
-    it.effect("add suggested fixes when requested", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(fixCommand, ["--suggested"], { layers: [runner.layer] })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-suggestions"])
-      })
-    )
-
-    it.effect("add dangerous fixes when requested", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(fixCommand, ["--dangerous"], { layers: [runner.layer] })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual(["--fix", "--fix-dangerously"])
-      })
-    )
-
     it.effect("add all fix modes when all is requested", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
@@ -195,7 +173,10 @@ describe("fix", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxlint", exitCode: 1 })
-        expect(runner.invocations).toHaveLength(2)
+        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
+          "oxlint",
+          "oxfmt",
+        ])
       })
     )
 

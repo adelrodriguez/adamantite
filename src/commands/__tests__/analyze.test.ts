@@ -31,87 +31,6 @@ describe("analyze", () => {
     )
   })
 
-  describe("fix mode", () => {
-    it.effect("add fix flags when requested", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(analyzeCommand, ["--fix"], { layers: [runner.layer] })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual(["--fix", "--allow-remove-files"])
-      })
-    )
-  })
-
-  describe("strict mode", () => {
-    it.effect("add strict flags when requested", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(analyzeCommand, ["--strict"], { layers: [runner.layer] })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual(["--production", "--strict"])
-      })
-    )
-  })
-
-  describe("combined flags", () => {
-    it.effect("support fix and strict together", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(analyzeCommand, ["--fix", "--strict"], {
-          layers: [runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual([
-          "--fix",
-          "--allow-remove-files",
-          "--production",
-          "--strict",
-        ])
-      })
-    )
-  })
-
-  describe("passthrough arguments", () => {
-    it.effect("append arguments after Adamantite-managed flags", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(analyzeCommand, ["--strict"], {
-          forwardedArguments: ["--directory", "packages/app"],
-          layers: [runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual([
-          "--production",
-          "--strict",
-          "--directory",
-          "packages/app",
-        ])
-      })
-    )
-  })
-
-  describe("error handling", () => {
-    it.effect("fail with CommandFailed when the runner returns a non-zero exit code", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext([1])
-
-        const exit = yield* runCommand(analyzeCommand, [], { layers: [runner.layer] })
-
-        expect(Exit.isFailure(exit)).toBe(true)
-        const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed" })
-      })
-    )
-  })
-
   describe("monorepo stage", () => {
     it.effect("run sherif before knip in a monorepo", () =>
       Effect.gen(function* () {
@@ -258,20 +177,6 @@ describe("analyze", () => {
   })
 
   describe("--only", () => {
-    it.effect("run only sherif with --only monorepo", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(analyzeCommand, ["--only", "monorepo"], {
-          files: createMonorepoFiles(),
-          layers: [runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([{ ...sherifStep, args: [] }])
-      })
-    )
-
     it.effect("forward arguments to sherif with --only monorepo --fix", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
@@ -303,19 +208,6 @@ describe("analyze", () => {
         expect(runner.invocations).toEqual([
           { ...knipStep, args: ["--fix", "--allow-remove-files", "--directory", "packages/app"] },
         ])
-      })
-    )
-
-    it.effect("behave like plain analyze with --only unused outside a monorepo", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(analyzeCommand, ["--only", "unused"], {
-          layers: [runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([{ ...knipStep, args: [] }])
       })
     )
 

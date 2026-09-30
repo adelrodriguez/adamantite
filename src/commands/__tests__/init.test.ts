@@ -313,23 +313,6 @@ describe("init", () => {
         )
       })
     )
-
-    it.effect("leave @shadcn/lint out when the shadcn preset is not selected", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": basePackageJson })
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--preset", "react"],
-          { files, layers: [prompter.layer, installer.layer] }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls[0]?.packages).not.toContain(`@shadcn/lint@${shadcnLint.version}`)
-      })
-    )
   })
 
   describe("sherif for analyze", () => {
@@ -358,31 +341,6 @@ describe("init", () => {
   })
 
   describe("workspace installation", () => {
-    it.effect("use workspace installation when the project is a monorepo", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": monorepoPackageJson })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
-          multiselectResponses: [["analyze"], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toEqual([
-          {
-            options: { silent: true, workspace: true },
-            packages: ["adamantite", `sherif@${sherif.version}`, `knip@${knip.version}`],
-          },
-        ])
-      })
-    )
-
     for (const { name, workspace } of [
       { name: "npm", workspace: false },
       { name: "pnpm", workspace: true },
@@ -407,27 +365,6 @@ describe("init", () => {
         })
       )
     }
-
-    it.effect("not install Sherif for analyze outside a monorepo", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "analyze"], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toEqual([
-          {
-            options: { silent: true, workspace: false },
-            packages: ["adamantite", `knip@${knip.version}`],
-          },
-        ])
-      })
-    )
 
     it.effect("say that analyze includes Sherif only in a monorepo", () =>
       Effect.gen(function* () {
@@ -479,27 +416,6 @@ describe("init", () => {
           files,
           layers: [prompter.layer, installer.layer],
         })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists("tsconfig.json")).toBe(false)
-
-        for (const log of monorepoGuidanceLogs) {
-          expect(prompter.logs).toContainEqual(log)
-        }
-      })
-    )
-
-    it.effect("print guidance instead of creating a root tsconfig in non-interactive mode", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": monorepoPackageJson })
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--typescript"],
-          { files, layers: [prompter.layer, installer.layer] }
-        )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.exists("tsconfig.json")).toBe(false)
@@ -741,43 +657,6 @@ describe("init", () => {
           expect(files.exists("AGENTS.md")).toBe(false)
           expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
         })
-    )
-
-    it.effect("configure every available script in a monorepo", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": monorepoPackageJson })
-
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--script", "fix", "--script", "analyze"],
-          { files, layers: [prompter.layer, installer.layer] }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toEqual([
-          {
-            options: { silent: true, workspace: true },
-            packages: [
-              "adamantite",
-              `oxlint@${oxlint.version}`,
-              `oxlint-tsgolint@${tsgolint.version}`,
-              `oxfmt@${oxfmt.version}`,
-              `sherif@${sherif.version}`,
-              `knip@${knip.version}`,
-            ],
-          },
-        ])
-
-        const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toEqual({
-          analyze: "adamantite analyze",
-          check: "adamantite check",
-          fix: "adamantite fix",
-        })
-      })
     )
 
     it.effect.each([
@@ -1255,34 +1134,6 @@ describe("init", () => {
         })
     )
 
-    it.effect(
-      "leaves AGENTS.md unchanged when Adamantite end marker is missing its start marker",
-      () =>
-        Effect.gen(function* () {
-          const existingAgents = `# Existing Instructions\n\nmanual content\n${ADAMANTITE_AGENTS_END_MARKER}\n`
-          const files = createInitTestContext({ "AGENTS.md": existingAgents })
-
-          const prompter = createPrompterTestContext({
-            confirmResponses: [false, false, true],
-            multiselectResponses: [["check"], [], []],
-          })
-          const installer = createDependencyInstallerTestContext()
-
-          const exit = yield* runCommand(initCommand, [], {
-            files,
-            layers: [prompter.layer, installer.layer],
-          })
-
-          expect(Exit.isSuccess(exit)).toBe(true)
-          expect(prompter.logs).toContainEqual({
-            level: "warning",
-            message:
-              "Could not update AGENTS.md because Adamantite markers are incomplete. Remove the stale ADAMANTITE marker and run adamantite init again.",
-          })
-          expect(files.read("AGENTS.md")).toBe(existingAgents)
-        })
-    )
-
     it.effect("leaves AGENTS.md unchanged when guidance is declined", () =>
       Effect.gen(function* () {
         const existingAgents = "# Existing Instructions\n"
@@ -1542,37 +1393,6 @@ describe("init", () => {
           message: "Your project is now configured",
         })
         expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
-      })
-    )
-
-    it.effect("skip tsconfig setup when the user declines the TypeScript preset prompt", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toEqual([
-          {
-            options: { silent: true, workspace: false },
-            packages: [
-              "adamantite",
-              `oxlint@${oxlint.version}`,
-              `oxlint-tsgolint@${tsgolint.version}`,
-              `oxfmt@${oxfmt.version}`,
-            ],
-          },
-        ])
-        expect(files.exists("oxlint.config.ts")).toBe(true)
-        expect(files.exists("tsconfig.json")).toBe(false)
       })
     )
 

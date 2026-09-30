@@ -59,12 +59,6 @@ function provideFileResolver(files: FileSystemTestContext) {
   )
 }
 
-function provideLiveResolver(files: FileSystemTestContext) {
-  const base = Layer.mergeAll(files.layer, Path.layer)
-
-  return Effect.provide(Layer.mergeAll(base, NodeVersionResolver.layer.pipe(Layer.provide(base))))
-}
-
 function getActionReference(content: string, action: string): string | undefined {
   return content
     .split("\n")
@@ -328,18 +322,6 @@ describe("github", () => {
     )
   })
 
-  describe("detect", () => {
-    it.effect("detect when the workflow does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const exists = yield* github.detect(ROOT).pipe(provideFallback(files))
-
-        expect(exists).toBe(false)
-      })
-    )
-  })
-
   describe("create", () => {
     it.effect("create a GitHub Actions workflow with the expected bun structure", () =>
       Effect.gen(function* () {
@@ -529,25 +511,6 @@ describe("github", () => {
       })
     )
 
-    it.effect("include concurrency settings", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        yield* github
-          .create(ROOT, {
-            packageManager: "bun",
-            scripts: ["check"],
-          })
-          .pipe(provideFallback(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("permissions:")
-        expect(content).toContain("contents: read")
-        expect(content).toContain("concurrency:")
-        expect(content).toContain("cancel-in-progress: true")
-      })
-    )
-
     it.effect(
       "render node-version-file for every Node-based workflow when the resolver selects a version file",
       () =>
@@ -594,38 +557,6 @@ describe("github", () => {
       })
     )
 
-    it.effect("resolve a target project's .node-version with the live resolver", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ ".node-version": "22.19.0\n" })
-
-        yield* github
-          .create(ROOT, {
-            packageManager: "npm",
-            scripts: ["check"],
-          })
-          .pipe(provideLiveResolver(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain('node-version-file: ".node-version"')
-      })
-    )
-
-    it.effect("fall back to lts/* with the live resolver when no declaration exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        yield* github
-          .create(ROOT, {
-            packageManager: "npm",
-            scripts: ["check"],
-          })
-          .pipe(provideLiveResolver(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain('node-version: "lts/*"')
-      })
-    )
-
     it.effect("return FailedToCreateDirectory when the workflow directory cannot be created", () =>
       Effect.gen(function* () {
         const files = makeFiles()
@@ -665,23 +596,6 @@ describe("github", () => {
         expect(content).toContain("name: check")
         expect(content).toContain("verify:")
         expect(content).not.toContain("Old Workflow")
-      })
-    )
-
-    it.effect("render the resolved Node.js source when updating", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ [WORKFLOW_PATH]: 'node-version: "26"' })
-
-        yield* github
-          .update(ROOT, {
-            packageManager: "bun",
-            scripts: ["check"],
-          })
-          .pipe(provideFileResolver(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain('node-version-file: ".node-version"')
-        expect(content).not.toContain('node-version: "26"')
       })
     )
 

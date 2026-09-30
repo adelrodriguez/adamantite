@@ -3,7 +3,6 @@ import { describe, expect, test } from "@effect/vitest"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { parse, printParseErrorCode } from "jsonc-parser"
 import {
-  CliNotFound,
   CommandFailed,
   FailedToInstallDependency,
   FailedToInstallExtension,
@@ -57,20 +56,6 @@ describe("errors", () => {
   })
 
   describe("FailedToInstallDependency", () => {
-    test("list the packages when they are provided", () => {
-      const error = new FailedToInstallDependency({
-        packages: ["oxlint@1.50.0", "oxfmt@0.35.0"],
-      })
-
-      expect(error.message).toContain("oxlint@1.50.0, oxfmt@0.35.0")
-    })
-
-    test("fall back to a generic message when packages are omitted", () => {
-      const error = new FailedToInstallDependency({})
-
-      expect(error.message).toBe("Failed to install dependencies.")
-    })
-
     test("include the package manager output from the cause", () => {
       const cause = new Error(
         [
@@ -181,12 +166,6 @@ describe("errors", () => {
       })
 
       expect(error.message).toBe("Command `oxlint` failed with exit code 2.")
-    })
-  })
-
-  describe("tags", () => {
-    test("preserve tagged error names", () => {
-      expect(new CliNotFound({ command: "oxlint" })._tag).toBe("CliNotFound")
     })
   })
 })

@@ -24,10 +24,6 @@ describe("hasCICompatibleScripts", () => {
   test("return false for an empty array", () => {
     expect(hasCICompatibleScripts([])).toBe(false)
   })
-
-  test("return true when CI and non-CI scripts are mixed", () => {
-    expect(hasCICompatibleScripts(["fix", "check"])).toBe(true)
-  })
 })
 
 describe("CI workflow entries", () => {

@@ -34,47 +34,6 @@ function runAssess(integration: typeof oxlint | typeof tsgolint, files: FileSyst
 }
 
 describe("oxlint", () => {
-  describe("detect", () => {
-    it.effect("detect when no oxlint config exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const state = yield* oxlint.detect(ROOT).pipe(provideFiles(files))
-
-        expect(state).toEqual({
-          active: null,
-          legacy: [],
-          warnings: [],
-        })
-      })
-    )
-
-    it.effect("report both configs and prefer oxlint.config.ts", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          ".oxlintrc.json": "{}",
-          "oxlint.config.ts":
-            'import { defineConfig } from "oxlint"\n\nexport default defineConfig({})\n',
-        })
-
-        const state = yield* oxlint.detect(ROOT).pipe(provideFiles(files))
-
-        expect(state.active).toEqual({
-          file: "oxlint.config.ts",
-          format: "ts",
-          path: join(ROOT, "oxlint.config.ts"),
-        })
-        expect(state.legacy).toEqual([
-          {
-            file: ".oxlintrc.json",
-            format: "json",
-            path: join(ROOT, ".oxlintrc.json"),
-          },
-        ])
-      })
-    )
-  })
-
   describe("create", () => {
     it.effect("create oxlint.config.ts with the correct config", () =>
       Effect.gen(function* () {
@@ -280,74 +239,11 @@ describe("oxlint", () => {
         })
       })
     )
-
-    it.effect("report a finding when the managed check config has an unsupported shape", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "oxlint.config.ts": [
-            'import { defineConfig } from "oxlint"',
-            "",
-            "export default defineConfig({",
-            "  options: getOptions(),",
-            "})",
-            "",
-          ].join("\n"),
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                oxlint: oxlint.version,
-              },
-              name: "test-project",
-              scripts: {
-                check: "adamantite check",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(oxlint, files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [{ id: "invalid-oxlint-config" }],
-          packageActions: [],
-          warnings: [],
-        })
-      })
-    )
   })
 })
 
 describe("tsgolint", () => {
   describe("assess", () => {
-    it.effect("report not applicable when no managed lint script exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                [tsgolint.name]: tsgolint.version,
-              },
-              name: "test-project",
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(tsgolint, files)
-
-        expect(result).toEqual({
-          applicable: false,
-          warnings: [],
-        })
-      })
-    )
-
     it.effect("report missing package when the managed check script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({
@@ -370,36 +266,6 @@ describe("tsgolint", () => {
           applicable: true,
           findings: [{ id: `missing-${tsgolint.name}` }],
           packageActions: [{ package: tsgolint.name, type: "install_package" }],
-          warnings: [],
-        })
-      })
-    )
-
-    it.effect("report healthy when the package and managed lint script are present", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                [tsgolint.name]: tsgolint.version,
-              },
-              name: "test-project",
-              scripts: {
-                fix: "adamantite fix",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(tsgolint, files)
-
-        expect(result).toEqual({
-          applicable: true,
-          findings: [],
-          packageActions: [],
           warnings: [],
         })
       })

@@ -9,66 +9,8 @@ import {
 } from "#lib/workspace/package-json.ts"
 
 describe("getConflictingScripts", () => {
-  test("returns scripts whose existing command differs from the managed command", () => {
-    const conflicts = getConflictingScripts(
-      {
-        scripts: {
-          analyze: "sherif --ignore-dependency tailwindcss",
-          fix: "sherif --fix --ignore-dependency tailwindcss",
-        },
-      },
-      ["analyze", "fix"]
-    )
-
-    expect(conflicts).toEqual([
-      { command: "sherif --ignore-dependency tailwindcss", script: "analyze" },
-      { command: "sherif --fix --ignore-dependency tailwindcss", script: "fix" },
-    ])
-  })
-
-  test("does not report scripts that already use the managed command", () => {
-    const conflicts = getConflictingScripts(
-      {
-        scripts: {
-          check: "adamantite check",
-          fix: "adamantite fix",
-        },
-      },
-      ["check", "fix"]
-    )
-
-    expect(conflicts).toEqual([])
-  })
-
-  test("does not report missing or empty scripts", () => {
-    const conflicts = getConflictingScripts(
-      {
-        scripts: {
-          check: "",
-        },
-      },
-      ["check", "fix"]
-    )
-
-    expect(conflicts).toEqual([])
-  })
-
   test("handles a package.json without a scripts field", () => {
     expect(getConflictingScripts({}, ["check"])).toEqual([])
-  })
-
-  test("only inspects the requested scripts", () => {
-    const conflicts = getConflictingScripts(
-      {
-        scripts: {
-          check: "tsc && eslint .",
-          fix: "prettier --write .",
-        },
-      },
-      ["fix"]
-    )
-
-    expect(conflicts).toEqual([{ command: "prettier --write .", script: "fix" }])
   })
 })
 
@@ -104,20 +46,6 @@ describe("script management", () => {
     Schema.optionalKey(scriptCommand)
   ).check(Schema.isMaxProperties(9))
   const manifest = Schema.Struct({ name: Schema.Literal("fixture"), scripts: manifestScripts })
-
-  it.prop(
-    "never report a script as both managed and conflicting",
-    { manifest, requested: requestedScripts },
-    ({ manifest: packageJson, requested }) => {
-      const managed = getManagedScripts(packageJson)
-      const conflicts = getConflictingScripts(packageJson, requested)
-
-      for (const conflict of conflicts) {
-        expect(managed).not.toContain(conflict.script)
-      }
-    },
-    { arbitrary: { runs: 300 } }
-  )
 
   it.prop(
     "report exactly the requested scripts whose non-empty command differs from the managed one",

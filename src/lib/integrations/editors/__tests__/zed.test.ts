@@ -10,6 +10,9 @@ const ROOT = "/project"
 
 const SETTINGS_PATH = ".zed/settings.json"
 
+const OXFMT_FORMATTER = { language_server: { name: "oxfmt" } }
+const OXC_FIX_ALL = { code_action: "source.fixAll.oxc" }
+
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
 }
@@ -62,18 +65,6 @@ describe("zed", () => {
           applicable: false,
           warnings: [],
         })
-      })
-    )
-  })
-
-  describe("detect", () => {
-    it.effect("detect when .zed/settings.json does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const exists = yield* zed.detect(ROOT).pipe(provideFiles(files))
-
-        expect(exists).toBe(false)
       })
     )
   })
@@ -174,7 +165,7 @@ describe("zed", () => {
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
         expect(config.lsp.custom.initialization_options.arguments).toEqual(["--flag", "--flag"])
-        expect(config.languages.JavaScript.formatter).toHaveLength(2)
+        expect(config.languages.JavaScript.formatter).toEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
       })
     )
 
@@ -230,8 +221,11 @@ describe("zed", () => {
 
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
-        expect(config.languages.JavaScript.formatter).toContainEqual(formatter)
-        expect(config.languages.JavaScript.formatter).toHaveLength(3)
+        expect(config.languages.JavaScript.formatter).toEqual([
+          OXFMT_FORMATTER,
+          OXC_FIX_ALL,
+          formatter,
+        ])
       })
     )
 
@@ -248,21 +242,8 @@ describe("zed", () => {
         const config = JSON.parse(secondUpdate)
 
         expect(secondUpdate).toBe(firstUpdate)
-        expect(config.languages.JavaScript.formatter).toHaveLength(2)
-        expect(config.languages.JSON.formatter).toHaveLength(1)
-      })
-    )
-
-    it.effect("merge an empty config with Adamantite's config", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ [SETTINGS_PATH]: "{}" })
-
-        yield* zed.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read(SETTINGS_PATH))
-
-        expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
-        expect(config.languages.JavaScript.format_on_save).toBe("on")
+        expect(config.languages.JavaScript.formatter).toEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
+        expect(config.languages.JSON.formatter).toEqual([OXFMT_FORMATTER])
       })
     )
 

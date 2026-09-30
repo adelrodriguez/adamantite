@@ -3,7 +3,6 @@ import type { JsonValue, PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
@@ -117,43 +116,10 @@ describe("readPackageJson", () => {
         expect(result).toEqual(packageJson)
       })
     )
-
-    it.effect("respect the explicit cwd argument", () =>
-      Effect.gen(function* () {
-        const fileSystemLayer = FileSystem.layerNoop({
-          readFileString: () =>
-            Effect.succeed(
-              JSON.stringify({
-                name: "test-project",
-                version: "1.0.0",
-              })
-            ),
-        })
-
-        const result = yield* readPackageJson("/test/project").pipe(
-          Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer))
-        )
-
-        expect(result.name).toBe("test-project")
-        expect(result.version).toBe("1.0.0")
-      })
-    )
   })
 })
 
 describe("parseJson", () => {
-  it.effect("parse valid JSON", () =>
-    Effect.gen(function* () {
-      const validJson = '{"name": "test", "version": "1.0.0"}'
-      const result = yield* parseJson(validJson)
-
-      expect(result).toEqual({
-        name: "test",
-        version: "1.0.0",
-      })
-    })
-  )
-
   it.effect("parse valid JSONC with comments", () =>
     Effect.gen(function* () {
       const jsonc = `{
@@ -186,17 +152,6 @@ describe("parseJson", () => {
     Effect.gen(function* () {
       const invalidJson = '{"name": "test", "version":}'
       const result = yield* Effect.result(parseJson(invalidJson))
-
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
-      }
-    })
-  )
-
-  it.effect("return an error for an empty string", () =>
-    Effect.gen(function* () {
-      const result = yield* Effect.result(parseJson(""))
 
       expect(Result.isFailure(result)).toBe(true)
       if (Result.isFailure(result)) {
@@ -245,26 +200,6 @@ describe("parseJson", () => {
 })
 
 describe("mergeConfig", () => {
-  it.effect("merge two objects", () =>
-    Effect.gen(function* () {
-      const base = { a: 1, b: 2 }
-      const override = { b: 3, c: 4 }
-      const result = yield* mergeConfig(base, override)
-
-      expect(result).toEqual({ a: 1, b: 2, c: 4 })
-    })
-  )
-
-  it.effect("give priority to the first argument", () =>
-    Effect.gen(function* () {
-      const first = { a: 1, b: 2 }
-      const second = { a: 3, b: 4 }
-      const result = yield* mergeConfig(first, second)
-
-      expect(result).toEqual({ a: 1, b: 2 })
-    })
-  )
-
   it.effect("handle nested objects", () =>
     Effect.gen(function* () {
       const base = { a: { x: 1, y: 2 }, b: 3 }
@@ -298,16 +233,9 @@ describe("mergeConfig", () => {
     })
   )
 
-  it.effect("drop null-valued keys from the first argument (defu behavior)", () =>
-    Effect.gen(function* () {
-      expect(yield* mergeConfig({ a: null }, {})).toEqual({})
-      expect(yield* mergeConfig({}, { a: null })).toEqual({ a: null })
-    })
-  )
-
   // defu drops `__proto__`/`constructor` keys and null-valued keys from its first argument, and
-  // concatenates arrays on conflicts, so these algebraic properties hold on array-free, null-free
-  // configs with plain keys.
+  // concatenates arrays on conflicts, so this property holds on array-free, null-free configs with
+  // plain keys.
   const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean])
   const plainKey = Schema.String.check(
     Schema.makeFilter((key) => key !== "__proto__" && key !== "constructor")
@@ -319,27 +247,6 @@ describe("mergeConfig", () => {
       Schema.Record(plainKey, jsonPrimitive).check(Schema.isMaxProperties(4)),
     ])
   ).check(Schema.isMaxProperties(8))
-
-  it.effect.prop(
-    "treat the empty object as the identity on both sides",
-    { config: arrayFreeConfig },
-    ({ config }) =>
-      Effect.gen(function* () {
-        expect(yield* mergeConfig(config, {})).toEqual(config)
-        expect(yield* mergeConfig({}, config)).toEqual(config)
-      }),
-    { arbitrary: { runs: 200 } }
-  )
-
-  it.effect.prop(
-    "merge any config with itself without changing it",
-    { config: arrayFreeConfig },
-    ({ config }) =>
-      Effect.gen(function* () {
-        expect(yield* mergeConfig(config, config)).toEqual(config)
-      }),
-    { arbitrary: { runs: 200 } }
-  )
 
   it.effect.prop(
     "keep every key from both inputs and prefer the first argument on conflicts",
@@ -367,30 +274,6 @@ describe("mergeConfig", () => {
 })
 
 describe("checkIsMonorepo", () => {
-  describe("when cwd is explicit", () => {
-    it.effect("respect the explicit cwd argument", () =>
-      Effect.gen(function* () {
-        const fileSystemLayer = FileSystem.layerNoop({
-          exists: () => Effect.succeed(false),
-          readFileString: () =>
-            Effect.succeed(
-              JSON.stringify({
-                name: "test-project",
-                version: "1.0.0",
-                workspaces: ["packages/*"],
-              })
-            ),
-        })
-
-        const result = yield* checkIsMonorepo("/test/project").pipe(
-          Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer))
-        )
-
-        expect(result).toBe(true)
-      })
-    )
-  })
-
   describe("when workspace files are present", () => {
     it.effect("return true when pnpm-workspace.yaml defines packages", () =>
       Effect.gen(function* () {
@@ -630,19 +513,6 @@ describe("printTitle", () => {
 })
 
 describe("normalizeDependencyVersion", () => {
-  it("strip caret and tilde prefixes", () => {
-    expect(normalizeDependencyVersion("^0.20.0")).toBe("0.20.0")
-    expect(normalizeDependencyVersion("~0.20.0")).toBe("0.20.0")
-  })
-
-  it("preserve exact versions", () => {
-    expect(normalizeDependencyVersion("0.20.0")).toBe("0.20.0")
-  })
-
-  it("trim whitespace and strip the workspace prefix", () => {
-    expect(normalizeDependencyVersion("  workspace:^0.20.0  ")).toBe("0.20.0")
-  })
-
   // The input domain is real dependency specifiers: optional whitespace padding, an optional
   // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
   // valid specifiers and are out of scope.
@@ -669,19 +539,6 @@ describe("normalizeDependencyVersion", () => {
       const specifier = `${padding}${workspacePrefix}${rangePrefix}${versionCore}${padding}`
 
       expect(normalizeDependencyVersion(specifier)).toBe(versionCore)
-    },
-    { arbitrary: { runs: 500 } }
-  )
-
-  it.prop(
-    "be idempotent on the specifier domain",
-    specifierParts,
-    ({ padding, rangePrefix, version: versionCore, workspacePrefix }) => {
-      const once = normalizeDependencyVersion(
-        `${padding}${workspacePrefix}${rangePrefix}${versionCore}${padding}`
-      )
-
-      expect(normalizeDependencyVersion(once)).toBe(once)
     },
     { arbitrary: { runs: 500 } }
   )

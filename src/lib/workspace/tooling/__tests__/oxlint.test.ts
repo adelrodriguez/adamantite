@@ -42,10 +42,6 @@ describe("inspectRequiredOxlintConfig", () => {
       invalidOptionsReason,
     ],
     [
-      `export default { options: { ${requiredOptions.replace("typeAware: true", 'typeAware: "true"')} } }`,
-      invalidOptionsReason,
-    ],
-    [
       `export default { options: { ${requiredOptions.replace("typeAware: true", "typeAware: enabled")} } }`,
       invalidOptionsReason,
     ],

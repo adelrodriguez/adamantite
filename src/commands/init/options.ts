@@ -69,6 +69,12 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
+  if (options.presets.includes("react-doctor") && !options.presets.includes("react")) {
+    return yield* new InvalidInitOptions({
+      reason: "`--preset react-doctor` requires `--preset react`.",
+    })
+  }
+
   if (options.typescript && !hasOxlint) {
     return yield* new InvalidInitOptions({
       reason: "`--typescript` requires the `check` or `fix` script.",

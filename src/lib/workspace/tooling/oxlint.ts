@@ -42,6 +42,7 @@ type NamedObjectPropertyResult =
 export const LINT_PRESETS = [
   "react",
   "react-strict",
+  "react-doctor",
   "nextjs",
   "vue",
   "jest",

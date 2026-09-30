@@ -9,6 +9,7 @@ import initCommand from "#commands/init/index.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif.ts"
@@ -333,6 +334,61 @@ describe("init", () => {
         expect(files.read("oxlint.config.ts")).toContain(
           'import shadcn from "adamantite/lint/shadcn"'
         )
+      })
+    )
+
+    it.effect("install oxlint-plugin-react-doctor when the react-doctor preset is selected", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({ "package.json": basePackageJson })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          [
+            "--non-interactive",
+            "--script",
+            "check",
+            "--preset",
+            "react",
+            "--preset",
+            "react-doctor",
+          ],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls[0]?.packages).toContain(
+          `oxlint-plugin-react-doctor@${reactDoctor.version}`
+        )
+        expect(files.read("oxlint.config.ts")).toContain(
+          'import reactDoctor from "adamantite/lint/react-doctor"'
+        )
+      })
+    )
+
+    it.effect("add the react preset when react-doctor is selected without it", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const prompter = createPrompterTestContext({
+          confirmResponses: [false, false, false],
+          multiselectResponses: [["check"], ["react-doctor"], []],
+        })
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read("oxlint.config.ts")).toContain(
+          'import react from "adamantite/lint/react"'
+        )
+        expect(prompter.logs).toContainEqual({
+          level: "info",
+          message: "Added the `react` preset, which `react-doctor` requires.",
+        })
       })
     )
   })
@@ -691,6 +747,11 @@ describe("init", () => {
         args: ["--non-interactive", "--script", "analyze", "--preset", "react"],
         name: "a preset without linting",
         reason: "`--preset` requires the `check` or `fix` script.",
+      },
+      {
+        args: ["--non-interactive", "--script", "check", "--preset", "react-doctor"],
+        name: "react-doctor without the react preset",
+        reason: "`--preset react-doctor` requires `--preset react`.",
       },
       {
         args: ["--non-interactive", "--script", "analyze", "--typescript"],

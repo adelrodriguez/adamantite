@@ -5,6 +5,7 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import updateCommand from "#commands/update.ts"
 import knip from "#lib/integrations/tooling/knip.ts"
+import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { toOxlintTsConfigContent } from "#lib/workspace/tooling/oxlint.ts"
@@ -60,13 +61,13 @@ describe("update", () => {
     })
   )
 
-  it.effect("update a managed plugin when the config imports its preset", () =>
+  it.effect.each(managedPlugins)("update $name when the config imports its preset", (plugin) =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "oxlint.config.ts": toOxlintTsConfigContent(["shadcn"]),
+          "oxlint.config.ts": toOxlintTsConfigContent([plugin.preset]),
           "package.json": manifest({
-            devDependencies: { "@shadcn/lint": "0.1.0" },
+            devDependencies: { [plugin.name]: "0.1.0" },
             scripts: { check: "adamantite check" },
           }),
         },
@@ -77,7 +78,7 @@ describe("update", () => {
       yield* runCommand(updateCommand, [], { files, layers: [prompter.layer, installer.layer] })
 
       expect(installer.calls.flatMap((call) => call.packages)).toContain(
-        `@shadcn/lint@${shadcnLint.version}`
+        `${plugin.name}@${plugin.version}`
       )
     })
   )

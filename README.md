@@ -88,7 +88,7 @@ Available setup values:
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `jest`, `vitest`,
-  `node`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
+  `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
@@ -244,13 +244,14 @@ Adamantite publishes configuration that can also be consumed directly:
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `adamantite/lint`              | Core Oxlint rules.                                                                                                                                                                                                                                                                     |
 | `adamantite/lint/react`        | React, JSX accessibility, and performance.                                                                                                                                                                                                                                             |
-| `adamantite/lint/react-strict` | Opinions for React feature code: no state, effect, or memoization hooks outside hook modules, and no type assertions outside tests. See [the react-strict preset](#the-react-strict-preset).                                                                                           |
+| `adamantite/lint/react-strict` | Opinions for React feature code: no state, effect, or memoization hooks outside hook modules. See [the react-strict preset](#the-react-strict-preset).                                                                                                                                 |
 | `adamantite/lint/react-doctor` | Curated [React Doctor](https://github.com/millionco/react-doctor) rules for React state and effect misuse. See [the react-doctor preset](#the-react-doctor-preset).                                                                                                                    |
 | `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/jest`         | Jest rules.                                                                                                                                                                                                                                                                            |
 | `adamantite/lint/vitest`       | Vitest rules.                                                                                                                                                                                                                                                                          |
+| `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, and no type assertions outside tests. See [the strict preset](#the-strict-preset).                                                                                                                                          |
 | `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
 | `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
 | `adamantite/format`            | Oxfmt configuration.                                                                                                                                                                                                                                                                   |
@@ -280,13 +281,12 @@ Configs generated by `adamantite init` include this automatically.
 it together with `adamantite/lint/react`. It needs no extra package: the rules come from
 Adamantite's own Oxlint plugin, which ships inside the package.
 
-- `adamantite/no-react-state-hooks` reports calls to `useState`, `useReducer`, `useEffect`,
-  `useLayoutEffect`, `useSyncExternalStore`, `useMemo`, and `useCallback` imported from
-  `react`, including aliased imports and `React.useState(...)`. Each message tells what to
-  do instead: derive state from loader data or URL params, move side effects to loaders,
-  actions, or event handlers, and let the React Compiler memoize.
-- `typescript/consistent-type-assertions` bans type assertions. `as const` stays allowed,
-  and test files (`*.test.*`, `*.spec.*`, and `__tests__/`) keep the core preset's setting.
+`adamantite/no-react-state-hooks` reports calls to `useState`, `useReducer`, `useEffect`,
+`useLayoutEffect`, `useSyncExternalStore`, `useMemo`, and `useCallback` imported from
+`react`, including aliased imports and `React.useState(...)`. Each message tells what to do
+instead: derive state from loader data or URL params, move side effects to loaders, actions,
+or event handlers, and let the React Compiler memoize. For the opinions that do not depend
+on React, add [the strict preset](#the-strict-preset).
 
 Hooks stay allowed in hook modules: files that match `**/use[A-Z]*.{ts,tsx}`, `**/use-*.{ts,tsx}`, or `**/hooks/**`, such as `useCart.ts`
 or `use-cart.ts`. A file such as `userProfile.tsx` is feature code.
@@ -337,6 +337,34 @@ the copyright holder to use the software as machine learning training data, or t
 as a hosted product. Read the
 [license](https://www.npmjs.com/package/oxlint-plugin-react-doctor?activeTab=code) before
 you select the preset.
+
+### The strict preset
+
+`adamantite/lint/strict` holds framework-neutral opinions. Use it with any other preset. Like
+`react-strict`, it needs no extra package.
+
+- `adamantite/no-overzealous-destructuring` reports destructuring patterns nested more than
+  `maxDepth` levels deep (default 2), such as `const { data: { user: { name } } } = query`,
+  and object patterns that take more than `maxProperties` properties (default 5). A rest
+  element does not count. Keep the object and read its members, or split the pattern.
+- `typescript/consistent-type-assertions` bans type assertions. `as const` stays allowed,
+  and test files (`*.test.*`, `*.spec.*`, and `__tests__/`) keep the core preset's setting.
+
+Set `maxDepth` and `maxProperties` to change the destructuring limits:
+
+```ts
+import { defineConfig } from "oxlint"
+import core from "adamantite/lint"
+import strict from "adamantite/lint/strict"
+
+export default defineConfig({
+  extends: [core, strict],
+  ignorePatterns: core.ignorePatterns,
+  rules: {
+    "adamantite/no-overzealous-destructuring": ["error", { maxDepth: 1, maxProperties: 3 }],
+  },
+})
+```
 
 ### The shadcn preset
 

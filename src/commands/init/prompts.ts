@@ -71,7 +71,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react",
         },
         {
-          hint: "Strict React feature code: no state, effect, or memoization hooks outside hook modules, no type assertions",
+          hint: "Strict React feature code: no state, effect, or memoization hooks outside hook modules",
           label: "react-strict",
           value: "react-strict",
         },
@@ -104,6 +104,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           hint: "Node.js callback and CommonJS pitfalls",
           label: "node",
           value: "node",
+        },
+        {
+          hint: "Framework-neutral strictness: no deep or wide destructuring, no type assertions outside tests",
+          label: "strict",
+          value: "strict",
         },
         {
           hint: "Rejects low-signal escape hatches: unjustified assertions, unknown leaks, module mocks",

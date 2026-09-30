@@ -29,7 +29,7 @@ Repeat `--script`, `--preset`, and `--editor` for multiple values. Available val
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `jest`, `vitest`, `node`,
-  `antislop`, `shadcn`;
+  `strict`, `antislop`, `shadcn`;
   editors: `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
@@ -38,7 +38,13 @@ The `react-strict` preset needs no extra package. Its `adamantite/no-react-state
 reports React state, effect, and memoization hooks outside hook modules (`useCart.ts`,
 `use-cart.ts`, and files under `hooks/`), and each message tells what to do instead. Do not move a hook call into
 a hook module only to silence the rule: follow the message. Set the rule's `allow` option
-when the project keeps hooks elsewhere. The preset also bans type assertions outside tests.
+when the project keeps hooks elsewhere.
+
+The `strict` preset needs no extra package either. Its `adamantite/no-overzealous-destructuring`
+rule reports destructuring nested more than 2 levels deep or object patterns with more than 5
+properties; keep the object and read its members, or split the pattern. Do not raise
+`maxDepth` or `maxProperties` only to silence a report. The preset also bans type assertions
+outside tests.
 
 The `react-doctor` preset requires the `react` preset and the `oxlint-plugin-react-doctor`
 package, which `init` installs at a pinned version and doctor and `update` keep in sync. It

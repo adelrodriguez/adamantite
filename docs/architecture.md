@@ -152,7 +152,8 @@ upstream change in the pull request.
 ## First-party plugin
 
 Rules that no upstream plugin provides live in Adamantite's own Oxlint plugin under
-`presets/lint/plugin/`, with one module per rule in `rules/`. `index.ts` registers each
+`presets/lint/plugin/`, with one module per rule in `rules/`. `options.ts` reads rule
+options for all rules. `index.ts` registers each
 rule under the `adamantite` namespace. Tsdown builds the plugin with the presets, so it
 ships at `dist/presets/lint/plugin/index.js`.
 

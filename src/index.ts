@@ -1,9 +1,9 @@
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Runtime from "effect/Runtime"
 import * as Stdio from "effect/Stdio"
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
 import { makeAppLayer, runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }

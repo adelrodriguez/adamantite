@@ -1,11 +1,11 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as Arbitrary from "effect/Arbitrary"
 import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import * as Arbitrary from "effect/unstable/arbitrary/Arbitrary"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   detectToolingConfig,

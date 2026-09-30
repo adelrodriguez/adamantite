@@ -1,4 +1,4 @@
-import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner"
+import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import type { ParseError } from "jsonc-parser"
 import { stripVTControlCharacters } from "node:util"
 import * as Array from "effect/Array"

@@ -3,19 +3,36 @@ import antislop from "./presets/lint/antislop.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import node from "./presets/lint/node.ts"
 
+/**
+ * The `src/lib` layers, lowest first. A layer imports only from the ranks below it, so layers that
+ * share a rank do not import each other.
+ */
+const LIB_LAYER_RANKS = [["shared"], ["workspace", "execution"], ["integrations"], ["assessment"]]
+
 const TERMINAL_IMPORTS = {
   group: ["#terminal/*"],
   message:
     "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
 }
 
-// The lib layers that each layer must not import. A layer imports only from the layers below it, and
-// `assessment` is the top layer.
-const LIB_LAYER_IMPORTS = {
-  execution: ["workspace", "integrations", "assessment"],
-  integrations: ["assessment"],
-  shared: ["workspace", "execution", "integrations", "assessment"],
-  workspace: ["execution", "integrations", "assessment"],
+function restrictLibLayerImports(layer: string, rank: number): OxlintOverride {
+  const forbidden = LIB_LAYER_RANKS.slice(rank)
+    .flat()
+    .filter((other) => other !== layer)
+  const layerImports = {
+    group: forbidden.map((other) => `#lib/${other}/**`),
+    message: `\`${layer}\` imports only from lower lib layers. See "Lib layers" in docs/architecture.md.`,
+  }
+
+  return {
+    files: [`src/lib/${layer}/**/*.ts`],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: forbidden.length > 0 ? [TERMINAL_IMPORTS, layerImports] : [TERMINAL_IMPORTS] },
+      ],
+    },
+  }
 }
 
 export default defineConfig({
@@ -31,28 +48,7 @@ export default defineConfig({
     typeAware: true,
     typeCheck: true,
   },
-  overrides: [
-    {
-      files: ["src/lib/**/*.ts"],
-      rules: { "no-restricted-imports": ["error", { patterns: [TERMINAL_IMPORTS] }] },
-    },
-    ...Object.entries(LIB_LAYER_IMPORTS).map(([layer, forbidden]): OxlintOverride => ({
-      files: [`src/lib/${layer}/**/*.ts`],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              TERMINAL_IMPORTS,
-              {
-                group: forbidden.map((target) => `#lib/${target}/**`),
-                message:
-                  "Lib layers depend in one direction: shared, then workspace and execution, then integrations, then assessment. Import only from a lower layer.",
-              },
-            ],
-          },
-        ],
-      },
-    })),
-  ],
+  overrides: LIB_LAYER_RANKS.flatMap((layers, rank) =>
+    layers.map((layer) => restrictLibLayerImports(layer, rank))
+  ),
 })

@@ -49,7 +49,10 @@ flowchart BT
 `workspace` and `execution` are siblings and do not import each other. `workspace` knows
 target-project files and package state, but not integration types such as `Finding`.
 The `no-restricted-imports` overrides in `oxlint.config.ts` enforce the direction, so an
-import from a higher layer fails `pnpm run check`.
+import from a higher layer fails `pnpm run check`. Lib modules import other lib modules
+through `#lib/...`, not parent-relative paths, so the layer rules see every import.
+`src/__tests__/lint/lib-layers.test.ts` runs Oxlint with these overrides to check both
+import forms.
 
 Inside `integrations`, `base.ts` defines the integration and finding types.
 `tooling/base.ts` and `tooling/preset-config.ts` hold the logic that several tools share.

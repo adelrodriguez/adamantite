@@ -9,6 +9,13 @@ const TERMINAL_IMPORTS = {
     "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
 }
 
+// Parent-relative paths would skip the `#lib/...` layer patterns below. `version.macro.ts` reads the
+// root `package.json`, which has no alias.
+const PARENT_RELATIVE_IMPORTS = {
+  group: ["../**", "!../../../package.json"],
+  message: "Import other lib modules through `#lib/...`, so the lib layer rules apply.",
+}
+
 const LIB_LAYER_MESSAGE =
   'Lib layers import only from lower layers: shared, then workspace and execution, then integrations, then assessment. See "Lib layers" in docs/architecture.md.'
 
@@ -34,6 +41,7 @@ export default defineConfig({
           {
             patterns: [
               TERMINAL_IMPORTS,
+              PARENT_RELATIVE_IMPORTS,
               {
                 group: [
                   "#lib/workspace/**",
@@ -56,6 +64,7 @@ export default defineConfig({
           {
             patterns: [
               TERMINAL_IMPORTS,
+              PARENT_RELATIVE_IMPORTS,
               {
                 group: ["#lib/execution/**", "#lib/integrations/**", "#lib/assessment/**"],
                 message: LIB_LAYER_MESSAGE,
@@ -73,6 +82,7 @@ export default defineConfig({
           {
             patterns: [
               TERMINAL_IMPORTS,
+              PARENT_RELATIVE_IMPORTS,
               {
                 group: ["#lib/workspace/**", "#lib/integrations/**", "#lib/assessment/**"],
                 message: LIB_LAYER_MESSAGE,
@@ -90,6 +100,7 @@ export default defineConfig({
           {
             patterns: [
               TERMINAL_IMPORTS,
+              PARENT_RELATIVE_IMPORTS,
               {
                 group: ["#lib/assessment/**"],
                 message: LIB_LAYER_MESSAGE,
@@ -102,7 +113,10 @@ export default defineConfig({
     {
       files: ["src/lib/assessment/**/*.ts"],
       rules: {
-        "no-restricted-imports": ["error", { patterns: [TERMINAL_IMPORTS] }],
+        "no-restricted-imports": [
+          "error",
+          { patterns: [TERMINAL_IMPORTS, PARENT_RELATIVE_IMPORTS] },
+        ],
       },
     },
   ],

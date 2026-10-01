@@ -2,7 +2,8 @@ import process from "node:process"
 import { Macros } from "unplugin-macros"
 import { defineConfig } from "vitest/config"
 
-const PRESET_TESTS = "src/__tests__/presets/**/*.test.ts"
+// These tests lint files in real Oxlint runs.
+const OXLINT_RUN_TESTS = ["src/__tests__/presets/**/*.test.ts", "src/__tests__/lint/**/*.test.ts"]
 
 export default defineConfig({
   plugins: [Macros.vite()],
@@ -11,13 +12,13 @@ export default defineConfig({
       provider: "v8",
     },
     isolate: false,
-    // Preset tests lint fixtures in real Oxlint runs, so CI runs them apart from the package's
+    // Oxlint-run tests are slower, so CI runs them apart from the package's
     // unit tests. `pnpm run test` runs both projects.
     projects: [
       {
         extends: true,
         test: {
-          exclude: [PRESET_TESTS],
+          exclude: OXLINT_RUN_TESTS,
           include: ["src/**/*.test.ts"],
           name: "unit",
         },
@@ -25,7 +26,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          include: [PRESET_TESTS],
+          include: OXLINT_RUN_TESTS,
           name: "presets",
         },
       },

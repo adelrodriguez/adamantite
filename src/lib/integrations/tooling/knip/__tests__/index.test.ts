@@ -4,9 +4,9 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import knip from "#lib/integrations/tooling/knip.ts"
+import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
+import knip from "#lib/integrations/tooling/knip/index.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 
 const ROOT = "/project"
 

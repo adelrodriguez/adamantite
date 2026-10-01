@@ -1,6 +1,6 @@
+import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
+import { getLegacyMonorepoScriptFindings } from "#lib/integrations/tooling/sherif/legacy-scripts.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { definePackageTooling } from "#lib/workspace/tooling/config.ts"
-import { getLegacyMonorepoScriptFindings } from "#lib/workspace/tooling/sherif.ts"
 
 export default definePackageTooling({
   legacyFindings: getLegacyMonorepoScriptFindings,

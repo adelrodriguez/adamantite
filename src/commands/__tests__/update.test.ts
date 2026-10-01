@@ -4,11 +4,11 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import updateCommand from "#commands/update.ts"
-import knip from "#lib/integrations/tooling/knip.ts"
+import knip from "#lib/integrations/tooling/knip/index.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
-import { toOxlintTsConfigContent } from "#lib/workspace/tooling/oxlint.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,

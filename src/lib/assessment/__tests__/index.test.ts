@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { type ProjectAssessment, renderAssessmentMarkdown } from "#lib/integrations/assessment.ts"
+import { type ProjectAssessment, renderAssessmentMarkdown } from "#lib/assessment/index.ts"
 
 function makeAssessment(value: Partial<ProjectAssessment>): ProjectAssessment {
   return {

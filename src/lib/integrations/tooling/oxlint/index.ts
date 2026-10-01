@@ -2,20 +2,20 @@ import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
-import { readFile, writeFile } from "#lib/shared/filesystem.ts"
-import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { getManagedScripts } from "#lib/workspace/package-json.ts"
 import {
   detectToolingConfig,
   getConfigFindings,
   getPackageActions,
   getPackageFindings,
   type RequiredConfigInspection,
-} from "#lib/workspace/tooling/config.ts"
+} from "#lib/integrations/tooling/base.ts"
 import {
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
-} from "#lib/workspace/tooling/oxlint.ts"
+} from "#lib/integrations/tooling/oxlint/config.ts"
+import { readFile, writeFile } from "#lib/shared/filesystem.ts"
+import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const CONFIG_FILE = "oxlint.config.ts"
 const LEGACY_CONFIG_FILE = ".oxlintrc.json"

@@ -14,14 +14,14 @@ import type {
 } from "#lib/integrations/base.ts"
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
-import knip from "#lib/integrations/tooling/knip.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import knip from "#lib/integrations/tooling/knip/index.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
-import sherif from "#lib/integrations/tooling/sherif.ts"
+import sherif from "#lib/integrations/tooling/sherif/index.ts"
+import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import tsconfig from "#lib/workspace/tsconfig.ts"
 
 /**
  * Every integration assessed against a project. The order fixes how findings are numbered in the

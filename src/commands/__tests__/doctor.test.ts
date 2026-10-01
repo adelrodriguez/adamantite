@@ -9,9 +9,9 @@ import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
 import { type CodingAgent, codingAgents } from "#lib/execution/coding-agents.ts"
-import knip from "#lib/integrations/tooling/knip.ts"
+import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
+import knip from "#lib/integrations/tooling/knip/index.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
-import { toKnipTsConfigContent } from "#lib/workspace/tooling/knip.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import {
   type RunnerTestContext,

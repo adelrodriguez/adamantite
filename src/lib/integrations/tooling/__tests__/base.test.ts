@@ -12,7 +12,7 @@ import {
   getConfigFindings,
   getPackageActions,
   type ToolingConfigState,
-} from "#lib/workspace/tooling/config.ts"
+} from "#lib/integrations/tooling/base.ts"
 
 const ROOT = "/project"
 const FILES = { config: "tool.config.ts", legacyConfigs: ["tool.json", "tool.jsonc"] }

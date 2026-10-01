@@ -4,10 +4,11 @@ import type * as PlatformError from "effect/PlatformError"
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
-import type { ToolingConfigState } from "#lib/workspace/tooling/config.ts"
+import type { ToolingConfigState } from "#lib/integrations/tooling/base.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
+import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import {
@@ -18,7 +19,6 @@ import {
   type Script,
   type SupportedPackageManager,
 } from "#lib/workspace/package-json.ts"
-import tsconfig, { MONOREPO_GUIDANCE } from "#lib/workspace/tsconfig.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 export const installDependencies = (cwd: string, packages: string[]) =>

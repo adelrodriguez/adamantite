@@ -1,5 +1,5 @@
 import { parseSync, type Program, Visitor } from "oxc-parser"
-import type { RequiredConfigInspection } from "#lib/workspace/tooling/config.ts"
+import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 
 function getDefaultImportName(program: Program, moduleName: string): string | null {
   for (const statement of program.body) {

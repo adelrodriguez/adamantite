@@ -1,4 +1,4 @@
-import { inspectRequiredPresetConfig } from "#lib/workspace/tooling/preset-config.ts"
+import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
 
 export function inspectRequiredOxfmtConfig(content: string) {
   return inspectRequiredPresetConfig(content, {

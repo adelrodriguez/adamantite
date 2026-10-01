@@ -22,20 +22,40 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Module seams
 
-| Module         | Responsibility                                                                                               |
-| -------------- | ------------------------------------------------------------------------------------------------------------ |
-| `commands`     | Define one CLI workflow and render its user-facing result.                                                   |
-| `execution`    | Run child commands, define coding-agent handoff, and carry forwarded arguments.                              |
-| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess the project against the managed ideal. |
-| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                       |
-| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                         |
-| `terminal`     | Prompt the user and render the CLI title.                                                                    |
-| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                |
+| Module         | Responsibility                                                                                            |
+| -------------- | --------------------------------------------------------------------------------------------------------- |
+| `commands`     | Define one CLI workflow and render its user-facing result.                                                |
+| `execution`    | Run child commands, define coding-agent handoff, and carry forwarded arguments.                           |
+| `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.             |
+| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal. |
+| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                    |
+| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                      |
+| `terminal`     | Prompt the user and render the CLI title.                                                                 |
+| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                             |
 
-Integration modules export only the integration itself as a default export.
-`src/lib/integrations/base.ts` and `src/lib/integrations/assessment.ts` are the shared
-infrastructure exceptions. Reusable behavior belongs in a nearby workspace or shared
-module instead of a named integration export.
+## Lib layers
+
+The modules in `src/lib` form layers. A layer imports only from the layers below it:
+
+```mermaid
+flowchart BT
+  shared --> workspace
+  shared --> execution
+  workspace --> integrations
+  execution --> integrations
+  integrations --> assessment
+```
+
+`workspace` and `execution` are siblings and do not import each other. `workspace` knows
+target-project files and package state, but not integration types such as `Finding`.
+The `no-restricted-imports` overrides in `oxlint.config.ts` enforce the direction, so an
+import from a higher layer fails `pnpm run check`.
+
+Inside `integrations`, `base.ts` defines the integration and finding types.
+`tooling/base.ts` and `tooling/preset-config.ts` hold the logic that several tools share.
+Each tool has a folder: `index.ts` exports only the integration as a default export, and
+helper modules beside it, such as `knip/config.ts`, hold the logic that only that tool
+uses. The `assessment` layer is the only module that imports every integration.
 
 ## Integration lifecycle
 
@@ -96,10 +116,12 @@ presets/
 src/
   commands/         CLI workflows
   lib/
-    execution/      child command runs, coding-agent handoff, forwarded arguments
-    integrations/   tooling, editor, and CI adapters; project assessment
-    shared/         cross-cutting types and helpers
+    shared/         errors, filesystem, and JSON helpers (bottom layer)
     workspace/      target-project state and file operations
+    execution/      child command runs, coding-agent handoff, forwarded arguments
+    integrations/   integration types, then tooling, editor, workspace, and CI adapters
+      tooling/      shared tooling infrastructure and one folder for each tool
+    assessment/     integration registry, project assessment, agent prompt (top layer)
   terminal/         user prompting and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
@@ -118,7 +140,7 @@ A preset can need a third-party Oxlint plugin that is published on npm, such as
 `@shadcn/lint` for the `shadcn` preset and `oxlint-plugin-react-doctor` for the
 `react-doctor` preset. The plugin stays an npm package in the target
 project. Its tooling integration lives in `src/lib/integrations/tooling/oxlint/plugins/`
-and is made with `defineManagedPlugin`, so the package is required only while
+and is made with `defineManagedPlugin` from `plugins/define.ts`, so the package is required only while
 `oxlint.config.ts` imports the preset. Register a new plugin in the `managedPlugins` list in
 that folder's `index.ts`; init and doctor read the list. The preset names the plugin by its bare package name
 in `jsPlugins`, and Oxlint resolves it from the target project. The pin is the devDependency

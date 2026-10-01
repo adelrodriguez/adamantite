@@ -4,9 +4,9 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { toOxfmtTsConfigContent } from "#lib/workspace/tooling/oxfmt.ts"
 
 const ROOT = "/project"
 

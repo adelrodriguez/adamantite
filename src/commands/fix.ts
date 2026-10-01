@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { InvalidFixOptions } from "#lib/shared/errors.ts"
 

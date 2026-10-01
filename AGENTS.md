@@ -55,14 +55,21 @@ files to the repository. See `docs/agents/issue-tracker.md`.
   callbacks, object methods, and functions that directly return an Effect chain.
 - Format suppressions as `@ts-expect-error - reason`. Prefer this form to casts that hide
   known third-party type mismatches.
-- Keep integration modules limited to their default integration export.
-  `src/lib/integrations/base.ts` is the shared infrastructure exception, and
-  `src/lib/integrations/tooling/oxlint/plugins/index.ts` exports the `managedPlugins`
-  registry.
+- Keep `src/lib` layers in one dependency direction: `shared`, then `workspace` and
+  `execution`, then `integrations`, then `assessment`. A layer imports only from the layers
+  below it. Oxlint enforces this rule.
+- Keep integration modules limited to their default integration export. Shared
+  infrastructure (`integrations/base.ts`, `integrations/tooling/base.ts`,
+  `integrations/tooling/preset-config.ts`), helper modules in a tool's folder, and the
+  `managedPlugins` registry in `integrations/tooling/oxlint/plugins/index.ts` are the
+  exceptions.
 - Keep packages that belong to a host tool under that tool's folder: companion packages
   beside it (`tooling/oxlint/tsgolint.ts`) and managed plugins in `plugins/`. Add a managed
   plugin with `defineManagedPlugin` and register it in `managedPlugins`.
-- Keep reusable integration behavior in `src/lib/workspace` or `src/lib/shared`.
+- Put behavior that one tool owns in that tool's folder, for example
+  `integrations/tooling/knip/config.ts`. Put behavior that several tools share in
+  `integrations/tooling/base.ts`. Put target-project state that does not use integration
+  types in `src/lib/workspace`, and cross-cutting helpers in `src/lib/shared`.
 - Keep `init` deterministic and independent from doctor assessment.
 - Keep `assess` and `doctor` read-only. Doctor reports current state, goal criteria, and
   verification instructions. Agents or humans perform repairs.

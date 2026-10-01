@@ -3,7 +3,7 @@ import {
   getImportedLintPresets,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
-} from "#lib/workspace/tooling/oxlint.ts"
+} from "#lib/integrations/tooling/oxlint/config.ts"
 
 const unsupportedConfigReason =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."

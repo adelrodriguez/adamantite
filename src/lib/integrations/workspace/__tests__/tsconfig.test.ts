@@ -6,7 +6,7 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import tsconfig from "#lib/workspace/tsconfig.ts"
+import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 
 const ROOT = "/project"
 

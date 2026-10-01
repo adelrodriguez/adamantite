@@ -1,5 +1,5 @@
-import type { RequiredConfigInspection } from "#lib/workspace/tooling/config.ts"
-import { inspectRequiredPresetConfig } from "#lib/workspace/tooling/preset-config.ts"
+import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
+import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
 
 const NOT_A_MONOREPO = { isMonorepo: false }
 

@@ -1,5 +1,66 @@
 # adamantite
 
+## 0.42.0
+
+### Minor Changes
+
+- [#464](https://github.com/adelrodriguez/adamantite/pull/464) [`ffab2d6`](https://github.com/adelrodriguez/adamantite/commit/ffab2d6f5bc585e0b343cee88529ba52c495145a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add `--only lint` and `--only format` to `adamantite check` and `adamantite fix` to run only the Oxlint stage or only the Oxfmt stage. Arguments after `--` go to the selected stage, and to Oxlint when both run.
+
+- [#479](https://github.com/adelrodriguez/adamantite/pull/479) [`b0bbf60`](https://github.com/adelrodriguez/adamantite/commit/b0bbf600b2809ab1faacc8298b9a5c2d000019ea) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/lint/strict` preset for framework-neutral opinions
+
+  The preset enables `adamantite/no-overzealous-destructuring`. The rule reports destructuring patterns nested more than 2 levels deep, such as `const { data: { user: { name } } } = query`, and object patterns that take more than 5 properties. A rest element does not count as a property. It checks declarations, parameters, assignments, `for...of` heads, and `catch` clauses. Each message tells what to do instead: keep the object and read its members, or split the pattern. Set the rule's `maxDepth` and `maxProperties` options to change the limits.
+
+  The preset also sets `typescript/consistent-type-assertions` to ban type assertions. `as const` stays allowed, and test files keep the core preset's setting.
+
+  Select the preset in `adamantite init` or with `--preset strict`. It uses Adamantite's own Oxlint plugin, so it needs no extra dependency.
+
+- [#480](https://github.com/adelrodriguez/adamantite/pull/480) [`466b75e`](https://github.com/adelrodriguez/adamantite/commit/466b75ed5660d0c06da0624a5b7f4784be60f790) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/lint/react-doctor` preset for React state and effect misuse
+
+  The preset enables 12 curated rules from [React Doctor](https://github.com/millionco/react-doctor) at `error`. They report state changed in place, impure state updaters, stores created during render, effects that do the work of an event handler or exist only to react to trigger state, data fetched in an effect, state set after an `await` in an effect, live state pushed to a parent, and observers or animation frame loops that an effect does not clean up. The preset leaves out rules that the native `react`, `react-hooks`, `jsx-a11y`, and `unicorn` rules already report, and the TanStack Query and TanStack Start rules.
+
+  Use the preset together with the `react` preset. It adds to `react-strict` and does not replace it.
+
+  `oxlint-plugin-react-doctor` is a managed plugin. Select the preset in `adamantite init` or with `--preset react --preset react-doctor`, and `init` installs the pinned version. `adamantite doctor` reports a missing or outdated package, and `adamantite update` moves it with the other managed dependencies. If you add the preset to `oxlint.config.ts` by hand, install `oxlint-plugin-react-doctor` too.
+
+  The plugin has a modified MIT license. Using it as machine learning training data, or selling it as a hosted product, needs written permission from the copyright holder.
+
+- [#478](https://github.com/adelrodriguez/adamantite/pull/478) [`1b03cd7`](https://github.com/adelrodriguez/adamantite/commit/1b03cd77b52c7f753c62a2e69e9926fcfe3b29ca) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/lint/react-strict` preset for React feature code
+
+  The preset enables `adamantite/no-react-state-hooks`, the first rule of Adamantite's own Oxlint plugin. The rule reports `useState`, `useReducer`, `useEffect`, `useLayoutEffect`, `useSyncExternalStore`, `useMemo`, and `useCallback` from `react`, including aliased imports and `React.useState(...)` calls. Each message tells what to do instead. Hooks stay allowed in hook modules that match `**/use[A-Z]*.{ts,tsx}`, `**/use-*.{ts,tsx}`, or `**/hooks/**`, such as `useCart.ts` and `use-cart.ts`. Set the rule's `allow` option for another layout, and its `hooks` option to change the reported hooks.
+
+  Select the preset in `adamantite init` or with `--preset react-strict`. The plugin ships inside the package, so the preset needs no extra dependency.
+
+- [#467](https://github.com/adelrodriguez/adamantite/pull/467) [`e747b74`](https://github.com/adelrodriguez/adamantite/commit/e747b74223d957ceb69e842526abdb20370d04eb) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/lint/shadcn` preset for Tailwind v4 design systems
+
+  The preset enables the six [@shadcn/lint](https://github.com/shadcn-ui/lint) rules at `error`: `shadcn/no-restyle`, `shadcn/no-raw-colors`, `shadcn/no-arbitrary-values`, `shadcn/no-inline-styles`, `shadcn/no-unknown-classes`, and `shadcn/require-static-classes`. Layout classes such as `mt-4` and `w-[320px]` are allowed, and the component-owned rules are off under `**/components/ui/**`. shadcn/ui is not required.
+
+  `@shadcn/lint` is a managed plugin. Select the preset in `adamantite init` or with `--preset shadcn`, and `init` installs the pinned version. `adamantite doctor` reports a missing or outdated package, and `adamantite update` moves it with the other managed dependencies. If you add the preset to `oxlint.config.ts` by hand, install `@shadcn/lint` too.
+
+  The plugin finds components and the theme through `components.json`. Without that file it looks for components in `components/ui` or `src/components/ui` and discovers the stylesheet that imports Tailwind. Set `settings.shadcn.ui` in the Oxlint config when components live elsewhere.
+
+  Also updates `oxc-parser` to 0.150.0.
+
+- [#458](https://github.com/adelrodriguez/adamantite/pull/458) [`086adcf`](https://github.com/adelrodriguez/adamantite/commit/086adcff95f10c18efb677efa9204eca67b2526d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove the deprecated `adamantite format` and `adamantite monorepo` commands.
+
+  Update package scripts, CI workflows, and agent instructions to use these replacements:
+
+  - Replace `adamantite format --check` with `adamantite check`.
+  - Replace `adamantite format` with `adamantite fix`.
+  - Replace `adamantite monorepo` with `adamantite analyze --only monorepo`.
+  - Replace `adamantite monorepo --fix` with `adamantite analyze --only monorepo --fix`.
+
+  `check` and `fix` also run Oxlint. To run only the formatter, use `adamantite check --only format` or `adamantite fix --only format`.
+
+  `init --script` now accepts only `check`, `fix`, and `analyze`. Run `adamantite doctor` to find retired scripts and workflow steps that still need updates.
+
+### Patch Changes
+
+- [#465](https://github.com/adelrodriguez/adamantite/pull/465) [`d636f37`](https://github.com/adelrodriguez/adamantite/commit/d636f37f7a6ccfcca28d72de869bc505a6afd3ae) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove the Git working tree check from the `adamantite doctor` agent handoff. Doctor no longer warns or asks for confirmation before starting an agent on a dirty tree, and the repair prompt no longer tells the agent to check for a clean tree.
+
+- [#481](https://github.com/adelrodriguez/adamantite/pull/481) [`ec80dac`](https://github.com/adelrodriguez/adamantite/commit/ec80dac2058c01958e984ed2cf9171d69080585c) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update Effect, `@effect/platform-node`, and `@effect/vitest` to the stable 4.0.0 release. Before this change, fresh installs resolved `@effect/platform-node-shared` to rc.118 next to `effect` rc.115, and the CLI crashed at start with `fiber.succeedWith is not a function`. Now all Effect packages resolve to one 4.0.0 runtime.
+
+- [#463](https://github.com/adelrodriguez/adamantite/pull/463) [`8974fa9`](https://github.com/adelrodriguez/adamantite/commit/8974fa9dfe776a97bc195df00546094e20f233fe) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Seed the `adamantite doctor` agent handoff with the combined Markdown repair prompt. The agent now starts with every finding instead of a one-line instruction to run Doctor itself.
+
 ## 0.41.0
 
 ### Minor Changes

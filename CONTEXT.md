@@ -27,6 +27,17 @@ pins its version, installs it when its preset is selected, and keeps it in sync 
 doctor and update.
 _Avoid_: Vendored bundle, dependency
 
+**Custom rule**:
+An Oxlint rule that the target project writes in a rules folder. The target project owns
+its correctness and its tests. Adamantite owns the wiring and the authoring guidance. Use
+"plugin" only for the Oxlint `jsPlugins` entry that loads the rules.
+_Avoid_: Custom plugin, project plugin, first-party rule
+
+**Rules folder**:
+The folder that `custom()` loads custom rules from, `.adamantite/rules` by default. Each
+file in it is one custom rule, except files that start with `_`.
+_Avoid_: Plugin folder
+
 **Target project**:
 The project that Adamantite configures or checks.
 _Avoid_: Adamantite repository, consumer repository

@@ -55,6 +55,10 @@ function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
 
+/**
+ * The `oxlint.config.ts` that `init` writes. It always extends `custom()`, which is an empty config
+ * until the project adds a rule to `.adamantite/rules`.
+ */
 export function toOxlintTsConfigContent(presets: string[] = []) {
   const presetNames = presets.includes("core") ? presets : ["core", ...presets]
   return [
@@ -63,9 +67,10 @@ export function toOxlintTsConfigContent(presets: string[] = []) {
       (preset) =>
         `import ${getImportName(preset)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
     ),
+    'import custom from "adamantite/lint/custom"',
     "",
     "export default defineConfig({",
-    `  extends: [${presetNames.map((preset) => getImportName(preset)).join(", ")}],`,
+    `  extends: [${[...presetNames.map((preset) => getImportName(preset)), "custom()"].join(", ")}],`,
     "  ignorePatterns: core.ignorePatterns,",
     "  options: {",
     ...REQUIRED_BOOLEAN_OPTIONS.map((option) => `    ${option}: true,`),
@@ -94,8 +99,14 @@ function parse(content: string) {
 const LINT_PRESET_PREFIX = "adamantite/lint/"
 
 /**
+ * The module that exports `custom()`. It loads the project's custom rules and is not a preset.
+ */
+const CUSTOM_RULES_MODULE = `${LINT_PRESET_PREFIX}custom`
+
+/**
  * The Adamantite lint presets that an `oxlint.config.ts` imports, such as `react` for
- * `adamantite/lint/react`. The core preset is not listed. An unparsable config imports none.
+ * `adamantite/lint/react`. The core preset and `custom()` are not listed. An unparsable config
+ * imports none.
  */
 export function getImportedLintPresets(content: string): string[] {
   return pipe(
@@ -104,6 +115,7 @@ export function getImportedLintPresets(content: string): string[] {
       ast.body.flatMap((statement) =>
         statement.type === "ImportDeclaration"
         && statement.source.value.startsWith(LINT_PRESET_PREFIX)
+        && statement.source.value !== CUSTOM_RULES_MODULE
           ? [statement.source.value.slice(LINT_PRESET_PREFIX.length)]
           : []
       )

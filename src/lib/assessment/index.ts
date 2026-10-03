@@ -16,6 +16,7 @@ import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
+import customRules from "#lib/integrations/tooling/oxlint/custom-rules/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
@@ -31,6 +32,7 @@ const managedIntegrations = [
   knip,
   oxfmt,
   oxlint,
+  customRules,
   ...managedPlugins,
   sherif,
   tsgolint,

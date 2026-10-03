@@ -54,6 +54,10 @@
       "types": "./dist/presets/lint/*.d.ts",
       "default": "./dist/presets/lint/*.js"
     },
+    "./rules": {
+      "types": "./dist/presets/rules/index.d.ts",
+      "default": "./dist/presets/rules/index.js"
+    },
     "./typescript": "./dist/presets/tsconfig.json"
   },
   "scripts": {
@@ -79,6 +83,7 @@
   "dependencies": {
     "@clack/prompts": "1.8.1",
     "@effect/platform-node": "4.0.0",
+    "@oxlint/plugins": "1.86.0",
     "defu": "6.1.7",
     "effect": "4.0.0",
     "jsonc-parser": "3.3.1",
@@ -90,7 +95,6 @@
     "@changesets/cli": "3.0.3",
     "@effect/tsgo": "0.48.0",
     "@effect/vitest": "4.0.0",
-    "@oxlint/plugins": "1.86.0",
     "@shadcn/lint": "0.2.0",
     "@tanstack/intent": "0.5.0",
     "@types/figlet": "1.7.0",

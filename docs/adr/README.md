@@ -8,3 +8,4 @@
 - [ADR 0006: Limit destructuring depth and width in a framework-neutral strict preset](0006-limit-destructuring-depth-and-width.md)
 - [ADR 0007: The effect preset patches Oxlint, and its rules are curated](0007-effect-preset-patches-oxlint.md)
 - [ADR 0008: Define TanStack queries once so route loaders can preload them](0008-tanstack-query-options-from-loaders.md)
+- [ADR 0009: Custom rules load from a rules folder through custom()](0009-custom-rules-load-through-custom.md)

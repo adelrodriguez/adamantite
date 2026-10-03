@@ -33,6 +33,21 @@ export const readFileIfExists = (path: string) =>
     )
   )
 
+/**
+ * Lists the entry names of a directory that may not exist. A missing path, or a path that is not a
+ * directory, is `Option.none`; every other failure is a `FailedToReadFile`.
+ */
+export const readDirectoryIfExists = (path: string) =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.readDirectory(path)),
+    Effect.map((entries) => pipe(entries, Option.some)),
+    Effect.catch((error) =>
+      error.reason._tag === "NotFound" || error.reason._tag === "BadResource"
+        ? Effect.succeed(Option.none<string[]>())
+        : Effect.fail(new FailedToReadFile({ cause: error, path }))
+    )
+  )
+
 export const writeFile = (path: string, content: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.writeFileString(path, content)),

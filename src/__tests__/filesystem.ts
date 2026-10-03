@@ -1,9 +1,11 @@
 import type * as Layer from "effect/Layer"
-import { dirname, resolve } from "node:path"
+import { basename, dirname, resolve } from "node:path"
+import * as EffectArray from "effect/Array"
 import * as ByteSize from "effect/ByteSize"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
+import * as Order from "effect/Order"
 import * as PlatformError from "effect/PlatformError"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
@@ -167,7 +169,27 @@ export function createFileSystemTestContext(options?: {
     makeTempFile: makeUnimplemented("makeTempFile"),
     makeTempFileScoped: makeUnimplemented("makeTempFileScoped"),
     open: makeUnimplemented("open"),
-    readDirectory: makeUnimplemented("readDirectory"),
+    readDirectory: (path, readOptions) =>
+      Effect.suspend(() => {
+        const target = normalize(path)
+
+        if (readOptions?.recursive) {
+          return Effect.die(makeUnimplementedError("readDirectory with recursive"))
+        }
+
+        if (!directories.has(target)) {
+          // The Node backend maps ENOTDIR to BadResource.
+          return files.has(target)
+            ? Effect.fail(makeSystemError("BadResource", "readDirectory", path))
+            : Effect.fail(makeSystemError("NotFound", "readDirectory", path))
+        }
+
+        const children = [...files.keys(), ...directories]
+          .filter((entry) => entry !== target && dirname(entry) === target)
+          .map((entry) => basename(entry))
+
+        return Effect.succeed(EffectArray.sort(new Set(children), Order.String))
+      }),
     readFile: makeUnimplemented("readFile"),
     readFileString: (path) =>
       Effect.suspend(() => {

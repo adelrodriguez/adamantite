@@ -54,6 +54,11 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
           ...selectedScriptGuidance,
         ]
       : []),
+    ...(scripts.includes("check") || scripts.includes("fix")
+      ? [
+          "- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule with its authoring guidance.",
+        ]
+      : []),
     "- Run `adamantite doctor` and follow its findings to repair managed setup.",
   ].join("\n")
 

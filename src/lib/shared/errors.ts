@@ -79,6 +79,14 @@ export class CommandFailed extends Data.TaggedError("CommandFailed")<{
   }
 }
 
+export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
+  path: string
+}> {
+  override get message() {
+    return `The custom rule \`${this.path}\` already exists. Choose another name or edit the file.`
+  }
+}
+
 export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDirectory")<{
   path?: string
   cause?: unknown
@@ -139,6 +147,17 @@ export class FailedToParseFile extends Data.TaggedError("FailedToParseFile")<{
   }
 }
 
+export class FailedToParseSource extends Data.TaggedError("FailedToParseSource")<{
+  path: string
+  errors: readonly string[]
+}> {
+  override get message() {
+    return [`Failed to parse \`${this.path}\`.`, ...this.errors.map((error) => `- ${error}`)].join(
+      "\n"
+    )
+  }
+}
+
 export class FailedToReadFile extends Data.TaggedError("FailedToReadFile")<{
   path?: string
   cause?: unknown
@@ -190,6 +209,14 @@ export class InvalidInitOptions extends Data.TaggedError("InvalidInitOptions")<{
 }> {
   override get message() {
     return `Invalid init options. ${this.reason}`
+  }
+}
+
+export class InvalidRuleName extends Data.TaggedError("InvalidRuleName")<{
+  name: string
+}> {
+  override get message() {
+    return `Invalid rule name \`${this.name}\`. Use kebab-case that starts with a letter, such as \`no-process-env\`.`
   }
 }
 

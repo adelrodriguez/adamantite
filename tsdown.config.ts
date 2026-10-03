@@ -31,7 +31,7 @@ export default defineConfig([
     // The first-party plugin imports only types from @oxlint/plugins. Keeping the package external
     // leaves a type reference in its declarations instead of inlining Oxlint's AST types.
     deps: { neverBundle: ["@oxlint/plugins", "knip", "oxfmt", "oxlint"] },
-    dts: { oxc: true },
+    dts: { generator: "oxc" },
     entry: ["presets/**/*.ts"],
     fixedExtension: false,
     outDir: "dist/presets",

@@ -448,38 +448,38 @@ describe("checkIsMonorepo", () => {
   })
 })
 
-describe("printTitle", () => {
-  function makeConsoleContext() {
-    const capturedLogs: string[] = []
-    const mockConsole: Console.Console = {
-      assert: noop,
-      clear: noop,
-      count: noop,
-      countReset: noop,
-      debug: noop,
-      dir: noop,
-      dirxml: noop,
-      error: noop,
-      group: noop,
-      groupCollapsed: noop,
-      groupEnd: noop,
-      info: (...args: unknown[]) => {
-        const message = args.map(String).join(" ")
-        capturedLogs.push(message)
-        return null
-      },
-      log: noop,
-      table: noop,
-      time: noop,
-      timeEnd: noop,
-      timeLog: noop,
-      trace: noop,
-      warn: noop,
-    }
-
-    return { capturedLogs, layer: Layer.succeed(Console.Console)(mockConsole) }
+function makeConsoleContext() {
+  const capturedLogs: string[] = []
+  const mockConsole: Console.Console = {
+    assert: noop,
+    clear: noop,
+    count: noop,
+    countReset: noop,
+    debug: noop,
+    dir: noop,
+    dirxml: noop,
+    error: noop,
+    group: noop,
+    groupCollapsed: noop,
+    groupEnd: noop,
+    info: (...args: unknown[]) => {
+      const message = args.map(String).join(" ")
+      capturedLogs.push(message)
+      return null
+    },
+    log: noop,
+    table: noop,
+    time: noop,
+    timeEnd: noop,
+    timeLog: noop,
+    trace: noop,
+    warn: noop,
   }
 
+  return { capturedLogs, layer: Layer.succeed(Console.Console)(mockConsole) }
+}
+
+describe("printTitle", () => {
   it.effect("print the title when the terminal is wide enough", () =>
     Effect.gen(function* () {
       const console = makeConsoleContext()

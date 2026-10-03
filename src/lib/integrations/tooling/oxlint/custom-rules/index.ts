@@ -2,6 +2,7 @@ import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import {
@@ -76,11 +77,14 @@ export default defineConfig({
 })
 `
 
-const RUNTIME_CONDITIONS = ["import", "node", "default"]
+/**
+ * The conditions that Oxlint matches when it imports a config under Node.js.
+ */
+const RUNTIME_CONDITIONS: ReadonlySet<string> = new Set(["default", "import", "node"])
 
 /**
- * The file that an export target selects at runtime: the target string, or the first runtime
- * condition that selects a file.
+ * The file that an export target selects at runtime: the target string, or the first matching
+ * condition in declaration order, as Node.js resolves it.
  */
 function getExportTarget(target: PackageJson.Exports | undefined): string | undefined {
   if (target === undefined || target === null) {
@@ -95,10 +99,21 @@ function getExportTarget(target: PackageJson.Exports | undefined): string | unde
     return target.map((entry) => getExportTarget(entry)).find((entry) => entry !== undefined)
   }
 
-  return RUNTIME_CONDITIONS.map((condition) => getExportTarget(target[condition])).find(
-    (entry) => entry !== undefined
-  )
+  return Object.entries(target)
+    .filter(([condition]) => RUNTIME_CONDITIONS.has(condition))
+    .map(([, entry]) => getExportTarget(entry))
+    .find((entry) => entry !== undefined)
 }
+
+const PATTERN_SPECIFICITY = Order.combine(
+  Order.mapInput(Order.flip(Order.Number), ([pattern]: readonly [string, PackageJson.Exports]) =>
+    pattern.indexOf("*")
+  ),
+  Order.mapInput(
+    Order.flip(Order.Number),
+    ([pattern]: readonly [string, PackageJson.Exports]) => pattern.length
+  )
+)
 
 /**
  * The file in a workspace package that an import of `subpath` loads, relative to the package
@@ -126,7 +141,9 @@ function resolvePackageTarget(workspacePackage: WorkspacePackage, subpath: strin
     return getExportTarget(subpaths[key])
   }
 
-  const patternMatch = Object.entries(subpaths)
+  // Node.js takes the most specific pattern: the longest prefix before `*`, then the longest key.
+  // Declaration order does not matter.
+  const patternMatch = Array.sort(Object.entries(subpaths), PATTERN_SPECIFICITY)
     .map(([pattern, target]) => {
       const [prefix, suffix, ...rest] = pattern.split("*")
       const matches =

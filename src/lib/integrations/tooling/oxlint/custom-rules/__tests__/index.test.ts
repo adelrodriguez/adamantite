@@ -1,3 +1,4 @@
+import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -41,6 +42,34 @@ function runAssess(files: FileSystemTestContext) {
 
 function getFindings(assessment: IntegrationAssessment) {
   return assessment.applicable ? assessment.findings : []
+}
+
+const CUSTOM_ACME = [
+  'import custom from "adamantite/lint/custom"',
+  "",
+  'export default custom({ dir: "rules", name: "acme" })',
+  "",
+].join("\n")
+const EMPTY_CONFIG = "export default {}\n"
+const ENUM_FINDING = "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts"
+
+function makeToolingFiles(
+  importSpecifier: string,
+  exports: PackageJson["exports"],
+  modules: Record<string, string>
+) {
+  return createFileSystemTestContext({
+    files: {
+      "oxlint.config.ts": makeConfig("core, tooling", [`import tooling from "${importSpecifier}"`]),
+      "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
+      "tooling/lint/package.json": JSON.stringify({ exports, name: "@acme/lint" }),
+      "tooling/lint/rules/no-enum.ts": `enum Kind { A }\n${RULE}`,
+      ...Object.fromEntries(
+        Object.entries(modules).map(([file, content]) => [`tooling/lint/${file}`, content])
+      ),
+    },
+    root: ROOT,
+  })
 }
 
 describe("custom-rules", () => {
@@ -251,6 +280,50 @@ describe("custom-rules", () => {
         packageActions: [],
         warnings: [],
       })
+    })
+  )
+
+  it.effect("select export conditions in declaration order, as Node.js does", () =>
+    Effect.gen(function* () {
+      const nodeFirst = makeToolingFiles(
+        "@acme/lint/config",
+        // oxlint-disable-next-line sort-keys -- The case tests that declaration order decides.
+        { "./config": { node: "./node.ts", import: "./import.ts" } },
+        { "import.ts": EMPTY_CONFIG, "node.ts": CUSTOM_ACME }
+      )
+      const defaultFirst = makeToolingFiles(
+        "@acme/lint",
+        { default: "./default.ts", node: "./node.ts" },
+        { "default.ts": CUSTOM_ACME, "node.ts": EMPTY_CONFIG }
+      )
+
+      for (const files of [nodeFirst, defaultFirst]) {
+        const findings = getFindings(yield* runAssess(files))
+
+        expect(findings.map((finding) => finding.id)).toEqual([ENUM_FINDING])
+      }
+    })
+  )
+
+  it.effect.each([
+    [{ "./*": "./src/*.ts", "./config/*": "./config/*.ts" }],
+    // oxlint-disable-next-line sort-keys -- The case tests that key order does not decide.
+    [{ "./config/*": "./config/*.ts", "./*": "./src/*.ts" }],
+  ])("select the most specific exports pattern in any key order: %j", ([exports]) =>
+    Effect.gen(function* () {
+      const files = makeToolingFiles("@acme/lint/config/base", exports, {
+        "config/base.ts": [
+          'import custom from "adamantite/lint/custom"',
+          "",
+          'export default custom({ dir: "../rules", name: "acme" })',
+          "",
+        ].join("\n"),
+        "src/config/base.ts": EMPTY_CONFIG,
+      })
+
+      const findings = getFindings(yield* runAssess(files))
+
+      expect(findings.map((finding) => finding.id)).toEqual([ENUM_FINDING])
     })
   )
 

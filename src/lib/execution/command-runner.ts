@@ -19,6 +19,10 @@ export interface CommandRunOptions {
    * process's group so terminal-generated signals reach it.
    */
   readonly detached?: boolean
+  /**
+   * Variables to set for the child, on top of this process's environment.
+   */
+  readonly env?: Readonly<Record<string, string>>
   readonly stderr?: "ignore" | "inherit"
   readonly stdin?: "ignore" | "inherit"
   readonly stdout?: "ignore" | "inherit"
@@ -69,6 +73,7 @@ const exitCode = Effect.fn("CommandRunner.exitCode")(function* ({
   command,
   cwd,
   detached,
+  env,
   stderr = "inherit",
   stdin = "ignore",
   stdout = "inherit",
@@ -78,7 +83,7 @@ const exitCode = Effect.fn("CommandRunner.exitCode")(function* ({
       const handle = yield* ChildProcess.make(command, args, {
         cwd,
         detached,
-        env: { NODE_OPTIONS: quietNodeOptions() },
+        env: { ...env, NODE_OPTIONS: quietNodeOptions() },
         extendEnv: true,
         stderr,
         stdin,

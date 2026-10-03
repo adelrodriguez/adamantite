@@ -378,8 +378,9 @@ When you select the preset, `adamantite init` does these steps:
 
 - Installs the pinned `@effect/tsgo` and runs the patch.
 - Adds `"prepare": "adamantite prepare"` to `package.json`. If the project already has a
-  `prepare` script, init adds `adamantite prepare &&` to its start, so a later command such as
-  `cd ..` does not move it out of the project.
+  `prepare` script, init rewrites it as `adamantite prepare && (<existing>)`. A command such as
+  `cd ..` then cannot move the patch out of the project, and a fallback such as `|| true`
+  cannot hide a failed patch.
 - Adds `{ "name": "@effect/language-service", "diagnostics": false }` to
   `compilerOptions.plugins` in `tsconfig.json`. Editors that use the workspace TypeScript
   get Effect quick fixes, refactors, and hovers. Oxlint reports the diagnostics, so the

@@ -8,6 +8,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import initCommand from "#commands/init/index.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
 import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
@@ -456,13 +457,34 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(readJson(files, "package.json")).toMatchObject({
-          scripts: { prepare: "adamantite prepare && husky" },
+          scripts: { prepare: "adamantite prepare && (husky)" },
         })
         expect(runner.invocations).toHaveLength(1)
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message: expect.stringContaining("No `tsconfig.json` found"),
         })
+      })
+    )
+
+    it.effect("patch a project that already uses the effect preset without selecting it", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+          files,
+          layers: [prompter.layer, installer.layer, runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          expect.objectContaining({ args: ["patch", "--oxlint", "--typescript"] }),
+        ])
       })
     )
 

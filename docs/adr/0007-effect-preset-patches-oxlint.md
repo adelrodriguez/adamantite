@@ -38,11 +38,13 @@ Oxlint unpatched after an update (#486). So the managed plugin manages more than
 - We considered a generic `prepare` step on `defineManagedPlugin`. No other managed plugin
   needs an install step, so the patch is specific to `@effect/tsgo`. A second plugin with
   an install step is the time to make it generic.
-- The `prepare` script must run `adamantite prepare`. `init` adds the script, or adds
-  `adamantite prepare &&` to the start of an existing one. Upstream's `setup` command adds its
+- The `prepare` script must run `adamantite prepare`. `init` adds the script, or rewrites an
+  existing one as `adamantite prepare && (<existing>)`. Upstream's `setup` command adds its
   patch to the end, but an earlier command can change directory, such as Husky's
   `cd .. && husky frontend/.husky` for a project below the Git root. A command at the end would
-  then run outside the project.
+  then run outside the project. The parentheses keep a fallback in the existing script, such as
+  `husky || true`, from also catching a failed patch: `&&` and `||` have the same precedence
+  and run left to right.
   Doctor reports a `prepare` script that does not run it. Users' `package.json` names only the
   Adamantite command, so Adamantite owns the patch flags.
 - `tsconfig.json` must have `{ "name": "@effect/language-service", "diagnostics": false }`

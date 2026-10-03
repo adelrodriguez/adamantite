@@ -1,4 +1,6 @@
+import { delimiter } from "node:path"
 import type { JsonObject, JsonValue, PackageJson } from "type-fest"
+import * as Config from "effect/Config"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import type { Finding } from "#lib/integrations/base.ts"
@@ -59,7 +61,7 @@ function getPrepareFindings(packageJson: PackageJson): Finding[] {
           ? `\`package.json\` has no \`${PREPARE_SCRIPT}\` script, so nothing patches Oxlint for the \`effecttsgo\` rules after an install.`
           : `The \`${PREPARE_SCRIPT}\` script (\`${command}\`) does not run \`${PREPARE_COMMAND}\`.`,
       goal: [
-        `Make the \`${PREPARE_SCRIPT}\` script in \`package.json\` run \`${PREPARE_COMMAND}\`. Put it first, before every command that the script already runs, and join them with \`&&\`, so a command such as \`cd ..\` cannot move it out of the project directory.`,
+        `Make the \`${PREPARE_SCRIPT}\` script in \`package.json\` run \`${PREPARE_COMMAND}\`. Put it first, then \`&&\`, then the existing commands in parentheses, such as \`${PREPARE_COMMAND} && (husky || true)\`. A command such as \`cd ..\` then cannot move it out of the project directory, and a fallback such as \`|| true\` cannot hide a failed patch.`,
         `Run \`${PREPARE_COMMAND}\` once, so the installed Oxlint, oxlint-tsgolint, and TypeScript binaries are patched.`,
       ],
       id: "missing-effect-tsgo-prepare",
@@ -128,7 +130,8 @@ export default {
   /**
    * Make the `prepare` script run `adamantite prepare`. An existing script keeps its commands, and
    * `adamantite prepare` runs before them: a command such as `cd ..` would otherwise move it out of
-   * the project directory.
+   * the project directory. The parentheses keep a fallback such as `|| true` in the existing script
+   * from hiding a failed patch.
    */
   addPrepareScript: (cwd: string) =>
     Effect.gen(function* () {
@@ -143,7 +146,7 @@ export default {
 
       packageJson.scripts = {
         ...packageJson.scripts,
-        [PREPARE_SCRIPT]: hasCommand ? `${PREPARE_COMMAND} && ${command}` : PREPARE_COMMAND,
+        [PREPARE_SCRIPT]: hasCommand ? `${PREPARE_COMMAND} && (${command})` : PREPARE_COMMAND,
       }
       yield* writePackageJson(cwd, packageJson)
 
@@ -221,19 +224,25 @@ export default {
     plugin.assess(cwd, packageJson).pipe(Effect.map((assessment) => assessment.applicable)),
   monorepoTsconfigGuidance: MONOREPO_TSCONFIG_GUIDANCE,
   /**
-   * Patch the installed Oxlint, oxlint-tsgolint, and TypeScript binaries. The package manager puts
-   * `node_modules/.bin` on `PATH`, as it does for `oxlint` in `adamantite check`. The patch reports
-   * each file it skips, so `quiet` keeps that output out of a spinner.
+   * Patch the installed Oxlint, oxlint-tsgolint, and TypeScript binaries. The project's
+   * `node_modules/.bin` goes first on `PATH`, because a runner such as `pnpm dlx` does not add it.
+   * The patch reports each file it skips, so `quiet` keeps that output out of a spinner.
    */
   patch: (cwd: string, options: { readonly quiet: boolean }) =>
     Effect.gen(function* () {
+      const path = yield* Path.Path
       const runner = yield* CommandRunner
       const output = options.quiet ? "ignore" : "inherit"
+      const inheritedPath = yield* Config.String("PATH").pipe(Config.withDefault(""))
+      const searchPath = [path.join(cwd, "node_modules", ".bin"), inheritedPath]
+        .filter(Boolean)
+        .join(delimiter)
 
       yield* runner.run({
         args: PATCH_ARGS,
         command: BIN,
         cwd,
+        env: { PATH: searchPath },
         stderr: output,
         stdout: output,
       })

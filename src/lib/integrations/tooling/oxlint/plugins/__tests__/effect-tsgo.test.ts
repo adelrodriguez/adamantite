@@ -1,3 +1,4 @@
+import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -223,14 +224,15 @@ describe("effect-tsgo", () => {
       Effect.gen(function* () {
         // Husky's setup for a project below the Git root changes directory, so a command after it
         // would run outside the project.
-        for (const prepare of ["husky", "cd .. && husky frontend/.husky"]) {
+        // The parentheses keep a fallback such as `|| true` from also catching a failed patch.
+        for (const prepare of ["husky", "cd .. && husky frontend/.husky", "husky || true"]) {
           const files = makeFiles({ "package.json": makePackageJson({ scripts: { prepare } }) })
 
           const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
 
           expect(result).toBe("merged")
           expect(JSON.parse(files.read("package.json"))).toMatchObject({
-            scripts: { prepare: `${PREPARE} && ${prepare}` },
+            scripts: { prepare: `${PREPARE} && (${prepare})` },
           })
         }
       })
@@ -284,7 +286,9 @@ describe("effect-tsgo", () => {
         ] as const) {
           const runner = makeRunner(0)
 
-          yield* effectTsgo.patch(ROOT, { quiet }).pipe(Effect.provide(runner.layer))
+          yield* effectTsgo
+            .patch(ROOT, { quiet })
+            .pipe(Effect.provide(Layer.merge(runner.layer, Path.layer)))
 
           expect(runner.invocations).toEqual([
             expect.objectContaining({
@@ -295,6 +299,10 @@ describe("effect-tsgo", () => {
               stdout: output,
             }),
           ])
+          // A runner such as `pnpm dlx` does not put the project's executables on `PATH`.
+          expect(runner.invocations[0]?.env?.["PATH"]).toMatch(
+            new RegExp(`^${join(ROOT, "node_modules", ".bin")}`, "u")
+          )
         }
       })
     )
@@ -303,7 +311,7 @@ describe("effect-tsgo", () => {
       Effect.gen(function* () {
         const result = yield* effectTsgo
           .patch(ROOT, { quiet: true })
-          .pipe(Effect.provide(makeRunner(1).layer), Effect.result)
+          .pipe(Effect.provide(Layer.merge(makeRunner(1).layer, Path.layer)), Effect.result)
 
         expect(Result.isFailure(result) && result.failure._tag).toBe("CommandFailed")
       })

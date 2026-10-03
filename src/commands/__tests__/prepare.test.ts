@@ -14,9 +14,6 @@ import {
 function makeFiles(presets: string[], packageJson: PackageJson = {}) {
   return createFileSystemTestContext({
     files: {
-      "node_modules/@effect/tsgo/package.json": JSON.stringify({
-        bin: { "effect-tsgo": "./dist/effect-tsgo.cjs" },
-      }),
       "oxlint.config.ts": toOxlintTsConfigContent(presets),
       "package.json": JSON.stringify({
         name: "test-project",
@@ -39,14 +36,18 @@ describe("prepare", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations.map((invocation) => invocation.args.slice(1))).toEqual([
-        ["patch", "--oxlint", "--typescript"],
+      expect(runner.invocations).toEqual([
+        expect.objectContaining({
+          args: ["patch", "--oxlint", "--typescript"],
+          command: "effect-tsgo",
+          stderr: "inherit",
+          stdout: "inherit",
+        }),
       ])
-      expect(prompter.logs).toContainEqual({ level: "success", message: "Prepared @effect/tsgo." })
     })
   )
 
-  it.effect("do nothing when no managed plugin has a prepare step that applies", () =>
+  it.effect("do nothing without the effect preset or a managed lint script", () =>
     Effect.gen(function* () {
       const runner = createRunnerTestContext()
 

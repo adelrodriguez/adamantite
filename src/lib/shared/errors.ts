@@ -99,17 +99,6 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
   }
 }
 
-export class FailedToPreparePlugin extends Data.TaggedError("FailedToPreparePlugin")<{
-  plugin: string
-  reason?: string
-  cause?: unknown
-}> {
-  override get message() {
-    const reason = this.reason ? ` ${this.reason}` : ""
-    return `Failed to prepare \`${this.plugin}\`.${reason}${formatCauseDetail(this.cause)}`
-  }
-}
-
 export class FailedToInstallExtension extends Data.TaggedError("FailedToInstallExtension")<{
   extension?: string
   cause?: unknown

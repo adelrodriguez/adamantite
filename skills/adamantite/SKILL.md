@@ -145,8 +145,8 @@ adamantite update
 adamantite doctor
 ```
 
-`update` updates Adamantite-managed dependencies and runs the install steps of the managed
-plugins, such as the effect preset's patch. It then reports any remaining doctor findings. Follow those findings and review the resulting diff.
+`update` updates Adamantite-managed dependencies and, with the effect preset, patches Oxlint
+and TypeScript again. It then reports any remaining doctor findings. Follow those findings and review the resulting diff.
 
 ## Decision guide
 

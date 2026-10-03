@@ -29,11 +29,15 @@ a named one (`npm install -D <package>`, `pnpm add -D <package>`). We tested bot
 and pnpm 12.6. `adamantite update` runs a named install, so the `prepare` script alone left
 Oxlint unpatched after an update (#486). So the managed plugin manages more than its package:
 
-- `defineManagedPlugin` takes an optional `prepare` step. While the plugin applies,
-  `adamantite prepare` runs it, and `init` and `update` run it after they install packages.
-  The `@effect/tsgo` step runs the installed `effect-tsgo` executable from its `bin` entry with
-  Node. It does not run the `prepare` script, so the two cannot call each other, and other
-  commands in that script do not run during `update`.
+- While the preset is imported, `adamantite prepare` runs `effect-tsgo patch --oxlint
+--typescript`, and `init` and `update` run the same patch after they install packages. The
+  patch runs `effect-tsgo` by name from `node_modules/.bin`, as `adamantite check` runs
+  `oxlint`. It does not run the `prepare` script, so the two cannot call each other, and other
+  commands in that script do not run during `update`. Inside a spinner, the patch output is
+  hidden, and a failure tells the user to run `adamantite prepare` to see it.
+- We considered a generic `prepare` step on `defineManagedPlugin`. No other managed plugin
+  needs an install step, so the patch is specific to `@effect/tsgo`. A second plugin with
+  an install step is the time to make it generic.
 - The `prepare` script must run `adamantite prepare`. `init` adds the script, or adds
   `&& adamantite prepare` to the end of an existing one, as upstream's `setup` command does.
   Doctor reports a `prepare` script that does not run it. Users' `package.json` names only the

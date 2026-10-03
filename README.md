@@ -214,21 +214,20 @@ adamantite doctor
 ```
 
 `update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
-`adamantite doctor` as the CI gate. After it installs packages, `update` runs the install
-steps of the managed plugins, such as the patch for [the effect preset](#the-effect-preset).
+`adamantite doctor` as the CI gate. After it installs packages, `update` patches Oxlint and TypeScript again for
+[the effect preset](#the-effect-preset).
 
 ### `adamantite prepare`
 
-Run the install steps of the managed plugins that the project uses. The `prepare` script in
-`package.json` runs it after each install:
+Patch Oxlint and TypeScript for [the effect preset](#the-effect-preset). The `prepare`
+script in `package.json` runs it after each install:
 
 ```json
 { "scripts": { "prepare": "adamantite prepare" } }
 ```
 
-Today only the effect preset has an install step. Without a managed plugin that needs one,
-`prepare` does nothing and exits 0. If an install step fails, `prepare` fails, so the install
-fails.
+Without the effect preset, `prepare` does nothing and exits 0. If the patch fails, `prepare`
+fails, so the install fails.
 
 ### Pass arguments to underlying tools
 

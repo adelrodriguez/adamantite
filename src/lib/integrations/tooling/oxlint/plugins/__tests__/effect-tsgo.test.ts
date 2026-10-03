@@ -1,5 +1,3 @@
-import { join } from "node:path"
-import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -249,48 +247,63 @@ describe("effect-tsgo", () => {
     )
   })
 
-  describe("prepare", () => {
-    const manifest = JSON.stringify({ bin: { "effect-tsgo": "./dist/effect-tsgo.cjs" } })
-
-    it.effect("run the installed effect-tsgo patch with Node", () =>
+  describe("checkNeedsPatch", () => {
+    it.effect("need the patch only with the effect preset and a managed lint script", () =>
       Effect.gen(function* () {
-        const files = makeFiles({ "node_modules/@effect/tsgo/package.json": manifest })
-        const runner = makeRunner(0)
+        const cases = [
+          [makeConfiguredFiles(), true],
+          [makeConfiguredFiles({ "oxlint.config.ts": toOxlintTsConfigContent(["react"]) }), false],
+          [
+            makeConfiguredFiles({
+              "package.json": makePackageJson({ scripts: { check: "oxlint" } }),
+            }),
+            false,
+          ],
+        ] as const
 
-        yield* effectTsgo.prepare(ROOT).pipe(provideFiles(files), Effect.provide(runner.layer))
+        for (const [files, expected] of cases) {
+          const result = yield* readPackageJson(ROOT).pipe(
+            Effect.flatMap((packageJson) => effectTsgo.checkNeedsPatch(ROOT, packageJson)),
+            provideFiles(files)
+          )
 
-        expect(runner.invocations).toEqual([
-          expect.objectContaining({
-            args: [
-              join(ROOT, "node_modules/@effect/tsgo/dist/effect-tsgo.cjs"),
-              "patch",
-              "--oxlint",
-              "--typescript",
-            ],
-            command: process.execPath,
-            cwd: ROOT,
-          }),
-        ])
+          expect(result).toBe(expected)
+        }
+      })
+    )
+  })
+
+  describe("patch", () => {
+    it.effect("run effect-tsgo patch for Oxlint and TypeScript", () =>
+      Effect.gen(function* () {
+        for (const [quiet, output] of [
+          [true, "ignore"],
+          [false, "inherit"],
+        ] as const) {
+          const runner = makeRunner(0)
+
+          yield* effectTsgo.patch(ROOT, { quiet }).pipe(Effect.provide(runner.layer))
+
+          expect(runner.invocations).toEqual([
+            expect.objectContaining({
+              args: ["patch", "--oxlint", "--typescript"],
+              command: "effect-tsgo",
+              cwd: ROOT,
+              stderr: output,
+              stdout: output,
+            }),
+          ])
+        }
       })
     )
 
-    it.effect("fail when @effect/tsgo is not installed or the patch fails", () =>
+    it.effect("fail when the patch fails", () =>
       Effect.gen(function* () {
-        const missing = yield* effectTsgo
-          .prepare(ROOT)
-          .pipe(provideFiles(makeFiles()), Effect.provide(makeRunner(0).layer), Effect.result)
-        const failed = yield* effectTsgo
-          .prepare(ROOT)
-          .pipe(
-            provideFiles(makeFiles({ "node_modules/@effect/tsgo/package.json": manifest })),
-            Effect.provide(makeRunner(1).layer),
-            Effect.result
-          )
+        const result = yield* effectTsgo
+          .patch(ROOT, { quiet: true })
+          .pipe(Effect.provide(makeRunner(1).layer), Effect.result)
 
-        expect(Result.isFailure(missing) && missing.failure.message).toBe(
-          "Failed to prepare `@effect/tsgo`. It is not installed. Run `adamantite update` to install it."
-        )
-        expect(Result.isFailure(failed) && failed.failure._tag).toBe("FailedToPreparePlugin")
+        expect(Result.isFailure(result) && result.failure._tag).toBe("CommandFailed")
       })
     )
   })

@@ -51,13 +51,6 @@ function createInitTestContext(files?: Record<string, string>) {
   })
 }
 
-// The installed @effect/tsgo manifest, which the patch reads for its executable.
-const EFFECT_TSGO_FILES = {
-  "node_modules/@effect/tsgo/package.json": JSON.stringify({
-    bin: { "effect-tsgo": "./dist/effect-tsgo.cjs" },
-  }),
-}
-
 function readJson(files: FileSystemTestContext, path: string): JsonObject {
   // SAFETY: every caller asserts the shape of a JSON fixture this test suite wrote itself.
   return JSON.parse(files.read(path)) as JsonObject
@@ -390,7 +383,7 @@ describe("init", () => {
 
     it.effect("install @effect/tsgo, patch, and configure the language service for effect", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext(EFFECT_TSGO_FILES)
+        const files = createInitTestContext()
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
@@ -409,13 +402,13 @@ describe("init", () => {
         expect(readJson(files, "package.json")).toMatchObject({
           scripts: { prepare: "adamantite prepare" },
         })
-        expect(runner.invocations.map((invocation) => invocation.args)).toEqual([
-          [
-            expect.stringMatching(/node_modules\/@effect\/tsgo\/dist\/effect-tsgo\.cjs$/u),
-            "patch",
-            "--oxlint",
-            "--typescript",
-          ],
+        expect(runner.invocations).toEqual([
+          expect.objectContaining({
+            args: ["patch", "--oxlint", "--typescript"],
+            command: "effect-tsgo",
+            stderr: "ignore",
+            stdout: "ignore",
+          }),
         ])
         expect(readJson(files, "tsconfig.json")).toEqual({
           compilerOptions: {
@@ -428,7 +421,7 @@ describe("init", () => {
 
     it.effect("ignore the language service plugin name in a new knip config", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext(EFFECT_TSGO_FILES)
+        const files = createInitTestContext()
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
@@ -449,7 +442,6 @@ describe("init", () => {
     it.effect("add adamantite prepare to the end of an existing prepare script", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
-          ...EFFECT_TSGO_FILES,
           "package.json": JSON.stringify({ name: "test-project", scripts: { prepare: "husky" } }),
         })
         const prompter = createPrompterTestContext()
@@ -476,7 +468,7 @@ describe("init", () => {
 
     it.effect("warn and continue when the patch fails", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext({ ...EFFECT_TSGO_FILES, "tsconfig.json": "{}" })
+        const files = createInitTestContext({ "tsconfig.json": "{}" })
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext([1])
@@ -490,7 +482,7 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toContainEqual({
           level: "warning",
-          message: expect.stringContaining("Failed to prepare `@effect/tsgo`."),
+          message: expect.stringContaining("Run `adamantite prepare` to see why the patch failed."),
         })
         expect(readJson(files, "tsconfig.json")).toEqual({
           compilerOptions: {
@@ -503,7 +495,6 @@ describe("init", () => {
     it.effect("give tsconfig guidance instead of editing it in a monorepo", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
-          ...EFFECT_TSGO_FILES,
           "package.json": monorepoPackageJson,
           "tsconfig.json": "{}",
         })

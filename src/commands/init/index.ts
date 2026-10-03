@@ -21,7 +21,7 @@ import {
   addScripts,
   installDependencies,
   installEditorExtensions,
-  prepareManagedPlugins,
+  patchEffectTsgo,
   setupAgentsGuidance,
   setupEditors,
   setupEffectTsgo,
@@ -169,10 +169,7 @@ export default Command.make("init", initCommandOptions).pipe(
       // After the TypeScript setup, so a `tsconfig.json` that init creates gets the plugin entry.
       if (presets.includes("effect")) {
         yield* setupEffectTsgo(cwd, isMonorepo)
-      }
-
-      if (hasOxlint) {
-        yield* prepareManagedPlugins(cwd)
+        yield* patchEffectTsgo(cwd)
       }
 
       yield* setupEditors(cwd, selectedEditors)

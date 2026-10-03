@@ -1,12 +1,10 @@
-import process from "node:process"
 import type { JsonObject, JsonValue, PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import type { Finding } from "#lib/integrations/base.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { defineManagedPlugin } from "#lib/integrations/tooling/oxlint/plugins/define.ts"
-import { FailedToPreparePlugin, InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonArray, checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -119,48 +117,8 @@ const assessTsconfig = Effect.fn("assessEffectTsgoTsconfig")(function* (cwd: str
   return { findings: [finding], warnings: [] }
 })
 
-/**
- * Patch the installed Oxlint, oxlint-tsgolint, and TypeScript binaries. The patch command comes
- * from the installed package's `bin` entry, so it runs under any package manager that creates
- * `node_modules`, and the `prepare` script is not run again.
- */
-const patch = Effect.fn("patchEffectTsgo")(function* (cwd: string) {
-  const path = yield* Path.Path
-  const runner = yield* CommandRunner
-  const manifestPath = path.join(cwd, "node_modules", NAME, "package.json")
-  const manifest = yield* readFileIfExists(manifestPath)
-
-  if (manifest._tag === "None") {
-    return yield* new FailedToPreparePlugin({
-      plugin: NAME,
-      reason: `It is not installed. Run \`adamantite update\` to install it.`,
-    })
-  }
-
-  const parsed = yield* parseJson(manifest.value, manifestPath)
-  const bin =
-    checkIsJsonObject(parsed) && checkIsJsonObject(parsed["bin"]) ? parsed["bin"][BIN] : undefined
-
-  if (!Predicate.isString(bin)) {
-    return yield* new FailedToPreparePlugin({
-      plugin: NAME,
-      reason: `Its \`package.json\` has no \`${BIN}\` executable.`,
-    })
-  }
-
-  yield* runner
-    .run({
-      args: [path.join(path.dirname(manifestPath), bin), ...PATCH_ARGS],
-      command: process.execPath,
-      cwd,
-      stdout: "ignore",
-    })
-    .pipe(Effect.mapError((cause) => new FailedToPreparePlugin({ cause, plugin: NAME })))
-})
-
 const plugin = defineManagedPlugin({
   name: NAME,
-  prepare: patch,
   preset: "effect",
   version: getDependencyVersion("@effect/tsgo"),
 })
@@ -254,7 +212,30 @@ export default {
         warnings: [...assessment.warnings, ...tsconfig.warnings],
       }
     }),
+  /**
+   * Whether the project needs the patch: `oxlint.config.ts` imports the `effect` preset, and a
+   * managed lint script runs Oxlint.
+   */
+  checkNeedsPatch: (cwd: string, packageJson: PackageJson) =>
+    plugin.assess(cwd, packageJson).pipe(Effect.map((assessment) => assessment.applicable)),
   monorepoTsconfigGuidance: MONOREPO_TSCONFIG_GUIDANCE,
-  prepare: patch,
+  /**
+   * Patch the installed Oxlint, oxlint-tsgolint, and TypeScript binaries. The package manager puts
+   * `node_modules/.bin` on `PATH`, as it does for `oxlint` in `adamantite check`. The patch reports
+   * each file it skips, so `quiet` keeps that output out of a spinner.
+   */
+  patch: (cwd: string, options: { readonly quiet: boolean }) =>
+    Effect.gen(function* () {
+      const runner = yield* CommandRunner
+      const output = options.quiet ? "ignore" : "inherit"
+
+      yield* runner.run({
+        args: PATCH_ARGS,
+        command: BIN,
+        cwd,
+        stderr: output,
+        stdout: output,
+      })
+    }),
   prepareCommand: PREPARE_COMMAND,
 }

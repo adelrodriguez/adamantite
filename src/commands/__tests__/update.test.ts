@@ -28,9 +28,6 @@ function manifest(value: PackageJson): string {
 function makeEffectFiles(oxlintConfig: string) {
   return createFileSystemTestContext({
     files: {
-      "node_modules/@effect/tsgo/package.json": JSON.stringify({
-        bin: { "effect-tsgo": "./dist/effect-tsgo.cjs" },
-      }),
       "oxlint.config.ts": oxlintConfig,
       "package.json": manifest({
         devDependencies: { "@effect/tsgo": effectTsgo.version, oxlint: "1.0.0" },
@@ -215,8 +212,11 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls[0]?.packages).toContain(`oxlint@${oxlint.version}`)
       expect(installer.calls[0]?.packages).not.toContain(`@effect/tsgo@${effectTsgo.version}`)
-      expect(runner.invocations.map((invocation) => invocation.args.slice(1))).toEqual([
-        ["patch", "--oxlint", "--typescript"],
+      expect(runner.invocations).toEqual([
+        expect.objectContaining({
+          args: ["patch", "--oxlint", "--typescript"],
+          command: "effect-tsgo",
+        }),
       ])
     })
   )

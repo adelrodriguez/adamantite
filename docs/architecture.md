@@ -101,10 +101,10 @@ warns the user and points to `adamantite doctor`.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
-- `update` updates managed dependencies, runs the managed plugins' `prepare` steps, then
-  emits any remaining doctor findings.
-- `prepare` runs the managed plugins' `prepare` steps. The target project's `prepare` script
-  runs it after each install.
+- `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
+  preset, then emits any remaining doctor findings.
+- `prepare` patches Oxlint and TypeScript for the effect preset. The target project's
+  `prepare` script runs it after each install.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -154,11 +154,10 @@ version in `package.json`. See ADR 0003.
 
 `@effect/tsgo` for the `effect` preset is a managed plugin too, but it is not a `jsPlugins`
 package. Its `effecttsgo` rules exist only after `effect-tsgo patch --oxlint --typescript`
-replaces the Oxlint and TypeScript binaries in `node_modules`. A managed plugin can give
-`defineManagedPlugin` a `prepare` step for this kind of install work. While the plugin
-applies, `adamantite prepare` runs the step from the target project's `prepare` script, and
-`init` and `update` run it after they install packages. The `@effect/tsgo` integration also
-manages that `prepare` script and the `@effect/language-service` entry in `tsconfig.json`. The Knip integration requires
+replaces the Oxlint and TypeScript binaries in `node_modules`. While the preset is imported,
+`adamantite prepare` runs the patch from the target project's `prepare` script, and `init`
+and `update` run it after they install packages. The `@effect/tsgo` integration also manages
+that `prepare` script and the `@effect/language-service` entry in `tsconfig.json`. The Knip integration requires
 `ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
 `@effect/tsgo` ships patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript
 versions. See ADR 0007.

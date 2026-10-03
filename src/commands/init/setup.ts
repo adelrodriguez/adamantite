@@ -9,7 +9,6 @@ import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
-import { getPluginsToPrepare } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
@@ -217,29 +216,30 @@ export const setupEffectTsgo = (cwd: string, isMonorepo: boolean) =>
   })
 
 /**
- * Run the install steps of the managed plugins that apply, such as the @effect/tsgo patch. Init
- * installed the packages before it wrote the `prepare` script, so the script has not run yet.
+ * Patch Oxlint and TypeScript for the `effect` preset. Init installed the packages before it wrote
+ * the `prepare` script, so the script has not run yet.
  */
-export const prepareManagedPlugins = (cwd: string) =>
+export const patchEffectTsgo = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const plugins = yield* getPluginsToPrepare(cwd, yield* readPackageJson(cwd))
 
-    for (const plugin of plugins) {
-      yield* prompter
-        .withSpinner(() => plugin.prepare(cwd), {
-          failure: `Failed to prepare ${plugin.name}.`,
-          start: `Preparing ${plugin.name}...`,
-          success: `${plugin.name} prepared.`,
-        })
-        .pipe(
-          Effect.catchTag("FailedToPreparePlugin", (error) =>
-            prompter.log.warning(
-              `${error.message} Run \`adamantite prepare\` before you run \`adamantite check\`.`
-            )
+    if (!(yield* effectTsgo.checkNeedsPatch(cwd, yield* readPackageJson(cwd)))) {
+      return
+    }
+
+    yield* prompter
+      .withSpinner(() => effectTsgo.patch(cwd, { quiet: true }), {
+        failure: "Failed to patch Oxlint and TypeScript.",
+        start: "Patching Oxlint and TypeScript with @effect/tsgo...",
+        success: "Oxlint and TypeScript patched with @effect/tsgo.",
+      })
+      .pipe(
+        Effect.catchTag(["CommandFailed", "CliNotFound", "PlatformError"], () =>
+          prompter.log.warning(
+            "Run `adamantite prepare` to see why the patch failed. Oxlint cannot load the `effect` preset until it succeeds."
           )
         )
-    }
+      )
   })
 
 export const setupEditors = (cwd: string, editors: string[]) =>

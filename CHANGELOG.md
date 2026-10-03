@@ -1,5 +1,34 @@
 # adamantite
 
+## 0.43.0
+
+### Minor Changes
+
+- [#490](https://github.com/adelrodriguez/adamantite/pull/490) [`47a2c98`](https://github.com/adelrodriguez/adamantite/commit/47a2c987f683072fa7411f9c961cf832e0495129) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add custom rules: write project-specific Oxlint rules in `.adamantite/rules/`, one rule for each file, and enable them with `custom()` from the new `adamantite/lint/custom` export. A file `no-process-env.ts` becomes the rule `project/no-process-env`, and files that start with `_` are helpers. A relative `dir` resolves from the file that calls `custom()`, so a monorepo can keep its rules in a shared tooling package, and the `name` option gives each rules folder its own plugin name. The new `adamantite/rules` export provides `defineRule` and the rule and AST types, so a rule file needs no other dependency; `@oxlint/plugins` is now a runtime dependency for this reason. `adamantite init` adds `custom()` to the generated `oxlint.config.ts`, where it is an empty config until the project adds a rule, and the AGENTS.md guidance mentions custom rules. The new `adamantite rule add <name>` command writes a rule stub and the authoring guidance, with `--dir` for another rules folder, and `adamantite rule ast <file>` prints the AST that rules visit. Doctor reports a rule file that cannot load, with the reason, a rules folder that no `custom()` call loads, and two rules folders that share a plugin name. The skill has a new "Custom rules" section.
+
+- [#486](https://github.com/adelrodriguez/adamantite/pull/486) [`2c3fcd1`](https://github.com/adelrodriguez/adamantite/commit/2c3fcd1549127b1534aa6f9a226dbe86ca60516a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `effect` lint preset with curated [@effect/tsgo](https://github.com/Effect-TS/tsgo) rules for Effect misuse, such as effects that never run and unhandled errors. `@effect/tsgo` is a managed plugin. Its rules exist only in Oxlint binaries that `effect-tsgo patch --oxlint --typescript` patched, so `adamantite init` installs the pinned package, runs the patch, sets the `prepare` script to the new `adamantite prepare` command, and adds the `@effect/language-service` entry with `diagnostics: false` to `tsconfig.json`. `adamantite prepare` runs the patch, and `adamantite update` runs it after it installs packages. Doctor reports a missing package, `prepare` step, or tsconfig entry. A production-only install that runs scripts fails at `adamantite prepare`, so use `--ignore-scripts` for those installs. The analyze preset exports `ignoreDependencies.effect`, which `init` sets and doctor requires while `oxlint.config.ts` imports the preset.
+
+- [#489](https://github.com/adelrodriguez/adamantite/pull/489) [`7697b18`](https://github.com/adelrodriguez/adamantite/commit/7697b18c080fa2ceccbf8280c443457ee60f5652) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/lint/tanstack` preset for TanStack Query apps that preload queries in route loaders
+
+  The preset enables two rules from Adamantite's own Oxlint plugin. `adamantite/query-from-loader` reports `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`, and `useSuspenseInfiniteQuery` from `@tanstack/react-query` in route files, which call a route factory such as `createFileRoute` from `@tanstack/react-router`, when they take a plain options object or a `queryOptions()` call made inside a function, including through a local `const`. Define each query once with `queryOptions()` (`infiniteQueryOptions()` for the infinite hooks) at module scope or in an exported factory, preload it in the route loader, and pass the same options to the hook. Type-only wrappers, such as `as const` and `satisfies`, do not hide the options from the rule. An object that spreads shared options, such as `{ ...userQuery(id), select }`, stays allowed. The rule checks one file at a time, so it cannot prove that a loader preloads the options. `adamantite/no-query-data-in-state` reports `useState` calls whose initial value comes from query data, such as `useState(query.data)`, because the copy stops updating when the query refetches.
+
+  Select the preset in `adamantite init` or with `--preset tanstack`. It needs no extra dependency.
+
+- [#483](https://github.com/adelrodriguez/adamantite/pull/483) [`1a65f53`](https://github.com/adelrodriguez/adamantite/commit/1a65f53a4ec24c535d477dd1b7d04966ee293480) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update the managed tooling and report utility types that resolve to `{}`
+
+  The core lint preset now enables `typescript/no-generated-empty-object-type`. This type-aware rule reports utility types and intersections that resolve to the empty object type `{}`, such as `Omit<{ a: string }, "a">`. It adds to `typescript/no-empty-object-type`, which reports only a `{}` that you write.
+
+  Update the managed tooling versions: Oxlint 1.86.0, Oxfmt 0.71.0, oxlint-tsgolint 7.0.2003, Knip 6.39.0, and `@shadcn/lint` 0.2.0. Also update the runtime dependencies `@clack/prompts` 1.8.1, `nypm` 0.6.10, and `oxc-parser` 0.152.0.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update` before you lint. Oxlint 1.83.0, which earlier Adamantite releases install, does not know the new rule and stops with `Rule 'no-generated-empty-object-type' not found in plugin 'typescript'`. `adamantite doctor` reports a version mismatch for older pins.
+  - Expect `adamantite check` to fail on existing utility types that resolve to `{}`. Replace each one with the type that you intend, such as `Record<string, never>` for an object with no properties.
+
+### Patch Changes
+
+- [#491](https://github.com/adelrodriguez/adamantite/pull/491) [`3edd34a`](https://github.com/adelrodriguez/adamantite/commit/3edd34a91f4ecffffe740422ebd21d6d9b0da62d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Type `ignorePatterns` on the core lint preset as `string[]`, not `string[] | undefined`, so projects can spread `core.ignorePatterns` into their own patterns
+
 ## 0.42.0
 
 ### Minor Changes

@@ -1,7 +1,9 @@
+import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import {
   defineIntegration,
   type Finding,
@@ -10,23 +12,31 @@ import {
 import {
   CUSTOM_RULES_MODULE,
   findCustomRulesCalls,
+  findRuntimeImports,
   inspectRuleFile,
   isRuleFile,
 } from "#lib/integrations/tooling/oxlint/custom-rules/inspect.ts"
-import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
+import { readDirectoryIfExists, readFile, readFileIfExists } from "#lib/shared/filesystem.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules.ts"
 import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const NAME = "custom-rules"
 
-const SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([
-  ".cjs",
-  ".cts",
-  ".js",
-  ".mjs",
-  ".mts",
-  ".ts",
-])
+const CONFIG_FILES = [
+  "oxlint.config.ts",
+  "oxlint.config.mts",
+  "oxlint.config.js",
+  "oxlint.config.mjs",
+]
+
+const MODULE_EXTENSIONS = [".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]
+
+interface WorkspacePackage {
+  readonly directory: string
+  readonly entry: string | undefined
+  readonly name: string
+}
 
 interface ResolvedCall {
   /**
@@ -51,38 +61,164 @@ export default defineConfig({
 })
 `
 
+function getExportsEntry(exports: PackageJson["exports"]): string | undefined {
+  if (Predicate.isString(exports)) {
+    return exports
+  }
+
+  if (exports === null || exports === undefined || Array.isArray(exports)) {
+    return undefined
+  }
+
+  const root = "." in exports ? exports["."] : exports
+
+  if (Predicate.isString(root)) {
+    return root
+  }
+
+  if (root === null || Array.isArray(root)) {
+    return undefined
+  }
+
+  const conditions = [root.import, root.default, root.node]
+
+  return conditions.find((condition) => Predicate.isString(condition))
+}
+
+const readWorkspacePackage = Effect.fn("readWorkspacePackage")(function* (directory: string) {
+  const packageJson = yield* readPackageJson(directory)
+
+  if (packageJson.name === undefined) {
+    return Option.none<WorkspacePackage>()
+  }
+
+  return Option.some({
+    directory,
+    entry: getExportsEntry(packageJson.exports) ?? packageJson.main,
+    name: packageJson.name,
+  } satisfies WorkspacePackage)
+})
+
 /**
- * The `custom()` calls in the top-level script files of a package directory, such as
- * `oxlint.config.ts` or the entry module of a shared tooling package.
+ * The first candidate file that exists, with its content.
  */
-const findCalls = Effect.fn("findCustomRulesCalls")(function* (directory: string) {
+const readFirstFile = Effect.fn("readFirstFile")(function* (candidates: readonly string[]) {
+  for (const candidate of candidates) {
+    const content = yield* readFileIfExists(candidate).pipe(
+      // A directory cannot be read as a file.
+      Effect.orElseSucceed(() => Option.none<string>())
+    )
+
+    if (Option.isSome(content)) {
+      return Option.some({ content: content.value, file: candidate })
+    }
+  }
+
+  return Option.none<{ readonly content: string; readonly file: string }>()
+})
+
+/**
+ * Resolve an import to a source file in the project: a relative path, or a workspace package and
+ * its subpaths. Other packages are not followed.
+ */
+const resolveImport = Effect.fn("resolveImport")(function* (
+  from: string,
+  specifier: string,
+  packages: readonly WorkspacePackage[]
+) {
   const path = yield* Path.Path
-  const entries = Option.getOrElse(yield* readDirectoryIfExists(directory), (): string[] => [])
-  const scripts = entries.filter(
-    (entry) => SCRIPT_EXTENSIONS.has(path.extname(entry)) && !/\.d\.[cm]?ts$/.test(entry)
+  let base: string | undefined
+
+  if (specifier.startsWith(".") || path.isAbsolute(specifier)) {
+    base = path.resolve(path.dirname(from), specifier)
+  } else {
+    const owner = packages.find(
+      (workspacePackage) =>
+        specifier === workspacePackage.name || specifier.startsWith(`${workspacePackage.name}/`)
+    )
+
+    if (owner !== undefined) {
+      const subpath = specifier.slice(owner.name.length + 1)
+
+      base =
+        subpath === ""
+          ? path.resolve(owner.directory, owner.entry ?? "index")
+          : path.resolve(owner.directory, subpath)
+    }
+  }
+
+  if (base === undefined || base.split(path.sep).includes("node_modules")) {
+    return Option.none<{ readonly content: string; readonly file: string }>()
+  }
+
+  const directory = base
+  // A TypeScript source can import a sibling with the `.js` extension of its build output.
+  const stem = base.replace(/\.[cm]?js$/u, "")
+
+  return yield* readFirstFile([
+    base,
+    ...MODULE_EXTENSIONS.map((extension) => `${stem}${extension}`),
+    ...MODULE_EXTENSIONS.map((extension) => path.join(directory, `index${extension}`)),
+  ])
+})
+
+/**
+ * The `custom()` calls that the Oxlint configs reach: calls in each config, and in the modules that
+ * a config imports, such as the entry module of a shared tooling package. A `custom()` call in a
+ * module that no config imports does not load rules.
+ */
+const findCalls = Effect.fn("findCustomRulesCalls")(function* (
+  packageDirectories: readonly string[]
+) {
+  const path = yield* Path.Path
+  const packages = Array.getSomes(
+    yield* Effect.forEach(packageDirectories, (directory) => readWorkspacePackage(directory), {
+      concurrency: "unbounded",
+    })
   )
-  const calls = yield* Effect.forEach(
-    scripts,
-    (entry) =>
-      Effect.gen(function* () {
-        const source = path.join(directory, entry)
-        // A directory with a script extension cannot be read as a file; it holds no calls.
-        const content = yield* readFile(source).pipe(Effect.orElseSucceed(() => ""))
+  const configs = Array.getSomes(
+    yield* Effect.forEach(
+      packageDirectories,
+      (directory) => readFirstFile(CONFIG_FILES.map((file) => path.join(directory, file))),
+      { concurrency: "unbounded" }
+    )
+  )
+  const visited = new Set<string>()
+  const calls: ResolvedCall[] = []
+  let queue = configs
 
-        if (!content.includes(CUSTOM_RULES_MODULE)) {
-          return []
-        }
+  while (queue.length > 0) {
+    const modules = queue.filter((module) => !visited.has(module.file))
 
-        return findCustomRulesCalls(source, content).map((call): ResolvedCall => ({
-          dir: call.dir === null ? null : path.resolve(directory, call.dir),
-          name: call.name,
-          source,
+    for (const module of modules) {
+      visited.add(module.file)
+
+      if (module.content.includes(CUSTOM_RULES_MODULE)) {
+        calls.push(
+          ...findCustomRulesCalls(module.file, module.content).map((call): ResolvedCall => ({
+            dir: call.dir === null ? null : path.resolve(path.dirname(module.file), call.dir),
+            name: call.name,
+            source: module.file,
+          }))
+        )
+      }
+    }
+
+    const imported = yield* Effect.forEach(
+      modules.flatMap((module) =>
+        findRuntimeImports(module.file, module.content).map((specifier) => ({
+          from: module.file,
+          specifier,
         }))
-      }),
-    { concurrency: "unbounded" }
-  )
+      ),
+      ({ from, specifier }) => resolveImport(from, specifier, packages),
+      { concurrency: "unbounded" }
+    )
 
-  return calls.flat()
+    queue = Array.getSomes(imported)
+  }
+
+  return calls
 })
 
 const readRulesFolder = Effect.fn("readRulesFolder")(function* (dir: string) {
@@ -105,13 +241,7 @@ export default defineIntegration({
         cwd,
         ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
       ]
-      const calls = (yield* Effect.forEach(
-        packageDirectories,
-        (directory) => findCalls(directory),
-        {
-          concurrency: "unbounded",
-        }
-      )).flat()
+      const calls = yield* findCalls(packageDirectories)
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )

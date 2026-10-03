@@ -34,9 +34,10 @@ repeat them against the pinned Oxlint:
   version.
 - Doctor stays read-only and does not run rule code. It parses each rule file with
   `oxc-parser` and reports syntax errors, TypeScript that type stripping cannot erase, and
-  a missing default export. It reads `custom()` calls in the top-level files of the root
-  and of each workspace package, and reports a rules folder that no call loads and two
-  folders that share a plugin name.
+  a missing default export. It starts from the Oxlint config of the root and of each
+  workspace package, follows relative imports and imports of workspace packages to the
+  `custom()` calls, and reports a rules folder that no call loads and two folders that
+  share a plugin name. A call in a module that no config imports does not count.
 
 ## Consequences
 

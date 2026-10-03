@@ -112,6 +112,16 @@ describe("inspectRuleFile", () => {
     ])
   })
 
+  test.each([
+    "export default interface Rule { create(): void }\n",
+    "const rule = {}\ntype Rule = typeof rule\nexport type { Rule as default }\n",
+    "const rule = {}\ntype Rule = typeof rule\nexport { type Rule as default }\n",
+  ])("report a default export that type stripping erases: %s", (content) => {
+    expect(inspectRuleFile("rule.ts", content)).toEqual([
+      "The file has no default export. Export the rule as default.",
+    ])
+  })
+
   test("report a missing default export", () => {
     expect(inspectRuleFile("rule.ts", "export const rule = {}\n")).toEqual([
       "The file has no default export. Export the rule as default.",

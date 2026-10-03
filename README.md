@@ -618,8 +618,9 @@ export default custom({ dir: "rules", name: "acme" })
 ```
 
 Run `adamantite rule add <name> --dir tooling/lint/rules` to add a rule to that folder.
-Doctor reads `custom()` calls in the top-level files of the root and of each workspace
-package, and resolves `dir` and `name` when they are string literals.
+Doctor starts from the Oxlint config of the root and of each workspace package, and follows
+relative imports and imports of workspace packages to find the `custom()` calls. It resolves
+`dir` and `name` when they are string literals.
 
 ## Requirements and boundaries
 

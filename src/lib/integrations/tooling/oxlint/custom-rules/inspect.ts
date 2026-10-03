@@ -168,17 +168,56 @@ function checkIsTypeOnlyModule(module: TSGlobalDeclaration | TSModuleDeclaration
   )
 }
 
+/**
+ * Whether the module has a default export that survives type stripping. `export default interface`
+ * and `export type { Rule as default }` are erased.
+ */
 function checkHasDefaultExport(program: Program) {
-  return program.body.some(
-    (statement) =>
-      statement.type === "ExportDefaultDeclaration"
-      || (statement.type === "ExportNamedDeclaration"
-        && statement.specifiers.some((specifier) =>
-          specifier.exported.type === "Literal"
+  return program.body.some((statement) => {
+    if (statement.type === "ExportDefaultDeclaration") {
+      return statement.declaration.type !== "TSInterfaceDeclaration"
+    }
+
+    return (
+      statement.type === "ExportNamedDeclaration"
+      && statement.exportKind !== "type"
+      && statement.specifiers.some(
+        (specifier) =>
+          specifier.exportKind !== "type"
+          && (specifier.exported.type === "Literal"
             ? specifier.exported.value === "default"
-            : specifier.exported.name === "default"
-        ))
-  )
+            : specifier.exported.name === "default")
+      )
+    )
+  })
+}
+
+/**
+ * The modules that a module imports or re-exports at runtime. Type-only imports are left out. A
+ * module that does not parse imports none.
+ */
+export function findRuntimeImports(file: string, content: string): string[] {
+  const parsed = parse(file, content)
+
+  if (parsed.errors.length > 0) {
+    return []
+  }
+
+  return parsed.program.body.flatMap((statement) => {
+    switch (statement.type) {
+      case "ImportDeclaration":
+        return statement.importKind === "type" ? [] : [statement.source.value]
+
+      case "ExportAllDeclaration":
+      case "ExportNamedDeclaration":
+        return statement.source === null || statement.exportKind === "type"
+          ? []
+          : [statement.source.value]
+
+      default:
+        return []
+    }
+  })
 }
 
 /**

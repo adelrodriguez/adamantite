@@ -101,6 +101,47 @@ describe("custom-rules", () => {
     })
   )
 
+  it.effect("report a rules folder when only a module that no config imports calls custom()", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/no-process-env.ts": RULE,
+          "oxlint.config.ts": makeConfig("core"),
+          "package.json": PACKAGE_JSON,
+          "scratch.ts": 'import custom from "adamantite/lint/custom"\n\nexport default custom()\n',
+        },
+        root: ROOT,
+      })
+
+      const findings = getFindings(yield* runAssess(files))
+
+      expect(findings.map((finding) => finding.id)).toEqual([
+        "custom-rules-not-loaded:.adamantite/rules",
+      ])
+    })
+  )
+
+  it.effect("follow a relative import from the config to the module that calls custom()", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/no-process-env.ts": RULE,
+          "lint/rules.ts": [
+            'import custom from "adamantite/lint/custom"',
+            "",
+            'export default custom({ dir: "../.adamantite/rules" })',
+            "",
+          ].join("\n"),
+          "oxlint.config.ts": makeConfig("core, rules", ['import rules from "./lint/rules.js"']),
+          "package.json": PACKAGE_JSON,
+        },
+        root: ROOT,
+      })
+
+      expect(getFindings(yield* runAssess(files))).toEqual([])
+    })
+  )
+
   it.effect("report a rule file that cannot load, with the reason", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

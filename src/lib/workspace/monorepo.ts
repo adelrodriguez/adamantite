@@ -1,8 +1,10 @@
+import type * as FileSystem from "effect/FileSystem"
 import process from "node:process"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { FailedToReadFile } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfExists } from "#lib/shared/filesystem.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
@@ -120,10 +122,87 @@ export function readPnpmWorkspacePatterns(content: string): string[] {
   return patterns
 }
 
+function escapeRegExp(text: string) {
+  return text.replaceAll(/[$()+.[\\\]^{|}]/gu, String.raw`\$&`)
+}
+
 /**
- * The absolute directories of the workspace packages, without the root. A pattern is a literal
- * directory or a directory followed by `/*` or `/**`. Both wildcard forms match the direct
- * subdirectories only. Negated patterns are ignored.
+ * Convert a workspace pattern to a regular expression that matches a relative directory path. `*`
+ * and `?` match inside one path segment, and a `**` segment matches zero or more segments.
+ */
+export function workspacePatternToRegExp(pattern: string): RegExp {
+  const segments = pattern.replace(/^\.\//u, "").replace(/\/+$/u, "").split("/")
+  let source = ""
+
+  for (const [index, segment] of segments.entries()) {
+    // A segment after `**` takes its separator from the `**` part.
+    const separator = index === 0 || segments[index - 1] === "**" ? "" : "/"
+
+    if (segment !== "**") {
+      source += `${separator}${escapeRegExp(segment).replaceAll("*", "[^/]*").replaceAll("?", "[^/]")}`
+    } else if (index < segments.length - 1) {
+      source += `${separator}(?:[^/]+/)*`
+    } else {
+      source += index === 0 ? "(?:[^/]+(?:/[^/]+)*)?" : "(?:/[^/]+)*"
+    }
+  }
+
+  return new RegExp(`^${source}$`, "u")
+}
+
+/**
+ * The fixed directory before the first wildcard segment of a pattern, such as `packages` for
+ * `packages/*`, and the number of segments after it. The depth is unbounded with `**`.
+ */
+function getPatternBase(pattern: string) {
+  const segments = pattern.replace(/^\.\//u, "").replace(/\/+$/u, "").split("/")
+  const wildcardIndex = segments.findIndex((segment) => /[*?]/u.test(segment))
+
+  if (wildcardIndex === -1) {
+    return { base: segments.join("/"), depth: 0 }
+  }
+
+  return {
+    base: segments.slice(0, wildcardIndex).join("/"),
+    depth: segments.includes("**") ? Number.POSITIVE_INFINITY : segments.length - wildcardIndex,
+  }
+}
+
+const SKIPPED_DIRECTORIES: ReadonlySet<string> = new Set(["node_modules"])
+
+/**
+ * The directory and every subdirectory up to `depth` levels below it, relative to `cwd`. Skips
+ * `node_modules` and directories whose names start with a dot.
+ */
+const listDirectories = (
+  cwd: string,
+  relative: string,
+  depth: number
+): Effect.Effect<string[], FailedToReadFile, FileSystem.FileSystem | Path.Path> =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path
+    const entries = yield* readDirectoryIfExists(path.resolve(cwd, relative))
+
+    if (Option.isNone(entries)) {
+      return []
+    }
+
+    if (depth === 0) {
+      return [relative]
+    }
+
+    const children = yield* Effect.forEach(
+      entries.value.filter((entry) => !entry.startsWith(".") && !SKIPPED_DIRECTORIES.has(entry)),
+      (entry) => listDirectories(cwd, relative === "" ? entry : `${relative}/${entry}`, depth - 1),
+      { concurrency: "unbounded" }
+    )
+
+    return [relative, ...children.flat()]
+  })
+
+/**
+ * The absolute directories of the workspace packages, without the root. A package is a directory
+ * with a `package.json` that matches an include pattern and no `!` exclusion pattern.
  */
 export const getWorkspacePackageDirectories = (cwd: string = process.cwd()) =>
   Effect.gen(function* () {
@@ -135,35 +214,33 @@ export const getWorkspacePackageDirectories = (cwd: string = process.cwd()) =>
       onNone: () => (Array.isArray(workspaces) ? workspaces : (workspaces?.packages ?? [])),
       onSome: (content) => readPnpmWorkspacePatterns(content),
     })
-    const directories = yield* Effect.forEach(
-      patterns.filter((pattern) => !pattern.startsWith("!")),
+    const includes = patterns.filter((pattern) => !pattern.startsWith("!"))
+    const excludes = patterns
+      .filter((pattern) => pattern.startsWith("!"))
+      .map((pattern) => workspacePatternToRegExp(pattern.slice(1)))
+    const candidates = yield* Effect.forEach(
+      includes,
       (pattern) =>
         Effect.gen(function* () {
-          const wildcard = /^(.*?)\/\*\*?$/u.exec(pattern)
+          const { base, depth } = getPatternBase(pattern)
+          const matcher = workspacePatternToRegExp(pattern)
+          const directories = yield* listDirectories(cwd, base, depth)
 
-          if (wildcard === null) {
-            const directory = path.resolve(cwd, pattern)
-            const entries = yield* readDirectoryIfExists(directory)
-
-            return Option.isSome(entries) ? [directory] : []
-          }
-
-          const parent = path.resolve(cwd, wildcard[1] ?? ".")
-          const entries = yield* readDirectoryIfExists(parent)
-          const children = Option.getOrElse(entries, (): string[] => [])
-          const packages = yield* Effect.forEach(
-            children,
-            (child) =>
-              readDirectoryIfExists(path.join(parent, child)).pipe(
-                Effect.map((nested) => (Option.isSome(nested) ? [path.join(parent, child)] : []))
-              ),
-            { concurrency: "unbounded" }
-          )
-
-          return packages.flat()
+          return directories.filter((directory) => directory !== "" && matcher.test(directory))
         }),
       { concurrency: "unbounded" }
     )
+    const matched = Array.dedupe(candidates.flat()).filter(
+      (directory) => !excludes.some((exclude) => exclude.test(directory))
+    )
+    const packages = yield* Effect.forEach(
+      matched,
+      (directory) =>
+        readFileIfExists(path.join(cwd, directory, "package.json")).pipe(
+          Effect.map((manifest) => (Option.isSome(manifest) ? [path.resolve(cwd, directory)] : []))
+        ),
+      { concurrency: "unbounded" }
+    )
 
-    return Array.dedupe(directories.flat())
+    return packages.flat()
   })

@@ -439,7 +439,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("add adamantite prepare to the end of an existing prepare script", () =>
+    it.effect("add adamantite prepare to the start of an existing prepare script", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
           "package.json": JSON.stringify({ name: "test-project", scripts: { prepare: "husky" } }),
@@ -456,7 +456,7 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(readJson(files, "package.json")).toMatchObject({
-          scripts: { prepare: "husky && adamantite prepare" },
+          scripts: { prepare: "adamantite prepare && husky" },
         })
         expect(runner.invocations).toHaveLength(1)
         expect(prompter.logs).toContainEqual({

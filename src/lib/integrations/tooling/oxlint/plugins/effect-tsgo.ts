@@ -59,7 +59,7 @@ function getPrepareFindings(packageJson: PackageJson): Finding[] {
           ? `\`package.json\` has no \`${PREPARE_SCRIPT}\` script, so nothing patches Oxlint for the \`effecttsgo\` rules after an install.`
           : `The \`${PREPARE_SCRIPT}\` script (\`${command}\`) does not run \`${PREPARE_COMMAND}\`.`,
       goal: [
-        `Make the \`${PREPARE_SCRIPT}\` script in \`package.json\` run \`${PREPARE_COMMAND}\`. Keep every command that the script already runs, and join them with \`&&\`.`,
+        `Make the \`${PREPARE_SCRIPT}\` script in \`package.json\` run \`${PREPARE_COMMAND}\`. Put it first, before every command that the script already runs, and join them with \`&&\`, so a command such as \`cd ..\` cannot move it out of the project directory.`,
         `Run \`${PREPARE_COMMAND}\` once, so the installed Oxlint, oxlint-tsgolint, and TypeScript binaries are patched.`,
       ],
       id: "missing-effect-tsgo-prepare",
@@ -127,7 +127,8 @@ export default {
   ...plugin,
   /**
    * Make the `prepare` script run `adamantite prepare`. An existing script keeps its commands, and
-   * `adamantite prepare` runs after them.
+   * `adamantite prepare` runs before them: a command such as `cd ..` would otherwise move it out of
+   * the project directory.
    */
   addPrepareScript: (cwd: string) =>
     Effect.gen(function* () {
@@ -142,7 +143,7 @@ export default {
 
       packageJson.scripts = {
         ...packageJson.scripts,
-        [PREPARE_SCRIPT]: hasCommand ? `${command} && ${PREPARE_COMMAND}` : PREPARE_COMMAND,
+        [PREPARE_SCRIPT]: hasCommand ? `${PREPARE_COMMAND} && ${command}` : PREPARE_COMMAND,
       }
       yield* writePackageJson(cwd, packageJson)
 

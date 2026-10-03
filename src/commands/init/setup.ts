@@ -197,7 +197,7 @@ export const setupEffectTsgo = (cwd: string, isMonorepo: boolean) =>
 
     if (prepare === "merged") {
       yield* prompter.log.info(
-        `Added \`${effectTsgo.prepareCommand}\` to the end of your existing \`prepare\` script.`
+        `Added \`${effectTsgo.prepareCommand}\` to the start of your existing \`prepare\` script.`
       )
     }
 

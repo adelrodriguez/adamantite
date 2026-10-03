@@ -149,7 +149,7 @@ describe("effect-tsgo", () => {
         const files = makeConfiguredFiles({
           "package.json": makePackageJson({
             devDependencies: { "@effect/tsgo": effectTsgo.version },
-            scripts: { check: "adamantite check", prepare: `husky && ${PREPARE}` },
+            scripts: { check: "adamantite check", prepare: `${PREPARE} && husky` },
           }),
         })
 
@@ -219,24 +219,26 @@ describe("effect-tsgo", () => {
       })
     )
 
-    it.effect("run adamantite prepare after the commands of an existing prepare script", () =>
+    it.effect("run adamantite prepare before the commands of an existing prepare script", () =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({ scripts: { prepare: "husky" } }),
-        })
+        // Husky's setup for a project below the Git root changes directory, so a command after it
+        // would run outside the project.
+        for (const prepare of ["husky", "cd .. && husky frontend/.husky"]) {
+          const files = makeFiles({ "package.json": makePackageJson({ scripts: { prepare } }) })
 
-        const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
+          const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
 
-        expect(result).toBe("merged")
-        expect(JSON.parse(files.read("package.json"))).toMatchObject({
-          scripts: { prepare: `husky && ${PREPARE}` },
-        })
+          expect(result).toBe("merged")
+          expect(JSON.parse(files.read("package.json"))).toMatchObject({
+            scripts: { prepare: `${PREPARE} && ${prepare}` },
+          })
+        }
       })
     )
 
     it.effect("keep a prepare script that already runs adamantite prepare", () =>
       Effect.gen(function* () {
-        const packageJson = makePackageJson({ scripts: { prepare: `husky && ${PREPARE}` } })
+        const packageJson = makePackageJson({ scripts: { prepare: `${PREPARE} && husky` } })
         const files = makeFiles({ "package.json": packageJson })
 
         const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))

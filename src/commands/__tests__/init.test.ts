@@ -314,6 +314,8 @@ describe("init", () => {
           "react-strict",
           "--preset",
           "strict",
+          "--preset",
+          "tanstack",
         ],
         { files, layers: [prompter.layer, installer.layer] }
       )
@@ -325,8 +327,14 @@ describe("init", () => {
       expect(files.read("oxlint.config.ts")).toContain(
         'import strict from "adamantite/lint/strict"'
       )
+      expect(files.read("oxlint.config.ts")).toContain(
+        'import tanstack from "adamantite/lint/tanstack"'
+      )
       expect(installer.calls[0]?.packages).toEqual(
         expect.not.arrayContaining([expect.stringContaining("strict")])
+      )
+      expect(installer.calls[0]?.packages).toEqual(
+        expect.not.arrayContaining([expect.stringContaining("tanstack")])
       )
     })
   )

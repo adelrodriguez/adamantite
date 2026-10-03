@@ -197,7 +197,8 @@ upstream change in the pull request.
 
 Rules that no upstream plugin provides live in Adamantite's own Oxlint plugin under
 `presets/lint/plugin/`, with one module per rule in `rules/`. `options.ts` reads rule
-options for all rules. `index.ts` registers each
+options for all rules, and `imports.ts` finds calls of imported functions, such as
+`useState` and `React.useState`. `index.ts` registers each
 rule under the `adamantite` namespace. Tsdown builds the plugin with the presets, so it
 ships at `dist/presets/lint/plugin/index.js`.
 

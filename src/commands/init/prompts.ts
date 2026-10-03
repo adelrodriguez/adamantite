@@ -81,6 +81,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react-doctor",
         },
         {
+          hint: "TanStack Query: queries defined once with queryOptions() so route loaders can preload them, no query data copied into state",
+          label: "tanstack",
+          value: "tanstack",
+        },
+        {
           hint: "Next.js pitfalls around scripts, fonts, images, and document/head usage",
           label: "next.js",
           value: "nextjs",

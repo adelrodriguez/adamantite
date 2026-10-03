@@ -1,4 +1,5 @@
-import type { Context, ESTree, Rule, Visitor } from "@oxlint/plugins"
+import type { Context, Rule, Visitor } from "@oxlint/plugins"
+import { findImportedCalls } from "../imports.ts"
 import { readStringArrayOption } from "../options.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
@@ -101,28 +102,6 @@ function getMatchPath(context: Context) {
   return filename.startsWith(`${cwd}/`) ? filename.slice(cwd.length + 1) : filename
 }
 
-function getImportedName(specifier: ESTree.ImportSpecifier) {
-  return specifier.imported.type === "Literal" ? specifier.imported.value : specifier.imported.name
-}
-
-function isStringLiteral(node: ESTree.Expression): node is ESTree.StringLiteral {
-  return node.type === "Literal" && typeof node.value === "string"
-}
-
-function getPropertyName(member: ESTree.MemberExpression) {
-  if (!member.computed) {
-    return member.property.type === "Identifier" ? member.property.name : undefined
-  }
-
-  return isStringLiteral(member.property) ? member.property.value : undefined
-}
-
-function isCallee(node: ESTree.Node) {
-  const { parent } = node
-
-  return parent?.type === "CallExpression" && parent.callee === node
-}
-
 const rule: Rule = {
   create(context): Visitor {
     const hooks = new Set(readStringArrayOption(context.options, "hooks") ?? DEFAULT_HOOKS)
@@ -135,55 +114,18 @@ const rule: Rule = {
       return {}
     }
 
-    function report(node: ESTree.Node, hook: string) {
-      context.report({ data: { hook }, messageId: HOOK_MESSAGES.get(hook) ?? "banned", node })
-    }
-
-    function getReferences(specifier: ESTree.ImportDeclarationSpecifier) {
-      return context.sourceCode
-        .getDeclaredVariables(specifier)
-        .flatMap((variable) => variable.references)
-        .map((reference) => reference.identifier)
-    }
-
     return {
       ImportDeclaration(node) {
-        if (node.source.value !== REACT_MODULE || node.importKind === "type") {
+        if (node.source.value !== REACT_MODULE) {
           return
         }
 
-        for (const specifier of node.specifiers) {
-          if (specifier.type === "ImportSpecifier") {
-            const hook = getImportedName(specifier)
-
-            if (specifier.importKind === "type" || !hooks.has(hook)) {
-              continue
-            }
-
-            for (const identifier of getReferences(specifier)) {
-              if (isCallee(identifier)) {
-                report(identifier.parent, hook)
-              }
-            }
-
-            continue
-          }
-
-          // `import React from "react"` and `import * as React from "react"`: report
-          // `React.useState(...)` calls.
-          for (const identifier of getReferences(specifier)) {
-            const member = identifier.parent
-
-            if (member.type !== "MemberExpression" || member.object !== identifier) {
-              continue
-            }
-
-            const hook = getPropertyName(member)
-
-            if (hook !== undefined && hooks.has(hook) && isCallee(member)) {
-              report(member.parent, hook)
-            }
-          }
+        for (const { call, name } of findImportedCalls(context, node, hooks)) {
+          context.report({
+            data: { hook: name },
+            messageId: HOOK_MESSAGES.get(name) ?? "banned",
+            node: call,
+          })
         }
       },
     }

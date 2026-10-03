@@ -87,8 +87,8 @@ Available setup values:
 
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
-- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `effect`, `jest`,
-  `vitest`, `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
+- Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`,
+  `jest`, `vitest`, `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
@@ -259,6 +259,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/react`        | React, JSX accessibility, and performance.                                                                                                                                                                                                                                             |
 | `adamantite/lint/react-strict` | Opinions for React feature code: no state, effect, or memoization hooks outside hook modules. See [the react-strict preset](#the-react-strict-preset).                                                                                                                                 |
 | `adamantite/lint/react-doctor` | Curated [React Doctor](https://github.com/millionco/react-doctor) rules for React state and effect misuse. See [the react-doctor preset](#the-react-doctor-preset).                                                                                                                    |
+| `adamantite/lint/tanstack`     | Opinions for [TanStack Query](https://tanstack.com/query) with route loaders: queries defined once with `queryOptions()`, and no query data copied into state. See [the tanstack preset](#the-tanstack-preset).                                                                        |
 | `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/effect`       | Curated [@effect/tsgo](https://github.com/Effect-TS/tsgo) rules for Effect misuse, such as effects that never run and unhandled errors. See [the effect preset](#the-effect-preset).                                                                                                   |
@@ -351,6 +352,30 @@ the copyright holder to use the software as machine learning training data, or t
 as a hosted product. Read the
 [license](https://www.npmjs.com/package/oxlint-plugin-react-doctor?activeTab=code) before
 you select the preset.
+
+### The tanstack preset
+
+`adamantite/lint/tanstack` holds opinions for TanStack Query (`@tanstack/react-query`) in
+apps that preload queries in route loaders, such as TanStack Router and TanStack Start apps.
+Like `react-strict`, it needs no extra package.
+
+- `adamantite/query-from-loader` reports `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`,
+  and `useSuspenseInfiniteQuery` calls that take a plain options object or a `queryOptions()`
+  call made inside a function. Define each query once with `queryOptions()` at module scope
+  or in an exported factory such as `userQuery(id)`, preload it in the route loader with
+  `queryClient.ensureQueryData()`, and pass the same options to the hook. Then a route with
+  `preload="intent"` renders from the cache without a request waterfall. An object that
+  spreads shared options, such as `{ ...userQuery(id), select }`, stays allowed.
+- `adamantite/no-query-data-in-state` reports `useState` calls whose initial value comes from
+  the data of a query in the same component, such as `useState(query.data)` or
+  `useState(() => data.user)`. The copy stops updating when the query refetches. Read the
+  value from the query result, and keep only the user's edits in state.
+
+`query-from-loader` checks one file at a time. It cannot prove that a loader preloads the
+options, so it moves queries toward shared definitions but does not guarantee the preload.
+The `react-doctor` preset reports other query misuse, such as refetches from effects and
+mutations that do not invalidate queries. See
+[ADR 0008](docs/adr/0008-tanstack-query-options-from-loaders.md).
 
 ### The effect preset
 

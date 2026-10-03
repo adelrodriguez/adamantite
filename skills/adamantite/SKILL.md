@@ -47,14 +47,15 @@ properties; keep the object and read its members, or split the pattern. Do not r
 outside tests.
 
 The `tanstack` preset needs no extra package. Its `adamantite/query-from-loader` rule reports
-TanStack Query hooks that take a plain options object or a `queryOptions()` call made inside a
+TanStack Query hooks in route files (files that call `createFileRoute`, `createRoute`, or another
+route factory from `@tanstack/react-router`) that take a plain options object or a `queryOptions()` call made inside a
 function; define the query once with `queryOptions()` at module scope or in an exported factory,
 preload it in the route loader with `ensureQueryData()`, and pass the same options to the hook. For
 `useInfiniteQuery` and `useSuspenseInfiniteQuery`, use `infiniteQueryOptions()` and
 `ensureInfiniteQueryData()`. Its
 `adamantite/no-query-data-in-state` rule reports `useState` initialized from query data; read the
 value from the query result and keep only the user's edits in state. Do not wrap options in a
-spread object only to silence `query-from-loader`.
+spread object, or move the hook out of the route file, only to silence `query-from-loader`.
 
 The `react-doctor` preset requires the `react` preset and the `oxlint-plugin-react-doctor`
 package, which `init` installs at a pinned version and doctor and `update` keep in sync. It

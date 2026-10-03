@@ -1,6 +1,10 @@
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query"
+import { createFileRoute } from "@tanstack/react-router"
 
-export function UserName({ id }: { id: string }) {
+export const Route = createFileRoute("/users/$id")({ component: UserName })
+
+function UserName() {
+  const { id } = Route.useParams()
   const options = queryOptions({ queryFn: () => fetchUser(id), queryKey: ["user", id] })
   const query = useSuspenseQuery(options)
 

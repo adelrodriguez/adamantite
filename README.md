@@ -360,7 +360,7 @@ apps that preload queries in route loaders, such as TanStack Router and TanStack
 Like `react-strict`, it needs no extra package.
 
 - `adamantite/query-from-loader` reports `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`,
-  and `useSuspenseInfiniteQuery` calls that take a plain options object or a `queryOptions()`
+  and `useSuspenseInfiniteQuery` calls in route files that take a plain options object or a `queryOptions()`
   call made inside a function. Define each query once with `queryOptions()` at module scope
   or in an exported factory such as `userQuery(id)`, preload it in the route loader with
   `queryClient.ensureQueryData()`, and pass the same options to the hook. For the infinite
@@ -373,6 +373,9 @@ Like `react-strict`, it needs no extra package.
   `useState(() => data.user)`. The copy stops updating when the query refetches. Read the
   value from the query result, and keep only the user's edits in state.
 
+A route file is a file that calls a route factory from `@tanstack/react-router`, such as
+`createFileRoute`, `createRootRoute`, or `createRoute`. Only a route has a loader to preload
+the query, so components outside route files can define their queries inline.
 `query-from-loader` checks one file at a time. It cannot prove that a loader preloads the
 options, so it moves queries toward shared definitions but does not guarantee the preload.
 The `react-doctor` preset reports other query misuse, such as refetches from effects and

@@ -6,7 +6,8 @@ with `preload="intent"` still shows a loading state. We decided (2026-10-03, iss
 that a new `tanstack` preset enables two first-party rules at `"error"`.
 
 `adamantite/query-from-loader` reports `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`,
-and `useSuspenseInfiniteQuery` from `@tanstack/react-query` when the options argument is:
+and `useSuspenseInfiniteQuery` from `@tanstack/react-query` in route files when the options
+argument is:
 
 - A plain object literal. An object that spreads other options, such as
   `{ ...userQuery(id), select }`, stays allowed, because it extends a shared definition.
@@ -15,6 +16,14 @@ and `useSuspenseInfiniteQuery` from `@tanstack/react-query` when the options arg
 - A `const` that resolves to one of the two cases above. A plain object at module scope is
   also reported: `queryOptions()` gives the query key and data types that the loader and
   the hook share.
+
+A route file is a file that calls a route factory from `@tanstack/react-router`:
+`createFileRoute`, `createLazyFileRoute`, `createRootRoute`, `createRootRouteWithContext`,
+`createRoute`, or `createLazyRoute`. Only a route has a loader that can preload a query. A
+component outside a route file, such as a search box that queries on user input, can keep
+inline options. The rule detects routes by the import, not by a `routes/` path, so it works
+with a custom `routesDirectory` and with code-based routing, and it skips files in a route
+directory that define no route.
 
 The rule looks through type-only wrappers, such as `as const` and `satisfies`. Each
 message names the matching factory and preload method: `queryOptions()` and

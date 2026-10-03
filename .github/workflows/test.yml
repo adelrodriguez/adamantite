@@ -78,7 +78,7 @@ jobs:
           fi
           grep "adamantite(no-overzealous-destructuring)" oxlint-output.txt
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import tanstack from "adamantite/lint/tanstack"' '' 'export default defineConfig({ extends: [tanstack] })' > oxlint.config.ts
-          printf '%s\n' 'import { useQuery } from "@tanstack/react-query"' '' 'export const User = () => useQuery({ queryKey: ["user"] })' > bad.tsx
+          printf '%s\n' 'import { useQuery } from "@tanstack/react-query"' 'import { createFileRoute } from "@tanstack/react-router"' '' 'const User = () => useQuery({ queryKey: ["user"] })' 'export const Route = createFileRoute("/user")({ component: User })' > bad.tsx
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.tsx > oxlint-output.txt 2>&1; then
             echo "Expected diagnostics from the packaged tanstack preset and the first-party plugin to fail the lint run"
             cat oxlint-output.txt

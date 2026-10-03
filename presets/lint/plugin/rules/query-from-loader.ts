@@ -7,6 +7,7 @@ import { findImportedCalls, type ImportedCall } from "../imports.ts"
 type MessageId = "plainObject" | "localOptions"
 
 const QUERY_MODULE = "@tanstack/react-query"
+const ROUTER_MODULE = "@tanstack/react-router"
 
 const QUERY_HOOKS: ReadonlySet<string> = new Set([
   "useInfiniteQuery",
@@ -21,6 +22,19 @@ const INFINITE_QUERY_HOOKS: ReadonlySet<string> = new Set([
 ])
 
 const OPTIONS_FACTORIES: ReadonlySet<string> = new Set(["infiniteQueryOptions", "queryOptions"])
+
+/**
+ * A file that calls one of these defines a route, in file-based or code-based routing. Only route
+ * files have a loader that can preload a query, so the rule checks only them.
+ */
+const ROUTE_FACTORIES: ReadonlySet<string> = new Set([
+  "createFileRoute",
+  "createLazyFileRoute",
+  "createLazyRoute",
+  "createRootRoute",
+  "createRootRouteWithContext",
+  "createRoute",
+])
 
 function findVariable(context: Context, identifier: ESTree.Node & { readonly name: string }) {
   let scope: Scope | null = context.sourceCode.getScope(identifier)
@@ -65,6 +79,7 @@ const rule: Rule = {
   create(context): Visitor {
     const hookCalls: ImportedCall[] = []
     const factoryCalls = new Set<ESTree.CallExpression>()
+    let isRouteFile = false
 
     /**
      * Why `options` does not come from a shared definition, or `undefined` when it does or when the
@@ -106,6 +121,12 @@ const rule: Rule = {
 
     return {
       ImportDeclaration(node) {
+        if (node.source.value === ROUTER_MODULE) {
+          isRouteFile ||= findImportedCalls(context, node, ROUTE_FACTORIES).length > 0
+
+          return
+        }
+
         if (node.source.value !== QUERY_MODULE) {
           return
         }
@@ -117,6 +138,10 @@ const rule: Rule = {
         }
       },
       "Program:exit"() {
+        if (!isRouteFile) {
+          return
+        }
+
         for (const { call, name } of hookCalls) {
           const [options] = call.arguments
 
@@ -140,13 +165,13 @@ const rule: Rule = {
   meta: {
     docs: {
       description:
-        "Require TanStack Query hooks to take options defined once with `queryOptions()` or `infiniteQueryOptions()`, so a route loader can preload the same query.",
+        "Require TanStack Query hooks in route files to take options defined once with `queryOptions()` or `infiniteQueryOptions()`, so the route loader can preload the same query.",
     },
     messages: {
       localOptions:
-        "`{{hook}}` takes query options created inside a function, so a route loader cannot preload the same query. Move the `{{factory}}()` call to module scope, or into an exported factory such as `userQuery(id)`, preload it in the route loader with `queryClient.{{preload}}()`, and pass the same options here.",
+        "`{{hook}}` takes query options created inside a function, so the route loader cannot preload the same query. Move the `{{factory}}()` call to module scope, or into an exported factory such as `userQuery(id)`, preload it in this route's loader with `queryClient.{{preload}}()`, and pass the same options here.",
       plainObject:
-        "`{{hook}}` takes a plain options object instead of options defined with `{{factory}}()`. Define the options once with `{{factory}}()` in a module that the route loader also imports, preload them in the loader with `queryClient.{{preload}}()`, and pass the same options here.",
+        "`{{hook}}` takes a plain options object instead of options defined with `{{factory}}()`. Define the options once with `{{factory}}()` at module scope or in a shared module, preload them in this route's loader with `queryClient.{{preload}}()`, and pass the same options here.",
     },
     schema: [],
     type: "suggestion",

@@ -66,6 +66,24 @@ function getActionReference(content: string, action: string): string | undefined
     .find((line) => line.startsWith(`uses: ${action}@`))
 }
 
+function expectNodeVersionFileWorkflow(packageManager: "bun" | "npm" | "pnpm" | "yarn") {
+  return Effect.gen(function* () {
+    const files = makeFiles()
+
+    yield* github
+      .create(ROOT, {
+        packageManager,
+        scripts: ["check"],
+      })
+      .pipe(provideFileResolver(files))
+
+    const content = files.read(WORKFLOW_PATH)
+    expect(content).toContain("Setup Node.js")
+    expect(content).toContain('node-version-file: ".node-version"')
+    expect(content).not.toContain('node-version: "')
+  })
+}
+
 describe("github", () => {
   describe("assess", () => {
     const packageJson = { scripts: { check: "adamantite check" } }
@@ -515,24 +533,6 @@ describe("github", () => {
       "render node-version-file for every Node-based workflow when the resolver selects a version file",
       () =>
         Effect.gen(function* () {
-          function expectNodeVersionFileWorkflow(packageManager: "bun" | "npm" | "pnpm" | "yarn") {
-            return Effect.gen(function* () {
-              const files = makeFiles()
-
-              yield* github
-                .create(ROOT, {
-                  packageManager,
-                  scripts: ["check"],
-                })
-                .pipe(provideFileResolver(files))
-
-              const content = files.read(WORKFLOW_PATH)
-              expect(content).toContain("Setup Node.js")
-              expect(content).toContain('node-version-file: ".node-version"')
-              expect(content).not.toContain('node-version: "')
-            })
-          }
-
           yield* expectNodeVersionFileWorkflow("bun")
           yield* expectNodeVersionFileWorkflow("npm")
           yield* expectNodeVersionFileWorkflow("pnpm")

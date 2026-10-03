@@ -1,17 +1,6 @@
 {
   "packages": [
     {
-      "name": "tsdown",
-      "registry": "npm",
-      "source": {
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/rolldown/tsdown"
-      },
-      "tracking": "dependency",
-      "version": "0.22.14"
-    },
-    {
       "name": "pnpm",
       "registry": "npm",
       "source": {
@@ -22,18 +11,6 @@
       },
       "tracking": "manual",
       "version": "12.4.2"
-    },
-    {
-      "name": "@clack/prompts",
-      "registry": "npm",
-      "source": {
-        "directory": "packages/prompts",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/bombshell-dev/clack"
-      },
-      "tracking": "dependency",
-      "version": "1.7.0"
     },
     {
       "name": "@effect/vitest",
@@ -69,7 +46,40 @@
         "url": "https://github.com/changesets/changesets"
       },
       "tracking": "dependency",
-      "version": "3.0.1"
+      "version": "3.0.3"
+    },
+    {
+      "name": "@clack/prompts",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/prompts",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/bombshell-dev/clack"
+      },
+      "tracking": "dependency",
+      "version": "1.8.1"
+    },
+    {
+      "name": "oxc-parser",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.152.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "0.152.0"
+    },
+    {
+      "name": "tsdown",
+      "registry": "npm",
+      "source": {
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/rolldown/tsdown"
+      },
+      "tracking": "dependency",
+      "version": "0.23.0"
     },
     {
       "name": "vitest",
@@ -81,17 +91,7 @@
         "url": "https://github.com/vitest-dev/vitest"
       },
       "tracking": "dependency",
-      "version": "5.0.1"
-    },
-    {
-      "name": "oxc-parser",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/oxc-parser/-/oxc-parser-0.150.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "0.150.0"
+      "version": "5.0.3"
     }
   ]
 }

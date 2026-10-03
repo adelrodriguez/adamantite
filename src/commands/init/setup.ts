@@ -9,9 +9,10 @@ import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
+import { getPluginsToPrepare } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
-import { addRootDevDependencies, DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import {
   getConflictingScripts,
   readPackageJson,
@@ -187,34 +188,18 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
   })
 
 /**
- * Set up the parts of the `effect` preset that are not the package: the `prepare` script that
- * patches Oxlint and TypeScript, one patch run, and the language service entry in `tsconfig.json`.
+ * Set up the parts of the `effect` preset that are not the package: the `prepare` script that runs
+ * `adamantite prepare` after each install, and the language service entry in `tsconfig.json`.
  */
 export const setupEffectTsgo = (cwd: string, isMonorepo: boolean) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const dependencyInstaller = yield* DependencyInstaller
     const prepare = yield* effectTsgo.addPrepareScript(cwd)
 
-    if (prepare === "conflict") {
-      yield* prompter.log.warning(
-        `Kept the existing \`${effectTsgo.prepareScript}\` script. Add \`${effectTsgo.patchCommand}\` to it and run it once, or Oxlint cannot load the \`effect\` preset. Run \`adamantite doctor\` for details.`
+    if (prepare === "merged") {
+      yield* prompter.log.info(
+        `Added \`${effectTsgo.prepareCommand}\` to the end of your existing \`prepare\` script.`
       )
-    } else {
-      // The dependencies were installed before the script existed, so the patch has not run yet.
-      yield* prompter
-        .withSpinner(() => dependencyInstaller.runScript(effectTsgo.prepareScript, cwd), {
-          failure: "Failed to patch Oxlint and TypeScript.",
-          start: "Patching Oxlint and TypeScript with @effect/tsgo...",
-          success: "Oxlint and TypeScript patched with @effect/tsgo.",
-        })
-        .pipe(
-          Effect.catchTag("FailedToRunScript", (error) =>
-            prompter.log.warning(
-              `${error.message} Run the \`${effectTsgo.prepareScript}\` script before you run \`adamantite check\`.`
-            )
-          )
-        )
     }
 
     if (isMonorepo) {
@@ -228,6 +213,32 @@ export const setupEffectTsgo = (cwd: string, isMonorepo: boolean) =>
       yield* prompter.log.warning(
         "No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry."
       )
+    }
+  })
+
+/**
+ * Run the install steps of the managed plugins that apply, such as the @effect/tsgo patch. Init
+ * installed the packages before it wrote the `prepare` script, so the script has not run yet.
+ */
+export const prepareManagedPlugins = (cwd: string) =>
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const plugins = yield* getPluginsToPrepare(cwd, yield* readPackageJson(cwd))
+
+    for (const plugin of plugins) {
+      yield* prompter
+        .withSpinner(() => plugin.prepare(cwd), {
+          failure: `Failed to prepare ${plugin.name}.`,
+          start: `Preparing ${plugin.name}...`,
+          success: `${plugin.name} prepared.`,
+        })
+        .pipe(
+          Effect.catchTag("FailedToPreparePlugin", (error) =>
+            prompter.log.warning(
+              `${error.message} Run \`adamantite prepare\` before you run \`adamantite check\`.`
+            )
+          )
+        )
     }
   })
 

@@ -1,16 +1,20 @@
+import { join } from "node:path"
+import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { type CommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
-const PATCH = "effect-tsgo patch --oxlint --typescript"
+const PREPARE = "adamantite prepare"
 const CONFIGURED_TSCONFIG = JSON.stringify({
   compilerOptions: { plugins: [{ diagnostics: false, name: "@effect/language-service" }] },
 })
@@ -42,11 +46,26 @@ function makeConfiguredFiles(overrides: Record<string, string> = {}) {
     "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
     "package.json": makePackageJson({
       devDependencies: { "@effect/tsgo": effectTsgo.version },
-      scripts: { check: "adamantite check", prepare: PATCH },
+      scripts: { check: "adamantite check", prepare: PREPARE },
     }),
     "tsconfig.json": CONFIGURED_TSCONFIG,
     ...overrides,
   })
+}
+
+function makeRunner(exitCode: number) {
+  const invocations: CommandRunOptions[] = []
+  const layer = Layer.succeed(
+    CommandRunner,
+    CommandRunner.make((options) =>
+      Effect.sync(() => {
+        invocations.push(options)
+        return ChildProcessSpawner.ExitCode(exitCode)
+      })
+    )
+  )
+
+  return { invocations, layer }
 }
 
 describe("effect-tsgo", () => {
@@ -91,7 +110,7 @@ describe("effect-tsgo", () => {
             { id: "missing-@effect/tsgo" },
             {
               currentState: expect.stringContaining("has no `prepare` script"),
-              id: "missing-effect-tsgo-patch",
+              id: "missing-effect-tsgo-prepare",
             },
             {
               currentState: expect.stringContaining("does not configure"),
@@ -103,9 +122,9 @@ describe("effect-tsgo", () => {
       })
     )
 
-    it.effect("report a prepare script that does not patch both Oxlint and TypeScript", () =>
+    it.effect("report a prepare script that does not run adamantite prepare", () =>
       Effect.gen(function* () {
-        for (const prepare of ["husky", "effect-tsgo patch --oxlint"]) {
+        for (const prepare of ["husky", "effect-tsgo patch --oxlint --typescript"]) {
           const files = makeConfiguredFiles({
             "package.json": makePackageJson({
               devDependencies: { "@effect/tsgo": effectTsgo.version },
@@ -118,8 +137,8 @@ describe("effect-tsgo", () => {
           expect(result).toMatchObject({
             findings: [
               {
-                currentState: `The \`prepare\` script (\`${prepare}\`) does not run \`${PATCH}\`.`,
-                id: "missing-effect-tsgo-patch",
+                currentState: `The \`prepare\` script (\`${prepare}\`) does not run \`${PREPARE}\`.`,
+                id: "missing-effect-tsgo-prepare",
               },
             ],
           })
@@ -127,12 +146,12 @@ describe("effect-tsgo", () => {
       })
     )
 
-    it.effect("accept the patch step next to other prepare commands", () =>
+    it.effect("accept adamantite prepare next to other prepare commands", () =>
       Effect.gen(function* () {
         const files = makeConfiguredFiles({
           "package.json": makePackageJson({
             devDependencies: { "@effect/tsgo": effectTsgo.version },
-            scripts: { check: "adamantite check", prepare: `husky && ${PATCH}` },
+            scripts: { check: "adamantite check", prepare: `husky && ${PREPARE}` },
           }),
         })
 
@@ -168,7 +187,7 @@ describe("effect-tsgo", () => {
         const files = makeConfiguredFiles({
           "package.json": makePackageJson({
             devDependencies: { "@effect/tsgo": effectTsgo.version },
-            scripts: { check: "adamantite check", prepare: PATCH },
+            scripts: { check: "adamantite check", prepare: PREPARE },
             workspaces: ["packages/*"],
           }),
           "tsconfig.json": "{}",
@@ -187,7 +206,7 @@ describe("effect-tsgo", () => {
   })
 
   describe("addPrepareScript", () => {
-    it.effect("add the patch command when the project has no prepare script", () =>
+    it.effect("add adamantite prepare when the project has no prepare script", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "package.json": makePackageJson({ scripts: { test: "vitest" } }),
@@ -197,25 +216,81 @@ describe("effect-tsgo", () => {
 
         expect(result).toBe("added")
         expect(JSON.parse(files.read("package.json"))).toMatchObject({
-          scripts: { prepare: PATCH, test: "vitest" },
+          scripts: { prepare: PREPARE, test: "vitest" },
         })
       })
     )
 
-    it.effect("keep a prepare script that already patches or runs something else", () =>
+    it.effect("run adamantite prepare after the commands of an existing prepare script", () =>
       Effect.gen(function* () {
-        for (const [prepare, expected] of [
-          [`husky && ${PATCH}`, "present"],
-          ["husky", "conflict"],
-        ] as const) {
-          const packageJson = makePackageJson({ scripts: { prepare } })
-          const files = makeFiles({ "package.json": packageJson })
+        const files = makeFiles({
+          "package.json": makePackageJson({ scripts: { prepare: "husky" } }),
+        })
 
-          const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
+        const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
 
-          expect(result).toBe(expected)
-          expect(files.read("package.json")).toBe(packageJson)
-        }
+        expect(result).toBe("merged")
+        expect(JSON.parse(files.read("package.json"))).toMatchObject({
+          scripts: { prepare: `husky && ${PREPARE}` },
+        })
+      })
+    )
+
+    it.effect("keep a prepare script that already runs adamantite prepare", () =>
+      Effect.gen(function* () {
+        const packageJson = makePackageJson({ scripts: { prepare: `husky && ${PREPARE}` } })
+        const files = makeFiles({ "package.json": packageJson })
+
+        const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
+
+        expect(result).toBe("present")
+        expect(files.read("package.json")).toBe(packageJson)
+      })
+    )
+  })
+
+  describe("prepare", () => {
+    const manifest = JSON.stringify({ bin: { "effect-tsgo": "./dist/effect-tsgo.cjs" } })
+
+    it.effect("run the installed effect-tsgo patch with Node", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({ "node_modules/@effect/tsgo/package.json": manifest })
+        const runner = makeRunner(0)
+
+        yield* effectTsgo.prepare(ROOT).pipe(provideFiles(files), Effect.provide(runner.layer))
+
+        expect(runner.invocations).toEqual([
+          expect.objectContaining({
+            args: [
+              join(ROOT, "node_modules/@effect/tsgo/dist/effect-tsgo.cjs"),
+              "patch",
+              "--oxlint",
+              "--typescript",
+            ],
+            command: process.execPath,
+            cwd: ROOT,
+          }),
+        ])
+      })
+    )
+
+    it.effect("fail when @effect/tsgo is not installed or the patch fails", () =>
+      Effect.gen(function* () {
+        const missing = yield* effectTsgo
+          .prepare(ROOT)
+          .pipe(provideFiles(makeFiles()), Effect.provide(makeRunner(0).layer), Effect.result)
+        const failed = yield* effectTsgo
+          .prepare(ROOT)
+          .pipe(
+            provideFiles(makeFiles({ "node_modules/@effect/tsgo/package.json": manifest })),
+            Effect.provide(makeRunner(1).layer),
+            Effect.result
+          )
+
+        expect(Result.isFailure(missing) && missing.failure.message).toBe(
+          "Failed to prepare `@effect/tsgo`. It is not installed. Run `adamantite update` to install it."
+        )
+        expect(Result.isFailure(failed) && failed.failure._tag).toBe("FailedToPreparePlugin")
       })
     )
   })

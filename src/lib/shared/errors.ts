@@ -99,12 +99,14 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
   }
 }
 
-export class FailedToRunScript extends Data.TaggedError("FailedToRunScript")<{
-  script: string
+export class FailedToPreparePlugin extends Data.TaggedError("FailedToPreparePlugin")<{
+  plugin: string
+  reason?: string
   cause?: unknown
 }> {
   override get message() {
-    return `Failed to run the \`${this.script}\` script.${formatCauseOutput(this.cause)}`
+    const reason = this.reason ? ` ${this.reason}` : ""
+    return `Failed to prepare \`${this.plugin}\`.${reason}${formatCauseDetail(this.cause)}`
   }
 }
 

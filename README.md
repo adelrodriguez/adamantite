@@ -214,7 +214,21 @@ adamantite doctor
 ```
 
 `update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
-`adamantite doctor` as the CI gate.
+`adamantite doctor` as the CI gate. After it installs packages, `update` runs the install
+steps of the managed plugins, such as the patch for [the effect preset](#the-effect-preset).
+
+### `adamantite prepare`
+
+Run the install steps of the managed plugins that the project uses. The `prepare` script in
+`package.json` runs it after each install:
+
+```json
+{ "scripts": { "prepare": "adamantite prepare" } }
+```
+
+Today only the effect preset has an install step. Without a managed plugin that needs one,
+`prepare` does nothing and exits 0. If an install step fails, `prepare` fails, so the install
+fails.
 
 ### Pass arguments to underlying tools
 
@@ -350,13 +364,22 @@ TypeScript-Go, and need Oxlint's type-aware mode.
 
 The rules are not a JavaScript plugin. They exist only after `effect-tsgo patch --oxlint
 --typescript` replaces the Oxlint, oxlint-tsgolint, and TypeScript binaries in
-`node_modules`. Without the patch, Oxlint stops with `Unknown plugin: 'effecttsgo'`. When you
-select the preset, `adamantite init` does these steps:
+`node_modules`. Without the patch, Oxlint stops with `Unknown plugin: 'effecttsgo'`. Each
+install of one of those packages restores the original binaries, so the patch must run again
+after it. Adamantite runs it in these places:
 
-- Installs the pinned `@effect/tsgo`.
-- Adds `"prepare": "effect-tsgo patch --oxlint --typescript"` to `package.json`, so the patch
-  runs again after each install, and runs it once. If the project already has a `prepare`
-  script, init keeps it, and you add the patch command yourself.
+- `adamantite prepare`, which the `prepare` script runs after a bare install, such as
+  `npm install`, `npm ci`, or a fresh clone in CI.
+- `adamantite init` and `adamantite update`, after they install packages. A named install,
+  such as `npm install -D oxlint@1.86.0`, does not run the `prepare` script. If you change one
+  of those versions yourself, doctor reports the version drift, and `adamantite update`
+  installs the pinned version and patches it.
+
+When you select the preset, `adamantite init` does these steps:
+
+- Installs the pinned `@effect/tsgo` and runs the patch.
+- Adds `"prepare": "adamantite prepare"` to `package.json`. If the project already has a
+  `prepare` script, init adds `&& adamantite prepare` to its end.
 - Adds `{ "name": "@effect/language-service", "diagnostics": false }` to
   `compilerOptions.plugins` in `tsconfig.json`. Editors that use the workspace TypeScript
   get Effect quick fixes, refactors, and hovers. Oxlint reports the diagnostics, so the
@@ -367,6 +390,11 @@ select the preset, `adamantite init` does these steps:
 `adamantite doctor` reports each missing part, and `adamantite update` keeps
 `@effect/tsgo` on its pinned version. Each `@effect/tsgo` release supports only some Oxlint,
 oxlint-tsgolint, and TypeScript versions, so Adamantite moves the pins together.
+
+A production-only install, such as `npm ci --omit=dev` or `pnpm install --prod`, still runs
+the `prepare` script, but it does not install Adamantite, so the install fails with
+`adamantite: not found`. Add `--ignore-scripts` to those installs. Nothing in a production
+install needs the patch.
 
 The rules read their options from the tsconfig entry. For example, `unstable-api-usage`
 reports each use of an API marked `@stability unstable`. To allow a module on purpose, list

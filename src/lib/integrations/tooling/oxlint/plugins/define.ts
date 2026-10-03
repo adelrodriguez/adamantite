@@ -24,8 +24,14 @@ const checkImportsLintPreset = Effect.fn("checkImportsLintPreset")(function* (
  * A managed plugin: an Oxlint plugin package the target project installs for one lint preset. The
  * package is required only while `oxlint.config.ts` imports that preset.
  */
-export function defineManagedPlugin(options: {
+export function defineManagedPlugin<PrepareError = never, PrepareRequirements = never>(options: {
   readonly name: string
+  /**
+   * An install step that the package needs, such as a binary patch. While the plugin applies,
+   * `adamantite prepare` runs it after each install, and `init` and `update` run it after they
+   * install packages.
+   */
+  readonly prepare?: (cwd: string) => Effect.Effect<void, PrepareError, PrepareRequirements>
   /**
    * The lint preset that loads the plugin, such as `shadcn` for `adamantite/lint/shadcn`.
    */
@@ -40,6 +46,7 @@ export function defineManagedPlugin(options: {
       scripts: ["check", "fix"],
       version: options.version,
     }),
+    prepare: options.prepare,
     preset: options.preset,
   }
 }

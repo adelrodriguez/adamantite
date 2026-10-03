@@ -14,7 +14,7 @@ import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.t
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
-import { CliNotFound, FailedToRunScript } from "#lib/shared/errors.ts"
+import { CliNotFound } from "#lib/shared/errors.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
@@ -49,6 +49,13 @@ function createInitTestContext(files?: Record<string, string>) {
   return createFileSystemTestContext({
     files: { "package.json": basePackageJson, ...files },
   })
+}
+
+// The installed @effect/tsgo manifest, which the patch reads for its executable.
+const EFFECT_TSGO_FILES = {
+  "node_modules/@effect/tsgo/package.json": JSON.stringify({
+    bin: { "effect-tsgo": "./dist/effect-tsgo.cjs" },
+  }),
 }
 
 function readJson(files: FileSystemTestContext, path: string): JsonObject {
@@ -383,14 +390,15 @@ describe("init", () => {
 
     it.effect("install @effect/tsgo, patch, and configure the language service for effect", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext()
+        const files = createInitTestContext(EFFECT_TSGO_FILES)
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "effect", "--typescript"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -399,9 +407,16 @@ describe("init", () => {
           'import effect from "adamantite/lint/effect"'
         )
         expect(readJson(files, "package.json")).toMatchObject({
-          scripts: { prepare: "effect-tsgo patch --oxlint --typescript" },
+          scripts: { prepare: "adamantite prepare" },
         })
-        expect(installer.scriptRuns).toEqual(["prepare"])
+        expect(runner.invocations.map((invocation) => invocation.args)).toEqual([
+          [
+            expect.stringMatching(/node_modules\/@effect\/tsgo\/dist\/effect-tsgo\.cjs$/u),
+            "patch",
+            "--oxlint",
+            "--typescript",
+          ],
+        ])
         expect(readJson(files, "tsconfig.json")).toEqual({
           compilerOptions: {
             plugins: [{ diagnostics: false, name: "@effect/language-service" }],
@@ -413,14 +428,15 @@ describe("init", () => {
 
     it.effect("ignore the language service plugin name in a new knip config", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext()
+        const files = createInitTestContext(EFFECT_TSGO_FILES)
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--script", "analyze", "--preset", "effect"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -430,27 +446,27 @@ describe("init", () => {
       })
     )
 
-    it.effect("keep an existing prepare script and skip the patch run", () =>
+    it.effect("add adamantite prepare to the end of an existing prepare script", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
+          ...EFFECT_TSGO_FILES,
           "package.json": JSON.stringify({ name: "test-project", scripts: { prepare: "husky" } }),
         })
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(readJson(files, "package.json")).toMatchObject({ scripts: { prepare: "husky" } })
-        expect(installer.scriptRuns).toEqual([])
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message: expect.stringContaining("Kept the existing `prepare` script."),
+        expect(readJson(files, "package.json")).toMatchObject({
+          scripts: { prepare: "husky && adamantite prepare" },
         })
+        expect(runner.invocations).toHaveLength(1)
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message: expect.stringContaining("No `tsconfig.json` found"),
@@ -458,24 +474,23 @@ describe("init", () => {
       })
     )
 
-    it.effect("warn and continue when the patch run fails", () =>
+    it.effect("warn and continue when the patch fails", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext({ "tsconfig.json": "{}" })
+        const files = createInitTestContext({ ...EFFECT_TSGO_FILES, "tsconfig.json": "{}" })
         const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext({
-          runScriptError: new FailedToRunScript({ script: "prepare" }),
-        })
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext([1])
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toContainEqual({
           level: "warning",
-          message: expect.stringContaining("Failed to run the `prepare` script."),
+          message: expect.stringContaining("Failed to prepare `@effect/tsgo`."),
         })
         expect(readJson(files, "tsconfig.json")).toEqual({
           compilerOptions: {
@@ -488,16 +503,18 @@ describe("init", () => {
     it.effect("give tsconfig guidance instead of editing it in a monorepo", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
+          ...EFFECT_TSGO_FILES,
           "package.json": monorepoPackageJson,
           "tsconfig.json": "{}",
         })
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)

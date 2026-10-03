@@ -7,8 +7,9 @@ import type { OxlintConfig } from "oxlint"
 // @effect/tsgo is a managed plugin, but it is not a `jsPlugins` package. The rules are native
 // type-aware rules that exist only after `effect-tsgo patch --oxlint --typescript` replaces the
 // Oxlint and oxlint-tsgolint binaries in `node_modules`. Without the patch, Oxlint stops with
-// "Unknown plugin: 'effecttsgo'". `adamantite init` installs the pinned version, adds the patch to
-// the `prepare` script, and runs it once. Doctor and update keep the package on that version.
+// "Unknown plugin: 'effecttsgo'". `adamantite prepare` runs the patch from the `prepare` script
+// after each install, and `adamantite init` and `adamantite update` run it after they install
+// packages. Doctor and update keep the package on its pinned version.
 //
 // The rules read their options, such as `allowedUnstableApis`, from the `@effect/language-service`
 // plugin entry in `tsconfig.json`.

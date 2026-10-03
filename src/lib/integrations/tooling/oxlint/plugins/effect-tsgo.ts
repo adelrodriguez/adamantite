@@ -1,9 +1,12 @@
+import process from "node:process"
 import type { JsonObject, JsonValue, PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import type { Finding } from "#lib/integrations/base.ts"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { defineManagedPlugin } from "#lib/integrations/tooling/oxlint/plugins/define.ts"
-import { InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { FailedToPreparePlugin, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonArray, checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -11,10 +14,13 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson, writePackageJson } from "#lib/workspace/package-json.ts"
 
 const NAME = "@effect/tsgo"
+const BIN = "effect-tsgo"
 const PREPARE_SCRIPT = "prepare"
+// Package managers run the `prepare` script after a bare install, which restores unpatched binaries.
+const PREPARE_COMMAND = "adamantite prepare"
 // The `effecttsgo` rules exist only in the patched Oxlint and oxlint-tsgolint binaries. The patched
 // `tsc` gives editors Effect quick fixes, refactors, and hovers.
-const PATCH_COMMAND = "effect-tsgo patch --oxlint --typescript"
+const PATCH_ARGS = ["patch", "--oxlint", "--typescript"]
 const TSCONFIG_FILE = "tsconfig.json"
 const LANGUAGE_SERVICE = "@effect/language-service"
 // Oxlint reports the Effect diagnostics, so the language service turns its own off and `tsc` and
@@ -28,13 +34,8 @@ const TSCONFIG_REFERENCE = `${JSON.stringify(
 
 const MONOREPO_TSCONFIG_GUIDANCE = `Skipping the root \`${TSCONFIG_FILE}\` check for \`${NAME}\`: in a monorepo, add \`${JSON.stringify(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\` in each package's \`${TSCONFIG_FILE}\` or in a shared base config.`
 
-function checkRunsPatch(command: string | undefined) {
-  return (
-    command !== undefined
-    && command.includes("effect-tsgo patch")
-    && command.includes("--oxlint")
-    && command.includes("--typescript")
-  )
+function checkRunsPrepare(command: string | undefined) {
+  return command?.includes(PREPARE_COMMAND) ?? false
 }
 
 function findLanguageServicePlugin(plugins: JsonValue | undefined) {
@@ -49,7 +50,7 @@ function findLanguageServicePlugin(plugins: JsonValue | undefined) {
 function getPrepareFindings(packageJson: PackageJson): Finding[] {
   const command = packageJson.scripts?.[PREPARE_SCRIPT]
 
-  if (checkRunsPatch(command)) {
+  if (checkRunsPrepare(command)) {
     return []
   }
 
@@ -58,18 +59,19 @@ function getPrepareFindings(packageJson: PackageJson): Finding[] {
       currentState:
         command === undefined
           ? `\`package.json\` has no \`${PREPARE_SCRIPT}\` script, so nothing patches Oxlint for the \`effecttsgo\` rules after an install.`
-          : `The \`${PREPARE_SCRIPT}\` script (\`${command}\`) does not run \`${PATCH_COMMAND}\`.`,
+          : `The \`${PREPARE_SCRIPT}\` script (\`${command}\`) does not run \`${PREPARE_COMMAND}\`.`,
       goal: [
-        `Make the \`${PREPARE_SCRIPT}\` script in \`package.json\` run \`${PATCH_COMMAND}\`. Keep every command that the script already runs.`,
-        "Run the script once, so the installed Oxlint, oxlint-tsgolint, and TypeScript binaries are patched.",
+        `Make the \`${PREPARE_SCRIPT}\` script in \`package.json\` run \`${PREPARE_COMMAND}\`. Keep every command that the script already runs, and join them with \`&&\`.`,
+        `Run \`${PREPARE_COMMAND}\` once, so the installed Oxlint, oxlint-tsgolint, and TypeScript binaries are patched.`,
       ],
-      id: "missing-effect-tsgo-patch",
+      id: "missing-effect-tsgo-prepare",
       integration: NAME,
       notes: [
         "Without the patch, Oxlint stops with `Unknown plugin: 'effecttsgo'`.",
-        "Package managers run `prepare` after each install, so the patch stays applied when Oxlint, oxlint-tsgolint, or TypeScript change.",
+        "Package managers run `prepare` after a bare install, such as `npm install` or `npm ci`, which restores the unpatched binaries. `adamantite init` and `adamantite update` patch after the installs that they run.",
+        "A production-only install, such as `npm ci --omit=dev`, also runs `prepare` but does not install Adamantite. Use `--ignore-scripts` for those installs.",
       ],
-      title: "Missing @effect/tsgo patch step",
+      title: "Missing adamantite prepare step",
     },
   ]
 }
@@ -117,8 +119,48 @@ const assessTsconfig = Effect.fn("assessEffectTsgoTsconfig")(function* (cwd: str
   return { findings: [finding], warnings: [] }
 })
 
+/**
+ * Patch the installed Oxlint, oxlint-tsgolint, and TypeScript binaries. The patch command comes
+ * from the installed package's `bin` entry, so it runs under any package manager that creates
+ * `node_modules`, and the `prepare` script is not run again.
+ */
+const patch = Effect.fn("patchEffectTsgo")(function* (cwd: string) {
+  const path = yield* Path.Path
+  const runner = yield* CommandRunner
+  const manifestPath = path.join(cwd, "node_modules", NAME, "package.json")
+  const manifest = yield* readFileIfExists(manifestPath)
+
+  if (manifest._tag === "None") {
+    return yield* new FailedToPreparePlugin({
+      plugin: NAME,
+      reason: `It is not installed. Run \`adamantite update\` to install it.`,
+    })
+  }
+
+  const parsed = yield* parseJson(manifest.value, manifestPath)
+  const bin =
+    checkIsJsonObject(parsed) && checkIsJsonObject(parsed["bin"]) ? parsed["bin"][BIN] : undefined
+
+  if (!Predicate.isString(bin)) {
+    return yield* new FailedToPreparePlugin({
+      plugin: NAME,
+      reason: `Its \`package.json\` has no \`${BIN}\` executable.`,
+    })
+  }
+
+  yield* runner
+    .run({
+      args: [path.join(path.dirname(manifestPath), bin), ...PATCH_ARGS],
+      command: process.execPath,
+      cwd,
+      stdout: "ignore",
+    })
+    .pipe(Effect.mapError((cause) => new FailedToPreparePlugin({ cause, plugin: NAME })))
+})
+
 const plugin = defineManagedPlugin({
   name: NAME,
+  prepare: patch,
   preset: "effect",
   version: getDependencyVersion("@effect/tsgo"),
 })
@@ -126,26 +168,27 @@ const plugin = defineManagedPlugin({
 export default {
   ...plugin,
   /**
-   * Add the patch command as the `prepare` script when the project has none. An existing `prepare`
-   * script is kept, because Adamantite cannot merge shell commands safely; doctor reports it.
+   * Make the `prepare` script run `adamantite prepare`. An existing script keeps its commands, and
+   * `adamantite prepare` runs after them.
    */
   addPrepareScript: (cwd: string) =>
     Effect.gen(function* () {
       const packageJson = yield* readPackageJson(cwd)
-      const command = packageJson.scripts?.[PREPARE_SCRIPT]
+      const command = packageJson.scripts?.[PREPARE_SCRIPT]?.trim()
 
-      if (checkRunsPatch(command)) {
+      if (checkRunsPrepare(command)) {
         return "present" as const
       }
 
-      if (command !== undefined && command !== "") {
-        return "conflict" as const
-      }
+      const hasCommand = command !== undefined && command !== ""
 
-      packageJson.scripts = { ...packageJson.scripts, [PREPARE_SCRIPT]: PATCH_COMMAND }
+      packageJson.scripts = {
+        ...packageJson.scripts,
+        [PREPARE_SCRIPT]: hasCommand ? `${command} && ${PREPARE_COMMAND}` : PREPARE_COMMAND,
+      }
       yield* writePackageJson(cwd, packageJson)
 
-      return "added" as const
+      return hasCommand ? ("merged" as const) : ("added" as const)
     }),
   /**
    * Add the language service plugin entry to the root `tsconfig.json`, or set `diagnostics` to
@@ -212,6 +255,6 @@ export default {
       }
     }),
   monorepoTsconfigGuidance: MONOREPO_TSCONFIG_GUIDANCE,
-  patchCommand: PATCH_COMMAND,
-  prepareScript: PREPARE_SCRIPT,
+  prepare: patch,
+  prepareCommand: PREPARE_COMMAND,
 }

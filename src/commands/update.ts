@@ -9,6 +9,7 @@ import { assessProject } from "#lib/assessment/index.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { getPluginsToPrepare } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
@@ -99,6 +100,18 @@ export default Command.make("update").pipe(
           }
         )
         yield* prompter.log.success("Dependencies updated successfully.")
+
+        // A named install does not run the `prepare` script, so the managed plugins' install steps,
+        // such as the @effect/tsgo patch, run here.
+        const plugins = yield* getPluginsToPrepare(cwd, yield* readPackageJson(cwd))
+
+        for (const plugin of plugins) {
+          yield* prompter.withSpinner(() => plugin.prepare(cwd), {
+            failure: `Failed to prepare ${plugin.name}.`,
+            start: `Preparing ${plugin.name}...`,
+            success: `${plugin.name} prepared.`,
+          })
+        }
       }
 
       const finalAssessment = updates.length === 0 ? assessment : yield* assessProject(cwd)

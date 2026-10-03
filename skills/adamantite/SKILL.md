@@ -28,8 +28,8 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
-- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `effect`, `jest`, `vitest`,
-  `node`, `strict`, `antislop`, `shadcn`;
+- Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`, `jest`,
+  `vitest`, `node`, `strict`, `antislop`, `shadcn`;
   editors: `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
@@ -45,6 +45,17 @@ rule reports destructuring nested more than 2 levels deep or object patterns wit
 properties; keep the object and read its members, or split the pattern. Do not raise
 `maxDepth` or `maxProperties` only to silence a report. The preset also bans type assertions
 outside tests.
+
+The `tanstack` preset needs no extra package. Its `adamantite/query-from-loader` rule reports
+TanStack Query hooks in route files (files that call `createFileRoute`, `createRoute`, or another
+route factory from `@tanstack/react-router`) that take a plain options object or a `queryOptions()` call made inside a
+function; define the query once with `queryOptions()` at module scope or in an exported factory,
+preload it in the route loader with `ensureQueryData()`, and pass the same options to the hook. For
+`useInfiniteQuery` and `useSuspenseInfiniteQuery`, use `infiniteQueryOptions()` and
+`ensureInfiniteQueryData()`. Its
+`adamantite/no-query-data-in-state` rule reports `useState` initialized from query data; read the
+value from the query result and keep only the user's edits in state. Do not wrap options in a
+spread object, or move the hook out of the route file, only to silence `query-from-loader`.
 
 The `react-doctor` preset requires the `react` preset and the `oxlint-plugin-react-doctor`
 package, which `init` installs at a pinned version and doctor and `update` keep in sync. It

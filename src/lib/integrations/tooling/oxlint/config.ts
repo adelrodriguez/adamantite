@@ -37,6 +37,7 @@ export const LINT_PRESETS = [
   "react",
   "react-strict",
   "react-doctor",
+  "tanstack",
   "nextjs",
   "vue",
   "effect",

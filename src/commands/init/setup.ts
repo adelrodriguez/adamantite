@@ -8,9 +8,10 @@ import type { ToolingConfigState } from "#lib/integrations/tooling/base.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
+import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
 import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
-import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
+import { addRootDevDependencies, DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   getConflictingScripts,
   readPackageJson,
@@ -185,6 +186,51 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
     )
   })
 
+/**
+ * Set up the parts of the `effect` preset that are not the package: the `prepare` script that
+ * patches Oxlint and TypeScript, one patch run, and the language service entry in `tsconfig.json`.
+ */
+export const setupEffectTsgo = (cwd: string, isMonorepo: boolean) =>
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const dependencyInstaller = yield* DependencyInstaller
+    const prepare = yield* effectTsgo.addPrepareScript(cwd)
+
+    if (prepare === "conflict") {
+      yield* prompter.log.warning(
+        `Kept the existing \`${effectTsgo.prepareScript}\` script. Add \`${effectTsgo.patchCommand}\` to it and run it once, or Oxlint cannot load the \`effect\` preset. Run \`adamantite doctor\` for details.`
+      )
+    } else {
+      // The dependencies were installed before the script existed, so the patch has not run yet.
+      yield* prompter
+        .withSpinner(() => dependencyInstaller.runScript(effectTsgo.prepareScript, cwd), {
+          failure: "Failed to patch Oxlint and TypeScript.",
+          start: "Patching Oxlint and TypeScript with @effect/tsgo...",
+          success: "Oxlint and TypeScript patched with @effect/tsgo.",
+        })
+        .pipe(
+          Effect.catchTag("FailedToRunScript", (error) =>
+            prompter.log.warning(
+              `${error.message} Run the \`${effectTsgo.prepareScript}\` script before you run \`adamantite check\`.`
+            )
+          )
+        )
+    }
+
+    if (isMonorepo) {
+      yield* prompter.log.info(effectTsgo.monorepoTsconfigGuidance)
+      return
+    }
+
+    const tsconfigResult = yield* effectTsgo.addTsconfigPlugin(cwd)
+
+    if (tsconfigResult === "missing") {
+      yield* prompter.log.warning(
+        "No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry."
+      )
+    }
+  })
+
 export const setupEditors = (cwd: string, editors: string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
@@ -255,25 +301,25 @@ export const installEditorExtensions = (editors: string[], scripts: Script[]) =>
         }
       )
       .pipe(
-        Effect.catchTag("FailedToInstallExtension", (error) =>
-          Effect.gen(function* () {
-            yield* prompter.log.warning(`⚠️ ${error.message}`)
-            yield* prompter.log.warning("Please install it manually after setup completes.")
-            return false as const
-          })
-        ),
-        Effect.catchTag("VscodeCliNotFound", () =>
-          Effect.gen(function* () {
-            yield* prompter.log.error("VSCode CLI ('code' command) not found.")
-            yield* prompter.log.info("To install it:")
-            yield* prompter.log.info("  1. Open VS Code")
-            yield* prompter.log.info(
-              "  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)"
-            )
-            yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
-            return false as const
-          })
-        )
+        Effect.catchTags({
+          FailedToInstallExtension: (error) =>
+            Effect.gen(function* () {
+              yield* prompter.log.warning(`⚠️ ${error.message}`)
+              yield* prompter.log.warning("Please install it manually after setup completes.")
+              return false as const
+            }),
+          VscodeCliNotFound: () =>
+            Effect.gen(function* () {
+              yield* prompter.log.error("VSCode CLI ('code' command) not found.")
+              yield* prompter.log.info("To install it:")
+              yield* prompter.log.info("  1. Open VS Code")
+              yield* prompter.log.info(
+                "  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)"
+              )
+              yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
+              return false as const
+            }),
+        })
       )
 
     if (hasZed) {

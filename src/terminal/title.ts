@@ -6,16 +6,15 @@ import { getTitle } from "./title.macro.ts" with { type: "macro" }
 
 const title = getTitle()
 
-export const printTitle = () =>
-  Effect.gen(function* () {
-    const terminal = yield* Terminal.Terminal
-    const terminalColumns = yield* terminal.columns
+export const printTitle = Effect.gen(function* () {
+  const terminal = yield* Terminal.Terminal
+  const terminalColumns = yield* terminal.columns
 
-    const columns = title.split("\n").reduce((max, line) => Math.max(max, line.trim().length), 0)
+  const columns = title.split("\n").reduce((max, line) => Math.max(max, line.trim().length), 0)
 
-    if (!terminalColumns || terminalColumns < columns) {
-      return
-    }
+  if (!terminalColumns || terminalColumns < columns) {
+    return
+  }
 
-    yield* Console.info(title)
-  })
+  yield* Console.info(title)
+})

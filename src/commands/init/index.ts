@@ -23,6 +23,7 @@ import {
   installEditorExtensions,
   setupAgentsGuidance,
   setupEditors,
+  setupEffectTsgo,
   setupGitHubActions,
   setupToolConfig,
   setupTypescript,
@@ -52,7 +53,7 @@ export default Command.make("init", initCommandOptions).pipe(
       const cwd = process.cwd()
       const prompter = yield* Prompter
 
-      yield* printTitle()
+      yield* printTitle
 
       yield* prompter.intro("💠 adamantite init")
 
@@ -162,6 +163,11 @@ export default Command.make("init", initCommandOptions).pipe(
 
       if (shouldSetupTypescript) {
         yield* setupTypescript(cwd, isMonorepo)
+      }
+
+      // After the TypeScript setup, so a `tsconfig.json` that init creates gets the plugin entry.
+      if (presets.includes("effect")) {
+        yield* setupEffectTsgo(cwd, isMonorepo)
       }
 
       yield* setupEditors(cwd, selectedEditors)

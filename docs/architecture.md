@@ -149,6 +149,15 @@ that folder's `index.ts`; init and doctor read the list. The preset names the pl
 in `jsPlugins`, and Oxlint resolves it from the target project. The pin is the devDependency
 version in `package.json`. See ADR 0003.
 
+`@effect/tsgo` for the `effect` preset is a managed plugin too, but it is not a `jsPlugins`
+package. Its `effecttsgo` rules exist only after `effect-tsgo patch --oxlint --typescript`
+replaces the Oxlint and TypeScript binaries in `node_modules`. So its integration also
+manages the `prepare` script that runs the patch and the `@effect/language-service` entry
+in `tsconfig.json`, and init runs the patch once. The Knip integration requires
+`ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
+`@effect/tsgo` ships patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript
+versions. See ADR 0007.
+
 ## Vendored bundles
 
 A preset can ship a vendored bundle of a third-party plugin whose upstream deliberately

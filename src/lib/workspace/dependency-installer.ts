@@ -4,9 +4,14 @@ import * as Layer from "effect/Layer"
 import {
   addDevDependency,
   detectPackageManager as detectNypmPackageManager,
+  runScript,
   type PackageManagerName,
 } from "nypm"
-import { FailedToInstallDependency, NoPackageManager } from "#lib/shared/errors.ts"
+import {
+  FailedToInstallDependency,
+  FailedToRunScript,
+  NoPackageManager,
+} from "#lib/shared/errors.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export interface DetectedPackageManager {
@@ -28,6 +33,10 @@ export class DependencyInstaller extends Context.Service<
     readonly detectPackageManager: (
       cwd: string
     ) => Effect.Effect<DetectedPackageManager | null, NoPackageManager>
+    /**
+     * Run a `package.json` script with the detected package manager.
+     */
+    readonly runScript: (script: string, cwd: string) => Effect.Effect<void, FailedToRunScript>
   }
 >()("DependencyInstaller") {
   static readonly layer = Layer.succeed(this)({
@@ -47,6 +56,12 @@ export class DependencyInstaller extends Context.Service<
         catch: (cause) => new NoPackageManager({ cause }),
         try: () => detectNypmPackageManager(cwd),
       }).pipe(Effect.map((detectedPackageManager) => detectedPackageManager ?? null))
+    ),
+    runScript: Effect.fn("DependencyInstaller.runScript")((script: string, cwd: string) =>
+      Effect.tryPromise({
+        catch: (cause) => new FailedToRunScript({ cause, script }),
+        try: () => runScript(script, { cwd, silent: true }),
+      }).pipe(Effect.asVoid)
     ),
   })
 }

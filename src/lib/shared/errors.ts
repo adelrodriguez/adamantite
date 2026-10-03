@@ -99,6 +99,15 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
   }
 }
 
+export class FailedToRunScript extends Data.TaggedError("FailedToRunScript")<{
+  script: string
+  cause?: unknown
+}> {
+  override get message() {
+    return `Failed to run the \`${this.script}\` script.${formatCauseOutput(this.cause)}`
+  }
+}
+
 export class FailedToInstallExtension extends Data.TaggedError("FailedToInstallExtension")<{
   extension?: string
   cause?: unknown

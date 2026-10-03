@@ -44,6 +44,7 @@ function provideAssessment(files: FileSystemTestContext) {
       Layer.succeed(DependencyInstaller)({
         addDevDependencies: () => Effect.void,
         detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+        runScript: () => Effect.void,
       })
     )
   )

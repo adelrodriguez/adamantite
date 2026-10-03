@@ -28,8 +28,8 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
-- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `jest`, `vitest`, `node`,
-  `strict`, `antislop`, `shadcn`;
+- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `effect`, `jest`, `vitest`,
+  `node`, `strict`, `antislop`, `shadcn`;
   editors: `vscode`, `zed`
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
@@ -53,6 +53,16 @@ enables curated React Doctor rules for React state and effect misuse, such as
 a modified MIT license: using it as machine learning training data or selling it as a
 hosted product needs written permission from the copyright holder. Tell the user before you
 select the preset.
+
+The `effect` preset needs the `@effect/tsgo` package, which `init` installs at a pinned
+version and doctor and `update` keep in sync. Its rules exist only in Oxlint binaries that
+`effect-tsgo patch --oxlint --typescript` patched, so the `prepare` script must run that
+command; without it, Oxlint stops with `Unknown plugin: 'effecttsgo'`. Do not remove the
+patch or the preset to get past that error: run the `prepare` script. `tsconfig.json` needs
+`{ "name": "@effect/language-service", "diagnostics": false }` in `compilerOptions.plugins`,
+and `knip.config.ts` needs `ignoreDependencies.effect`. To allow an unstable Effect module
+on purpose, add it to `allowedUnstableApis` in that tsconfig entry. Do not turn off
+`effecttsgo/unstable-api-usage`.
 
 The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
 at a pinned version and doctor and `update` keep in sync. The plugin finds components and

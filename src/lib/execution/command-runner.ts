@@ -106,7 +106,7 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
       const code = yield* exitCode(options)
 
       if (code !== ChildProcessSpawner.ExitCode(0)) {
-        yield* new CommandFailed({ command: options.command, exitCode: code })
+        return yield* new CommandFailed({ command: options.command, exitCode: code })
       }
     })
 

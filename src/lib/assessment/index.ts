@@ -56,6 +56,7 @@ const collect = Effect.fn("collectApplicableAssessments")(function* (
   return yield* Effect.forEach(
     integrations,
     (integration) =>
+      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- `collectApplicable` restores the precise channels.
       integration
         .assess(cwd, packageJson)
         .pipe(
@@ -86,6 +87,7 @@ function collectApplicable(
   cwd: string,
   packageJson: PackageJson
 ) {
+  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The overload above declares the precise channels.
   return collect(integrations, cwd, packageJson)
 }
 

@@ -17,7 +17,11 @@ import {
   CommandRunner,
 } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
+import {
+  type FailedToInstallDependency,
+  type FailedToRunScript,
+  OperationCancelled,
+} from "#lib/shared/errors.ts"
 import {
   type DetectedPackageManager,
   DependencyInstaller,
@@ -61,6 +65,7 @@ export interface DependencyInstallerCall {
 export interface DependencyInstallerTestContext {
   readonly calls: DependencyInstallerCall[]
   readonly layer: Layer.Layer<DependencyInstaller>
+  readonly scriptRuns: string[]
 }
 
 export interface RunnerTestContext {
@@ -264,8 +269,10 @@ export function createPrompterTestContext(options?: {
 export function createDependencyInstallerTestContext(options?: {
   readonly addDevDependenciesError?: FailedToInstallDependency
   readonly detectedPackageManager?: DetectedPackageManager | null
+  readonly runScriptError?: FailedToRunScript
 }): DependencyInstallerTestContext {
   const calls: DependencyInstallerCall[] = []
+  const scriptRuns: string[] = []
   const detectedPackageManager: DetectedPackageManager | null =
     options && "detectedPackageManager" in options
       ? (options.detectedPackageManager ?? null)
@@ -286,7 +293,16 @@ export function createDependencyInstallerTestContext(options?: {
           }
         }),
       detectPackageManager: (_cwd) => Effect.succeed(detectedPackageManager),
+      runScript: (script, _cwd) =>
+        Effect.gen(function* () {
+          scriptRuns.push(script)
+
+          if (options?.runScriptError) {
+            return yield* options.runScriptError
+          }
+        }),
     }),
+    scriptRuns,
   }
 }
 
@@ -320,6 +336,7 @@ const unexpectedInstallerLayer = Layer.succeed(DependencyInstaller)({
     Effect.die("Unexpected dependency install: pass an installer layer to runCommand"),
   detectPackageManager: () =>
     Effect.die("Unexpected package manager detection: pass an installer layer to runCommand"),
+  runScript: () => Effect.die("Unexpected script run: pass an installer layer to runCommand"),
 })
 
 export interface RunCommandOptions<Layers extends readonly TestLayer[]> {

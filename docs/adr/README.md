@@ -6,3 +6,4 @@
 - [ADR 0004: Ban React state, effect, and memoization hooks in feature code](0004-ban-react-state-hooks-in-feature-code.md)
 - [ADR 0005: Curate the react-doctor rules](0005-curate-react-doctor-rules.md)
 - [ADR 0006: Limit destructuring depth and width in a framework-neutral strict preset](0006-limit-destructuring-depth-and-width.md)
+- [ADR 0007: The effect preset patches Oxlint, and its rules are curated](0007-effect-preset-patches-oxlint.md)

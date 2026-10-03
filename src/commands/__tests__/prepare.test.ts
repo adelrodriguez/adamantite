@@ -47,22 +47,30 @@ describe("prepare", () => {
     })
   )
 
-  it.effect("do nothing without the effect preset or a managed lint script", () =>
+  it.effect("patch for the effect preset with a custom lint script", () =>
     Effect.gen(function* () {
       const runner = createRunnerTestContext()
 
-      for (const files of [
-        makeFiles(["shadcn"]),
-        makeFiles(["effect"], { scripts: { check: "oxlint" } }),
-      ]) {
-        const exit = yield* runCommand(prepareCommand, [], {
-          files,
-          layers: [createPrompterTestContext().layer, runner.layer],
-        })
+      const exit = yield* runCommand(prepareCommand, [], {
+        files: makeFiles(["effect"], { scripts: { check: "oxlint" } }),
+        layers: [createPrompterTestContext().layer, runner.layer],
+      })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
-      }
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations).toHaveLength(1)
+    })
+  )
 
+  it.effect("do nothing without the effect preset", () =>
+    Effect.gen(function* () {
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(prepareCommand, [], {
+        files: makeFiles(["shadcn"]),
+        layers: [createPrompterTestContext().layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toEqual([])
     })
   )

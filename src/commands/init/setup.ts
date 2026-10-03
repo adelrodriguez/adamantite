@@ -223,7 +223,7 @@ export const patchEffectTsgo = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
 
-    if (!(yield* effectTsgo.checkNeedsPatch(cwd, yield* readPackageJson(cwd)))) {
+    if (!(yield* effectTsgo.checkNeedsPatch(cwd))) {
       return
     }
 

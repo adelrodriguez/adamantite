@@ -5,7 +5,10 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import type { Finding } from "#lib/integrations/base.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { defineManagedPlugin } from "#lib/integrations/tooling/oxlint/plugins/define.ts"
+import {
+  checkImportsLintPreset,
+  defineManagedPlugin,
+} from "#lib/integrations/tooling/oxlint/plugins/define.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonArray, checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
@@ -217,11 +220,10 @@ export default {
       }
     }),
   /**
-   * Whether the project needs the patch: `oxlint.config.ts` imports the `effect` preset, and a
-   * managed lint script runs Oxlint.
+   * Whether the project needs the patch: `oxlint.config.ts` imports the `effect` preset. How the
+   * project runs Oxlint does not matter, because Oxlint cannot load the preset unpatched.
    */
-  checkNeedsPatch: (cwd: string, packageJson: PackageJson) =>
-    plugin.assess(cwd, packageJson).pipe(Effect.map((assessment) => assessment.applicable)),
+  checkNeedsPatch: (cwd: string) => checkImportsLintPreset(cwd, "effect"),
   monorepoTsconfigGuidance: MONOREPO_TSCONFIG_GUIDANCE,
   /**
    * Patch the installed Oxlint, oxlint-tsgolint, and TypeScript binaries. The project's

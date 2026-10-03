@@ -252,24 +252,23 @@ describe("effect-tsgo", () => {
   })
 
   describe("checkNeedsPatch", () => {
-    it.effect("need the patch only with the effect preset and a managed lint script", () =>
+    it.effect("need the patch whenever oxlint.config.ts imports the effect preset", () =>
       Effect.gen(function* () {
         const cases = [
           [makeConfiguredFiles(), true],
           [makeConfiguredFiles({ "oxlint.config.ts": toOxlintTsConfigContent(["react"]) }), false],
+          // A custom lint script still loads the preset, so it still needs the patch.
           [
             makeConfiguredFiles({
               "package.json": makePackageJson({ scripts: { check: "oxlint" } }),
             }),
-            false,
+            true,
           ],
+          [makeConfiguredFiles({ "oxlint.config.ts": "" }), false],
         ] as const
 
         for (const [files, expected] of cases) {
-          const result = yield* readPackageJson(ROOT).pipe(
-            Effect.flatMap((packageJson) => effectTsgo.checkNeedsPatch(ROOT, packageJson)),
-            provideFiles(files)
-          )
+          const result = yield* effectTsgo.checkNeedsPatch(ROOT).pipe(provideFiles(files))
 
           expect(result).toBe(expected)
         }

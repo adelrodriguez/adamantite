@@ -102,7 +102,7 @@ export default Command.make("update").pipe(
         yield* prompter.log.success("Dependencies updated successfully.")
 
         // A named install does not run the `prepare` script, which reapplies the @effect/tsgo patch.
-        if (yield* effectTsgo.checkNeedsPatch(cwd, yield* readPackageJson(cwd))) {
+        if (yield* effectTsgo.checkNeedsPatch(cwd)) {
           yield* prompter.withSpinner(() => effectTsgo.patch(cwd, { quiet: true }), {
             failure: "Failed to patch Oxlint and TypeScript. Run `adamantite prepare` to see why.",
             start: "Patching Oxlint and TypeScript with @effect/tsgo...",

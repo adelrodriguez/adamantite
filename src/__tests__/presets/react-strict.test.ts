@@ -20,7 +20,7 @@ describe("react-strict preset", () => {
   })
 
   test("take the plugin types from the Oxlint version that runs the plugin", () => {
-    expect(packageJson.devDependencies["@oxlint/plugins"]).toBe(packageJson.devDependencies.oxlint)
+    expect(packageJson.dependencies["@oxlint/plugins"]).toBe(packageJson.devDependencies.oxlint)
   })
 })
 

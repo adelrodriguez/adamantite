@@ -34,6 +34,8 @@ and Sherif so humans and coding agents can use the same project workflow.
   through an interactive or non-interactive initializer.
 - **Setup maintenance**: Assess managed integrations with `doctor`, update managed
   dependencies, and give humans or agents repair instructions.
+- **Custom rules**: Write project-specific Oxlint rules in `.adamantite/rules/`, one rule
+  for each file, and enable all of them with one line.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
 - **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`.
@@ -229,6 +231,20 @@ script in `package.json` runs it after each install:
 Without the effect preset, `prepare` does nothing and exits 0. If the patch fails, `prepare`
 fails, so the install fails.
 
+### `adamantite rule`
+
+Write and inspect [custom rules](#custom-rules):
+
+```sh
+adamantite rule add no-process-env
+adamantite rule add no-window --dir tooling/lint/rules
+adamantite rule ast src/index.ts
+```
+
+`rule add` writes a rule stub to `.adamantite/rules/`, or to the folder that `--dir` names,
+and an `AGENTS.md` with the authoring guidance when the folder has none. `rule ast` prints the
+ESTree-shaped AST that Oxlint rules visit, so you can read node names off real code.
+
 ### Pass arguments to underlying tools
 
 Commands that invoke Knip, Oxlint, Oxfmt, or Sherif forward arguments after `--`:
@@ -269,6 +285,8 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, and no type assertions outside tests. See [the strict preset](#the-strict-preset).                                                                                                                                          |
 | `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
 | `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
+| `adamantite/lint/custom`       | A function, `custom()`, that loads the project's own rules from `.adamantite/rules/`. See [custom rules](#custom-rules).                                                                                                                                                               |
+| `adamantite/rules`             | `defineRule` and the rule and AST types for custom rules.                                                                                                                                                                                                                              |
 | `adamantite/format`            | Oxfmt configuration.                                                                                                                                                                                                                                                                   |
 | `adamantite/analyze`           | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo and `ignoreDependencies.effect` with the effect preset.                                                                               |
 | `adamantite/typescript`        | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                                             |
@@ -506,6 +524,103 @@ off `no-restyle`, `no-arbitrary-values`, and `require-static-classes` under
 another component directory. See the
 [@shadcn/lint documentation](https://github.com/shadcn-ui/lint#settings) for settings,
 contracts, and custom messages.
+
+## Custom rules
+
+Custom rules are Oxlint rules that your project writes and owns. Each file in
+`.adamantite/rules/` is one rule. `custom()` from `adamantite/lint/custom` loads the folder
+and enables each rule as `error` under the `project` plugin, so `no-process-env.ts` becomes
+`project/no-process-env`. Add a file to add a rule, and delete the file to remove it. A file
+that starts with `_`, such as `_helpers.ts`, is a helper, not a rule.
+
+```text
+.adamantite/rules/
+  no-process-env.ts      # enabled as project/no-process-env
+  _helpers.ts            # skipped
+```
+
+```ts
+// .adamantite/rules/no-process-env.ts
+import { defineRule } from "adamantite/rules"
+
+export default defineRule({
+  meta: {
+    messages: { unexpected: "Read configuration through the config module." },
+    type: "problem",
+  },
+  createOnce(context) {
+    return {
+      MemberExpression(node) {
+        if (node.object.type === "Identifier" && node.object.name === "process") {
+          context.report({ messageId: "unexpected", node })
+        }
+      },
+    }
+  },
+})
+```
+
+```ts
+// oxlint.config.ts
+import { defineConfig } from "oxlint"
+import core from "adamantite/lint"
+import custom from "adamantite/lint/custom"
+
+export default defineConfig({
+  extends: [core, custom()],
+  ignorePatterns: core.ignorePatterns,
+})
+```
+
+`custom()` returns an empty config when the folder does not exist, so `adamantite init` adds
+it to every generated config. It takes these options:
+
+- `dir`: the rules folder. A relative path resolves from the file that calls `custom()`, not
+  from the working directory. Default: `.adamantite/rules`.
+- `name`: the plugin name that prefixes each rule. Default: `project`.
+- `rules`: severity or options for a rule, by rule name without the prefix, such as
+  `{ "no-process-env": "warn" }`.
+
+Rule files run with Node.js type stripping, so use erasable TypeScript only: no `enum`,
+`namespace` with values, or parameter properties. Rules get no type information. A rule
+that throws prints an error for each file, and the lint run still exits 0. Adamantite owns
+the wiring and the authoring guidance; your project owns the correctness and the tests of
+its rules. To test a rule, use `RuleTester` from `oxlint/plugins-dev`. `adamantite rule add`
+writes the full authoring guidance to `.adamantite/rules/AGENTS.md`.
+
+`adamantite doctor` reports a rule file that cannot load, with the reason, a rules folder
+that no `custom()` call loads, and two rules folders that use the same plugin name.
+
+### Custom rules in a monorepo
+
+Oxlint rejects two plugins with the same name in one run, so give each rules folder its own
+name. A nested Oxlint config replaces the root config, so a workspace package that needs the
+root rules extends the root config:
+
+```ts
+// packages/web/oxlint.config.ts
+import { defineConfig } from "oxlint"
+import custom from "adamantite/lint/custom"
+import root from "../../oxlint.config.ts"
+
+export default defineConfig({ extends: [root, custom({ name: "web" })] })
+```
+
+To share one rules folder across the workspace, keep it in a tooling package and call
+`custom()` there. The relative `dir` resolves from the tooling package, so every config that
+extends it loads the same rules:
+
+```ts
+// tooling/lint/index.ts
+import custom from "adamantite/lint/custom"
+
+export default custom({ dir: "rules", name: "acme" })
+```
+
+Run `adamantite rule add <name> --dir tooling/lint/rules` to add a rule to that folder.
+Doctor starts from the Oxlint config of the root and of each workspace package, and follows
+relative imports and imports of workspace packages to find the `custom()` calls. It resolves
+`dir` and `name` when they are string literals.
 
 ## Requirements and boundaries
 

@@ -60,7 +60,8 @@ describe("oxlint", () => {
         expect(content).toContain("typeAware: true")
         expect(content).toContain("typeCheck: true")
         expect(content).toContain("ignorePatterns: core.ignorePatterns")
-        expect(content).toContain("extends: [core]")
+        expect(content).toContain('import custom from "adamantite/lint/custom"')
+        expect(content).toContain("extends: [core, custom()]")
       })
     )
 
@@ -73,7 +74,7 @@ describe("oxlint", () => {
         const content = files.read("oxlint.config.ts")
         expect(content).toContain('import core from "adamantite/lint"')
         expect(content).toContain('import antislop from "adamantite/lint/antislop"')
-        expect(content).toContain("extends: [core, antislop]")
+        expect(content).toContain("extends: [core, antislop, custom()]")
       })
     )
   })

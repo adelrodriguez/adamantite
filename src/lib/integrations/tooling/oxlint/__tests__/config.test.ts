@@ -66,7 +66,7 @@ describe("inspectRequiredOxlintConfig", () => {
 })
 
 describe("getImportedLintPresets", () => {
-  test("list the presets a generated config imports, without core", () => {
+  test("list the presets a generated config imports, without core and custom", () => {
     expect(getImportedLintPresets(toOxlintTsConfigContent(["react", "shadcn"]))).toEqual([
       "react",
       "shadcn",
@@ -77,7 +77,7 @@ describe("getImportedLintPresets", () => {
     const content = toOxlintTsConfigContent(["react", "react-strict"])
 
     expect(content).toContain('import reactStrict from "adamantite/lint/react-strict"')
-    expect(content).toContain("extends: [core, react, reactStrict],")
+    expect(content).toContain("extends: [core, react, reactStrict, custom()],")
     expect(getImportedLintPresets(content)).toEqual(["react", "react-strict"])
   })
 

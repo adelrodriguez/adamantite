@@ -34,9 +34,24 @@ const MODULE_EXTENSIONS = [".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]
 
 interface WorkspacePackage {
   readonly directory: string
-  readonly entry: string | undefined
+  readonly exports: PackageJson.Exports | undefined
+  readonly main: string | undefined
   readonly name: string
 }
+
+interface SourceModule {
+  readonly content: string
+  readonly file: string
+}
+
+/**
+ * `unresolved` is an import of a workspace package or a relative path that Doctor cannot follow.
+ * Imports of other packages are `external`.
+ */
+type ResolvedImport =
+  | { readonly _tag: "external" }
+  | { readonly _tag: "found"; readonly module: SourceModule }
+  | { readonly _tag: "unresolved" }
 
 interface ResolvedCall {
   /**
@@ -61,28 +76,76 @@ export default defineConfig({
 })
 `
 
-function getExportsEntry(exports: PackageJson["exports"]): string | undefined {
-  if (Predicate.isString(exports)) {
-    return exports
-  }
+const RUNTIME_CONDITIONS = ["import", "node", "default"]
 
-  if (exports === null || exports === undefined || Array.isArray(exports)) {
+/**
+ * The file that an export target selects at runtime: the target string, or the first runtime
+ * condition that selects a file.
+ */
+function getExportTarget(target: PackageJson.Exports | undefined): string | undefined {
+  if (target === undefined || target === null) {
     return undefined
   }
 
-  const root = "." in exports ? exports["."] : exports
-
-  if (Predicate.isString(root)) {
-    return root
+  if (Predicate.isString(target)) {
+    return target
   }
 
-  if (root === null || Array.isArray(root)) {
-    return undefined
+  if (Array.isArray(target)) {
+    return target.map((entry) => getExportTarget(entry)).find((entry) => entry !== undefined)
   }
 
-  const conditions = [root.import, root.default, root.node]
+  return RUNTIME_CONDITIONS.map((condition) => getExportTarget(target[condition])).find(
+    (entry) => entry !== undefined
+  )
+}
 
-  return conditions.find((condition) => Predicate.isString(condition))
+/**
+ * The file in a workspace package that an import of `subpath` loads, relative to the package
+ * directory. Follows the `exports` map, with `*` patterns, and falls back to `main` and `index` for
+ * a package without one. Undefined when the package does not export the subpath.
+ */
+function resolvePackageTarget(workspacePackage: WorkspacePackage, subpath: string) {
+  const { exports } = workspacePackage
+
+  if (exports === undefined) {
+    return subpath === "" ? (workspacePackage.main ?? "index") : subpath
+  }
+
+  const key = subpath === "" ? "." : `./${subpath}`
+
+  if (exports === null || Predicate.isString(exports) || Array.isArray(exports)) {
+    return key === "." ? getExportTarget(exports) : undefined
+  }
+
+  const subpaths = Object.keys(exports).some((name) => name.startsWith("."))
+    ? exports
+    : { ".": exports }
+
+  if (key in subpaths) {
+    return getExportTarget(subpaths[key])
+  }
+
+  const patternMatch = Object.entries(subpaths)
+    .map(([pattern, target]) => {
+      const [prefix, suffix, ...rest] = pattern.split("*")
+      const matches =
+        prefix !== undefined
+        && suffix !== undefined
+        && rest.length === 0
+        && key.startsWith(prefix)
+        && key.endsWith(suffix)
+        && key.length >= prefix.length + suffix.length
+
+      return matches
+        ? { match: key.slice(prefix.length, key.length - suffix.length), target }
+        : null
+    })
+    .find((candidate) => candidate !== null)
+
+  return patternMatch === undefined
+    ? undefined
+    : getExportTarget(patternMatch.target)?.replaceAll("*", patternMatch.match)
 }
 
 const readWorkspacePackage = Effect.fn("readWorkspacePackage")(function* (directory: string) {
@@ -94,7 +157,8 @@ const readWorkspacePackage = Effect.fn("readWorkspacePackage")(function* (direct
 
   return Option.some({
     directory,
-    entry: getExportsEntry(packageJson.exports) ?? packageJson.main,
+    exports: packageJson.exports,
+    main: packageJson.main,
     name: packageJson.name,
   } satisfies WorkspacePackage)
 })
@@ -114,7 +178,7 @@ const readFirstFile = Effect.fn("readFirstFile")(function* (candidates: readonly
     }
   }
 
-  return Option.none<{ readonly content: string; readonly file: string }>()
+  return Option.none<SourceModule>()
 })
 
 /**
@@ -137,29 +201,36 @@ const resolveImport = Effect.fn("resolveImport")(function* (
         specifier === workspacePackage.name || specifier.startsWith(`${workspacePackage.name}/`)
     )
 
-    if (owner !== undefined) {
-      const subpath = specifier.slice(owner.name.length + 1)
-
-      base =
-        subpath === ""
-          ? path.resolve(owner.directory, owner.entry ?? "index")
-          : path.resolve(owner.directory, subpath)
+    if (owner === undefined) {
+      return { _tag: "external" } satisfies ResolvedImport
     }
+
+    const target = resolvePackageTarget(owner, specifier.slice(owner.name.length + 1))
+
+    if (target === undefined) {
+      return { _tag: "unresolved" } satisfies ResolvedImport
+    }
+
+    base = path.resolve(owner.directory, target)
   }
 
-  if (base === undefined || base.split(path.sep).includes("node_modules")) {
-    return Option.none<{ readonly content: string; readonly file: string }>()
+  if (base.split(path.sep).includes("node_modules")) {
+    return { _tag: "external" } satisfies ResolvedImport
   }
 
   const directory = base
   // A TypeScript source can import a sibling with the `.js` extension of its build output.
   const stem = base.replace(/\.[cm]?js$/u, "")
-
-  return yield* readFirstFile([
+  const module = yield* readFirstFile([
     base,
     ...MODULE_EXTENSIONS.map((extension) => `${stem}${extension}`),
     ...MODULE_EXTENSIONS.map((extension) => path.join(directory, `index${extension}`)),
   ])
+
+  return Option.match(module, {
+    onNone: (): ResolvedImport => ({ _tag: "unresolved" }),
+    onSome: (found): ResolvedImport => ({ _tag: "found", module: found }),
+  })
 })
 
 /**
@@ -185,6 +256,7 @@ const findCalls = Effect.fn("findCustomRulesCalls")(function* (
   )
   const visited = new Set<string>()
   const calls: ResolvedCall[] = []
+  const unresolvedImports: Array<{ readonly from: string; readonly specifier: string }> = []
   let queue = configs
 
   while (queue.length > 0) {
@@ -204,21 +276,32 @@ const findCalls = Effect.fn("findCustomRulesCalls")(function* (
       }
     }
 
-    const imported = yield* Effect.forEach(
-      modules.flatMap((module) =>
-        findRuntimeImports(module.file, module.content).map((specifier) => ({
-          from: module.file,
-          specifier,
-        }))
-      ),
+    const imports = modules.flatMap((module) =>
+      findRuntimeImports(module.file, module.content).map((specifier) => ({
+        from: module.file,
+        specifier,
+      }))
+    )
+    const resolved = yield* Effect.forEach(
+      imports,
       ({ from, specifier }) => resolveImport(from, specifier, packages),
       { concurrency: "unbounded" }
     )
 
-    queue = Array.getSomes(imported)
+    queue = []
+
+    for (const [index, result] of resolved.entries()) {
+      const source = imports[index]
+
+      if (result._tag === "found") {
+        queue.push(result.module)
+      } else if (result._tag === "unresolved" && source !== undefined) {
+        unresolvedImports.push(source)
+      }
+    }
   }
 
-  return calls
+  return { calls, unresolvedImports }
 })
 
 const readRulesFolder = Effect.fn("readRulesFolder")(function* (dir: string) {
@@ -241,7 +324,7 @@ export default defineIntegration({
         cwd,
         ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
       ]
-      const calls = yield* findCalls(packageDirectories)
+      const { calls, unresolvedImports } = yield* findCalls(packageDirectories)
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )
@@ -256,20 +339,26 @@ export default defineIntegration({
         )
       ).filter((folder) => folder.ruleFiles.length > 0)
 
-      if (calls.length === 0 && folders.length === 0) {
+      if (calls.length === 0 && folders.length === 0 && unresolvedImports.length === 0) {
         return { applicable: false, warnings: [] } satisfies IntegrationAssessment
       }
 
       const unresolvedCalls = calls.filter((call) => call.dir === null || call.name === null)
-      const warnings = unresolvedCalls.map(
-        (call) =>
-          `Doctor cannot read the \`dir\` or \`name\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that rules folder.`
-      )
+      const warnings = [
+        ...unresolvedImports.map(
+          ({ from, specifier }) =>
+            `Doctor cannot resolve the import of \`${specifier}\` in \`${relative(from)}\`, so it does not check the \`custom()\` calls and rules folders behind it.`
+        ),
+        ...unresolvedCalls.map(
+          (call) =>
+            `Doctor cannot read the \`dir\` or \`name\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that rules folder.`
+        ),
+      ]
       const findings: Finding[] = []
 
-      // An unresolved call can load any folder, so an unloaded folder is reported only when every
-      // call is resolved.
-      if (unresolvedCalls.length === 0) {
+      // An unresolved call or import can load any folder, so an unloaded folder is reported only
+      // when every call and import is resolved.
+      if (unresolvedCalls.length === 0 && unresolvedImports.length === 0) {
         for (const folder of folders) {
           if (loadedFolders.includes(folder.dir)) {
             continue

@@ -191,6 +191,97 @@ describe("custom-rules", () => {
     })
   )
 
+  it.effect("follow a workspace package subpath through its exports map", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": makeConfig("core, tooling", [
+            'import tooling from "@acme/lint/config"',
+          ]),
+          "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
+          "tooling/lint/index.ts": [
+            'import custom from "adamantite/lint/custom"',
+            "",
+            'export default custom({ dir: "rules", name: "acme" })',
+            "",
+          ].join("\n"),
+          "tooling/lint/package.json": JSON.stringify({
+            exports: { "./*": { import: "./src/*.ts" }, "./config": "./index.ts" },
+            name: "@acme/lint",
+          }),
+          "tooling/lint/rules/no-enum.ts": `enum Kind { A }\n${RULE}`,
+        },
+        root: ROOT,
+      })
+
+      const findings = getFindings(yield* runAssess(files))
+
+      expect(findings.map((finding) => finding.id)).toEqual([
+        "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts",
+      ])
+    })
+  )
+
+  it.effect("follow a workspace package subpath through an exports pattern", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/no-process-env.ts": RULE,
+          "oxlint.config.ts": makeConfig("core, tooling", [
+            'import tooling from "@acme/lint/rules"',
+          ]),
+          "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
+          "tooling/lint/package.json": JSON.stringify({
+            exports: { "./*": { import: "./src/*.ts" } },
+            name: "@acme/lint",
+          }),
+          "tooling/lint/src/rules.ts": [
+            'import custom from "adamantite/lint/custom"',
+            "",
+            'export default custom({ dir: "../../../.adamantite/rules" })',
+            "",
+          ].join("\n"),
+        },
+        root: ROOT,
+      })
+
+      expect(yield* runAssess(files)).toEqual({
+        applicable: true,
+        findings: [],
+        packageActions: [],
+        warnings: [],
+      })
+    })
+  )
+
+  it.effect(
+    "warn about a workspace import that doctor cannot resolve, and skip the folder check",
+    () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            ".adamantite/rules/no-process-env.ts": RULE,
+            "oxlint.config.ts": makeConfig("core, tooling", [
+              'import tooling from "@acme/lint/missing"',
+            ]),
+            "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
+            "tooling/lint/package.json": JSON.stringify({
+              exports: { "./config": "./index.ts" },
+              name: "@acme/lint",
+            }),
+          },
+          root: ROOT,
+        })
+
+        const assessment = yield* runAssess(files)
+
+        expect(getFindings(assessment)).toEqual([])
+        expect(assessment.warnings).toEqual([
+          "Doctor cannot resolve the import of `@acme/lint/missing` in `oxlint.config.ts`, so it does not check the `custom()` calls and rules folders behind it.",
+        ])
+      })
+  )
+
   it.effect("report a workspace package rules folder that only the root config could load", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

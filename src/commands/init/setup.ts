@@ -8,7 +8,7 @@ import type { ToolingConfigState } from "#lib/integrations/tooling/base.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
+import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
@@ -190,25 +190,24 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
  * Set up the parts of the `effect` preset that are not the package: the `prepare` script that runs
  * `adamantite prepare` after each install, and the language service entry in `tsconfig.json`.
  */
-export const setupEffectTsgo = (cwd: string, isMonorepo: boolean) =>
+export const setupEffectTsgo = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const prepare = yield* effectTsgo.addPrepareScript(cwd)
+    const result = yield* effectTsgo.update(cwd)
 
-    if (prepare === "merged") {
+    if (result.prepare === "merged") {
       yield* prompter.log.info(
-        `Added \`${effectTsgo.prepareCommand}\` to the start of your existing \`prepare\` script.`
+        "Added `adamantite prepare` to the start of your existing `prepare` script."
       )
     }
 
-    if (isMonorepo) {
-      yield* prompter.log.info(effectTsgo.monorepoTsconfigGuidance)
-      return
+    if (result.tsconfig === "monorepo") {
+      yield* prompter.log.info(
+        "In a monorepo, add the Effect language service entry to each package's `tsconfig.json` or to a shared base config. Run `adamantite doctor` for the reference entry."
+      )
     }
 
-    const tsconfigResult = yield* effectTsgo.addTsconfigPlugin(cwd)
-
-    if (tsconfigResult === "missing") {
+    if (result.tsconfig === "missing") {
       yield* prompter.log.warning(
         "No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry."
       )
@@ -223,7 +222,7 @@ export const patchEffectTsgo = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
 
-    if (!(yield* effectTsgo.checkNeedsPatch(cwd))) {
+    if (!(yield* effectTsgo.detect(cwd))) {
       return
     }
 

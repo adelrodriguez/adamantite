@@ -10,7 +10,7 @@ import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
+import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
@@ -534,7 +534,7 @@ describe("init", () => {
         expect(files.read("tsconfig.json")).toBe("{}")
         expect(prompter.logs).toContainEqual({
           level: "info",
-          message: effectTsgo.monorepoTsconfigGuidance,
+          message: expect.stringContaining("In a monorepo, add the Effect language service entry"),
         })
       })
     )

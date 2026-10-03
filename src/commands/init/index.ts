@@ -168,7 +168,7 @@ export default Command.make("init", initCommandOptions).pipe(
 
       // After the TypeScript setup, so a `tsconfig.json` that init creates gets the plugin entry.
       if (presets.includes("effect")) {
-        yield* setupEffectTsgo(cwd, isMonorepo)
+        yield* setupEffectTsgo(cwd)
       }
 
       // Init installs the pinned lint tools even when it keeps an existing config, so a project

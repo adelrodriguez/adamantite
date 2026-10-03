@@ -1,4 +1,4 @@
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
+import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
 import shadcn from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 

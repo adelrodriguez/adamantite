@@ -9,11 +9,12 @@ import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { type CommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo.ts"
+import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 const PREPARE = "adamantite prepare"
+const TSCONFIG = "tsconfig.json"
 const CONFIGURED_TSCONFIG = JSON.stringify({
   compilerOptions: { plugins: [{ diagnostics: false, name: "@effect/language-service" }] },
 })
@@ -198,60 +199,13 @@ describe("effect-tsgo", () => {
           applicable: true,
           findings: [],
           packageActions: [],
-          warnings: [effectTsgo.monorepoTsconfigGuidance],
+          warnings: [expect.stringContaining("in a monorepo, add")],
         })
       })
     )
   })
 
-  describe("addPrepareScript", () => {
-    it.effect("add adamantite prepare when the project has no prepare script", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({ scripts: { test: "vitest" } }),
-        })
-
-        const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe("added")
-        expect(JSON.parse(files.read("package.json"))).toMatchObject({
-          scripts: { prepare: PREPARE, test: "vitest" },
-        })
-      })
-    )
-
-    it.effect("run adamantite prepare before the commands of an existing prepare script", () =>
-      Effect.gen(function* () {
-        // Husky's setup for a project below the Git root changes directory, so a command after it
-        // would run outside the project.
-        // The parentheses keep a fallback such as `|| true` from also catching a failed patch.
-        for (const prepare of ["husky", "cd .. && husky frontend/.husky", "husky || true"]) {
-          const files = makeFiles({ "package.json": makePackageJson({ scripts: { prepare } }) })
-
-          const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
-
-          expect(result).toBe("merged")
-          expect(JSON.parse(files.read("package.json"))).toMatchObject({
-            scripts: { prepare: `${PREPARE} && (${prepare})` },
-          })
-        }
-      })
-    )
-
-    it.effect("keep a prepare script that already runs adamantite prepare", () =>
-      Effect.gen(function* () {
-        const packageJson = makePackageJson({ scripts: { prepare: `${PREPARE} && husky` } })
-        const files = makeFiles({ "package.json": packageJson })
-
-        const result = yield* effectTsgo.addPrepareScript(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe("present")
-        expect(files.read("package.json")).toBe(packageJson)
-      })
-    )
-  })
-
-  describe("checkNeedsPatch", () => {
+  describe("detect", () => {
     it.effect("need the patch whenever oxlint.config.ts imports the effect preset", () =>
       Effect.gen(function* () {
         const cases = [
@@ -268,7 +222,7 @@ describe("effect-tsgo", () => {
         ] as const
 
         for (const [files, expected] of cases) {
-          const result = yield* effectTsgo.checkNeedsPatch(ROOT).pipe(provideFiles(files))
+          const result = yield* effectTsgo.detect(ROOT).pipe(provideFiles(files))
 
           expect(result).toBe(expected)
         }
@@ -317,77 +271,35 @@ describe("effect-tsgo", () => {
     )
   })
 
-  describe("addTsconfigPlugin", () => {
-    it.effect("append the entry and keep other plugins and options", () =>
+  describe("update", () => {
+    it.effect("write the prepare script and the language service entry", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "tsconfig.json": JSON.stringify({
-            compilerOptions: { plugins: [{ name: "other" }], strict: true },
-            extends: "adamantite/typescript",
-          }),
+          "package.json": makePackageJson({ scripts: { prepare: "husky" } }),
+          "tsconfig.json": "{}",
         })
 
-        const result = yield* effectTsgo.addTsconfigPlugin(ROOT).pipe(provideFiles(files))
+        const result = yield* effectTsgo.update(ROOT).pipe(provideFiles(files))
 
-        expect(result).toBe("updated")
-        expect(JSON.parse(files.read("tsconfig.json"))).toEqual({
-          compilerOptions: {
-            plugins: [{ name: "other" }, { diagnostics: false, name: "@effect/language-service" }],
-            strict: true,
-          },
-          extends: "adamantite/typescript",
+        expect(result).toEqual({ prepare: "merged", tsconfig: "updated" })
+        expect(JSON.parse(files.read("package.json"))).toMatchObject({
+          scripts: { prepare: `${PREPARE} && (husky)` },
         })
+        expect(JSON.parse(files.read(TSCONFIG))).toEqual(JSON.parse(CONFIGURED_TSCONFIG))
       })
     )
 
-    it.effect("turn off diagnostics in an existing entry and keep its options", () =>
+    it.effect("leave the root tsconfig.json alone in a monorepo", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "tsconfig.json": JSON.stringify({
-            compilerOptions: {
-              plugins: [{ allowedUnstableApis: ["effect/cli"], name: "@effect/language-service" }],
-            },
-          }),
+          "package.json": makePackageJson({ workspaces: ["packages/*"] }),
+          "tsconfig.json": "{}",
         })
 
-        yield* effectTsgo.addTsconfigPlugin(ROOT).pipe(provideFiles(files))
+        const result = yield* effectTsgo.update(ROOT).pipe(provideFiles(files))
 
-        expect(JSON.parse(files.read("tsconfig.json"))).toEqual({
-          compilerOptions: {
-            plugins: [
-              {
-                allowedUnstableApis: ["effect/cli"],
-                diagnostics: false,
-                name: "@effect/language-service",
-              },
-            ],
-          },
-        })
-      })
-    )
-
-    it.effect("report a missing tsconfig.json without creating one", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* effectTsgo.addTsconfigPlugin(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe("missing")
-        expect(files.exists("tsconfig.json")).toBe(false)
-      })
-    )
-
-    it.effect("fail on plugins that are not an array", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": JSON.stringify({ compilerOptions: { plugins: {} } }),
-        })
-
-        const result = yield* effectTsgo
-          .addTsconfigPlugin(ROOT)
-          .pipe(provideFiles(files), Effect.result)
-
-        expect(Result.isFailure(result) && result.failure._tag).toBe("InvalidConfigFormat")
+        expect(result).toEqual({ prepare: "added", tsconfig: "monorepo" })
+        expect(files.read(TSCONFIG)).toBe("{}")
       })
     )
   })

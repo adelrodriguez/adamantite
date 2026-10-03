@@ -91,6 +91,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "vue",
         },
         {
+          hint: "Effect misuse, such as effects that never run and unhandled errors; installs @effect/tsgo and patches Oxlint and TypeScript",
+          label: "effect",
+          value: "effect",
+        },
+        {
           hint: "Jest test hygiene: focused/disabled tests, matcher and snapshot discipline",
           label: "jest",
           value: "jest",

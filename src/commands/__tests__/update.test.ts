@@ -6,17 +6,35 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import updateCommand from "#commands/update.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
+import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,
+  createRunnerTestContext,
   runCommand,
 } from "./command-test-helpers.ts"
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
+}
+
+/**
+ * A project with the effect preset where only Oxlint is off its pin.
+ */
+function makeEffectFiles(oxlintConfig: string) {
+  return createFileSystemTestContext({
+    files: {
+      "oxlint.config.ts": oxlintConfig,
+      "package.json": manifest({
+        devDependencies: { "@effect/tsgo": effectTsgo.version, oxlint: "1.0.0" },
+        scripts: { check: "adamantite check", prepare: "adamantite prepare" },
+      }),
+    },
+  })
 }
 
 describe("update", () => {
@@ -172,6 +190,64 @@ describe("update", () => {
       const exit = yield* runCommand(updateCommand, [], {
         files,
         layers: [prompter.layer, installer.layer],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.outros).toEqual(["❌ Update failed"])
+    })
+  )
+
+  it.effect("patch for the effect preset after an update that does not touch @effect/tsgo", () =>
+    Effect.gen(function* () {
+      const files = makeEffectFiles(toOxlintTsConfigContent(["effect"]))
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [prompter.layer, installer.layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls[0]?.packages).toContain(`oxlint@${oxlint.version}`)
+      expect(installer.calls[0]?.packages).not.toContain(`@effect/tsgo@${effectTsgo.version}`)
+      expect(runner.invocations).toEqual([
+        expect.objectContaining({
+          args: ["patch", "--oxlint", "--typescript"],
+          command: "effect-tsgo",
+        }),
+      ])
+    })
+  )
+
+  it.effect("skip the patch without the effect preset", () =>
+    Effect.gen(function* () {
+      const files = makeEffectFiles(toOxlintTsConfigContent([]))
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [prompter.layer, installer.layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations).toEqual([])
+    })
+  )
+
+  it.effect("fail when the patch fails after an update", () =>
+    Effect.gen(function* () {
+      const files = makeEffectFiles(toOxlintTsConfigContent(["effect"]))
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+      const runner = createRunnerTestContext([1])
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [prompter.layer, installer.layer, runner.layer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)

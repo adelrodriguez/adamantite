@@ -1,5 +1,6 @@
 import { defineConfigTooling } from "#lib/integrations/tooling/base.ts"
 import {
+  detectKnipWorkspace,
   inspectRequiredKnipConfig,
   toKnipTsConfigContent,
 } from "#lib/integrations/tooling/knip/config.ts"
@@ -11,6 +12,7 @@ export default defineConfigTooling({
     config: "knip.config.ts",
     legacyConfigs: ["knip.json", "knip.jsonc"],
   },
+  detectWorkspace: detectKnipWorkspace,
   inspectConfig: inspectRequiredKnipConfig,
   name: "knip",
   purpose: "the managed `analyze` script",

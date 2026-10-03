@@ -101,7 +101,10 @@ warns the user and points to `adamantite doctor`.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
-- `update` updates managed dependencies, then emits any remaining doctor findings.
+- `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
+  preset, then emits any remaining doctor findings.
+- `prepare` patches Oxlint and TypeScript for the effect preset. The target project's
+  `prepare` script runs it after each install.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -148,6 +151,19 @@ and is made with `defineManagedPlugin` from `plugins/define.ts`, so the package 
 that folder's `index.ts`; init and doctor read the list. The preset names the plugin by its bare package name
 in `jsPlugins`, and Oxlint resolves it from the target project. The pin is the devDependency
 version in `package.json`. See ADR 0003.
+
+`@effect/tsgo` for the `effect` preset is a managed plugin too, but it is not a `jsPlugins`
+package. Its `effecttsgo` rules exist only after `effect-tsgo patch --oxlint --typescript`
+replaces the Oxlint and TypeScript binaries in `node_modules`. While the preset is imported,
+`adamantite prepare` runs the patch from the target project's `prepare` script, and `init`
+and `update` run it after they install packages. The `@effect/tsgo` integration also manages
+that `prepare` script and the `@effect/language-service` entry in `tsconfig.json`. It lives in
+`plugins/effect-tsgo/`: `index.ts` exports the integration (`detect`, `update`, `patch`, and
+`assess`), and `prepare-script.ts`, `tsconfig.ts`, and `patch.ts` hold one concern each. The
+helpers do not import `index.ts` or each other. The Knip integration requires
+`ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
+`@effect/tsgo` ships patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript
+versions. See ADR 0007.
 
 ## Vendored bundles
 

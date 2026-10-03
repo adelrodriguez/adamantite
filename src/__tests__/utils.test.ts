@@ -484,7 +484,7 @@ describe("printTitle", () => {
     Effect.gen(function* () {
       const console = makeConsoleContext()
 
-      yield* printTitle().pipe(Effect.provide(Layer.merge(makeTerminalLayer(120), console.layer)))
+      yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(120), console.layer)))
 
       expect(console.capturedLogs.length).toBe(1)
       expect(console.capturedLogs[0]).toContain(".ooooo.")
@@ -495,7 +495,7 @@ describe("printTitle", () => {
     Effect.gen(function* () {
       const console = makeConsoleContext()
 
-      yield* printTitle().pipe(Effect.provide(Layer.merge(makeTerminalLayer(50), console.layer)))
+      yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(50), console.layer)))
 
       expect(console.capturedLogs.length).toBe(0)
     })
@@ -505,7 +505,7 @@ describe("printTitle", () => {
     Effect.gen(function* () {
       const console = makeConsoleContext()
 
-      yield* printTitle().pipe(Effect.provide(Layer.merge(makeTerminalLayer(), console.layer)))
+      yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(), console.layer)))
 
       expect(console.capturedLogs.length).toBe(0)
     })

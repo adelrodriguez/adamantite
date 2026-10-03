@@ -8,7 +8,9 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import initCommand from "#commands/init/index.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
@@ -377,6 +379,163 @@ describe("init", () => {
         expect(files.read("oxlint.config.ts")).toContain(
           'import reactDoctor from "adamantite/lint/react-doctor"'
         )
+      })
+    )
+
+    it.effect("install @effect/tsgo, patch, and configure the language service for effect", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--preset", "effect", "--typescript"],
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls[0]?.packages).toContain(`@effect/tsgo@${effectTsgo.version}`)
+        expect(files.read("oxlint.config.ts")).toContain(
+          'import effect from "adamantite/lint/effect"'
+        )
+        expect(readJson(files, "package.json")).toMatchObject({
+          scripts: { prepare: "adamantite prepare" },
+        })
+        expect(runner.invocations).toEqual([
+          expect.objectContaining({
+            args: ["patch", "--oxlint", "--typescript"],
+            command: "effect-tsgo",
+            stderr: "ignore",
+            stdout: "ignore",
+          }),
+        ])
+        expect(readJson(files, "tsconfig.json")).toEqual({
+          compilerOptions: {
+            plugins: [{ diagnostics: false, name: "@effect/language-service" }],
+          },
+          extends: "adamantite/typescript",
+        })
+      })
+    )
+
+    it.effect("ignore the language service plugin name in a new knip config", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--script", "analyze", "--preset", "effect"],
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read("knip.config.ts")).toContain(
+          "ignoreDependencies: ignoreDependencies.effect,"
+        )
+      })
+    )
+
+    it.effect("add adamantite prepare to the start of an existing prepare script", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "package.json": JSON.stringify({ name: "test-project", scripts: { prepare: "husky" } }),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--preset", "effect"],
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(readJson(files, "package.json")).toMatchObject({
+          scripts: { prepare: "adamantite prepare && (husky)" },
+        })
+        expect(runner.invocations).toHaveLength(1)
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message: expect.stringContaining("No `tsconfig.json` found"),
+        })
+      })
+    )
+
+    it.effect("patch a project that already uses the effect preset without selecting it", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+          files,
+          layers: [prompter.layer, installer.layer, runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toEqual([
+          expect.objectContaining({ args: ["patch", "--oxlint", "--typescript"] }),
+        ])
+      })
+    )
+
+    it.effect("warn and continue when the patch fails", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({ "tsconfig.json": "{}" })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext([1])
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--preset", "effect"],
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message: expect.stringContaining("Run `adamantite prepare` to see why the patch failed."),
+        })
+        expect(readJson(files, "tsconfig.json")).toEqual({
+          compilerOptions: {
+            plugins: [{ diagnostics: false, name: "@effect/language-service" }],
+          },
+        })
+      })
+    )
+
+    it.effect("give tsconfig guidance instead of editing it in a monorepo", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "package.json": monorepoPackageJson,
+          "tsconfig.json": "{}",
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--preset", "effect"],
+          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read("tsconfig.json")).toBe("{}")
+        expect(prompter.logs).toContainEqual({
+          level: "info",
+          message: expect.stringContaining("In a monorepo, add the Effect language service entry"),
+        })
       })
     )
 

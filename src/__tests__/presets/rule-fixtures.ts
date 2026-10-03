@@ -53,7 +53,7 @@ const OxlintJsonOutput = Schema.Struct({
     Schema.Struct({
       code: Schema.optional(Schema.String),
       filename: Schema.String,
-      labels: Schema.Array(Schema.Struct({ span: Schema.Struct({ line: Schema.Number }) })),
+      labels: Schema.Array(Schema.Struct({ span: Schema.Struct({ line: Schema.Finite }) })),
     })
   ),
 })

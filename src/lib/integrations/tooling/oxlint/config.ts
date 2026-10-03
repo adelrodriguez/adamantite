@@ -39,6 +39,7 @@ export const LINT_PRESETS = [
   "react-doctor",
   "nextjs",
   "vue",
+  "effect",
   "jest",
   "vitest",
   "node",

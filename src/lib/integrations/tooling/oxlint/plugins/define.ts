@@ -7,7 +7,11 @@ import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 const OXLINT_CONFIG_FILE = "oxlint.config.ts"
 
-const checkImportsLintPreset = Effect.fn("checkImportsLintPreset")(function* (
+/**
+ * Whether `oxlint.config.ts` imports the lint preset, such as `effect` for
+ * `adamantite/lint/effect`.
+ */
+export const checkImportsLintPreset = Effect.fn("checkImportsLintPreset")(function* (
   cwd: string,
   preset: string
 ) {

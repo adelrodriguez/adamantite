@@ -6,6 +6,7 @@ import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
@@ -184,10 +185,10 @@ describe("knip", () => {
     it.effect("report the preset list when the named import is missing", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true }).replace(
-            "import analyze, { ignoreDependencies } from",
-            "import analyze from"
-          ),
+          "knip.config.ts": toKnipTsConfigContent({
+            isMonorepo: true,
+            usesEffectPreset: false,
+          }).replace("import analyze, { ignoreDependencies } from", "import analyze from"),
           "package.json": JSON.stringify({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
@@ -206,7 +207,7 @@ describe("knip", () => {
     it.effect("accept a monorepo config that ignores sherif by reference", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true }),
+          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: false }),
           "package.json": JSON.stringify({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
@@ -217,6 +218,75 @@ describe("knip", () => {
         const result = yield* runAssess(files)
 
         expect(result.applicable && result.findings).toEqual([])
+      })
+    )
+
+    it.effect(
+      "require the effect ignore list when oxlint.config.ts imports the effect preset",
+      () =>
+        Effect.gen(function* () {
+          const packageJson = JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+          })
+          const missing = makeFiles({
+            "knip.config.ts": toKnipTsConfigContent(),
+            "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
+            "package.json": packageJson,
+          })
+          const configured = makeFiles({
+            "knip.config.ts": toKnipTsConfigContent({ isMonorepo: false, usesEffectPreset: true }),
+            "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
+            "package.json": packageJson,
+          })
+
+          const missingResult = yield* runAssess(missing)
+          const configuredResult = yield* runAssess(configured)
+
+          expect(missingResult.applicable && missingResult.findings).toEqual([
+            expect.objectContaining({
+              currentState: expect.stringContaining(
+                "`ignoreDependencies: ignoreDependencies.effect`"
+              ),
+              id: "invalid-knip-config",
+              reference: expect.objectContaining({
+                content: expect.stringContaining("ignoreDependencies: ignoreDependencies.effect,"),
+              }),
+            }),
+          ])
+          expect(configuredResult.applicable && configuredResult.findings).toEqual([])
+        })
+    )
+
+    it.effect("require both ignore lists in a monorepo that uses the effect preset", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: false }),
+          "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            scripts: { analyze: "adamantite analyze" },
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).toEqual([
+          expect.objectContaining({
+            goal: [
+              expect.stringContaining(
+                "`ignoreDependencies: [...ignoreDependencies.monorepo, ...ignoreDependencies.effect]`"
+              ),
+            ],
+            id: "invalid-knip-config",
+          }),
+        ])
+        expect(
+          toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: true }).includes(
+            "ignoreDependencies: [...ignoreDependencies.monorepo, ...ignoreDependencies.effect],"
+          )
+        ).toBe(true)
       })
     )
 

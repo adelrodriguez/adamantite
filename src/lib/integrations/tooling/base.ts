@@ -359,20 +359,37 @@ export function definePackageTooling<Error = never, Requirements = never>(option
 }
 
 /**
+ * The target-project facts that a managed config file depends on.
+ */
+export interface ToolingWorkspace {
+  readonly isMonorepo: boolean
+}
+
+export const detectToolingWorkspace = Effect.fn("detectToolingWorkspace")(function* (cwd: string) {
+  return { isMonorepo: yield* checkIsMonorepo(cwd) } satisfies ToolingWorkspace
+})
+
+/**
  * A tooling integration that manages a package version and a TypeScript config file with legacy
  * JSON predecessors (Knip, Oxfmt).
  */
-export function defineConfigTooling(options: {
+export function defineConfigTooling<
+  Workspace extends ToolingWorkspace,
+  Error,
+  Requirements,
+>(options: {
   /**
    * The config file content `init` writes and doctor findings reference. It can depend on the
-   * workspace shape.
+   * workspace.
    */
-  readonly configContent: (workspace: { readonly isMonorepo: boolean }) => string
+  readonly configContent: (workspace: Workspace) => string
   readonly configFiles: ToolingConfigFiles
-  readonly inspectConfig: (
-    content: string,
-    workspace: { readonly isMonorepo: boolean }
-  ) => RequiredConfigInspection
+  /**
+   * Read the workspace facts for `configContent` and `inspectConfig`. Use `detectToolingWorkspace`
+   * when the config depends only on the monorepo shape.
+   */
+  readonly detectWorkspace: (cwd: string) => Effect.Effect<Workspace, Error, Requirements>
+  readonly inspectConfig: (content: string, workspace: Workspace) => RequiredConfigInspection
   /**
    * Findings for retired managed scripts. While any exist, the integration stays applicable and
    * reports them so the scripts get removed.
@@ -412,7 +429,7 @@ export function defineConfigTooling(options: {
 
         const state = yield* detect(cwd)
         const packageActions = getPackageActions(packageJson, options, options.purpose)
-        const workspace = { isMonorepo: yield* checkIsMonorepo(cwd) }
+        const workspace = yield* options.detectWorkspace(cwd)
         const configContent = options.configContent(workspace)
         const inspection =
           state.active?.format === "ts"
@@ -441,7 +458,7 @@ export function defineConfigTooling(options: {
         const path = yield* Path.Path
         yield* writeFile(
           path.join(cwd, options.configFiles.config),
-          options.configContent({ isMonorepo: yield* checkIsMonorepo(cwd) })
+          options.configContent(yield* options.detectWorkspace(cwd))
         )
       }),
     detect,

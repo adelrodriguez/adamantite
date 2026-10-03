@@ -10,6 +10,7 @@ import checkCommand from "#commands/check.ts"
 import doctorCommand from "#commands/doctor.ts"
 import fixCommand from "#commands/fix.ts"
 import initCommand from "#commands/init/index.ts"
+import prepareCommand from "#commands/prepare.ts"
 import updateCommand from "#commands/update.ts"
 import { CodingAgents } from "#lib/execution/coding-agents.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
@@ -27,6 +28,7 @@ const commands = [
   doctorCommand,
   fixCommand,
   initCommand,
+  prepareCommand,
   updateCommand,
 ] as const
 const commandNames: ReadonlySet<string> = new Set(commands.map((command) => command.name))

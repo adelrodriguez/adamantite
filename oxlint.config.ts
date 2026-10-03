@@ -1,6 +1,7 @@
 import { defineConfig } from "oxlint"
 import antislop from "./presets/lint/antislop.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
+import effect from "./presets/lint/effect.ts"
 import node from "./presets/lint/node.ts"
 
 const TERMINAL_IMPORTS = {
@@ -20,7 +21,7 @@ const LIB_LAYER_MESSAGE =
   'Lib layers import only from lower layers: shared, then workspace and execution, then integrations, then assessment. See "Lib layers" in docs/architecture.md.'
 
 export default defineConfig({
-  extends: [core, node, antislop],
+  extends: [core, node, antislop, effect],
   ignorePatterns: [
     ...ignorePatterns,
     // Vendored plugin bundles are entirely generated; see scripts/vendor-plugins.ts.

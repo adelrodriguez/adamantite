@@ -87,8 +87,8 @@ Available setup values:
 
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
-- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `jest`, `vitest`,
-  `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
+- Presets: `react`, `react-strict`, `react-doctor`, `nextjs`, `vue`, `effect`, `jest`,
+  `vitest`, `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
@@ -214,7 +214,20 @@ adamantite doctor
 ```
 
 `update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
-`adamantite doctor` as the CI gate.
+`adamantite doctor` as the CI gate. After it installs packages, `update` patches Oxlint and TypeScript again for
+[the effect preset](#the-effect-preset).
+
+### `adamantite prepare`
+
+Patch Oxlint and TypeScript for [the effect preset](#the-effect-preset). The `prepare`
+script in `package.json` runs it after each install:
+
+```json
+{ "scripts": { "prepare": "adamantite prepare" } }
+```
+
+Without the effect preset, `prepare` does nothing and exits 0. If the patch fails, `prepare`
+fails, so the install fails.
 
 ### Pass arguments to underlying tools
 
@@ -248,6 +261,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/react-doctor` | Curated [React Doctor](https://github.com/millionco/react-doctor) rules for React state and effect misuse. See [the react-doctor preset](#the-react-doctor-preset).                                                                                                                    |
 | `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                             |
+| `adamantite/lint/effect`       | Curated [@effect/tsgo](https://github.com/Effect-TS/tsgo) rules for Effect misuse, such as effects that never run and unhandled errors. See [the effect preset](#the-effect-preset).                                                                                                   |
 | `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/jest`         | Jest rules.                                                                                                                                                                                                                                                                            |
 | `adamantite/lint/vitest`       | Vitest rules.                                                                                                                                                                                                                                                                          |
@@ -255,7 +269,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
 | `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
 | `adamantite/format`            | Oxfmt configuration.                                                                                                                                                                                                                                                                   |
-| `adamantite/analyze`           | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo.                                                                                                                                      |
+| `adamantite/analyze`           | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo and `ignoreDependencies.effect` with the effect preset.                                                                               |
 | `adamantite/typescript`        | Strict TypeScript configuration for TS 7+.                                                                                                                                                                                                                                             |
 
 When consuming the lint presets directly, hoist the core preset's ignore patterns onto the
@@ -337,6 +351,74 @@ the copyright holder to use the software as machine learning training data, or t
 as a hosted product. Read the
 [license](https://www.npmjs.com/package/oxlint-plugin-react-doctor?activeTab=code) before
 you select the preset.
+
+### The effect preset
+
+`adamantite/lint/effect` reports misuse of [Effect](https://effect.website), such as an
+effect that is neither yielded nor assigned (`floating-effect`), an unhandled error or
+requirement (`missing-effect-error`, `missing-effect-context`), and a combinator with a
+simpler replacement (`catch-all-to-map-error`). The rules come from
+[@effect/tsgo](https://github.com/Effect-TS/tsgo), the Effect Language Service for
+TypeScript-Go, and need Oxlint's type-aware mode.
+
+The rules are not a JavaScript plugin. They exist only after `effect-tsgo patch --oxlint
+--typescript` replaces the Oxlint, oxlint-tsgolint, and TypeScript binaries in
+`node_modules`. Without the patch, Oxlint stops with `Unknown plugin: 'effecttsgo'`. Each
+install of one of those packages restores the original binaries, so the patch must run again
+after it. Adamantite runs it in these places:
+
+- `adamantite prepare`, which the `prepare` script runs after a bare install, such as
+  `npm install`, `npm ci`, or a fresh clone in CI.
+- `adamantite init` and `adamantite update`, after they install packages. A named install,
+  such as `npm install -D oxlint@1.86.0`, does not run the `prepare` script. If you change one
+  of those versions yourself, doctor reports the version drift, and `adamantite update`
+  installs the pinned version and patches it.
+
+When you select the preset, `adamantite init` does these steps:
+
+- Installs the pinned `@effect/tsgo` and runs the patch.
+- Adds `"prepare": "adamantite prepare"` to `package.json`. If the project already has a
+  `prepare` script, init rewrites it as `adamantite prepare && (<existing>)`. A command such as
+  `cd ..` then cannot move the patch out of the project, and a fallback such as `|| true`
+  cannot hide a failed patch.
+- Adds `{ "name": "@effect/language-service", "diagnostics": false }` to
+  `compilerOptions.plugins` in `tsconfig.json`. Editors that use the workspace TypeScript
+  get Effect quick fixes, refactors, and hovers. Oxlint reports the diagnostics, so the
+  language service does not report them a second time.
+- Sets `ignoreDependencies.effect` in `knip.config.ts`, because no package has the name
+  `@effect/language-service`.
+
+`adamantite doctor` reports each missing part, and `adamantite update` keeps
+`@effect/tsgo` on its pinned version. Each `@effect/tsgo` release supports only some Oxlint,
+oxlint-tsgolint, and TypeScript versions, so Adamantite moves the pins together.
+
+A production-only install, such as `npm ci --omit=dev` or `pnpm install --prod`, still runs
+the `prepare` script, but it does not install Adamantite, so the install fails with
+`adamantite: not found`. Add `--ignore-scripts` to those installs. Nothing in a production
+install needs the patch.
+
+The rules read their options from the tsconfig entry. For example, `unstable-api-usage`
+reports each use of an API marked `@stability unstable`. To allow a module on purpose, list
+it in `allowedUnstableApis`:
+
+```jsonc
+{
+  "compilerOptions": {
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "diagnostics": false,
+        "allowedUnstableApis": ["effect/cli"],
+      },
+    ],
+  },
+}
+```
+
+The preset enables only rules that report Effect code. It does not ban platform APIs, such
+as `Date.now()` or `process.env`, in code that is not Effect code. Inside Effect code, it
+reports them, because `Clock`, `Random`, and `Config` let tests control them. See
+[ADR 0007](docs/adr/0007-effect-preset-patches-oxlint.md) for the criteria.
 
 ### The strict preset
 

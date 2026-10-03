@@ -20,13 +20,17 @@ function provideFiles(files: FileSystemTestContext) {
   return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
 }
 
+type AssessError =
+  | Effect.Error<ReturnType<typeof oxlint.assess>>
+  | Effect.Error<ReturnType<typeof tsgolint.assess>>
+
 // The explicit return type unifies the two `assess` signatures, which differ in their literals.
 function runAssess(integration: typeof oxlint | typeof tsgolint, files: FileSystemTestContext) {
   return readPackageJson(ROOT).pipe(
     Effect.flatMap(
       (
         packageJson
-      ): Effect.Effect<IntegrationAssessment, unknown, FileSystem.FileSystem | Path.Path> =>
+      ): Effect.Effect<IntegrationAssessment, AssessError, FileSystem.FileSystem | Path.Path> =>
         integration.assess(ROOT, packageJson)
     ),
     provideFiles(files)

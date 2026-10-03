@@ -6,7 +6,15 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
-    "types": ["node"]
+    "types": ["node"],
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        // Oxlint reports the Effect diagnostics through the effect preset.
+        "diagnostics": false,
+        "allowedUnstableApis": ["effect/Arbitrary", "effect/cli", "effect/process"]
+      }
+    ]
   },
   "include": ["src", "presets/**/*.ts", "scripts", "*.config.ts"],
   "exclude": [".packref", "dist", "node_modules", "src/__tests__/presets/fixtures"]

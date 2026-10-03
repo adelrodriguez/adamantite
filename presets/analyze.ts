@@ -1,6 +1,7 @@
 import type { KnipConfiguration } from "knip"
 
 interface SuggestedIgnoreDependencies {
+  effect: string[]
   monorepo: string[]
 }
 
@@ -11,6 +12,9 @@ interface SuggestedIgnoreDependencies {
  *
  * - `monorepo`: `adamantite analyze` runs Sherif in a monorepo, and Knip has no plugin that sees that
  *   reference, so it reports Sherif as an unused devDependency.
+ * - `effect`: the `effect` lint preset names the `@effect/language-service` plugin in
+ *   `tsconfig.json`. The patched TypeScript from `@effect/tsgo` supplies it, so no package has that
+ *   name, and Knip reports it as an unlisted dependency.
  *
  * ```ts
  * import analyze, { ignoreDependencies } from "adamantite/analyze"
@@ -19,6 +23,7 @@ interface SuggestedIgnoreDependencies {
  * ```
  */
 export const ignoreDependencies: SuggestedIgnoreDependencies = {
+  effect: ["@effect/language-service"],
   monorepo: ["sherif"],
 }
 

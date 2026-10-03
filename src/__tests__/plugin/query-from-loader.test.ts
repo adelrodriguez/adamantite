@@ -16,38 +16,121 @@ tester.run("query-from-loader", plugin.rules["query-from-loader"], {
   invalid: [
     {
       code: `${IMPORT}export function User() {\n  return useQuery({ queryFn: fetchUser, queryKey: ["user"] })\n}`,
-      errors: [{ column: 18, data: { hook: "useQuery" }, line: 3, messageId: "plainObject" }],
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 3,
+          messageId: "plainObject",
+        },
+      ],
     },
     {
       code: `${IMPORT}export function User() {\n  return useQuery(queryOptions({ queryFn: fetchUser, queryKey: ["user"] }))\n}`,
-      errors: [{ column: 18, data: { hook: "useQuery" }, line: 3, messageId: "localOptions" }],
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 3,
+          messageId: "localOptions",
+        },
+      ],
     },
     {
       code: `${IMPORT}export function User() {\n  const options = { queryFn: fetchUser, queryKey: ["user"] }\n  return useQuery(options)\n}`,
-      errors: [{ column: 18, data: { hook: "useQuery" }, line: 4, messageId: "plainObject" }],
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 4,
+          messageId: "plainObject",
+        },
+      ],
     },
     {
       code: `${IMPORT}export function User() {\n  const options = queryOptions({ queryFn: fetchUser, queryKey: ["user"] })\n  return useQuery(options)\n}`,
-      errors: [{ column: 18, data: { hook: "useQuery" }, line: 4, messageId: "localOptions" }],
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 4,
+          messageId: "localOptions",
+        },
+      ],
     },
     {
       code: `${IMPORT}const userQuery = { queryFn: fetchUser, queryKey: ["user"] }\nexport function User() {\n  return useQuery(userQuery)\n}`,
-      errors: [{ column: 18, data: { hook: "useQuery" }, line: 4, messageId: "plainObject" }],
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 4,
+          messageId: "plainObject",
+        },
+      ],
     },
     {
       code: 'import { useSuspenseQuery as useData } from "@tanstack/react-query"\nexport function User() {\n  return useData({ queryFn: fetchUser, queryKey: ["user"] })\n}',
       errors: [
-        { column: 17, data: { hook: "useSuspenseQuery" }, line: 3, messageId: "plainObject" },
+        {
+          column: 17,
+          data: { factory: "queryOptions", hook: "useSuspenseQuery", preload: "ensureQueryData" },
+          line: 3,
+          messageId: "plainObject",
+        },
       ],
     },
     {
       code: 'import * as Query from "@tanstack/react-query"\nexport function Users() {\n  return Query.useInfiniteQuery({ queryFn: fetchUsers, queryKey: ["users"] })\n}',
       errors: [
-        { column: 32, data: { hook: "useInfiniteQuery" }, line: 3, messageId: "plainObject" },
+        {
+          column: 32,
+          data: {
+            factory: "infiniteQueryOptions",
+            hook: "useInfiniteQuery",
+            preload: "ensureInfiniteQueryData",
+          },
+          line: 3,
+          messageId: "plainObject",
+        },
+      ],
+    },
+    {
+      code: `${IMPORT}export function User() {\n  const options = { queryFn: fetchUser, queryKey: ["user"] } as const\n  return useQuery(options)\n}`,
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 4,
+          messageId: "plainObject",
+        },
+      ],
+    },
+    {
+      code: `${IMPORT}export function User() {\n  return useQuery({ queryFn: fetchUser, queryKey: ["user"] } satisfies Options)\n}`,
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 3,
+          messageId: "plainObject",
+        },
+      ],
+    },
+    {
+      code: `${IMPORT}export function User() {\n  const options = queryOptions({ queryFn: fetchUser, queryKey: ["user"] }) satisfies Options\n  return useQuery(options)\n}`,
+      errors: [
+        {
+          column: 18,
+          data: { factory: "queryOptions", hook: "useQuery", preload: "ensureQueryData" },
+          line: 4,
+          messageId: "localOptions",
+        },
       ],
     },
   ],
   valid: [
+    `${IMPORT}const userQuery = queryOptions({ queryFn: fetchUser, queryKey: ["user"] }) satisfies Options\nexport function User() {\n  return useQuery(userQuery)\n}`,
     `${IMPORT}const userQuery = queryOptions({ queryFn: fetchUser, queryKey: ["user"] })\nexport function User() {\n  return useQuery(userQuery)\n}`,
     `${IMPORT}export function User({ id }: { id: string }) {\n  return useQuery(userQuery(id))\n}`,
     `${IMPORT}export function User({ id }: { id: string }) {\n  const options = userQuery(id)\n  return useQuery(options)\n}`,

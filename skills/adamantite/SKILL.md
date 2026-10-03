@@ -49,7 +49,9 @@ outside tests.
 The `tanstack` preset needs no extra package. Its `adamantite/query-from-loader` rule reports
 TanStack Query hooks that take a plain options object or a `queryOptions()` call made inside a
 function; define the query once with `queryOptions()` at module scope or in an exported factory,
-preload it in the route loader, and pass the same options to the hook. Its
+preload it in the route loader with `ensureQueryData()`, and pass the same options to the hook. For
+`useInfiniteQuery` and `useSuspenseInfiniteQuery`, use `infiniteQueryOptions()` and
+`ensureInfiniteQueryData()`. Its
 `adamantite/no-query-data-in-state` rule reports `useState` initialized from query data; read the
 value from the query result and keep only the user's edits in state. Do not wrap options in a
 spread object only to silence `query-from-loader`.

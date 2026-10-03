@@ -16,6 +16,11 @@ and `useSuspenseInfiniteQuery` from `@tanstack/react-query` when the options arg
   also reported: `queryOptions()` gives the query key and data types that the loader and
   the hook share.
 
+The rule looks through type-only wrappers, such as `as const` and `satisfies`. Each
+message names the matching factory and preload method: `queryOptions()` and
+`ensureQueryData()` for the regular hooks, and `infiniteQueryOptions()` and
+`ensureInfiniteQueryData()` for the infinite hooks.
+
 Other arguments are allowed: imports, parameters, member expressions, and calls such as
 `userQuery(id)`. The rule checks one file at a time, so it cannot prove that a loader
 preloads the options. It moves queries toward shared definitions, and the loader stays a

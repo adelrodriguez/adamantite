@@ -363,7 +363,9 @@ Like `react-strict`, it needs no extra package.
   and `useSuspenseInfiniteQuery` calls that take a plain options object or a `queryOptions()`
   call made inside a function. Define each query once with `queryOptions()` at module scope
   or in an exported factory such as `userQuery(id)`, preload it in the route loader with
-  `queryClient.ensureQueryData()`, and pass the same options to the hook. Then a route with
+  `queryClient.ensureQueryData()`, and pass the same options to the hook. For the infinite
+  hooks, use `infiniteQueryOptions()` and `queryClient.ensureInfiniteQueryData()`. The rule
+  looks through type-only wrappers such as `as const` and `satisfies`. Then a route with
   `preload="intent"` renders from the cache without a request waterfall. An object that
   spreads shared options, such as `{ ...userQuery(id), select }`, stays allowed.
 - `adamantite/no-query-data-in-state` reports `useState` calls whose initial value comes from

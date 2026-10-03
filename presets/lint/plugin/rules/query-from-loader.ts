@@ -15,6 +15,11 @@ const QUERY_HOOKS: ReadonlySet<string> = new Set([
   "useSuspenseQuery",
 ])
 
+const INFINITE_QUERY_HOOKS: ReadonlySet<string> = new Set([
+  "useInfiniteQuery",
+  "useSuspenseInfiniteQuery",
+])
+
 const OPTIONS_FACTORIES: ReadonlySet<string> = new Set(["infiniteQueryOptions", "queryOptions"])
 
 function findVariable(context: Context, identifier: ESTree.Node & { readonly name: string }) {
@@ -66,6 +71,16 @@ const rule: Rule = {
      * rule cannot tell. `inModule` is true when the expression sits at module scope.
      */
     function classify(options: ESTree.Node, inModule: boolean): MessageId | undefined {
+      // `as const`, `satisfies`, and other type-only wrappers do not change where options come from.
+      if (
+        options.type === "TSAsExpression"
+        || options.type === "TSNonNullExpression"
+        || options.type === "TSSatisfiesExpression"
+        || options.type === "TSTypeAssertion"
+      ) {
+        return classify(options.expression, inModule)
+      }
+
       if (options.type === "ObjectExpression") {
         // `{ ...userQuery(id), select }` extends shared options.
         return options.properties.some((property) => property.type === "SpreadElement")
@@ -112,7 +127,11 @@ const rule: Rule = {
           const messageId = classify(options, false)
 
           if (messageId !== undefined) {
-            context.report({ data: { hook: name }, messageId, node: options })
+            const data = INFINITE_QUERY_HOOKS.has(name)
+              ? { factory: "infiniteQueryOptions", hook: name, preload: "ensureInfiniteQueryData" }
+              : { factory: "queryOptions", hook: name, preload: "ensureQueryData" }
+
+            context.report({ data, messageId, node: options })
           }
         }
       },
@@ -121,13 +140,13 @@ const rule: Rule = {
   meta: {
     docs: {
       description:
-        "Require TanStack Query hooks to take options defined once with `queryOptions()`, so a route loader can preload the same query.",
+        "Require TanStack Query hooks to take options defined once with `queryOptions()` or `infiniteQueryOptions()`, so a route loader can preload the same query.",
     },
     messages: {
       localOptions:
-        "`{{hook}}` takes query options created inside a function, so a route loader cannot preload the same query. Move the `queryOptions()` call to module scope, or into an exported factory such as `userQuery(id)`, preload it in the route loader with `queryClient.ensureQueryData()`, and pass the same options here.",
+        "`{{hook}}` takes query options created inside a function, so a route loader cannot preload the same query. Move the `{{factory}}()` call to module scope, or into an exported factory such as `userQuery(id)`, preload it in the route loader with `queryClient.{{preload}}()`, and pass the same options here.",
       plainObject:
-        "`{{hook}}` takes a plain options object instead of options defined with `queryOptions()`. Define the options once with `queryOptions()` in a module that the route loader also imports, preload them in the loader with `queryClient.ensureQueryData()`, and pass the same options here.",
+        "`{{hook}}` takes a plain options object instead of options defined with `{{factory}}()`. Define the options once with `{{factory}}()` in a module that the route loader also imports, preload them in the loader with `queryClient.{{preload}}()`, and pass the same options here.",
     },
     schema: [],
     type: "suggestion",

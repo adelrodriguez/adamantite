@@ -158,8 +158,11 @@ replaces the Oxlint and TypeScript binaries in `node_modules`. While the preset 
 `adamantite prepare` runs the patch from the target project's `prepare` script, and `init`
 and `update` run it after they install packages. The `@effect/tsgo` integration also manages
 that `prepare` script and the `@effect/language-service` entry in `tsconfig.json`. It lives in
-`plugins/effect-tsgo/`: `index.ts` exports the integration (`detect`, `update`, `patch`, and
-`assess`), and `prepare-script.ts`, `tsconfig.ts`, and `patch.ts` hold one concern each. The
+`plugins/effect-tsgo/`: `index.ts` is one `defineManagedPlugin` call, and
+`prepare-script.ts`, `tsconfig.ts`, and `patch.ts` hold one concern each.
+`defineManagedPlugin` takes an optional `assess` for findings beyond the package, which runs
+only while the plugin applies, and keeps other options, such as `detect`, `update`, and
+`patch`, as methods of the integration. The
 helpers do not import `index.ts` or each other. The Knip integration requires
 `ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
 `@effect/tsgo` ships patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript

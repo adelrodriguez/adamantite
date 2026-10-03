@@ -15,32 +15,16 @@ import {
 } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/tsconfig.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
-const plugin = defineManagedPlugin({
-  name: "@effect/tsgo",
-  preset: "effect",
-  version: getDependencyVersion("@effect/tsgo"),
-})
+const NAME = "@effect/tsgo"
 
-export default {
-  ...plugin,
+export default defineManagedPlugin({
   assess: (cwd: string, packageJson: PackageJson) =>
     Effect.gen(function* () {
-      const assessment = yield* plugin.assess(cwd, packageJson)
-
-      if (!assessment.applicable) {
-        return assessment
-      }
-
-      const tsconfig = yield* assessTsconfigPlugin(cwd, plugin.name)
+      const tsconfig = yield* assessTsconfigPlugin(cwd, NAME)
 
       return {
-        ...assessment,
-        findings: [
-          ...assessment.findings,
-          ...assessPrepareScript(packageJson, plugin.name),
-          ...tsconfig.findings,
-        ],
-        warnings: [...assessment.warnings, ...tsconfig.warnings],
+        findings: [...assessPrepareScript(packageJson, NAME), ...tsconfig.findings],
+        warnings: tsconfig.warnings,
       }
     }),
   /**
@@ -48,7 +32,9 @@ export default {
    * project runs Oxlint does not matter, because Oxlint cannot load the preset unpatched.
    */
   detect: (cwd: string) => checkImportsLintPreset(cwd, "effect"),
+  name: NAME,
   patch: runPatch,
+  preset: "effect",
   /**
    * Write the `prepare` script that runs `adamantite prepare`, and the language service entry in
    * `tsconfig.json`.
@@ -60,4 +46,5 @@ export default {
         tsconfig: yield* updateTsconfigPlugin(cwd),
       }
     }),
-}
+  version: getDependencyVersion("@effect/tsgo"),
+})

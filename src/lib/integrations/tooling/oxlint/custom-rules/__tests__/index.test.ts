@@ -327,6 +327,28 @@ describe("custom-rules", () => {
     })
   )
 
+  it.effect("skip an exports pattern whose `*` would match nothing, as Node.js does", () =>
+    Effect.gen(function* () {
+      const files = makeToolingFiles(
+        "@acme/lint/foo",
+        { "./*": "./fallback/*.ts", "./foo*": "./special.ts" },
+        {
+          "fallback/foo.ts": [
+            'import custom from "adamantite/lint/custom"',
+            "",
+            'export default custom({ dir: "../rules", name: "acme" })',
+            "",
+          ].join("\n"),
+          "special.ts": EMPTY_CONFIG,
+        }
+      )
+
+      const findings = getFindings(yield* runAssess(files))
+
+      expect(findings.map((finding) => finding.id)).toEqual([ENUM_FINDING])
+    })
+  )
+
   it.effect(
     "warn about a workspace import that doctor cannot resolve, and skip the folder check",
     () =>

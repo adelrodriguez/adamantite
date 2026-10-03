@@ -152,7 +152,8 @@ function resolvePackageTarget(workspacePackage: WorkspacePackage, subpath: strin
         && rest.length === 0
         && key.startsWith(prefix)
         && key.endsWith(suffix)
-        && key.length >= prefix.length + suffix.length
+        // Node.js requires `*` to match at least one character.
+        && key.length > prefix.length + suffix.length
 
       return matches
         ? { match: key.slice(prefix.length, key.length - suffix.length), target }

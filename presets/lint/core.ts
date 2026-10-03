@@ -65,7 +65,7 @@ export const ignorePatterns: string[] = [
   "**/worker-configuration.d.ts",
 ]
 
-const config: OxlintConfig = {
+const config: OxlintConfig & { ignorePatterns: string[] } = {
   ignorePatterns,
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   rules: {

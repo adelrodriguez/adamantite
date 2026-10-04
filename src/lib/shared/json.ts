@@ -9,12 +9,14 @@ import * as Predicate from "effect/Predicate"
 import {
   type FormattingOptions,
   type JSONPath,
+  type Node,
   type ParseError,
   applyEdits,
   findNodeAtLocation,
   modify,
   parse,
   parseTree,
+  visit,
 } from "jsonc-parser"
 import { FailedToMergeConfig, FailedToParseFile } from "#lib/shared/errors.ts"
 
@@ -56,6 +58,11 @@ function detectFormattingOptions(content: string): FormattingOptions {
     : { eol, insertSpaces: true, tabSize: indentation.length }
 }
 
+// Read own keys only, so that a key such as `toString` does not find an Object method.
+function getOwnValue(object: Schema.JsonObject, key: string): Schema.Json | undefined {
+  return Object.hasOwn(object, key) ? object[key] : undefined
+}
+
 function collectJsonChanges(
   current: Schema.Json | undefined,
   next: Schema.Json | undefined,
@@ -67,7 +74,9 @@ function collectJsonChanges(
       ...Object.keys(next).filter((key) => !Object.hasOwn(current, key)),
     ]
 
-    return keys.flatMap((key) => collectJsonChanges(current[key], next[key], [...path, key]))
+    return keys.flatMap((key) =>
+      collectJsonChanges(getOwnValue(current, key), getOwnValue(next, key), [...path, key])
+    )
   }
 
   return Equal.equals(current, next) ? [] : [[path, next]]
@@ -77,30 +86,59 @@ function collectJsonChanges(
 const TRAILING_COMMENT_REGEX =
   /^(?<comma>[ \t]*,)?(?<comment>(?:[ \t]*(?:\/\/[^\r\n]*|\/\*[^\r\n]*?\*\/))+)/u
 
-function countKeys(text: string, path: JSONPath): number {
+// The first property with the last key of `path`, when a later property repeats that key.
+function findShadowedProperty(text: string, path: JSONPath): Node | undefined {
   const key = path.at(-1)
   const root = parseTree(text)
   const parent = root && findNodeAtLocation(root, path.slice(0, -1))
+  const properties =
+    parent?.type === "object"
+      ? (parent.children ?? []).filter((property) => property.children?.[0]?.value === key)
+      : []
 
-  return parent?.type === "object"
-    ? (parent.children ?? []).filter((property) => property.children?.[0]?.value === key).length
-    : 0
+  return properties.length > 1 ? properties[0] : undefined
+}
+
+// Delete the property and the comma after it, and keep the comments around them. The line goes too
+// when nothing else is on it.
+function removeProperty(text: string, property: Node): string {
+  const end = property.offset + property.length
+  let comma: number | undefined
+
+  visit(text, {
+    onSeparator: (character, offset) => {
+      if (comma === undefined && character === "," && offset >= end) {
+        comma = offset
+      }
+    },
+  })
+
+  // A later property repeats the key, so a comma always follows the property.
+  const uncommaed = comma === undefined ? text : text.slice(0, comma) + text.slice(comma + 1)
+  const removed = uncommaed.slice(0, property.offset) + uncommaed.slice(end)
+  const lineStart = removed.lastIndexOf("\n", property.offset - 1) + 1
+  const lineEnd = removed.indexOf("\n", property.offset)
+  const nextLineStart = lineEnd === -1 ? removed.length : lineEnd + 1
+
+  return removed.slice(lineStart, nextLineStart).trim() === ""
+    ? removed.slice(0, lineStart) + removed.slice(nextLineStart)
+    : removed
 }
 
 // Parsing keeps the last of repeated keys, but jsonc-parser edits the first. Remove the earlier
 // keys on the path, which have no effect, so the edit reaches the key that parsing keeps.
-function removeShadowedKeys(
-  text: string,
-  path: JSONPath,
-  formattingOptions: FormattingOptions
-): string {
+function removeShadowedKeys(text: string, path: JSONPath): string {
   let result = text
 
   for (const depth of path.keys()) {
     const prefix = path.slice(0, depth + 1)
 
-    while (countKeys(result, prefix) > 1) {
-      result = applyEdits(result, modify(result, prefix, undefined, { formattingOptions }))
+    for (
+      let shadowed = findShadowedProperty(result, prefix);
+      shadowed;
+      shadowed = findShadowedProperty(result, prefix)
+    ) {
+      result = removeProperty(result, shadowed)
     }
   }
 
@@ -163,12 +201,7 @@ export function updateJsonText(content: string, next: Schema.Json): string {
 
   return collectJsonChanges(current, next, []).reduce(
     (text, [path, value]) =>
-      setJsonValue(
-        removeShadowedKeys(text, path, formattingOptions),
-        path,
-        value,
-        formattingOptions
-      ),
+      setJsonValue(removeShadowedKeys(text, path), path, value, formattingOptions),
     content
   )
 }

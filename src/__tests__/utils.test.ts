@@ -350,6 +350,23 @@ describe("updateJsonText", () => {
     ).toBe('{\n  "a": true,\n  "b": 1\n}\n')
   })
 
+  it("keep the comments around a repeated key that it removes", () => {
+    expect(
+      updateJsonText(
+        '{\n  "tabSize": 4, // team preference\n  "save": false,\n  // effective setting\n  "save": false\n}\n',
+        { save: true, tabSize: 4 }
+      )
+    ).toBe('{\n  "tabSize": 4, // team preference\n  // effective setting\n  "save": true\n}\n')
+  })
+
+  it("keep the comment before the kept key when the removed key comes first", () => {
+    expect(
+      updateJsonText('{\n  "save": false,\n  // effective setting\n  "save": false\n}\n', {
+        save: true,
+      })
+    ).toBe('{\n  // effective setting\n  "save": true\n}\n')
+  })
+
   it("add a key to the last of repeated objects", () => {
     expect(
       updateJsonText('{\n  "a": { "x": 1 },\n  "a": { "y": 2 }\n}\n', { a: { y: 2, z: 3 } })
@@ -358,6 +375,12 @@ describe("updateJsonText", () => {
 
   it("remove a key that the next value does not have", () => {
     expect(updateJsonText('{\n  "a": 1,\n  "b": 2\n}\n', { b: 2 })).toBe('{\n  "b": 2\n}\n')
+  })
+
+  it("remove a key that has the name of an Object method", () => {
+    expect(updateJsonText('{\n  "toString": false,\n  "a": 1\n}\n', { a: 1 })).toBe(
+      '{\n  "a": 1\n}\n'
+    )
   })
 
   it("return the content unchanged when the value does not change", () => {

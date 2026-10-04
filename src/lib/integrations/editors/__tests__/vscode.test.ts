@@ -96,6 +96,23 @@ describe("vscode", () => {
       })
     )
 
+    it.effect("keep the comments and indentation of the existing config", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          ".vscode/settings.json": '{\n\t// Team setting\n\t"editor.tabSize": 4,\n}\n',
+        })
+
+        yield* vscode.update(ROOT).pipe(provideFiles(files))
+
+        const content = files.read(".vscode/settings.json")
+
+        expect(content).toMatch(
+          /^\{\n\t\/\/ Team setting\n\t"editor\.tabSize": 4,\n\t"\[css\]": \{\n\t\t"/u
+        )
+        expect(content).toContain('\t"editor.formatOnSave": true')
+      })
+    )
+
     it.effect("return InvalidConfigFormat when the config is not a JSON object", () =>
       Effect.gen(function* () {
         const files = makeFiles({ ".vscode/settings.json": "[]" })

@@ -176,6 +176,35 @@ describe("tsconfig", () => {
       })
     )
 
+    it.effect("keep the comments of the existing config", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "tsconfig.json": `{
+  // Shared base
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist", // build output
+  },
+}
+`,
+        })
+
+        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+
+        expect(files.read("tsconfig.json")).toBe(`{
+  // Shared base
+  "extends": [
+    "./tsconfig.base.json",
+    "adamantite/typescript"
+  ],
+  "compilerOptions": {
+    "outDir": "dist", // build output
+  },
+}
+`)
+      })
+    )
+
     it.effect("return InvalidConfigFormat when tsconfig.json is not a JSON object", () =>
       Effect.gen(function* () {
         const files = makeFiles({ "tsconfig.json": "true" })

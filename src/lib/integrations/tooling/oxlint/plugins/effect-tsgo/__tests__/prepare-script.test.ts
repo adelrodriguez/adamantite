@@ -56,6 +56,36 @@ describe("prepare-script", () => {
       })
     )
 
+    it.effect("keep the indentation of package.json", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json":
+            '{\n\t"name": "test-project",\n\t"scripts": {\n\t\t"test": "vitest"\n\t}\n}\n',
+        })
+
+        yield* updatePrepareScript(ROOT).pipe(provideFiles(files))
+
+        expect(files.read("package.json")).toBe(
+          `{\n\t"name": "test-project",\n\t"scripts": {\n\t\t"test": "vitest",\n\t\t"prepare": "${PREPARE}"\n\t}\n}\n`
+        )
+      })
+    )
+
+    it.effect("update the last of repeated prepare scripts, which is the one that runs", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json":
+            '{\n  "scripts": {\n    "prepare": "husky",\n    "prepare": "husky"\n  }\n}\n',
+        })
+
+        yield* updatePrepareScript(ROOT).pipe(provideFiles(files))
+
+        expect(files.read("package.json")).toBe(
+          `{\n  "scripts": {\n    "prepare": "${PREPARE} && (husky)"\n  }\n}\n`
+        )
+      })
+    )
+
     it.effect("keep a prepare script that already runs adamantite prepare", () =>
       Effect.gen(function* () {
         const packageJson = makePackageJson({ scripts: { prepare: `${PREPARE} && husky` } })

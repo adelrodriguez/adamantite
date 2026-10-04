@@ -7,8 +7,8 @@ import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Result from "effect/Result"
-import { readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { parseJson } from "#lib/shared/json.ts"
+import { readFile, writeFile } from "#lib/shared/filesystem.ts"
+import { parseJson, updateJsonText } from "#lib/shared/json.ts"
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
 const RANGE_PREFIX_REGEX = /^[\^~]/
@@ -28,10 +28,16 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
     return parsed as PackageJson
   })
 
+/**
+ * Writes the changed fields of `packageJson` into the existing `package.json`, and keeps the file's
+ * formatting.
+ */
 export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
-    yield* writeJsonFile(path.join(cwd, "package.json"), packageJson)
+    const packagePath = path.join(cwd, "package.json")
+    const content = yield* readFile(packagePath)
+    yield* writeFile(packagePath, updateJsonText(content, packageJson))
   })
 
 export type Script = keyof typeof MANAGED_SCRIPT_COMMANDS

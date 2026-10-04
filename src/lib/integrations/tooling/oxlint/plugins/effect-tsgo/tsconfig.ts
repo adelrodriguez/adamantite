@@ -3,8 +3,8 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import type { Finding } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { checkIsJsonArray, checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
+import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { checkIsJsonArray, checkIsJsonObject, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 const TSCONFIG_FILE = "tsconfig.json"
@@ -122,10 +122,13 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
     ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: false } : entry))
     : [...plugins, LANGUAGE_SERVICE_PLUGIN]
 
-  yield* writeJsonFile(configPath, {
-    ...config,
-    compilerOptions: { ...compilerOptions, plugins: nextPlugins },
-  })
+  yield* writeFile(
+    configPath,
+    updateJsonText(content.value, {
+      ...config,
+      compilerOptions: { ...compilerOptions, plugins: nextPlugins },
+    })
+  )
 
   return "updated" as const
 })

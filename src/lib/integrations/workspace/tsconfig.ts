@@ -6,8 +6,8 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
+import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
@@ -143,6 +143,6 @@ export default defineIntegration({
         ["extends", mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined)],
       ])
 
-      yield* writeJsonFile(configPath, newConfig)
+      yield* writeFile(configPath, updateJsonText(tsconfigFile, newConfig))
     }),
 })

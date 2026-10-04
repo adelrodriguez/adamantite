@@ -10,8 +10,8 @@ import {
   InvalidConfigFormat,
   VscodeCliNotFound,
 } from "#lib/shared/errors.ts"
-import { ensureDirectory, readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { ensureDirectory, readFile, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
+import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 const CONFIG = {
@@ -112,6 +112,6 @@ export default defineIntegration({
 
       const newConfig = yield* mergeConfig(CONFIG, existingConfig)
 
-      yield* writeJsonFile(settingsPath, newConfig)
+      yield* writeFile(settingsPath, updateJsonText(vscodeFile, newConfig))
     }),
 })

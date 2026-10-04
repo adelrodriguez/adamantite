@@ -77,6 +77,36 @@ function collectJsonChanges(
 const TRAILING_COMMENT_REGEX =
   /^(?<comma>[ \t]*,)?(?<comment>(?:[ \t]*(?:\/\/[^\r\n]*|\/\*[^\r\n]*?\*\/))+)/u
 
+function countKeys(text: string, path: JSONPath): number {
+  const key = path.at(-1)
+  const root = parseTree(text)
+  const parent = root && findNodeAtLocation(root, path.slice(0, -1))
+
+  return parent?.type === "object"
+    ? (parent.children ?? []).filter((property) => property.children?.[0]?.value === key).length
+    : 0
+}
+
+// Parsing keeps the last of repeated keys, but jsonc-parser edits the first. Remove the earlier
+// keys on the path, which have no effect, so the edit reaches the key that parsing keeps.
+function removeShadowedKeys(
+  text: string,
+  path: JSONPath,
+  formattingOptions: FormattingOptions
+): string {
+  let result = text
+
+  for (const depth of path.keys()) {
+    const prefix = path.slice(0, depth + 1)
+
+    while (countKeys(result, prefix) > 1) {
+      result = applyEdits(result, modify(result, prefix, undefined, { formattingOptions }))
+    }
+  }
+
+  return result
+}
+
 function setJsonValue(
   text: string,
   path: JSONPath,
@@ -132,7 +162,13 @@ export function updateJsonText(content: string, next: Schema.Json): string {
   const formattingOptions = detectFormattingOptions(content)
 
   return collectJsonChanges(current, next, []).reduce(
-    (text, [path, value]) => setJsonValue(text, path, value, formattingOptions),
+    (text, [path, value]) =>
+      setJsonValue(
+        removeShadowedKeys(text, path, formattingOptions),
+        path,
+        value,
+        formattingOptions
+      ),
     content
   )
 }

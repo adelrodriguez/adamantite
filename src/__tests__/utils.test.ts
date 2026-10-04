@@ -344,6 +344,18 @@ describe("updateJsonText", () => {
     )
   })
 
+  it("change the last of repeated keys, which is the one that parsing keeps", () => {
+    expect(
+      updateJsonText('{\n  "a": false,\n  "a": false,\n  "b": 1\n}\n', { a: true, b: 1 })
+    ).toBe('{\n  "a": true,\n  "b": 1\n}\n')
+  })
+
+  it("add a key to the last of repeated objects", () => {
+    expect(
+      updateJsonText('{\n  "a": { "x": 1 },\n  "a": { "y": 2 }\n}\n', { a: { y: 2, z: 3 } })
+    ).toBe('{\n  "a": {\n    "y": 2,\n    "z": 3\n  }\n}\n')
+  })
+
   it("remove a key that the next value does not have", () => {
     expect(updateJsonText('{\n  "a": 1,\n  "b": 2\n}\n', { b: 2 })).toBe('{\n  "b": 2\n}\n')
   })

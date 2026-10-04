@@ -10,7 +10,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { mergeConfig, parseJson } from "#lib/shared/json.ts"
+import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printTitle } from "#terminal/title.ts"
@@ -270,6 +270,106 @@ describe("mergeConfig", () => {
         }
       }),
     { arbitrary: { runs: 200 } }
+  )
+})
+
+describe("updateJsonText", () => {
+  it("keep comments and trailing commas when it adds keys", () => {
+    const content = `{
+  // Editor settings
+  "editor.tabSize": 4, // keep four
+  "[json]": {
+    /* user choice */
+    "editor.wordWrap": "on",
+  },
+}
+`
+
+    expect(
+      updateJsonText(content, {
+        "[json]": { "editor.defaultFormatter": "oxc.oxc-vscode", "editor.wordWrap": "on" },
+        "editor.formatOnSave": true,
+        "editor.tabSize": 4,
+      })
+    ).toBe(`{
+  // Editor settings
+  "editor.tabSize": 4, // keep four
+  "[json]": {
+    /* user choice */
+    "editor.wordWrap": "on",
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
+  "editor.formatOnSave": true,
+}
+`)
+  })
+
+  it("keep tab indentation and CRLF line endings", () => {
+    const content = '{\r\n\t"name": "test",\r\n\t"scripts": {\r\n\t\t"build": "tsc"\r\n\t}\r\n}\r\n'
+
+    expect(
+      updateJsonText(content, { name: "test", scripts: { build: "tsc", check: "oxlint" } })
+    ).toBe(
+      '{\r\n\t"name": "test",\r\n\t"scripts": {\r\n\t\t"build": "tsc",\r\n\t\t"check": "oxlint"\r\n\t}\r\n}\r\n'
+    )
+  })
+
+  it("replace a changed value and keep its comment", () => {
+    const content = `{
+    "extends": "base", // the old base
+    "strict": true
+}
+`
+
+    expect(updateJsonText(content, { extends: ["base", "adamantite/typescript"], strict: true }))
+      .toBe(`{
+    "extends": [
+        "base",
+        "adamantite/typescript"
+    ], // the old base
+    "strict": true
+}
+`)
+  })
+
+  it("keep a comment on the last property with that property when it adds a key", () => {
+    expect(updateJsonText('{\n  "a": 1 // note on a\n}\n', { a: 1, b: 2 })).toBe(
+      '{\n  "a": 1, // note on a\n  "b": 2\n}\n'
+    )
+  })
+
+  it("keep a comment and a trailing comma on the last property when it adds a key", () => {
+    expect(updateJsonText('{\n  "a": 1, // note on a\n}\n', { a: 1, b: 2 })).toBe(
+      '{\n  "a": 1, // note on a\n  "b": 2,\n}\n'
+    )
+  })
+
+  it("remove a key that the next value does not have", () => {
+    expect(updateJsonText('{\n  "a": 1,\n  "b": 2\n}\n', { b: 2 })).toBe('{\n  "b": 2\n}\n')
+  })
+
+  it("return the content unchanged when the value does not change", () => {
+    const content = '{ "a": [1, 2], /* note */ "b": { "c": null } }'
+
+    expect(updateJsonText(content, { a: [1, 2], b: { c: null } })).toBe(content)
+  })
+
+  const plainJson = Schema.MutableJson.check(
+    Schema.makeFilter((value) => !someKey(value, (key) => key === "__proto__"))
+  )
+
+  it.effect.prop(
+    "produce text that parses to the next value",
+    { current: plainJson, next: plainJson },
+    ({ current, next }) =>
+      Effect.gen(function* () {
+        const parsed = yield* parseJson(updateJsonText(JSON.stringify(current, null, 2), next))
+        // JSON has no negative zero, so compare with the parsed JSON form of `next`.
+        const expected = yield* parseJson(JSON.stringify(next))
+
+        expect(parsed).toEqual(expected)
+      }),
+    { arbitrary: { runs: 300 } }
   )
 })
 

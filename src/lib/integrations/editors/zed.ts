@@ -11,9 +11,16 @@ import {
   ensureDirectory,
   readFile,
   readFileIfExists,
+  writeFile,
   writeJsonFile,
 } from "#lib/shared/filesystem.ts"
-import { checkIsJsonArray, checkIsJsonObject, mergeConfig, parseJson } from "#lib/shared/json.ts"
+import {
+  checkIsJsonArray,
+  checkIsJsonObject,
+  mergeConfig,
+  parseJson,
+  updateJsonText,
+} from "#lib/shared/json.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
 const CONFIG = {
@@ -246,6 +253,6 @@ export default defineIntegration({
       const mergedConfig = yield* mergeConfig(CONFIG, existingConfig)
       const newConfig = deduplicateManagedFormatters(mergedConfig)
 
-      yield* writeJsonFile(settingsPath, newConfig)
+      yield* writeFile(settingsPath, updateJsonText(zedFile, newConfig))
     }),
 })

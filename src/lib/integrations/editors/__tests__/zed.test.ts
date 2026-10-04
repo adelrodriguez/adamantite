@@ -247,6 +247,23 @@ describe("zed", () => {
       })
     )
 
+    it.effect("keep the comments of the existing config", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [SETTINGS_PATH]: '// Zed settings\n{\n  // Light theme\n  "theme": "One Light",\n}\n',
+        })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        const content = files.read(SETTINGS_PATH)
+
+        expect(content).toMatch(
+          /^\/\/ Zed settings\n\{\n {2}\/\/ Light theme\n {2}"theme": "One Light",\n/u
+        )
+        expect(content).toContain('"format_on_save": "on"')
+      })
+    )
+
     it.effect("return InvalidConfigFormat when the config is not a JSON object", () =>
       Effect.gen(function* () {
         const files = makeFiles({ [SETTINGS_PATH]: "[]" })

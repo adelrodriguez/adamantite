@@ -2,7 +2,7 @@
 
 Use ASD-STE100 Simplified Technical English for all communication.
 
-Before you explore or change code, read `CONTEXT.md` and the relevant parts of
+Before you explore or change code, read `GLOSSARY.md` and the relevant parts of
 `docs/architecture.md`. Use the project's domain language.
 
 ## Agent skills

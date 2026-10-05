@@ -19,7 +19,7 @@ Thank you for contributing to Adamantite.
 
 3. Create a branch for the change.
 
-Read [CONTEXT.md](CONTEXT.md) before you change domain behavior. Use
+Read [GLOSSARY.md](GLOSSARY.md) before you change domain behavior. Use
 [docs/architecture.md](docs/architecture.md) to find the relevant module boundary.
 
 ## Development commands

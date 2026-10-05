@@ -18,7 +18,7 @@ const config: OxlintConfig = {
     "jest/no-duplicate-hooks": "error",
     "jest/no-export": "error",
     "jest/no-focused-tests": "error",
-    "jest/no-hooks": "error",
+    "jest/no-hooks": "off",
     "jest/no-identical-title": "error",
     "jest/no-interpolation-in-snapshots": "error",
     "jest/no-jasmine-globals": "error",

@@ -76,26 +76,11 @@ export function listFixtureRules(fixturesDir: string): string[] {
   return listDirectory(fixturesDir)
 }
 
-export interface FixtureDiagnostic {
-  /**
-   * Diagnostic code as Oxlint prints it, such as `vitest(valid-title)`.
-   */
-  readonly code: string | undefined
-  /**
-   * Fixture path relative to the fixtures directory, with forward slashes.
-   */
-  readonly file: string
-  readonly lines: readonly number[]
-}
-
 /**
- * Lint every file in the fixtures directory in one real Oxlint run through the preset, and return
- * every diagnostic. The preset's plugins resolve from the repository's `node_modules`, as they do
- * from a target project's.
+ * Lint every fixture in one real Oxlint run through the preset, and return one case per fixture
+ * file with the reports of that file's own rule.
  */
-export function lintFixtures(
-  options: Pick<RuleFixtureOptions, "fixturesDir" | "presetPath">
-): FixtureDiagnostic[] {
+export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[] {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-rule-fixtures-"))
 
   try {
@@ -132,43 +117,29 @@ export function lintFixtures(
       })
     }
 
-    return output.diagnostics.map((diagnostic) => ({
-      code: diagnostic.code,
-      file: diagnostic.filename
-        .split(sep)
-        .join("/")
-        .slice(FIXTURES_DIRECTORY.length + 1),
-      lines: diagnostic.labels.map((label) => label.span.line),
-    }))
+    const reportedLinesByFile = new Map<string, number[]>()
+
+    for (const diagnostic of output.diagnostics) {
+      const file = diagnostic.filename.split(sep).join("/")
+      const lines = reportedLinesByFile.get(`${diagnostic.code}:${file}`) ?? []
+
+      lines.push(...diagnostic.labels.map((label) => label.span.line))
+      reportedLinesByFile.set(`${diagnostic.code}:${file}`, lines)
+    }
+
+    const kinds: RuleFixtureKind[] = ["valid", "invalid"]
+
+    return listFixtureRules(options.fixturesDir).flatMap((rule) =>
+      kinds.flatMap((kind) =>
+        listDirectory(join(options.fixturesDir, rule, kind)).map((name) => {
+          const file = `${rule}/${kind}/${name}`
+          const key = `${options.namespace}(${rule}):${FIXTURES_DIRECTORY}/${file}`
+
+          return { file, kind, reportedLines: reportedLinesByFile.get(key) ?? [], rule }
+        })
+      )
+    )
   } finally {
     rmSync(tempDir, { force: true, recursive: true })
   }
-}
-
-/**
- * Lint every fixture in one real Oxlint run through the preset, and return one case per fixture
- * file with the reports of that file's own rule.
- */
-export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[] {
-  const reportedLinesByFile = new Map<string, number[]>()
-
-  for (const diagnostic of lintFixtures(options)) {
-    const lines = reportedLinesByFile.get(`${diagnostic.code}:${diagnostic.file}`) ?? []
-
-    lines.push(...diagnostic.lines)
-    reportedLinesByFile.set(`${diagnostic.code}:${diagnostic.file}`, lines)
-  }
-
-  const kinds: RuleFixtureKind[] = ["valid", "invalid"]
-
-  return listFixtureRules(options.fixturesDir).flatMap((rule) =>
-    kinds.flatMap((kind) =>
-      listDirectory(join(options.fixturesDir, rule, kind)).map((name) => {
-        const file = `${rule}/${kind}/${name}`
-        const key = `${options.namespace}(${rule}):${file}`
-
-        return { file, kind, reportedLines: reportedLinesByFile.get(key) ?? [], rule }
-      })
-    )
-  )
 }

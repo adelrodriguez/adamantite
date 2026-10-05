@@ -63,6 +63,7 @@
   "scripts": {
     "analyze": "knip",
     "build": "tsdown",
+    "build:verify": "pnpm run build && pnpm run test:build",
     "bump:deps": "pnpm update --interactive --latest",
     "check": "oxlint",
     "dev": "tsdown --watch",

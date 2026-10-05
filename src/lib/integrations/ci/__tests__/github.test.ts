@@ -397,16 +397,15 @@ describe("github", () => {
           )
         }
 
-        // The quality workflow pins the same actions independently; keep it from drifting.
-        const qualityWorkflow = readFileSync(
-          join(process.cwd(), ".github/workflows/quality.yml"),
-          "utf8"
-        )
+        // The adamantite and build workflows pin the same actions independently; keep them from drifting.
+        for (const file of ["adamantite.yml", "build.yml"]) {
+          const workflow = readFileSync(join(process.cwd(), ".github/workflows", file), "utf8")
 
-        for (const action of ["actions/checkout", "actions/setup-node", "pnpm/action-setup"]) {
-          expect(getActionReference(qualityWorkflow, action)).toBe(
-            getActionReference(referenceWorkflow, action)
-          )
+          for (const action of ["actions/checkout", "actions/setup-node", "pnpm/action-setup"]) {
+            expect(getActionReference(workflow, action)).toBe(
+              getActionReference(referenceWorkflow, action)
+            )
+          }
         }
       })
     )

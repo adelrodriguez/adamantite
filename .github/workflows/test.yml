@@ -12,8 +12,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  compatibility:
-    name: compatibility
+  compat:
+    name: compat
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -160,7 +160,7 @@ jobs:
         include:
           - name: unit
             command: pnpm run test:unit
-          - name: presets
+          - name: integration
             command: pnpm run test:presets
           - name: e2e
             command: pnpm run test:dist

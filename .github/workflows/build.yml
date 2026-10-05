@@ -1,4 +1,4 @@
-name: quality
+name: build
 
 on:
   pull_request:
@@ -12,20 +12,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    name: ${{ matrix.name }}
+  build:
+    name: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: check
-            command: pnpm run check
-          - name: format
-            command: pnpm run format --check
-          - name: analyze
-            command: pnpm run analyze
 
     steps:
       - name: Checkout
@@ -45,5 +35,5 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run ${{ matrix.name }}
-        run: ${{ matrix.command }}
+      - name: Build and verify package
+        run: pnpm run build:verify

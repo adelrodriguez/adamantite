@@ -650,7 +650,7 @@ npx skills add adelrodriguez/adamantite --skill adamantite
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository workflow. Contributors should
-also read the [domain glossary](CONTEXT.md) and [architecture reference](docs/architecture.md).
+also read the [domain glossary](GLOSSARY.md) and [architecture reference](docs/architecture.md).
 
 ## License
 

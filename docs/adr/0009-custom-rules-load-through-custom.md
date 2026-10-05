@@ -7,7 +7,7 @@ surface that the target project authors and Adamantite loads, so the division of
 explicit: Adamantite owns the wiring and the authoring guidance, and the target project
 owns the correctness and the tests of its rules.
 
-`CONTEXT.md` lists "plugin" as a term to avoid. User-facing text says "custom rules" and
+`GLOSSARY.md` lists "plugin" as a term to avoid. User-facing text says "custom rules" and
 "rules folder". "Plugin" stays only for the Oxlint `jsPlugins` entry and its `name`
 option, because those are Oxlint terms.
 

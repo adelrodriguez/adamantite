@@ -2,7 +2,7 @@
 
 Adamantite is a preset package and CLI that applies and maintains code-quality tooling in
 a target project. Product behavior is documented in the [README](../README.md), domain
-terms live in [CONTEXT.md](../CONTEXT.md), and durable tradeoffs belong in
+terms live in [GLOSSARY.md](../GLOSSARY.md), and durable tradeoffs belong in
 [decision records](./adr/README.md).
 
 ## Runtime

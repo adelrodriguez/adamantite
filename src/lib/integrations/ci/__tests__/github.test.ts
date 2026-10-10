@@ -400,11 +400,13 @@ describe("github", () => {
           cache: /cache: "(\w+)"/.exec(workflow)?.[1] ?? null,
           install: /- name: Install dependencies\n\s+run: (.+)/.exec(workflow)?.[1],
           jobs: getMatrixJobs(workflow),
+          run: /- name: Run .+\n\s+run: (.+)/.exec(workflow)?.[1],
         }).toStrictEqual({
           actions: expected.actions,
           cache: expected.cache,
           install: expected.install,
           jobs: [{ command: expected.command, name: "check" }],
+          run: `\${{ matrix.command }}`,
         })
       })
     )

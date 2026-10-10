@@ -10,7 +10,10 @@ import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
+import {
+  getImportedLintPresets,
+  toOxlintTsConfigContent,
+} from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
@@ -138,11 +141,11 @@ describe("init", () => {
         expect({
           "knip.config.ts": files.read("knip.config.ts"),
           "oxfmt.config.ts": files.read("oxfmt.config.ts"),
-          "oxlint.config.ts": files.read("oxlint.config.ts"),
+          presets: getImportedLintPresets(files.read("oxlint.config.ts")),
         }).toStrictEqual({
           "knip.config.ts": toKnipTsConfigContent(),
           "oxfmt.config.ts": toOxfmtTsConfigContent(),
-          "oxlint.config.ts": toOxlintTsConfigContent(["react"]),
+          presets: ["react"],
         })
         expect(readJson(files, "tsconfig.json")).toMatchObject({ extends: "adamantite/typescript" })
         expect(readJson(files, ".vscode/settings.json")).toMatchObject({
@@ -334,9 +337,12 @@ describe("init", () => {
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(files.read("oxlint.config.ts")).toBe(
-        toOxlintTsConfigContent(["react", "react-strict", "strict", "tanstack"])
-      )
+      expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
+        "react",
+        "react-strict",
+        "strict",
+        "tanstack",
+      ])
       expect(installer.calls[0]?.packages).toStrictEqual(
         expect.not.arrayContaining([expect.stringMatching(/strict|tanstack/)])
       )
@@ -419,7 +425,7 @@ describe("init", () => {
         const { exit, files } = yield* runEffectSetup()
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["effect"]))
+        expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["effect"])
         expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
             plugins: [{ diagnostics: false, name: "@effect/language-service" }],
@@ -916,7 +922,7 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["react"]))
+        expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["react"])
       })
     )
 

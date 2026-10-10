@@ -83,6 +83,10 @@ describe("getImportedLintPresets", () => {
     expect(getImportedLintPresets(content)).toStrictEqual(["react", "react-strict"])
   })
 
+  it("extend core and custom() in the default config", () => {
+    expect(toOxlintTsConfigContent()).toContain("  extends: [core, custom()],")
+  })
+
   it("list no preset for a config with only the core preset", () => {
     expect(getImportedLintPresets(toOxlintTsConfigContent())).toStrictEqual([])
   })

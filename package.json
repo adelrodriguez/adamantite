@@ -84,6 +84,7 @@
   "dependencies": {
     "@clack/prompts": "1.8.1",
     "@effect/platform-node": "4.0.0",
+    "@effect/platform-node-shared": "4.0.0",
     "@oxlint/plugins": "1.86.0",
     "defu": "6.1.7",
     "effect": "4.0.0",

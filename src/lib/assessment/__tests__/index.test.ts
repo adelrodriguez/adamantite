@@ -34,13 +34,41 @@ describe("renderAssessmentMarkdown", () => {
       "1.2.3"
     )
 
-    expect(prompt).toContain("# Adamantite doctor findings")
-    expect(prompt).toContain("This project uses Adamantite 1.2.3")
-    expect(prompt).toContain("## 1. Missing tool configuration")
-    expect(prompt).toContain("## Assessment warnings")
-    expect(prompt).toContain("- Found two competing tool configurations.")
-    expect(prompt).toContain('```json\n{ "extends": "adamantite/typescript" }\n```')
-    expect(prompt).toContain("Do not suppress or work around checks")
+    expect(prompt).toBe(
+      [
+        "# Adamantite doctor findings",
+        "",
+        "This project uses Adamantite 1.2.3 to manage linting, formatting, and type tooling.",
+        "`adamantite doctor` found 1 issue(s). Fix them so that `adamantite doctor` exits 0.",
+        "",
+        "## Assessment warnings",
+        "",
+        "Account for these warnings while fixing the findings:",
+        "",
+        "- Found two competing tool configurations.",
+        "",
+        "## 1. Missing tool configuration",
+        "",
+        "- **Current state:** `tool.config.ts` is missing.",
+        "- **Goal:**",
+        "  - Create `tool.config.ts`.",
+        "  - Preserve project settings.",
+        "- **Reference:**",
+        "",
+        "```json",
+        '{ "extends": "adamantite/typescript" }',
+        "```",
+        "- **Notes:**",
+        "  - Do not replace custom rules.",
+        "",
+        "## Verify",
+        "",
+        "Run `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, if it is not on PATH.",
+        "All findings above must be gone and it must exit 0.",
+        "Do not suppress or work around checks; fix the underlying state.",
+        "",
+      ].join("\n")
+    )
   })
 
   it("omit the Notes section when a finding has no notes", () => {

@@ -24,6 +24,10 @@ function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
 }
 
+function getHeadings(markdown: string) {
+  return markdown.match(/^#{1,2} .+$/gm) ?? []
+}
+
 function makeInteractiveTerminalLayer() {
   return Layer.succeed(TerminalCapabilities)({
     copyToClipboard: () => Effect.void,
@@ -42,6 +46,17 @@ function agentByCommand(command: string): CodingAgent {
   return agent
 }
 
+// Doctor reports no finding for format guidance in AGENTS.md, only for the script and the workflow
+// step.
+const LEGACY_FORMAT_AGENTS_GUIDANCE = [
+  "# AGENTS.md",
+  "",
+  "## Adamantite",
+  "",
+  "- Run `pnpm run format` after editing files. Direct command: `adamantite format`.",
+  "",
+].join("\n")
+
 const claudeAgent = agentByCommand("claude")
 const codexAgent = agentByCommand("codex")
 const geminiAgent = agentByCommand("gemini")
@@ -54,6 +69,28 @@ function makeFindingsFixture() {
         scripts: { analyze: "adamantite analyze" },
       }),
     },
+  })
+}
+
+// Runs doctor on the findings fixture in an interactive terminal where the user chooses to copy the
+// prompt.
+function runCopyResolution() {
+  return Effect.gen(function* () {
+    const files = makeFindingsFixture()
+    const copied: string[] = []
+    const prompter = createPrompterTestContext({ selectResponses: ["copy"] })
+    const runner = makeHandoffRunner()
+    const interactive = Layer.succeed(TerminalCapabilities)({
+      copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
+      isInteractive: Effect.succeed(true),
+    })
+
+    const exit = yield* runCommand(doctorCommand, [], {
+      files,
+      layers: [prompter.layer, runner.layer, interactive],
+    })
+
+    return { copied, exit, prompter }
   })
 }
 
@@ -196,12 +233,10 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.messages).toHaveLength(1)
-      expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
-      expect(prompter.messages[0]).toContain("## 1. Missing knip configuration")
-      expect(prompter.intros).toStrictEqual([])
-      expect(prompter.notes).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual([])
+      expect(prompter.messages.map(getHeadings)).toStrictEqual([
+        ["# Adamantite doctor findings", "## 1. Missing knip configuration", "## Verify"],
+      ])
+      expect(prompter).toMatchObject({ intros: [], notes: [], outros: [] })
     })
   )
 
@@ -221,11 +256,15 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.messages).toHaveLength(1)
-      expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
-      expect(prompter.messages[0]).toContain("Skipping `tsconfig.json` setup")
-      expect(prompter.logs).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual([])
+      expect(prompter).toMatchObject({
+        logs: [],
+        messages: [
+          expect.stringMatching(
+            /^# Adamantite doctor findings\n[\s\S]*Skipping `tsconfig\.json` setup/
+          ),
+        ],
+        outros: [],
+      })
     })
   )
 
@@ -242,64 +281,61 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.messages).toHaveLength(1)
-      expect(prompter.messages[0]).toContain("# Adamantite doctor warnings")
-      expect(prompter.messages[0]).toContain("No CI-compatible managed scripts were found")
-      expect(prompter.logs).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual([])
+      expect(prompter).toMatchObject({
+        logs: [],
+        messages: [
+          expect.stringMatching(
+            /^# Adamantite doctor warnings\n[\s\S]*No CI-compatible managed scripts were found/
+          ),
+        ],
+        outros: [],
+      })
     })
   )
 
-  it.effect("report the legacy format script and workflow step until both are removed", () =>
+  it.effect("report the legacy format script and workflow step", () =>
     Effect.gen(function* () {
-      const agentsGuidance = [
-        "# AGENTS.md",
-        "",
-        "## Adamantite",
-        "",
-        "- Run `pnpm run format` after editing files. Direct command: `adamantite format`.",
-        "",
-      ].join("\n")
-      const legacy = createFileSystemTestContext({
+      const files = createFileSystemTestContext({
         files: {
           ".github/workflows/adamantite.yml": "steps:\n  - run: pnpm run format --check\n",
-          "AGENTS.md": agentsGuidance,
+          "AGENTS.md": LEGACY_FORMAT_AGENTS_GUIDANCE,
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0" },
             scripts: { format: "adamantite format" },
           }),
         },
       })
-      const legacyPrompter = createPrompterTestContext()
+      const prompter = createPrompterTestContext()
 
-      const legacyExit = yield* runCommand(doctorCommand, [], {
-        files: legacy,
-        layers: [legacyPrompter.layer],
-      })
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
-      expect(Exit.isFailure(legacyExit)).toBe(true)
-      expect(legacyPrompter.messages).toHaveLength(1)
-      expect(legacyPrompter.messages[0]).toContain("Legacy format script")
-      expect(legacyPrompter.messages[0]).toContain("Legacy format workflow step")
-      expect(legacyPrompter.messages[0]).toContain("## 2.")
-      expect(legacyPrompter.messages[0]).not.toContain("## 3.")
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages.map(getHeadings)).toStrictEqual([
+        [
+          "# Adamantite doctor findings",
+          "## 1. Legacy format script",
+          "## 2. Legacy format workflow step",
+          "## Verify",
+        ],
+      ])
+    })
+  )
 
-      const migrated = createFileSystemTestContext({
+  it.effect("report nothing once the legacy format script and workflow step are removed", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
         files: {
           ".github/workflows/adamantite.yml": "steps:\n  - run: pnpm run lint\n",
-          "AGENTS.md": agentsGuidance,
+          "AGENTS.md": LEGACY_FORMAT_AGENTS_GUIDANCE,
           "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
         },
       })
-      const migratedPrompter = createPrompterTestContext()
+      const prompter = createPrompterTestContext()
 
-      const migratedExit = yield* runCommand(doctorCommand, [], {
-        files: migrated,
-        layers: [migratedPrompter.layer],
-      })
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
-      expect(Exit.isSuccess(migratedExit)).toBe(true)
-      expect(migratedPrompter.messages).toStrictEqual([])
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([])
     })
   )
 
@@ -361,65 +397,63 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toStrictEqual([])
-      expect(prompter.messages).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual([])
-      expect(prompter.intros).toStrictEqual([])
-      expect(prompter.notes).toStrictEqual([])
+      expect(prompter).toMatchObject({ intros: [], logs: [], messages: [], notes: [], outros: [] })
     })
   )
 
-  it.effect("show formatted findings and copy the Markdown prompt", () =>
+  it.effect("show each finding as a note and offer the resolutions", () =>
     Effect.gen(function* () {
-      const files = makeFindingsFixture()
-      const copied: string[] = []
-      const prompter = createPrompterTestContext({ selectResponses: ["copy"] })
-      const runner = makeHandoffRunner()
-      const interactive = Layer.succeed(TerminalCapabilities)({
-        copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
-        isInteractive: Effect.succeed(true),
-      })
-
-      const exit = yield* runCommand(doctorCommand, [], {
-        files,
-        layers: [prompter.layer, runner.layer, interactive],
-      })
+      const { exit, prompter } = yield* runCopyResolution()
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.notes).toStrictEqual([
-        expect.objectContaining({
-          message: expect.stringContaining(
-            "Current state\nThe managed `knip.config.ts` file is missing."
-          ),
-          title: "1. Missing knip configuration",
-        }),
-      ])
-      expect(prompter.selectCalls).toStrictEqual([
-        expect.objectContaining({
-          message: "How do you want to resolve these findings?",
-          options: [
-            expect.objectContaining({ label: "Hand off to Claude Code" }),
-            expect.objectContaining({ label: "Hand off to Codex" }),
-            expect.objectContaining({
-              label: "Copy the Markdown prompt for a coding agent",
-              value: "copy",
-            }),
-            expect.objectContaining({ label: "Do nothing", value: "done" }),
-          ],
-        }),
-      ])
-      expect(prompter.confirmCalls).toStrictEqual([])
-      expect(copied).toHaveLength(1)
-      expect(copied[0]).toContain("# Adamantite doctor findings")
-      expect(copied[0]).toContain("Do not suppress or work around checks")
-      expect(prompter.messages).toHaveLength(1)
-      expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
-      expect(prompter.messages[0]).toContain("Do not suppress or work around checks")
-      expect(prompter.logs).toContainEqual({
-        level: "success",
-        message: "The Markdown prompt was printed and sent to the terminal clipboard.",
+      expect(prompter).toMatchObject({
+        confirmCalls: [],
+        notes: [
+          {
+            message: expect.stringContaining(
+              "Current state\nThe managed `knip.config.ts` file is missing."
+            ),
+            title: "1. Missing knip configuration",
+          },
+        ],
+        selectCalls: [
+          {
+            message: "How do you want to resolve these findings?",
+            options: [
+              expect.objectContaining({ label: "Hand off to Claude Code" }),
+              expect.objectContaining({ label: "Hand off to Codex" }),
+              expect.objectContaining({
+                label: "Copy the Markdown prompt for a coding agent",
+                value: "copy",
+              }),
+              expect.objectContaining({ label: "Do nothing", value: "done" }),
+            ],
+          },
+        ],
       })
-      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
+    })
+  )
+
+  it.effect("print the Markdown prompt and copy it when the user chooses to copy", () =>
+    Effect.gen(function* () {
+      const { copied, exit, prompter } = yield* runCopyResolution()
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(copied).toStrictEqual(prompter.messages)
+      expect(prompter).toMatchObject({
+        logs: [
+          {
+            level: "success",
+            message: "The Markdown prompt was printed and sent to the terminal clipboard.",
+          },
+        ],
+        messages: [
+          expect.stringMatching(
+            /^# Adamantite doctor findings\n[\s\S]*Do not suppress or work around checks/
+          ),
+        ],
+        outros: ["⚠️ Doctor found issues."],
+      })
     })
   )
 
@@ -461,7 +495,12 @@ describe("doctor", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(nonProbeInvocations(runner)).toStrictEqual([
         expect.objectContaining({
-          args: [expect.stringContaining("# Adamantite doctor findings")],
+          // The seeded agent often cannot reach `adamantite` on PATH; the prompt must say how.
+          args: [
+            expect.stringMatching(
+              /^# Adamantite doctor findings\n[\s\S]*knip[\s\S]*`npx` or `pnpm exec`/
+            ),
+          ],
           command: "claude",
           detached: false,
           stderr: "inherit",
@@ -469,18 +508,16 @@ describe("doctor", () => {
           stdout: "inherit",
         }),
       ])
-      expect(nonProbeInvocations(runner)[0]?.args[0]).toContain("knip")
-      // The seeded agent often cannot reach `adamantite` on PATH; the prompt must say how.
-      expect(nonProbeInvocations(runner)[0]?.args[0]).toContain("`npx` or `pnpm exec`")
-      expect(prompter.logs).toContainEqual({
-        level: "info",
-        message: "Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
+      expect(prompter).toMatchObject({
+        logs: [
+          {
+            level: "info",
+            message: "Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
+          },
+          { level: "success", message: "All findings were resolved by Claude Code." },
+        ],
+        outros: ["✅ Doctor completed successfully!"],
       })
-      expect(prompter.logs).toContainEqual({
-        level: "success",
-        message: "All findings were resolved by Claude Code.",
-      })
-      expect(prompter.outros).toStrictEqual(["✅ Doctor completed successfully!"])
     })
   )
 

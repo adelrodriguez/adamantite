@@ -49,6 +49,17 @@ function provideAssessment(files: FileSystemTestContext) {
   )
 }
 
+function getMatrixJobs(workflow: string) {
+  return Array.from(workflow.matchAll(/- name: (.+)\n\s+command: (.+)/g), ([, name, command]) => ({
+    command,
+    name,
+  }))
+}
+
+function getSteps(workflow: string) {
+  return workflow.slice(workflow.indexOf("    steps:"))
+}
+
 function provideFileResolver(files: FileSystemTestContext) {
   return Effect.provide(
     Layer.mergeAll(
@@ -357,22 +368,66 @@ describe("github", () => {
         const exists = yield* github.detect(ROOT).pipe(provideFallback(files))
         expect(exists).toBe(true)
 
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("name: adamantite")
-        expect(content).toContain("verify:")
-        expect(content).toContain("strategy:")
-        expect(content).toContain("matrix:")
-        expect(content).toContain("include:")
-        expect(content).toContain("name: check")
-        expect(content).toContain("command: bun run check")
-        expect(content).toContain("Setup Node.js")
-        expect(content).toContain("actions/setup-node@v7")
-        expect(content).toContain('node-version: "lts/*"')
-        expect(content).toContain("Setup Bun")
-        expect(content).toContain("Cache dependencies")
-        expect(content).toContain("actions/cache@v6")
-        expect(content).toContain("~/.bun/install/cache")
-        expect(content).toContain("bun install --frozen-lockfile")
+        expect(files.read(WORKFLOW_PATH)).toBe(
+          [
+            "name: adamantite",
+            "",
+            "on:",
+            "  push:",
+            "    branches:",
+            "      - main",
+            "  pull_request:",
+            "    types: [opened, synchronize, reopened]",
+            "",
+            "permissions:",
+            "  contents: read",
+            "",
+            "concurrency:",
+            `  group: \${{ github.workflow }}-\${{ github.ref }}`,
+            "  cancel-in-progress: true",
+            "",
+            "jobs:",
+            "  verify:",
+            `    name: \${{ matrix.name }}`,
+            "    runs-on: ubuntu-latest",
+            "    timeout-minutes: 10",
+            "    strategy:",
+            "      fail-fast: false",
+            "      matrix:",
+            "        include:",
+            "          - name: check",
+            "            command: bun run check",
+            "",
+            "    steps:",
+            "      - name: Checkout",
+            "        uses: actions/checkout@v7",
+            "",
+            "      - name: Setup Node.js",
+            "        uses: actions/setup-node@v7",
+            "        with:",
+            '          node-version: "lts/*"',
+            "",
+            "      - name: Setup Bun",
+            "        uses: oven-sh/setup-bun@v2",
+            "",
+            "      - name: Cache dependencies",
+            "        uses: actions/cache@v6",
+            "        with:",
+            "          path: |",
+            "            ~/.bun/install/cache",
+            "            node_modules",
+            `          key: \${{ runner.os }}-bun-\${{ hashFiles('bun.lock') }}`,
+            "          restore-keys: |",
+            `            \${{ runner.os }}-bun-`,
+            "",
+            "      - name: Install dependencies",
+            "        run: bun install --frozen-lockfile",
+            "",
+            `      - name: Run \${{ matrix.name }}`,
+            `        run: \${{ matrix.command }}`,
+            "",
+          ].join("\n")
+        )
       })
     )
 
@@ -444,12 +499,30 @@ describe("github", () => {
           .pipe(provideFallback(files))
 
         const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("Setup pnpm")
-        expect(content).toContain("pnpm/action-setup@v4")
-        expect(content).toContain("actions/setup-node@v7")
-        expect(content).toContain('cache: "pnpm"')
-        expect(content).toContain("pnpm install --frozen-lockfile")
-        expect(content).toContain("command: pnpm run check")
+        expect(getMatrixJobs(content)).toStrictEqual([{ command: "pnpm run check", name: "check" }])
+        expect(getSteps(content)).toBe(
+          [
+            "    steps:",
+            "      - name: Checkout",
+            "        uses: actions/checkout@v7",
+            "",
+            "      - name: Setup pnpm",
+            "        uses: pnpm/action-setup@v4",
+            "",
+            "      - name: Setup Node.js",
+            "        uses: actions/setup-node@v7",
+            "        with:",
+            '          node-version: "lts/*"',
+            '          cache: "pnpm"',
+            "",
+            "      - name: Install dependencies",
+            "        run: pnpm install --frozen-lockfile",
+            "",
+            `      - name: Run \${{ matrix.name }}`,
+            `        run: \${{ matrix.command }}`,
+            "",
+          ].join("\n")
+        )
       })
     )
 
@@ -503,14 +576,10 @@ describe("github", () => {
           })
           .pipe(provideFallback(files))
 
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("name: check")
-        expect(content).not.toContain("name: format")
-        expect(content).toContain("name: analyze")
-        expect(content).not.toContain("monorepo")
-        expect(content).toContain("command:")
-        expect(content).not.toContain("format")
-        expect(content).not.toContain("--check")
+        expect(getMatrixJobs(files.read(WORKFLOW_PATH))).toStrictEqual([
+          { command: "bun run check", name: "check" },
+          { command: "bun run analyze", name: "analyze" },
+        ])
       })
     )
 

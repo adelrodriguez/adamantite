@@ -42,9 +42,6 @@ export default defineConfig({
       plugins: vitest.plugins,
       rules: {
         ...vitest.rules,
-        // A command test checks the full result of one command run. A split test runs the command
-        // again.
-        "vitest/max-expects": "off",
         // Describe titles name the service or error class under test, such as `NodeVersionResolver`.
         "vitest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],
         // `RuleTester` from `oxlint/plugins-dev` declares its own `describe` and `it` blocks, so

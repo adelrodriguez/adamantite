@@ -6,7 +6,9 @@ import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import initCommand from "#commands/init/index.ts"
+import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
@@ -57,30 +59,61 @@ function readJson(files: FileSystemTestContext, path: string): JsonObject {
   return JSON.parse(files.read(path)) as JsonObject
 }
 
-function countOccurrences(content: string, search: string) {
-  return content.split(search).length - 1
+// Runs init interactively with the check and analyze scripts, the react preset, and VS Code.
+function runFreshSetup() {
+  return Effect.gen(function* () {
+    const files = createInitTestContext()
+    const prompter = createPrompterTestContext({
+      confirmResponses: [true, false, false, false],
+      multiselectResponses: [["check", "analyze"], ["react"], ["vscode"]],
+    })
+    const installer = createDependencyInstallerTestContext()
+
+    const exit = yield* runCommand(initCommand, [], {
+      files,
+      layers: [prompter.layer, installer.layer],
+    })
+
+    return { exit, files, installer, prompter }
+  })
+}
+
+// Runs init non-interactively with the check script, the effect preset, and TypeScript.
+function runEffectSetup() {
+  return Effect.gen(function* () {
+    const files = createInitTestContext()
+    const prompter = createPrompterTestContext()
+    const installer = createDependencyInstallerTestContext()
+    const runner = createRunnerTestContext()
+
+    const exit = yield* runCommand(
+      initCommand,
+      ["--non-interactive", "--script", "check", "--preset", "effect", "--typescript"],
+      { files, layers: [prompter.layer, installer.layer, runner.layer] }
+    )
+
+    return { exit, files, installer, runner }
+  })
 }
 
 describe("init", () => {
   describe("fresh project setup", () => {
-    it.effect("set up the selected files, scripts, and dependencies", () =>
+    it.effect("offer the managed scripts without the retired format script", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false, false],
-          multiselectResponses: [["check", "analyze"], ["react"], ["vscode"]],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
+        const { exit, prompter } = yield* runFreshSetup()
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.multiselectCalls[0]).toMatchObject({
           options: expect.not.arrayContaining([expect.objectContaining({ value: "format" })]),
         })
+      })
+    )
+
+    it.effect("install the managed packages and add the selected scripts", () =>
+      Effect.gen(function* () {
+        const { exit, files, installer } = yield* runFreshSetup()
+
+        expect(Exit.isSuccess(exit)).toBe(true)
         expect(installer.calls).toStrictEqual([
           {
             options: { silent: true, workspace: false },
@@ -93,44 +126,53 @@ describe("init", () => {
             ],
           },
         ])
-
-        const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toStrictEqual({
+        expect(readJson(files, "package.json").scripts).toStrictEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
         })
+      })
+    )
 
-        const oxlintConfig = files.read("oxlint.config.ts")
-        expect(oxlintConfig).toContain('import react from "adamantite/lint/react"')
-        expect(oxlintConfig).toContain("respectEslintDisableDirectives: true")
-        expect(oxlintConfig).toContain("typeAware: true")
-        expect(oxlintConfig).toContain("typeCheck: true")
+    it.effect("write the configs for the selected tools, preset, and editor", () =>
+      Effect.gen(function* () {
+        const { exit, files } = yield* runFreshSetup()
 
-        const oxfmtConfig = files.read("oxfmt.config.ts")
-        expect(oxfmtConfig).toContain('import { defineConfig } from "oxfmt"')
-        expect(oxfmtConfig).toContain('import format from "adamantite/format"')
-        expect(oxfmtConfig).toContain("export default defineConfig(format)")
-
-        // SAFETY: this test wrote the tsconfig fixture and asserts its shape.
-        const tsconfig = readJson(files, "tsconfig.json") as { extends: string }
-        expect(tsconfig.extends).toBe("adamantite/typescript")
-
-        const vscodeSettings = readJson(files, ".vscode/settings.json")
-        expect(vscodeSettings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
-
-        const knipConfig = files.read("knip.config.ts")
-        expect(knipConfig).toContain('import type { KnipConfig } from "knip"')
-        expect(knipConfig).toContain('import analyze from "adamantite/analyze"')
-        expect(knipConfig).toContain("const config: KnipConfig = analyze")
-
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message: "Detected package manager: bun",
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.list()).toStrictEqual([
+          ".vscode/settings.json",
+          "knip.config.ts",
+          "oxfmt.config.ts",
+          "oxlint.config.ts",
+          "package.json",
+          "tsconfig.json",
+        ])
+        expect({
+          "knip.config.ts": files.read("knip.config.ts"),
+          "oxfmt.config.ts": files.read("oxfmt.config.ts"),
+          "oxlint.config.ts": files.read("oxlint.config.ts"),
+        }).toStrictEqual({
+          "knip.config.ts": toKnipTsConfigContent(),
+          "oxfmt.config.ts": toOxfmtTsConfigContent(),
+          "oxlint.config.ts": toOxlintTsConfigContent(["react"]),
         })
-        expect(prompter.logs).toContainEqual({
-          level: "success",
-          message: "Your project is now configured",
+        expect(readJson(files, "tsconfig.json")).toMatchObject({ extends: "adamantite/typescript" })
+        expect(readJson(files, ".vscode/settings.json")).toMatchObject({
+          "editor.defaultFormatter": "oxc.oxc-vscode",
         })
+      })
+    )
+
+    it.effect("report the detected package manager and the result", () =>
+      Effect.gen(function* () {
+        const { exit, prompter } = yield* runFreshSetup()
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.logs).toStrictEqual(
+          expect.arrayContaining([
+            { level: "info", message: "Detected package manager: bun" },
+            { level: "success", message: "Your project is now configured" },
+          ])
+        )
         expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })
     )
@@ -218,15 +260,14 @@ describe("init", () => {
   describe("knip config handling", () => {
     it.effect("keep a legacy knip config in place during init", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext({
-          "knip.jsonc": [
-            "{",
-            '  "entry": ["src/index.ts"],',
-            '  "ignore": ["bunup.config.ts"],',
-            "}",
-            "",
-          ].join("\n"),
-        })
+        const legacyKnipConfig = [
+          "{",
+          '  "entry": ["src/index.ts"],',
+          '  "ignore": ["bunup.config.ts"],',
+          "}",
+          "",
+        ].join("\n")
+        const files = createInitTestContext({ "knip.jsonc": legacyKnipConfig })
 
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false],
@@ -240,17 +281,13 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists("knip.jsonc")).toBe(true)
-        expect(files.exists("knip.config.ts")).toBe(false)
+        expect(files.list()).toStrictEqual(["knip.jsonc", "package.json"])
+        expect(files.read("knip.jsonc")).toBe(legacyKnipConfig)
         expect(prompter.logs).toContainEqual({
           level: "info",
           message:
             "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest knip config.",
         })
-
-        const knipConfig = files.read("knip.jsonc")
-        expect(knipConfig).toContain('"src/index.ts"')
-        expect(knipConfig).toContain('"bunup.config.ts"')
       })
     )
 
@@ -279,19 +316,21 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth in its findings.",
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message:
-            "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest knip config.",
-        })
-        expect(files.exists("knip.json")).toBe(true)
-        expect(files.exists("knip.jsonc")).toBe(true)
-        expect(files.exists("knip.config.ts")).toBe(false)
+        expect(files.list()).toStrictEqual(["knip.json", "knip.jsonc", "package.json"])
+        expect(prompter.logs).toStrictEqual(
+          expect.arrayContaining([
+            {
+              level: "warning",
+              message:
+                "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth in its findings.",
+            },
+            {
+              level: "info",
+              message:
+                "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest knip config.",
+            },
+          ])
+        )
       })
     )
   })
@@ -321,20 +360,11 @@ describe("init", () => {
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(files.read("oxlint.config.ts")).toContain(
-        'import reactStrict from "adamantite/lint/react-strict"'
-      )
-      expect(files.read("oxlint.config.ts")).toContain(
-        'import strict from "adamantite/lint/strict"'
-      )
-      expect(files.read("oxlint.config.ts")).toContain(
-        'import tanstack from "adamantite/lint/tanstack"'
+      expect(files.read("oxlint.config.ts")).toBe(
+        toOxlintTsConfigContent(["react", "react-strict", "strict", "tanstack"])
       )
       expect(installer.calls[0]?.packages).toStrictEqual(
-        expect.not.arrayContaining([expect.stringContaining("strict")])
-      )
-      expect(installer.calls[0]?.packages).toStrictEqual(
-        expect.not.arrayContaining([expect.stringContaining("tanstack")])
+        expect.not.arrayContaining([expect.stringMatching(/strict|tanstack/)])
       )
     })
   )
@@ -390,24 +420,12 @@ describe("init", () => {
       })
     )
 
-    it.effect("install @effect/tsgo, patch, and configure the language service for effect", () =>
+    it.effect("install @effect/tsgo and patch Oxlint for effect", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--preset", "effect", "--typescript"],
-          { files, layers: [prompter.layer, installer.layer, runner.layer] }
-        )
+        const { exit, files, installer, runner } = yield* runEffectSetup()
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(installer.calls[0]?.packages).toContain(`@effect/tsgo@${effectTsgo.version}`)
-        expect(files.read("oxlint.config.ts")).toContain(
-          'import effect from "adamantite/lint/effect"'
-        )
         expect(readJson(files, "package.json")).toMatchObject({
           scripts: { prepare: "adamantite prepare" },
         })
@@ -419,6 +437,15 @@ describe("init", () => {
             stdout: "ignore",
           }),
         ])
+      })
+    )
+
+    it.effect("configure the effect preset and the language service for effect", () =>
+      Effect.gen(function* () {
+        const { exit, files } = yield* runEffectSetup()
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["effect"]))
         expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
             plugins: [{ diagnostics: false, name: "@effect/language-service" }],
@@ -758,25 +785,15 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-
-        const oxfmtConfig = files.read("oxfmt.config.ts")
-        expect(oxfmtConfig).toBe(originalOxfmtConfig)
-
-        // SAFETY: this test wrote the tsconfig fixture and asserts its shape.
-        const tsconfig = readJson(files, "tsconfig.json") as {
-          compilerOptions: {
-            paths: Record<string, string[]>
-          }
-          extends: string
-        }
-        expect(tsconfig.extends).toBe("adamantite/typescript")
-        expect(tsconfig.compilerOptions.paths).toStrictEqual({
-          "@/*": ["src/*"],
+        expect(files.read("oxfmt.config.ts")).toBe(originalOxfmtConfig)
+        expect(readJson(files, "tsconfig.json")).toStrictEqual({
+          compilerOptions: { paths: { "@/*": ["src/*"] } },
+          extends: "adamantite/typescript",
         })
-
-        const vscodeSettings = readJson(files, ".vscode/settings.json")
-        expect(vscodeSettings["editor.tabSize"]).toBe(4)
-        expect(vscodeSettings["editor.defaultFormatter"]).toBe("oxc.oxc-vscode")
+        expect(readJson(files, ".vscode/settings.json")).toMatchObject({
+          "editor.defaultFormatter": "oxc.oxc-vscode",
+          "editor.tabSize": 4,
+        })
         expect(files.exists("oxlint.config.ts")).toBe(true)
       })
     )
@@ -810,15 +827,13 @@ describe("init", () => {
           },
         ])
 
-        const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toStrictEqual({ check: "adamantite check" })
-
-        expect(files.exists("oxfmt.config.ts")).toBe(true)
-        expect(files.exists(".zed/settings.json")).toBe(true)
-        expect(files.exists("oxlint.config.ts")).toBe(true)
-        expect(files.exists("tsconfig.json")).toBe(false)
-        expect(files.exists("knip.config.ts")).toBe(false)
-        expect(files.exists(".vscode/settings.json")).toBe(false)
+        expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "adamantite check" })
+        expect(files.list()).toStrictEqual([
+          ".zed/settings.json",
+          "oxfmt.config.ts",
+          "oxlint.config.ts",
+          "package.json",
+        ])
       })
     )
   })
@@ -884,8 +899,7 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls).toStrictEqual([])
-        expect(prompter.multiselectCalls).toStrictEqual([])
+        expect(prompter).toMatchObject({ confirmCalls: [], multiselectCalls: [] })
         expect(installer.calls).toStrictEqual([
           {
             options: { silent: true, workspace: false },
@@ -898,19 +912,20 @@ describe("init", () => {
             ],
           },
         ])
-
-        const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toStrictEqual({
+        expect(readJson(files, "package.json").scripts).toStrictEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
         })
-        expect(files.exists("oxlint.config.ts")).toBe(true)
-        expect(files.exists("oxfmt.config.ts")).toBe(true)
-        expect(files.exists("knip.config.ts")).toBe(true)
-        expect(files.exists("tsconfig.json")).toBe(true)
-        expect(files.exists(".zed/settings.json")).toBe(true)
-        expect(files.exists("AGENTS.md")).toBe(true)
-        expect(files.exists(".github/workflows/adamantite.yml")).toBe(true)
+        expect(files.list()).toStrictEqual([
+          ".github/workflows/adamantite.yml",
+          ".zed/settings.json",
+          "AGENTS.md",
+          "knip.config.ts",
+          "oxfmt.config.ts",
+          "oxlint.config.ts",
+          "package.json",
+          "tsconfig.json",
+        ])
       })
     )
 
@@ -929,8 +944,7 @@ describe("init", () => {
           )
 
           expect(Exit.isSuccess(exit)).toBe(true)
-          expect(prompter.confirmCalls).toStrictEqual([])
-          expect(prompter.multiselectCalls).toStrictEqual([])
+          expect(prompter).toMatchObject({ confirmCalls: [], multiselectCalls: [] })
           expect(installer.calls).toStrictEqual([
             {
               options: { silent: true, workspace: false },
@@ -942,13 +956,14 @@ describe("init", () => {
               ],
             },
           ])
-          expect(files.exists("oxfmt.config.ts")).toBe(true)
           expect(readJson(files, "package.json").scripts).toStrictEqual({
             [script]: `adamantite ${script}`,
           })
-          expect(files.exists("tsconfig.json")).toBe(false)
-          expect(files.exists("AGENTS.md")).toBe(false)
-          expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
+          expect(files.list()).toStrictEqual([
+            "oxfmt.config.ts",
+            "oxlint.config.ts",
+            "package.json",
+          ])
         })
     )
 
@@ -1312,17 +1327,24 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-
-        const agents = files.read("AGENTS.md")
-        expect(agents).toContain(ADAMANTITE_AGENTS_START_MARKER)
-        expect(agents).toContain("## Adamantite")
-        expect(agents).not.toContain("adamantite format")
-        expect(agents).toContain("Run `bun run check` to catch formatting, lint, and type issues")
-        expect(agents).toContain("Run `bun run analyze` after changing dependencies")
-        expect(agents).toContain("adamantite doctor")
-        expect(agents).not.toContain("adamantite fix")
-        expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
-        expect(agents.endsWith("\n")).toBe(true)
+        expect(files.read("AGENTS.md")).toBe(
+          [
+            ADAMANTITE_AGENTS_START_MARKER,
+            "",
+            "## Adamantite",
+            "",
+            "This project uses Adamantite for its managed formatting, linting, type checking, and dependency-analysis setup.",
+            "",
+            "- Prefer the package scripts Adamantite added for this workspace.",
+            "- Run `bun run check` to catch formatting, lint, and type issues. Direct command: `adamantite check`.",
+            "- Run `bun run analyze` after changing dependencies, imports, or exports. Direct command: `adamantite analyze`.",
+            "- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule with its authoring guidance.",
+            "- Run `adamantite doctor` and follow its findings to repair managed setup.",
+            "",
+            ADAMANTITE_AGENTS_END_MARKER,
+            "",
+          ].join("\n")
+        )
       })
     )
 
@@ -1394,13 +1416,24 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-
-        const agents = files.read("AGENTS.md")
-        expect(agents).toContain("# Existing Instructions")
-        expect(agents).toContain("Run `bun run analyze` after changing dependencies")
-        expect(agents).not.toContain("old content")
-        expect(countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER)).toBe(1)
-        expect(countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER)).toBe(1)
+        expect(files.read("AGENTS.md")).toBe(
+          [
+            "# Existing Instructions",
+            "",
+            ADAMANTITE_AGENTS_START_MARKER,
+            "",
+            "## Adamantite",
+            "",
+            "This project uses Adamantite for its managed formatting, linting, type checking, and dependency-analysis setup.",
+            "",
+            "- Prefer the package scripts Adamantite added for this workspace.",
+            "- Run `bun run analyze` after changing dependencies, imports, or exports. Direct command: `adamantite analyze`.",
+            "- Run `adamantite doctor` and follow its findings to repair managed setup.",
+            "",
+            ADAMANTITE_AGENTS_END_MARKER,
+            "",
+          ].join("\n")
+        )
       })
     )
 
@@ -1644,15 +1677,12 @@ describe("init", () => {
           },
         ])
 
-        const workflowPath = ".github/workflows/adamantite.yml"
-        expect(files.exists(workflowPath)).toBe(true)
-
-        const workflow = files.read(workflowPath)
-        expect(workflow).toContain("oven-sh/setup-bun@v2")
-        expect(workflow).toContain("name: check")
-        expect(workflow).not.toContain("name: format")
-        expect(workflow).toContain("command: bun run check")
-        expect(workflow).not.toContain("command: bun run format --check")
+        const workflow = files.read(".github/workflows/adamantite.yml")
+        expect(workflow).toContain("uses: oven-sh/setup-bun@v2")
+        // The matrix has exactly one job: a blank line follows the check entry.
+        expect(workflow).toMatch(
+          / {8}include:\n {10}- name: check\n {12}command: bun run check\n\n/
+        )
       })
     )
 
@@ -1675,21 +1705,22 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.exists(workflowPath)).toBe(false)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message: expect.stringMatching(
-            /Could not set up the GitHub Actions workflow\. Failed to write `.*adamantite\.yml`\./
-          ),
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Fix the reported problem and run `adamantite init` again, or create the workflow manually.",
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "success",
-          message: "Your project is now configured",
-        })
+        expect(prompter.logs).toStrictEqual(
+          expect.arrayContaining([
+            {
+              level: "warning",
+              message: expect.stringMatching(
+                /Could not set up the GitHub Actions workflow\. Failed to write `.*adamantite\.yml`\./
+              ),
+            },
+            {
+              level: "warning",
+              message:
+                "Fix the reported problem and run `adamantite init` again, or create the workflow manually.",
+            },
+            { level: "success", message: "Your project is now configured" },
+          ])
+        )
         expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })
     )
@@ -1768,21 +1799,14 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-
-        expect(prompter.logs).toContainEqual({
-          level: "error",
-          message: "VSCode CLI ('code' command) not found.",
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message: "To install it:",
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "success",
-          message: "Your project is now configured",
-        })
+        expect(prompter.logs).toStrictEqual(
+          expect.arrayContaining([
+            { level: "error", message: "VSCode CLI ('code' command) not found." },
+            { level: "info", message: "To install it:" },
+            { level: "success", message: "Your project is now configured" },
+          ])
+        )
         expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
-
         expect(files.exists(".vscode/settings.json")).toBe(true)
       })
     )

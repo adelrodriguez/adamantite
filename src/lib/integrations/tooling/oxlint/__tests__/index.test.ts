@@ -46,22 +46,33 @@ describe("oxlint", () => {
         yield* oxlint.create(ROOT).pipe(provideFiles(files))
 
         const state = yield* oxlint.detect(ROOT).pipe(provideFiles(files))
-        expect(state.active).toStrictEqual({
-          file: "oxlint.config.ts",
-          format: "ts",
-          path: join(ROOT, "oxlint.config.ts"),
+        expect(state).toStrictEqual({
+          active: {
+            file: "oxlint.config.ts",
+            format: "ts",
+            path: join(ROOT, "oxlint.config.ts"),
+          },
+          legacy: [],
+          warnings: [],
         })
-        expect(state.legacy).toStrictEqual([])
-
-        const content = files.read("oxlint.config.ts")
-        expect(content).toContain('import { defineConfig } from "oxlint"')
-        expect(content).toContain('import core from "adamantite/lint"')
-        expect(content).toContain("respectEslintDisableDirectives: true")
-        expect(content).toContain("typeAware: true")
-        expect(content).toContain("typeCheck: true")
-        expect(content).toContain("ignorePatterns: core.ignorePatterns")
-        expect(content).toContain('import custom from "adamantite/lint/custom"')
-        expect(content).toContain("extends: [core, custom()]")
+        expect(files.read("oxlint.config.ts")).toBe(
+          [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            'import custom from "adamantite/lint/custom"',
+            "",
+            "export default defineConfig({",
+            "  extends: [core, custom()],",
+            "  ignorePatterns: core.ignorePatterns,",
+            "  options: {",
+            "    respectEslintDisableDirectives: true,",
+            "    typeAware: true,",
+            "    typeCheck: true,",
+            "  },",
+            "})",
+            "",
+          ].join("\n")
+        )
       })
     )
 

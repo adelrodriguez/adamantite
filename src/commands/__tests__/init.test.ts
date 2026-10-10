@@ -824,6 +824,39 @@ describe("init", () => {
   })
 
   describe("non-interactive setup", () => {
+    it.effect.each(["dependencies", "devDependencies"])(
+      "keep the adamantite version in $0 and install only the tools",
+      (field) =>
+        Effect.gen(function* () {
+          const files = createInitTestContext({
+            "package.json": JSON.stringify({
+              [field]: { adamantite: "file:../adamantite.tgz" },
+              name: "test-project",
+              version: "1.0.0",
+            }),
+          })
+          const prompter = createPrompterTestContext()
+          const installer = createDependencyInstallerTestContext()
+
+          const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+            files,
+            layers: [prompter.layer, installer.layer],
+          })
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(installer.calls).toStrictEqual([
+            {
+              options: { silent: true, workspace: false },
+              packages: [
+                `oxlint@${oxlint.version}`,
+                `oxlint-tsgolint@${tsgolint.version}`,
+                `oxfmt@${oxfmt.version}`,
+              ],
+            },
+          ])
+        })
+    )
+
     it.effect("configure the project entirely from flags without showing prompts", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()

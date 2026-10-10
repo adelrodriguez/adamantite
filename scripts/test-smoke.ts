@@ -144,6 +144,17 @@ try {
     "export function add(left: number, right: number): number {\n  return left + right\n}\n"
   )
 
+  // Install this checkout as the fixture's `adamantite` before init. Init keeps a dependency that
+  // the project already has, so the run never installs `adamantite` from the registry.
+  run("pnpm", ["pack", "--pack-destination", packDirectory], { cwd: repoRoot })
+  const [tarball, ...extraTarballs] = readdirSync(packDirectory)
+
+  if (!tarball || extraTarballs.length > 0) {
+    throw new Error(`Expected exactly one packed tarball in ${packDirectory}`)
+  }
+
+  run("npm", ["install", "--save-dev", join(packDirectory, tarball)], { cwd: fixture })
+
   console.info("Running `adamantite init` against the fixture project...")
   run(
     process.execPath,
@@ -162,19 +173,8 @@ try {
     { cwd: fixture }
   )
 
-  // Init installs the published `adamantite` package; swap in the local build so the
-  // generated configs exercise this checkout's presets and package exports.
-  run("pnpm", ["pack", "--pack-destination", packDirectory], { cwd: repoRoot })
-  const [tarball, ...extraTarballs] = readdirSync(packDirectory)
-
-  if (!tarball || extraTarballs.length > 0) {
-    throw new Error(`Expected exactly one packed tarball in ${packDirectory}`)
-  }
-
-  run("npm", ["install", "--save-dev", join(packDirectory, tarball)], { cwd: fixture })
-
-  // Prove the swap took: a silent no-op would validate the published presets instead of
-  // this checkout's, which is the one thing the tarball install exists to prevent.
+  // Prove init kept the tarball: a registry install would validate the published presets
+  // instead of this checkout's.
   assertFileContains(join(fixture, "package.json"), '"adamantite": "file:')
 
   assertFileContains(join(fixture, "oxlint.config.ts"), "adamantite/lint")
@@ -221,15 +221,16 @@ try {
   writeWorkspacePackage(monorepoFixture, "first", "7.0.0")
   writeWorkspacePackage(monorepoFixture, "second", "6.0.0")
 
+  run("pnpm", ["add", "--save-dev", "--workspace-root", join(packDirectory, tarball)], {
+    cwd: monorepoFixture,
+  })
+
   console.info("Running `adamantite init` against the monorepo fixture...")
   run(
     process.execPath,
     [cliPath, "init", "--non-interactive", "--script", "check", "--script", "analyze"],
     { cwd: monorepoFixture }
   )
-  run("pnpm", ["add", "--save-dev", "--workspace-root", join(packDirectory, tarball)], {
-    cwd: monorepoFixture,
-  })
   // Init installs Sherif with the `analyze` script in a monorepo.
   assertFileContains(join(monorepoFixture, "package.json"), '"sherif"')
   assertFileContains(join(monorepoFixture, "package.json"), '"adamantite": "file:')

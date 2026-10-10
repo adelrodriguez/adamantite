@@ -36,7 +36,7 @@ describe("prepare", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([
+      expect(runner.invocations).toStrictEqual([
         expect.objectContaining({
           args: ["patch", "--oxlint", "--typescript"],
           command: "effect-tsgo",
@@ -71,7 +71,7 @@ describe("prepare", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([])
+      expect(runner.invocations).toStrictEqual([])
     })
   )
 

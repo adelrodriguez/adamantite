@@ -1,4 +1,4 @@
-import { describe, expect, it, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
@@ -12,7 +12,7 @@ import {
 const ROOT = "/project"
 
 describe("readPnpmWorkspacePatterns", () => {
-  test("read a block list with quotes and comments", () => {
+  it("read a block list with quotes and comments", () => {
     const content = [
       "packages:",
       "  - packages/* # apps and libraries",
@@ -22,27 +22,26 @@ describe("readPnpmWorkspacePatterns", () => {
       "  effect: 4.0.0",
     ].join("\n")
 
-    expect(readPnpmWorkspacePatterns(content)).toEqual([
+    expect(readPnpmWorkspacePatterns(content)).toStrictEqual([
       "packages/*",
       "tooling/lint",
       "!packages/legacy",
     ])
   })
 
-  test("read a flow list over several lines", () => {
-    expect(readPnpmWorkspacePatterns('packages: [\n  "apps/*",\n  tooling/lint\n]\n')).toEqual([
-      "apps/*",
-      "tooling/lint",
-    ])
+  it("read a flow list over several lines", () => {
+    expect(
+      readPnpmWorkspacePatterns('packages: [\n  "apps/*",\n  tooling/lint\n]\n')
+    ).toStrictEqual(["apps/*", "tooling/lint"])
   })
 
-  test("read no pattern without a packages key", () => {
-    expect(readPnpmWorkspacePatterns("catalog:\n  effect: 4.0.0\n")).toEqual([])
+  it("read no pattern without a packages key", () => {
+    expect(readPnpmWorkspacePatterns("catalog:\n  effect: 4.0.0\n")).toStrictEqual([])
   })
 })
 
 describe("workspacePatternToRegExp", () => {
-  test.each([
+  it.each([
     ["packages/*", "packages/web", true],
     ["packages/*", "packages/group/web", false],
     ["packages/**", "packages/group/web", true],
@@ -75,7 +74,7 @@ describe("getWorkspacePackageDirectories", () => {
         Effect.provide(Layer.mergeAll(files.layer, Path.layer))
       )
 
-      expect(directories).toEqual(["/project/packages/group/web"])
+      expect(directories).toStrictEqual(["/project/packages/group/web"])
     })
   )
 
@@ -98,7 +97,7 @@ describe("getWorkspacePackageDirectories", () => {
         Effect.provide(Layer.mergeAll(files.layer, Path.layer))
       )
 
-      expect(directories).toEqual([
+      expect(directories).toStrictEqual([
         "/project/packages/api",
         "/project/packages/web",
         "/project/tooling/lint",
@@ -122,7 +121,7 @@ describe("getWorkspacePackageDirectories", () => {
         Effect.provide(Layer.mergeAll(files.layer, Path.layer))
       )
 
-      expect(directories).toEqual(["/project/apps/site"])
+      expect(directories).toStrictEqual(["/project/apps/site"])
     })
   )
 })

@@ -24,7 +24,32 @@ const config: OxlintConfig = {
     "vitest/no-large-snapshots": "error",
     "vitest/no-mocks-import": "error",
     "vitest/no-restricted-matchers": "error",
-    "vitest/no-standalone-expect": "error",
+    // The rule recognizes only the Vitest test functions. These are the test functions of
+    // @effect/vitest.
+    "vitest/no-standalone-expect": [
+      "error",
+      {
+        additionalTestBlockFunctions: [
+          "it.effect",
+          "it.effect.each",
+          "it.effect.fails",
+          "it.effect.only",
+          "it.effect.prop",
+          "it.effect.runIf",
+          "it.effect.skip",
+          "it.effect.skipIf",
+          "it.live",
+          "it.live.each",
+          "it.live.fails",
+          "it.live.only",
+          "it.live.prop",
+          "it.live.runIf",
+          "it.live.skip",
+          "it.live.skipIf",
+          "it.prop",
+        ],
+      },
+    ],
     "vitest/no-test-prefixes": "error",
     "vitest/no-test-return-statement": "error",
     "vitest/no-unneeded-async-expect-function": "error",
@@ -37,7 +62,16 @@ const config: OxlintConfig = {
     "vitest/prefer-describe-function-title": "off",
     "vitest/prefer-each": "error",
     "vitest/prefer-equality-matcher": "error",
-    "vitest/prefer-expect-assertions": "error",
+    // Without options, the rule requires the call in every test, also in synchronous tests where
+    // every expect always runs. These options report only tests where an expect can fail to run.
+    "vitest/prefer-expect-assertions": [
+      "error",
+      {
+        onlyFunctionsWithAsyncKeyword: true,
+        onlyFunctionsWithExpectInCallback: true,
+        onlyFunctionsWithExpectInLoop: true,
+      },
+    ],
     "vitest/prefer-expect-resolves": "error",
     "vitest/prefer-expect-type-of": "error",
     "vitest/prefer-hooks-in-order": "error",

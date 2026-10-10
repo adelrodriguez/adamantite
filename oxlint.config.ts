@@ -3,6 +3,7 @@ import antislop from "./presets/lint/antislop.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import effect from "./presets/lint/effect.ts"
 import node from "./presets/lint/node.ts"
+import vitest from "./presets/lint/vitest.ts"
 
 const TERMINAL_IMPORTS = {
   group: ["#terminal/*"],
@@ -34,6 +35,23 @@ export default defineConfig({
     typeCheck: true,
   },
   overrides: [
+    // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
+    // rule makes some test code impossible to write.
+    {
+      files: ["**/*.test.ts"],
+      plugins: vitest.plugins,
+      rules: {
+        ...vitest.rules,
+        // A command test checks the full result of one command run. A split test runs the command
+        // again.
+        "vitest/max-expects": "off",
+        // Describe titles name the service or error class under test, such as `NodeVersionResolver`.
+        "vitest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],
+        // `RuleTester` from `oxlint/plugins-dev` declares its own `describe` and `it` blocks, so
+        // `tester.run` is a test, not setup code.
+        "vitest/require-hook": ["error", { allowedFunctionCalls: ["tester.run"] }],
+      },
+    },
     {
       files: ["src/lib/shared/**/*.ts"],
       rules: {

@@ -59,10 +59,10 @@ describe("Prompter.withSpinner", () => {
         spinner
       )
 
-      expect(exit).toEqual(Exit.succeed(42))
-      expect(starts).toEqual(["Starting operation..."])
-      expect(messages).toEqual(["Still working..."])
-      expect(stops).toEqual(["Operation returned 42."])
+      expect(exit).toStrictEqual(Exit.succeed(42))
+      expect(starts).toStrictEqual(["Starting operation..."])
+      expect(messages).toStrictEqual(["Still working..."])
+      expect(stops).toStrictEqual(["Operation returned 42."])
     })
   )
 
@@ -82,7 +82,7 @@ describe("Prompter.withSpinner", () => {
       )
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(stops).toEqual(["Operation failed."])
+      expect(stops).toStrictEqual(["Operation failed."])
     })
   )
 
@@ -102,7 +102,7 @@ describe("Prompter.withSpinner", () => {
       )
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(stops).toEqual(["Operation interrupted."])
+      expect(stops).toStrictEqual(["Operation interrupted."])
     })
   )
 })

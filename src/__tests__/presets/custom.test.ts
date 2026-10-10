@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { afterEach, beforeEach, describe, expect, test } from "@effect/vitest"
+import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
@@ -61,7 +61,7 @@ function makeConfig(customCall: string, imports: readonly string[] = []) {
 }
 
 describe("custom preset", () => {
-  let project = ""
+  let project: string
 
   function write(path: string, content: string) {
     mkdirSync(dirname(join(project, path)), { recursive: true })
@@ -97,17 +97,17 @@ describe("custom preset", () => {
     rmSync(project, { force: true, recursive: true })
   })
 
-  test("enable each rule file in .adamantite/rules and skip helper files", () => {
+  it("enable each rule file in .adamantite/rules and skip helper files", () => {
     write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
     // A helper without a default export fails the run if it loads as a rule.
     write(".adamantite/rules/_helpers.ts", "export const helper = 1\n")
     write(".adamantite/rules/AGENTS.md", "# Custom rules\n")
     write("oxlint.config.ts", makeConfig("custom()"))
 
-    expect(lint("src")).toEqual(["project(no-debugger-here):error"])
+    expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
   })
 
-  test("resolve the rules folder from the config file, not the working directory", () => {
+  it("resolve the rules folder from the config file, not the working directory", () => {
     write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
     write("oxlint.config.ts", makeConfig("custom()"))
 
@@ -120,20 +120,20 @@ describe("custom preset", () => {
     expect(result.stdout).toContain("project(no-debugger-here)")
   })
 
-  test("apply severity overrides from the rules option", () => {
+  it("apply severity overrides from the rules option", () => {
     write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
     write("oxlint.config.ts", makeConfig('custom({ rules: { "no-debugger-here": "warn" } })'))
 
-    expect(lint("src")).toEqual(["project(no-debugger-here):warning"])
+    expect(lint("src")).toStrictEqual(["project(no-debugger-here):warning"])
   })
 
-  test("return an empty config without a rules folder", () => {
+  it("return an empty config without a rules folder", () => {
     write("oxlint.config.ts", makeConfig("custom()"))
 
-    expect(lint("src")).toEqual([])
+    expect(lint("src")).toStrictEqual([])
   })
 
-  test("load a rules folder from a shared tooling package under its own name", () => {
+  it("load a rules folder from a shared tooling package under its own name", () => {
     // A monorepo keeps its lint config and rules in a tooling package. The relative `dir` resolves
     // from the tooling config, so every package that extends it loads the same rules.
     write("tooling/lint/rules/no-debugger-here.ts", makeRule("No debugger here."))
@@ -152,13 +152,13 @@ describe("custom preset", () => {
     )
     write("packages/web/src/index.ts", "export function stop() {\n  debugger\n}\n")
 
-    expect(lint("src", "packages")).toEqual([
+    expect(lint("src", "packages")).toStrictEqual([
       "acme(no-debugger-here):error",
       "acme(no-debugger-here):error",
     ])
   })
 
-  test("load one rules folder per workspace package under distinct names", () => {
+  it("load one rules folder per workspace package under distinct names", () => {
     write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
     write("packages/web/.adamantite/rules/no-debugger-in-web.ts", makeRule("No debugger in web."))
     write("oxlint.config.ts", makeConfig("custom()"))
@@ -169,14 +169,14 @@ describe("custom preset", () => {
     )
     write("packages/web/src/index.ts", "export function stop() {\n  debugger\n}\n")
 
-    expect(EffectArray.sort(lint("packages"), Order.String)).toEqual([
+    expect(EffectArray.sort(lint("packages"), Order.String)).toStrictEqual([
       "project(no-debugger-here):error",
       "web(no-debugger-in-web):error",
     ])
   })
 
   // Bun prints stack frames as plain paths, where Node.js prints file URLs.
-  test.skipIf(!hasBun)("resolve the rules folder from the calling file under Bun", () => {
+  it.skipIf(!hasBun)("resolve the rules folder from the calling file under Bun", () => {
     write("tooling/lint/rules/no-debugger-here.ts", makeRule("No debugger here."))
     write(
       "tooling/lint/index.ts",

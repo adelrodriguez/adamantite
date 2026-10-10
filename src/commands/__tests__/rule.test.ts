@@ -23,7 +23,7 @@ describe("rule add", () => {
         toCustomRuleStub("no-process-env")
       )
       expect(files.read(".adamantite/rules/AGENTS.md")).toBe(CUSTOM_RULES_AGENTS_CONTENT)
-      expect(prompter.logs.filter((log) => log.level === "success")).toEqual([
+      expect(prompter.logs.filter((log) => log.level === "success")).toStrictEqual([
         { level: "success", message: "Wrote .adamantite/rules/no-process-env.ts." },
         { level: "success", message: "Wrote .adamantite/rules/AGENTS.md." },
       ])
@@ -124,7 +124,7 @@ describe("rule ast", () => {
         _tag: "FailedToParseSource",
         path: `${files.root}/src/broken.ts`,
       })
-      expect(prompter.messages).toEqual([])
+      expect(prompter.messages).toStrictEqual([])
     })
   )
 })

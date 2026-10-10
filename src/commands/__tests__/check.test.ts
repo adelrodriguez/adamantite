@@ -17,7 +17,7 @@ describe("check", () => {
         const exit = yield* runCommand(checkCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--check"],
             command: "oxfmt",
@@ -44,7 +44,7 @@ describe("check", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--deny-warnings"],
             command: "oxlint",
@@ -64,7 +64,7 @@ describe("check", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--check", "--no-error-on-unmatched-pattern"],
             command: "oxfmt",
@@ -83,7 +83,7 @@ describe("check", () => {
 
         yield* runCommand(checkCommand, [], { layers: [runner.layer], logLines })
 
-        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toEqual([
+        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toStrictEqual([
           "✨ Checking formatting · adamantite (oxfmt)",
           "",
           "🔍 Linting · adamantite (oxlint)",
@@ -107,7 +107,7 @@ describe("check", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--check", join(files.root, "index.ts")],
             command: "oxfmt",
@@ -133,7 +133,7 @@ describe("check", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
-        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
+        expect(runner.invocations.map((invocation) => invocation.command)).toStrictEqual([
           "oxfmt",
           "oxlint",
         ])

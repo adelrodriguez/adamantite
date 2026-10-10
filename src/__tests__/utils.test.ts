@@ -69,7 +69,7 @@ describe("readPackageJson", () => {
 
         const result = yield* readPackageJson(ROOT).pipe(provideFiles(files))
 
-        expect(result).toEqual(packageJson)
+        expect(result).toStrictEqual(packageJson)
       })
     )
 
@@ -113,7 +113,7 @@ describe("readPackageJson", () => {
 
         const result = yield* readPackageJson().pipe(provideFiles(files))
 
-        expect(result).toEqual(packageJson)
+        expect(result).toStrictEqual(packageJson)
       })
     )
   })
@@ -129,7 +129,7 @@ describe("parseJson", () => {
     }`
       const result = yield* parseJson(jsonc)
 
-      expect(result).toEqual({
+      expect(result).toStrictEqual({
         name: "test",
         version: "1.0.0",
       })
@@ -141,7 +141,7 @@ describe("parseJson", () => {
       const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
       const result = yield* parseJson(jsonWithTrailingComma)
 
-      expect(result).toEqual({
+      expect(result).toStrictEqual({
         name: "test",
         version: "1.0.0",
       })
@@ -164,7 +164,7 @@ describe("parseJson", () => {
     Effect.gen(function* () {
       const parsed = yield* parseJson('{"__proto__": {"polluted": true}, "a": 1}')
 
-      expect(parsed).toEqual({ a: 1 })
+      expect(parsed).toStrictEqual({ a: 1 })
     })
   )
 
@@ -206,7 +206,7 @@ describe("mergeConfig", () => {
       const override = { a: { y: 4, z: 5 }, b: 6 }
       const result = yield* mergeConfig(base, override)
 
-      expect(result).toEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
+      expect(result).toStrictEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
     })
   )
 
@@ -265,7 +265,7 @@ describe("mergeConfig", () => {
         }
         for (const key of Object.keys(override)) {
           if (!Object.hasOwn(base, key)) {
-            expect(merged[key]).toEqual(override[key])
+            expect(merged[key]).toStrictEqual(override[key])
           }
         }
       }),
@@ -402,7 +402,7 @@ describe("updateJsonText", () => {
         // JSON has no negative zero, so compare with the parsed JSON form of `next`.
         const expected = yield* parseJson(JSON.stringify(next))
 
-        expect(parsed).toEqual(expected)
+        expect(parsed).toStrictEqual(expected)
       }),
     { arbitrary: { runs: 300 } }
   )
@@ -621,7 +621,7 @@ describe("printTitle", () => {
 
       yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(120), console.layer)))
 
-      expect(console.capturedLogs.length).toBe(1)
+      expect(console.capturedLogs).toHaveLength(1)
       expect(console.capturedLogs[0]).toContain(".ooooo.")
     })
   )
@@ -632,7 +632,7 @@ describe("printTitle", () => {
 
       yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(50), console.layer)))
 
-      expect(console.capturedLogs.length).toBe(0)
+      expect(console.capturedLogs).toHaveLength(0)
     })
   )
 
@@ -642,7 +642,7 @@ describe("printTitle", () => {
 
       yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(), console.layer)))
 
-      expect(console.capturedLogs.length).toBe(0)
+      expect(console.capturedLogs).toHaveLength(0)
     })
   )
 })

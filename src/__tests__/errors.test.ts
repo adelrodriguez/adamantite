@@ -1,5 +1,5 @@
 import type { ParseError } from "jsonc-parser"
-import { describe, expect, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { parse, printParseErrorCode } from "jsonc-parser"
 import {
@@ -28,13 +28,15 @@ function createParseErrors(count: number): ParseError[] {
 
 describe("errors", () => {
   describe("FailedToParseFile", () => {
-    test("use a fallback parse message when there are no parse errors", () => {
+    it("use a fallback parse message when there are no parse errors", () => {
       const error = new FailedToParseFile({ errors: [], path: "foo.json" })
 
       expect(error.message).toContain("Unknown JSON/JSONC parsing error")
     })
 
-    test("include up to three parse errors with offsets and codes", () => {
+    it("include up to three parse errors with offsets and codes", () => {
+      expect.assertions(6)
+
       const errors = createParseErrors(3)
       const error = new FailedToParseFile({ errors, path: "foo.json" })
 
@@ -44,7 +46,7 @@ describe("errors", () => {
       }
     })
 
-    test("truncate parse details after the first three errors", () => {
+    it("truncate parse details after the first three errors", () => {
       const errors = createParseErrors(4)
       const error = new FailedToParseFile({ errors, path: "foo.json" })
 
@@ -56,7 +58,7 @@ describe("errors", () => {
   })
 
   describe("FailedToInstallDependency", () => {
-    test("include the package manager output from the cause", () => {
+    it("include the package manager output from the cause", () => {
       const cause = new Error(
         [
           "`pnpm add -D adamantite` failed.",
@@ -75,7 +77,7 @@ describe("errors", () => {
       expect(error.message).not.toContain("\n\n")
     })
 
-    test("strip ANSI escape codes and carriage returns from the cause output", () => {
+    it("strip ANSI escape codes and carriage returns from the cause output", () => {
       const cause = new Error("\u001B[31mERR_PNPM_FETCH_404\u001B[39m\rretrying...\r\ndone")
       const error = new FailedToInstallDependency({ cause })
 
@@ -85,7 +87,7 @@ describe("errors", () => {
       expect(error.message).not.toContain("\r")
     })
 
-    test("truncate long cause output to the last 20 lines", () => {
+    it("truncate long cause output to the last 20 lines", () => {
       const lines = Array.from({ length: 30 }, (_, index) => `line ${index + 1}`)
       const cause = new Error(lines.join("\n"))
       const error = new FailedToInstallDependency({ cause })
@@ -96,7 +98,7 @@ describe("errors", () => {
       expect(error.message).not.toContain("line 10\n")
     })
 
-    test("ignore causes that are not Error instances", () => {
+    it("ignore causes that are not Error instances", () => {
       const error = new FailedToInstallDependency({ cause: "boom" })
 
       expect(error.message).toBe("Failed to install dependencies.")
@@ -104,7 +106,7 @@ describe("errors", () => {
   })
 
   describe("FailedToWriteFile", () => {
-    test("include the cause detail when the cause is an Error", () => {
+    it("include the cause detail when the cause is an Error", () => {
       const cause = new Error("PermissionDenied: FileSystem.writeFile (/repo/oxlint.json)")
       const error = new FailedToWriteFile({ cause, path: "/repo/oxlint.json" })
 
@@ -113,7 +115,7 @@ describe("errors", () => {
       )
     })
 
-    test("do not double the period when the cause already ends with one", () => {
+    it("do not double the period when the cause already ends with one", () => {
       const cause = new Error("Something went wrong.")
       const error = new FailedToWriteFile({ cause, path: "/repo/oxlint.json" })
 
@@ -122,7 +124,7 @@ describe("errors", () => {
       )
     })
 
-    test("keep only the first line of a multi-line cause", () => {
+    it("keep only the first line of a multi-line cause", () => {
       const cause = new Error("first line\nsecond line")
       const error = new FailedToWriteFile({ cause, path: "/repo/oxlint.json" })
 
@@ -132,7 +134,7 @@ describe("errors", () => {
   })
 
   describe("FailedToReadFile", () => {
-    test("fall back to a plain message when the cause is missing", () => {
+    it("fall back to a plain message when the cause is missing", () => {
       const error = new FailedToReadFile({ path: "/repo/tsconfig.json" })
 
       expect(error.message).toBe("Failed to read `/repo/tsconfig.json`.")
@@ -140,7 +142,7 @@ describe("errors", () => {
   })
 
   describe("FailedToInstallExtension", () => {
-    test("report the exit code when the cause is a number", () => {
+    it("report the exit code when the cause is a number", () => {
       const error = new FailedToInstallExtension({ cause: 1, extension: "oxc.oxc-vscode" })
 
       expect(error.message).toBe(
@@ -148,7 +150,7 @@ describe("errors", () => {
       )
     })
 
-    test("include the cause detail when the cause is an Error", () => {
+    it("include the cause detail when the cause is an Error", () => {
       const cause = new Error("SystemError: spawn code EAGAIN")
       const error = new FailedToInstallExtension({ cause, extension: "oxc.oxc-vscode" })
 
@@ -159,7 +161,7 @@ describe("errors", () => {
   })
 
   describe("CommandFailed", () => {
-    test("include the command and exit code in the message", () => {
+    it("include the command and exit code in the message", () => {
       const error = new CommandFailed({
         command: "oxlint",
         exitCode: ChildProcessSpawner.ExitCode(2),

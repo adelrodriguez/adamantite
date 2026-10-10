@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, sep } from "node:path"
-import { afterAll, beforeAll, describe, expect, test } from "@effect/vitest"
+import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
@@ -116,7 +116,7 @@ function lintLayerImports(tempDir: string): Set<string> {
 
 describe("lib layer imports", () => {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-lib-layers-"))
-  let reported = new Set<string>()
+  let reported: Set<string>
 
   beforeAll(() => {
     reported = lintLayerImports(tempDir)
@@ -126,7 +126,7 @@ describe("lib layer imports", () => {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  test.each(CASES)("$file importing $specifier", ({ file, reported: expected }) => {
+  it.each(CASES)("$file importing $specifier", ({ file, reported: expected }) => {
     expect(reported.has(file)).toBe(expected)
   })
 })

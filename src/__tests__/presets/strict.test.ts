@@ -1,13 +1,18 @@
 import { join } from "node:path"
 import type { OxlintConfig } from "oxlint"
-import { beforeAll, describe, expect, test } from "@effect/vitest"
+import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import adamantitePlugin from "#presets/lint/plugin/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
-import { lintRuleFixtures, listFixtureRules, type RuleFixtureCase } from "./rule-fixtures.ts"
+import {
+  lintRuleFixtures,
+  listFixtureRules,
+  type RuleFixtureCase,
+  selectRuleFixtures,
+} from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/strict")
@@ -22,12 +27,14 @@ function getFirstPartyRules(rules: OxlintConfig["rules"]) {
 const presetRules = getFirstPartyRules(strict.rules)
 
 describe("strict preset", () => {
-  test("have fixtures for exactly the rules the preset enables", () => {
-    expect(listFixtureRules(FIXTURES_DIR)).toEqual(EffectArray.sort(presetRules, Order.String))
+  it("have fixtures for exactly the rules the preset enables", () => {
+    expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
+      EffectArray.sort(presetRules, Order.String)
+    )
   })
 
-  test("ban type assertions outside tests", () => {
-    expect(strict.rules?.["typescript/consistent-type-assertions"]).toEqual([
+  it("ban type assertions outside tests", () => {
+    expect(strict.rules?.["typescript/consistent-type-assertions"]).toStrictEqual([
       "error",
       { assertionStyle: "never" },
     ])
@@ -35,21 +42,21 @@ describe("strict preset", () => {
 })
 
 describe("first-party plugin", () => {
-  test("have each rule enabled by exactly one of the strict, react-strict, and tanstack presets", () => {
+  it("have each rule enabled by exactly one of the strict, react-strict, and tanstack presets", () => {
     const enabled = [
       ...presetRules,
       ...getFirstPartyRules(reactStrict.rules),
       ...getFirstPartyRules(tanstack.rules),
     ]
 
-    expect(EffectArray.sort(enabled, Order.String)).toEqual(
+    expect(EffectArray.sort(enabled, Order.String)).toStrictEqual(
       EffectArray.sort(Object.keys(adamantitePlugin.rules), Order.String)
     )
   })
 })
 
 describe("strict rule fixtures", () => {
-  let cases: RuleFixtureCase[] = []
+  let cases: RuleFixtureCase[]
 
   beforeAll(() => {
     cases = lintRuleFixtures({
@@ -60,20 +67,22 @@ describe("strict rule fixtures", () => {
   })
 
   describe.each(listFixtureRules(FIXTURES_DIR))("%s", (rule) => {
-    test("report every invalid fixture", () => {
-      const invalid = cases.filter((entry) => entry.rule === rule && entry.kind === "invalid")
+    it("report every invalid fixture", () => {
+      const invalid = selectRuleFixtures(cases, rule, "invalid")
       const missed = invalid.filter((entry) => entry.reportedLines.length === 0)
 
-      expect(invalid).not.toEqual([])
-      expect(missed.map((entry) => entry.file)).toEqual([])
+      expect(invalid).not.toStrictEqual([])
+      expect(missed.map((entry) => entry.file)).toStrictEqual([])
     })
 
-    test("report no valid fixture", () => {
-      const valid = cases.filter((entry) => entry.rule === rule && entry.kind === "valid")
+    it("report no valid fixture", () => {
+      const valid = selectRuleFixtures(cases, rule, "valid")
       const reported = valid.filter((entry) => entry.reportedLines.length > 0)
 
-      expect(valid).not.toEqual([])
-      expect(reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)).toEqual([])
+      expect(valid).not.toStrictEqual([])
+      expect(
+        reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)
+      ).toStrictEqual([])
     })
   })
 })

@@ -117,8 +117,8 @@ describe("tsconfig", () => {
 
         const config = JSON.parse(files.read("tsconfig.json"))
 
-        expect(config.extends).toEqual(["@company/tsconfig", "adamantite/typescript"])
-        expect(config.compilerOptions).toEqual({ target: "ES2020" })
+        expect(config.extends).toStrictEqual(["@company/tsconfig", "adamantite/typescript"])
+        expect(config.compilerOptions).toStrictEqual({ target: "ES2020" })
       })
     )
 
@@ -150,7 +150,7 @@ describe("tsconfig", () => {
 
         const config = JSON.parse(files.read("tsconfig.json"))
 
-        expect(config.extends).toEqual([
+        expect(config.extends).toStrictEqual([
           "@company/tsconfig",
           "@company/tsconfig-strict",
           "adamantite/typescript",
@@ -172,7 +172,7 @@ describe("tsconfig", () => {
 
         const config = JSON.parse(files.read("tsconfig.json"))
 
-        expect(config.extends).toEqual(["adamantite/typescript", "@company/tsconfig"])
+        expect(config.extends).toStrictEqual(["adamantite/typescript", "@company/tsconfig"])
       })
     )
 
@@ -305,11 +305,11 @@ describe("tsconfig update properties", () => {
             : (Array.isArray(extendsValue) ? extendsValue : [extendsValue]).filter(
                 (entry) => entry !== PRESET
               )
-        expect(mergedExtends.filter((entry) => entry !== PRESET)).toEqual(userEntries)
+        expect(mergedExtends.filter((entry) => entry !== PRESET)).toStrictEqual(userEntries)
 
         const parsed = readTsConfig(files)
-        expect(parsed.compilerOptions).toEqual(config.compilerOptions)
-        expect(parsed.include).toEqual(config.include)
+        expect(parsed.compilerOptions).toStrictEqual({ ...config.compilerOptions })
+        expect(parsed.include).toStrictEqual(config.include)
       }),
     { arbitrary: { runs: 150 } }
   )

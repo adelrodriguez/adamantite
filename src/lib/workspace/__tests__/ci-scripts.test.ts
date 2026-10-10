@@ -1,4 +1,4 @@
-import { describe, expect, it, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Schema from "effect/Schema"
 import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
@@ -9,19 +9,19 @@ import {
 } from "#lib/workspace/package-json.ts"
 
 describe("hasCICompatibleScripts", () => {
-  test("return true when the check script is present", () => {
+  it("return true when the check script is present", () => {
     expect(hasCICompatibleScripts(["check"])).toBe(true)
   })
 
-  test("return true when the analyze script is present", () => {
+  it("return true when the analyze script is present", () => {
     expect(hasCICompatibleScripts(["analyze"])).toBe(true)
   })
 
-  test("return false when only fix scripts are present", () => {
+  it("return false when only fix scripts are present", () => {
     expect(hasCICompatibleScripts(["fix"])).toBe(false)
   })
 
-  test("return false for an empty array", () => {
+  it("return false for an empty array", () => {
     expect(hasCICompatibleScripts([])).toBe(false)
   })
 })
@@ -57,7 +57,7 @@ describe("CI workflow entries", () => {
       const entries = getCIWorkflowEntries(manager, selected)
       const reversed = getCIWorkflowEntries(manager, EffectArray.reverse(selected))
 
-      expect(reversed).toEqual(entries)
+      expect(reversed).toStrictEqual(entries)
       expect(new Set(entries.map((entry) => entry.name)).size).toBe(entries.length)
       expect(entries.length).toBeLessThanOrEqual(selected.length)
     },

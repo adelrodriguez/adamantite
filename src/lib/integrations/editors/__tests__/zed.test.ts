@@ -61,7 +61,7 @@ describe("zed", () => {
     it.effect("ignore a missing settings file", () =>
       Effect.gen(function* () {
         const files = makeFiles()
-        expect(yield* zed.assess(ROOT, {}).pipe(provideFiles(files))).toEqual({
+        expect(yield* zed.assess(ROOT, {}).pipe(provideFiles(files))).toStrictEqual({
           applicable: false,
           warnings: [],
         })
@@ -83,7 +83,7 @@ describe("zed", () => {
 
         expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
         expect(config.languages.JavaScript.format_on_save).toBe("on")
-        expect(config.languages.Astro).toEqual({
+        expect(config.languages.Astro).toStrictEqual({
           format_on_save: "on",
           prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
         })
@@ -134,7 +134,7 @@ describe("zed", () => {
 
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
-        expect(config.languages.JavaScript.formatter).toEqual([
+        expect(config.languages.JavaScript.formatter).toStrictEqual([
           { language_server: { name: "oxfmt" } },
           { code_action: "source.fixAll.oxc" },
         ])
@@ -164,8 +164,11 @@ describe("zed", () => {
 
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
-        expect(config.lsp.custom.initialization_options.arguments).toEqual(["--flag", "--flag"])
-        expect(config.languages.JavaScript.formatter).toEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
+        expect(config.lsp.custom.initialization_options.arguments).toStrictEqual([
+          "--flag",
+          "--flag",
+        ])
+        expect(config.languages.JavaScript.formatter).toStrictEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
       })
     )
 
@@ -180,7 +183,7 @@ describe("zed", () => {
 
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
-        expect(config.languages.Svelte.formatter).toEqual(formatter)
+        expect(config.languages.Svelte.formatter).toStrictEqual(formatter)
       })
     )
 
@@ -199,7 +202,7 @@ describe("zed", () => {
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
         expect(config.languages.Astro.formatter).toBeUndefined()
-        expect(config.languages.Astro.prettier.plugins).toEqual(["prettier-plugin-astro"])
+        expect(config.languages.Astro.prettier.plugins).toStrictEqual(["prettier-plugin-astro"])
       })
     )
 
@@ -221,7 +224,7 @@ describe("zed", () => {
 
         const config = JSON.parse(files.read(SETTINGS_PATH))
 
-        expect(config.languages.JavaScript.formatter).toEqual([
+        expect(config.languages.JavaScript.formatter).toStrictEqual([
           OXFMT_FORMATTER,
           OXC_FIX_ALL,
           formatter,
@@ -242,8 +245,8 @@ describe("zed", () => {
         const config = JSON.parse(secondUpdate)
 
         expect(secondUpdate).toBe(firstUpdate)
-        expect(config.languages.JavaScript.formatter).toEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
-        expect(config.languages.JSON.formatter).toEqual([OXFMT_FORMATTER])
+        expect(config.languages.JavaScript.formatter).toStrictEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
+        expect(config.languages.JSON.formatter).toStrictEqual([OXFMT_FORMATTER])
       })
     )
 

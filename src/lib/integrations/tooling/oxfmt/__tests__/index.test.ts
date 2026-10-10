@@ -34,7 +34,7 @@ describe("oxfmt", () => {
         yield* oxfmt.create(ROOT).pipe(provideFiles(files))
 
         const state = yield* oxfmt.detect(ROOT).pipe(provideFiles(files))
-        expect(state.active).toEqual({
+        expect(state.active).toStrictEqual({
           file: "oxfmt.config.ts",
           format: "ts",
           path: join(ROOT, "oxfmt.config.ts"),
@@ -128,7 +128,7 @@ describe("oxfmt", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: false,
           warnings: [],
         })
@@ -157,7 +157,7 @@ describe("oxfmt", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: true,
           findings: [],
           packageActions: [],

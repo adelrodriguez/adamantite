@@ -10,7 +10,7 @@ describe("inspectRequiredPresetConfig", () => {
         'import analyze from "adamantite/analyze"\nexport default analyze\n',
         options
       )
-    ).toEqual({ kind: "configured" })
+    ).toStrictEqual({ kind: "configured" })
   })
 
   it("accept a preset used by an exported variable", () => {
@@ -19,7 +19,7 @@ describe("inspectRequiredPresetConfig", () => {
         'import analyze from "adamantite/analyze"\nconst config = { ...analyze, entry: ["src/index.ts"] }\nexport default config\n',
         options
       )
-    ).toEqual({ kind: "configured" })
+    ).toStrictEqual({ kind: "configured" })
   })
 
   it("reject an unused preset import", () => {

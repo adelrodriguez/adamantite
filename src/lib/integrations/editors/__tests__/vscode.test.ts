@@ -32,7 +32,7 @@ describe("vscode", () => {
     Effect.gen(function* () {
       const runner = createRunnerTestContext()
       yield* vscode.extension([]).pipe(Effect.provide(runner.layer))
-      expect(runner.invocations).toEqual([])
+      expect(runner.invocations).toStrictEqual([])
     })
   )
 

@@ -80,7 +80,7 @@ describe("custom-rules", () => {
         root: ROOT,
       })
 
-      expect(yield* runAssess(files)).toEqual({ applicable: false, warnings: [] })
+      expect(yield* runAssess(files)).toStrictEqual({ applicable: false, warnings: [] })
     })
   )
 
@@ -97,7 +97,7 @@ describe("custom-rules", () => {
         root: ROOT,
       })
 
-      expect(yield* runAssess(files)).toEqual({
+      expect(yield* runAssess(files)).toStrictEqual({
         applicable: true,
         findings: [],
         packageActions: [],
@@ -119,7 +119,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings).toEqual([
+      expect(findings).toStrictEqual([
         expect.objectContaining({
           currentState:
             "`.adamantite/rules` has 1 rule file(s), but no `custom()` call loads it, so Oxlint does not run them.",
@@ -144,7 +144,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings.map((finding) => finding.id)).toEqual([
+      expect(findings.map((finding) => finding.id)).toStrictEqual([
         "custom-rules-not-loaded:.adamantite/rules",
       ])
     })
@@ -167,7 +167,7 @@ describe("custom-rules", () => {
         root: ROOT,
       })
 
-      expect(getFindings(yield* runAssess(files))).toEqual([])
+      expect(getFindings(yield* runAssess(files))).toStrictEqual([])
     })
   )
 
@@ -185,7 +185,7 @@ describe("custom-rules", () => {
 
       const [finding, ...rest] = getFindings(yield* runAssess(files))
 
-      expect(rest).toEqual([])
+      expect(rest).toStrictEqual([])
       expect(finding?.id).toBe("custom-rule-cannot-load:.adamantite/rules/no-enum.ts")
       expect(finding?.currentState).toContain(
         "Line 1: `enum` needs a TypeScript transform, which type stripping does not do."
@@ -214,7 +214,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings.map((finding) => finding.id)).toEqual([
+      expect(findings.map((finding) => finding.id)).toStrictEqual([
         "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts",
       ])
     })
@@ -245,7 +245,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings.map((finding) => finding.id)).toEqual([
+      expect(findings.map((finding) => finding.id)).toStrictEqual([
         "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts",
       ])
     })
@@ -274,7 +274,7 @@ describe("custom-rules", () => {
         root: ROOT,
       })
 
-      expect(yield* runAssess(files)).toEqual({
+      expect(yield* runAssess(files)).toStrictEqual({
         applicable: true,
         findings: [],
         packageActions: [],
@@ -300,7 +300,7 @@ describe("custom-rules", () => {
       for (const files of [nodeFirst, defaultFirst]) {
         const findings = getFindings(yield* runAssess(files))
 
-        expect(findings.map((finding) => finding.id)).toEqual([ENUM_FINDING])
+        expect(findings.map((finding) => finding.id)).toStrictEqual([ENUM_FINDING])
       }
     })
   )
@@ -323,7 +323,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings.map((finding) => finding.id)).toEqual([ENUM_FINDING])
+      expect(findings.map((finding) => finding.id)).toStrictEqual([ENUM_FINDING])
     })
   )
 
@@ -345,7 +345,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings.map((finding) => finding.id)).toEqual([ENUM_FINDING])
+      expect(findings.map((finding) => finding.id)).toStrictEqual([ENUM_FINDING])
     })
   )
 
@@ -370,8 +370,8 @@ describe("custom-rules", () => {
 
         const assessment = yield* runAssess(files)
 
-        expect(getFindings(assessment)).toEqual([])
-        expect(assessment.warnings).toEqual([
+        expect(getFindings(assessment)).toStrictEqual([])
+        expect(assessment.warnings).toStrictEqual([
           "Doctor cannot resolve the import of `@acme/lint/missing` in `oxlint.config.ts`, so it does not check the `custom()` calls and rules folders behind it.",
         ])
       })
@@ -391,7 +391,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings.map((finding) => finding.id)).toEqual([
+      expect(findings.map((finding) => finding.id)).toStrictEqual([
         "custom-rules-not-loaded:packages/web/.adamantite/rules",
       ])
       expect(findings[0]?.goal[0]).toContain("in the Oxlint config of `packages/web`")
@@ -416,7 +416,7 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings).toEqual([
+      expect(findings).toStrictEqual([
         expect.objectContaining({
           currentState:
             "2 rules folders use the plugin name `project`: `.adamantite/rules`, `packages/web/.adamantite/rules`. Oxlint rejects two plugins with the same name in one run.",
@@ -442,7 +442,7 @@ describe("custom-rules", () => {
         root: ROOT,
       })
 
-      expect(getFindings(yield* runAssess(files))).toEqual([])
+      expect(getFindings(yield* runAssess(files))).toStrictEqual([])
     })
   )
 
@@ -463,8 +463,8 @@ describe("custom-rules", () => {
 
         const assessment = yield* runAssess(files)
 
-        expect(getFindings(assessment)).toEqual([])
-        expect(assessment.warnings).toEqual([
+        expect(getFindings(assessment)).toStrictEqual([])
+        expect(assessment.warnings).toStrictEqual([
           "Doctor cannot read the `dir` or `name` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
         ])
       })

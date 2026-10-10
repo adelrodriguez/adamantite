@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import {
   getImportedLintPresets,
   inspectRequiredOxlintConfig,
@@ -17,21 +17,23 @@ const invalidOptionsReason = "The required Oxlint options are missing or are not
 const requiredOptions = "respectEslintDisableDirectives: true, typeAware: true, typeCheck: true"
 
 describe("inspectRequiredOxlintConfig", () => {
-  test("accept the generated config with selected presets", () => {
-    expect(inspectRequiredOxlintConfig(toOxlintTsConfigContent(["react", "vitest"]))).toEqual({
-      kind: "configured",
-    })
+  it("accept the generated config with selected presets", () => {
+    expect(inspectRequiredOxlintConfig(toOxlintTsConfigContent(["react", "vitest"]))).toStrictEqual(
+      {
+        kind: "configured",
+      }
+    )
   })
 
-  test("accept a direct object export with custom settings", () => {
+  it("accept a direct object export with custom settings", () => {
     expect(
       inspectRequiredOxlintConfig(
         `export default { options: { ${requiredOptions}, custom: false }, rules: { semi: "off" } }`
       )
-    ).toEqual({ kind: "configured" })
+    ).toStrictEqual({ kind: "configured" })
   })
 
-  test.each([
+  it.each([
     ["export default {", unsupportedConfigReason],
     ["export default makeConfig()", unsupportedConfigReason],
     ["export default {}", missingOptionsReason],
@@ -58,7 +60,7 @@ describe("inspectRequiredOxlintConfig", () => {
       unsupportedOptionsReason,
     ],
   ])("report an invalid config without generating a repair: %s", (content, reason) => {
-    expect(inspectRequiredOxlintConfig(content)).toEqual({
+    expect(inspectRequiredOxlintConfig(content)).toStrictEqual({
       kind: "invalid",
       reason,
     })
@@ -66,28 +68,28 @@ describe("inspectRequiredOxlintConfig", () => {
 })
 
 describe("getImportedLintPresets", () => {
-  test("list the presets a generated config imports, without core and custom", () => {
-    expect(getImportedLintPresets(toOxlintTsConfigContent(["react", "shadcn"]))).toEqual([
+  it("list the presets a generated config imports, without core and custom", () => {
+    expect(getImportedLintPresets(toOxlintTsConfigContent(["react", "shadcn"]))).toStrictEqual([
       "react",
       "shadcn",
     ])
   })
 
-  test("import a hyphenated preset under a camel-case name", () => {
+  it("import a hyphenated preset under a camel-case name", () => {
     const content = toOxlintTsConfigContent(["react", "react-strict"])
 
     expect(content).toContain('import reactStrict from "adamantite/lint/react-strict"')
     expect(content).toContain("extends: [core, react, reactStrict, custom()],")
-    expect(getImportedLintPresets(content)).toEqual(["react", "react-strict"])
+    expect(getImportedLintPresets(content)).toStrictEqual(["react", "react-strict"])
   })
 
-  test("list no preset for a config with only the core preset", () => {
-    expect(getImportedLintPresets(toOxlintTsConfigContent())).toEqual([])
+  it("list no preset for a config with only the core preset", () => {
+    expect(getImportedLintPresets(toOxlintTsConfigContent())).toStrictEqual([])
   })
 
-  test("list no preset for a config that does not parse", () => {
+  it("list no preset for a config that does not parse", () => {
     expect(
       getImportedLintPresets('import shadcn from "adamantite/lint/shadcn"\nexport default {')
-    ).toEqual([])
+    ).toStrictEqual([])
   })
 })

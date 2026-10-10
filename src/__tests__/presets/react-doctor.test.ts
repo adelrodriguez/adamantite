@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
-import { beforeAll, describe, expect, test } from "@effect/vitest"
+import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 import reactDoctorPlugin from "oxlint-plugin-react-doctor"
 import reactDoctor from "#presets/lint/react-doctor.ts"
@@ -80,25 +80,25 @@ function lintFixtures() {
 }
 
 describe("react-doctor preset", () => {
-  test("enable only rules the managed plugin defines", () => {
+  it("enable only rules the managed plugin defines", () => {
     const pluginRules = new Set(Object.keys(reactDoctorPlugin.rules))
 
-    expect(presetRules.filter((rule) => !pluginRules.has(rule))).toEqual([])
+    expect(presetRules.filter((rule) => !pluginRules.has(rule))).toStrictEqual([])
   })
 
-  test("load the plugin by its package name", () => {
-    expect(reactDoctor.jsPlugins).toEqual(["oxlint-plugin-react-doctor"])
+  it("load the plugin by its package name", () => {
+    expect(reactDoctor.jsPlugins).toStrictEqual(["oxlint-plugin-react-doctor"])
   })
 
-  test("have one fixture for each enabled rule", () => {
-    expect(new Set(ruleFixtures.map((file) => basename(file, ".tsx")))).toEqual(
+  it("have one fixture for each enabled rule", () => {
+    expect(new Set(ruleFixtures.map((file) => basename(file, ".tsx")))).toStrictEqual(
       new Set(presetRules)
     )
   })
 })
 
 describe("react-doctor and react preset overlap", () => {
-  let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"] = []
+  let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"]
 
   function getFixtureCodes(fixture: string) {
     return diagnostics
@@ -110,19 +110,19 @@ describe("react-doctor and react preset overlap", () => {
     diagnostics = lintFixtures()
   })
 
-  test.each(ruleFixtures)("report %s through the plugin", (fixture) => {
+  it.each(ruleFixtures)("report %s through the plugin", (fixture) => {
     expect(getFixtureCodes(fixture)).toContain(`${NAMESPACE}(${basename(fixture, ".tsx")})`)
   })
 
-  test.each(ruleFixtures)("leave %s to the react-doctor rules", (fixture) => {
+  it.each(ruleFixtures)("leave %s to the react-doctor rules", (fixture) => {
     const nativeCodes = getFixtureCodes(fixture).filter(
       (code) => !code?.startsWith(`${NAMESPACE}(`)
     )
 
-    expect(nativeCodes).toEqual([])
+    expect(nativeCodes).toStrictEqual([])
   })
 
-  test("report nothing for a plain component", () => {
-    expect(getFixtureCodes(CLEAN_FIXTURE)).toEqual([])
+  it("report nothing for a plain component", () => {
+    expect(getFixtureCodes(CLEAN_FIXTURE)).toStrictEqual([])
   })
 })

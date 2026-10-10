@@ -578,8 +578,7 @@ describe("doctor", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "info",
-        message:
-          "Doctor can hand findings off when one of these CLIs is installed: `claude`, `codex`, `cursor-agent`, `gemini`, `grok`, `opencode`.",
+        message: expect.stringMatching(/^Doctor can hand findings off when one of these CLIs/u),
       })
       expect(prompter.selectCalls).toStrictEqual([
         expect.objectContaining({

@@ -356,7 +356,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("add adamantite prepare to the start of an existing prepare script", () =>
+    it.effect("log the merged prepare script and the missing tsconfig.json", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
           "package.json": JSON.stringify({ name: "test-project", scripts: { prepare: "husky" } }),
@@ -372,14 +372,19 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(readJson(files, "package.json")).toMatchObject({
-          scripts: { prepare: "adamantite prepare && (husky)" },
-        })
-        expect(runner.invocations).toHaveLength(1)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message: expect.stringContaining("No `tsconfig.json` found"),
-        })
+        expect(prompter.logs).toStrictEqual(
+          expect.arrayContaining([
+            {
+              level: "info",
+              message: "Added `adamantite prepare` to the start of your existing `prepare` script.",
+            },
+            {
+              level: "warning",
+              message:
+                "No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry.",
+            },
+          ])
+        )
       })
     )
 

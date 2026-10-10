@@ -59,6 +59,20 @@ function readJson(files: FileSystemTestContext, path: string): JsonObject {
   return JSON.parse(files.read(path)) as JsonObject
 }
 
+function readOptionalFile(files: FileSystemTestContext, path: string): string | null {
+  return files.exists(path) ? files.read(path) : null
+}
+
+const EXISTING_MONOREPO_TSCONFIG = JSON.stringify(
+  {
+    extends: "./tooling/tsconfig.base.json",
+    files: [],
+    references: [{ path: "packages/app" }],
+  },
+  null,
+  2
+)
+
 // Runs init interactively with the check and analyze scripts, the react preset, and VS Code.
 function runFreshSetup() {
   return Effect.gen(function* () {
@@ -522,21 +536,20 @@ describe("init", () => {
   })
 
   describe("monorepo TypeScript setup", () => {
-    it.effect("leave the root tsconfig unchanged and print guidance in a monorepo", () =>
+    it.effect.each<{
+      readonly files: Record<string, string>
+      readonly name: string
+      readonly tsconfig: string | null
+    }>([
+      { files: {}, name: "no root tsconfig.json", tsconfig: null },
+      {
+        files: { "tsconfig.json": EXISTING_MONOREPO_TSCONFIG },
+        name: "an existing root tsconfig.json",
+        tsconfig: EXISTING_MONOREPO_TSCONFIG,
+      },
+    ])("leave $name as it is and print guidance in a monorepo", ({ files: rootFiles, tsconfig }) =>
       Effect.gen(function* () {
-        const existingTsconfig = JSON.stringify(
-          {
-            extends: "./tooling/tsconfig.base.json",
-            files: [],
-            references: [{ path: "packages/app" }],
-          },
-          null,
-          2
-        )
-        const files = createInitTestContext({
-          "package.json": monorepoPackageJson,
-          "tsconfig.json": existingTsconfig,
-        })
+        const files = createInitTestContext({ "package.json": monorepoPackageJson, ...rootFiles })
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
 
@@ -547,7 +560,7 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("tsconfig.json")).toBe(existingTsconfig)
+        expect(readOptionalFile(files, "tsconfig.json")).toBe(tsconfig)
         expect(prompter.logs).toStrictEqual(
           expect.arrayContaining([
             {

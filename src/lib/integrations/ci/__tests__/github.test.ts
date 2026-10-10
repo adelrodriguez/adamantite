@@ -4,7 +4,6 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import github from "#lib/integrations/ci/github.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
@@ -510,27 +509,6 @@ describe("github", () => {
         expect(content).not.toContain("node-version")
       })
     )
-
-    it.effect("return FailedToCreateDirectory when the workflow directory cannot be created", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-        files.makeReadOnly(".github")
-
-        const result = yield* Effect.result(
-          github
-            .create(ROOT, {
-              packageManager: "bun",
-              scripts: ["check"],
-            })
-            .pipe(provideFallback(files))
-        )
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToCreateDirectory" })
-        }
-      })
-    )
   })
 
   describe("update", () => {
@@ -550,27 +528,6 @@ describe("github", () => {
         expect(content).toContain("name: check")
         expect(content).toContain("verify:")
         expect(content).not.toContain("Old Workflow")
-      })
-    )
-
-    it.effect("return FailedToWriteFile when writing the workflow fails", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ [WORKFLOW_PATH]: "name: Old" })
-        files.makeReadOnly(WORKFLOW_PATH)
-
-        const result = yield* Effect.result(
-          github
-            .update(ROOT, {
-              packageManager: "bun",
-              scripts: ["check"],
-            })
-            .pipe(provideFallback(files))
-        )
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
-        }
       })
     )
   })

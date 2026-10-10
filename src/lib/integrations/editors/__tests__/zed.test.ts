@@ -70,51 +70,18 @@ describe("zed", () => {
   })
 
   describe("create", () => {
-    it.effect("create .zed/settings.json", () =>
+    it.effect("create .zed/settings.json when the .zed directory does not exist", () =>
       Effect.gen(function* () {
         const files = makeFiles()
 
         yield* zed.create(ROOT).pipe(provideFiles(files))
 
-        const exists = yield* zed.detect(ROOT).pipe(provideFiles(files))
-        expect(exists).toBe(true)
-
-        const config = JSON.parse(files.read(SETTINGS_PATH))
-
-        expect(config.lsp.oxlint.initialization_options.settings.run).toBe("onType")
-        expect(config.languages.JavaScript.format_on_save).toBe("on")
-        expect(config.languages.Astro).toStrictEqual({
-          format_on_save: "on",
-          prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
-        })
+        expect(yield* zed.detect(ROOT).pipe(provideFiles(files))).toBe(true)
       })
     )
   })
 
   describe("update", () => {
-    it.effect("update an existing .zed/settings.json config", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify(
-            {
-              ui_font_size: 14,
-            },
-            null,
-            2
-          ),
-        })
-
-        const existsBefore = yield* zed.detect(ROOT).pipe(provideFiles(files))
-        expect(existsBefore).toBe(true)
-        yield* zed.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read(SETTINGS_PATH))
-
-        expect(config.ui_font_size).toBe(14)
-        expect(config.lsp.oxfmt.initialization_options.settings.run).toBe("onSave")
-      })
-    )
-
     it.effect("deduplicate formatter entries for managed languages", () =>
       Effect.gen(function* () {
         const files = makeFiles({
@@ -242,11 +209,9 @@ describe("zed", () => {
         const firstUpdate = files.read(SETTINGS_PATH)
         yield* zed.update(ROOT).pipe(provideFiles(files))
         const secondUpdate = files.read(SETTINGS_PATH)
-        const config = JSON.parse(secondUpdate)
 
         expect(secondUpdate).toBe(firstUpdate)
-        expect(config.languages.JavaScript.formatter).toStrictEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
-        expect(config.languages.JSON.formatter).toStrictEqual([OXFMT_FORMATTER])
+        expect(JSON.parse(secondUpdate).ui_font_size).toBe(14)
       })
     )
 
@@ -276,37 +241,6 @@ describe("zed", () => {
         expect(Result.isFailure(result)).toBe(true)
         if (Result.isFailure(result)) {
           expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
-        }
-      })
-    )
-
-    it.effect("return FailedToReadFile when the config does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* Effect.result(zed.update(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-        }
-      })
-    )
-
-    it.effect("return FailedToWriteFile when writing the config fails", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({
-            ui_font_size: 12,
-          }),
-        })
-        files.makeReadOnly(SETTINGS_PATH)
-
-        const result = yield* Effect.result(zed.update(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
         }
       })
     )

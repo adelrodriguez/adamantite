@@ -187,8 +187,13 @@ describe("custom-rules", () => {
 
       const findings = getFindings(yield* runAssess(files))
 
-      expect(findings.map((finding) => finding.id)).toStrictEqual([
-        "custom-rule-cannot-load:.adamantite/rules/no-enum.ts",
+      expect(findings).toMatchObject([
+        {
+          currentState: expect.stringContaining(
+            "Line 1: `enum` needs a TypeScript transform, which type stripping does not do."
+          ),
+          id: "custom-rule-cannot-load:.adamantite/rules/no-enum.ts",
+        },
       ])
     })
   )

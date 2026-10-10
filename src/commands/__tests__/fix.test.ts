@@ -179,5 +179,17 @@ describe("fix", () => {
         ])
       })
     )
+
+    it.effect("report a formatting failure after linting succeeds", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext([0, 2])
+
+        const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
+      })
+    )
   })
 })

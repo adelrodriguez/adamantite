@@ -1,5 +1,27 @@
 # adamantite
 
+## 0.43.1
+
+### Patch Changes
+
+- [#512](https://github.com/adelrodriguez/adamantite/pull/512) [`25fa5e3`](https://github.com/adelrodriguez/adamantite/commit/25fa5e3bffa47df50b293d5321adcca0b106639a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Keep the `adamantite` dependency that a project already has when `adamantite init` runs. Before, `init` installed `adamantite` from the registry every time, which replaced a pinned version, a `file:` path, or a workspace link with the latest published version. `init` still installs the pinned Oxlint, Oxfmt, Knip, and Sherif versions.
+
+- [#493](https://github.com/adelrodriguez/adamantite/pull/493) [`b0dfe2a`](https://github.com/adelrodriguez/adamantite/commit/b0dfe2a47b8bb5ee005a5e838f7f95ebf5fcfb7c) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Keep comments and formatting when `adamantite init` updates an existing JSON file. Before, `init` rewrote `.vscode/settings.json`, `.zed/settings.json`, `tsconfig.json`, and `package.json` with two-space indentation, which removed every comment and changed tab or four-space indentation. Now `init` edits only the values that it changes. Comments, trailing commas, indentation, line endings, and key order stay as they are, and new keys go at the end of their object.
+
+- [#512](https://github.com/adelrodriguez/adamantite/pull/512) [`25fa5e3`](https://github.com/adelrodriguez/adamantite/commit/25fa5e3bffa47df50b293d5321adcca0b106639a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Fix `npm install adamantite`, which hung. `@effect/platform-node` accepts any `@effect/platform-node-shared@^4.0.0`, and each `@effect/platform-node-shared` release requires the matching `effect` version, which differs from the `effect@4.0.0` that Adamantite pins. Since `@effect/platform-node-shared@4.0.3`, which requires the unpublished `effect@4.0.3`, npm repeated the resolution forever. Adamantite now pins `@effect/platform-node-shared@4.0.0`, aligned with `effect` and `@effect/platform-node`.
+
+- [#498](https://github.com/adelrodriguez/adamantite/pull/498) [`2190a1b`](https://github.com/adelrodriguez/adamantite/commit/2190a1bb7ad1318d997d67435a66b15ee121ce26) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Turn off four rules in the `vitest` lint preset and one in the `jest` lint preset that contradict another rule in the same preset. Before, code that one rule required was reported by the other rule.
+
+  - `vitest`: keep `prefer-importing-vitest-globals` and turn off `no-importing-vitest-globals`.
+  - `vitest`: keep `prefer-called-once` and turn off `prefer-called-times`.
+  - `vitest`: keep `valid-title` and turn off `prefer-describe-function-title`.
+  - `vitest` and `jest`: keep `require-hook` and turn off `no-hooks`. Setup code can now go in `beforeAll` and `beforeEach`, and `prefer-hooks-on-top`, `prefer-hooks-in-order`, and `no-duplicate-hooks` now apply.
+
+- [#501](https://github.com/adelrodriguez/adamantite/pull/501) [`760642c`](https://github.com/adelrodriguez/adamantite/commit/760642cc9b3898b7df0665657d1ad053659bdab2) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop two rules in the `vitest` and `jest` lint presets from reporting correct tests.
+
+  - `vitest`: `no-standalone-expect` now accepts `expect` in the test functions of `@effect/vitest`: `it.effect`, `it.live`, and `it.prop`, with their `each`, `fails`, `only`, `prop`, `runIf`, `skip`, and `skipIf` forms. Before, the rule reported every `expect` in an `it.effect` test.
+  - `vitest` and `jest`: `prefer-expect-assertions` now reports only `async` tests and tests that call `expect` in a callback or a loop, where an `expect` can fail to run. Before, the rule required `expect.assertions()` or `expect.hasAssertions()` in every test, also in synchronous tests where every `expect` always runs.
+
 ## 0.43.0
 
 ### Minor Changes

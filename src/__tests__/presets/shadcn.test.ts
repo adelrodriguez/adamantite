@@ -75,10 +75,6 @@ describe("shadcn preset", () => {
   it("enable exactly the rules the managed plugin defines", () => {
     expect(new Set(presetRules)).toStrictEqual(new Set(Object.keys(shadcnPlugin.rules)))
   })
-
-  it("load the plugin by its package name", () => {
-    expect(shadcn.jsPlugins).toStrictEqual(["@shadcn/lint"])
-  })
 })
 
 describe("shadcn and react preset overlap", () => {

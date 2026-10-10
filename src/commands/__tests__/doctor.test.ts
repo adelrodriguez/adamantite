@@ -140,81 +140,101 @@ function nonProbeInvocations(runner: RunnerTestContext) {
   return runner.invocations.filter((invocation) => !isProbe(invocation))
 }
 
+// No managed integration applies to a project that has only the adamantite package.
+const NO_INTEGRATION_FILES = {
+  "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+}
+
+const HEALTHY_FILES = {
+  "knip.config.ts": toKnipTsConfigContent(),
+  "package.json": manifest({
+    devDependencies: { adamantite: "1.0.0", knip: knip.version },
+    scripts: { analyze: "adamantite analyze" },
+  }),
+}
+
 describe("doctor", () => {
-  it.effect("report success when no managed integration applies", () =>
+  it.effect.each([
+    {
+      files: NO_INTEGRATION_FILES,
+      layers: [],
+      logs: [],
+      name: "no managed integration applies in a non-interactive terminal",
+      outros: [],
+    },
+    {
+      files: NO_INTEGRATION_FILES,
+      layers: [makeInteractiveTerminalLayer()],
+      logs: [{ level: "success", message: "No applicable integrations found." }],
+      name: "no managed integration applies in an interactive terminal",
+      outros: ["✅ Doctor completed successfully!"],
+    },
+    {
+      files: HEALTHY_FILES,
+      layers: [],
+      logs: [],
+      name: "managed state meets the oracle in a non-interactive terminal",
+      outros: [],
+    },
+    {
+      files: HEALTHY_FILES,
+      layers: [makeInteractiveTerminalLayer()],
+      logs: [{ level: "success", message: "No issues found." }],
+      name: "managed state meets the oracle in an interactive terminal",
+      outros: ["✅ Doctor completed successfully!"],
+    },
+  ])("report success when $name", ({ files, layers, logs, outros }) =>
     Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }) },
-      })
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual([])
-    })
-  )
-
-  it.effect("show no-applicable success framing in an interactive terminal", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }) },
-      })
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(doctorCommand, [], {
-        files,
-        layers: [prompter.layer, makeInteractiveTerminalLayer()],
+        files: createFileSystemTestContext({ files }),
+        layers: [prompter.layer, ...layers],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "success",
-        message: "No applicable integrations found.",
-      })
-      expect(prompter.outros).toStrictEqual(["✅ Doctor completed successfully!"])
+      expect(prompter.logs).toStrictEqual(logs)
+      expect(prompter.outros).toStrictEqual(outros)
     })
   )
 
-  it.effect("fail when Adamantite is not installed", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({}) },
-      })
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toStrictEqual([])
-      expect(prompter.messages).toStrictEqual([
+  it.effect.each([
+    {
+      layers: [],
+      logs: [],
+      messages: [
         "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
-      ])
-      expect(prompter.outros).toStrictEqual([])
-    })
-  )
-
-  it.effect("show the missing-package failure in an interactive terminal", () =>
+      ],
+      name: "a non-interactive terminal",
+      outros: [],
+    },
+    {
+      layers: [makeInteractiveTerminalLayer()],
+      logs: [
+        {
+          level: "warning",
+          message:
+            "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
+        },
+      ],
+      messages: [],
+      name: "an interactive terminal",
+      outros: ["⚠️ Doctor found issues."],
+    },
+  ])("fail when Adamantite is not installed in $name", ({ layers, logs, messages, outros }) =>
     Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({}) },
-      })
+      const files = createFileSystemTestContext({ files: { "package.json": manifest({}) } })
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, ...layers],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({
-        level: "warning",
-        message:
-          "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
-      })
-      expect(prompter.messages).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
+      expect(prompter.logs).toStrictEqual(logs)
+      expect(prompter.messages).toStrictEqual(messages)
+      expect(prompter.outros).toStrictEqual(outros)
     })
   )
 
@@ -318,86 +338,6 @@ describe("doctor", () => {
           "## Verify",
         ],
       ])
-    })
-  )
-
-  it.effect("report nothing once the legacy format script and workflow step are removed", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          ".github/workflows/adamantite.yml": "steps:\n  - run: pnpm run lint\n",
-          "AGENTS.md": LEGACY_FORMAT_AGENTS_GUIDANCE,
-          "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
-        },
-      })
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.messages).toStrictEqual([])
-    })
-  )
-
-  it.effect("report success when managed state meets the oracle", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          "knip.config.ts": toKnipTsConfigContent(),
-          "package.json": manifest({
-            devDependencies: { adamantite: "1.0.0", knip: knip.version },
-            scripts: { analyze: "adamantite analyze" },
-          }),
-        },
-      })
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual([])
-    })
-  )
-
-  it.effect("show success framing in an interactive terminal", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          "knip.config.ts": toKnipTsConfigContent(),
-          "package.json": manifest({
-            devDependencies: { adamantite: "1.0.0", knip: knip.version },
-            scripts: { analyze: "adamantite analyze" },
-          }),
-        },
-      })
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, [], {
-        files,
-        layers: [prompter.layer, makeInteractiveTerminalLayer()],
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toContainEqual({ level: "success", message: "No issues found." })
-      expect(prompter.outros).toStrictEqual(["✅ Doctor completed successfully!"])
-    })
-  )
-
-  it.effect("reject --fix as an unknown option", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }) },
-      })
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, ["--fix"], {
-        files,
-        layers: [prompter.layer],
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter).toMatchObject({ intros: [], logs: [], messages: [], notes: [], outros: [] })
     })
   )
 

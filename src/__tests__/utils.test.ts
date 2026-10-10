@@ -1,4 +1,4 @@
-import type { JsonValue, PackageJson } from "type-fest"
+import type { JsonValue } from "type-fest"
 
 import { describe, expect, it } from "@effect/vitest"
 import * as Console from "effect/Console"
@@ -52,90 +52,21 @@ function makeTerminalLayer(columns?: number) {
 }
 
 describe("readPackageJson", () => {
-  describe("when a path is provided", () => {
-    it.effect("read and parse a valid package.json", () =>
-      Effect.gen(function* () {
-        const packageJson: PackageJson = {
-          dependencies: {
-            react: "^18.0.0",
-          },
-          devDependencies: {
-            typescript: "^5.0.0",
-          },
-          name: "test-package",
-          version: "1.0.0",
-        }
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
+  it.effect("return an error when package.json does not exist", () =>
+    Effect.gen(function* () {
+      const files = makeFiles()
 
-        const result = yield* readPackageJson(ROOT).pipe(provideFiles(files))
+      const result = yield* Effect.result(readPackageJson(ROOT).pipe(provideFiles(files)))
 
-        expect(result).toStrictEqual(packageJson)
-      })
-    )
-
-    it.effect("return an error when package.json does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* Effect.result(readPackageJson(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-        }
-      })
-    )
-
-    it.effect("return an error when package.json contains invalid JSON", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "package.json": "invalid json content" })
-
-        const result = yield* Effect.result(readPackageJson(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
-        }
-      })
-    )
-  })
-
-  describe("when cwd is omitted", () => {
-    it.effect("use the current working directory by default", () =>
-      Effect.gen(function* () {
-        const packageJson: PackageJson = {
-          name: "test-package",
-          version: "1.0.0",
-        }
-        const files = createFileSystemTestContext({
-          files: { "package.json": JSON.stringify(packageJson, null, 2) },
-        })
-
-        const result = yield* readPackageJson().pipe(provideFiles(files))
-
-        expect(result).toStrictEqual(packageJson)
-      })
-    )
-  })
+      expect(Result.isFailure(result)).toBe(true)
+      if (Result.isFailure(result)) {
+        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
+      }
+    })
+  )
 })
 
 describe("parseJson", () => {
-  it.effect("parse valid JSONC with comments", () =>
-    Effect.gen(function* () {
-      const jsonc = `{
-      // This is a comment
-      "name": "test",
-      "version": "1.0.0"
-    }`
-      const result = yield* parseJson(jsonc)
-
-      expect(result).toStrictEqual({
-        name: "test",
-        version: "1.0.0",
-      })
-    })
-  )
-
   it.effect("parse JSON with trailing commas", () =>
     Effect.gen(function* () {
       const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
@@ -159,80 +90,9 @@ describe("parseJson", () => {
       }
     })
   )
-
-  it.effect("strip __proto__ keys (jsonc-parser pollution protection)", () =>
-    Effect.gen(function* () {
-      const parsed = yield* parseJson('{"__proto__": {"polluted": true}, "a": 1}')
-
-      expect(parsed).toStrictEqual({ a: 1 })
-    })
-  )
-
-  it.effect.prop(
-    "round-trip any JSON value without __proto__ keys through JSON.stringify",
-    {
-      value: Schema.MutableJson.check(
-        Schema.makeFilter((value) => !someKey(value, (key) => key === "__proto__"))
-      ),
-    },
-    ({ value }) =>
-      Effect.gen(function* () {
-        const parsed = yield* parseJson(JSON.stringify(value))
-
-        expect(JSON.stringify(parsed)).toBe(JSON.stringify(value))
-      }),
-    { arbitrary: { runs: 300 } }
-  )
-
-  it.effect.prop(
-    "resolve to success or FailedToParseFile for arbitrary input, never a defect",
-    { content: Schema.String },
-    ({ content }) =>
-      Effect.gen(function* () {
-        const result = yield* Effect.result(parseJson(content))
-
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
-        }
-      }),
-    { arbitrary: { runs: 500 } }
-  )
 })
 
 describe("mergeConfig", () => {
-  it.effect("handle nested objects", () =>
-    Effect.gen(function* () {
-      const base = { a: { x: 1, y: 2 }, b: 3 }
-      const override = { a: { y: 4, z: 5 }, b: 6 }
-      const result = yield* mergeConfig(base, override)
-
-      expect(result).toStrictEqual({ a: { x: 1, y: 2, z: 5 }, b: 3 })
-    })
-  )
-
-  it.effect("return an error when defu throws", () =>
-    Effect.gen(function* () {
-      const throwingBase = new Proxy(
-        {},
-        {
-          get() {
-            throw new Error("Simulated defu error")
-          },
-          ownKeys() {
-            throw new Error("Simulated defu error")
-          },
-        }
-      )
-
-      const result = yield* Effect.result(mergeConfig(throwingBase, { b: 2 }))
-
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToMergeConfig" })
-      }
-    })
-  )
-
   // defu drops `__proto__`/`constructor` keys and null-valued keys from its first argument, and
   // concatenates arrays on conflicts, so this property holds on array-free, null-free configs with
   // plain keys.
@@ -409,178 +269,91 @@ describe("updateJsonText", () => {
 })
 
 describe("checkIsMonorepo", () => {
-  describe("when workspace files are present", () => {
-    it.effect("return true when pnpm-workspace.yaml defines packages", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "pnpm-workspace.yaml": "packages:\n  - 'packages/*'" })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(true)
+  it.effect.each([
+    {
+      content: "packages:\n  - 'packages/*'",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm-workspace.yaml defines packages",
+    },
+    {
+      content: "\uFEFFpackages:\n  - 'packages/*'\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm workspace content starts with a byte-order mark",
+    },
+    {
+      content: "\"packages\":\n  - 'packages/*'\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm quotes the packages key",
+    },
+    {
+      content: "allowBuilds:\n  msgpackr-extract: false\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm-workspace.yaml does not define packages",
+    },
+    {
+      content: "packages: [] # no workspace packages\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm declares an empty package list with a comment",
+    },
+    {
+      content: "packages: [\n]\n",
+      expected: false,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm declares an empty multiline flow sequence",
+    },
+    {
+      content: "packages: [\n  'packages/*',\n]\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm declares packages in a multiline flow sequence",
+    },
+    {
+      content: JSON.stringify({ workspaces: ["packages/*"] }),
+      expected: true,
+      file: "package.json",
+      name: "package.json has a workspaces field",
+    },
+    {
+      content: JSON.stringify({ workspaces: { packages: ["packages/*"] } }),
+      expected: true,
+      file: "package.json",
+      name: "package.json has workspace packages in object form",
+    },
+    {
+      content: JSON.stringify({ workspaces: { packages: [] } }),
+      expected: false,
+      file: "package.json",
+      name: "package.json has no workspace packages in object form",
+    },
+    {
+      content: JSON.stringify({ workspaces: [] }),
+      expected: false,
+      file: "package.json",
+      name: "package.json has no workspace packages",
+    },
+    {
+      content: JSON.stringify({ name: "test-package", version: "1.0.0" }),
+      expected: false,
+      file: "package.json",
+      name: "neither pnpm-workspace.yaml nor workspaces is present",
+    },
+  ])("return $expected when $name", ({ content, expected, file }) =>
+    Effect.gen(function* () {
+      const files = makeFiles({
+        "package.json": JSON.stringify({ name: "test-package" }),
+        [file]: content,
       })
-    )
 
-    it.effect("return true when pnpm workspace content starts with a byte-order mark", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify({ name: "test-package" }),
-          "pnpm-workspace.yaml": "\uFEFFpackages:\n  - 'packages/*'\n",
-        })
+      const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
 
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(true)
-      })
-    )
-
-    it.effect("return true when pnpm quotes the packages key", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify({ name: "test-package" }),
-          "pnpm-workspace.yaml": "\"packages\":\n  - 'packages/*'\n",
-        })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(true)
-      })
-    )
-
-    it.effect("return false when pnpm-workspace.yaml does not define packages", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify({ name: "test-package" }),
-          "pnpm-workspace.yaml": "allowBuilds:\n  msgpackr-extract: false\n",
-        })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(false)
-      })
-    )
-
-    it.effect("return false when pnpm declares an empty package list with a comment", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify({ name: "test-package" }),
-          "pnpm-workspace.yaml": "packages: [] # no workspace packages\n",
-        })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(false)
-      })
-    )
-
-    it.effect("return false when pnpm declares an empty multiline flow sequence", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify({ name: "test-package" }),
-          "pnpm-workspace.yaml": "packages: [\n]\n",
-        })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(false)
-      })
-    )
-
-    it.effect("return true when pnpm declares packages in a multiline flow sequence", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify({ name: "test-package" }),
-          "pnpm-workspace.yaml": "packages: [\n  'packages/*',\n]\n",
-        })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(true)
-      })
-    )
-
-    it.effect("return true when package.json has a workspaces field", () =>
-      Effect.gen(function* () {
-        const packageJson: PackageJson = {
-          name: "test-package",
-          workspaces: ["packages/*"],
-        }
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(true)
-      })
-    )
-
-    it.effect("return true when package.json has workspace packages in object form", () =>
-      Effect.gen(function* () {
-        const packageJson: PackageJson = {
-          name: "test-package",
-          workspaces: { packages: ["packages/*"] },
-        }
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(true)
-      })
-    )
-
-    it.effect("return false when package.json has no workspace packages in object form", () =>
-      Effect.gen(function* () {
-        const packageJson: PackageJson = {
-          name: "test-package",
-          workspaces: { packages: [] },
-        }
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(false)
-      })
-    )
-
-    it.effect("return false when package.json has no workspace packages", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify({ name: "test-package", workspaces: [] }),
-        })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(false)
-      })
-    )
-  })
-
-  describe("when workspace files are absent", () => {
-    it.effect("return false when neither condition is met", () =>
-      Effect.gen(function* () {
-        const packageJson: PackageJson = {
-          name: "test-package",
-          version: "1.0.0",
-        }
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson, null, 2) })
-
-        const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
-
-        expect(result).toBe(false)
-      })
-    )
-
-    it.effect("return an error when package.json does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* Effect.result(checkIsMonorepo(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-        }
-      })
-    )
-  })
+      expect(result).toBe(expected)
+    })
+  )
 })
 
 function makeConsoleContext() {

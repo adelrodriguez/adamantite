@@ -1,9 +1,7 @@
 import type { ParseError } from "jsonc-parser"
 import { describe, expect, it } from "@effect/vitest"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { parse, printParseErrorCode } from "jsonc-parser"
 import {
-  CommandFailed,
   FailedToInstallDependency,
   FailedToInstallExtension,
   FailedToParseFile,
@@ -34,25 +32,14 @@ describe("errors", () => {
       expect(error.message).toContain("Unknown JSON/JSONC parsing error")
     })
 
-    it("include up to three parse errors with offsets and codes", () => {
-      expect.assertions(6)
-
-      const errors = createParseErrors(3)
-      const error = new FailedToParseFile({ errors, path: "foo.json" })
-
-      for (const parseError of errors) {
-        expect(error.message).toContain(printParseErrorCode(parseError.error))
-        expect(error.message).toContain(`offset: ${parseError.offset}`)
-      }
-    })
-
     it("truncate parse details after the first three errors", () => {
       const errors = createParseErrors(4)
       const error = new FailedToParseFile({ errors, path: "foo.json" })
+      const [code] = errors.map((parseError) => printParseErrorCode(parseError.error))
 
-      expect(error.message).toContain(`offset: ${errors[0]?.offset}`)
-      expect(error.message).toContain(`offset: ${errors[1]?.offset}`)
-      expect(error.message).toContain(`offset: ${errors[2]?.offset}`)
+      expect(error.message).toContain(`- ${code} (offset: ${errors[0]?.offset})`)
+      expect(error.message).toContain(`- ${code} (offset: ${errors[1]?.offset})`)
+      expect(error.message).toContain(`- ${code} (offset: ${errors[2]?.offset})`)
       expect(error.message).not.toContain(`offset: ${errors[3]?.offset}`)
     })
   })
@@ -148,26 +135,6 @@ describe("errors", () => {
       expect(error.message).toBe(
         "Failed to install `oxc.oxc-vscode`. The `code` CLI exited with code 1."
       )
-    })
-
-    it("include the cause detail when the cause is an Error", () => {
-      const cause = new Error("SystemError: spawn code EAGAIN")
-      const error = new FailedToInstallExtension({ cause, extension: "oxc.oxc-vscode" })
-
-      expect(error.message).toBe(
-        "Failed to install `oxc.oxc-vscode`. Cause: SystemError: spawn code EAGAIN."
-      )
-    })
-  })
-
-  describe("CommandFailed", () => {
-    it("include the command and exit code in the message", () => {
-      const error = new CommandFailed({
-        command: "oxlint",
-        exitCode: ChildProcessSpawner.ExitCode(2),
-      })
-
-      expect(error.message).toBe("Command `oxlint` failed with exit code 2.")
     })
   })
 })

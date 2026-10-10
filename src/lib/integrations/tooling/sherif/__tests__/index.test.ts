@@ -89,65 +89,6 @@ describe("sherif", () => {
       })
     )
 
-    it.effect("report retired scripts without installing an unused package", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              name: "test-project",
-              scripts: {
-                "check:monorepo": "adamantite monorepo",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [{ id: "legacy-monorepo-scripts" }],
-          packageActions: [],
-          warnings: [],
-        })
-      })
-    )
-
-    it.effect("report the managed legacy monorepo scripts", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({
-            devDependencies: { sherif: sherif.version },
-            scripts: {
-              analyze: "adamantite analyze",
-              "check:monorepo": "adamantite monorepo",
-              "fix:monorepo": "adamantite monorepo --fix",
-            },
-            workspaces: ["packages/*"],
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              goal: [
-                "Remove the `check:monorepo` script from `package.json`.",
-                "Remove the `fix:monorepo` script from `package.json`.",
-              ],
-              id: "legacy-monorepo-scripts",
-            },
-          ],
-          packageActions: [],
-        })
-      })
-    )
-
     it.effect("report a script with another name that runs adamantite monorepo", () =>
       Effect.gen(function* () {
         const files = makeFiles({

@@ -10,25 +10,19 @@ const IMPORT = 'import custom from "adamantite/lint/custom"\n'
 
 describe("isRuleFile", () => {
   it.each([
-    "no-process-env.ts",
-    "no-process-env.mts",
-    "no-process-env.js",
-    "no-process-env.mjs",
-    "_helpers.ts",
-    "types.d.ts",
-    "types.d.mts",
-    "AGENTS.md",
-    "component.tsx",
-    "legacy.cjs",
-  ])("agree with the files that custom() loads: %s", (name) => {
-    expect(isRuleFile(name)).toBe(isLoadedRuleFile(name))
-  })
-
-  it("accept rule files and reject helpers and other files", () => {
-    expect(isRuleFile("no-process-env.ts")).toBe(true)
-    expect(isRuleFile("_helpers.ts")).toBe(false)
-    expect(isRuleFile("types.d.ts")).toBe(false)
-    expect(isRuleFile("AGENTS.md")).toBe(false)
+    ["no-process-env.ts", true],
+    ["no-process-env.mts", true],
+    ["no-process-env.js", true],
+    ["no-process-env.mjs", true],
+    ["_helpers.ts", false],
+    ["types.d.ts", false],
+    ["types.d.mts", false],
+    ["AGENTS.md", false],
+    ["component.tsx", false],
+    ["legacy.cjs", false],
+  ])("classify %s as a rule file: %s, as custom() does", (name, expected) => {
+    expect(isRuleFile(name)).toBe(expected)
+    expect(isLoadedRuleFile(name)).toBe(expected)
   })
 })
 

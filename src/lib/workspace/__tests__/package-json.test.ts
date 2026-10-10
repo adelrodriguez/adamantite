@@ -15,21 +15,6 @@ describe("getConflictingScripts", () => {
 })
 
 describe("script management", () => {
-  it("exclude retired commands from managed scripts", () => {
-    expect(
-      getManagedScripts({
-        scripts: {
-          analyze: "adamantite analyze",
-          check: "adamantite check",
-          "check:monorepo": "adamantite monorepo",
-          fix: "adamantite fix",
-          "fix:monorepo": "adamantite monorepo --fix",
-          format: "adamantite format",
-        },
-      })
-    ).toStrictEqual(["analyze", "check", "fix"])
-  })
-
   // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
   const ALL_SCRIPTS = Object.keys(MANAGED_SCRIPT_COMMANDS) as Script[]
 

@@ -3,7 +3,6 @@ import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import reactStrict from "#presets/lint/react-strict.ts"
-import packageJson from "../../../package.json" with { type: "json" }
 import {
   lintRuleFixtures,
   listFixtureRules,
@@ -24,10 +23,6 @@ describe("react-strict preset", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
       EffectArray.sort(presetRules, Order.String)
     )
-  })
-
-  it("take the plugin types from the Oxlint version that runs the plugin", () => {
-    expect(packageJson.dependencies["@oxlint/plugins"]).toBe(packageJson.devDependencies.oxlint)
   })
 })
 

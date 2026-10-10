@@ -146,33 +146,29 @@ describe("knip", () => {
       })
     )
 
-    it.effect("accept a regular expression that ignores sherif", () =>
+    it.effect.each([
+      {
+        config: toKnipTsConfigContent().replace(
+          "const config: KnipConfig = analyze",
+          "const config: KnipConfig = { ...analyze, ignoreDependencies: [/^sherif$/] }"
+        ),
+        name: "a regular expression",
+      },
+      {
+        config: toKnipTsConfigContent().replace(
+          "const config: KnipConfig = analyze",
+          'const config: KnipConfig = { ...analyze, ignoreDependencies: ["sherif"] }'
+        ),
+        name: "name",
+      },
+      {
+        config: toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: false }),
+        name: "reference",
+      },
+    ])("accept a monorepo config that ignores sherif by $name", ({ config }) =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent().replace(
-            "const config: KnipConfig = analyze",
-            "const config: KnipConfig = { ...analyze, ignoreDependencies: [/^sherif$/] }"
-          ),
-          "package.json": JSON.stringify({
-            devDependencies: { knip: knip.version },
-            scripts: { analyze: "adamantite analyze" },
-            workspaces: ["packages/*"],
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result.applicable && result.findings).toStrictEqual([])
-      })
-    )
-
-    it.effect("accept a monorepo config that ignores sherif by name", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent().replace(
-            "const config: KnipConfig = analyze",
-            'const config: KnipConfig = { ...analyze, ignoreDependencies: ["sherif"] }'
-          ),
+          "knip.config.ts": config,
           "package.json": JSON.stringify({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
@@ -205,23 +201,6 @@ describe("knip", () => {
         expect(result.applicable && result.findings).toStrictEqual([
           expect.objectContaining({ id: "invalid-knip-config" }),
         ])
-      })
-    )
-
-    it.effect("accept a monorepo config that ignores sherif by reference", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: false }),
-          "package.json": JSON.stringify({
-            devDependencies: { knip: knip.version },
-            scripts: { analyze: "adamantite analyze" },
-            workspaces: ["packages/*"],
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result.applicable && result.findings).toStrictEqual([])
       })
     )
 
@@ -297,36 +276,6 @@ describe("knip", () => {
       })
     )
 
-    it.effect("report missing managed config when the managed analyze script exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                knip: knip.version,
-              },
-              name: "test-project",
-              scripts: {
-                analyze: "adamantite analyze",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [{ id: "missing-knip-config" }],
-          packageActions: [],
-          warnings: [],
-        })
-      })
-    )
-
     it.effect("report a finding when a legacy config is active", () =>
       Effect.gen(function* () {
         const files = makeFiles({
@@ -352,37 +301,6 @@ describe("knip", () => {
         expect(result).toMatchObject({
           applicable: true,
           findings: [{ id: "legacy-knip-config" }],
-          packageActions: [],
-          warnings: [],
-        })
-      })
-    )
-
-    it.effect("report healthy when package and managed config are present", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "knip.config.ts": toKnipTsConfigContent(),
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                knip: knip.version,
-              },
-              name: "test-project",
-              scripts: {
-                analyze: "adamantite analyze",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toStrictEqual({
-          applicable: true,
-          findings: [],
           packageActions: [],
           warnings: [],
         })

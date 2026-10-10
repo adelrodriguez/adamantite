@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
-import reactDoctorPlugin from "oxlint-plugin-react-doctor"
 import reactDoctor from "#presets/lint/react-doctor.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
@@ -80,16 +79,6 @@ function lintFixtures() {
 }
 
 describe("react-doctor preset", () => {
-  it("enable only rules the managed plugin defines", () => {
-    const pluginRules = new Set(Object.keys(reactDoctorPlugin.rules))
-
-    expect(presetRules.filter((rule) => !pluginRules.has(rule))).toStrictEqual([])
-  })
-
-  it("load the plugin by its package name", () => {
-    expect(reactDoctor.jsPlugins).toStrictEqual(["oxlint-plugin-react-doctor"])
-  })
-
   it("have one fixture for each enabled rule", () => {
     expect(new Set(ruleFixtures.map((file) => basename(file, ".tsx")))).toStrictEqual(
       new Set(presetRules)

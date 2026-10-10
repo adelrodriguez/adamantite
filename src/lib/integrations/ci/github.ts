@@ -117,7 +117,7 @@ function getSetupSteps(source: NodeVersionSource) {
       - name: Install dependencies
         run: npm ci`,
     pnpm: `      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
 ${renderNodeSetup(source)}
           cache: "pnpm"

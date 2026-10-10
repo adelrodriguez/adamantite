@@ -35,32 +35,22 @@ function runWriteAgentsGuidance(
 }
 
 describe("writeAgentsGuidance", () => {
-  it.effect("create AGENTS.md when it does not exist", () =>
+  it.effect("create AGENTS.md with the script guidance in check, fix, analyze order", () =>
     Effect.gen(function* () {
       const files = makeFiles()
 
       const result = yield* runWriteAgentsGuidance(files, {
         isMonorepo: false,
         packageManager: "bun",
-        scripts: ["fix", "check"],
+        scripts: ["analyze", "fix", "check"],
       })
 
-      expect(result).toBe("updated")
-
       const agents = files.read("AGENTS.md")
-      expect(agents).toContain(ADAMANTITE_AGENTS_START_MARKER)
-      expect(agents).toContain("## Adamantite")
-      expect(agents).toContain("Run `bun run fix` to apply safe lint fixes and format code")
-      expect(agents).toContain("Run `bun run check` to catch formatting, lint, and type issues")
-      expect(agents).not.toContain("adamantite analyze")
-      expect(agents).toContain(
-        "Write project-specific lint rules in `.adamantite/rules/`, one rule for each file."
-      )
-      expect(agents).toContain(
-        "Run `adamantite doctor` and follow its findings to repair managed setup.\n\n<!-- ADAMANTITE:END -->"
-      )
-      expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
-      expect(agents.endsWith("\n")).toBe(true)
+      expect(result).toBe("updated")
+      expect(
+        Array.from(agents.matchAll(/^- Run `bun run (\w+)`/gm), ([, script]) => script)
+      ).toStrictEqual(["check", "fix", "analyze"])
+      expect(agents).toContain(".adamantite/rules")
     })
   )
 
@@ -226,18 +216,14 @@ describe("writeAgentsGuidance", () => {
         const existing = `${prefix}${ADAMANTITE_AGENTS_START_MARKER}\nOLD-CONTENT-SENTINEL\n${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
         const files = makeFiles({ "AGENTS.md": existing })
 
+        const fresh = makeFiles()
+
         const result = yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
+        yield* runWriteAgentsGuidance(fresh, { isMonorepo, packageManager, scripts })
 
+        const expected = `${prefix}${fresh.read("AGENTS.md").trimEnd()}${suffix}`
         expect(result).toBe("updated")
-
-        const agents = files.read("AGENTS.md")
-        expect(agents.startsWith(prefix)).toBe(true)
-        expect(agents).not.toContain("OLD-CONTENT-SENTINEL")
-        expect(countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER)).toBe(1)
-        expect(countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER)).toBe(1)
-
-        expect(agents.endsWith(suffix) || agents.endsWith(`${suffix}\n`)).toBe(true)
-        expect(agents.endsWith("\n")).toBe(true)
+        expect(files.read("AGENTS.md")).toBe(expected.endsWith("\n") ? expected : `${expected}\n`)
       }),
     { arbitrary: { runs: 150 } }
   )

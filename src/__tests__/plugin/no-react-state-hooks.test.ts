@@ -120,21 +120,19 @@ tester.run("no-react-state-hooks", plugin.rules["no-react-state-hooks"], {
 })
 
 describe("globToRegExp", () => {
-  it("matches the default allow globs", () => {
-    const hookModule = globToRegExp("**/use[A-Z]*.{ts,tsx}")
-    const kebabHookModule = globToRegExp("**/use-*.{ts,tsx}")
-    const hooksDirectory = globToRegExp("**/hooks/**")
-
-    expect(hookModule.test("useCart.ts")).toBe(true)
-    expect(hookModule.test("src/cart/useCart.tsx")).toBe(true)
-    expect(hookModule.test("src/cart/useCart.js")).toBe(false)
-    expect(hookModule.test("src/user/Profile.tsx")).toBe(false)
-    expect(hookModule.test("src/features/userProfile.tsx")).toBe(false)
-    expect(kebabHookModule.test("src/cart/use-cart.ts")).toBe(true)
-    expect(kebabHookModule.test("src/features/user-profile.tsx")).toBe(false)
-    expect(hooksDirectory.test("src/hooks/cart.ts")).toBe(true)
-    expect(hooksDirectory.test("hooks/cart/index.ts")).toBe(true)
-    expect(hooksDirectory.test("src/no-hooks/cart.ts")).toBe(false)
+  it.each([
+    { expected: true, glob: "**/use[A-Z]*.{ts,tsx}", path: "useCart.ts" },
+    { expected: true, glob: "**/use[A-Z]*.{ts,tsx}", path: "src/cart/useCart.tsx" },
+    { expected: false, glob: "**/use[A-Z]*.{ts,tsx}", path: "src/cart/useCart.js" },
+    { expected: false, glob: "**/use[A-Z]*.{ts,tsx}", path: "src/user/Profile.tsx" },
+    { expected: false, glob: "**/use[A-Z]*.{ts,tsx}", path: "src/features/userProfile.tsx" },
+    { expected: true, glob: "**/use-*.{ts,tsx}", path: "src/cart/use-cart.ts" },
+    { expected: false, glob: "**/use-*.{ts,tsx}", path: "src/features/user-profile.tsx" },
+    { expected: true, glob: "**/hooks/**", path: "src/hooks/cart.ts" },
+    { expected: true, glob: "**/hooks/**", path: "hooks/cart/index.ts" },
+    { expected: false, glob: "**/hooks/**", path: "src/no-hooks/cart.ts" },
+  ])("match $path against the default allow glob $glob: $expected", ({ expected, glob, path }) => {
+    expect(globToRegExp(glob).test(path)).toBe(expected)
   })
 
   it("matches character classes and negated character classes", () => {

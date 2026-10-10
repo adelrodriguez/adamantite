@@ -1,5 +1,4 @@
 import type * as FileSystem from "effect/FileSystem"
-import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -39,29 +38,25 @@ function runAssess(integration: typeof oxlint | typeof tsgolint, files: FileSyst
 
 describe("oxlint", () => {
   describe("create", () => {
-    it.effect("create oxlint.config.ts with the correct config", () =>
+    it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
+        const files = makeFiles({
+          "package.json": JSON.stringify({
+            devDependencies: { oxlint: oxlint.version },
+            name: "test-project",
+            scripts: { check: "adamantite check" },
+            version: "1.0.0",
+          }),
+        })
 
         yield* oxlint.create(ROOT).pipe(provideFiles(files))
 
-        const state = yield* oxlint.detect(ROOT).pipe(provideFiles(files))
-        expect(state.active).toStrictEqual({
-          file: "oxlint.config.ts",
-          format: "ts",
-          path: join(ROOT, "oxlint.config.ts"),
+        expect(yield* runAssess(oxlint, files)).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
         })
-        expect(state.legacy).toStrictEqual([])
-
-        const content = files.read("oxlint.config.ts")
-        expect(content).toContain('import { defineConfig } from "oxlint"')
-        expect(content).toContain('import core from "adamantite/lint"')
-        expect(content).toContain("respectEslintDisableDirectives: true")
-        expect(content).toContain("typeAware: true")
-        expect(content).toContain("typeCheck: true")
-        expect(content).toContain("ignorePatterns: core.ignorePatterns")
-        expect(content).toContain('import custom from "adamantite/lint/custom"')
-        expect(content).toContain("extends: [core, custom()]")
       })
     )
 

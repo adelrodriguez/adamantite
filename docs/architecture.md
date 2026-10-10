@@ -188,13 +188,9 @@ run, so a re-vendor that tightens or relaxes a rule fails the fixture of that ca
 fixtures when a rule is added, and move or change a fixture only when the upstream change
 is accepted.
 
-Each rule also has an in-process test under `src/__tests__/vendor/<bundle>/<rule>.test.ts`
-that runs the rule object from the bundle through `RuleTester` from `oxlint/plugins-dev`.
-These cases pin what the fixture run cannot: the message id, the placeholder data, the
-report line and column, and the effect of rule options. They run with the unit tests. The
-generated `plugin.d.mts` names each rule, so a test addresses its rule without a cast. When
-a re-vendor moves a report or renames a message, update the case and record the accepted
-upstream change in the pull request.
+A bundle has no tests for each rule. Adamantite does not change vendored rules, so their message
+ids, placeholder data, and report positions are upstream behaviour, and the fixture run already
+covers each rule as the preset configures it.
 
 ## First-party plugin
 

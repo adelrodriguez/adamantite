@@ -3,9 +3,11 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
+import type { Script } from "#lib/workspace/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
+import { CliNotFound } from "#lib/shared/errors.ts"
 
 const ROOT = "/project"
 
@@ -18,23 +20,49 @@ function provideFiles(files: FileSystemTestContext) {
 }
 
 describe("vscode", () => {
-  it.effect.each(["check", "fix"] as const)("install Oxc for the %s script", (script) =>
-    Effect.gen(function* () {
-      const runner = createRunnerTestContext()
-      yield* vscode.extension([script]).pipe(Effect.provide(runner.layer))
-      expect(runner.invocations).toMatchObject([
-        { args: ["--install-extension", "oxc.oxc-vscode"], command: "code" },
-      ])
-    })
-  )
+  describe("extension", () => {
+    it.effect.each<{ expected: string[]; name: string; scripts: Script[] }>([
+      { expected: ["oxc.oxc-vscode"], name: "install Oxc for check", scripts: ["check"] },
+      { expected: ["oxc.oxc-vscode"], name: "install Oxc for fix", scripts: ["fix"] },
+      { expected: ["webpro.vscode-knip"], name: "install Knip for analyze", scripts: ["analyze"] },
+      {
+        expected: ["oxc.oxc-vscode", "webpro.vscode-knip"],
+        name: "install Oxc once and Knip for every script",
+        scripts: ["analyze", "check", "fix"],
+      },
+      { expected: [], name: "install nothing without scripts", scripts: [] },
+    ])("$name", ({ expected, scripts }) =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
 
-  it.effect("skip extensions when no scripts are selected", () =>
-    Effect.gen(function* () {
-      const runner = createRunnerTestContext()
-      yield* vscode.extension([]).pipe(Effect.provide(runner.layer))
-      expect(runner.invocations).toStrictEqual([])
-    })
-  )
+        yield* vscode.extension(scripts).pipe(Effect.provide(runner.layer))
+
+        expect(runner.invocations.map(({ args, command }) => ({ args, command }))).toStrictEqual(
+          expected.map((extension) => ({
+            args: ["--install-extension", extension],
+            command: "code",
+          }))
+        )
+      })
+    )
+
+    it.effect("return VscodeCliNotFound when the code command is not found", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext({
+          implementation: (options) => Effect.fail(new CliNotFound({ command: options.command })),
+        })
+
+        const error = yield* vscode
+          .extension(["check"])
+          .pipe(Effect.provide(runner.layer), Effect.flip)
+
+        expect(error).toMatchObject({
+          _tag: "VscodeCliNotFound",
+          cause: { _tag: "CliNotFound", command: "code" },
+        })
+      })
+    )
+  })
 
   describe("create", () => {
     it.effect("create .vscode/settings.json", () =>

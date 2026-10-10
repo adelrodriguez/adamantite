@@ -36,6 +36,25 @@ describe("tsconfig", () => {
       })
     )
 
+    it.effect.each([
+      { config: { compilerOptions: { strict: true } }, name: "no extends" },
+      { config: { extends: "@company/tsconfig" }, name: "another base config" },
+      { config: { extends: ["./base.json"] }, name: "an extends array without the preset" },
+    ])("report a config with $name", ({ config }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify(packageJson),
+          "tsconfig.json": JSON.stringify(config),
+        })
+        const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [{ id: "missing-adamantite-tsconfig-extends" }],
+        })
+      })
+    )
+
     it.effect("accept string or array preset extends", () =>
       Effect.gen(function* () {
         for (const preset of ["adamantite/typescript", ["./base.json", "adamantite/typescript"]]) {

@@ -108,7 +108,7 @@ describe("github", () => {
           applicable: true,
           findings: [
             {
-              currentState: expect.stringContaining("hard-coded"),
+              currentState: expect.stringMatching(/hard-coded Node\.js version\..*`check` script/u),
               id: "outdated-adamantite-workflow",
             },
           ],

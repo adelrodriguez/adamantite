@@ -70,13 +70,18 @@ describe("zed", () => {
   })
 
   describe("create", () => {
-    it.effect("create .zed/settings.json when the .zed directory does not exist", () =>
+    it.effect("create .zed/settings.json with type-aware Oxlint on type", () =>
       Effect.gen(function* () {
         const files = makeFiles()
 
         yield* zed.create(ROOT).pipe(provideFiles(files))
 
         expect(yield* zed.detect(ROOT).pipe(provideFiles(files))).toBe(true)
+        expect(JSON.parse(files.read(SETTINGS_PATH))).toMatchObject({
+          lsp: {
+            oxlint: { initialization_options: { settings: { run: "onType", typeAware: true } } },
+          },
+        })
       })
     )
   })

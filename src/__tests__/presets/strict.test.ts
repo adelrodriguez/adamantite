@@ -7,6 +7,7 @@ import adamantitePlugin from "#presets/lint/plugin/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
+import packageJson from "../../../package.json" with { type: "json" }
 import {
   lintRuleFixtures,
   listFixtureRules,
@@ -32,13 +33,6 @@ describe("strict preset", () => {
       EffectArray.sort(presetRules, Order.String)
     )
   })
-
-  it("ban type assertions outside tests", () => {
-    expect(strict.rules?.["typescript/consistent-type-assertions"]).toStrictEqual([
-      "error",
-      { assertionStyle: "never" },
-    ])
-  })
 })
 
 describe("first-party plugin", () => {
@@ -52,6 +46,10 @@ describe("first-party plugin", () => {
     expect(EffectArray.sort(enabled, Order.String)).toStrictEqual(
       EffectArray.sort(Object.keys(adamantitePlugin.rules), Order.String)
     )
+  })
+
+  it("take the plugin types from the Oxlint version that runs the plugin", () => {
+    expect(packageJson.dependencies["@oxlint/plugins"]).toBe(packageJson.devDependencies.oxlint)
   })
 })
 

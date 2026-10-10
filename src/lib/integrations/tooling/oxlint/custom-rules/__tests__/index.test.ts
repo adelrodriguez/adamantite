@@ -171,10 +171,12 @@ describe("custom-rules", () => {
     })
   )
 
-  it.effect("report a rule file that cannot load, with the reason", () =>
+  it.effect("report a rule file that cannot load and skip helper files", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          // A helper is not a rule, so the enum that would stop a rule from loading is not reported.
+          ".adamantite/rules/_helpers.ts": "enum Kind { A }\nexport const helper = Kind.A\n",
           ".adamantite/rules/no-enum.ts": `enum Kind { A }\n${RULE}`,
           ".adamantite/rules/no-process-env.ts": RULE,
           "oxlint.config.ts": toOxlintTsConfigContent(),
@@ -183,13 +185,16 @@ describe("custom-rules", () => {
         root: ROOT,
       })
 
-      const [finding, ...rest] = getFindings(yield* runAssess(files))
+      const findings = getFindings(yield* runAssess(files))
 
-      expect(rest).toStrictEqual([])
-      expect(finding?.id).toBe("custom-rule-cannot-load:.adamantite/rules/no-enum.ts")
-      expect(finding?.currentState).toContain(
-        "Line 1: `enum` needs a TypeScript transform, which type stripping does not do."
-      )
+      expect(findings).toMatchObject([
+        {
+          currentState: expect.stringContaining(
+            "Line 1: `enum` needs a TypeScript transform, which type stripping does not do."
+          ),
+          id: "custom-rule-cannot-load:.adamantite/rules/no-enum.ts",
+        },
+      ])
     })
   )
 

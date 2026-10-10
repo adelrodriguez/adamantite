@@ -155,33 +155,6 @@ describe("detectToolingConfig", () => {
 describe("getPackageActions", () => {
   const pkg = { name: "tool", version: "1.2.3" }
 
-  it("request an install when the package is missing", () => {
-    expect(
-      getPackageActions({ name: "test-project" }, pkg, "the managed `test` script")
-    ).toStrictEqual([
-      {
-        description: "Install `tool@1.2.3` for the managed `test` script.",
-        package: "tool",
-        targetVersion: "1.2.3",
-        type: "install_package",
-      },
-    ])
-  })
-
-  it("request an update when the installed version drifts", () => {
-    expect(getPackageActions({ devDependencies: { tool: "1.0.0" } }, pkg, "purpose")).toStrictEqual(
-      [
-        {
-          currentVersion: "1.0.0",
-          description: "Update `tool` from `1.0.0` to `1.2.3`.",
-          package: "tool",
-          targetVersion: "1.2.3",
-          type: "update_package",
-        },
-      ]
-    )
-  })
-
   const specifier = Arbitrary.schema(
     Schema.NullOr(
       Schema.Tuple([

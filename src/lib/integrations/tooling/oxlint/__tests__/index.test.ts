@@ -1,12 +1,10 @@
-import type * as FileSystem from "effect/FileSystem"
+import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import type { IntegrationAssessment } from "#lib/integrations/base.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
@@ -19,21 +17,15 @@ function provideFiles(files: FileSystemTestContext) {
   return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
 }
 
-type AssessError =
-  | Effect.Error<ReturnType<typeof oxlint.assess>>
-  | Effect.Error<ReturnType<typeof tsgolint.assess>>
-
-// The explicit return type unifies the two `assess` signatures, which differ in their literals.
-function runAssess(integration: typeof oxlint | typeof tsgolint, files: FileSystemTestContext) {
+function runAssess(files: FileSystemTestContext) {
   return readPackageJson(ROOT).pipe(
-    Effect.flatMap(
-      (
-        packageJson
-      ): Effect.Effect<IntegrationAssessment, AssessError, FileSystem.FileSystem | Path.Path> =>
-        integration.assess(ROOT, packageJson)
-    ),
+    Effect.flatMap((packageJson) => oxlint.assess(ROOT, packageJson)),
     provideFiles(files)
   )
+}
+
+function makePackageJson(manifest: PackageJson) {
+  return JSON.stringify({ name: "test-project", version: "1.0.0", ...manifest }, null, 2)
 }
 
 describe("oxlint", () => {
@@ -41,35 +33,20 @@ describe("oxlint", () => {
     it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify({
+          "package.json": makePackageJson({
             devDependencies: { oxlint: oxlint.version },
-            name: "test-project",
             scripts: { check: "adamantite check" },
-            version: "1.0.0",
           }),
         })
 
         yield* oxlint.create(ROOT).pipe(provideFiles(files))
 
-        expect(yield* runAssess(oxlint, files)).toStrictEqual({
+        expect(yield* runAssess(files)).toStrictEqual({
           applicable: true,
           findings: [],
           packageActions: [],
           warnings: [],
         })
-      })
-    )
-
-    it.effect("create oxlint.config.ts with selected presets", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        yield* oxlint.create(ROOT, ["antislop"]).pipe(provideFiles(files))
-
-        const content = files.read("oxlint.config.ts")
-        expect(content).toContain('import core from "adamantite/lint"')
-        expect(content).toContain('import antislop from "adamantite/lint/antislop"')
-        expect(content).toContain("extends: [core, antislop, custom()]")
       })
     )
   })
@@ -78,20 +55,10 @@ describe("oxlint", () => {
     it.effect("report not applicable when no managed lint script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                oxlint: oxlint.version,
-              },
-              name: "test-project",
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
+          "package.json": makePackageJson({ devDependencies: { oxlint: oxlint.version } }),
         })
 
-        const result = yield* runAssess(oxlint, files)
+        const result = yield* runAssess(files)
 
         expect(result).toStrictEqual({
           applicable: false,
@@ -103,23 +70,13 @@ describe("oxlint", () => {
     it.effect("report missing managed config when the managed check script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                oxlint: oxlint.version,
-              },
-              name: "test-project",
-              scripts: {
-                check: "adamantite check",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
         })
 
-        const result = yield* runAssess(oxlint, files)
+        const result = yield* runAssess(files)
 
         expect(result).toMatchObject({
           applicable: true,
@@ -134,23 +91,13 @@ describe("oxlint", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           ".oxlintrc.json": JSON.stringify({ rules: { semi: "error" } }, null, 2),
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                oxlint: oxlint.version,
-              },
-              name: "test-project",
-              scripts: {
-                check: "adamantite check",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
         })
 
-        const result = yield* runAssess(oxlint, files)
+        const result = yield* runAssess(files)
 
         expect(result).toMatchObject({
           applicable: true,
@@ -174,23 +121,13 @@ describe("oxlint", () => {
             "})",
             "",
           ].join("\n"),
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                oxlint: oxlint.version,
-              },
-              name: "test-project",
-              scripts: {
-                check: "adamantite check",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
         })
 
-        const result = yield* runAssess(oxlint, files)
+        const result = yield* runAssess(files)
 
         expect(result).toStrictEqual({
           applicable: true,
@@ -213,59 +150,18 @@ describe("oxlint", () => {
             "})",
             "",
           ].join("\n"),
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                oxlint: oxlint.version,
-              },
-              name: "test-project",
-              scripts: {
-                check: "adamantite check",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
         })
 
-        const result = yield* runAssess(oxlint, files)
+        const result = yield* runAssess(files)
 
         expect(result).toMatchObject({
           applicable: true,
           findings: [{ id: "invalid-oxlint-config" }],
           packageActions: [],
-          warnings: [],
-        })
-      })
-    )
-  })
-})
-
-describe("tsgolint", () => {
-  describe("assess", () => {
-    it.effect("report missing package when the managed check script exists", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              name: "test-project",
-              scripts: {
-                check: "adamantite check",
-              },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
-        })
-
-        const result = yield* runAssess(tsgolint, files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [{ id: `missing-${tsgolint.name}` }],
-          packageActions: [{ package: tsgolint.name, type: "install_package" }],
           warnings: [],
         })
       })

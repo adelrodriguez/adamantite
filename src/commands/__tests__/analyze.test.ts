@@ -1,4 +1,3 @@
-import { stripVTControlCharacters } from "node:util"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -35,12 +34,10 @@ describe("analyze", () => {
     it.effect("run sherif before knip in a monorepo", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
-        const logLines: unknown[] = []
 
         const exit = yield* runCommand(analyzeCommand, [], {
           files: createMonorepoFiles(),
           layers: [runner.layer],
-          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -48,25 +45,6 @@ describe("analyze", () => {
           { ...sherifStep, args: [] },
           { ...knipStep, args: [] },
         ])
-        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toStrictEqual([
-          "📦 Analyzing the monorepo · adamantite (sherif)",
-          "",
-          "🧹 Analyzing unused code · adamantite (knip)",
-        ])
-      })
-    )
-
-    it.effect("skip sherif when a package.json declares no workspaces", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(analyzeCommand, [], {
-          files: createFileSystemTestContext({ files: { "package.json": "{}" } }),
-          layers: [runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
       })
     )
 

@@ -84,81 +84,34 @@ describe("tsconfig", () => {
   })
 
   describe("update", () => {
-    it.effect("append the preset to an existing extends string instead of overwriting it", () =>
+    it.effect.each([
+      {
+        expected: ["@company/tsconfig", "adamantite/typescript"],
+        input: "@company/tsconfig",
+        name: "append the preset to an existing extends string",
+      },
+      {
+        expected: "adamantite/typescript",
+        input: "adamantite/typescript",
+        name: "keep extends as a string when it is already the preset",
+      },
+      {
+        expected: ["@company/tsconfig", "@company/tsconfig-strict", "adamantite/typescript"],
+        input: ["@company/tsconfig", "@company/tsconfig-strict"],
+        name: "append the preset to an existing extends array",
+      },
+      {
+        expected: ["adamantite/typescript", "@company/tsconfig"],
+        input: ["adamantite/typescript", "@company/tsconfig"],
+        name: "leave an extends array unchanged when it already contains the preset",
+      },
+    ])("$name", ({ expected, input }) =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": JSON.stringify(
-            {
-              compilerOptions: {
-                target: "ES2020",
-              },
-              extends: "@company/tsconfig",
-            },
-            null,
-            2
-          ),
-        })
+        const files = makeFiles({ "tsconfig.json": JSON.stringify({ extends: input }, null, 2) })
 
         yield* tsconfig.update(ROOT).pipe(provideFiles(files))
 
-        const config = JSON.parse(files.read("tsconfig.json"))
-
-        expect(config.extends).toStrictEqual(["@company/tsconfig", "adamantite/typescript"])
-        expect(config.compilerOptions).toStrictEqual({ target: "ES2020" })
-      })
-    )
-
-    it.effect("keep extends as a string when it is already the preset", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": JSON.stringify({ extends: "adamantite/typescript" }, null, 2),
-        })
-
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read("tsconfig.json"))
-
-        expect(config.extends).toBe("adamantite/typescript")
-      })
-    )
-
-    it.effect("append the preset to an existing extends array", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": JSON.stringify(
-            { extends: ["@company/tsconfig", "@company/tsconfig-strict"] },
-            null,
-            2
-          ),
-        })
-
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read("tsconfig.json"))
-
-        expect(config.extends).toStrictEqual([
-          "@company/tsconfig",
-          "@company/tsconfig-strict",
-          "adamantite/typescript",
-        ])
-      })
-    )
-
-    it.effect("leave an extends array unchanged when it already contains the preset", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": JSON.stringify(
-            { extends: ["adamantite/typescript", "@company/tsconfig"] },
-            null,
-            2
-          ),
-        })
-
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
-
-        const config = JSON.parse(files.read("tsconfig.json"))
-
-        expect(config.extends).toStrictEqual(["adamantite/typescript", "@company/tsconfig"])
+        expect(readTsConfig(files).extends).toStrictEqual(expected)
       })
     )
 

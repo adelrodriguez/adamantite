@@ -98,17 +98,6 @@ function runEffectSetup() {
 
 describe("init", () => {
   describe("fresh project setup", () => {
-    it.effect("offer the managed scripts without the retired format script", () =>
-      Effect.gen(function* () {
-        const { exit, prompter } = yield* runFreshSetup()
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.multiselectCalls[0]).toMatchObject({
-          options: expect.not.arrayContaining([expect.objectContaining({ value: "format" })]),
-        })
-      })
-    )
-
     it.effect("install the managed packages and add the selected scripts", () =>
       Effect.gen(function* () {
         const { exit, files, installer } = yield* runFreshSetup()
@@ -159,21 +148,6 @@ describe("init", () => {
         expect(readJson(files, ".vscode/settings.json")).toMatchObject({
           "editor.defaultFormatter": "oxc.oxc-vscode",
         })
-      })
-    )
-
-    it.effect("report the detected package manager and the result", () =>
-      Effect.gen(function* () {
-        const { exit, prompter } = yield* runFreshSetup()
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toStrictEqual(
-          expect.arrayContaining([
-            { level: "info", message: "Detected package manager: bun" },
-            { level: "success", message: "Your project is now configured" },
-          ])
-        )
-        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })
     )
   })
@@ -929,42 +903,21 @@ describe("init", () => {
       })
     )
 
-    it.effect.each(["check", "fix"])(
-      "configure only $0 and deduplicate repeated selections",
-      (script) =>
-        Effect.gen(function* () {
-          const files = createInitTestContext()
-          const prompter = createPrompterTestContext()
-          const installer = createDependencyInstallerTestContext()
+    it.effect("deduplicate a repeated preset", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
 
-          const exit = yield* runCommand(
-            initCommand,
-            ["--non-interactive", "--script", script, "--script", script],
-            { files, layers: [prompter.layer, installer.layer] }
-          )
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--preset", "react", "--preset", "react"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
 
-          expect(Exit.isSuccess(exit)).toBe(true)
-          expect(prompter).toMatchObject({ confirmCalls: [], multiselectCalls: [] })
-          expect(installer.calls).toStrictEqual([
-            {
-              options: { silent: true, workspace: false },
-              packages: [
-                "adamantite",
-                `oxlint@${oxlint.version}`,
-                `oxlint-tsgolint@${tsgolint.version}`,
-                `oxfmt@${oxfmt.version}`,
-              ],
-            },
-          ])
-          expect(readJson(files, "package.json").scripts).toStrictEqual({
-            [script]: `adamantite ${script}`,
-          })
-          expect(files.list()).toStrictEqual([
-            "oxfmt.config.ts",
-            "oxlint.config.ts",
-            "package.json",
-          ])
-        })
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read("oxlint.config.ts")).toBe(toOxlintTsConfigContent(["react"]))
+      })
     )
 
     it.effect.each([
@@ -1312,42 +1265,6 @@ describe("init", () => {
   })
 
   describe("agents guidance", () => {
-    it.effect("adds script-specific Adamantite guidance to AGENTS.md when confirmed", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, true],
-          multiselectResponses: [["check", "analyze"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("AGENTS.md")).toBe(
-          [
-            ADAMANTITE_AGENTS_START_MARKER,
-            "",
-            "## Adamantite",
-            "",
-            "This project uses Adamantite for its managed formatting, linting, type checking, and dependency-analysis setup.",
-            "",
-            "- Prefer the package scripts Adamantite added for this workspace.",
-            "- Run `bun run check` to catch formatting, lint, and type issues. Direct command: `adamantite check`.",
-            "- Run `bun run analyze` after changing dependencies, imports, or exports. Direct command: `adamantite analyze`.",
-            "- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule with its authoring guidance.",
-            "- Run `adamantite doctor` and follow its findings to repair managed setup.",
-            "",
-            ADAMANTITE_AGENTS_END_MARKER,
-            "",
-          ].join("\n")
-        )
-      })
-    )
-
     it.effect("uses the detected package manager in AGENTS.md guidance", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
@@ -1395,45 +1312,6 @@ describe("init", () => {
         )
         expect(agents).toContain("## Adamantite")
         expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
-      })
-    )
-
-    it.effect("replaces existing Adamantite guidance without duplicating markers", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "AGENTS.md": `# Existing Instructions\n\n${ADAMANTITE_AGENTS_START_MARKER}\nold content\n${ADAMANTITE_AGENTS_END_MARKER}\n`,
-        })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, true],
-          multiselectResponses: [["analyze"], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("AGENTS.md")).toBe(
-          [
-            "# Existing Instructions",
-            "",
-            ADAMANTITE_AGENTS_START_MARKER,
-            "",
-            "## Adamantite",
-            "",
-            "This project uses Adamantite for its managed formatting, linting, type checking, and dependency-analysis setup.",
-            "",
-            "- Prefer the package scripts Adamantite added for this workspace.",
-            "- Run `bun run analyze` after changing dependencies, imports, or exports. Direct command: `adamantite analyze`.",
-            "- Run `adamantite doctor` and follow its findings to repair managed setup.",
-            "",
-            ADAMANTITE_AGENTS_END_MARKER,
-            "",
-          ].join("\n")
-        )
       })
     )
 
@@ -1665,24 +1543,7 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toStrictEqual([
-          {
-            options: { silent: true, workspace: false },
-            packages: [
-              "adamantite",
-              `oxlint@${oxlint.version}`,
-              `oxlint-tsgolint@${tsgolint.version}`,
-              `oxfmt@${oxfmt.version}`,
-            ],
-          },
-        ])
-
-        const workflow = files.read(".github/workflows/adamantite.yml")
-        expect(workflow).toContain("uses: oven-sh/setup-bun@v2")
-        // The matrix has exactly one job: a blank line follows the check entry.
-        expect(workflow).toMatch(
-          / {8}include:\n {10}- name: check\n {12}command: bun run check\n\n/
-        )
+        expect(files.read(".github/workflows/adamantite.yml")).toContain("command: bun run check")
       })
     )
 

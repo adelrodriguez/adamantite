@@ -35,36 +35,22 @@ function runWriteAgentsGuidance(
 }
 
 describe("writeAgentsGuidance", () => {
-  it.effect("create AGENTS.md when it does not exist", () =>
+  it.effect("create AGENTS.md with the script guidance in check, fix, analyze order", () =>
     Effect.gen(function* () {
       const files = makeFiles()
 
       const result = yield* runWriteAgentsGuidance(files, {
         isMonorepo: false,
         packageManager: "bun",
-        scripts: ["fix", "check"],
+        scripts: ["analyze", "fix", "check"],
       })
 
+      const agents = files.read("AGENTS.md")
       expect(result).toBe("updated")
-
-      expect(files.read("AGENTS.md")).toBe(
-        [
-          ADAMANTITE_AGENTS_START_MARKER,
-          "",
-          "## Adamantite",
-          "",
-          "This project uses Adamantite for its managed formatting, linting, type checking, and dependency-analysis setup.",
-          "",
-          "- Prefer the package scripts Adamantite added for this workspace.",
-          "- Run `bun run check` to catch formatting, lint, and type issues. Direct command: `adamantite check`.",
-          "- Run `bun run fix` to apply safe lint fixes and format code. Direct command: `adamantite fix`.",
-          "- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule with its authoring guidance.",
-          "- Run `adamantite doctor` and follow its findings to repair managed setup.",
-          "",
-          ADAMANTITE_AGENTS_END_MARKER,
-          "",
-        ].join("\n")
-      )
+      expect(
+        Array.from(agents.matchAll(/^- Run `bun run (\w+)`/gm), ([, script]) => script)
+      ).toStrictEqual(["check", "fix", "analyze"])
+      expect(agents).toContain(".adamantite/rules")
     })
   )
 

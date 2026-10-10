@@ -1,11 +1,8 @@
-// The "keep shared action versions aligned" test compares generated output
-// against this repository's committed workflow files, so those reference
-// reads use the real filesystem.
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
+import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
@@ -15,6 +12,7 @@ import {
   type NodeVersionSource,
   NodeVersionResolver,
 } from "#lib/workspace/node-version-resolver.ts"
+import testWorkflow from "../../../../../.github/workflows/test.yml?raw"
 
 const ROOT = "/project"
 
@@ -66,11 +64,16 @@ function provideFileResolver(files: FileSystemTestContext) {
   )
 }
 
-function getActionReference(content: string, action: string): string | undefined {
-  return content
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => line.startsWith(`uses: ${action}@`))
+function getPinnedActions(workflow: string) {
+  const pins = new Map<string, string>()
+
+  for (const [, action, ref] of workflow.matchAll(/uses: ([^@\s]+)@(\S+)/g)) {
+    if (action && ref) {
+      pins.set(action, ref)
+    }
+  }
+
+  return pins
 }
 
 function expectNodeVersionFileWorkflow(packageManager: "bun" | "npm" | "pnpm" | "yarn") {
@@ -411,39 +414,38 @@ describe("github", () => {
       })
     )
 
-    it.effect("keep shared action versions aligned with this repository's test workflow", () =>
+    // Dependabot updates the actions in this repository's workflows, not in the generated workflow.
+    // This test fails the Dependabot PR until the generator pins the same version.
+    it.effect("pin the actions this repository also uses at the same version", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
+        const generated = new Map<string, string>()
 
-        yield* github
-          .create(ROOT, {
-            packageManager: "bun",
-            scripts: ["check"],
-          })
-          .pipe(provideFallback(files))
+        for (const packageManager of ["bun", "deno", "npm", "pnpm", "yarn"] as const) {
+          const files = makeFiles()
+          yield* github
+            .create(ROOT, { packageManager, scripts: ["check"] })
+            .pipe(provideFallback(files))
 
-        const generatedWorkflow = files.read(WORKFLOW_PATH)
-        const referenceWorkflow = readFileSync(
-          join(process.cwd(), ".github/workflows/test.yml"),
-          "utf8"
-        )
-
-        for (const action of ["actions/checkout", "actions/setup-node", "oven-sh/setup-bun"]) {
-          expect(getActionReference(generatedWorkflow, action)).toBe(
-            getActionReference(referenceWorkflow, action)
-          )
-        }
-
-        // The adamantite and build workflows pin the same actions independently; keep them from drifting.
-        for (const file of ["adamantite.yml", "build.yml"]) {
-          const workflow = readFileSync(join(process.cwd(), ".github/workflows", file), "utf8")
-
-          for (const action of ["actions/checkout", "actions/setup-node", "pnpm/action-setup"]) {
-            expect(getActionReference(workflow, action)).toBe(
-              getActionReference(referenceWorkflow, action)
-            )
+          for (const [action, ref] of getPinnedActions(files.read(WORKFLOW_PATH))) {
+            generated.set(action, ref)
           }
         }
+
+        const reference = getPinnedActions(testWorkflow)
+        const shared = EffectArray.sort(
+          [...generated.keys()].filter((action) => reference.has(action)),
+          Order.String
+        )
+
+        expect(shared).toStrictEqual([
+          "actions/checkout",
+          "actions/setup-node",
+          "oven-sh/setup-bun",
+          "pnpm/action-setup",
+        ])
+        expect(
+          Object.fromEntries(shared.map((action) => [action, generated.get(action)]))
+        ).toStrictEqual(Object.fromEntries(shared.map((action) => [action, reference.get(action)])))
       })
     )
 

@@ -70,7 +70,11 @@ describe("effect-tsgo", () => {
   describe("assess", () => {
     it.effect("report not applicable when the config does not import the effect preset", () =>
       Effect.gen(function* () {
-        const files = makeConfiguredFiles({ "oxlint.config.ts": toOxlintTsConfigContent([]) })
+        // No package, prepare script, or tsconfig entry: each would be a finding with the preset.
+        const files = makeFiles({
+          "oxlint.config.ts": toOxlintTsConfigContent([]),
+          "package.json": makePackageJson({ scripts: { check: "adamantite check" } }),
+        })
 
         const result = yield* runAssess(files)
 

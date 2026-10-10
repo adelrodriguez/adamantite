@@ -12,9 +12,10 @@ const TERMINAL_IMPORTS = {
 }
 
 // Parent-relative paths would skip the `#lib/...` layer patterns below. `version.macro.ts` reads the
-// root `package.json`, which has no alias.
+// root `package.json`, and the GitHub workflow test reads this repository's workflows. Neither has
+// an alias.
 const PARENT_RELATIVE_IMPORTS = {
-  group: ["../**", "!../../../package.json"],
+  group: ["../**", "!../../../package.json", "!../../../../../.github/workflows/**"],
   message: "Import other lib modules through `#lib/...`, so the lib layer rules apply.",
 }
 
@@ -47,6 +48,14 @@ export default defineConfig({
         // `RuleTester` from `oxlint/plugins-dev` declares its own `describe` and `it` blocks, so
         // `tester.run` is a test, not setup code.
         "vitest/require-hook": ["error", { allowedFunctionCalls: ["tester.run"] }],
+      },
+    },
+    // A wildcard module declaration is valid only in a script file. The override is temporary:
+    // inline disable comments do not suppress file-scope rules (oxc-project/oxc#21072).
+    {
+      files: ["src/__tests__/raw.d.ts"],
+      rules: {
+        "import/unambiguous": "off",
       },
     },
     {

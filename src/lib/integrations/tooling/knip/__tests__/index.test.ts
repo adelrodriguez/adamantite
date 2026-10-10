@@ -1,4 +1,3 @@
-import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -28,43 +27,48 @@ function runAssess(files: FileSystemTestContext) {
 
 describe("knip", () => {
   describe("create", () => {
-    it.effect("create knip.config.ts with the preset config", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "package.json": "{}" })
-
-        yield* knip.create(ROOT).pipe(provideFiles(files))
-
-        const state = yield* knip.detect(ROOT).pipe(provideFiles(files))
-        expect(state.active).toStrictEqual({
-          file: "knip.config.ts",
-          format: "ts",
-          path: join(ROOT, "knip.config.ts"),
-        })
-
-        const content = files.read("knip.config.ts")
-        expect(content).toContain('import type { KnipConfig } from "knip"')
-        expect(content).toContain('import analyze from "adamantite/analyze"')
-        expect(content).toContain("const config: KnipConfig = analyze")
-        expect(content).toContain("export default config")
-      })
-    )
-  })
-
-  describe("create in a monorepo", () => {
-    it.effect("ignore sherif, which adamantite analyze runs without a reference knip can see", () =>
+    it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            name: "test-project",
+            scripts: { analyze: "adamantite analyze" },
+            version: "1.0.0",
+          }),
         })
 
         yield* knip.create(ROOT).pipe(provideFiles(files))
 
-        const content = files.read("knip.config.ts")
-        expect(content).toContain("...analyze,")
-        expect(content).toContain(
-          'import analyze, { ignoreDependencies } from "adamantite/analyze"'
-        )
-        expect(content).toContain("  ignoreDependencies: ignoreDependencies.monorepo,")
+        expect(yield* runAssess(files)).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
+      })
+    )
+
+    it.effect("create a monorepo config that assess accepts", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": JSON.stringify({
+            devDependencies: { knip: knip.version },
+            name: "test-project",
+            scripts: { analyze: "adamantite analyze" },
+            version: "1.0.0",
+            workspaces: ["packages/*"],
+          }),
+        })
+
+        yield* knip.create(ROOT).pipe(provideFiles(files))
+
+        expect(yield* runAssess(files)).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
       })
     )
   })
@@ -260,17 +264,24 @@ describe("knip", () => {
 
     it.effect("require both ignore lists in a monorepo that uses the effect preset", () =>
       Effect.gen(function* () {
+        const packageJson = JSON.stringify({
+          devDependencies: { knip: knip.version },
+          scripts: { analyze: "adamantite analyze" },
+          workspaces: ["packages/*"],
+        })
         const files = makeFiles({
           "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: false }),
           "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
-          "package.json": JSON.stringify({
-            devDependencies: { knip: knip.version },
-            scripts: { analyze: "adamantite analyze" },
-            workspaces: ["packages/*"],
-          }),
+          "package.json": packageJson,
+        })
+        const configured = makeFiles({
+          "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: true }),
+          "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
+          "package.json": packageJson,
         })
 
         const result = yield* runAssess(files)
+        const configuredResult = yield* runAssess(configured)
 
         expect(result.applicable && result.findings).toStrictEqual([
           expect.objectContaining({
@@ -282,14 +293,7 @@ describe("knip", () => {
             id: "invalid-knip-config",
           }),
         ])
-        expect(
-          toKnipTsConfigContent({
-            isMonorepo: true,
-            usesEffectPreset: true,
-          })
-        ).toContain(
-          "ignoreDependencies: [...ignoreDependencies.monorepo, ...ignoreDependencies.effect],"
-        )
+        expect(configuredResult.applicable && configuredResult.findings).toStrictEqual([])
       })
     )
 

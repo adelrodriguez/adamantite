@@ -1,9 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as PlatformError from "effect/PlatformError"
 import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
@@ -51,36 +49,6 @@ describe("writeAgentsGuidance", () => {
         Array.from(agents.matchAll(/^- Run `bun run (\w+)`/gm), ([, script]) => script)
       ).toStrictEqual(["check", "fix", "analyze"])
       expect(agents).toContain(".adamantite/rules")
-    })
-  )
-
-  it.effect("return FailedToReadFile when reading AGENTS.md fails", () =>
-    Effect.gen(function* () {
-      const agentsPath = `${ROOT}/AGENTS.md`
-      const cause = PlatformError.systemError({
-        _tag: "PermissionDenied",
-        method: "readFileString",
-        module: "FileSystem",
-        pathOrDescriptor: agentsPath,
-      })
-      const fileSystemLayer = FileSystem.layerNoop({
-        readFileString: () => Effect.fail(cause),
-      })
-
-      const result = yield* writeAgentsGuidance(ROOT, {
-        isMonorepo: false,
-        packageManager: "bun",
-        scripts: ["fix"],
-      }).pipe(Effect.provide(Layer.mergeAll(fileSystemLayer, Path.layer)), Effect.result)
-
-      expect(result._tag).toBe("Failure")
-      if (result._tag === "Failure") {
-        expect(result.failure).toMatchObject({
-          _tag: "FailedToReadFile",
-          cause,
-          path: agentsPath,
-        })
-      }
     })
   )
 

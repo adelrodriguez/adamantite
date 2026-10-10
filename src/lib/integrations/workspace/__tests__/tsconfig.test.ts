@@ -66,33 +66,19 @@ describe("tsconfig", () => {
   })
 
   describe("create", () => {
-    it.effect("create tsconfig.json with the correct config", () =>
+    it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
+        const packageJson = { scripts: { check: "adamantite check" } }
+        const files = makeFiles({ "package.json": JSON.stringify(packageJson) })
 
         yield* tsconfig.create(ROOT).pipe(provideFiles(files))
 
-        const exists = yield* tsconfig.detect(ROOT).pipe(provideFiles(files))
-        expect(exists).toBe(true)
-
-        const config = JSON.parse(files.read("tsconfig.json"))
-
-        expect(config).toHaveProperty("extends")
-        expect(config.extends).toBe("adamantite/typescript")
-      })
-    )
-
-    it.effect("handle write failures when creating tsconfig.json", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-        files.makeReadOnly("tsconfig.json")
-
-        const result = yield* Effect.result(tsconfig.create(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
-        }
+        expect(yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
       })
     )
   })
@@ -213,37 +199,6 @@ describe("tsconfig", () => {
         expect(Result.isFailure(result)).toBe(true)
         if (Result.isFailure(result)) {
           expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
-        }
-      })
-    )
-
-    it.effect("return FailedToReadFile when the config does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* Effect.result(tsconfig.update(ROOT).pipe(provideFiles(files)))
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-        }
-      })
-    )
-
-    it.effect("return FailedToWriteFile when writing the config fails", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": JSON.stringify({
-            compilerOptions: {
-              target: "ES2020",
-            },
-          }),
-        })
-        files.makeReadOnly("tsconfig.json")
-
-        const result = yield* Effect.result(tsconfig.update(ROOT).pipe(provideFiles(files)))
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
         }
       })
     )

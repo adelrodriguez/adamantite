@@ -81,7 +81,7 @@ describe("init", () => {
         expect(prompter.multiselectCalls[0]).toMatchObject({
           options: expect.not.arrayContaining([expect.objectContaining({ value: "format" })]),
         })
-        expect(installer.calls).toEqual([
+        expect(installer.calls).toStrictEqual([
           {
             options: { silent: true, workspace: false },
             packages: [
@@ -95,7 +95,7 @@ describe("init", () => {
         ])
 
         const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toEqual({
+        expect(packageJson.scripts).toStrictEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
         })
@@ -131,7 +131,7 @@ describe("init", () => {
           level: "success",
           message: "Your project is now configured",
         })
-        expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })
     )
   })
@@ -330,10 +330,10 @@ describe("init", () => {
       expect(files.read("oxlint.config.ts")).toContain(
         'import tanstack from "adamantite/lint/tanstack"'
       )
-      expect(installer.calls[0]?.packages).toEqual(
+      expect(installer.calls[0]?.packages).toStrictEqual(
         expect.not.arrayContaining([expect.stringContaining("strict")])
       )
-      expect(installer.calls[0]?.packages).toEqual(
+      expect(installer.calls[0]?.packages).toStrictEqual(
         expect.not.arrayContaining([expect.stringContaining("tanstack")])
       )
     })
@@ -411,7 +411,7 @@ describe("init", () => {
         expect(readJson(files, "package.json")).toMatchObject({
           scripts: { prepare: "adamantite prepare" },
         })
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           expect.objectContaining({
             args: ["patch", "--oxlint", "--typescript"],
             command: "effect-tsgo",
@@ -419,7 +419,7 @@ describe("init", () => {
             stdout: "ignore",
           }),
         ])
-        expect(readJson(files, "tsconfig.json")).toEqual({
+        expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
             plugins: [{ diagnostics: false, name: "@effect/language-service" }],
           },
@@ -490,7 +490,7 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           expect.objectContaining({ args: ["patch", "--oxlint", "--typescript"] }),
         ])
       })
@@ -514,7 +514,7 @@ describe("init", () => {
           level: "warning",
           message: expect.stringContaining("Run `adamantite prepare` to see why the patch failed."),
         })
-        expect(readJson(files, "tsconfig.json")).toEqual({
+        expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
             plugins: [{ diagnostics: false, name: "@effect/language-service" }],
           },
@@ -586,7 +586,7 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls[0]?.packages).toEqual([
+        expect(installer.calls[0]?.packages).toStrictEqual([
           "adamantite",
           `sherif@${sherif.version}`,
           `knip@${knip.version}`,
@@ -619,7 +619,9 @@ describe("init", () => {
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
-          expect(installer.calls.map((call) => call.options)).toEqual([{ silent: true, workspace }])
+          expect(installer.calls.map((call) => call.options)).toStrictEqual([
+            { silent: true, workspace },
+          ])
         })
       )
     }
@@ -768,7 +770,7 @@ describe("init", () => {
           extends: string
         }
         expect(tsconfig.extends).toBe("adamantite/typescript")
-        expect(tsconfig.compilerOptions.paths).toEqual({
+        expect(tsconfig.compilerOptions.paths).toStrictEqual({
           "@/*": ["src/*"],
         })
 
@@ -796,7 +798,7 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toEqual([
+        expect(installer.calls).toStrictEqual([
           {
             options: { silent: true, workspace: false },
             packages: [
@@ -809,7 +811,7 @@ describe("init", () => {
         ])
 
         const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toEqual({ check: "adamantite check" })
+        expect(packageJson.scripts).toStrictEqual({ check: "adamantite check" })
 
         expect(files.exists("oxfmt.config.ts")).toBe(true)
         expect(files.exists(".zed/settings.json")).toBe(true)
@@ -849,9 +851,9 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls).toEqual([])
-        expect(prompter.multiselectCalls).toEqual([])
-        expect(installer.calls).toEqual([
+        expect(prompter.confirmCalls).toStrictEqual([])
+        expect(prompter.multiselectCalls).toStrictEqual([])
+        expect(installer.calls).toStrictEqual([
           {
             options: { silent: true, workspace: false },
             packages: [
@@ -865,7 +867,7 @@ describe("init", () => {
         ])
 
         const packageJson = readJson(files, "package.json")
-        expect(packageJson.scripts).toEqual({
+        expect(packageJson.scripts).toStrictEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
         })
@@ -894,9 +896,9 @@ describe("init", () => {
           )
 
           expect(Exit.isSuccess(exit)).toBe(true)
-          expect(prompter.confirmCalls).toEqual([])
-          expect(prompter.multiselectCalls).toEqual([])
-          expect(installer.calls).toEqual([
+          expect(prompter.confirmCalls).toStrictEqual([])
+          expect(prompter.multiselectCalls).toStrictEqual([])
+          expect(installer.calls).toStrictEqual([
             {
               options: { silent: true, workspace: false },
               packages: [
@@ -908,7 +910,7 @@ describe("init", () => {
             },
           ])
           expect(files.exists("oxfmt.config.ts")).toBe(true)
-          expect(readJson(files, "package.json").scripts).toEqual({
+          expect(readJson(files, "package.json").scripts).toStrictEqual({
             [script]: `adamantite ${script}`,
           })
           expect(files.exists("tsconfig.json")).toBe(false)
@@ -975,7 +977,7 @@ describe("init", () => {
           _tag: "InvalidInitOptions",
           reason,
         })
-        expect(installer.calls).toEqual([])
+        expect(installer.calls).toStrictEqual([])
         expect(files.read("package.json")).toBe(originalPackageJson)
       })
     )
@@ -1003,7 +1005,7 @@ describe("init", () => {
             reason:
               "`--github-actions` does not support the detected package manager `aube`. Use bun, deno, npm, pnpm, or yarn.",
           })
-          expect(installer.calls).toEqual([])
+          expect(installer.calls).toStrictEqual([])
           expect(files.read("package.json")).toBe(originalPackageJson)
           expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
         })
@@ -1021,7 +1023,7 @@ describe("init", () => {
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
-        expect(installer.calls).toEqual([])
+        expect(installer.calls).toStrictEqual([])
       })
     )
   })
@@ -1056,13 +1058,13 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls).toEqual([])
+        expect(prompter.confirmCalls).toStrictEqual([])
 
         // SAFETY: this test wrote the package.json fixture and asserts its scripts shape.
         const packageJson = readJson(files, "package.json") as {
           scripts: Record<string, string>
         }
-        expect(packageJson.scripts).toEqual({
+        expect(packageJson.scripts).toStrictEqual({
           analyze: "knip --directory packages/app",
           fix: "adamantite fix",
         })
@@ -1101,7 +1103,7 @@ describe("init", () => {
         const packageJson = readJson(files, "package.json") as {
           scripts: Record<string, string>
         }
-        expect(packageJson.scripts).toEqual({
+        expect(packageJson.scripts).toStrictEqual({
           analyze: "adamantite analyze",
           fix: "adamantite fix",
         })
@@ -1150,7 +1152,7 @@ describe("init", () => {
         const packageJson = readJson(files, "package.json") as {
           scripts: Record<string, string>
         }
-        expect(packageJson.scripts).toEqual({ check: "adamantite check" })
+        expect(packageJson.scripts).toStrictEqual({ check: "adamantite check" })
       })
     )
 
@@ -1185,7 +1187,7 @@ describe("init", () => {
         const packageJson = readJson(files, "package.json") as {
           scripts: Record<string, string>
         }
-        expect(packageJson.scripts).toEqual({ check: "tsc && eslint ." })
+        expect(packageJson.scripts).toStrictEqual({ check: "tsc && eslint ." })
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message:
@@ -1232,7 +1234,7 @@ describe("init", () => {
           const packageJson = readJson(files, "package.json") as {
             scripts: Record<string, string>
           }
-          expect(packageJson.scripts).toEqual({ check: "adamantite check" })
+          expect(packageJson.scripts).toStrictEqual({ check: "adamantite check" })
         })
     )
 
@@ -1446,7 +1448,7 @@ describe("init", () => {
           level: "success",
           message: "Your project is now configured",
         })
-        expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })
     )
 
@@ -1466,9 +1468,9 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])
-        expect(prompter.outros).toEqual([])
-        expect(installer.calls).toEqual([])
+        expect(prompter.cancels).toStrictEqual(["You've cancelled the initialization process."])
+        expect(prompter.outros).toStrictEqual([])
+        expect(installer.calls).toStrictEqual([])
         expect(files.exists("AGENTS.md")).toBe(false)
       })
     )
@@ -1597,7 +1599,7 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toEqual([
+        expect(installer.calls).toStrictEqual([
           {
             options: { silent: true, workspace: false },
             packages: [
@@ -1655,7 +1657,7 @@ describe("init", () => {
           level: "success",
           message: "Your project is now configured",
         })
-        expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })
     )
 
@@ -1672,9 +1674,9 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.cancels).toEqual(["You've cancelled the initialization process."])
-        expect(prompter.outros).toEqual([])
-        expect(installer.calls).toEqual([])
+        expect(prompter.cancels).toStrictEqual(["You've cancelled the initialization process."])
+        expect(prompter.outros).toStrictEqual([])
+        expect(installer.calls).toStrictEqual([])
       })
     )
 
@@ -1746,7 +1748,7 @@ describe("init", () => {
           level: "success",
           message: "Your project is now configured",
         })
-        expect(prompter.outros).toEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
 
         expect(files.exists(".vscode/settings.json")).toBe(true)
       })

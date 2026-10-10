@@ -110,7 +110,9 @@ describe("github", () => {
     it.effect("do not create a finding when the workflow is absent", () =>
       Effect.gen(function* () {
         const files = makeFiles()
-        expect(yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))).toEqual({
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toStrictEqual({
           applicable: false,
           warnings: [],
         })

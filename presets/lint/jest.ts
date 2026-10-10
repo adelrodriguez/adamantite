@@ -38,7 +38,16 @@ const config: OxlintConfig = {
     "jest/prefer-each": "error",
     "jest/prefer-ending-with-an-expect": "error",
     "jest/prefer-equality-matcher": "error",
-    "jest/prefer-expect-assertions": "error",
+    // Without options, the rule requires the call in every test, also in synchronous tests where
+    // every expect always runs. These options report only tests where an expect can fail to run.
+    "jest/prefer-expect-assertions": [
+      "error",
+      {
+        onlyFunctionsWithAsyncKeyword: true,
+        onlyFunctionsWithExpectInCallback: true,
+        onlyFunctionsWithExpectInLoop: true,
+      },
+    ],
     "jest/prefer-expect-resolves": "error",
     "jest/prefer-hooks-in-order": "error",
     "jest/prefer-hooks-on-top": "error",

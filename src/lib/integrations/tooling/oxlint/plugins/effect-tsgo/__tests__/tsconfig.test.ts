@@ -33,7 +33,7 @@ describe("tsconfig", () => {
         const result = yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
 
         expect(result).toBe("updated")
-        expect(JSON.parse(files.read("tsconfig.json"))).toEqual({
+        expect(JSON.parse(files.read("tsconfig.json"))).toStrictEqual({
           compilerOptions: {
             plugins: [{ name: "other" }, { diagnostics: false, name: "@effect/language-service" }],
             strict: true,
@@ -55,7 +55,7 @@ describe("tsconfig", () => {
 
         yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
 
-        expect(JSON.parse(files.read("tsconfig.json"))).toEqual({
+        expect(JSON.parse(files.read("tsconfig.json"))).toStrictEqual({
           compilerOptions: {
             plugins: [
               {

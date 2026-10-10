@@ -24,7 +24,7 @@ describe("adamantite", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: [
               "--production",
@@ -52,7 +52,7 @@ describe("adamantite", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error._tag).toBe("PassthroughNotSupported")
-        expect(runner.invocations).toEqual([])
+        expect(runner.invocations).toStrictEqual([])
       })
     )
   })

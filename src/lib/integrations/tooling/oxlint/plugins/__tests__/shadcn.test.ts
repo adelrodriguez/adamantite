@@ -40,7 +40,7 @@ describe("shadcn-lint", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({ applicable: false, warnings: [] })
+        expect(result).toStrictEqual({ applicable: false, warnings: [] })
       })
     )
 
@@ -52,7 +52,7 @@ describe("shadcn-lint", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({ applicable: false, warnings: [] })
+        expect(result).toStrictEqual({ applicable: false, warnings: [] })
       })
     )
 
@@ -65,7 +65,7 @@ describe("shadcn-lint", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({ applicable: false, warnings: [] })
+        expect(result).toStrictEqual({ applicable: false, warnings: [] })
       })
     )
 
@@ -79,7 +79,7 @@ describe("shadcn-lint", () => {
         const result = yield* runAssess(files)
 
         expect(result.applicable).toBe(true)
-        expect(result.applicable && result.packageActions).toEqual([
+        expect(result.applicable && result.packageActions).toStrictEqual([
           expect.objectContaining({ package: "@shadcn/lint", type: "install_package" }),
         ])
       })
@@ -97,7 +97,7 @@ describe("shadcn-lint", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.packageActions).toEqual([])
+        expect(result.applicable && result.packageActions).toStrictEqual([])
       })
     )
   })

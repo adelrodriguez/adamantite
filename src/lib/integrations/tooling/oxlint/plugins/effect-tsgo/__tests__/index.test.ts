@@ -76,7 +76,7 @@ describe("effect-tsgo", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({ applicable: false, warnings: [] })
+        expect(result).toStrictEqual({ applicable: false, warnings: [] })
       })
     )
 
@@ -86,7 +86,7 @@ describe("effect-tsgo", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: true,
           findings: [],
           packageActions: [],
@@ -195,7 +195,7 @@ describe("effect-tsgo", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: true,
           findings: [],
           packageActions: [],
@@ -243,7 +243,7 @@ describe("effect-tsgo", () => {
             .patch(ROOT, { quiet })
             .pipe(Effect.provide(Layer.merge(runner.layer, Path.layer)))
 
-          expect(runner.invocations).toEqual([
+          expect(runner.invocations).toStrictEqual([
             expect.objectContaining({
               args: ["patch", "--oxlint", "--typescript"],
               command: "effect-tsgo",
@@ -281,11 +281,11 @@ describe("effect-tsgo", () => {
 
         const result = yield* effectTsgo.update(ROOT).pipe(provideFiles(files))
 
-        expect(result).toEqual({ prepare: "merged", tsconfig: "updated" })
+        expect(result).toStrictEqual({ prepare: "merged", tsconfig: "updated" })
         expect(JSON.parse(files.read("package.json"))).toMatchObject({
           scripts: { prepare: `${PREPARE} && (husky)` },
         })
-        expect(JSON.parse(files.read(TSCONFIG))).toEqual(JSON.parse(CONFIGURED_TSCONFIG))
+        expect(JSON.parse(files.read(TSCONFIG))).toStrictEqual(JSON.parse(CONFIGURED_TSCONFIG))
       })
     )
 
@@ -298,7 +298,7 @@ describe("effect-tsgo", () => {
 
         const result = yield* effectTsgo.update(ROOT).pipe(provideFiles(files))
 
-        expect(result).toEqual({ prepare: "added", tsconfig: "monorepo" })
+        expect(result).toStrictEqual({ prepare: "added", tsconfig: "monorepo" })
         expect(files.read(TSCONFIG)).toBe("{}")
       })
     )

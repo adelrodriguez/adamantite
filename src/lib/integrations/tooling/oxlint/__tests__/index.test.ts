@@ -46,12 +46,12 @@ describe("oxlint", () => {
         yield* oxlint.create(ROOT).pipe(provideFiles(files))
 
         const state = yield* oxlint.detect(ROOT).pipe(provideFiles(files))
-        expect(state.active).toEqual({
+        expect(state.active).toStrictEqual({
           file: "oxlint.config.ts",
           format: "ts",
           path: join(ROOT, "oxlint.config.ts"),
         })
-        expect(state.legacy).toEqual([])
+        expect(state.legacy).toStrictEqual([])
 
         const content = files.read("oxlint.config.ts")
         expect(content).toContain('import { defineConfig } from "oxlint"')
@@ -98,7 +98,7 @@ describe("oxlint", () => {
 
         const result = yield* runAssess(oxlint, files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: false,
           warnings: [],
         })
@@ -197,7 +197,7 @@ describe("oxlint", () => {
 
         const result = yield* runAssess(oxlint, files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: true,
           findings: [],
           packageActions: [],

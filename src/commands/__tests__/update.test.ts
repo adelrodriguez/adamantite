@@ -52,8 +52,8 @@ describe("update", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls).toEqual([])
-      expect(prompter.outros).toEqual(["✅ Adamantite is already up to date."])
+      expect(installer.calls).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
     })
   )
 
@@ -118,8 +118,8 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toHaveLength(1)
-      expect(installer.calls[0]?.packages).toEqual([`knip@${knip.version}`])
-      expect(prompter.outros).toEqual(["✅ Update completed successfully!"])
+      expect(installer.calls[0]?.packages).toStrictEqual([`knip@${knip.version}`])
+      expect(prompter.outros).toStrictEqual(["✅ Update completed successfully!"])
     })
   )
 
@@ -144,7 +144,7 @@ describe("update", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls[0]?.options).toEqual({ silent: true, workspace: true })
+      expect(installer.calls[0]?.options).toStrictEqual({ silent: true, workspace: true })
     })
   )
 
@@ -193,7 +193,7 @@ describe("update", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.outros).toEqual(["❌ Update failed"])
+      expect(prompter.outros).toStrictEqual(["❌ Update failed"])
     })
   )
 
@@ -212,7 +212,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls[0]?.packages).toContain(`oxlint@${oxlint.version}`)
       expect(installer.calls[0]?.packages).not.toContain(`@effect/tsgo@${effectTsgo.version}`)
-      expect(runner.invocations).toEqual([
+      expect(runner.invocations).toStrictEqual([
         expect.objectContaining({
           args: ["patch", "--oxlint", "--typescript"],
           command: "effect-tsgo",
@@ -234,7 +234,7 @@ describe("update", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(runner.invocations).toEqual([])
+      expect(runner.invocations).toStrictEqual([])
     })
   )
 
@@ -251,7 +251,7 @@ describe("update", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.outros).toEqual(["❌ Update failed"])
+      expect(prompter.outros).toStrictEqual(["❌ Update failed"])
     })
   )
 })

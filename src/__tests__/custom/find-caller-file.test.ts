@@ -1,4 +1,4 @@
-import { describe, expect, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import { findCallerFile } from "#presets/lint/custom.ts"
 
 const OWN_FILE = "/project/node_modules/adamantite/dist/presets/lint/custom.js"
@@ -8,7 +8,7 @@ function callFromOwnFile() {
 }
 
 describe("findCallerFile", () => {
-  test("find the config file in a Node.js stack, without Oxlint's cache query", () => {
+  it("find the config file in a Node.js stack, without Oxlint's cache query", () => {
     const stack = [
       "Error: custom()",
       "    at resolveRulesDirectory (file:///project/node_modules/adamantite/dist/presets/lint/custom.js:90:20)",
@@ -21,7 +21,7 @@ describe("findCallerFile", () => {
     expect(findCallerFile(stack, OWN_FILE)).toBe("/project/oxlint.config.ts")
   })
 
-  test("find the config file in a Bun stack", () => {
+  it("find the config file in a Bun stack", () => {
     const stack = [
       "Error: custom()",
       "    at resolveRulesDirectory (/project/node_modules/adamantite/dist/presets/lint/custom.js:90:20)",
@@ -33,7 +33,7 @@ describe("findCallerFile", () => {
     expect(findCallerFile(stack, OWN_FILE)).toBe("/project/oxlint.config.ts")
   })
 
-  test("find a named caller frame, such as a shared tooling config", () => {
+  it("find a named caller frame, such as a shared tooling config", () => {
     const stack = [
       "Error: custom()",
       "    at custom (/project/node_modules/adamantite/dist/presets/lint/custom.js:160:15)",
@@ -43,12 +43,12 @@ describe("findCallerFile", () => {
     expect(findCallerFile(stack, OWN_FILE)).toBe("/project/tooling/lint/index.ts")
   })
 
-  test("find the caller in the stack of the current runtime", () => {
+  it("find the caller in the stack of the current runtime", () => {
     expect(findCallerFile(callFromOwnFile(), import.meta.filename)).not.toBe(import.meta.filename)
     expect(findCallerFile(callFromOwnFile(), "/elsewhere.ts")).toBe(import.meta.filename)
   })
 
-  test("return undefined when no frame names another file", () => {
+  it("return undefined when no frame names another file", () => {
     const stack = [
       "Error: custom()",
       "    at custom (/project/node_modules/adamantite/dist/presets/lint/custom.js:160:15)",

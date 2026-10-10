@@ -16,7 +16,7 @@ describe("fix", () => {
         const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--fix"],
             command: "oxlint",
@@ -40,7 +40,7 @@ describe("fix", () => {
         const exit = yield* runCommand(fixCommand, ["--all"], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations[0]?.args).toEqual([
+        expect(runner.invocations[0]?.args).toStrictEqual([
           "--fix",
           "--fix-suggestions",
           "--fix-dangerously",
@@ -60,7 +60,7 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--fix", "--fix-suggestions", "--deny-warnings"],
             command: "oxlint",
@@ -80,7 +80,7 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--write", "--no-error-on-unmatched-pattern"],
             command: "oxfmt",
@@ -101,7 +101,7 @@ describe("fix", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "InvalidFixOptions" })
-        expect(runner.invocations).toEqual([])
+        expect(runner.invocations).toStrictEqual([])
       })
     )
   })
@@ -120,7 +120,7 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--fix", join(files.root, "index.ts")],
             command: "oxlint",
@@ -147,7 +147,7 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           {
             args: ["--fix", "--fix-dangerously", "--deny-warnings"],
             command: "oxlint",
@@ -173,7 +173,7 @@ describe("fix", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxlint", exitCode: 1 })
-        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
+        expect(runner.invocations.map((invocation) => invocation.command)).toStrictEqual([
           "oxlint",
           "oxfmt",
         ])

@@ -35,7 +35,7 @@ describe("knip", () => {
         yield* knip.create(ROOT).pipe(provideFiles(files))
 
         const state = yield* knip.detect(ROOT).pipe(provideFiles(files))
-        expect(state.active).toEqual({
+        expect(state.active).toStrictEqual({
           file: "knip.config.ts",
           format: "ts",
           path: join(ROOT, "knip.config.ts"),
@@ -88,7 +88,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: false,
           warnings: [],
         })
@@ -108,7 +108,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.findings).toEqual([
+        expect(result.applicable && result.findings).toStrictEqual([
           expect.objectContaining({
             currentState: expect.stringContaining("ignoreDependencies.monorepo"),
             id: "invalid-knip-config",
@@ -133,7 +133,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.findings).toEqual([
+        expect(result.applicable && result.findings).toStrictEqual([
           expect.objectContaining({
             goal: [expect.stringContaining("ignoreDependencies: ignoreDependencies.monorepo")],
             id: "invalid-knip-config",
@@ -158,7 +158,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.findings).toEqual([])
+        expect(result.applicable && result.findings).toStrictEqual([])
       })
     )
 
@@ -178,7 +178,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.findings).toEqual([])
+        expect(result.applicable && result.findings).toStrictEqual([])
       })
     )
 
@@ -198,7 +198,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.findings).toEqual([
+        expect(result.applicable && result.findings).toStrictEqual([
           expect.objectContaining({ id: "invalid-knip-config" }),
         ])
       })
@@ -217,7 +217,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.findings).toEqual([])
+        expect(result.applicable && result.findings).toStrictEqual([])
       })
     )
 
@@ -243,7 +243,7 @@ describe("knip", () => {
           const missingResult = yield* runAssess(missing)
           const configuredResult = yield* runAssess(configured)
 
-          expect(missingResult.applicable && missingResult.findings).toEqual([
+          expect(missingResult.applicable && missingResult.findings).toStrictEqual([
             expect.objectContaining({
               currentState: expect.stringContaining(
                 "`ignoreDependencies: ignoreDependencies.effect`"
@@ -254,7 +254,7 @@ describe("knip", () => {
               }),
             }),
           ])
-          expect(configuredResult.applicable && configuredResult.findings).toEqual([])
+          expect(configuredResult.applicable && configuredResult.findings).toStrictEqual([])
         })
     )
 
@@ -272,7 +272,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result.applicable && result.findings).toEqual([
+        expect(result.applicable && result.findings).toStrictEqual([
           expect.objectContaining({
             goal: [
               expect.stringContaining(
@@ -283,10 +283,13 @@ describe("knip", () => {
           }),
         ])
         expect(
-          toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: true }).includes(
-            "ignoreDependencies: [...ignoreDependencies.monorepo, ...ignoreDependencies.effect],"
-          )
-        ).toBe(true)
+          toKnipTsConfigContent({
+            isMonorepo: true,
+            usesEffectPreset: true,
+          })
+        ).toContain(
+          "ignoreDependencies: [...ignoreDependencies.monorepo, ...ignoreDependencies.effect],"
+        )
       })
     )
 
@@ -373,7 +376,7 @@ describe("knip", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: true,
           findings: [],
           packageActions: [],

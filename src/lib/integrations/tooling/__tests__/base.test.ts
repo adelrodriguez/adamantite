@@ -42,12 +42,12 @@ describe("detectToolingConfig", () => {
 
       const state = yield* detect(files)
 
-      expect(state.active).toEqual({
+      expect(state.active).toStrictEqual({
         file: "tool.config.ts",
         format: "ts",
         path: `${ROOT}/tool.config.ts`,
       })
-      expect(state.legacy).toEqual([
+      expect(state.legacy).toStrictEqual([
         { file: "tool.json", format: "json", path: `${ROOT}/tool.json` },
         { file: "tool.jsonc", format: "jsonc", path: `${ROOT}/tool.jsonc` },
       ])
@@ -63,7 +63,7 @@ describe("detectToolingConfig", () => {
 
       const state = yield* detect(files)
 
-      expect(state.warnings).toEqual([
+      expect(state.warnings).toStrictEqual([
         "Found both `tool.config.ts` and `tool.json(c)`. Adamantite will use `tool.config.ts`.",
       ])
     })
@@ -78,7 +78,7 @@ describe("detectToolingConfig", () => {
 
       const state = yield* detect(files, SINGLE_LEGACY_FILES)
 
-      expect(state.warnings).toEqual([
+      expect(state.warnings).toStrictEqual([
         "Found both `tool.config.ts` and `.toolrc.json`. Adamantite will use `tool.config.ts`.",
       ])
     })
@@ -93,7 +93,7 @@ describe("detectToolingConfig", () => {
 
       const state = yield* detect(files)
 
-      expect(state.warnings).toEqual([
+      expect(state.warnings).toStrictEqual([
         "Found both `tool.json` and `tool.jsonc`. Multiple legacy tool configs exist; Adamantite will treat `tool.jsonc` as the source of truth in its findings.",
       ])
     })
@@ -143,7 +143,7 @@ describe("detectToolingConfig", () => {
             state.legacy.map((entry) => entry.file),
             Order.String
           )
-        ).toEqual(EffectArray.sort(expectedLegacy, Order.String))
+        ).toStrictEqual(EffectArray.sort(expectedLegacy, Order.String))
 
         const hasWarnings = expectedActive !== null && expectedLegacy.length > 0
         expect(state.warnings.length > 0).toBe(hasWarnings)
@@ -156,7 +156,9 @@ describe("getPackageActions", () => {
   const pkg = { name: "tool", version: "1.2.3" }
 
   it("request an install when the package is missing", () => {
-    expect(getPackageActions({ name: "test-project" }, pkg, "the managed `test` script")).toEqual([
+    expect(
+      getPackageActions({ name: "test-project" }, pkg, "the managed `test` script")
+    ).toStrictEqual([
       {
         description: "Install `tool@1.2.3` for the managed `test` script.",
         package: "tool",
@@ -167,15 +169,17 @@ describe("getPackageActions", () => {
   })
 
   it("request an update when the installed version drifts", () => {
-    expect(getPackageActions({ devDependencies: { tool: "1.0.0" } }, pkg, "purpose")).toEqual([
-      {
-        currentVersion: "1.0.0",
-        description: "Update `tool` from `1.0.0` to `1.2.3`.",
-        package: "tool",
-        targetVersion: "1.2.3",
-        type: "update_package",
-      },
-    ])
+    expect(getPackageActions({ devDependencies: { tool: "1.0.0" } }, pkg, "purpose")).toStrictEqual(
+      [
+        {
+          currentVersion: "1.0.0",
+          description: "Update `tool` from `1.0.0` to `1.2.3`.",
+          package: "tool",
+          targetVersion: "1.2.3",
+          type: "update_package",
+        },
+      ]
+    )
   })
 
   const specifier = Arbitrary.schema(
@@ -205,13 +209,13 @@ describe("getPackageActions", () => {
       const actions = getPackageActions(manifest, pkg, "purpose")
 
       if (installed === null) {
-        expect(actions).toEqual([
+        expect(actions).toStrictEqual([
           expect.objectContaining({ targetVersion: pkg.version, type: "install_package" }),
         ])
       } else if (installed.version === pkg.version) {
-        expect(actions).toEqual([])
+        expect(actions).toStrictEqual([])
       } else {
-        expect(actions).toEqual([
+        expect(actions).toStrictEqual([
           expect.objectContaining({
             currentVersion: installed.written,
             targetVersion: pkg.version,
@@ -236,7 +240,7 @@ describe("getConfigFindings", () => {
   }
 
   it("report a missing config with canonical content", () => {
-    expect(getConfigFindings(state(null), options)).toEqual([
+    expect(getConfigFindings(state(null), options)).toStrictEqual([
       expect.objectContaining({
         id: "missing-tool-config",
         reference: { content: options.configContent, language: "ts" },
@@ -250,7 +254,7 @@ describe("getConfigFindings", () => {
         state({ file: "tool.jsonc", format: "jsonc", path: "/tmp/tool.jsonc" }),
         options
       )
-    ).toEqual([expect.objectContaining({ id: "legacy-tool-config" })])
+    ).toStrictEqual([expect.objectContaining({ id: "legacy-tool-config" })])
   })
 
   it("report nothing when the TS config is active and configured", () => {
@@ -259,7 +263,7 @@ describe("getConfigFindings", () => {
         state({ file: "tool.config.ts", format: "ts", path: "/tmp/tool.config.ts" }),
         { ...options, inspection: { kind: "configured" } }
       )
-    ).toEqual([])
+    ).toStrictEqual([])
   })
 
   it("report invalid content and shadowed legacy files independently", () => {
@@ -272,6 +276,6 @@ describe("getConfigFindings", () => {
         },
         { ...options, inspection: { kind: "invalid", reason: "Preset missing." } }
       ).map(({ id }) => id)
-    ).toEqual(["shadowed-legacy-tool-config", "invalid-tool-config"])
+    ).toStrictEqual(["shadowed-legacy-tool-config", "invalid-tool-config"])
   })
 })

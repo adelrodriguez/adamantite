@@ -37,7 +37,7 @@ describe("NodeVersionResolver", () => {
 
       const source = yield* runResolve(files)
 
-      expect(source).toEqual({ _tag: "Version", value: "lts/*" })
+      expect(source).toStrictEqual({ _tag: "Version", value: "lts/*" })
     })
   )
 
@@ -122,7 +122,7 @@ describe("NodeVersionResolver", () => {
 
         const source = yield* runResolve(files)
 
-        expect(source).toEqual(
+        expect(source).toStrictEqual(
           hasNode ? { _tag: "File", path: ".tool-versions" } : { _tag: "Version", value: "lts/*" }
         )
       }),
@@ -201,7 +201,7 @@ describe("NodeVersionResolver", () => {
               : packageJson?.valid
                 ? { _tag: "File", path: "package.json" }
                 : { _tag: "Version", value: "lts/*" }
-        expect(source).toEqual(expected)
+        expect(source).toStrictEqual(expected)
       }),
     { arbitrary: { runs: 200 } }
   )
@@ -262,7 +262,7 @@ describe("NodeVersionResolver", () => {
 
         const source = yield* runResolve(files)
 
-        expect(source).toEqual({ _tag: "File", path: "package.json" })
+        expect(source).toStrictEqual({ _tag: "File", path: "package.json" })
       }),
     { arbitrary: { runs: 200 } }
   )
@@ -276,7 +276,7 @@ describe("NodeVersionResolver", () => {
 
         const source = yield* runResolve(files)
 
-        expect(source).toEqual({ _tag: "Version", value: "lts/*" })
+        expect(source).toStrictEqual({ _tag: "Version", value: "lts/*" })
       }),
     { arbitrary: { runs: 100 } }
   )

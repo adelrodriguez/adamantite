@@ -1,5 +1,5 @@
 import type { PackageJson } from "type-fest"
-import { describe, expect, it, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 import {
   getConflictingScripts,
@@ -9,13 +9,13 @@ import {
 } from "#lib/workspace/package-json.ts"
 
 describe("getConflictingScripts", () => {
-  test("handles a package.json without a scripts field", () => {
-    expect(getConflictingScripts({}, ["check"])).toEqual([])
+  it("handles a package.json without a scripts field", () => {
+    expect(getConflictingScripts({}, ["check"])).toStrictEqual([])
   })
 })
 
 describe("script management", () => {
-  test("exclude retired commands from managed scripts", () => {
+  it("exclude retired commands from managed scripts", () => {
     expect(
       getManagedScripts({
         scripts: {
@@ -27,7 +27,7 @@ describe("script management", () => {
           format: "adamantite format",
         },
       })
-    ).toEqual(["analyze", "check", "fix"])
+    ).toStrictEqual(["analyze", "check", "fix"])
   })
 
   // SAFETY: MANAGED_SCRIPT_COMMANDS is a Record<Script, string>, so its keys are Script values.
@@ -64,7 +64,7 @@ describe("script management", () => {
           command !== undefined && command !== "" && command !== MANAGED_SCRIPT_COMMANDS[script]
         )
       })
-      expect(conflicts.map((conflict) => conflict.script)).toEqual(expectedConflicting)
+      expect(conflicts.map((conflict) => conflict.script)).toStrictEqual(expectedConflicting)
     },
     { arbitrary: { runs: 300 } }
   )
@@ -79,7 +79,7 @@ describe("script management", () => {
       }
       const adopted: PackageJson = { name: "fixture", scripts: adoptedScripts }
 
-      expect(getConflictingScripts(adopted, requested)).toEqual([])
+      expect(getConflictingScripts(adopted, requested)).toStrictEqual([])
 
       const managed = getManagedScripts(adopted)
       for (const script of requested) {

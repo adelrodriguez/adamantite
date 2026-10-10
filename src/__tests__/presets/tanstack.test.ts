@@ -1,9 +1,14 @@
 import { join } from "node:path"
-import { beforeAll, describe, expect, test } from "@effect/vitest"
+import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import tanstack from "#presets/lint/tanstack.ts"
-import { lintRuleFixtures, listFixtureRules, type RuleFixtureCase } from "./rule-fixtures.ts"
+import {
+  lintRuleFixtures,
+  listFixtureRules,
+  type RuleFixtureCase,
+  selectRuleFixtures,
+} from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/tanstack")
@@ -14,13 +19,15 @@ const presetRules = Object.keys(tanstack.rules ?? {})
   .map((name) => name.slice(NAMESPACE.length + 1))
 
 describe("tanstack preset", () => {
-  test("have fixtures for exactly the rules the preset enables", () => {
-    expect(listFixtureRules(FIXTURES_DIR)).toEqual(EffectArray.sort(presetRules, Order.String))
+  it("have fixtures for exactly the rules the preset enables", () => {
+    expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
+      EffectArray.sort(presetRules, Order.String)
+    )
   })
 })
 
 describe("tanstack rule fixtures", () => {
-  let cases: RuleFixtureCase[] = []
+  let cases: RuleFixtureCase[]
 
   beforeAll(() => {
     cases = lintRuleFixtures({
@@ -31,20 +38,22 @@ describe("tanstack rule fixtures", () => {
   })
 
   describe.each(listFixtureRules(FIXTURES_DIR))("%s", (rule) => {
-    test("report every invalid fixture", () => {
-      const invalid = cases.filter((entry) => entry.rule === rule && entry.kind === "invalid")
+    it("report every invalid fixture", () => {
+      const invalid = selectRuleFixtures(cases, rule, "invalid")
       const missed = invalid.filter((entry) => entry.reportedLines.length === 0)
 
-      expect(invalid).not.toEqual([])
-      expect(missed.map((entry) => entry.file)).toEqual([])
+      expect(invalid).not.toStrictEqual([])
+      expect(missed.map((entry) => entry.file)).toStrictEqual([])
     })
 
-    test("report no valid fixture", () => {
-      const valid = cases.filter((entry) => entry.rule === rule && entry.kind === "valid")
+    it("report no valid fixture", () => {
+      const valid = selectRuleFixtures(cases, rule, "valid")
       const reported = valid.filter((entry) => entry.reportedLines.length > 0)
 
-      expect(valid).not.toEqual([])
-      expect(reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)).toEqual([])
+      expect(valid).not.toStrictEqual([])
+      expect(
+        reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)
+      ).toStrictEqual([])
     })
   })
 })

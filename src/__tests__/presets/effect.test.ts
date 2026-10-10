@@ -4,7 +4,7 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import process from "node:process"
-import { describe, expect, test } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 import effect from "#presets/lint/effect.ts"
 
@@ -129,20 +129,19 @@ function lint(files: Record<string, string>) {
 }
 
 describe("effect preset", () => {
-  test("enable only rules that @effect/tsgo defines", () => {
-    expect(presetRules.filter((rule) => !upstreamRules.includes(rule))).toEqual([])
+  it("enable only rules that @effect/tsgo defines", () => {
+    expect(presetRules.filter((rule) => !upstreamRules.includes(rule))).toStrictEqual([])
   })
 
-  test("decide on every @effect/tsgo rule", () => {
-    const undecided = upstreamRules.filter(
-      (rule) => !presetRules.includes(rule) && !EXCLUDED_RULES.has(rule)
-    )
+  it("decide on every @effect/tsgo rule", () => {
+    const decided = new Set([...presetRules, ...EXCLUDED_RULES])
+    const undecided = upstreamRules.filter((rule) => !decided.has(rule))
 
-    expect(undecided).toEqual([])
-    expect(presetRules.filter((rule) => EXCLUDED_RULES.has(rule))).toEqual([])
+    expect(undecided).toStrictEqual([])
+    expect(presetRules.filter((rule) => EXCLUDED_RULES.has(rule))).toStrictEqual([])
   })
 
-  test("ship patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript", () => {
+  it("ship patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
     )
@@ -153,10 +152,10 @@ describe("effect preset", () => {
       .map((tool) => `${tool}/${devDependencies[tool]}`)
       .filter((artifact) => !existsSync(join(dirname(platformPackageJson), "artifacts", artifact)))
 
-    expect(missing).toEqual([])
+    expect(missing).toStrictEqual([])
   })
 
-  test("report Effect misuse through the patched Oxlint", () => {
+  it("report Effect misuse through the patched Oxlint", () => {
     const diagnostics = lint({
       "bad.ts": [
         'import * as Effect from "effect/Effect"',
@@ -174,7 +173,7 @@ describe("effect preset", () => {
       ].join("\n"),
     })
 
-    expect(diagnostics.map(({ code, filename }) => ({ code, filename }))).toEqual([
+    expect(diagnostics.map(({ code, filename }) => ({ code, filename }))).toStrictEqual([
       { code: `${NAMESPACE}(floating-effect)`, filename: "bad.ts" },
     ])
   })

@@ -69,7 +69,7 @@ describe("CodingAgents.detectInstalled", () => {
       yield* TestClock.adjust("9 seconds")
       const installed = yield* Fiber.join(fiber)
 
-      expect(installed.map((agent) => agent.command)).toEqual(
+      expect(installed.map((agent) => agent.command)).toStrictEqual(
         codingAgents.map((agent) => agent.command)
       )
     })

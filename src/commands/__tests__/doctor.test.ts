@@ -114,8 +114,8 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toEqual([])
-      expect(prompter.outros).toEqual([])
+      expect(prompter.logs).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
     })
   )
 
@@ -136,7 +136,7 @@ describe("doctor", () => {
         level: "success",
         message: "No applicable integrations found.",
       })
-      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Doctor completed successfully!"])
     })
   )
 
@@ -150,11 +150,11 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toEqual([])
-      expect(prompter.messages).toEqual([
+      expect(prompter.logs).toStrictEqual([])
+      expect(prompter.messages).toStrictEqual([
         "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
       ])
-      expect(prompter.outros).toEqual([])
+      expect(prompter.outros).toStrictEqual([])
     })
   )
 
@@ -176,8 +176,8 @@ describe("doctor", () => {
         message:
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
       })
-      expect(prompter.messages).toEqual([])
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+      expect(prompter.messages).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
   )
 
@@ -199,9 +199,9 @@ describe("doctor", () => {
       expect(prompter.messages).toHaveLength(1)
       expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
       expect(prompter.messages[0]).toContain("## 1. Missing knip configuration")
-      expect(prompter.intros).toEqual([])
-      expect(prompter.notes).toEqual([])
-      expect(prompter.outros).toEqual([])
+      expect(prompter.intros).toStrictEqual([])
+      expect(prompter.notes).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
     })
   )
 
@@ -224,8 +224,8 @@ describe("doctor", () => {
       expect(prompter.messages).toHaveLength(1)
       expect(prompter.messages[0]).toContain("# Adamantite doctor findings")
       expect(prompter.messages[0]).toContain("Skipping `tsconfig.json` setup")
-      expect(prompter.logs).toEqual([])
-      expect(prompter.outros).toEqual([])
+      expect(prompter.logs).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
     })
   )
 
@@ -245,8 +245,8 @@ describe("doctor", () => {
       expect(prompter.messages).toHaveLength(1)
       expect(prompter.messages[0]).toContain("# Adamantite doctor warnings")
       expect(prompter.messages[0]).toContain("No CI-compatible managed scripts were found")
-      expect(prompter.logs).toEqual([])
-      expect(prompter.outros).toEqual([])
+      expect(prompter.logs).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
     })
   )
 
@@ -299,7 +299,7 @@ describe("doctor", () => {
       })
 
       expect(Exit.isSuccess(migratedExit)).toBe(true)
-      expect(migratedPrompter.messages).toEqual([])
+      expect(migratedPrompter.messages).toStrictEqual([])
     })
   )
 
@@ -319,8 +319,8 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toEqual([])
-      expect(prompter.outros).toEqual([])
+      expect(prompter.logs).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
     })
   )
 
@@ -344,7 +344,7 @@ describe("doctor", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({ level: "success", message: "No issues found." })
-      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Doctor completed successfully!"])
     })
   )
 
@@ -361,11 +361,11 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs).toEqual([])
-      expect(prompter.messages).toEqual([])
-      expect(prompter.outros).toEqual([])
-      expect(prompter.intros).toEqual([])
-      expect(prompter.notes).toEqual([])
+      expect(prompter.logs).toStrictEqual([])
+      expect(prompter.messages).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
+      expect(prompter.intros).toStrictEqual([])
+      expect(prompter.notes).toStrictEqual([])
     })
   )
 
@@ -386,7 +386,7 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.notes).toEqual([
+      expect(prompter.notes).toStrictEqual([
         expect.objectContaining({
           message: expect.stringContaining(
             "Current state\nThe managed `knip.config.ts` file is missing."
@@ -394,7 +394,7 @@ describe("doctor", () => {
           title: "1. Missing knip configuration",
         }),
       ])
-      expect(prompter.selectCalls).toEqual([
+      expect(prompter.selectCalls).toStrictEqual([
         expect.objectContaining({
           message: "How do you want to resolve these findings?",
           options: [
@@ -408,7 +408,7 @@ describe("doctor", () => {
           ],
         }),
       ])
-      expect(prompter.confirmCalls).toEqual([])
+      expect(prompter.confirmCalls).toStrictEqual([])
       expect(copied).toHaveLength(1)
       expect(copied[0]).toContain("# Adamantite doctor findings")
       expect(copied[0]).toContain("Do not suppress or work around checks")
@@ -419,7 +419,7 @@ describe("doctor", () => {
         level: "success",
         message: "The Markdown prompt was printed and sent to the terminal clipboard.",
       })
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
   )
 
@@ -435,9 +435,9 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.confirmCalls).toEqual([])
-      expect(nonProbeInvocations(runner)).toEqual([])
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+      expect(prompter.confirmCalls).toStrictEqual([])
+      expect(nonProbeInvocations(runner)).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
   )
 
@@ -459,7 +459,7 @@ describe("doctor", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(nonProbeInvocations(runner)).toEqual([
+      expect(nonProbeInvocations(runner)).toStrictEqual([
         expect.objectContaining({
           args: [expect.stringContaining("# Adamantite doctor findings")],
           command: "claude",
@@ -480,7 +480,7 @@ describe("doctor", () => {
         level: "success",
         message: "All findings were resolved by Claude Code.",
       })
-      expect(prompter.outros).toEqual(["✅ Doctor completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Doctor completed successfully!"])
     })
   )
 
@@ -507,7 +507,7 @@ describe("doctor", () => {
         initialValue: true,
         message: "Copy the Markdown prompt for a coding agent?",
       })
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
   )
 
@@ -535,7 +535,7 @@ describe("doctor", () => {
         initialValue: true,
         message: "Copy the Markdown prompt for a coding agent?",
       })
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
   )
 
@@ -562,7 +562,7 @@ describe("doctor", () => {
         initialValue: true,
         message: "Copy the Markdown prompt for a coding agent?",
       })
-      expect(prompter.outros).toEqual(["⚠️ Doctor found issues."])
+      expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
   )
 
@@ -578,9 +578,9 @@ describe("doctor", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.cancels).toEqual(["Doctor was cancelled. The findings remain."])
-      expect(nonProbeInvocations(runner)).toEqual([])
-      expect(prompter.outros).toEqual([])
+      expect(prompter.cancels).toStrictEqual(["Doctor was cancelled. The findings remain."])
+      expect(nonProbeInvocations(runner)).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
     })
   )
 
@@ -604,7 +604,7 @@ describe("doctor", () => {
         message:
           "Doctor can hand findings off when one of these CLIs is installed: `claude`, `codex`, `cursor-agent`, `gemini`, `grok`, `opencode`.",
       })
-      expect(prompter.selectCalls).toEqual([
+      expect(prompter.selectCalls).toStrictEqual([
         expect.objectContaining({
           options: [
             expect.objectContaining({
@@ -639,7 +639,7 @@ describe("doctor", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(nonProbeInvocations(runner)[0]).toEqual(
+      expect(nonProbeInvocations(runner)[0]).toStrictEqual(
         expect.objectContaining({
           args: ["-i", expect.stringContaining("# Adamantite doctor findings")],
           command: "gemini",

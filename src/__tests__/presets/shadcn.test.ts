@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { cpSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { beforeAll, describe, expect, test } from "@effect/vitest"
+import { beforeAll, describe, expect, it } from "@effect/vitest"
 import { plugin as shadcnPlugin } from "@shadcn/lint"
 import * as Schema from "effect/Schema"
 import shadcn from "#presets/lint/shadcn.ts"
@@ -72,38 +72,40 @@ function lintOverlapFixtures() {
 }
 
 describe("shadcn preset", () => {
-  test("enable exactly the rules the managed plugin defines", () => {
-    expect(new Set(presetRules)).toEqual(new Set(Object.keys(shadcnPlugin.rules)))
+  it("enable exactly the rules the managed plugin defines", () => {
+    expect(new Set(presetRules)).toStrictEqual(new Set(Object.keys(shadcnPlugin.rules)))
   })
 
-  test("load the plugin by its package name", () => {
-    expect(shadcn.jsPlugins).toEqual(["@shadcn/lint"])
+  it("load the plugin by its package name", () => {
+    expect(shadcn.jsPlugins).toStrictEqual(["@shadcn/lint"])
   })
 })
 
 describe("shadcn and react preset overlap", () => {
-  let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"] = []
+  let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"]
 
   beforeAll(() => {
     diagnostics = lintOverlapFixtures()
   })
 
-  test("report the fixtures through the plugin", () => {
+  it("report the fixtures through the plugin", () => {
     const codes = new Set(diagnostics.map((diagnostic) => diagnostic.code))
 
     expect(codes).toContain("shadcn(no-inline-styles)")
     expect(codes).toContain("shadcn(no-raw-colors)")
   })
 
-  test("leave shadcn findings to the shadcn rules", () => {
+  it("leave shadcn findings to the shadcn rules", () => {
+    const reactCodes = new Set<string | undefined>([
+      "react(no-unknown-property)",
+      "react(style-prop-object)",
+    ])
     const overlapping = diagnostics
       .map((diagnostic) => diagnostic.code)
-      .filter(
-        (code) => code === "react(no-unknown-property)" || code === "react(style-prop-object)"
-      )
+      .filter((code) => reactCodes.has(code))
 
     // A string `style` prop is the one known overlap: react/style-prop-object reports the type
     // of the value, and shadcn/no-inline-styles reports the inline style itself.
-    expect(overlapping).toEqual(["react(style-prop-object)"])
+    expect(overlapping).toStrictEqual(["react(style-prop-object)"])
   })
 })

@@ -26,7 +26,7 @@ describe("analyze", () => {
         const exit = yield* runCommand(analyzeCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([{ ...knipStep, args: [] }])
+        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
       })
     )
   })
@@ -44,11 +44,11 @@ describe("analyze", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           { ...sherifStep, args: [] },
           { ...knipStep, args: [] },
         ])
-        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toEqual([
+        expect(logLines.map((line) => stripVTControlCharacters(String(line)))).toStrictEqual([
           "📦 Analyzing the monorepo · adamantite (sherif)",
           "",
           "🧹 Analyzing unused code · adamantite (knip)",
@@ -66,7 +66,7 @@ describe("analyze", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([{ ...knipStep, args: [] }])
+        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
       })
     )
 
@@ -80,7 +80,7 @@ describe("analyze", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([{ ...knipStep, args: [] }])
+        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
       })
     )
 
@@ -94,7 +94,7 @@ describe("analyze", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           { ...sherifStep, args: ["--fix"] },
           { ...knipStep, args: ["--fix", "--allow-remove-files", "--production", "--strict"] },
         ])
@@ -111,7 +111,7 @@ describe("analyze", () => {
           layers: [runner.layer],
         })
 
-        expect(runner.invocations.map((invocation) => invocation.args)).toEqual([
+        expect(runner.invocations.map((invocation) => invocation.args)).toStrictEqual([
           [],
           ["--directory", "packages/app"],
         ])
@@ -127,7 +127,7 @@ describe("analyze", () => {
           layers: [runner.layer],
         })
 
-        expect(runner.invocations.map((invocation) => invocation.command)).toEqual([
+        expect(runner.invocations.map((invocation) => invocation.command)).toStrictEqual([
           "sherif",
           "knip",
         ])
@@ -148,7 +148,7 @@ describe("analyze", () => {
           layers: [runner.layer],
         })
 
-        expect(runner.invocations.map((invocation) => invocation.command)).toEqual(["sherif"])
+        expect(runner.invocations.map((invocation) => invocation.command)).toStrictEqual(["sherif"])
         expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
           _tag: "CommandFailed",
           command: "sherif",
@@ -188,7 +188,7 @@ describe("analyze", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           { ...sherifStep, args: ["--fix", "--select", "highest"] },
         ])
       })
@@ -205,7 +205,7 @@ describe("analyze", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toEqual([
+        expect(runner.invocations).toStrictEqual([
           { ...knipStep, args: ["--fix", "--allow-remove-files", "--directory", "packages/app"] },
         ])
       })
@@ -219,7 +219,7 @@ describe("analyze", () => {
           layers: [runner.layer],
         })
 
-        expect(runner.invocations).toEqual([])
+        expect(runner.invocations).toStrictEqual([])
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "InvalidAnalyzeOptions" })
         expect(error.message).toContain("no monorepo was detected")
@@ -235,7 +235,7 @@ describe("analyze", () => {
           layers: [runner.layer],
         })
 
-        expect(runner.invocations).toEqual([])
+        expect(runner.invocations).toStrictEqual([])
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "InvalidAnalyzeOptions" })
         expect(error.message).toContain("`--strict` applies to the unused stage")

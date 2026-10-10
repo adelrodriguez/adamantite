@@ -48,7 +48,7 @@ describe("sherif", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({
+        expect(result).toStrictEqual({
           applicable: false,
           warnings: [],
         })
@@ -68,7 +68,7 @@ describe("sherif", () => {
         const result = yield* runAssess(files)
 
         expect(result.applicable).toBe(true)
-        expect(result.applicable && result.packageActions).toEqual([
+        expect(result.applicable && result.packageActions).toStrictEqual([
           expect.objectContaining({ package: "sherif", type: "install_package" }),
         ])
       })
@@ -85,7 +85,7 @@ describe("sherif", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toEqual({ applicable: false, warnings: [] })
+        expect(result).toStrictEqual({ applicable: false, warnings: [] })
       })
     )
 

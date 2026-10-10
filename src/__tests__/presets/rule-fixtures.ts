@@ -143,3 +143,14 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
     rmSync(tempDir, { force: true, recursive: true })
   }
 }
+
+/**
+ * Select the cases of one rule and kind.
+ */
+export function selectRuleFixtures(
+  cases: readonly RuleFixtureCase[],
+  rule: string,
+  kind: RuleFixtureKind
+): RuleFixtureCase[] {
+  return cases.filter((entry) => entry.rule === rule && entry.kind === kind)
+}

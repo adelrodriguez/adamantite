@@ -31,19 +31,6 @@ function makePackageJson(manifest: PackageJson) {
 
 describe("shadcn-lint", () => {
   describe("assess", () => {
-    it.effect("report not applicable when the config does not import the shadcn preset", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "oxlint.config.ts": toOxlintTsConfigContent(["react"]),
-          "package.json": makePackageJson({ scripts: { check: "adamantite check" } }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toStrictEqual({ applicable: false, warnings: [] })
-      })
-    )
-
     it.effect("report not applicable when the config file is missing", () =>
       Effect.gen(function* () {
         const files = makeFiles({

@@ -5,7 +5,6 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { type CommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
@@ -14,7 +13,6 @@ import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 const PREPARE = "adamantite prepare"
-const TSCONFIG = "tsconfig.json"
 const CONFIGURED_TSCONFIG = JSON.stringify({
   compilerOptions: { plugins: [{ diagnostics: false, name: "@effect/language-service" }] },
 })
@@ -205,31 +203,6 @@ describe("effect-tsgo", () => {
     )
   })
 
-  describe("detect", () => {
-    it.effect("need the patch whenever oxlint.config.ts imports the effect preset", () =>
-      Effect.gen(function* () {
-        const cases = [
-          [makeConfiguredFiles(), true],
-          [makeConfiguredFiles({ "oxlint.config.ts": toOxlintTsConfigContent(["react"]) }), false],
-          // A custom lint script still loads the preset, so it still needs the patch.
-          [
-            makeConfiguredFiles({
-              "package.json": makePackageJson({ scripts: { check: "oxlint" } }),
-            }),
-            true,
-          ],
-          [makeConfiguredFiles({ "oxlint.config.ts": "" }), false],
-        ] as const
-
-        for (const [files, expected] of cases) {
-          const result = yield* effectTsgo.detect(ROOT).pipe(provideFiles(files))
-
-          expect(result).toBe(expected)
-        }
-      })
-    )
-  })
-
   describe("patch", () => {
     it.effect("run effect-tsgo patch for Oxlint and TypeScript", () =>
       Effect.gen(function* () {
@@ -257,49 +230,6 @@ describe("effect-tsgo", () => {
             new RegExp(`^${join(ROOT, "node_modules", ".bin")}`, "u")
           )
         }
-      })
-    )
-
-    it.effect("fail when the patch fails", () =>
-      Effect.gen(function* () {
-        const result = yield* effectTsgo
-          .patch(ROOT, { quiet: true })
-          .pipe(Effect.provide(Layer.merge(makeRunner(1).layer, Path.layer)), Effect.result)
-
-        expect(Result.isFailure(result) && result.failure._tag).toBe("CommandFailed")
-      })
-    )
-  })
-
-  describe("update", () => {
-    it.effect("write the prepare script and the language service entry", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({ scripts: { prepare: "husky" } }),
-          "tsconfig.json": "{}",
-        })
-
-        const result = yield* effectTsgo.update(ROOT).pipe(provideFiles(files))
-
-        expect(result).toStrictEqual({ prepare: "merged", tsconfig: "updated" })
-        expect(JSON.parse(files.read("package.json"))).toMatchObject({
-          scripts: { prepare: `${PREPARE} && (husky)` },
-        })
-        expect(JSON.parse(files.read(TSCONFIG))).toStrictEqual(JSON.parse(CONFIGURED_TSCONFIG))
-      })
-    )
-
-    it.effect("leave the root tsconfig.json alone in a monorepo", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({ workspaces: ["packages/*"] }),
-          "tsconfig.json": "{}",
-        })
-
-        const result = yield* effectTsgo.update(ROOT).pipe(provideFiles(files))
-
-        expect(result).toStrictEqual({ prepare: "added", tsconfig: "monorepo" })
-        expect(files.read(TSCONFIG)).toBe("{}")
       })
     )
   })

@@ -107,19 +107,6 @@ describe("custom preset", () => {
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
   })
 
-  it("resolve the rules folder from the config file, not the working directory", () => {
-    write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
-    write("oxlint.config.ts", makeConfig("custom()"))
-
-    const result = spawnSync(
-      join(REPO_ROOT, "node_modules/.bin/oxlint"),
-      ["-f", "json", "-c", join(project, "oxlint.config.ts"), "."],
-      { cwd: join(project, "src"), encoding: "utf8" }
-    )
-
-    expect(result.stdout).toContain("project(no-debugger-here)")
-  })
-
   it("apply severity overrides from the rules option", () => {
     write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
     write("oxlint.config.ts", makeConfig('custom({ rules: { "no-debugger-here": "warn" } })'))

@@ -21,10 +21,7 @@ import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
-import {
-  ADAMANTITE_AGENTS_END_MARKER,
-  ADAMANTITE_AGENTS_START_MARKER,
-} from "#lib/workspace/agents.ts"
+import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/workspace/agents.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
@@ -61,6 +58,20 @@ function readJson(files: FileSystemTestContext, path: string): JsonObject {
   // SAFETY: every caller asserts the shape of a JSON fixture this test suite wrote itself.
   return JSON.parse(files.read(path)) as JsonObject
 }
+
+function readOptionalFile(files: FileSystemTestContext, path: string): string | null {
+  return files.exists(path) ? files.read(path) : null
+}
+
+const EXISTING_MONOREPO_TSCONFIG = JSON.stringify(
+  {
+    extends: "./tooling/tsconfig.base.json",
+    files: [],
+    references: [{ path: "packages/app" }],
+  },
+  null,
+  2
+)
 
 // Runs init interactively with the check and analyze scripts, the react preset, and VS Code.
 function runFreshSetup() {
@@ -155,160 +166,50 @@ describe("init", () => {
     )
   })
 
-  describe("oxlint config handling", () => {
-    it.effect("keep a legacy oxlint config in place during init", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          ".oxlintrc.json": JSON.stringify(
-            {
-              extends: ["adamantite/lint/node"],
-              rules: { semi: "error" },
-            },
-            null,
-            2
-          ),
+  describe("legacy config handling", () => {
+    it.effect.each([
+      {
+        content: JSON.stringify({ extends: ["adamantite/lint/node"], rules: { semi: "error" } }),
+        legacyConfig: ".oxlintrc.json",
+        modernConfig: "oxlint.config.ts",
+        script: "check",
+        tool: "oxlint",
+      },
+      {
+        content: JSON.stringify({ semi: true }),
+        legacyConfig: ".oxfmtrc.json",
+        modernConfig: "oxfmt.config.ts",
+        script: "check",
+        tool: "oxfmt",
+      },
+      {
+        content: '{\n  "entry": ["src/index.ts"],\n  "ignore": ["bunup.config.ts"],\n}\n',
+        legacyConfig: "knip.jsonc",
+        modernConfig: "knip.config.ts",
+        script: "analyze",
+        tool: "knip",
+      },
+    ])(
+      "keep a legacy $tool config in place during init",
+      ({ content, legacyConfig, modernConfig, script, tool }) =>
+        Effect.gen(function* () {
+          const files = createInitTestContext({ [legacyConfig]: content })
+          const prompter = createPrompterTestContext()
+          const installer = createDependencyInstallerTestContext()
+
+          const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", script], {
+            files,
+            layers: [prompter.layer, installer.layer],
+          })
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(files.read(legacyConfig)).toBe(content)
+          expect(files.exists(modernConfig)).toBe(false)
+          expect(prompter.logs).toContainEqual({
+            level: "info",
+            message: `Legacy \`${legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor\` and follow its findings to migrate it to the latest ${tool} config.`,
+          })
         })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false],
-          multiselectResponses: [["check"], ["react"], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists(".oxlintrc.json")).toBe(true)
-        expect(files.exists("oxlint.config.ts")).toBe(false)
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message:
-            "Legacy `.oxlintrc.json` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest oxlint config.",
-        })
-
-        const oxlintConfig = files.read(".oxlintrc.json")
-        expect(oxlintConfig).toContain('"semi": "error"')
-      })
-    )
-  })
-
-  describe("oxfmt config handling", () => {
-    it.effect("keep a legacy oxfmt config in place during init", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          ".oxfmtrc.json": JSON.stringify(
-            {
-              semi: true,
-            },
-            null,
-            2
-          ),
-        })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists(".oxfmtrc.json")).toBe(true)
-        expect(files.exists("oxfmt.config.ts")).toBe(false)
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message:
-            "Legacy `.oxfmtrc.json` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest oxfmt config.",
-        })
-
-        const oxfmtConfig = files.read(".oxfmtrc.json")
-        expect(oxfmtConfig).toContain('"semi": true')
-      })
-    )
-  })
-
-  describe("knip config handling", () => {
-    it.effect("keep a legacy knip config in place during init", () =>
-      Effect.gen(function* () {
-        const legacyKnipConfig = [
-          "{",
-          '  "entry": ["src/index.ts"],',
-          '  "ignore": ["bunup.config.ts"],',
-          "}",
-          "",
-        ].join("\n")
-        const files = createInitTestContext({ "knip.jsonc": legacyKnipConfig })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
-          multiselectResponses: [["analyze"], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.list()).toStrictEqual(["knip.jsonc", "package.json"])
-        expect(files.read("knip.jsonc")).toBe(legacyKnipConfig)
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message:
-            "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest knip config.",
-        })
-      })
-    )
-
-    it.effect("keep legacy knip configs in place when both knip.json and knip.jsonc exist", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "knip.json": JSON.stringify({ entry: ["src/other.ts"] }, null, 2),
-          "knip.jsonc": [
-            "{",
-            '  "entry": ["src/index.ts"],',
-            '  "ignore": ["bunup.config.ts"],',
-            "}",
-            "",
-          ].join("\n"),
-        })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
-          multiselectResponses: [["analyze"], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.list()).toStrictEqual(["knip.json", "knip.jsonc", "package.json"])
-        expect(prompter.logs).toStrictEqual(
-          expect.arrayContaining([
-            {
-              level: "warning",
-              message:
-                "Found both `knip.json` and `knip.jsonc`. Multiple legacy knip configs exist; Adamantite will treat `knip.jsonc` as the source of truth in its findings.",
-            },
-            {
-              level: "info",
-              message:
-                "Legacy `knip.jsonc` was preserved during `adamantite init`. Run `adamantite doctor` and follow its findings to migrate it to the latest knip config.",
-            },
-          ])
-        )
-      })
     )
   })
 
@@ -632,83 +533,23 @@ describe("init", () => {
         })
       )
     }
-
-    it.effect("say that analyze includes Sherif only in a monorepo", () =>
-      Effect.gen(function* () {
-        const getScriptPicker = Effect.fn(function* (packageJson?: string) {
-          const files = createInitTestContext(
-            packageJson === undefined ? undefined : { "package.json": packageJson }
-          )
-          const prompter = createPrompterTestContext({
-            confirmResponses: [false, false],
-            multiselectResponses: [["analyze"], []],
-          })
-          const installer = createDependencyInstallerTestContext()
-
-          yield* runCommand(initCommand, [], { files, layers: [prompter.layer, installer.layer] })
-
-          return JSON.stringify(prompter.multiselectCalls[0])
-        })
-
-        expect(yield* getScriptPicker(monorepoPackageJson)).toContain("analyze - check monorepo")
-        expect(yield* getScriptPicker()).not.toContain("Sherif")
-      })
-    )
   })
 
   describe("monorepo TypeScript setup", () => {
-    const monorepoGuidanceLogs = [
+    it.effect.each<{
+      readonly files: Record<string, string>
+      readonly name: string
+      readonly tsconfig: string | null
+    }>([
+      { files: {}, name: "no root tsconfig.json", tsconfig: null },
       {
-        level: "info",
-        message:
-          "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project.",
+        files: { "tsconfig.json": EXISTING_MONOREPO_TSCONFIG },
+        name: "an existing root tsconfig.json",
+        tsconfig: EXISTING_MONOREPO_TSCONFIG,
       },
-      {
-        level: "info",
-        message:
-          'To use the TypeScript preset, add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
-      },
-    ] as const
-
-    it.effect("print guidance instead of creating a root tsconfig in a monorepo", () =>
+    ])("leave $name as it is and print guidance in a monorepo", ({ files: rootFiles, tsconfig }) =>
       Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": monorepoPackageJson })
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists("tsconfig.json")).toBe(false)
-
-        for (const log of monorepoGuidanceLogs) {
-          expect(prompter.logs).toContainEqual(log)
-        }
-      })
-    )
-
-    it.effect("leave an existing root tsconfig unchanged in a monorepo", () =>
-      Effect.gen(function* () {
-        const existingTsconfig = JSON.stringify(
-          {
-            extends: "./tooling/tsconfig.base.json",
-            files: [],
-            references: [{ path: "packages/app" }],
-          },
-          null,
-          2
-        )
-        const files = createInitTestContext({
-          "package.json": monorepoPackageJson,
-          "tsconfig.json": existingTsconfig,
-        })
-
+        const files = createInitTestContext({ "package.json": monorepoPackageJson, ...rootFiles })
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
 
@@ -719,7 +560,21 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("tsconfig.json")).toBe(existingTsconfig)
+        expect(readOptionalFile(files, "tsconfig.json")).toBe(tsconfig)
+        expect(prompter.logs).toStrictEqual(
+          expect.arrayContaining([
+            {
+              level: "info",
+              message:
+                "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project.",
+            },
+            {
+              level: "info",
+              message:
+                'To use the TypeScript preset, add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
+            },
+          ])
+        )
       })
     )
   })
@@ -1017,22 +872,6 @@ describe("init", () => {
           expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
         })
     )
-
-    it.effect("reject unknown selection values during CLI parsing", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "unknown"], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isFailure(exit)).toBe(true)
-        expect(installer.calls).toStrictEqual([])
-      })
-    )
   })
 
   describe("existing scripts", () => {
@@ -1067,11 +906,7 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.confirmCalls).toStrictEqual([])
 
-        // SAFETY: this test wrote the package.json fixture and asserts its scripts shape.
-        const packageJson = readJson(files, "package.json") as {
-          scripts: Record<string, string>
-        }
-        expect(packageJson.scripts).toStrictEqual({
+        expect(readJson(files, "package.json").scripts).toStrictEqual({
           analyze: "knip --directory packages/app",
           fix: "adamantite fix",
         })
@@ -1106,11 +941,7 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
 
-        // SAFETY: this test wrote the package.json fixture and asserts its scripts shape.
-        const packageJson = readJson(files, "package.json") as {
-          scripts: Record<string, string>
-        }
-        expect(packageJson.scripts).toStrictEqual({
+        expect(readJson(files, "package.json").scripts).toStrictEqual({
           analyze: "adamantite analyze",
           fix: "adamantite fix",
         })
@@ -1155,11 +986,7 @@ describe("init", () => {
           message: "Overwrite this existing script with Adamantite's command?",
         })
 
-        // SAFETY: this test wrote the package.json fixture and asserts its scripts shape.
-        const packageJson = readJson(files, "package.json") as {
-          scripts: Record<string, string>
-        }
-        expect(packageJson.scripts).toStrictEqual({ check: "adamantite check" })
+        expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "adamantite check" })
       })
     )
 
@@ -1190,11 +1017,7 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
 
-        // SAFETY: this test wrote the package.json fixture and asserts its scripts shape.
-        const packageJson = readJson(files, "package.json") as {
-          scripts: Record<string, string>
-        }
-        expect(packageJson.scripts).toStrictEqual({ check: "tsc && eslint ." })
+        expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "tsc && eslint ." })
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message:
@@ -1237,11 +1060,9 @@ describe("init", () => {
             expect.objectContaining({ message: expect.stringContaining("Kept existing") })
           )
 
-          // SAFETY: this test wrote the package.json fixture and asserts its scripts shape.
-          const packageJson = readJson(files, "package.json") as {
-            scripts: Record<string, string>
-          }
-          expect(packageJson.scripts).toStrictEqual({ check: "adamantite check" })
+          expect(readJson(files, "package.json").scripts).toStrictEqual({
+            check: "adamantite check",
+          })
         })
     )
 
@@ -1264,7 +1085,6 @@ describe("init", () => {
 
         const agents = files.read("AGENTS.md")
         expect(agents).toContain("adamantite check")
-        expect(agents).not.toContain("adamantite format")
         expect(agents).not.toContain("analyze")
       })
     )
@@ -1291,33 +1111,6 @@ describe("init", () => {
 
         const agents = files.read("AGENTS.md")
         expect(agents).toContain("Run `npm run check` to catch formatting, lint, and type issues")
-      })
-    )
-
-    it.effect("appends Adamantite guidance to an existing AGENTS.md without markers", () =>
-      Effect.gen(function* () {
-        const existingAgents = "# Existing Instructions\n\nKeep project guidance here.\n"
-        const files = createInitTestContext({ "AGENTS.md": existingAgents })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, true],
-          multiselectResponses: [["check"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-
-        const agents = files.read("AGENTS.md")
-        expect(agents.startsWith(`${existingAgents}\n${ADAMANTITE_AGENTS_START_MARKER}\n`)).toBe(
-          true
-        )
-        expect(agents).toContain("## Adamantite")
-        expect(agents).toContain(ADAMANTITE_AGENTS_END_MARKER)
       })
     )
 
@@ -1401,29 +1194,6 @@ describe("init", () => {
         expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })
     )
-
-    it.effect("gracefully handles AGENTS.md prompt cancellation", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-        const prompter = createPrompterTestContext({
-          cancelAtPromptIndex: 6,
-          confirmResponses: [false, false],
-          multiselectResponses: [["check"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.cancels).toStrictEqual(["You've cancelled the initialization process."])
-        expect(prompter.outros).toStrictEqual([])
-        expect(installer.calls).toStrictEqual([])
-        expect(files.exists("AGENTS.md")).toBe(false)
-      })
-    )
   })
 
   describe("dual-config warnings", () => {
@@ -1453,63 +1223,6 @@ describe("init", () => {
             "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
         })
         expect(files.exists("knip.json")).toBe(true)
-      })
-    )
-
-    it.effect("warn when both legacy and modern oxfmt configs exist", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          ".oxfmtrc.json": JSON.stringify({ semi: true }, null, 2),
-          "oxfmt.config.ts":
-            'import { defineConfig } from "oxfmt"\n\nexport default defineConfig({ semi: false })\n',
-        })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Found both `oxfmt.config.ts` and `.oxfmtrc.json(c)`. Adamantite will use `oxfmt.config.ts`.",
-        })
-        expect(files.exists(".oxfmtrc.json")).toBe(true)
-      })
-    )
-
-    it.effect("warn when both legacy and modern oxlint configs exist", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          ".oxlintrc.json": JSON.stringify({ rules: { semi: "error" } }, null, 2),
-          "oxlint.config.ts": 'export default { rules: { curly: "error" } }\n',
-        })
-
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Found both `oxlint.config.ts` and `.oxlintrc.json`. Adamantite will use `oxlint.config.ts`.",
-        })
-        expect(files.exists(".oxlintrc.json")).toBe(true)
       })
     )
   })

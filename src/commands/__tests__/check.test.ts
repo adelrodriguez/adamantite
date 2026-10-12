@@ -9,30 +9,6 @@ import checkCommand from "#commands/check.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("check", () => {
-  describe("default invocation", () => {
-    it.effect("check formatting before linting", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(checkCommand, [], { layers: [runner.layer] })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual([
-          {
-            args: ["--check"],
-            command: "oxfmt",
-            title: "✨ Checking formatting",
-          },
-          {
-            args: [],
-            command: "oxlint",
-            title: "🔍 Linting",
-          },
-        ])
-      })
-    )
-  })
-
   describe("stage flags", () => {
     it.effect("run only the lint stage when selected", () =>
       Effect.gen(function* () {

@@ -1,5 +1,5 @@
 import type * as Layer from "effect/Layer"
-import { basename, dirname, resolve } from "node:path"
+import { basename, dirname, relative, resolve } from "node:path"
 import * as EffectArray from "effect/Array"
 import * as ByteSize from "effect/ByteSize"
 import * as Effect from "effect/Effect"
@@ -20,6 +20,10 @@ export interface FileSystemTestContext {
    */
   readonly layer: Layer.Layer<FileSystem.FileSystem>
   readonly exists: (path: string) => boolean
+  /**
+   * List the files relative to the root, in sorted order.
+   */
+  readonly list: () => string[]
   /**
    * Read a file for assertions. Throws when the file does not exist.
    */
@@ -287,6 +291,11 @@ export function createFileSystemTestContext(options?: {
       return files.has(target) || directories.has(target)
     },
     layer,
+    list: () =>
+      EffectArray.sort(
+        Array.from(files.keys(), (path) => relative(root, path)),
+        Order.String
+      ),
     makeReadOnly: (path) => {
       readOnlyPaths.add(normalize(path))
     },

@@ -49,6 +49,13 @@ function provideAssessment(files: FileSystemTestContext) {
   )
 }
 
+function getMatrixJobs(workflow: string) {
+  return Array.from(workflow.matchAll(/- name: (.+)\n\s+command: (.+)/g), ([, name, command]) => ({
+    command,
+    name,
+  }))
+}
+
 function provideFileResolver(files: FileSystemTestContext) {
   return Effect.provide(
     Layer.mergeAll(
@@ -343,36 +350,64 @@ describe("github", () => {
   })
 
   describe("create", () => {
-    it.effect("create a GitHub Actions workflow with the expected bun structure", () =>
+    it.effect.each([
+      {
+        actions: ["actions/checkout", "actions/setup-node", "oven-sh/setup-bun", "actions/cache"],
+        cache: null,
+        command: "bun run check",
+        install: "bun install --frozen-lockfile",
+        packageManager: "bun",
+      },
+      {
+        actions: ["actions/checkout", "actions/setup-node"],
+        cache: "npm",
+        command: "npm run check",
+        install: "npm ci",
+        packageManager: "npm",
+      },
+      {
+        actions: ["actions/checkout", "pnpm/action-setup", "actions/setup-node"],
+        cache: "pnpm",
+        command: "pnpm run check",
+        install: "pnpm install --frozen-lockfile",
+        packageManager: "pnpm",
+      },
+      {
+        actions: ["actions/checkout", "actions/setup-node"],
+        cache: "yarn",
+        command: "yarn run check",
+        install: "yarn install --frozen-lockfile",
+        packageManager: "yarn",
+      },
+      {
+        actions: ["actions/checkout", "denoland/setup-deno"],
+        cache: null,
+        command: "deno task check",
+        install: "deno install --frozen",
+        packageManager: "deno",
+      },
+    ] as const)("set up $packageManager and run its check command", (expected) =>
       Effect.gen(function* () {
         const files = makeFiles()
 
         yield* github
-          .create(ROOT, {
-            packageManager: "bun",
-            scripts: ["check", "fix"],
-          })
+          .create(ROOT, { packageManager: expected.packageManager, scripts: ["check"] })
           .pipe(provideFallback(files))
 
-        const exists = yield* github.detect(ROOT).pipe(provideFallback(files))
-        expect(exists).toBe(true)
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("name: adamantite")
-        expect(content).toContain("verify:")
-        expect(content).toContain("strategy:")
-        expect(content).toContain("matrix:")
-        expect(content).toContain("include:")
-        expect(content).toContain("name: check")
-        expect(content).toContain("command: bun run check")
-        expect(content).toContain("Setup Node.js")
-        expect(content).toContain("actions/setup-node@v7")
-        expect(content).toContain('node-version: "lts/*"')
-        expect(content).toContain("Setup Bun")
-        expect(content).toContain("Cache dependencies")
-        expect(content).toContain("actions/cache@v6")
-        expect(content).toContain("~/.bun/install/cache")
-        expect(content).toContain("bun install --frozen-lockfile")
+        const workflow = files.read(WORKFLOW_PATH)
+        expect({
+          actions: Array.from(workflow.matchAll(/uses: ([^@\s]+)@/g), ([, action]) => action),
+          cache: /cache: "(\w+)"/.exec(workflow)?.[1] ?? null,
+          install: /- name: Install dependencies\n\s+run: (.+)/.exec(workflow)?.[1],
+          jobs: getMatrixJobs(workflow),
+          run: /- name: Run .+\n\s+run: (.+)/.exec(workflow)?.[1],
+        }).toStrictEqual({
+          actions: expected.actions,
+          cache: expected.cache,
+          install: expected.install,
+          jobs: [{ command: expected.command, name: "check" }],
+          run: `\${{ matrix.command }}`,
+        })
       })
     )
 
@@ -412,86 +447,6 @@ describe("github", () => {
       })
     )
 
-    it.effect("generate the correct workflow for npm", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        yield* github
-          .create(ROOT, {
-            packageManager: "npm",
-            scripts: ["check"],
-          })
-          .pipe(provideFallback(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("Setup Node.js")
-        expect(content).toContain("actions/setup-node@v7")
-        expect(content).toContain('cache: "npm"')
-        expect(content).toContain("npm ci")
-        expect(content).toContain("command: npm run check")
-      })
-    )
-
-    it.effect("generate the correct workflow for pnpm", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        yield* github
-          .create(ROOT, {
-            packageManager: "pnpm",
-            scripts: ["check"],
-          })
-          .pipe(provideFallback(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("Setup pnpm")
-        expect(content).toContain("pnpm/action-setup@v4")
-        expect(content).toContain("actions/setup-node@v7")
-        expect(content).toContain('cache: "pnpm"')
-        expect(content).toContain("pnpm install --frozen-lockfile")
-        expect(content).toContain("command: pnpm run check")
-      })
-    )
-
-    it.effect("generate the correct workflow for yarn", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        yield* github
-          .create(ROOT, {
-            packageManager: "yarn",
-            scripts: ["check"],
-          })
-          .pipe(provideFallback(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("Setup Node.js")
-        expect(content).toContain("actions/setup-node@v7")
-        expect(content).toContain('cache: "yarn"')
-        expect(content).toContain("yarn install --frozen-lockfile")
-        expect(content).toContain("command: yarn run check")
-      })
-    )
-
-    it.effect("generate the correct workflow for deno", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        yield* github
-          .create(ROOT, {
-            packageManager: "deno",
-            scripts: ["check"],
-          })
-          .pipe(provideFallback(files))
-
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("Setup Deno")
-        expect(content).toContain("denoland/setup-deno@v2")
-        expect(content).toContain("deno install --frozen")
-        expect(content).toContain("deno task check")
-      })
-    )
-
     it.effect("include all CI-compatible scripts as jobs", () =>
       Effect.gen(function* () {
         const files = makeFiles()
@@ -503,14 +458,10 @@ describe("github", () => {
           })
           .pipe(provideFallback(files))
 
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("name: check")
-        expect(content).not.toContain("name: format")
-        expect(content).toContain("name: analyze")
-        expect(content).not.toContain("monorepo")
-        expect(content).toContain("command:")
-        expect(content).not.toContain("format")
-        expect(content).not.toContain("--check")
+        expect(getMatrixJobs(files.read(WORKFLOW_PATH))).toStrictEqual([
+          { command: "bun run check", name: "check" },
+          { command: "bun run analyze", name: "analyze" },
+        ])
       })
     )
 

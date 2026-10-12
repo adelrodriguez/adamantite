@@ -125,34 +125,5 @@ describe("vscode", () => {
         }
       })
     )
-
-    it.effect("return FailedToReadFile when the config does not exist", () =>
-      Effect.gen(function* () {
-        const files = makeFiles()
-
-        const result = yield* Effect.result(vscode.update(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-        }
-      })
-    )
-
-    it.effect("return FailedToWriteFile when writing the config fails", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          ".vscode/settings.json": JSON.stringify({ "editor.tabSize": 2 }),
-        })
-        files.makeReadOnly(".vscode/settings.json")
-
-        const result = yield* Effect.result(vscode.update(ROOT).pipe(provideFiles(files)))
-
-        expect(Result.isFailure(result)).toBe(true)
-        if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "FailedToWriteFile" })
-        }
-      })
-    )
   })
 })

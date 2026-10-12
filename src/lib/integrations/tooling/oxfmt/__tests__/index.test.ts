@@ -1,4 +1,3 @@
-import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -27,24 +26,25 @@ function runAssess(files: FileSystemTestContext) {
 
 describe("oxfmt", () => {
   describe("create", () => {
-    it.effect("create oxfmt.config.ts with the correct config", () =>
+    it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
-        const files = makeFiles({ "package.json": "{}" })
+        const files = makeFiles({
+          "package.json": JSON.stringify({
+            devDependencies: { oxfmt: oxfmt.version },
+            name: "test-project",
+            scripts: { check: "adamantite check" },
+            version: "1.0.0",
+          }),
+        })
 
         yield* oxfmt.create(ROOT).pipe(provideFiles(files))
 
-        const state = yield* oxfmt.detect(ROOT).pipe(provideFiles(files))
-        expect(state.active).toStrictEqual({
-          file: "oxfmt.config.ts",
-          format: "ts",
-          path: join(ROOT, "oxfmt.config.ts"),
+        expect(yield* runAssess(files)).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
         })
-
-        const content = files.read("oxfmt.config.ts")
-
-        expect(content).toContain('import { defineConfig } from "oxfmt"')
-        expect(content).toContain('import format from "adamantite/format"')
-        expect(content).toContain("export default defineConfig(format)")
       })
     )
   })

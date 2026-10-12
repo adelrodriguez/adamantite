@@ -43,8 +43,8 @@ describe("NodeVersionResolver", () => {
 
   it.effect("return FailedToReadFile for an unreadable .node-version", () =>
     Effect.gen(function* () {
-      // The in-memory filesystem cannot make reads fail with permissions, so an
-      // explicit layer reports the file as existing but unreadable (chmod 0o000).
+      // The in-memory filesystem cannot make reads fail with permissions, so a noop layer
+      // fails every read with PermissionDenied, as for a file with mode 0o000.
       const cause = PlatformError.systemError({
         _tag: "PermissionDenied",
         method: "readFileString",
@@ -52,18 +52,15 @@ describe("NodeVersionResolver", () => {
         pathOrDescriptor: `${ROOT}/.node-version`,
       })
       const fileSystemLayer = FileSystem.layerNoop({
-        exists: () => Effect.succeed(true),
         readFileString: () => Effect.fail(cause),
       })
 
-      const result = yield* Effect.result(
-        resolve(ROOT).pipe(Effect.provide(makeTestLayer(fileSystemLayer)))
+      const error = yield* resolve(ROOT).pipe(
+        Effect.provide(makeTestLayer(fileSystemLayer)),
+        Effect.flip
       )
 
-      expect(Result.isFailure(result)).toBe(true)
-      if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
-      }
+      expect(error).toMatchObject({ _tag: "FailedToReadFile", path: `${ROOT}/.node-version` })
     })
   )
 

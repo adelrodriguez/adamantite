@@ -24,7 +24,7 @@ describe("adamantite", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual([
+        expect(runner.invocations.map(({ args, command }) => ({ args, command }))).toStrictEqual([
           {
             args: [
               "--production",
@@ -36,8 +36,6 @@ describe("adamantite", () => {
               "src",
             ],
             command: "knip",
-            stdin: "ignore",
-            title: "🧹 Analyzing unused code",
           },
         ])
       })

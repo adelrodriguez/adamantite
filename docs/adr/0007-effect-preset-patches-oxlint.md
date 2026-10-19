@@ -30,7 +30,7 @@ and pnpm 12.6. `adamantite update` runs a named install, so the `prepare` script
 Oxlint unpatched after an update (#486). So the managed plugin manages more than its package:
 
 - While the preset is imported, `adamantite prepare` runs `effect-tsgo patch --oxlint
---typescript`, and `init` and `update` run the same patch after they install packages. The
+  --typescript`, and `init` and `update` run the same patch after they install packages. The
   patch runs `effect-tsgo` by name from `node_modules/.bin`, as `adamantite check` runs
   `oxlint`. It does not run the `prepare` script, so the two cannot call each other, and other
   commands in that script do not run during `update`. Inside a spinner, the patch output is

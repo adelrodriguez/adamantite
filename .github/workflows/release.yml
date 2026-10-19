@@ -24,7 +24,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: "12.4.2"
+          version: "12.14.0"
 
       # Setup Node.js configures the npm registry. Changesets uses pnpm publish
       # in this workspace. pnpm uses the OIDC permission for trusted publishing

@@ -1,0 +1,12 @@
+# pnpm 12 rejects packages younger than one day, even with a frozen lockfile. These were
+# published on 2026-10-19. Delete this file after 2026-10-20; it has no other purpose, and it
+# must not gain a `packages` key, which would mark the repository as a monorepo.
+minimumReleaseAgeExclude:
+  - "@effect/tsgo@0.54.0"
+  - "@effect/tsgo-darwin-arm64@0.54.0"
+  - "@effect/tsgo-darwin-x64@0.54.0"
+  - "@effect/tsgo-linux-arm@0.54.0"
+  - "@effect/tsgo-linux-arm64@0.54.0"
+  - "@effect/tsgo-linux-x64@0.54.0"
+  - "@effect/tsgo-win32-arm64@0.54.0"
+  - "@effect/tsgo-win32-x64@0.54.0"

@@ -97,7 +97,7 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
   dir: string = CUSTOM_RULES_DIRECTORY
 ) {
   if (!RULE_NAME_PATTERN.test(name)) {
-    return yield* new InvalidRuleName({ name })
+    return yield* new InvalidRuleName({ rule: name })
   }
 
   const fs = yield* FileSystem.FileSystem

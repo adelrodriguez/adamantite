@@ -78,7 +78,8 @@ describe("rule add", () => {
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
         _tag: "InvalidRuleName",
-        name: "_helpers",
+        name: "InvalidRuleName",
+        rule: "_helpers",
       })
       expect(files.exists(".adamantite")).toBe(false)
     })

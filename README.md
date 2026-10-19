@@ -655,6 +655,21 @@ npx skills add adelrodriguez/adamantite --list
 npx skills add adelrodriguez/adamantite --skill adamantite
 ```
 
+The Adamantite package also ships the skill. With pnpm 12.11 or later, `pnpm install` links
+it into the agent skill directories that exist in the project, such as `.claude/skills`,
+after you approve it. pnpm creates the directory only when the agent that runs pnpm sets an
+environment variable that identifies it, such as `CLAUDECODE` for `.claude/skills`.
+Otherwise, if no skill directory exists, the install fails, so create one before you
+approve the skill:
+
+```sh
+mkdir -p .claude/skills
+pnpm approve
+```
+
+The linked skill then matches the installed Adamantite version. To choose the directories,
+set `skills.dirs`.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository workflow. Contributors should

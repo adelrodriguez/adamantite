@@ -5,7 +5,7 @@ Thank you for contributing to Adamantite.
 ## Requirements
 
 - [Node.js](https://nodejs.org) at the version in `.node-version`.
-- [pnpm](https://pnpm.io) 12.14.0.
+- [pnpm](https://pnpm.io) at the version in `packageManager` in `package.json`.
 - [Git](https://git-scm.com).
 
 ## Set up the repository

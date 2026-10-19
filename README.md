@@ -437,10 +437,10 @@ When you select the preset, `adamantite init` does these steps:
   `@effect/language-service`.
 
 `adamantite doctor` reports each missing part, and `adamantite update` keeps
-`@effect/tsgo` on its pinned version. Each `@effect/tsgo` release supports only some Oxlint
-and oxlint-tsgolint versions, so Adamantite moves the pins together. The patch accepts any
-TypeScript 7 version: it replaces `tsc` with the TypeScript-Go build that `@effect/tsgo`
-embeds.
+`@effect/tsgo` on its pinned version. Each `@effect/tsgo` release supports only some Oxlint,
+oxlint-tsgolint, and TypeScript versions, so Adamantite moves the pins together. If you
+install a TypeScript version that the pinned `@effect/tsgo` does not support, the `prepare`
+script fails.
 
 A production-only install, such as `npm ci --omit=dev` or `pnpm install --prod`, still runs
 the `prepare` script, but it does not install Adamantite, so the install fails with

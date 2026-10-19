@@ -57,17 +57,13 @@ Oxlint unpatched after an update (#486). So the managed plugin manages more than
   that name. The analyze preset exports `ignoreDependencies.effect`, `init` sets it, and
   doctor requires it while `oxlint.config.ts` imports the preset.
 
-`@effect/tsgo` ships patched binaries only for some Oxlint and oxlint-tsgolint versions. A
-test asserts that the pinned versions each have an artifact in
-`@effect/tsgo-<platform>/artifacts/`. Thus, a bump of one of those pins fails until a
-compatible `@effect/tsgo` release is pinned too.
-
-The TypeScript patch is different. It replaces `tsc` with the TypeScript-Go build that
-`@effect/tsgo` embeds, and it accepts any installed TypeScript 7 version. `@effect/tsgo`
-0.52.0 and later embed only TypeScript 7.1 dev builds. With `@effect/tsgo` 0.54.0 and
-TypeScript 7.0.2, the patch succeeds and `tsc --version` prints
-`7.0.2+effect-tsgo.0.54.0`. Thus, the TypeScript pin needs no artifact, and the test does
-not check it.
+`@effect/tsgo` ships patched binaries only for some Oxlint, oxlint-tsgolint, and TypeScript
+versions. The platform package `@effect/tsgo-<platform>` keeps the compiler for the
+TypeScript version that `lib/upstream.json` tags as `latest` at `lib/tsc`, and every other
+patched binary in `artifacts/<tool>/<version>/`. With `@effect/tsgo` 0.54.0, `latest` is
+TypeScript 7.0.2, so the patched `tsc --version` prints `7.0.2+effect-tsgo.0.54.0`. A
+test asserts that each pinned version has a patched binary in one of those places. Thus, a
+bump of one of those pins fails until a compatible `@effect/tsgo` release is pinned too.
 
 ## Curation
 

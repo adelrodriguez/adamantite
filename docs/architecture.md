@@ -168,8 +168,8 @@ only while the plugin applies, and keeps other options, such as `detect`, `updat
 `patch`, as methods of the integration. The
 helpers do not import `index.ts` or each other. The Knip integration requires
 `ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
-`@effect/tsgo` ships patched binaries for the pinned Oxlint and oxlint-tsgolint versions. See
-ADR 0007.
+`@effect/tsgo` ships patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript
+versions. See ADR 0007.
 
 ## Vendored bundles
 

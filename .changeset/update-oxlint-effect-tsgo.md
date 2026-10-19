@@ -21,4 +21,4 @@ To upgrade an existing project:
 - Run `adamantite update`. It installs the new versions and patches them again.
 - Expect `adamantite check` to report Schema classes without a brand. Add `{ readonly brand: unique symbol }` as the second type argument, or add `{}` to keep the class structural.
 - Oxlint 1.88 compares keys with ESLint's `natural-compare` in `sort-keys` with `natural: true`, which the core preset sets ([oxc#27579](https://github.com/oxc-project/oxc/pull/27579)). `adamantite check` can report different objects.
-- `@effect/tsgo` 0.54.0 embeds a TypeScript 7.1 dev build. The patch replaces `tsc` with that build for every installed TypeScript 7 version.
+- `@effect/tsgo` 0.54.0 patches TypeScript 7.0.2 and `7.1.0-dev.20261018.1`. With another TypeScript version, the `prepare` script fails. Install one of those versions.

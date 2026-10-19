@@ -57,6 +57,10 @@ const RootPackageJson = Schema.Struct({
   devDependencies: Schema.Record(Schema.String, Schema.String),
 })
 const decodeRootPackageJson = Schema.decodeUnknownSync(Schema.fromJsonString(RootPackageJson))
+const UpstreamJson = Schema.Struct({
+  tags: Schema.Struct({ typescript: Schema.Struct({ latest: Schema.String }) }),
+})
+const decodeUpstreamJson = Schema.decodeUnknownSync(Schema.fromJsonString(UpstreamJson))
 
 const upstreamRules = CATEGORY_PRESETS.flatMap((category) =>
   Object.keys(
@@ -146,18 +150,24 @@ describe("effect preset", () => {
     expect(presetRules.filter((rule) => EXCLUDED_RULES.has(rule))).toStrictEqual([])
   })
 
-  // The TypeScript patch replaces `tsc` with the TypeScript-Go build that `@effect/tsgo`
-  // embeds, so it accepts any TypeScript 7 version and needs no artifact for the pin.
-  it("ship patched binaries for the pinned Oxlint and oxlint-tsgolint", () => {
+  // The platform package keeps the compiler for its latest TypeScript version at `lib/tsc`,
+  // and every other patched binary at `artifacts/<tool>/<version>`.
+  it("ship patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
     )
-    const platformPackageJson = createRequire(tsgoPackageJson).resolve(
-      `@effect/tsgo-${process.platform}-${process.arch}/package.json`
+    const platformDirectory = dirname(
+      createRequire(tsgoPackageJson).resolve(
+        `@effect/tsgo-${process.platform}-${process.arch}/package.json`
+      )
     )
-    const missing = ["oxlint", "oxlint-tsgolint"]
+    const { tags } = decodeUpstreamJson(
+      readFileSync(join(platformDirectory, "lib", "upstream.json"), "utf8")
+    )
+    const missing = ["oxlint", "oxlint-tsgolint", "typescript"]
       .map((tool) => `${tool}/${devDependencies[tool]}`)
-      .filter((artifact) => !existsSync(join(dirname(platformPackageJson), "artifacts", artifact)))
+      .filter((artifact) => artifact !== `typescript/${tags.typescript.latest}`)
+      .filter((artifact) => !existsSync(join(platformDirectory, "artifacts", artifact)))
 
     expect(missing).toStrictEqual([])
   })

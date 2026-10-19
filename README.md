@@ -297,8 +297,8 @@ hoist, dependencies, build output, and generated code are only skipped when your
 `.gitignore` happens to cover them:
 
 ```ts
-import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
+import { defineConfig } from "oxlint"
 
 export default defineConfig({
   extends: [core],
@@ -327,10 +327,10 @@ Globs match paths relative to the working directory. Set `allow` to use another 
 `hooks` to change the list of reported hooks:
 
 ```ts
-import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
 import react from "adamantite/lint/react"
 import reactStrict from "adamantite/lint/react-strict"
+import { defineConfig } from "oxlint"
 
 export default defineConfig({
   extends: [core, react, reactStrict],
@@ -483,9 +483,9 @@ reports them, because `Clock`, `Random`, and `Config` let tests control them. Se
 Set `maxDepth` and `maxProperties` to change the destructuring limits:
 
 ```ts
-import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
 import strict from "adamantite/lint/strict"
+import { defineConfig } from "oxlint"
 
 export default defineConfig({
   extends: [core, strict],
@@ -507,9 +507,9 @@ or `src/components/ui` and discovers the stylesheet that imports Tailwind. When 
 components live elsewhere, set `settings.shadcn.ui`:
 
 ```ts
-import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
 import shadcn from "adamantite/lint/shadcn"
+import { defineConfig } from "oxlint"
 
 export default defineConfig({
   extends: [core, shadcn],
@@ -562,9 +562,9 @@ export default defineRule({
 
 ```ts
 // oxlint.config.ts
-import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
 import custom from "adamantite/lint/custom"
+import { defineConfig } from "oxlint"
 
 export default defineConfig({
   extends: [core, custom()],
@@ -599,8 +599,8 @@ root rules extends the root config:
 
 ```ts
 // packages/web/oxlint.config.ts
-import { defineConfig } from "oxlint"
 import custom from "adamantite/lint/custom"
+import { defineConfig } from "oxlint"
 import root from "../../oxlint.config.ts"
 
 export default defineConfig({ extends: [root, custom({ name: "web" })] })

@@ -1,5 +1,19 @@
 import type { OxlintConfig } from "oxlint"
 
+/**
+ * The files that Vitest runs as tests by default. A preset in `extends` applies to every file, so
+ * spread the preset in an override for these files:
+ *
+ * ```ts
+ * import vitest, { testFiles } from "adamantite/lint/vitest"
+ *
+ * export default defineConfig({
+ *   overrides: [{ files: testFiles, plugins: vitest.plugins, rules: vitest.rules }],
+ * })
+ * ```
+ */
+export const testFiles: string[] = ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"]
+
 const config: OxlintConfig = {
   plugins: ["vitest"],
   rules: {

@@ -59,10 +59,12 @@ value from the query result and keep only the user's edits in state. Do not wrap
 spread object, or move the hook out of the route file, only to silence `query-from-loader`.
 
 The `jest` and `vitest` presets apply only to test files. `init` adds them in an `overrides`
-entry for test files, not in `extends`, because their rules report setup code and top-level calls
-in other files. An override cannot use `extends`, so the entry spreads the preset:
-`{ files: [...], plugins: vitest.plugins, rules: vitest.rules }`. Doctor reports a test preset in
-the global `extends`. When the project keeps tests in other files, change `files` to match them.
+entry, not in `extends`, because their rules report setup code and top-level calls in other files.
+An override cannot use `extends`, so the entry spreads the preset over its `testFiles` export:
+`{ files: testFiles, plugins: vitest.plugins, rules: vitest.rules }`, with `testFiles` imported
+from `adamantite/lint/vitest`. Doctor reports a test preset in the global `extends`. When the
+project keeps tests in other files, set `files` to those patterns. Keep `plugins` in the override,
+because Oxlint ignores its `vitest/*` rules without it.
 
 The `react-doctor` preset requires the `react` preset and the `oxlint-plugin-react-doctor`
 package, which `init` installs at a pinned version and doctor and `update` keep in sync. It

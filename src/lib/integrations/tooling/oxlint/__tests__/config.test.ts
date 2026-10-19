@@ -98,27 +98,36 @@ describe("getImportedLintPresets", () => {
     expect(toOxlintTsConfigContent()).toContain("  extends: [core, custom()],")
   })
 
-  it("scope the test presets to test files in overrides", () => {
-    const content = toOxlintTsConfigContent(["react", "vitest", "jest"])
+  it("scope a test preset to its test files in overrides", () => {
+    const content = toOxlintTsConfigContent(["react", "vitest"])
 
+    expect(content).toContain('import vitest, { testFiles } from "adamantite/lint/vitest"')
     expect(content).toContain("  extends: [core, react, custom()],")
     expect(content).toContain(
       [
         "  overrides: [",
         "    {",
-        '      files: ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", "**/__tests__/**"],',
+        "      files: testFiles,",
         "      plugins: vitest.plugins,",
         "      rules: vitest.rules,",
-        "    },",
-        "    {",
-        '      files: ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", "**/__tests__/**"],',
-        "      plugins: jest.plugins,",
-        "      rules: jest.rules,",
         "    },",
         "  ],",
       ].join("\n")
     )
-    expect(getImportedLintPresets(content)).toStrictEqual(["react", "vitest", "jest"])
+    expect(getImportedLintPresets(content)).toStrictEqual(["react", "vitest"])
+  })
+
+  it("give each test preset's test files their own import name", () => {
+    const content = toOxlintTsConfigContent(["vitest", "jest"])
+
+    expect(content).toContain(
+      'import vitest, { testFiles as vitestTestFiles } from "adamantite/lint/vitest"'
+    )
+    expect(content).toContain(
+      'import jest, { testFiles as jestTestFiles } from "adamantite/lint/jest"'
+    )
+    expect(content).toContain("      files: vitestTestFiles,\n      plugins: vitest.plugins,")
+    expect(content).toContain("      files: jestTestFiles,\n      plugins: jest.plugins,")
   })
 
   it("write no overrides without a test preset", () => {
@@ -146,12 +155,12 @@ describe("getTestPresetFindings", () => {
           "`oxlint.config.ts` lists the `vitest` preset in the global `extends`. Its test rules also report files that are not tests.",
         goal: [
           "Remove the `vitest` preset from `extends`. Keep the other presets and `custom()` in `extends`.",
-          "Add an `overrides` entry for the test files that spreads the preset: `{ files: [...], plugins: vitest.plugins, rules: vitest.rules }`.",
+          "Add an `overrides` entry that spreads the preset over its test files, such as `{ files: testFiles, plugins: vitest.plugins, rules: vitest.rules }` with `testFiles` imported from `adamantite/lint/vitest`.",
         ],
         id: "unscoped-oxlint-test-preset",
         integration: "oxlint",
         notes: [
-          "The reference matches `*.test.*` and `*.spec.*` files and files in `__tests__` folders. If the test runner of the project finds tests in other files, use its patterns.",
+          "`testFiles` lists the files that the test runner runs as tests by default. If the project configures its test runner to find tests in other files, set `files` to those patterns.",
         ],
         reference: { content: toOxlintTsConfigContent(["vitest"]), language: "ts" },
         title: "Unscoped oxlint test preset",
@@ -174,7 +183,7 @@ describe("getTestPresetFindings", () => {
           "`oxlint.config.ts` lists the `jest` and `vitest` presets in the global `extends`. Their test rules also report files that are not tests.",
         goal: [
           "Remove the `jest` and `vitest` presets from `extends`. Keep the other presets and `custom()` in `extends`.",
-          "Add an `overrides` entry for the test files that spreads each preset: `{ files: [...], plugins: jestPreset.plugins, rules: jestPreset.rules }`.",
+          "Add an `overrides` entry that spreads each preset over its test files, such as `{ files: testFiles, plugins: jestPreset.plugins, rules: jestPreset.rules }` with `testFiles` imported from `adamantite/lint/jest`.",
         ],
       },
     ])

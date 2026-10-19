@@ -58,12 +58,6 @@ export type LintPreset = (typeof LINT_PRESETS)[number]
  */
 const TEST_PRESETS = ["jest", "vitest"] as const satisfies readonly LintPreset[]
 
-/**
- * The test files of the `overrides` entry. They are the test files of the strict preset, plus
- * JavaScript test files.
- */
-const TEST_FILES = ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", "**/__tests__/**"]
-
 function checkIsTestPreset(preset: string) {
   return TEST_PRESETS.some((testPreset) => testPreset === preset)
 }
@@ -73,9 +67,27 @@ function getImportName(preset: string) {
 }
 
 /**
+ * The local name of a test preset's `testFiles`. Each test preset exports `testFiles`, so a config
+ * with two test presets gives each import its own name.
+ */
+function getTestFilesName(preset: string, testPresetCount: number) {
+  return testPresetCount > 1 ? `${getImportName(preset)}TestFiles` : "testFiles"
+}
+
+function getImportClause(preset: string, testPresetCount: number) {
+  if (!checkIsTestPreset(preset)) {
+    return getImportName(preset)
+  }
+
+  const testFilesName = getTestFilesName(preset, testPresetCount)
+  const specifier = testFilesName === "testFiles" ? testFilesName : `testFiles as ${testFilesName}`
+  return `${getImportName(preset)}, { ${specifier} }`
+}
+
+/**
  * The `oxlint.config.ts` that `init` writes. It always extends `custom()`, which is an empty config
  * until the project adds a rule to `.adamantite/rules`. An override cannot use `extends`, so the
- * override for each test preset spreads the preset.
+ * override for each test preset spreads the preset over the preset's `testFiles`.
  */
 export function toOxlintTsConfigContent(presets: string[] = []) {
   const presetNames = presets.includes("core") ? presets : ["core", ...presets]
@@ -85,7 +97,7 @@ export function toOxlintTsConfigContent(presets: string[] = []) {
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
       (preset) =>
-        `import ${getImportName(preset)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
+        `import ${getImportClause(preset, testPresets.length)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
     ),
     'import custom from "adamantite/lint/custom"',
     "",
@@ -101,7 +113,7 @@ export function toOxlintTsConfigContent(presets: string[] = []) {
           "  overrides: [",
           ...testPresets.flatMap((preset) => [
             "    {",
-            `      files: [${TEST_FILES.map((glob) => JSON.stringify(glob)).join(", ")}],`,
+            `      files: ${getTestFilesName(preset, testPresets.length)},`,
             `      plugins: ${getImportName(preset)}.plugins,`,
             `      rules: ${getImportName(preset)}.rules,`,
             "    },",
@@ -372,12 +384,12 @@ export function getTestPresetFindings(content: string): Finding[] {
       currentState: `\`oxlint.config.ts\` lists the ${presetList} in the global \`extends\`. ${isPlural ? "Their" : "Its"} test rules also report files that are not tests.`,
       goal: [
         `Remove the ${presetList} from \`extends\`. Keep the other presets and \`custom()\` in \`extends\`.`,
-        `Add an \`overrides\` entry for the test files that spreads ${isPlural ? "each" : "the"} preset: \`{ files: [...], plugins: ${example.importName}.plugins, rules: ${example.importName}.rules }\`.`,
+        `Add an \`overrides\` entry that spreads ${isPlural ? "each" : "the"} preset over its test files, such as \`{ files: testFiles, plugins: ${example.importName}.plugins, rules: ${example.importName}.rules }\` with \`testFiles\` imported from \`${LINT_PRESET_PREFIX}${example.preset}\`.`,
       ],
       id: "unscoped-oxlint-test-preset",
       integration: "oxlint",
       notes: [
-        "The reference matches `*.test.*` and `*.spec.*` files and files in `__tests__` folders. If the test runner of the project finds tests in other files, use its patterns.",
+        "`testFiles` lists the files that the test runner runs as tests by default. If the project configures its test runner to find tests in other files, set `files` to those patterns.",
       ],
       reference: {
         content: toOxlintTsConfigContent(getImportedLintPresets(content)),

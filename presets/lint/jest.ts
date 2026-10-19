@@ -1,5 +1,22 @@
 import type { OxlintConfig } from "oxlint"
 
+/**
+ * The files that Jest runs as tests by default. A preset in `extends` applies to every file, so
+ * spread the preset in an override for these files:
+ *
+ * ```ts
+ * import jest, { testFiles } from "adamantite/lint/jest"
+ *
+ * export default defineConfig({
+ *   overrides: [{ files: testFiles, plugins: jest.plugins, rules: jest.rules }],
+ * })
+ * ```
+ */
+export const testFiles: string[] = [
+  "**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}",
+  "**/__tests__/**/*.{js,jsx,mjs,cjs,ts,tsx,mts,cts}",
+]
+
 const config: OxlintConfig = {
   plugins: ["jest"],
   rules: {

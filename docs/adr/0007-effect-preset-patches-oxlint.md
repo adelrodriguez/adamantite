@@ -107,5 +107,8 @@ rules are in the preset, including `any-unknown-in-error-context` and
   until we decide on it.
 - Upstream owns rule behavior, so the rules have no per-rule fixtures. One real Oxlint run
   confirms that the patched binaries load the rules.
-- Adamantite uses the preset itself. Its `tsconfig.json` allows `effect/Arbitrary`,
-  `effect/cli`, and `effect/process`.
+- Adamantite uses the preset itself. Its `tsconfig.json` allows the unstable modules that
+  it uses, such as `effect/cli`, `effect/FileSystem`, `@effect/platform-node`, and
+  `@effect/vitest`. Effect 4.0.2 tagged each module with a stability
+  ([Effect-TS/effect#8770](https://github.com/Effect-TS/effect/pull/8770)), so the list
+  grew from three modules to twelve entries.

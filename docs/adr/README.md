@@ -10,3 +10,4 @@
 - [ADR 0008: Define TanStack queries once so route loaders can preload them](0008-tanstack-query-options-from-loaders.md)
 - [ADR 0009: Custom rules load from a rules folder through custom()](0009-custom-rules-load-through-custom.md)
 - [ADR 0010: Core absorbs no plugin rules while Oxlint JS plugins are alpha](0010-core-stays-native.md)
+- [ADR 0011: The test presets scope themselves to test files](0011-test-presets-scope-themselves.md)

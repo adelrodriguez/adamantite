@@ -10,7 +10,6 @@ import {
   type Program,
   type PropertyKey,
 } from "oxc-parser"
-import type { Finding } from "#lib/integrations/base.ts"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
@@ -52,74 +51,30 @@ export const LINT_PRESETS = [
 
 export type LintPreset = (typeof LINT_PRESETS)[number]
 
-/**
- * The lint presets for test files. Their rules report code that is not a test, such as top-level
- * calls in a script, so `init` adds them in an `overrides` entry for test files, not in `extends`.
- */
-const TEST_PRESETS = ["jest", "vitest"] as const satisfies readonly LintPreset[]
-
-function checkIsTestPreset(preset: string) {
-  return TEST_PRESETS.some((testPreset) => testPreset === preset)
-}
-
 function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
 
 /**
- * The local name of a test preset's `testFiles`. Each test preset exports `testFiles`, so a config
- * with two test presets gives each import its own name.
- */
-function getTestFilesName(preset: string, testPresetCount: number) {
-  return testPresetCount > 1 ? `${getImportName(preset)}TestFiles` : "testFiles"
-}
-
-function getImportClause(preset: string, testPresetCount: number) {
-  if (!checkIsTestPreset(preset)) {
-    return getImportName(preset)
-  }
-
-  const testFilesName = getTestFilesName(preset, testPresetCount)
-  const specifier = testFilesName === "testFiles" ? testFilesName : `testFiles as ${testFilesName}`
-  return `${getImportName(preset)}, { ${specifier} }`
-}
-
-/**
  * The `oxlint.config.ts` that `init` writes. It always extends `custom()`, which is an empty config
- * until the project adds a rule to `.adamantite/rules`. An override cannot use `extends`, so the
- * override for each test preset spreads the preset over the preset's `testFiles`.
+ * until the project adds a rule to `.adamantite/rules`.
  */
 export function toOxlintTsConfigContent(presets: string[] = []) {
   const presetNames = presets.includes("core") ? presets : ["core", ...presets]
-  const extendedPresets = presetNames.filter((preset) => !checkIsTestPreset(preset))
-  const testPresets = presetNames.filter((preset) => checkIsTestPreset(preset))
   return [
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
       (preset) =>
-        `import ${getImportClause(preset, testPresets.length)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
+        `import ${getImportName(preset)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
     ),
     'import custom from "adamantite/lint/custom"',
     "",
     "export default defineConfig({",
-    `  extends: [${[...extendedPresets.map((preset) => getImportName(preset)), "custom()"].join(", ")}],`,
+    `  extends: [${[...presetNames.map((preset) => getImportName(preset)), "custom()"].join(", ")}],`,
     "  ignorePatterns: core.ignorePatterns,",
     "  options: {",
     ...REQUIRED_BOOLEAN_OPTIONS.map((option) => `    ${option}: true,`),
     "  },",
-    ...(testPresets.length === 0
-      ? []
-      : [
-          "  overrides: [",
-          ...testPresets.flatMap((preset) => [
-            "    {",
-            `      files: ${getTestFilesName(preset, testPresets.length)},`,
-            `      plugins: ${getImportName(preset)}.plugins,`,
-            `      rules: ${getImportName(preset)}.rules,`,
-            "    },",
-          ]),
-          "  ],",
-        ]),
     "})",
     "",
   ].join("\n")
@@ -318,84 +273,4 @@ export function inspectRequiredOxlintConfig(content: string): RequiredConfigInsp
   }
 
   return inspectOptionsObject(optionsPropertyResult.property.value)
-}
-
-function getDefaultImportNames(ast: Program, moduleName: string) {
-  return ast.body.flatMap((statement) =>
-    statement.type === "ImportDeclaration" && statement.source.value === moduleName
-      ? statement.specifiers.flatMap((specifier) =>
-          specifier.type === "ImportDefaultSpecifier" ? [specifier.local.name] : []
-        )
-      : []
-  )
-}
-
-/**
- * The identifiers in the `extends` array of the exported config. A config without an `extends`
- * array literal lists none.
- */
-function getExtendedIdentifiers(config: ObjectExpression) {
-  const extendsProperty = getNamedObjectProperty(config, "extends")
-
-  if (
-    extendsProperty.status !== "found"
-    || extendsProperty.property.value.type !== "ArrayExpression"
-  ) {
-    return []
-  }
-
-  return extendsProperty.property.value.elements.flatMap((element) =>
-    element?.type === "Identifier" ? [element.name] : []
-  )
-}
-
-/**
- * Report the test presets that the global `extends` lists, under their import names. A config that
- * Adamantite cannot inspect gets no finding.
- */
-export function getTestPresetFindings(content: string): Finding[] {
-  const parsed = parse(content)
-
-  if (Option.isNone(parsed)) {
-    return []
-  }
-
-  const extended = pipe(
-    getExportedConfigObject(parsed.value),
-    Option.map((config) => getExtendedIdentifiers(config)),
-    Option.getOrElse((): string[] => [])
-  )
-  const testPresets = TEST_PRESETS.flatMap((preset) =>
-    getDefaultImportNames(parsed.value, `${LINT_PRESET_PREFIX}${preset}`)
-      .filter((name) => extended.includes(name))
-      .map((importName) => ({ importName, preset }))
-  )
-  const [example] = testPresets
-
-  if (example === undefined) {
-    return []
-  }
-
-  const isPlural = testPresets.length > 1
-  const presetList = `${testPresets.map(({ preset }) => `\`${preset}\``).join(" and ")} ${isPlural ? "presets" : "preset"}`
-
-  return [
-    {
-      currentState: `\`oxlint.config.ts\` lists the ${presetList} in the global \`extends\`. ${isPlural ? "Their" : "Its"} test rules also report files that are not tests.`,
-      goal: [
-        `Remove the ${presetList} from \`extends\`. Keep the other presets and \`custom()\` in \`extends\`.`,
-        `Add an \`overrides\` entry that spreads ${isPlural ? "each" : "the"} preset over its test files, such as \`{ files: testFiles, plugins: ${example.importName}.plugins, rules: ${example.importName}.rules }\` with \`testFiles\` imported from \`${LINT_PRESET_PREFIX}${example.preset}\`.`,
-      ],
-      id: "unscoped-oxlint-test-preset",
-      integration: "oxlint",
-      notes: [
-        "`testFiles` lists the files that the test runner runs as tests by default. If the project configures its test runner to find tests in other files, set `files` to those patterns.",
-      ],
-      reference: {
-        content: toOxlintTsConfigContent(getImportedLintPresets(content)),
-        language: "ts",
-      },
-      title: "Unscoped oxlint test preset",
-    },
-  ]
 }

@@ -1,121 +1,130 @@
 import type { OxlintConfig } from "oxlint"
 
 /**
- * The files that Vitest runs as tests by default. A preset in `extends` applies to every file, so
- * spread the preset in an override for these files:
+ * The files that Vitest runs as tests by default. The preset applies its rules only to these files.
+ * To change the files or a rule, use the preset in an override of your own instead of `extends`:
  *
  * ```ts
  * import vitest, { testFiles } from "adamantite/lint/vitest"
  *
  * export default defineConfig({
- *   overrides: [{ files: testFiles, plugins: vitest.plugins, rules: vitest.rules }],
+ *   overrides: [{ files: testFiles, plugins: vitest.plugins, rules: { ...vitest.rules } }],
  * })
  * ```
  */
 export const testFiles: string[] = ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}"]
 
-const config: OxlintConfig = {
-  plugins: ["vitest"],
-  rules: {
-    "vitest/consistent-each-for": "error",
-    "vitest/consistent-test-it": "error",
-    "vitest/hoisted-apis-on-top": "error",
-    "vitest/max-expects": "error",
-    "vitest/max-nested-describe": "error",
-    "vitest/no-alias-methods": "error",
-    "vitest/no-commented-out-tests": "error",
-    "vitest/no-conditional-expect": "error",
-    "vitest/no-conditional-in-test": "error",
-    "vitest/no-conditional-tests": "error",
-    "vitest/no-disabled-tests": "error",
-    "vitest/no-duplicate-hooks": "error",
-    "vitest/no-focused-tests": "error",
-    "vitest/no-hooks": "off",
-    "vitest/no-identical-title": "error",
-    "vitest/no-import-node-test": "error",
-    "vitest/no-importing-vitest-globals": "off",
-    "vitest/no-interpolation-in-snapshots": "error",
-    "vitest/no-large-snapshots": "error",
-    "vitest/no-mocks-import": "error",
-    "vitest/no-restricted-matchers": "error",
-    // The rule recognizes only the Vitest test functions. These are the test functions of
-    // @effect/vitest.
-    "vitest/no-standalone-expect": [
-      "error",
-      {
-        additionalTestBlockFunctions: [
-          "it.effect",
-          "it.effect.each",
-          "it.effect.fails",
-          "it.effect.only",
-          "it.effect.prop",
-          "it.effect.runIf",
-          "it.effect.skip",
-          "it.effect.skipIf",
-          "it.live",
-          "it.live.each",
-          "it.live.fails",
-          "it.live.only",
-          "it.live.prop",
-          "it.live.runIf",
-          "it.live.skip",
-          "it.live.skipIf",
-          "it.prop",
-        ],
-      },
-    ],
-    "vitest/no-test-prefixes": "error",
-    "vitest/no-test-return-statement": "error",
-    "vitest/no-unneeded-async-expect-function": "error",
-    "vitest/padding-around-test-blocks": "error",
-    "vitest/prefer-called-exactly-once-with": "error",
-    "vitest/prefer-called-once": "error",
-    "vitest/prefer-called-times": "off",
-    "vitest/prefer-called-with": "error",
-    "vitest/prefer-comparison-matcher": "error",
-    "vitest/prefer-describe-function-title": "off",
-    "vitest/prefer-each": "error",
-    "vitest/prefer-equality-matcher": "error",
-    // Without options, the rule requires the call in every test, also in synchronous tests where
-    // every expect always runs. These options report only tests where an expect can fail to run.
-    "vitest/prefer-expect-assertions": [
-      "error",
-      {
-        onlyFunctionsWithAsyncKeyword: true,
-        onlyFunctionsWithExpectInCallback: true,
-        onlyFunctionsWithExpectInLoop: true,
-      },
-    ],
-    "vitest/prefer-expect-resolves": "error",
-    "vitest/prefer-expect-type-of": "error",
-    "vitest/prefer-hooks-in-order": "error",
-    "vitest/prefer-hooks-on-top": "error",
-    "vitest/prefer-import-in-mock": "error",
-    "vitest/prefer-importing-vitest-globals": "error",
-    "vitest/prefer-lowercase-title": "error",
-    "vitest/prefer-mock-promise-shorthand": "error",
-    "vitest/prefer-mock-return-shorthand": "error",
-    "vitest/prefer-snapshot-hint": "error",
-    "vitest/prefer-spy-on": "error",
-    "vitest/prefer-strict-boolean-matchers": "error",
-    "vitest/prefer-strict-equal": "error",
-    "vitest/prefer-to-be": "error",
-    "vitest/prefer-to-be-object": "error",
-    "vitest/prefer-to-contain": "error",
-    "vitest/prefer-to-have-been-called-times": "error",
-    "vitest/prefer-to-have-length": "error",
-    "vitest/prefer-todo": "error",
-    "vitest/require-awaited-expect-poll": "error",
-    "vitest/require-hook": "error",
-    "vitest/require-local-test-context-for-concurrent-snapshots": "error",
-    "vitest/require-mock-type-parameters": "error",
-    "vitest/require-to-throw-message": "error",
-    "vitest/require-top-level-describe": "error",
-    "vitest/valid-describe-callback": "error",
-    "vitest/valid-expect": "error",
-    "vitest/valid-expect-in-promise": "error",
-    "vitest/valid-title": "error",
-  },
+const plugins: OxlintConfig["plugins"] = ["vitest"]
+
+const rules: OxlintConfig["rules"] = {
+  "vitest/consistent-each-for": "error",
+  "vitest/consistent-test-it": "error",
+  "vitest/hoisted-apis-on-top": "error",
+  "vitest/max-expects": "error",
+  "vitest/max-nested-describe": "error",
+  "vitest/no-alias-methods": "error",
+  "vitest/no-commented-out-tests": "error",
+  "vitest/no-conditional-expect": "error",
+  "vitest/no-conditional-in-test": "error",
+  "vitest/no-conditional-tests": "error",
+  "vitest/no-disabled-tests": "error",
+  "vitest/no-duplicate-hooks": "error",
+  "vitest/no-focused-tests": "error",
+  "vitest/no-hooks": "off",
+  "vitest/no-identical-title": "error",
+  "vitest/no-import-node-test": "error",
+  "vitest/no-importing-vitest-globals": "off",
+  "vitest/no-interpolation-in-snapshots": "error",
+  "vitest/no-large-snapshots": "error",
+  "vitest/no-mocks-import": "error",
+  "vitest/no-restricted-matchers": "error",
+  // The rule recognizes only the Vitest test functions. These are the test functions of
+  // @effect/vitest.
+  "vitest/no-standalone-expect": [
+    "error",
+    {
+      additionalTestBlockFunctions: [
+        "it.effect",
+        "it.effect.each",
+        "it.effect.fails",
+        "it.effect.only",
+        "it.effect.prop",
+        "it.effect.runIf",
+        "it.effect.skip",
+        "it.effect.skipIf",
+        "it.live",
+        "it.live.each",
+        "it.live.fails",
+        "it.live.only",
+        "it.live.prop",
+        "it.live.runIf",
+        "it.live.skip",
+        "it.live.skipIf",
+        "it.prop",
+      ],
+    },
+  ],
+  "vitest/no-test-prefixes": "error",
+  "vitest/no-test-return-statement": "error",
+  "vitest/no-unneeded-async-expect-function": "error",
+  "vitest/padding-around-test-blocks": "error",
+  "vitest/prefer-called-exactly-once-with": "error",
+  "vitest/prefer-called-once": "error",
+  "vitest/prefer-called-times": "off",
+  "vitest/prefer-called-with": "error",
+  "vitest/prefer-comparison-matcher": "error",
+  "vitest/prefer-describe-function-title": "off",
+  "vitest/prefer-each": "error",
+  "vitest/prefer-equality-matcher": "error",
+  // Without options, the rule requires the call in every test, also in synchronous tests where
+  // every expect always runs. These options report only tests where an expect can fail to run.
+  "vitest/prefer-expect-assertions": [
+    "error",
+    {
+      onlyFunctionsWithAsyncKeyword: true,
+      onlyFunctionsWithExpectInCallback: true,
+      onlyFunctionsWithExpectInLoop: true,
+    },
+  ],
+  "vitest/prefer-expect-resolves": "error",
+  "vitest/prefer-expect-type-of": "error",
+  "vitest/prefer-hooks-in-order": "error",
+  "vitest/prefer-hooks-on-top": "error",
+  "vitest/prefer-import-in-mock": "error",
+  "vitest/prefer-importing-vitest-globals": "error",
+  "vitest/prefer-lowercase-title": "error",
+  "vitest/prefer-mock-promise-shorthand": "error",
+  "vitest/prefer-mock-return-shorthand": "error",
+  "vitest/prefer-snapshot-hint": "error",
+  "vitest/prefer-spy-on": "error",
+  "vitest/prefer-strict-boolean-matchers": "error",
+  "vitest/prefer-strict-equal": "error",
+  "vitest/prefer-to-be": "error",
+  "vitest/prefer-to-be-object": "error",
+  "vitest/prefer-to-contain": "error",
+  "vitest/prefer-to-have-been-called-times": "error",
+  "vitest/prefer-to-have-length": "error",
+  "vitest/prefer-todo": "error",
+  "vitest/require-awaited-expect-poll": "error",
+  "vitest/require-hook": "error",
+  "vitest/require-local-test-context-for-concurrent-snapshots": "error",
+  "vitest/require-mock-type-parameters": "error",
+  "vitest/require-to-throw-message": "error",
+  "vitest/require-top-level-describe": "error",
+  "vitest/valid-describe-callback": "error",
+  "vitest/valid-expect": "error",
+  "vitest/valid-expect-in-promise": "error",
+  "vitest/valid-title": "error",
 }
+
+const config: OxlintConfig = {
+  overrides: [{ files: testFiles, plugins, rules }],
+}
+
+// Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties. So a config
+// that extends the preset gets only the override for test files, while a project override can still
+// read `vitest.plugins` and `vitest.rules`. See ADR 0011. `src/__tests__/presets/test-presets.test.ts`
+// checks both uses.
+Object.defineProperties(config, { plugins: { value: plugins }, rules: { value: rules } })
 
 export default config

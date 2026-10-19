@@ -1,5 +1,16 @@
 # adamantite
 
+## 0.45.0
+
+### Minor Changes
+
+- [#520](https://github.com/adelrodriguez/adamantite/pull/520) [`0089968`](https://github.com/adelrodriguez/adamantite/commit/008996873ebcd779d038a803ec38fce2caf1c0a3) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Scope the `jest` and `vitest` presets to test files. A config that extends a test preset now gets
+  its rules only for the files that the test runner runs as tests by default, so rules such as
+  `vitest/require-hook` no longer report scripts and library code. Each preset exports these files as
+  `testFiles`. To use other files or change a rule, use the preset in an override of your own:
+  `{ files: [...testFiles, "e2e/**/*.ts"], plugins: vitest.plugins, rules: { ...vitest.rules } }`. A
+  top-level `rules` entry no longer changes a test rule in test files.
+
 ## 0.44.0
 
 ### Minor Changes

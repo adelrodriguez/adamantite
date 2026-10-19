@@ -116,9 +116,8 @@ function assertFileContains(path: string, expected: string) {
   }
 }
 
-// The fixture uses npm: pnpm >= 10 fails `pnpm add` with ERR_PNPM_IGNORED_BUILDS because
-// adamantite -> @effect/platform-node -> msgpackr -> msgpackr-extract has a build script,
-// and approving it requires a pnpm-workspace.yaml, which init would misread as a monorepo.
+// The fixture uses npm and the monorepo fixture uses pnpm, so the smoke test covers both
+// package managers.
 const npmVersion = run("npm", ["--version"], { cwd: repoRoot }).trim()
 const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
@@ -197,8 +196,8 @@ try {
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
 
-  // The monorepo fixture uses pnpm: init installs at the workspace root there, and the
-  // pnpm-workspace.yaml that skips the msgpackr-extract build is what marks it as a monorepo.
+  // Init installs at the workspace root in a monorepo, and pnpm-workspace.yaml marks the
+  // fixture as one.
   const pnpmVersion = run("pnpm", ["--version"], { cwd: repoRoot }).trim()
 
   writeFileSync(
@@ -214,10 +213,7 @@ try {
       2
     )
   )
-  writeFileSync(
-    join(monorepoFixture, "pnpm-workspace.yaml"),
-    'packages:\n  - "packages/*"\nignoredBuiltDependencies:\n  - msgpackr-extract\n'
-  )
+  writeFileSync(join(monorepoFixture, "pnpm-workspace.yaml"), 'packages:\n  - "packages/*"\n')
   writeWorkspacePackage(monorepoFixture, "first", "7.0.0")
   writeWorkspacePackage(monorepoFixture, "second", "6.0.0")
 

@@ -91,6 +91,9 @@ Available setup values:
   Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`,
   `jest`, `vitest`, `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
+  `init` adds `jest` and `vitest` in an `overrides` entry for test files
+  (`**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}` and `**/__tests__/**`), not in
+  `extends`, so their rules do not report other files. Edit the entry to use other patterns.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation

@@ -10,6 +10,7 @@ import {
   type Program,
   type PropertyKey,
 } from "oxc-parser"
+import type { Finding } from "#lib/integrations/base.ts"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
@@ -51,16 +52,35 @@ export const LINT_PRESETS = [
 
 export type LintPreset = (typeof LINT_PRESETS)[number]
 
+/**
+ * The lint presets for test files. Their rules report code that is not a test, such as top-level
+ * calls in a script, so `init` adds them in an `overrides` entry for test files, not in `extends`.
+ */
+const TEST_PRESETS = ["jest", "vitest"] as const satisfies readonly LintPreset[]
+
+/**
+ * The test files of the `overrides` entry. They are the test files of the strict preset, plus
+ * JavaScript test files.
+ */
+const TEST_FILES = ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", "**/__tests__/**"]
+
+function checkIsTestPreset(preset: string) {
+  return TEST_PRESETS.some((testPreset) => testPreset === preset)
+}
+
 function getImportName(preset: string) {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
 
 /**
  * The `oxlint.config.ts` that `init` writes. It always extends `custom()`, which is an empty config
- * until the project adds a rule to `.adamantite/rules`.
+ * until the project adds a rule to `.adamantite/rules`. An override cannot use `extends`, so the
+ * override for each test preset spreads the preset.
  */
 export function toOxlintTsConfigContent(presets: string[] = []) {
   const presetNames = presets.includes("core") ? presets : ["core", ...presets]
+  const extendedPresets = presetNames.filter((preset) => !checkIsTestPreset(preset))
+  const testPresets = presetNames.filter((preset) => checkIsTestPreset(preset))
   return [
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
@@ -70,11 +90,24 @@ export function toOxlintTsConfigContent(presets: string[] = []) {
     'import custom from "adamantite/lint/custom"',
     "",
     "export default defineConfig({",
-    `  extends: [${[...presetNames.map((preset) => getImportName(preset)), "custom()"].join(", ")}],`,
+    `  extends: [${[...extendedPresets.map((preset) => getImportName(preset)), "custom()"].join(", ")}],`,
     "  ignorePatterns: core.ignorePatterns,",
     "  options: {",
     ...REQUIRED_BOOLEAN_OPTIONS.map((option) => `    ${option}: true,`),
     "  },",
+    ...(testPresets.length === 0
+      ? []
+      : [
+          "  overrides: [",
+          ...testPresets.flatMap((preset) => [
+            "    {",
+            `      files: [${TEST_FILES.map((glob) => JSON.stringify(glob)).join(", ")}],`,
+            `      plugins: ${getImportName(preset)}.plugins,`,
+            `      rules: ${getImportName(preset)}.rules,`,
+            "    },",
+          ]),
+          "  ],",
+        ]),
     "})",
     "",
   ].join("\n")
@@ -273,4 +306,84 @@ export function inspectRequiredOxlintConfig(content: string): RequiredConfigInsp
   }
 
   return inspectOptionsObject(optionsPropertyResult.property.value)
+}
+
+function getDefaultImportNames(ast: Program, moduleName: string) {
+  return ast.body.flatMap((statement) =>
+    statement.type === "ImportDeclaration" && statement.source.value === moduleName
+      ? statement.specifiers.flatMap((specifier) =>
+          specifier.type === "ImportDefaultSpecifier" ? [specifier.local.name] : []
+        )
+      : []
+  )
+}
+
+/**
+ * The identifiers in the `extends` array of the exported config. A config without an `extends`
+ * array literal lists none.
+ */
+function getExtendedIdentifiers(config: ObjectExpression) {
+  const extendsProperty = getNamedObjectProperty(config, "extends")
+
+  if (
+    extendsProperty.status !== "found"
+    || extendsProperty.property.value.type !== "ArrayExpression"
+  ) {
+    return []
+  }
+
+  return extendsProperty.property.value.elements.flatMap((element) =>
+    element?.type === "Identifier" ? [element.name] : []
+  )
+}
+
+/**
+ * Report the test presets that the global `extends` lists, under their import names. A config that
+ * Adamantite cannot inspect gets no finding.
+ */
+export function getTestPresetFindings(content: string): Finding[] {
+  const parsed = parse(content)
+
+  if (Option.isNone(parsed)) {
+    return []
+  }
+
+  const extended = pipe(
+    getExportedConfigObject(parsed.value),
+    Option.map((config) => getExtendedIdentifiers(config)),
+    Option.getOrElse((): string[] => [])
+  )
+  const testPresets = TEST_PRESETS.flatMap((preset) =>
+    getDefaultImportNames(parsed.value, `${LINT_PRESET_PREFIX}${preset}`)
+      .filter((name) => extended.includes(name))
+      .map((importName) => ({ importName, preset }))
+  )
+  const [example] = testPresets
+
+  if (example === undefined) {
+    return []
+  }
+
+  const isPlural = testPresets.length > 1
+  const presetList = `${testPresets.map(({ preset }) => `\`${preset}\``).join(" and ")} ${isPlural ? "presets" : "preset"}`
+
+  return [
+    {
+      currentState: `\`oxlint.config.ts\` lists the ${presetList} in the global \`extends\`. ${isPlural ? "Their" : "Its"} test rules also report files that are not tests.`,
+      goal: [
+        `Remove the ${presetList} from \`extends\`. Keep the other presets and \`custom()\` in \`extends\`.`,
+        `Add an \`overrides\` entry for the test files that spreads ${isPlural ? "each" : "the"} preset: \`{ files: [...], plugins: ${example.importName}.plugins, rules: ${example.importName}.rules }\`.`,
+      ],
+      id: "unscoped-oxlint-test-preset",
+      integration: "oxlint",
+      notes: [
+        "The reference matches `*.test.*` and `*.spec.*` files and files in `__tests__` folders. If the test runner of the project finds tests in other files, use its patterns.",
+      ],
+      reference: {
+        content: toOxlintTsConfigContent(getImportedLintPresets(content)),
+        language: "ts",
+      },
+      title: "Unscoped oxlint test preset",
+    },
+  ]
 }

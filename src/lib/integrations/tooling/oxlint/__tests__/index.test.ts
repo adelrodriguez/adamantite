@@ -39,7 +39,7 @@ describe("oxlint", () => {
           }),
         })
 
-        yield* oxlint.create(ROOT).pipe(provideFiles(files))
+        yield* oxlint.create(ROOT, ["react", "vitest", "jest"]).pipe(provideFiles(files))
 
         expect(yield* runAssess(files)).toStrictEqual({
           applicable: true,
@@ -132,6 +132,37 @@ describe("oxlint", () => {
         expect(result).toStrictEqual({
           applicable: true,
           findings: [],
+          packageActions: [],
+          warnings: [],
+        })
+      })
+    )
+
+    it.effect("report a test preset in the global extends", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            'import vitest from "adamantite/lint/vitest"',
+            "",
+            "export default defineConfig({",
+            "  extends: [core, vitest],",
+            "  options: { respectEslintDisableDirectives: true, typeAware: true, typeCheck: true },",
+            "})",
+            "",
+          ].join("\n"),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [{ id: "unscoped-oxlint-test-preset" }],
           packageActions: [],
           warnings: [],
         })

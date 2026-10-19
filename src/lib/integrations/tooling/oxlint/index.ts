@@ -1,7 +1,11 @@
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
-import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type Finding,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
 import {
   detectToolingConfig,
   getConfigFindings,
@@ -10,6 +14,7 @@ import {
   type RequiredConfigInspection,
 } from "#lib/integrations/tooling/base.ts"
 import {
+  getTestPresetFindings,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
@@ -52,10 +57,12 @@ export default defineIntegration({
 
       const activeConfig = state.active
       let inspection: RequiredConfigInspection | undefined
+      let testPresetFindings: Finding[] = []
 
       if (activeConfig?.format === "ts") {
         const content = yield* readFile(activeConfig.path)
         inspection = inspectRequiredOxlintConfig(content)
+        testPresetFindings = getTestPresetFindings(content)
       }
 
       const configContent = toOxlintTsConfigContent()
@@ -72,6 +79,7 @@ export default defineIntegration({
               "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting.",
             toolName: "oxlint",
           }),
+          ...testPresetFindings,
         ],
         packageActions,
         warnings: state.warnings,

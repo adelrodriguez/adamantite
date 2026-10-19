@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   getImportedLintPresets,
+  getTestPresetFindings,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
@@ -15,6 +16,16 @@ const missingOptionsReason = "The required Oxlint options are missing."
 const invalidOptionsReason = "The required Oxlint options are missing or are not set to true."
 
 const requiredOptions = "respectEslintDisableDirectives: true, typeAware: true, typeCheck: true"
+
+function makeConfig(imports: string[], extended: string) {
+  return [
+    'import core from "adamantite/lint"',
+    ...imports,
+    "",
+    `export default { extends: [${extended}], options: { ${requiredOptions} } }`,
+    "",
+  ].join("\n")
+}
 
 describe("inspectRequiredOxlintConfig", () => {
   it("accept the generated config with selected presets", () => {
@@ -87,6 +98,33 @@ describe("getImportedLintPresets", () => {
     expect(toOxlintTsConfigContent()).toContain("  extends: [core, custom()],")
   })
 
+  it("scope the test presets to test files in overrides", () => {
+    const content = toOxlintTsConfigContent(["react", "vitest", "jest"])
+
+    expect(content).toContain("  extends: [core, react, custom()],")
+    expect(content).toContain(
+      [
+        "  overrides: [",
+        "    {",
+        '      files: ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", "**/__tests__/**"],',
+        "      plugins: vitest.plugins,",
+        "      rules: vitest.rules,",
+        "    },",
+        "    {",
+        '      files: ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts,cts}", "**/__tests__/**"],',
+        "      plugins: jest.plugins,",
+        "      rules: jest.rules,",
+        "    },",
+        "  ],",
+      ].join("\n")
+    )
+    expect(getImportedLintPresets(content)).toStrictEqual(["react", "vitest", "jest"])
+  })
+
+  it("write no overrides without a test preset", () => {
+    expect(toOxlintTsConfigContent(["react"])).not.toContain("overrides")
+  })
+
   it("list no preset for a config with only the core preset", () => {
     expect(getImportedLintPresets(toOxlintTsConfigContent())).toStrictEqual([])
   })
@@ -95,5 +133,75 @@ describe("getImportedLintPresets", () => {
     expect(
       getImportedLintPresets('import shadcn from "adamantite/lint/shadcn"\nexport default {')
     ).toStrictEqual([])
+  })
+})
+
+describe("getTestPresetFindings", () => {
+  it("report a test preset in the global extends", () => {
+    const content = makeConfig(['import vitest from "adamantite/lint/vitest"'], "core, vitest")
+
+    expect(getTestPresetFindings(content)).toStrictEqual([
+      {
+        currentState:
+          "`oxlint.config.ts` lists the `vitest` preset in the global `extends`. Its test rules also report files that are not tests.",
+        goal: [
+          "Remove the `vitest` preset from `extends`. Keep the other presets and `custom()` in `extends`.",
+          "Add an `overrides` entry for the test files that spreads the preset: `{ files: [...], plugins: vitest.plugins, rules: vitest.rules }`.",
+        ],
+        id: "unscoped-oxlint-test-preset",
+        integration: "oxlint",
+        notes: [
+          "The reference matches `*.test.*` and `*.spec.*` files and files in `__tests__` folders. If the test runner of the project finds tests in other files, use its patterns.",
+        ],
+        reference: { content: toOxlintTsConfigContent(["vitest"]), language: "ts" },
+        title: "Unscoped oxlint test preset",
+      },
+    ])
+  })
+
+  it("report every test preset in the global extends under its import name", () => {
+    const content = makeConfig(
+      [
+        'import jestPreset from "adamantite/lint/jest"',
+        'import vitestPreset from "adamantite/lint/vitest"',
+      ],
+      "core, jestPreset, vitestPreset"
+    )
+
+    expect(getTestPresetFindings(content)).toMatchObject([
+      {
+        currentState:
+          "`oxlint.config.ts` lists the `jest` and `vitest` presets in the global `extends`. Their test rules also report files that are not tests.",
+        goal: [
+          "Remove the `jest` and `vitest` presets from `extends`. Keep the other presets and `custom()` in `extends`.",
+          "Add an `overrides` entry for the test files that spreads each preset: `{ files: [...], plugins: jestPreset.plugins, rules: jestPreset.rules }`.",
+        ],
+      },
+    ])
+  })
+
+  it.each([
+    ["the generated config", toOxlintTsConfigContent(["react", "vitest", "jest"])],
+    [
+      "a test preset in an override",
+      [
+        'import vitest from "adamantite/lint/vitest"',
+        `export default { extends: [], overrides: [{ files: ["**/*.test.ts"], plugins: vitest.plugins, rules: vitest.rules }] }`,
+      ].join("\n"),
+    ],
+    [
+      "another preset in the global extends",
+      makeConfig(['import node from "adamantite/lint/node"'], "core, node"),
+    ],
+    [
+      "an identifier that is not a test preset import",
+      makeConfig(['import vitest from "./vitest.ts"'], "core, vitest"),
+    ],
+    [
+      "a config that does not parse",
+      'import vitest from "adamantite/lint/vitest"\nexport default {',
+    ],
+  ])("report no finding for %s", (_, content) => {
+    expect(getTestPresetFindings(content)).toStrictEqual([])
   })
 })

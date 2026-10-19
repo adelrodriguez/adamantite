@@ -76,7 +76,9 @@ install instead of changing the script. `tsconfig.json` needs
 `{ "name": "@effect/language-service", "diagnostics": false }` in `compilerOptions.plugins`,
 and `knip.config.ts` needs `ignoreDependencies.effect`. To allow an unstable Effect module
 on purpose, add it to `allowedUnstableApis` in that tsconfig entry. Do not turn off
-`effecttsgo/unstable-api-usage`.
+`effecttsgo/unstable-api-usage`. In Effect 4.0.2 and later, the platform modules (such as
+`effect/FileSystem` and `effect/Path`), `@effect/platform-node`, and `@effect/vitest` are
+unstable. An entry can be a module or a full package.
 
 The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
 at a pinned version and doctor and `update` keep in sync. The plugin finds components and

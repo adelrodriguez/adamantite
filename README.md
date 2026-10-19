@@ -463,6 +463,12 @@ it in `allowedUnstableApis`:
 }
 ```
 
+Effect 4.0.2 and later tag each module as stable or unstable. Unstable modules can have
+breaking changes in minor releases. The unstable modules include the platform modules, such
+as `effect/FileSystem`, `effect/Path`, and `effect/Terminal`, and all modules in
+`@effect/platform-node` and `@effect/vitest`. A project that uses them must list them. An
+entry can be a module, such as `effect/Path`, or a full package, such as `@effect/vitest`.
+
 The preset enables only rules that report Effect code. It does not ban platform APIs, such
 as `Date.now()` or `process.env`, in code that is not Effect code. Inside Effect code, it
 reports them, because `Clock`, `Random`, and `Config` let tests control them. See

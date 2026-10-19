@@ -12,7 +12,20 @@
         "name": "@effect/language-service",
         // Oxlint reports the Effect diagnostics through the effect preset.
         "diagnostics": false,
-        "allowedUnstableApis": ["effect/Arbitrary", "effect/cli", "effect/process"]
+        "allowedUnstableApis": [
+          "@effect/platform-node",
+          "@effect/vitest",
+          "effect/Arbitrary",
+          "effect/ByteSize",
+          "effect/cli",
+          "effect/FileSystem",
+          "effect/Path",
+          "effect/PlatformError",
+          "effect/process",
+          "effect/Stdio",
+          "effect/Terminal",
+          "effect/testing/TestConsole"
+        ]
       }
     ]
   },

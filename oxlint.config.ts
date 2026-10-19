@@ -3,7 +3,7 @@ import antislop from "./presets/lint/antislop.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import effect from "./presets/lint/effect.ts"
 import node from "./presets/lint/node.ts"
-import vitest from "./presets/lint/vitest.ts"
+import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
 const TERMINAL_IMPORTS = {
   group: ["#terminal/*"],
@@ -39,7 +39,7 @@ export default defineConfig({
     // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
     // rule makes some test code impossible to write.
     {
-      files: ["**/*.test.ts"],
+      files: testFiles,
       plugins: vitest.plugins,
       rules: {
         ...vitest.rules,

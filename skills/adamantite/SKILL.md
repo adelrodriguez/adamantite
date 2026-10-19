@@ -58,6 +58,13 @@ preload it in the route loader with `ensureQueryData()`, and pass the same optio
 value from the query result and keep only the user's edits in state. Do not wrap options in a
 spread object, or move the hook out of the route file, only to silence `query-from-loader`.
 
+The `jest` and `vitest` presets apply their rules only to the files that the test runner runs as
+tests by default, which each preset exports as `testFiles`. When the project keeps tests in other
+files, replace the preset in `extends` with an override of the project's own:
+`{ files: [...], plugins: vitest.plugins, rules: { ...vitest.rules } }`. Change a test rule in such
+an override, not in the top-level `rules`, which do not reach test files. Keep `plugins` in the
+override, because Oxlint ignores its `vitest/*` rules without it.
+
 The `react-doctor` preset requires the `react` preset and the `oxlint-plugin-react-doctor`
 package, which `init` installs at a pinned version and doctor and `update` keep in sync. It
 enables curated React Doctor rules for React state and effect misuse, such as

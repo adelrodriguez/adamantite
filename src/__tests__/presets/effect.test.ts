@@ -27,6 +27,8 @@ const EXCLUDED_RULES = new Set([
   "global-timers",
   "new-promise",
   "node-builtin-import",
+  "prefer-effect-array",
+  "prefer-effect-record",
   "prefer-schema-over-json",
   "process-env",
   "schema-sync",
@@ -36,9 +38,12 @@ const EXCLUDED_RULES = new Set([
   // They depend on the project layout or on library-authoring choices.
   "deterministic-keys",
   "missing-pipeable-signature",
+  "prefer-barrel-import",
+  "prefer-namespace-import",
   // They are a style preference and report no defect.
   "missed-pipeable-opportunity",
   "new-schema-class",
+  "prefer-schema-tagged-error",
   // `Effect.Service` exists only in Effect v3.
   "missing-effect-service-dependency",
 ])
@@ -141,14 +146,16 @@ describe("effect preset", () => {
     expect(presetRules.filter((rule) => EXCLUDED_RULES.has(rule))).toStrictEqual([])
   })
 
-  it("ship patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript", () => {
+  // The TypeScript patch replaces `tsc` with the TypeScript-Go build that `@effect/tsgo`
+  // embeds, so it accepts any TypeScript 7 version and needs no artifact for the pin.
+  it("ship patched binaries for the pinned Oxlint and oxlint-tsgolint", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
     )
     const platformPackageJson = createRequire(tsgoPackageJson).resolve(
       `@effect/tsgo-${process.platform}-${process.arch}/package.json`
     )
-    const missing = ["oxlint", "oxlint-tsgolint", "typescript"]
+    const missing = ["oxlint", "oxlint-tsgolint"]
       .map((tool) => `${tool}/${devDependencies[tool]}`)
       .filter((artifact) => !existsSync(join(dirname(platformPackageJson), "artifacts", artifact)))
 

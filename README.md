@@ -418,7 +418,7 @@ after it. Adamantite runs it in these places:
 - `adamantite prepare`, which the `prepare` script runs after a bare install, such as
   `npm install`, `npm ci`, or a fresh clone in CI.
 - `adamantite init` and `adamantite update`, after they install packages. A named install,
-  such as `npm install -D oxlint@1.86.0`, does not run the `prepare` script. If you change one
+  such as `npm install -D oxlint@1.88.0`, does not run the `prepare` script. If you change one
   of those versions yourself, doctor reports the version drift, and `adamantite update`
   installs the pinned version and patches it.
 
@@ -437,8 +437,10 @@ When you select the preset, `adamantite init` does these steps:
   `@effect/language-service`.
 
 `adamantite doctor` reports each missing part, and `adamantite update` keeps
-`@effect/tsgo` on its pinned version. Each `@effect/tsgo` release supports only some Oxlint,
-oxlint-tsgolint, and TypeScript versions, so Adamantite moves the pins together.
+`@effect/tsgo` on its pinned version. Each `@effect/tsgo` release supports only some Oxlint
+and oxlint-tsgolint versions, so Adamantite moves the pins together. The patch accepts any
+TypeScript 7 version: it replaces `tsc` with the TypeScript-Go build that `@effect/tsgo`
+embeds.
 
 A production-only install, such as `npm ci --omit=dev` or `pnpm install --prod`, still runs
 the `prepare` script, but it does not install Adamantite, so the install fails with

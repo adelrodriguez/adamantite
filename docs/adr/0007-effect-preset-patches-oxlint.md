@@ -57,32 +57,43 @@ Oxlint unpatched after an update (#486). So the managed plugin manages more than
   that name. The analyze preset exports `ignoreDependencies.effect`, `init` sets it, and
   doctor requires it while `oxlint.config.ts` imports the preset.
 
-`@effect/tsgo` ships patched binaries only for some Oxlint, oxlint-tsgolint, and TypeScript
-versions. A test asserts that the pinned versions each have an artifact in
+`@effect/tsgo` ships patched binaries only for some Oxlint and oxlint-tsgolint versions. A
+test asserts that the pinned versions each have an artifact in
 `@effect/tsgo-<platform>/artifacts/`. Thus, a bump of one of those pins fails until a
 compatible `@effect/tsgo` release is pinned too.
 
+The TypeScript patch is different. It replaces `tsc` with the TypeScript-Go build that
+`@effect/tsgo` embeds, and it accepts any installed TypeScript 7 version. `@effect/tsgo`
+0.52.0 and later embed only TypeScript 7.1 dev builds. With `@effect/tsgo` 0.54.0 and
+TypeScript 7.0.2, the patch succeeds and `tsc --version` prints
+`7.0.2+effect-tsgo.0.54.0`. Thus, the TypeScript pin needs no artifact, and the test does
+not check it.
+
 ## Curation
 
-`@effect/tsgo` 0.48.0 has 120 rules in four categories. A rule is in the preset only when all
-of these conditions are true:
+`@effect/tsgo` 0.48.0 has 120 rules in four categories, and 0.54.0 has 128. A rule is in the
+preset only when all of these conditions are true:
 
 1. It reports Effect code. It does not ban a platform API in code that is not Effect code,
    such as `async-function`, `new-promise`, `node-builtin-import`, or the variants of
-   `global-date` and `process-env` for code outside Effect. The `-in-effect` variants are in
-   the preset: inside Effect code, `Clock`, `Random`, and `Config` let tests control time,
-   randomness, and configuration.
+   `global-date` and `process-env` for code outside Effect. `prefer-effect-array` and
+   `prefer-effect-record` report each native array and `Object` method. The `-in-effect`
+   variants are in the preset: inside Effect code, `Clock`, `Random`, and `Config` let tests
+   control time, randomness, and configuration.
 2. No rule that Adamantite already enables reports the same defect. `unnecessary-arrow-block`
    repeats `arrow-body-style`. `strict-boolean-expressions` is a general TypeScript rule, so
    the core or strict preset decides it.
 3. It does not depend on the project layout or on library-authoring choices.
    `strict-effect-provide` needs the entry points of the project, `deterministic-keys` reads
    key patterns based on `src/`, and `missing-pipeable-signature` is for library APIs.
+   `prefer-barrel-import` and `prefer-namespace-import` report only the packages that the
+   project lists in its own options.
 4. It applies to Effect v4. `missing-effect-service-dependency` checks `Effect.Service`, which
    exists only in v3.
 
-`missed-pipeable-opportunity` and `new-schema-class` are style preferences that report no
-defect, so they are not in the preset. All the other correctness, anti-pattern, and style
+`missed-pipeable-opportunity`, `new-schema-class`, and `prefer-schema-tagged-error` are style
+preferences that report no defect, so they are not in the preset. `Data.TaggedError` is
+correct when an error is not encoded. All the other correctness, anti-pattern, and style
 rules are in the preset, including `any-unknown-in-error-context` and
 `unsafe-effect-type-assertion`, which upstream turns off by default. Every enabled rule is
 `"error"`, as in the other presets.

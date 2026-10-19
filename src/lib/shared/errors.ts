@@ -213,10 +213,10 @@ export class InvalidInitOptions extends Data.TaggedError("InvalidInitOptions")<{
 }
 
 export class InvalidRuleName extends Data.TaggedError("InvalidRuleName")<{
-  name: string
+  rule: string
 }> {
   override get message() {
-    return `Invalid rule name \`${this.name}\`. Use kebab-case that starts with a letter, such as \`no-process-env\`.`
+    return `Invalid rule name \`${this.rule}\`. Use kebab-case that starts with a letter, such as \`no-process-env\`.`
   }
 }
 

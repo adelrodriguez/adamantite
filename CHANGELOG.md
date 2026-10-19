@@ -1,5 +1,42 @@
 # adamantite
 
+## 0.44.0
+
+### Minor Changes
+
+- [#516](https://github.com/adelrodriguez/adamantite/pull/516) [`a0bf5cf`](https://github.com/adelrodriguez/adamantite/commit/a0bf5cf6236d8887bda598e908ad255642eab99f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update Oxlint and `@effect/tsgo`, and enable five new rules in the effect preset
+
+  Update the managed tooling versions: Oxlint 1.88.0, oxlint-tsgolint 7.0.2004, and `@effect/tsgo` 0.54.0. Also update the runtime dependency `@oxlint/plugins` to 1.88.0.
+
+  The effect preset enables these new `@effect/tsgo` rules:
+
+  - `error-payload-shadows-name` reports an error payload field named `name`. The field replaces the error's own name, so logs and `String(error)` show the field value instead of the error type.
+  - `schema-class-object-literal` reports an object literal that is checked as a Schema class instance. The object has no class prototype, so `instanceof`, methods, and encoding can fail.
+  - `schema-class-missing-brand` reports a Schema class, error, or Opaque class without a brand type argument. Without a brand, TypeScript accepts structurally compatible values as instances.
+  - `effect-sleep-zero-to-yield-now` reports `Effect.sleep(0)`. Use `Effect.yieldNow`.
+  - `flat-map-to-tap` reports a `flatMap` or `andThen` callback that runs an effect and returns its parameter unchanged. Use `Effect.tap`.
+
+  `adamantite rule add` now names its error `InvalidRuleName` when the rule name is not kebab-case. Before, the error took the rule name as its name.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update`. It installs the new versions and patches them again.
+  - Expect `adamantite check` to report Schema classes without a brand. Add `{ readonly brand: unique symbol }` as the second type argument, or add `{}` to keep the class structural.
+  - Oxlint 1.88 compares keys with ESLint's `natural-compare` in `sort-keys` with `natural: true`, which the core preset sets ([oxc#27579](https://github.com/oxc-project/oxc/pull/27579)). `adamantite check` can report different objects.
+  - `@effect/tsgo` 0.54.0 patches TypeScript 7.0.2 and `7.1.0-dev.20261018.1`. With another TypeScript version, the `prepare` script fails. Install one of those versions.
+
+### Patch Changes
+
+- [#519](https://github.com/adelrodriguez/adamantite/pull/519) [`192f0b4`](https://github.com/adelrodriguez/adamantite/commit/192f0b43f2ee6ac3600635025add95483989253f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Document how pnpm 12.11 and later link the Adamantite agent skill from the installed package. Create an agent skill directory, such as `.claude/skills`, run `pnpm approve` after the install, and the linked skill matches the installed Adamantite version.
+
+- [#515](https://github.com/adelrodriguez/adamantite/pull/515) [`326df83`](https://github.com/adelrodriguez/adamantite/commit/326df83e3e7dd69155c8f79dd462bb5c11872012) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update the runtime dependencies `effect`, `@effect/platform-node`, and `@effect/platform-node-shared` to 4.0.5.
+
+  Effect 4.0.2 and later tag each module as stable or unstable. The unstable modules include `effect/FileSystem`, `effect/Path`, and all modules in `@effect/platform-node` and `@effect/vitest`. With the effect preset, `effecttsgo/unstable-api-usage` reports each use of them after you update Effect. To use them on purpose, list them in `allowedUnstableApis` in the `@effect/language-service` entry of `tsconfig.json`. An entry can be a module, such as `effect/Path`, or a full package, such as `@effect/vitest`.
+
+- [#514](https://github.com/adelrodriguez/adamantite/pull/514) [`214b5b1`](https://github.com/adelrodriguez/adamantite/commit/214b5b1adf5b1b3722c0a1d0c62a6485608f94f2) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update the managed tooling versions: Oxfmt 0.73.0, Knip 6.42.0, `oxlint-plugin-react-doctor` 0.9.18, and `@shadcn/lint` 0.2.1. Also update the runtime dependency `oxc-parser` to 0.154.0.
+
+  Run `adamantite update` to install the new versions. Oxfmt 0.73 sorts the imports in Markdown code blocks, so `adamantite fix --only format` can change existing Markdown files after the update.
+
 ## 0.43.1
 
 ### Patch Changes

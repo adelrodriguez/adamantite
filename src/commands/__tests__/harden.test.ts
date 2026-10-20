@@ -35,6 +35,29 @@ function getMissingPhrases(section: string, phrases: readonly string[]) {
   return phrases.filter((phrase) => !section.includes(phrase))
 }
 
+// The phrases that each section must keep, so a failure names each lost one.
+const REQUIRED_PHRASES = {
+  "## 2. Survey the code": ["This step is done when each area has its candidates"],
+  "## 3. Drop what a tool already enforces": ["lint a counterexample from step 2 where it is"],
+  "## 5. Show the candidates and wait for approval": [
+    "This step is done when the user names the candidates to write",
+    "When no human can approve",
+    "Stop after this step.",
+  ],
+  "## 6. Write the approved standards": [
+    "`adamantite rule add <name>`",
+    'the "Custom rules" section of the Adamantite skill',
+    "pass it with `--dir`",
+    "states the standard and why it exists",
+    "delete the instruction of each standard that a rule now checks",
+    "keep the code that a new rule reports as it is",
+    "for a custom rule, use the `rules` option of `custom()`",
+    "for a preset rule or an import rule, set it in the Oxlint config",
+    "`CODING_STANDARDS.md`",
+  ],
+  "## Verify": ["`adamantite check`", "`adamantite doctor`", "Both must exit 0."],
+} satisfies Readonly<Record<string, readonly string[]>>
+
 const INSTALLED = manifest({ devDependencies: { adamantite: "1.0.0" } })
 
 const CUSTOM_RULES_CONFIG = `import { defineConfig } from "oxlint"
@@ -138,7 +161,7 @@ describe("harden", () => {
 
       expect(rulesFolders).toContain("adamantite/lint/custom")
       expect(rulesFolders).toContain(".adamantite/rules")
-      expect(getSection(prompt, "### Instructions")).toContain("CODING_STANDARDS.md")
+      expect(getSection(prompt, "### Instructions")).toContain("No instruction file was found.")
     })
   )
 
@@ -148,8 +171,7 @@ describe("harden", () => {
 
       expect(
         getMissingPhrases(getSection(prompt, "### Oxlint config"), [
-          "Do not create one.",
-          "run `adamantite init` before you write rules",
+          "tell the user to run `adamantite init` before step 6",
         ])
       ).toStrictEqual([])
     })
@@ -179,44 +201,25 @@ describe("harden", () => {
     })
   )
 
-  it.effect("have the approval gate, the write steps, and the verification commands", () =>
-    Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt({
-        "oxlint.config.ts": CORE_CONFIG,
-        "package.json": INSTALLED,
-      })
+  it.effect(
+    "have the read-only phase, the approval gate, the write steps, and the verification",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* runHardenPrompt({
+          "oxlint.config.ts": CORE_CONFIG,
+          "package.json": INSTALLED,
+        })
+        const missing = Object.entries(REQUIRED_PHRASES).flatMap(([heading, phrases]) =>
+          getMissingPhrases(getSection(prompt, heading), phrases).map(
+            (phrase) => `${heading}: ${phrase}`
+          )
+        )
 
-      expect(
-        getMissingPhrases(getSection(prompt, "## 3. Drop what a tool already enforces"), [
-          "lint a counterexample from step 2",
-          "Do not write a sample file",
-        ])
-      ).toStrictEqual([])
-      expect(
-        getMissingPhrases(getSection(prompt, "## 5. Show the candidates and wait for approval"), [
-          "Do not change any file before the user approves.",
-          "If no human can approve",
-        ])
-      ).toStrictEqual([])
-      expect(
-        getMissingPhrases(getSection(prompt, "## 6. Write the approved standards"), [
-          "`adamantite rule add <name>`",
-          "pass it with `--dir`",
-          "`RuleTester`",
-          "delete the instruction of each written standard",
-          "states the standard and why it exists",
-          "For a custom rule, use the `rules` option of `custom()`",
-          "For a preset rule or an import rule, set it to `warn` in the Oxlint config",
-          "`CODING_STANDARDS.md`",
-        ])
-      ).toStrictEqual([])
-      expect(
-        getMissingPhrases(getSection(prompt, "## Verify"), [
-          "`adamantite check`",
-          "`adamantite doctor`",
-        ])
-      ).toStrictEqual([])
-    })
+        expect(prompt.slice(0, prompt.indexOf("\n## Context\n"))).toContain(
+          "Steps 1 to 5 are read-only."
+        )
+        expect(missing).toStrictEqual([])
+      })
   )
 
   it.effect("fail when Adamantite is not installed", () =>

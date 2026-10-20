@@ -53,54 +53,35 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (cwd: 
 })
 
 function renderList(paths: readonly string[], empty: string) {
-  return paths.length === 0 ? [empty] : paths.map((file) => `- \`${file}\``)
+  return paths.length === 0 ? empty : paths.map((file) => `- \`${file}\``).join("\n")
 }
 
-function renderContext(context: HardenContext) {
-  const rulesFolders =
-    context.rulesFolders.length === 0 && context.unresolvedCalls.length === 0
-      ? [
-          `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/lint/custom\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`,
-        ]
-      : [
-          ...context.rulesFolders.map((folder) => `- \`${folder}\``),
-          ...context.unresolvedCalls.map(
-            (file) =>
-              `- A \`custom()\` call in \`${file}\` whose \`dir\` is not a string literal. Read the config to find its rules folder.`
-          ),
-        ]
+function renderRulesFolders(context: HardenContext) {
+  if (context.rulesFolders.length === 0 && context.unresolvedCalls.length === 0) {
+    return `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/lint/custom\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`
+  }
 
   return [
-    "## Context",
-    "",
-    "Adamantite found these files at the project root. Read them before you search the code.",
-    "",
-    "### Oxlint config",
-    "",
-    ...renderList(
-      context.configs,
-      "No Oxlint config was found. Do not create one. When you show the candidates, tell the user to run `adamantite init` before you write rules."
+    ...context.rulesFolders.map((folder) => `- \`${folder}\``),
+    ...context.unresolvedCalls.map(
+      (file) =>
+        `- A \`custom()\` call in \`${file}\` whose \`dir\` is not a string literal. Read the config to find its rules folder.`
     ),
-    "",
-    "### Rules folders",
-    "",
-    ...rulesFolders,
-    "",
-    "### Instructions",
-    "",
-    ...renderList(
-      context.instructionFiles,
-      "No instruction file was found. Write the approved standards that no rule can check to `CODING_STANDARDS.md`."
-    ),
-  ]
+  ].join("\n")
 }
 
 /**
- * The Markdown prompt that a coding agent follows to harden the project.
+ * The Markdown prompt that a coding agent follows to harden the project. Code renders only the
+ * detected files; `harden-prompt.md` holds the rest.
  */
 export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
   return fillTemplate(hardenPromptTemplate, {
-    context: renderContext(context).join("\n"),
+    configs: renderList(
+      context.configs,
+      "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 6."
+    ),
+    instructionFiles: renderList(context.instructionFiles, "No instruction file was found."),
+    rulesFolders: renderRulesFolders(context),
     version: adamantiteVersion,
   })
 }

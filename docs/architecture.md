@@ -232,6 +232,7 @@ ADR 0009. Three modules carry them:
   module calls to import every rule file.
 - The `custom-rules` integration in `src/lib/integrations/tooling/oxlint/custom-rules/`
   reads `custom()` calls and rule files with `oxc-parser`, without running them.
+  `discover.ts` finds the Oxlint configs and follows their imports to the `custom()` calls.
   `inspect.ts` keeps its own copy of the rule file test, and a unit test keeps it equal to
   `isRuleFile` in the preset.
 

@@ -116,8 +116,8 @@ warns the user and points to `adamantite doctor`.
   preset, then emits any remaining doctor findings.
 - `prepare` patches Oxlint and TypeScript for the effect preset. The target project's
   `prepare` script runs it after each install.
-- `rule add` writes a custom rule stub and the authoring guidance. `rule ast` prints the
-  AST that Oxlint rules visit.
+- `rule add` writes a custom rule stub. `rule ast` prints the AST that Oxlint rules
+  visit.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -245,7 +245,7 @@ ADR 0009. Four modules carry them:
   finds the Oxlint configs and follows their imports to the `custom()` calls. `harden` uses
   it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
   copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in the preset.
-  `index.ts` writes the rule stub and the `AGENTS.md` for `adamantite rule add`.
+  `index.ts` writes the rule stub for `adamantite rule add`.
 - The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
   that module to report rules folders that no `custom()` call loads, rule files that cannot
   load, and rules folders that share a plugin name.
@@ -257,5 +257,5 @@ extensions. `src/__tests__/presets/custom.test.ts` lints temporary projects in r
 runs, including a monorepo with a shared tooling package, and runs `custom()` under Bun
 when Bun is installed.
 
-Keep the `AGENTS.md` text in `src/lib/workspace/custom-rules/index.ts` the same as the
-"Custom rules" section of `skills/adamantite/SKILL.md`.
+The authoring guidance lives only in the "Custom rules" section of
+`skills/adamantite/SKILL.md`.

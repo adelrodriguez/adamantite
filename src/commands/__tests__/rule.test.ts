@@ -4,11 +4,11 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand from "#commands/rule.ts"
-import { CUSTOM_RULES_AGENTS_CONTENT, toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
+import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 import { createPrompterTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("rule add", () => {
-  it.effect("write the stub and the authoring guidance to .adamantite/rules", () =>
+  it.effect("write only the stub to .adamantite/rules", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext()
       const prompter = createPrompterTestContext()
@@ -22,19 +22,16 @@ describe("rule add", () => {
       expect(files.read(".adamantite/rules/no-process-env.ts")).toBe(
         toCustomRuleStub("no-process-env")
       )
-      expect(files.read(".adamantite/rules/AGENTS.md")).toBe(CUSTOM_RULES_AGENTS_CONTENT)
+      expect(files.exists(".adamantite/rules/AGENTS.md")).toBe(false)
       expect(prompter.logs.filter((log) => log.level === "success")).toStrictEqual([
         { level: "success", message: "Wrote .adamantite/rules/no-process-env.ts." },
-        { level: "success", message: "Wrote .adamantite/rules/AGENTS.md." },
       ])
     })
   )
 
   it.effect("write to a custom folder, such as a monorepo tooling package", () =>
     Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "tooling/lint/rules/AGENTS.md": "# Our rules\n" },
-      })
+      const files = createFileSystemTestContext()
 
       const exit = yield* runCommand(
         ruleCommand,
@@ -44,7 +41,6 @@ describe("rule add", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(files.read("tooling/lint/rules/no-window.ts")).toBe(toCustomRuleStub("no-window"))
-      expect(files.read("tooling/lint/rules/AGENTS.md")).toBe("# Our rules\n")
       expect(files.exists(".adamantite")).toBe(false)
     })
   )

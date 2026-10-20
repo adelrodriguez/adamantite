@@ -51,23 +51,18 @@ const dir = Flag.String("dir").pipe(
 
 const add = Command.make("add", { dir, name: ruleName }).pipe(
   Command.withDescription(
-    "Write a custom rule stub, and the authoring guidance when the rules folder has none"
+    "Write a custom rule stub. The Adamantite skill has the authoring guidance"
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
       const path = yield* Path.Path
       const cwd = process.cwd()
-      const added = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
+      const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
-      yield* prompter.log.success(`Wrote ${path.relative(cwd, added.rulePath)}.`)
-
-      if (added.agentsPath !== undefined) {
-        yield* prompter.log.success(`Wrote ${path.relative(cwd, added.agentsPath)}.`)
-      }
-
+      yield* prompter.log.success(`Wrote ${path.relative(cwd, rulePath)}.`)
       yield* prompter.log.info(
-        "`custom()` from `adamantite/lint/custom` loads the rule. Run `adamantite doctor` to check the wiring."
+        '`custom()` from `adamantite/lint/custom` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells you how to write the rule.'
       )
     })
   )

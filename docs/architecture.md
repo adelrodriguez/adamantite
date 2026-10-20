@@ -130,6 +130,7 @@ src/
   lib/
     shared/         errors, filesystem, and JSON helpers (bottom layer)
     workspace/      target-project state and file operations
+      custom-rules/ rules folders, custom() discovery, and rule file checks
     execution/      child command runs, coding-agent detection and handoff, forwarded arguments
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
@@ -220,7 +221,7 @@ Oxlint run.
 ## Custom rules
 
 Custom rules are Oxlint rules that the target project writes in a rules folder. See
-ADR 0009. Three modules carry them:
+ADR 0009. Four modules carry them:
 
 - `presets/lint/custom.ts` exports `custom()`, which runs while Oxlint loads the config. It
   finds the calling file in the call stack, resolves the rules folder from it, lists the
@@ -230,11 +231,14 @@ ADR 0009. Three modules carry them:
 - `presets/rules/index.ts` is published as `adamantite/rules`. It re-exports `defineRule`
   and the rule types from `@oxlint/plugins`, and exports `loadRules`, which the entry
   module calls to import every rule file.
-- The `custom-rules` integration in `src/lib/integrations/tooling/oxlint/custom-rules/`
-  reads `custom()` calls and rule files with `oxc-parser`, without running them.
-  `discover.ts` finds the Oxlint configs and follows their imports to the `custom()` calls.
-  `inspect.ts` keeps its own copy of the rule file test, and a unit test keeps it equal to
-  `isRuleFile` in the preset.
+- `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
+  `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
+  finds the Oxlint configs and follows their imports to the `custom()` calls. `inspect.ts`
+  keeps its own copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in
+  the preset. `index.ts` writes the rule stub and the `AGENTS.md` for `adamantite rule add`.
+- The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
+  that module to report rules folders that no `custom()` call loads, rule files that cannot
+  load, and rules folders that share a plugin name.
 
 Both preset modules run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`
@@ -243,6 +247,5 @@ extensions. `src/__tests__/presets/custom.test.ts` lints temporary projects in r
 runs, including a monorepo with a shared tooling package, and runs `custom()` under Bun
 when Bun is installed.
 
-`src/lib/workspace/custom-rules.ts` writes the rule stub and the `AGENTS.md` for
-`adamantite rule add`. Keep that `AGENTS.md` text the same as the "Custom rules" section of
-`skills/adamantite/SKILL.md`.
+Keep the `AGENTS.md` text in `src/lib/workspace/custom-rules/index.ts` the same as the
+"Custom rules" section of `skills/adamantite/SKILL.md`.

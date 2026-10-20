@@ -6,7 +6,7 @@ import * as Path from "effect/Path"
 import type { IntegrationAssessment } from "#lib/integrations/base.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
-import customRules from "#lib/integrations/tooling/oxlint/custom-rules/index.ts"
+import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
 
 const ROOT = "/project"
 
@@ -37,7 +37,7 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
 }
 
 function runAssess(files: FileSystemTestContext) {
-  return customRules.assess(ROOT).pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer)))
+  return oxlintCustom.assess(ROOT).pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer)))
 }
 
 function getFindings(assessment: IntegrationAssessment) {
@@ -72,7 +72,7 @@ function makeToolingFiles(
   })
 }
 
-describe("custom-rules", () => {
+describe("oxlint-custom", () => {
   it.effect("report not applicable without a rules folder or a custom() call", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -124,7 +124,7 @@ describe("custom-rules", () => {
           currentState:
             "`.adamantite/rules` has 1 rule file(s), but no `custom()` call loads it, so Oxlint does not run them.",
           id: "custom-rules-not-loaded:.adamantite/rules",
-          integration: "custom-rules",
+          integration: "oxlint-custom",
         }),
       ])
     })

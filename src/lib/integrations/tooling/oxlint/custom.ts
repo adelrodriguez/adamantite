@@ -7,16 +7,13 @@ import {
   type Finding,
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
-import { discoverCustomRules } from "#lib/integrations/tooling/oxlint/custom-rules/discover.ts"
-import {
-  inspectRuleFile,
-  isRuleFile,
-} from "#lib/integrations/tooling/oxlint/custom-rules/inspect.ts"
 import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules.ts"
+import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
+import { inspectRuleFile, isRuleFile } from "#lib/workspace/custom-rules/inspect.ts"
 import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
-const NAME = "custom-rules"
+const NAME = "oxlint-custom"
 
 interface RulesFolder {
   readonly dir: string

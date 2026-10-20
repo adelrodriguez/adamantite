@@ -4,7 +4,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand from "#commands/rule.ts"
-import { CUSTOM_RULES_AGENTS_CONTENT, toCustomRuleStub } from "#lib/workspace/custom-rules.ts"
+import { CUSTOM_RULES_AGENTS_CONTENT, toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 import { createPrompterTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("rule add", () => {

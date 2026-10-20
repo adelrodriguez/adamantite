@@ -5,12 +5,12 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import {
   CUSTOM_RULES_MODULE,
   findCustomRulesCalls,
   findRuntimeImports,
-} from "#lib/integrations/tooling/oxlint/custom-rules/inspect.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
+} from "#lib/workspace/custom-rules/inspect.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const CONFIG_FILES = [

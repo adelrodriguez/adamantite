@@ -3,7 +3,7 @@ import {
   findCustomRulesCalls,
   inspectRuleFile,
   isRuleFile,
-} from "#lib/integrations/tooling/oxlint/custom-rules/inspect.ts"
+} from "#lib/workspace/custom-rules/inspect.ts"
 import { isRuleFile as isLoadedRuleFile } from "#presets/lint/custom.ts"
 
 const IMPORT = 'import custom from "adamantite/lint/custom"\n'

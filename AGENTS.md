@@ -57,7 +57,8 @@ files to the repository. See `docs/agents/issue-tracker.md`.
   known third-party type mismatches.
 - Keep `src/lib` layers in one dependency direction: `shared`, then `workspace` and
   `execution`, then `integrations`, then `assessment`. A layer imports only from the layers
-  below it. Oxlint enforces this rule.
+  below it. `hardening` sits beside `integrations` and imports only `shared`, `workspace`,
+  and `execution`. Oxlint enforces these rules.
 - Keep integration modules limited to their default integration export. Shared
   infrastructure (`integrations/base.ts`, `integrations/tooling/base.ts`,
   `integrations/tooling/preset-config.ts`), helper modules in a tool's folder, and the

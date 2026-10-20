@@ -1,8 +1,8 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import { discoverCustomRules } from "#lib/integrations/tooling/oxlint/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules.ts"
+import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
 
 /**
  * The prose files that can state coding standards, and the ADR folder.

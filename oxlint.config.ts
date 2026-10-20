@@ -20,7 +20,7 @@ const PARENT_RELATIVE_IMPORTS = {
 }
 
 const LIB_LAYER_MESSAGE =
-  'Lib layers import only from lower layers: shared, then workspace and execution, then integrations, then assessment and hardening. See "Lib layers" in docs/architecture.md.'
+  'Lib layers import only from lower layers: shared, then workspace and execution, then integrations, then assessment. Hardening sits beside integrations and imports only shared, workspace, and execution. See "Lib layers" in docs/architecture.md.'
 
 export default defineConfig({
   extends: [core, node, antislop, effect],
@@ -171,7 +171,10 @@ export default defineConfig({
             patterns: [
               TERMINAL_IMPORTS,
               PARENT_RELATIVE_IMPORTS,
-              { group: ["#lib/assessment/**"], message: LIB_LAYER_MESSAGE },
+              {
+                group: ["#lib/integrations/**", "#lib/assessment/**"],
+                message: LIB_LAYER_MESSAGE,
+              },
             ],
           },
         ],

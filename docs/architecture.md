@@ -45,11 +45,13 @@ flowchart BT
   workspace --> integrations
   execution --> integrations
   integrations --> assessment
-  integrations --> hardening
+  workspace --> hardening
+  execution --> hardening
 ```
 
 `workspace` and `execution` are siblings and do not import each other, and so are
-`assessment` and `hardening`. `workspace` knows
+`integrations` and `hardening`. `assessment` does not import `hardening` either: harden is
+not an assessment. `workspace` knows
 target-project files and package state, but not integration types such as `Finding`.
 The `no-restricted-imports` overrides in `oxlint.config.ts` enforce the direction, so an
 import from a higher layer fails `pnpm run check`. Lib modules import other lib modules
@@ -141,7 +143,7 @@ src/
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
     assessment/     integration registry, project assessment, agent prompt (top layer)
-    hardening/      harden context and harden prompt (top layer)
+    hardening/      harden context and harden prompt
   terminal/         user prompting, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary

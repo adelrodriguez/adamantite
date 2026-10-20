@@ -71,7 +71,12 @@ const CASES: readonly LayerImportCase[] = [
   {
     file: "src/lib/hardening/lower.ts",
     reported: false,
-    specifier: "#lib/integrations/base.ts",
+    specifier: "#lib/workspace/custom-rules/discover.ts",
+  },
+  {
+    file: "src/lib/hardening/integration.ts",
+    reported: true,
+    specifier: "#lib/integrations/tooling/oxlint/custom.ts",
   },
   {
     file: "src/lib/hardening/sibling.ts",

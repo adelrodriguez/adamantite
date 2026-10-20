@@ -68,7 +68,7 @@ _Avoid_: Action, diagnostic, manual fix
 **Handoff**:
 Give the terminal to an installed coding agent CLI, seeded with a Markdown prompt. Adamantite
 waits until the agent session ends.
-_Avoid_: Agent session, delegation
+_Avoid_: Delegation, agent launch
 
 **Resolution menu**:
 The terminal menu that offers a handoff to each installed coding agent, a copy of the Markdown

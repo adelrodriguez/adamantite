@@ -155,6 +155,19 @@ describe("harden", () => {
     })
   )
 
+  it.effect("keep placeholder-like text in a detected path literal", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace("tooling/rules", "rules/{{version}}"),
+        "package.json": INSTALLED,
+      })
+
+      expect(getListItems(getSection(prompt, "### Rules folders"))).toStrictEqual([
+        "- `rules/{{version}}`",
+      ])
+    })
+  )
+
   it.effect("point to the config when a custom() folder is not a string literal", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({

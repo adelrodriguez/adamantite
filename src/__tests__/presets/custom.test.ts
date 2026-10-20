@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
+import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/lint/custom.ts")
@@ -102,6 +103,19 @@ describe("custom preset", () => {
     // A helper without a default export fails the run if it loads as a rule.
     write(".adamantite/rules/_helpers.ts", "export const helper = 1\n")
     write(".adamantite/rules/AGENTS.md", "# Custom rules\n")
+    write("oxlint.config.ts", makeConfig("custom()"))
+
+    expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
+  })
+
+  it("load and run the stub that rule add writes", () => {
+    write(
+      ".adamantite/rules/no-debugger-here.ts",
+      toCustomRuleStub("no-debugger-here").replace(
+        '"adamantite/rules"',
+        JSON.stringify(RULES_MODULE)
+      )
+    )
     write("oxlint.config.ts", makeConfig("custom()"))
 
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])

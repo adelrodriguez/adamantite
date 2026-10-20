@@ -30,7 +30,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal. |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                    |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                      |
-| `terminal`     | Prompt the user and render the CLI title.                                                                 |
+| `terminal`     | Prompt the user, render findings, offer the coding-agent handoff, and render the CLI title.               |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                             |
 
 ## Lib layers
@@ -78,7 +78,8 @@ target project. A later Doctor run confirms whether the project reached the goal
 Tooling config generators produce only the current setup for `init` and Doctor reference
 content. They do not convert existing configs or generate patches.
 Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
-installed coding agent CLI or to copy the combined Markdown prompt. Installation is
+installed coding agent CLI or to copy the combined Markdown prompt. `src/terminal/handoff.ts`
+owns this menu, so other commands can offer the same handoff with their own prompt. Installation is
 detected by probing each supported CLI's version command, bounded by a timeout; only
 agents whose probe command starts appear in the menu. A handoff hands the terminal to
 the agent CLI with inherited stdio
@@ -131,7 +132,7 @@ src/
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
     assessment/     integration registry, project assessment, agent prompt (top layer)
-  terminal/         user prompting and title output
+  terminal/         user prompting, findings, agent handoff menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
 ```

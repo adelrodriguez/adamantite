@@ -259,9 +259,9 @@ adamantite rule add no-window --dir tooling/lint/rules
 adamantite rule ast src/index.ts
 ```
 
-`rule add` writes a rule stub to `.adamantite/rules/`, or to the folder that `--dir` names,
-and an `AGENTS.md` with the authoring guidance when the folder has none. `rule ast` prints the
-ESTree-shaped AST that Oxlint rules visit, so you can read node names off real code.
+`rule add` writes a rule stub to `.adamantite/rules/`, or to the folder that `--dir` names.
+`rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
+real code.
 
 ### Pass arguments to underlying tools
 
@@ -656,8 +656,8 @@ Rule files run with Node.js type stripping, so use erasable TypeScript only: no 
 `namespace` with values, or parameter properties. Rules get no type information. A rule
 that throws prints an error for each file, and the lint run still exits 0. Adamantite owns
 the wiring and the authoring guidance; your project owns the correctness and the tests of
-its rules. To test a rule, use `RuleTester` from `oxlint/plugins-dev`. `adamantite rule add`
-writes the full authoring guidance to `.adamantite/rules/AGENTS.md`.
+its rules. To test a rule, use `RuleTester` from `oxlint/plugins-dev`. The "Custom rules"
+section of the [Adamantite skill](#agent-skill) has the full authoring guidance.
 
 `adamantite doctor` reports a rule file that cannot load, with the reason, a rules folder
 that no `custom()` call loads, and two rules folders that use the same plugin name.

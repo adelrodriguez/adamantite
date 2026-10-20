@@ -27,6 +27,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `commands`     | Define one CLI workflow and render its user-facing result.                                                |
 | `execution`    | Run child commands, hand off to coding agents, and carry forwarded arguments.                             |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.             |
+| `hardening`    | Find the configs, rules folders, and prose of the project, and render the Markdown harden prompt.         |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal. |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                    |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                      |
@@ -44,9 +45,11 @@ flowchart BT
   workspace --> integrations
   execution --> integrations
   integrations --> assessment
+  integrations --> hardening
 ```
 
-`workspace` and `execution` are siblings and do not import each other. `workspace` knows
+`workspace` and `execution` are siblings and do not import each other, and so are
+`assessment` and `hardening`. `workspace` knows
 target-project files and package state, but not integration types such as `Finding`.
 The `no-restricted-imports` overrides in `oxlint.config.ts` enforce the direction, so an
 import from a higher layer fails `pnpm run check`. Lib modules import other lib modules
@@ -104,6 +107,9 @@ warns the user and points to `adamantite doctor`.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
+- `harden` prints a prompt that tells a coding agent to turn the project's coding standards
+  into custom rules and prose. It never produces findings, so it never changes Doctor's
+  result. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
   preset, then emits any remaining doctor findings.
 - `prepare` patches Oxlint and TypeScript for the effect preset. The target project's
@@ -135,6 +141,7 @@ src/
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
     assessment/     integration registry, project assessment, agent prompt (top layer)
+    hardening/      harden context and harden prompt (top layer)
   terminal/         user prompting, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
@@ -233,9 +240,10 @@ ADR 0009. Four modules carry them:
   module calls to import every rule file.
 - `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
   `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
-  finds the Oxlint configs and follows their imports to the `custom()` calls. `inspect.ts`
-  keeps its own copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in
-  the preset. `index.ts` writes the rule stub and the `AGENTS.md` for `adamantite rule add`.
+  finds the Oxlint configs and follows their imports to the `custom()` calls. `harden` uses
+  it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
+  copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in the preset.
+  `index.ts` writes the rule stub and the `AGENTS.md` for `adamantite rule add`.
 - The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
   that module to report rules folders that no `custom()` call loads, rule files that cannot
   load, and rules folders that share a plugin name.

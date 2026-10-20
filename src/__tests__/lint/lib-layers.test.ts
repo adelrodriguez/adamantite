@@ -63,6 +63,26 @@ const CASES: readonly LayerImportCase[] = [
     specifier: "#lib/integrations/base.ts",
   },
   { file: "src/lib/assessment/terminal.ts", reported: true, specifier: "#terminal/title.ts" },
+  {
+    file: "src/lib/assessment/sibling.ts",
+    reported: true,
+    specifier: "#lib/hardening/index.ts",
+  },
+  {
+    file: "src/lib/hardening/lower.ts",
+    reported: false,
+    specifier: "#lib/integrations/base.ts",
+  },
+  {
+    file: "src/lib/hardening/sibling.ts",
+    reported: true,
+    specifier: "#lib/assessment/index.ts",
+  },
+  {
+    file: "src/lib/integrations/higher-sibling.ts",
+    reported: true,
+    specifier: "#lib/hardening/index.ts",
+  },
 ]
 
 const OxlintJsonOutput = Schema.Struct({

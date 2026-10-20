@@ -1,0 +1,168 @@
+import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
+import * as Path from "effect/Path"
+import { discoverCustomRules } from "#lib/integrations/tooling/oxlint/custom-rules/discover.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules.ts"
+
+/**
+ * The prose files that can state coding standards, and the ADR folder.
+ */
+const PROSE_FILES = ["CODING_STANDARDS.md", "AGENTS.md", "GLOSSARY.md", "docs/adr"] as const
+
+/**
+ * The files that a harden session starts from. Paths are relative to the project root.
+ */
+interface HardenContext {
+  readonly configs: readonly string[]
+  readonly proseFiles: readonly string[]
+  readonly rulesFolders: readonly string[]
+  /**
+   * Files with a `custom()` call whose `dir` is not a string literal, so only the agent can find
+   * its rules folder.
+   */
+  readonly unresolvedCalls: readonly string[]
+}
+
+export const readHardenContext = Effect.fn("readHardenContext")(function* (cwd: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const relative = (target: string) => path.relative(cwd, target) || "."
+  const { calls, configs } = yield* discoverCustomRules([cwd])
+  // `forEach` keeps the order of `PROSE_FILES`, which `Effect.filter` loses under concurrency.
+  const exists = yield* Effect.forEach(
+    PROSE_FILES,
+    (file) => fs.exists(path.join(cwd, file)).pipe(Effect.orElseSucceed(() => false)),
+    { concurrency: "unbounded" }
+  )
+  const proseFiles = PROSE_FILES.filter((_, index) => exists[index])
+
+  return {
+    configs: configs.map((config) => relative(config)),
+    proseFiles,
+    rulesFolders: [
+      ...new Set(calls.flatMap((call) => (call.dir === null ? [] : [relative(call.dir)]))),
+    ],
+    unresolvedCalls: [
+      ...new Set(calls.flatMap((call) => (call.dir === null ? [relative(call.source)] : []))),
+    ],
+  } satisfies HardenContext
+})
+
+function renderList(paths: readonly string[], empty: string) {
+  return paths.length === 0 ? [empty] : paths.map((file) => `- \`${file}\``)
+}
+
+function renderContext(context: HardenContext) {
+  const rulesFolders =
+    context.rulesFolders.length === 0 && context.unresolvedCalls.length === 0
+      ? [
+          `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/lint/custom\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`,
+        ]
+      : [
+          ...context.rulesFolders.map((folder) => `- \`${folder}\``),
+          ...context.unresolvedCalls.map(
+            (file) =>
+              `- A \`custom()\` call in \`${file}\` whose \`dir\` is not a string literal. Read the config to find its rules folder.`
+          ),
+        ]
+
+  return [
+    "## Context",
+    "",
+    "Adamantite found these files at the project root. Read them before you search the code.",
+    "",
+    "### Oxlint config",
+    "",
+    ...renderList(context.configs, "No Oxlint config was found. Run `adamantite init` first."),
+    "",
+    "### Rules folders",
+    "",
+    ...rulesFolders,
+    "",
+    "### Prose",
+    "",
+    ...renderList(
+      context.proseFiles,
+      "No prose file was found. Write the approved standards that no rule can check to `CODING_STANDARDS.md`."
+    ),
+    "",
+  ]
+}
+
+const PROCEDURE = [
+  "## 1. List the written standards",
+  "",
+  "Read the prose files above. List each standard that they state, with its file and line.",
+  "",
+  "## 2. Survey the code",
+  "",
+  "Find the patterns that the code follows but that no prose states: file names and placement, import direction, naming, API use, error handling, and test layout.",
+  "",
+  "- A pattern is a standard only when the code follows it in several places and has few counterexamples. List each counterexample with its file and line.",
+  "- If the GitHub CLI `gh` is available and authenticated, read the review comments of recent merged pull requests. A correction that reviewers repeat is a strong sign of a standard.",
+  "- Do not propose a standard for a pattern that occurs one time. A rule earns its place when it stops a mistake that recurs.",
+  "",
+  "## 3. Drop what a tool already enforces",
+  "",
+  "For each candidate, find out whether a tool already enforces it. Read the Oxlint config, the presets and plugins that it extends, its overrides, and the custom rules. Read `tsconfig.json` for the type-level standards.",
+  "",
+  "- When you are not sure, write a small sample file that breaks the standard, lint it, read the result, and delete the sample.",
+  "- Drop each candidate that a tool already enforces.",
+  "",
+  "## 4. Place each candidate on the enforcement ladder",
+  "",
+  "Put each remaining candidate at the highest step that works:",
+  "",
+  "1. **Type or structure:** a type, a schema, a module boundary, or a stricter TypeScript option makes the mistake impossible.",
+  "2. **Preset rule:** a rule in an Oxlint preset or plugin that the project can turn on, or an option of a rule that is already on.",
+  "3. **Import rule:** `no-restricted-imports`, with an override for the files that the standard applies to.",
+  "4. **Custom rule:** a rule in the rules folder that checks the AST.",
+  "5. **Prose:** a line in `CODING_STANDARDS.md`, only when no tool can check the standard.",
+  "",
+  "## 5. Show the candidates and wait for approval",
+  "",
+  "Show each candidate to the user with:",
+  "",
+  "- the standard in one sentence",
+  "- its source: the prose file and line, or the code only",
+  "- the number of places that follow it, and the counterexamples",
+  "- its step on the ladder, and the rule, option, or prose line that you propose",
+  "- the existing code that the new rule would report",
+  "",
+  "Ask the user which candidates to write. **Do not change any file before the user approves.**",
+  "",
+  "**If no human can approve, for example in CI or in an unattended session, stop here.** The candidates are the result of the run.",
+  "",
+  "## 6. Write the approved standards",
+  "",
+  "Write only the candidates that the user approved:",
+  "",
+  "- **Type, structure, preset rule, or import rule:** change the types, the Oxlint config, or `tsconfig.json`.",
+  "- **Custom rule:** run `adamantite rule add <name>` to write the rule in the rules folder, and follow the `AGENTS.md` in that folder. Run `adamantite rule ast <file>` to find the node names. Test the rule with `RuleTester` from `oxlint/plugins-dev`.",
+  "  - The rule message says what to do instead.",
+  "  - A comment at the top of the rule file states the standard and why it exists.",
+  "- **Prose that became a rule:** delete the prose line of each written standard that a rule now checks. The rule is the only source of the standard.",
+  '- **Existing violations:** when a new rule reports existing code, do not fix that code. List the violations for the user, and set the rule to `warn` through the `rules` option of `custom()`, such as `custom({ rules: { "no-foo": "warn" } })`. A separate change fixes the violations and removes the override.',
+  "- **Prose:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard.",
+  "",
+]
+
+/**
+ * The Markdown prompt that a coding agent follows to harden the project.
+ */
+export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
+  return [
+    "# Adamantite harden",
+    "",
+    `This project uses Adamantite ${adamantiteVersion} to manage linting, formatting, and type tooling.`,
+    "`adamantite harden` asks you to find the coding standards that this project already follows, and to put each one at the highest level of enforcement that works: a custom rule when a rule can check it, and prose when no rule can.",
+    "",
+    ...renderContext(context),
+    ...PROCEDURE,
+    "## Verify",
+    "",
+    "When you wrote files, run `adamantite check` and `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.",
+    "Both must exit 0. Do not suppress or work around a rule; fix the rule or set it to `warn` as step 6 says.",
+    "",
+  ].join("\n")
+}

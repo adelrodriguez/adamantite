@@ -36,6 +36,8 @@ and Sherif so humans and coding agents can use the same project workflow.
   dependencies, and give humans or agents repair instructions.
 - **Custom rules**: Write project-specific Oxlint rules in `.adamantite/rules/`, one rule
   for each file, and enable all of them with one line.
+- **Hardening**: Have a coding agent turn the coding standards that your code already
+  follows into custom rules, and into prose for the ones that no rule can check.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
 - **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`.
@@ -206,6 +208,23 @@ directly. In a non-interactive run, Doctor prints the combined repair prompt and
 when findings remain. If only assessment warnings remain, Doctor prints a Markdown
 warning report and exits 0.
 
+### `adamantite harden`
+
+Print a Markdown prompt that tells a coding agent to find the coding standards that the
+project already follows, and to put each one at the highest level of enforcement that works:
+a custom rule when a rule can check it, and a line in `CODING_STANDARDS.md` when no rule can.
+`fix` applies the tools' own fixes; `harden` asks an agent to write new rules.
+
+```sh
+adamantite harden
+```
+
+The prompt lists the Oxlint config, the rules folder that its `custom()` call loads, and the
+prose files that exist: `CODING_STANDARDS.md`, `AGENTS.md`, `GLOSSARY.md`, and `docs/adr`.
+The agent shows the candidates and writes nothing until you approve them. When no human can
+approve, the agent stops at the candidates. `harden` never produces Doctor findings. See
+[ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).
+
 ### `adamantite update`
 
 Update Adamantite-managed dependencies, then report any setup findings:
@@ -262,7 +281,7 @@ bun run analyze -- -- --directory packages/app
 npm run analyze -- -- --directory packages/app
 ```
 
-`init`, `doctor`, and `update` do not forward arguments because they do not invoke one
+`init`, `doctor`, `harden`, and `update` do not forward arguments because they do not invoke one
 underlying CLI.
 
 ## Presets

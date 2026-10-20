@@ -11,3 +11,4 @@
 - [ADR 0009: Custom rules load from a rules folder through custom()](0009-custom-rules-load-through-custom.md)
 - [ADR 0010: Core absorbs no plugin rules while Oxlint JS plugins are alpha](0010-core-stays-native.md)
 - [ADR 0011: The test presets scope themselves to test files](0011-test-presets-scope-themselves.md)
+- [ADR 0012: Harden instructs agents to turn coding standards into rules](0012-harden-instructs-agents-to-write-rules.md)

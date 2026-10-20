@@ -20,7 +20,7 @@ const PARENT_RELATIVE_IMPORTS = {
 }
 
 const LIB_LAYER_MESSAGE =
-  'Lib layers import only from lower layers: shared, then workspace and execution, then integrations, then assessment. See "Lib layers" in docs/architecture.md.'
+  'Lib layers import only from lower layers: shared, then workspace and execution, then integrations, then assessment and hardening. See "Lib layers" in docs/architecture.md.'
 
 export default defineConfig({
   extends: [core, node, antislop, effect],
@@ -73,6 +73,7 @@ export default defineConfig({
                   "#lib/execution/**",
                   "#lib/integrations/**",
                   "#lib/assessment/**",
+                  "#lib/hardening/**",
                 ],
                 message: LIB_LAYER_MESSAGE,
               },
@@ -91,7 +92,12 @@ export default defineConfig({
               TERMINAL_IMPORTS,
               PARENT_RELATIVE_IMPORTS,
               {
-                group: ["#lib/execution/**", "#lib/integrations/**", "#lib/assessment/**"],
+                group: [
+                  "#lib/execution/**",
+                  "#lib/integrations/**",
+                  "#lib/assessment/**",
+                  "#lib/hardening/**",
+                ],
                 message: LIB_LAYER_MESSAGE,
               },
             ],
@@ -109,7 +115,12 @@ export default defineConfig({
               TERMINAL_IMPORTS,
               PARENT_RELATIVE_IMPORTS,
               {
-                group: ["#lib/workspace/**", "#lib/integrations/**", "#lib/assessment/**"],
+                group: [
+                  "#lib/workspace/**",
+                  "#lib/integrations/**",
+                  "#lib/assessment/**",
+                  "#lib/hardening/**",
+                ],
                 message: LIB_LAYER_MESSAGE,
               },
             ],
@@ -127,7 +138,7 @@ export default defineConfig({
               TERMINAL_IMPORTS,
               PARENT_RELATIVE_IMPORTS,
               {
-                group: ["#lib/assessment/**"],
+                group: ["#lib/assessment/**", "#lib/hardening/**"],
                 message: LIB_LAYER_MESSAGE,
               },
             ],
@@ -135,12 +146,34 @@ export default defineConfig({
         ],
       },
     },
+    // Assessment and hardening are siblings at the top, and do not import each other.
     {
       files: ["src/lib/assessment/**/*.ts"],
       rules: {
         "no-restricted-imports": [
           "error",
-          { patterns: [TERMINAL_IMPORTS, PARENT_RELATIVE_IMPORTS] },
+          {
+            patterns: [
+              TERMINAL_IMPORTS,
+              PARENT_RELATIVE_IMPORTS,
+              { group: ["#lib/hardening/**"], message: LIB_LAYER_MESSAGE },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      files: ["src/lib/hardening/**/*.ts"],
+      rules: {
+        "no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              TERMINAL_IMPORTS,
+              PARENT_RELATIVE_IMPORTS,
+              { group: ["#lib/assessment/**"], message: LIB_LAYER_MESSAGE },
+            ],
+          },
         ],
       },
     },

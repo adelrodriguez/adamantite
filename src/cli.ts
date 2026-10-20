@@ -9,6 +9,7 @@ import analyzeCommand from "#commands/analyze.ts"
 import checkCommand from "#commands/check.ts"
 import doctorCommand from "#commands/doctor.ts"
 import fixCommand from "#commands/fix.ts"
+import hardenCommand from "#commands/harden.ts"
 import initCommand from "#commands/init/index.ts"
 import prepareCommand from "#commands/prepare.ts"
 import ruleCommand from "#commands/rule.ts"
@@ -28,6 +29,7 @@ const commands = [
   checkCommand,
   doctorCommand,
   fixCommand,
+  hardenCommand,
   initCommand,
   prepareCommand,
   ruleCommand,

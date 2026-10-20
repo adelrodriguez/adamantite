@@ -18,7 +18,7 @@ const sentinel = () => {
   // Stands in for the runtime's SIGINT listener; only its identity matters.
 }
 
-describe("CodingAgents.runSession", () => {
+describe("CodingAgents.handoff", () => {
   it.effect("ignore SIGINT while the agent session runs and restore listeners afterwards", () =>
     Effect.gen(function* () {
       process.on("SIGINT", sentinel)
@@ -35,7 +35,7 @@ describe("CodingAgents.runSession", () => {
       )
       yield* Effect.gen(function* () {
         const agents = yield* CodingAgents
-        yield* agents.runSession({ agent: claudeAgent, cwd: "/project", prompt: "prompt" })
+        yield* agents.handoff({ agent: claudeAgent, cwd: "/project", prompt: "prompt" })
       }).pipe(Effect.provide(CodingAgents.layer.pipe(Layer.provide(runner))))
 
       const listenersAfterRun = process.listeners("SIGINT")

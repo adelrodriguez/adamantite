@@ -3,7 +3,7 @@ import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/cod
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
-interface HandoffOptions {
+interface ResolutionMenuOptions {
   /**
    * The command's display name, such as `Doctor`, in "Exit the agent to return to Doctor."
    */
@@ -22,9 +22,10 @@ interface HandoffOptions {
 
 /**
  * The user's choice in the resolution menu. `Failed` means that the agent CLI did not start, and
- * `Ended` means that the agent session ran and ended. The command decides what happens next.
+ * `Ended` means that the handoff ran and the agent session ended. The command decides what happens
+ * next.
  */
-type Handoff =
+type Resolution =
   | { readonly _tag: "Copied" }
   | { readonly _tag: "Declined" }
   | { readonly _tag: "Ended"; readonly agent: CodingAgent }
@@ -54,10 +55,12 @@ export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: s
 })
 
 /**
- * Offers each installed coding agent, a copy of the Markdown prompt, or nothing, and runs the
- * choice. When the agent CLI does not start, it offers the prompt copy instead.
+ * Offers a handoff to each installed coding agent, a copy of the Markdown prompt, or nothing, and
+ * runs the choice. When the agent CLI does not start, it offers the prompt copy instead.
  */
-export const offerHandoff = Effect.fn("offerHandoff")(function* (options: HandoffOptions) {
+export const chooseResolution = Effect.fn("chooseResolution")(function* (
+  options: ResolutionMenuOptions
+) {
   const agents = yield* CodingAgents
   const prompter = yield* Prompter
 
@@ -90,13 +93,13 @@ export const offerHandoff = Effect.fn("offerHandoff")(function* (options: Handof
   })
 
   if (action === "done") {
-    return { _tag: "Declined" } satisfies Handoff
+    return { _tag: "Declined" } satisfies Resolution
   }
 
   if (action === "copy") {
     // The select already carried the intent; copy without asking again.
     yield* copyPrompt(options.prompt)
-    return { _tag: "Copied" } satisfies Handoff
+    return { _tag: "Copied" } satisfies Resolution
   }
 
   const agent = action
@@ -105,25 +108,23 @@ export const offerHandoff = Effect.fn("offerHandoff")(function* (options: Handof
     `Handing the terminal to ${agent.name}. Exit the agent to return to ${options.command}.`
   )
 
-  const started = yield* agents
-    .runSession({ agent, cwd: options.cwd, prompt: options.prompt })
-    .pipe(
-      Effect.as(true),
-      Effect.catchTag("AgentSessionFailed", (error) =>
-        prompter.log
-          .error(
-            error.reason === "not-found"
-              ? `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
-              : `Failed to start ${agent.name}: ${error.cause.message}`
-          )
-          .pipe(Effect.as(false))
-      )
+  const started = yield* agents.handoff({ agent, cwd: options.cwd, prompt: options.prompt }).pipe(
+    Effect.as(true),
+    Effect.catchTag("HandoffFailed", (error) =>
+      prompter.log
+        .error(
+          error.reason === "not-found"
+            ? `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
+            : `Failed to start ${agent.name}: ${error.cause.message}`
+        )
+        .pipe(Effect.as(false))
     )
+  )
 
   if (!started) {
     yield* offerPromptCopy(options.prompt)
-    return { _tag: "Failed", agent } satisfies Handoff
+    return { _tag: "Failed", agent } satisfies Resolution
   }
 
-  return { _tag: "Ended", agent } satisfies Handoff
+  return { _tag: "Ended", agent } satisfies Resolution
 })

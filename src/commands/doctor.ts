@@ -8,8 +8,8 @@ import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "m
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
-import { offerHandoff, offerPromptCopy } from "#terminal/handoff.ts"
 import { Prompter } from "#terminal/prompter.ts"
+import { chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
 
@@ -91,7 +91,7 @@ export default Command.make("doctor").pipe(
 
       yield* printFindings(assessment.findings)
 
-      const handoff = yield* offerHandoff({
+      const resolution = yield* chooseResolution({
         command: "Doctor",
         cwd,
         message: "How do you want to resolve these findings?",
@@ -99,11 +99,11 @@ export default Command.make("doctor").pipe(
         subject: "findings",
       })
 
-      if (handoff._tag !== "Ended") {
+      if (resolution._tag !== "Ended") {
         return yield* failWithFindings
       }
 
-      const { agent } = handoff
+      const { agent } = resolution
       const after = yield* assessProject(cwd)
 
       if (after.findings.length === 0) {

@@ -23,6 +23,7 @@ import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.t
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
+import { fillTemplate } from "#lib/shared/template.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const repairPromptTemplate = getRepairPromptTemplate()
@@ -185,16 +186,10 @@ function renderRepairPrompt(
           "",
         ].join("\n")
       : ""
-  const slots = new Map([
-    ["findingCount", `${findings.length}`],
-    ["findings", sections.join("\n\n")],
-    ["version", adamantiteVersion],
-    ["warnings", warningSection],
-  ])
-
-  // One pass, so placeholder-like text inside the inserted content stays literal.
-  return repairPromptTemplate.replaceAll(
-    /\{\{(\w+)\}\}/g,
-    (placeholder, name: string) => slots.get(name) ?? placeholder
-  )
+  return fillTemplate(repairPromptTemplate, {
+    findingCount: `${findings.length}`,
+    findings: sections.join("\n\n"),
+    version: adamantiteVersion,
+    warnings: warningSection,
+  })
 }

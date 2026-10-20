@@ -99,3 +99,32 @@ _Avoid_: Fix, update
 Report findings for Adamantite-managed integrations and provide one combined repair
 prompt.
 _Avoid_: Check, fix, update
+
+## Hardening
+
+**Coding standard**:
+A convention that the code of a target project follows, such as where a file goes or which
+module may import another. An instruction can state it, or the code can follow it without one.
+_Avoid_: Best practice, guideline
+
+**Instructions**:
+The written coding standards of a target project, in `CODING_STANDARDS.md`, `AGENTS.md`,
+`GLOSSARY.md`, and the ADRs. Agents read them, but no tool checks them.
+_Avoid_: Prose, docs
+
+**Standards file**:
+`CODING_STANDARDS.md` in the target project. It holds the coding standards that no tool can
+check.
+_Avoid_: Style guide, conventions doc
+
+**Enforcement ladder**:
+The order of the places that can hold a coding standard, from strongest to weakest: a type
+or structure, a preset rule, an import rule, a custom rule, and an instruction. A standard goes on
+the highest step that can hold it.
+_Avoid_: Pyramid, enforcement level
+
+**Harden**:
+Find the coding standards that a target project follows, and move each one up the
+enforcement ladder after the user approves it. A coding agent does the work, and Adamantite
+renders its prompt. Harden is not an assessment and produces no findings.
+_Avoid_: Scan, codify, audit

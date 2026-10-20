@@ -1,0 +1,18 @@
+import { defineRule } from "adamantite/rules"
+
+export default defineRule({
+  meta: {
+    docs: { description: "TODO: describe what {{name}} reports." },
+    messages: { unexpected: "TODO: tell the author what to do instead." },
+    schema: [],
+    type: "problem",
+  },
+  createOnce(context) {
+    return {
+      // Run `adamantite rule ast <file>` to find the node types to visit.
+      DebuggerStatement(node) {
+        context.report({ messageId: "unexpected", node })
+      },
+    }
+  },
+})

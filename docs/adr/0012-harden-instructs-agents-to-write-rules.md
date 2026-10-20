@@ -41,7 +41,7 @@ The decisions:
 ## Consequences
 
 - Without a terminal, `harden` prints the prompt and exits 0. The interactive handoff and
-  the verification after a session reuse Doctor's handoff menu
+  the verification after a session reuse Doctor's resolution menu
   ([#529](https://github.com/adelrodriguez/adamantite/issues/529),
   [#531](https://github.com/adelrodriguez/adamantite/issues/531)).
 - No unit test can show that an agent finds good standards. The command tests check the

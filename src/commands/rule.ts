@@ -8,7 +8,7 @@ import * as Path from "effect/Path"
 import { parseSync } from "oxc-parser"
 import { FailedToParseSource } from "#lib/shared/errors.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
-import { addCustomRule, CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules.ts"
+import { addCustomRule, CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 const astFile = Argument.File("file", { mustExist: true }).pipe(

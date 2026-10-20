@@ -8,7 +8,7 @@ metadata:
 sources:
   - "adelrodriguez/adamantite:src/cli.ts"
   - "adelrodriguez/adamantite:src/commands/*.ts"
-  - "adelrodriguez/adamantite:src/lib/workspace/custom-rules.ts"
+  - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/index.ts"
 ---
 
 # Adamantite
@@ -171,7 +171,7 @@ and TypeScript again. It then reports any remaining doctor findings. Follow thos
 
 ## Custom rules
 
-<!-- Keep this section the same as the AGENTS.md text in src/lib/workspace/custom-rules.ts. -->
+<!-- Keep this section the same as the AGENTS.md text in src/lib/workspace/custom-rules/index.ts. -->
 
 Each file in the rules folder, `.adamantite/rules/` by default, is an Oxlint rule that this
 project owns. `custom()` from `adamantite/lint/custom` loads the folder and enables each

@@ -1,5 +1,20 @@
 # adamantite
 
+## 0.46.0
+
+### Minor Changes
+
+- [#536](https://github.com/adelrodriguez/adamantite/pull/536) [`e3e9cb5`](https://github.com/adelrodriguez/adamantite/commit/e3e9cb526a9dc45b1436583f8e0c6554bca2b14b) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add `adamantite harden`. It prints a Markdown prompt that tells a coding agent to find the coding
+  standards that the project already follows, drop the ones that a tool already enforces, and put
+  each remaining one at the highest level of enforcement that works: a custom rule when a rule can
+  check it, and a line in `CODING_STANDARDS.md` when no rule can. The agent writes nothing until the
+  user approves the candidates. The prompt lists the Oxlint config, the rules folder that its
+  `custom()` call loads, and the instruction files that exist.
+
+### Patch Changes
+
+- [#541](https://github.com/adelrodriguez/adamantite/pull/541) [`70611d9`](https://github.com/adelrodriguez/adamantite/commit/70611d965feaa6b68b3a6bcf0cd315b141a937a9) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite rule add` no longer writes an `AGENTS.md` to the rules folder. The authoring guidance lives only in the "Custom rules" section of the Adamantite skill, and `rule add` and the `AGENTS.md` section that `init` writes point to it. An existing `.adamantite/rules/AGENTS.md` stays in place, and you can delete it.
+
 ## 0.45.0
 
 ### Minor Changes

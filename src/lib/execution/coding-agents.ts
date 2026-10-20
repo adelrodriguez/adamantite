@@ -42,7 +42,7 @@ export const codingAgents: readonly CodingAgent[] = [
   { command: "opencode", name: "OpenCode", seedArguments: (prompt) => ["--prompt", prompt] },
 ]
 
-export interface AgentSessionOptions {
+export interface HandoffOptions {
   readonly agent: CodingAgent
   readonly cwd: string
   /**
@@ -53,20 +53,20 @@ export interface AgentSessionOptions {
 
 // Lives here instead of lib/shared/errors.ts because it carries the runner failure,
 // and shared must not depend on execution.
-export class AgentSessionFailed extends Data.TaggedError("AgentSessionFailed")<{
+export class HandoffFailed extends Data.TaggedError("HandoffFailed")<{
   readonly cause: CommandFailedLike
   readonly reason: "not-found" | "spawn-failed"
 }> {}
 
 const ignoreSigint = () => {
-  // Doctor stays alive; the agent in the foreground process group handles the signal.
+  // Adamantite stays alive; the agent in the foreground process group handles the signal.
 }
 
 // While the agent owns the terminal, Ctrl-C is the agent's to handle. The session is
-// spawned with `detached: false` so the agent joins Doctor's foreground process group
+// spawned with `detached: false` so the agent joins Adamantite's foreground process group
 // (the platform spawner would otherwise start it in a new session on POSIX, cutting it
 // off from terminal-generated SIGINT and SIGWINCH). Sharing the group means the same
-// SIGINT also reaches Doctor's runtime, whose spawner finalizer would kill the agent
+// SIGINT also reaches Adamantite's runtime, whose spawner finalizer would kill the agent
 // mid-edit — this shield discards it until the enclosing scope closes.
 const sigintShield = Effect.acquireRelease(
   Effect.sync(() => {
@@ -94,11 +94,11 @@ export class CodingAgents extends Context.Service<
     readonly detectInstalled: (cwd: string) => Effect.Effect<CodingAgent[]>
     /**
      * Hands the terminal to the agent with inherited stdio, seeded with the prompt. Resolves when
-     * the session ends; the agent's exit code is deliberately discarded because only a reassessment
-     * can judge whether the findings were repaired. Doctor ignores SIGINT for the duration of the
-     * session so a Ctrl-C reaches only the agent.
+     * the session ends; the agent's exit code is deliberately discarded because only the command
+     * can judge the result, such as Doctor's reassessment. Adamantite ignores SIGINT for the
+     * duration of the session so a Ctrl-C reaches only the agent.
      */
-    readonly runSession: (options: AgentSessionOptions) => Effect.Effect<void, AgentSessionFailed>
+    readonly handoff: (options: HandoffOptions) => Effect.Effect<void, HandoffFailed>
   }
 >()("CodingAgents") {
   static readonly layer = Layer.effect(
@@ -129,7 +129,7 @@ export class CodingAgents extends Context.Service<
             concurrency: "unbounded",
           }).pipe(Effect.map((installed) => codingAgents.filter((_, index) => installed[index])))
         ),
-        runSession: Effect.fn("CodingAgents.runSession")(
+        handoff: Effect.fn("CodingAgents.handoff")(
           function* ({ agent, cwd, prompt }) {
             yield* sigintShield
             yield* runner.exitCode({
@@ -145,7 +145,7 @@ export class CodingAgents extends Context.Service<
           Effect.scoped,
           Effect.mapError(
             (cause) =>
-              new AgentSessionFailed({
+              new HandoffFailed({
                 cause,
                 reason: cause._tag === "CliNotFound" ? "not-found" : "spawn-failed",
               })

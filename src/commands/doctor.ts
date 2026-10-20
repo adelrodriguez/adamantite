@@ -3,15 +3,13 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { assessProject, renderAssessmentMarkdown } from "#lib/assessment/index.ts"
-import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
-
-type ResolveAction = CodingAgent | "copy" | "done"
+import { chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
 
@@ -20,7 +18,6 @@ export default Command.make("doctor").pipe(
   Command.withHandler(() =>
     Effect.gen(function* () {
       const cwd = process.cwd()
-      const agents = yield* CodingAgents
       const prompter = yield* Prompter
       const terminal = yield* TerminalCapabilities
       const isInteractive = yield* terminal.isInteractive
@@ -92,91 +89,21 @@ export default Command.make("doctor").pipe(
         })
       }
 
-      const offerPromptCopy = (promptText: string) =>
-        Effect.gen(function* () {
-          const shouldCopyPrompt = yield* prompter.confirm({
-            initialValue: true,
-            message: "Copy the Markdown prompt for a coding agent?",
-          })
-
-          if (shouldCopyPrompt) {
-            yield* prompter.message(promptText)
-            yield* terminal.copyToClipboard(promptText)
-            yield* prompter.log.success(
-              "The Markdown prompt was printed and sent to the terminal clipboard."
-            )
-          }
-        })
-
       yield* printFindings(assessment.findings)
 
-      const installedAgents = yield* prompter.withSpinner(() => agents.detectInstalled(cwd), {
-        start: "Checking for installed coding agents...",
-        success: (detected) =>
-          detected.length === 0
-            ? "No supported coding agent CLI was found on PATH."
-            : `Found ${detected.map((agent) => agent.name).join(", ")}.`,
-      })
-
-      if (installedAgents.length === 0) {
-        yield* prompter.log.info(
-          `Doctor can hand findings off when one of these CLIs is installed: ${codingAgents
-            .map((agent) => `\`${agent.command}\``)
-            .join(", ")}.`
-        )
-      }
-
-      const prompt = renderAssessmentMarkdown(assessment, version)
-      const action = yield* prompter.select<ResolveAction>({
+      const resolution = yield* chooseResolution({
+        command: "Doctor",
+        cwd,
         message: "How do you want to resolve these findings?",
-        options: [
-          ...installedAgents.map((agent) => ({
-            label: `Hand off to ${agent.name}`,
-            value: agent,
-          })),
-          { label: "Copy the Markdown prompt for a coding agent", value: "copy" as const },
-          { label: "Do nothing", value: "done" as const },
-        ],
+        prompt: renderAssessmentMarkdown(assessment, version),
+        subject: "findings",
       })
 
-      if (action === "done") {
+      if (resolution._tag !== "Ended") {
         return yield* failWithFindings
       }
 
-      if (action === "copy") {
-        // The select already carried the intent; copy without asking again.
-        yield* prompter.message(prompt)
-        yield* terminal.copyToClipboard(prompt)
-        yield* prompter.log.success(
-          "The Markdown prompt was printed and sent to the terminal clipboard."
-        )
-        return yield* failWithFindings
-      }
-
-      const agent = action
-
-      yield* prompter.log.info(
-        `Handing the terminal to ${agent.name}. Exit the agent to return to Doctor.`
-      )
-
-      const started = yield* agents.runSession({ agent, cwd, prompt }).pipe(
-        Effect.as(true),
-        Effect.catchTag("AgentSessionFailed", (error) =>
-          prompter.log
-            .error(
-              error.reason === "not-found"
-                ? `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
-                : `Failed to start ${agent.name}: ${error.cause.message}`
-            )
-            .pipe(Effect.as(false))
-        )
-      )
-
-      if (!started) {
-        yield* offerPromptCopy(prompt)
-        return yield* failWithFindings
-      }
-
+      const { agent } = resolution
       const after = yield* assessProject(cwd)
 
       if (after.findings.length === 0) {

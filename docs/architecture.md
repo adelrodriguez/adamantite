@@ -25,12 +25,12 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | Module         | Responsibility                                                                                            |
 | -------------- | --------------------------------------------------------------------------------------------------------- |
 | `commands`     | Define one CLI workflow and render its user-facing result.                                                |
-| `execution`    | Run child commands, define coding-agent handoff, and carry forwarded arguments.                           |
+| `execution`    | Run child commands, hand off to coding agents, and carry forwarded arguments.                             |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.             |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal. |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                    |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                      |
-| `terminal`     | Prompt the user and render the CLI title.                                                                 |
+| `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                     |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                             |
 
 ## Lib layers
@@ -78,7 +78,10 @@ target project. A later Doctor run confirms whether the project reached the goal
 Tooling config generators produce only the current setup for `init` and Doctor reference
 content. They do not convert existing configs or generate patches.
 Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
-installed coding agent CLI or to copy the combined Markdown prompt. Installation is
+installed coding agent CLI or to copy the combined Markdown prompt. The resolution menu in
+`src/terminal/resolution-menu.ts` offers these choices, so other commands can offer them with
+their own prompt. `CodingAgents` in `src/lib/execution` detects the agents and does the
+handoff. Installation is
 detected by probing each supported CLI's version command, bounded by a timeout; only
 agents whose probe command starts appear in the menu. A handoff hands the terminal to
 the agent CLI with inherited stdio
@@ -127,11 +130,11 @@ src/
   lib/
     shared/         errors, filesystem, and JSON helpers (bottom layer)
     workspace/      target-project state and file operations
-    execution/      child command runs, coding-agent handoff, forwarded arguments
+    execution/      child command runs, coding-agent detection and handoff, forwarded arguments
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
     assessment/     integration registry, project assessment, agent prompt (top layer)
-  terminal/         user prompting and title output
+  terminal/         user prompting, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
 ```

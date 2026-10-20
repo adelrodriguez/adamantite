@@ -1,7 +1,7 @@
 # Harden instructs agents to turn coding standards into rules
 
 A target project follows more coding standards than its tools enforce. Some are written in
-prose that no rule checks, and some exist only in the code. We decided (2026-10-20) to add
+instructions that no rule checks, and some exist only in the code. We decided (2026-10-20) to add
 `adamantite harden`, which extends the model of
 [ADR 0002](0002-doctor-instructs-agents-mutate.md) to coding standards: Adamantite detects
 the relevant files and renders one Markdown prompt, a coding agent does the work, and
@@ -10,10 +10,10 @@ Adamantite verifies the result. See
 
 The decisions:
 
-- The prompt tells the agent to find the standards that the prose states and the patterns
+- The prompt tells the agent to find the standards that the instructions state and the patterns
   that the code follows, to drop each one that a tool already enforces, and to put each
   remaining one on the highest step of the enforcement ladder that works: a type or
-  structure, a preset rule, an import rule, a custom rule, then prose in
+  structure, a preset rule, an import rule, a custom rule, then an instruction in
   `CODING_STANDARDS.md`.
 - The command has one mode. The agent shows the candidates and writes nothing until the
   user approves. When no human can approve, the agent stops at the candidates, so an
@@ -23,8 +23,8 @@ The decisions:
   guarantee.
 - The agent, not Adamantite, decides which standards a tool already enforces. Adamantite
   does not resolve the effective Oxlint config.
-- Prose does not mark which standards are enforced. A standard that becomes a rule leaves
-  the prose, and the rule file gets a comment that states the standard and why it exists,
+- Instructions do not mark which standards are enforced. A standard that becomes a rule
+  leaves the instructions, and the rule file gets a comment that states the standard and why it exists,
   so each standard has one source.
 - When a new rule reports existing code, the agent lists the violations and sets the rule
   to `warn`: through the `rules` option of `custom()` for a custom rule, or in the config

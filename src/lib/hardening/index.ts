@@ -5,16 +5,16 @@ import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
 
 /**
- * The prose files that can state coding standards, and the ADR folder.
+ * The instruction files that can state coding standards, and the ADR folder.
  */
-const PROSE_FILES = ["CODING_STANDARDS.md", "AGENTS.md", "GLOSSARY.md", "docs/adr"] as const
+const INSTRUCTION_FILES = ["CODING_STANDARDS.md", "AGENTS.md", "GLOSSARY.md", "docs/adr"] as const
 
 /**
  * The files that a harden session starts from. Paths are relative to the project root.
  */
 interface HardenContext {
   readonly configs: readonly string[]
-  readonly proseFiles: readonly string[]
+  readonly instructionFiles: readonly string[]
   readonly rulesFolders: readonly string[]
   /**
    * Files with a `custom()` call whose `dir` is not a string literal, so only the agent can find
@@ -28,17 +28,17 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (cwd: 
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
   const { calls, configs } = yield* discoverCustomRules([cwd])
-  // `forEach` keeps the order of `PROSE_FILES`, which `Effect.filter` loses under concurrency.
+  // `forEach` keeps the order of `INSTRUCTION_FILES`, which `Effect.filter` loses under concurrency.
   const exists = yield* Effect.forEach(
-    PROSE_FILES,
+    INSTRUCTION_FILES,
     (file) => fs.exists(path.join(cwd, file)).pipe(Effect.orElseSucceed(() => false)),
     { concurrency: "unbounded" }
   )
-  const proseFiles = PROSE_FILES.filter((_, index) => exists[index])
+  const instructionFiles = INSTRUCTION_FILES.filter((_, index) => exists[index])
 
   return {
     configs: configs.map((config) => relative(config)),
-    proseFiles,
+    instructionFiles,
     rulesFolders: [
       ...new Set(calls.flatMap((call) => (call.dir === null ? [] : [relative(call.dir)]))),
     ],
@@ -82,11 +82,11 @@ function renderContext(context: HardenContext) {
     "",
     ...rulesFolders,
     "",
-    "### Prose",
+    "### Instructions",
     "",
     ...renderList(
-      context.proseFiles,
-      "No prose file was found. Write the approved standards that no rule can check to `CODING_STANDARDS.md`."
+      context.instructionFiles,
+      "No instruction file was found. Write the approved standards that no rule can check to `CODING_STANDARDS.md`."
     ),
     "",
   ]
@@ -95,11 +95,11 @@ function renderContext(context: HardenContext) {
 const PROCEDURE = [
   "## 1. List the written standards",
   "",
-  "Read the prose files above. List each standard that they state, with its file and line.",
+  "Read the instruction files above. List each standard that they state, with its file and line.",
   "",
   "## 2. Survey the code",
   "",
-  "Find the patterns that the code follows but that no prose states: file names and placement, import direction, naming, API use, error handling, and test layout.",
+  "Find the patterns that the code follows but that no instruction states: file names and placement, import direction, naming, API use, error handling, and test layout.",
   "",
   "- A pattern is a standard only when the code follows it in several places and has few counterexamples. List each counterexample with its file and line.",
   "- If the GitHub CLI `gh` is available and authenticated, read the review comments of recent merged pull requests. A correction that reviewers repeat is a strong sign of a standard.",
@@ -120,16 +120,16 @@ const PROCEDURE = [
   "2. **Preset rule:** a rule in an Oxlint preset or plugin that the project can turn on, or an option of a rule that is already on.",
   "3. **Import rule:** `no-restricted-imports`, with an override for the files that the standard applies to.",
   "4. **Custom rule:** a rule in the rules folder that checks the AST.",
-  "5. **Prose:** a line in `CODING_STANDARDS.md`, only when no tool can check the standard.",
+  "5. **Instruction:** a line in `CODING_STANDARDS.md`, only when no tool can check the standard.",
   "",
   "## 5. Show the candidates and wait for approval",
   "",
   "Show each candidate to the user with:",
   "",
   "- the standard in one sentence",
-  "- its source: the prose file and line, or the code only",
+  "- its source: the instruction file and line, or the code only",
   "- the number of places that follow it, and the counterexamples",
-  "- its step on the ladder, and the rule, option, or prose line that you propose",
+  "- its step on the ladder, and the rule, option, or instruction that you propose",
   "- the existing code that the new rule would report",
   "",
   "Ask the user which candidates to write. **Do not change any file before the user approves.**",
@@ -144,9 +144,9 @@ const PROCEDURE = [
   "- **Custom rule:** run `adamantite rule add <name>` to write the rule in the rules folder, and follow the `AGENTS.md` in that folder. When the rules folder above is not `.adamantite/rules`, pass it with `--dir`, such as `adamantite rule add <name> --dir tooling/rules`. Run `adamantite rule ast <file>` to find the node names. Test the rule with `RuleTester` from `oxlint/plugins-dev`.",
   "  - The rule message says what to do instead.",
   "  - A comment at the top of the rule file states the standard and why it exists.",
-  "- **Prose that became a rule:** delete the prose line of each written standard that a rule now checks. The rule is the only source of the standard.",
+  "- **Instruction that became a rule:** delete the instruction of each written standard that a rule now checks. The rule is the only source of the standard.",
   '- **Existing violations:** when a new rule reports existing code, do not fix that code. List the violations for the user, and set the rule to `warn`. For a custom rule, use the `rules` option of `custom()`, such as `custom({ rules: { "no-foo": "warn" } })`. For a preset rule or an import rule, set it to `warn` in the Oxlint config or override that turns it on. A separate change fixes the violations and sets the rule back to `error`.',
-  "- **Prose:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard.",
+  "- **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard.",
   "",
 ]
 
@@ -158,7 +158,7 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
     "# Adamantite harden",
     "",
     `This project uses Adamantite ${adamantiteVersion} to manage linting, formatting, and type tooling.`,
-    "`adamantite harden` asks you to find the coding standards that this project already follows, and to put each one at the highest level of enforcement that works: a custom rule when a rule can check it, and prose when no rule can.",
+    "`adamantite harden` asks you to find the coding standards that this project already follows, and to put each one at the highest level of enforcement that works: a custom rule when a rule can check it, and an instruction when no rule can.",
     "",
     ...renderContext(context),
     ...PROCEDURE,

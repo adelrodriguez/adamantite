@@ -104,8 +104,13 @@ _Avoid_: Check, fix, update
 
 **Coding standard**:
 A convention that the code of a target project follows, such as where a file goes or which
-module may import another. Prose can state it, or the code can follow it without prose.
+module may import another. An instruction can state it, or the code can follow it without one.
 _Avoid_: Best practice, guideline
+
+**Instructions**:
+The written coding standards of a target project, in `CODING_STANDARDS.md`, `AGENTS.md`,
+`GLOSSARY.md`, and the ADRs. Agents read them, but no tool checks them.
+_Avoid_: Prose, docs
 
 **Standards file**:
 `CODING_STANDARDS.md` in the target project. It holds the coding standards that no tool can
@@ -114,7 +119,7 @@ _Avoid_: Style guide, conventions doc
 
 **Enforcement ladder**:
 The order of the places that can hold a coding standard, from strongest to weakest: a type
-or structure, a preset rule, an import rule, a custom rule, and prose. A standard goes on
+or structure, a preset rule, an import rule, a custom rule, and an instruction. A standard goes on
 the highest step that can hold it.
 _Avoid_: Pyramid, enforcement level
 

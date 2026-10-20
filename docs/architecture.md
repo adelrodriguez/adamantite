@@ -27,7 +27,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `commands`     | Define one CLI workflow and render its user-facing result.                                                |
 | `execution`    | Run child commands, hand off to coding agents, and carry forwarded arguments.                             |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.             |
-| `hardening`    | Find the configs, rules folders, and prose of the project, and render the Markdown harden prompt.         |
+| `hardening`    | Find the configs, rules folders, and instructions of the project, and render the Markdown harden prompt.  |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal. |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                    |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                      |
@@ -110,7 +110,7 @@ warns the user and points to `adamantite doctor`.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
 - `harden` prints a prompt that tells a coding agent to turn the project's coding standards
-  into custom rules and prose. It never produces findings, so it never changes Doctor's
+  into custom rules and instructions. It never produces findings, so it never changes Doctor's
   result. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
   preset, then emits any remaining doctor findings.

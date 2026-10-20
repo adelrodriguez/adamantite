@@ -92,7 +92,7 @@ describe("harden", () => {
           "## Context",
           "### Oxlint config",
           "### Rules folders",
-          "### Prose",
+          "### Instructions",
           "## 1. List the written standards",
           "## 2. Survey the code",
           "## 3. Drop what a tool already enforces",
@@ -106,7 +106,7 @@ describe("harden", () => {
     })
   )
 
-  it.effect("list the Oxlint config, its rules folder, and the prose files that exist", () =>
+  it.effect("list the Oxlint config, its rules folder, and the instruction files that exist", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
         "AGENTS.md": "# AGENTS.md\n",
@@ -121,7 +121,7 @@ describe("harden", () => {
       expect(getListItems(getSection(prompt, "### Rules folders"))).toStrictEqual([
         "- `tooling/rules`",
       ])
-      expect(getListItems(getSection(prompt, "### Prose"))).toStrictEqual([
+      expect(getListItems(getSection(prompt, "### Instructions"))).toStrictEqual([
         "- `AGENTS.md`",
         "- `docs/adr`",
       ])
@@ -138,7 +138,7 @@ describe("harden", () => {
 
       expect(rulesFolders).toContain("adamantite/lint/custom")
       expect(rulesFolders).toContain(".adamantite/rules")
-      expect(getSection(prompt, "### Prose")).toContain("CODING_STANDARDS.md")
+      expect(getSection(prompt, "### Instructions")).toContain("CODING_STANDARDS.md")
     })
   )
 
@@ -190,7 +190,7 @@ describe("harden", () => {
           "`adamantite rule add <name>`",
           "pass it with `--dir`",
           "`RuleTester`",
-          "delete the prose line",
+          "delete the instruction of each written standard",
           "states the standard and why it exists",
           "For a custom rule, use the `rules` option of `custom()`",
           "For a preset rule or an import rule, set it to `warn` in the Oxlint config",

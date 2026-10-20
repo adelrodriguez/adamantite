@@ -37,7 +37,7 @@ and Sherif so humans and coding agents can use the same project workflow.
 - **Custom rules**: Write project-specific Oxlint rules in `.adamantite/rules/`, one rule
   for each file, and enable all of them with one line.
 - **Hardening**: Have a coding agent turn the coding standards that your code already
-  follows into custom rules, and into prose for the ones that no rule can check.
+  follows into custom rules, and into instructions for the ones that no rule can check.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
 - **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`.
@@ -220,7 +220,7 @@ adamantite harden
 ```
 
 The prompt lists the Oxlint config, the rules folder that its `custom()` call loads, and the
-prose files that exist: `CODING_STANDARDS.md`, `AGENTS.md`, `GLOSSARY.md`, and `docs/adr`.
+instruction files that exist: `CODING_STANDARDS.md`, `AGENTS.md`, `GLOSSARY.md`, and `docs/adr`.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates. `harden` never produces Doctor findings. See
 [ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).

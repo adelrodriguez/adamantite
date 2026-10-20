@@ -27,7 +27,10 @@ The decisions:
   the prose, and the rule file gets a comment that states the standard and why it exists,
   so each standard has one source.
 - When a new rule reports existing code, the agent lists the violations and sets the rule
-  to `warn` through the `rules` option of `custom()`. A separate change fixes the code.
+  to `warn`: through the `rules` option of `custom()` for a custom rule, or in the config
+  that turns on any other rule. A separate change fixes the code.
+- Nothing changes before the approval, not even a sample file: the agent confirms what a
+  tool enforces by linting a counterexample that the code already has.
 - Harden is not part of Doctor. Doctor is a deterministic CI gate, and a harden session can
   give a different result on each run, so harden never produces findings. Its context and
   prompt live in `src/lib/hardening`, beside `assessment`, because hardening does not

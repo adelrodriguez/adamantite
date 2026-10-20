@@ -142,6 +142,19 @@ describe("harden", () => {
     })
   )
 
+  it.effect("defer adamantite init to the approval when no Oxlint config exists", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({ "package.json": INSTALLED })
+
+      expect(
+        getMissingPhrases(getSection(prompt, "### Oxlint config"), [
+          "Do not create one.",
+          "run `adamantite init` before you write rules",
+        ])
+      ).toStrictEqual([])
+    })
+  )
+
   it.effect("point to the config when a custom() folder is not a string literal", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
@@ -161,6 +174,12 @@ describe("harden", () => {
       })
 
       expect(
+        getMissingPhrases(getSection(prompt, "## 3. Drop what a tool already enforces"), [
+          "lint a counterexample from step 2",
+          "Do not write a sample file",
+        ])
+      ).toStrictEqual([])
+      expect(
         getMissingPhrases(getSection(prompt, "## 5. Show the candidates and wait for approval"), [
           "Do not change any file before the user approves.",
           "If no human can approve",
@@ -169,10 +188,12 @@ describe("harden", () => {
       expect(
         getMissingPhrases(getSection(prompt, "## 6. Write the approved standards"), [
           "`adamantite rule add <name>`",
+          "pass it with `--dir`",
           "`RuleTester`",
           "delete the prose line",
           "states the standard and why it exists",
-          "set the rule to `warn` through the `rules` option of `custom()`",
+          "For a custom rule, use the `rules` option of `custom()`",
+          "For a preset rule or an import rule, set it to `warn` in the Oxlint config",
           "`CODING_STANDARDS.md`",
         ])
       ).toStrictEqual([])

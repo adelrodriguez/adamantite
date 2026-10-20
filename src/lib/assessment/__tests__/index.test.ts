@@ -91,6 +91,26 @@ describe("renderAssessmentMarkdown", () => {
     expect(prompt).not.toContain("**Notes:**")
   })
 
+  it("keep placeholder-like text in findings literal", () => {
+    const prompt = renderAssessmentMarkdown(
+      makeAssessment({
+        findings: [
+          {
+            currentState: "The script runs `echo {{version}} $&`.",
+            goal: ["Keep `{{findings}}` as written."],
+            id: "literal-text",
+            integration: "tool",
+            title: "Literal text",
+          },
+        ],
+      }),
+      "1.2.3"
+    )
+
+    expect(prompt).toContain("- **Current state:** The script runs `echo {{version}} $&`.")
+    expect(prompt).toContain("  - Keep `{{findings}}` as written.")
+  })
+
   it("render the warning report when no findings remain", () => {
     const report = renderAssessmentMarkdown(
       makeAssessment({ warnings: ["Skipping `tsconfig.json` setup."] }),

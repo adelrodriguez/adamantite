@@ -12,6 +12,7 @@ import type {
   IntegrationKind,
   PackageAction,
 } from "#lib/integrations/base.ts"
+import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -23,6 +24,8 @@ import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+
+const repairPromptTemplate = getRepairPromptTemplate()
 
 /**
  * Every integration assessed against a project. The order fixes how findings are numbered in the
@@ -179,23 +182,19 @@ function renderRepairPrompt(
           "",
           ...warnings.map((warning) => `- ${warning}`),
           "",
-        ]
-      : []
+          "",
+        ].join("\n")
+      : ""
+  const slots = new Map([
+    ["findingCount", `${findings.length}`],
+    ["findings", sections.join("\n\n")],
+    ["version", adamantiteVersion],
+    ["warnings", warningSection],
+  ])
 
-  return [
-    "# Adamantite doctor findings",
-    "",
-    `This project uses Adamantite ${adamantiteVersion} to manage linting, formatting, and type tooling.`,
-    `\`adamantite doctor\` found ${findings.length} issue(s). Fix them so that \`adamantite doctor\` exits 0.`,
-    "",
-    ...warningSection,
-    sections.join("\n\n"),
-    "",
-    "## Verify",
-    "",
-    "Run `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, if it is not on PATH.",
-    "All findings above must be gone and it must exit 0.",
-    "Do not suppress or work around checks; fix the underlying state.",
-    "",
-  ].join("\n")
+  // One pass, so placeholder-like text inside the inserted content stays literal.
+  return repairPromptTemplate.replaceAll(
+    /\{\{(\w+)\}\}/g,
+    (placeholder, name: string) => slots.get(name) ?? placeholder
+  )
 }

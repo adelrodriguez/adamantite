@@ -213,7 +213,6 @@ warning report and exits 0.
 Print a Markdown prompt that tells a coding agent to find the coding standards that the
 project already follows, and to put each one at the highest level of enforcement that works:
 a custom rule when a rule can check it, and a line in `CODING_STANDARDS.md` when no rule can.
-`fix` applies the tools' own fixes; `harden` asks an agent to write new rules.
 
 ```sh
 adamantite harden

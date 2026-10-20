@@ -12,7 +12,7 @@ const version = getPackageVersion()
 
 export default Command.make("harden").pipe(
   Command.withDescription(
-    "Ask a coding agent to turn the project's coding standards into custom rules and instructions. `fix` applies the tools' own fixes"
+    "Ask a coding agent to turn the project's coding standards into custom rules and instructions"
   ),
   Command.withHandler(() =>
     Effect.gen(function* () {

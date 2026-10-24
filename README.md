@@ -224,8 +224,9 @@ The agent shows the candidates and writes nothing until you approve them. When n
 approve, the agent stops at the candidates.
 
 In an interactive terminal, `harden` offers the same menu as Doctor: hand off to an installed
-coding agent seeded with the prompt, copy the prompt, or do nothing. Without a terminal, it
-prints the prompt and exits 0. `harden` never produces Doctor findings. See
+coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff, `harden`
+runs `check` and the Doctor assessment, and exits 1 when either fails. A copy or "do nothing"
+exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings. See
 [ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).
 
 ### `adamantite update`

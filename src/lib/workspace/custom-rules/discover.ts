@@ -227,13 +227,14 @@ const resolveImport = Effect.fn("resolveImport")(function* (
 })
 
 /**
- * The Oxlint config of each package directory, and the `custom()` calls that the configs reach:
+ * The Oxlint config of each config directory, and the `custom()` calls that the configs reach:
  * calls in each config, and in the modules that a config imports, such as the entry module of a
- * shared tooling package. A `custom()` call in a module that no config imports does not load
- * rules.
+ * shared tooling package. A `custom()` call in a module that no config imports does not load rules.
+ * Imports resolve against all `packageDirectories`, so a config directory can be a subset.
  */
 export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
-  packageDirectories: readonly string[]
+  packageDirectories: readonly string[],
+  configDirectories: readonly string[] = packageDirectories
 ) {
   const path = yield* Path.Path
   const packages = Array.getSomes(
@@ -243,7 +244,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   )
   const configs = Array.getSomes(
     yield* Effect.forEach(
-      packageDirectories,
+      configDirectories,
       (directory) => readFirstFile(CONFIG_FILES.map((file) => path.join(directory, file))),
       { concurrency: "unbounded" }
     )

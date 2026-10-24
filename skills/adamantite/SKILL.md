@@ -158,6 +158,21 @@ non-interactive run — the path an agent uses — Doctor prints Markdown direct
 produce a repair prompt and exit 1. Assessment warnings alone produce a warning report
 and exit 0. Run `adamantite doctor` again until it exits 0.
 
+## Harden
+
+To turn the coding standards that the project follows into custom rules, run:
+
+```shell
+adamantite harden
+```
+
+In a non-interactive run, `harden` prints a Markdown prompt and exits 0. Follow the prompt: list
+the candidate standards, show them to the user, and write nothing until the user approves. When
+no human can approve, stop after you show the candidates. In an interactive terminal, `harden`
+offers a handoff to an installed coding agent CLI, a copy of the prompt, or nothing. After a
+handoff, it runs `check` and the Doctor assessment, and exits 1 when either fails. `harden` never
+produces Doctor findings.
+
 ## Update
 
 For an existing installation, run:
@@ -217,4 +232,6 @@ rule as `error` under the `project` plugin: `no-process-env.ts` becomes
   reinitialize the project.
 - Project-specific lint rule: add a custom rule with `adamantite rule add <name>`; do not
   edit Adamantite presets.
+- Coding standards that live only in instructions or in the code: run `harden` and follow its
+  prompt.
 - Unknown option or behavior: run `adamantite <command> --help` before guessing.

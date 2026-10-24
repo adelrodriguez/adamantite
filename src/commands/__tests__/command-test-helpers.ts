@@ -4,20 +4,25 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import * as PlatformError from "effect/PlatformError"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stdio from "effect/Stdio"
 import * as Terminal from "effect/Terminal"
 import { TestConsole } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { CodingAgents } from "#lib/execution/coding-agents.ts"
+import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import {
   type CommandFailedLike,
   type CommandRunOptions,
   CommandRunner,
 } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { type FailedToInstallDependency, OperationCancelled } from "#lib/shared/errors.ts"
+import {
+  CliNotFound,
+  type FailedToInstallDependency,
+  OperationCancelled,
+} from "#lib/shared/errors.ts"
 import {
   type DetectedPackageManager,
   DependencyInstaller,
@@ -121,6 +126,68 @@ export function createRunnerTestContext(
       )
     ),
   }
+}
+
+interface HandoffRunnerOptions {
+  readonly agentExit?: number | "not-found" | "spawn-error"
+  readonly installedCommands?: readonly string[]
+  readonly onAgentRun?: () => void
+}
+
+function isProbe(invocation: { readonly args: string[] }) {
+  return invocation.args[0] === "--version" || invocation.args[0] === "version"
+}
+
+// Dispatches on the invocation shape: `--version` probes answer installation,
+// and everything else is the agent spawn.
+export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
+  const installed = options.installedCommands ?? ["claude", "codex"]
+
+  return createRunnerTestContext({
+    implementation: (invocation) =>
+      Effect.suspend((): Effect.Effect<ChildProcessSpawner.ExitCode, CommandFailedLike> => {
+        if (isProbe(invocation)) {
+          return installed.includes(invocation.command)
+            ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
+            : Effect.fail(new CliNotFound({ command: invocation.command }))
+        }
+        if (options.agentExit === "not-found") {
+          return Effect.fail(new CliNotFound({ command: invocation.command }))
+        }
+        if (options.agentExit === "spawn-error") {
+          return Effect.fail(
+            PlatformError.systemError({
+              _tag: "PermissionDenied",
+              method: "spawn",
+              module: "FileSystem",
+              pathOrDescriptor: invocation.command,
+            })
+          )
+        }
+        options.onAgentRun?.()
+        return Effect.succeed(ChildProcessSpawner.ExitCode(options.agentExit ?? 0))
+      }),
+  })
+}
+
+export function nonProbeInvocations(runner: RunnerTestContext) {
+  return runner.invocations.filter((invocation) => !isProbe(invocation))
+}
+
+export const interactiveTerminalLayer = Layer.succeed(TerminalCapabilities)({
+  copyToClipboard: () => Effect.void,
+  isInteractive: Effect.succeed(true),
+})
+
+// Drawn from the shipped catalog so a changed seed or probe form fails these tests.
+export function agentByCommand(command: string): CodingAgent {
+  const agent = codingAgents.find((candidate) => candidate.command === command)
+
+  if (!agent) {
+    throw new Error(`No coding agent in the catalog with command \`${command}\``)
+  }
+
+  return agent
 }
 
 export function createPrompterTestContext(options?: {

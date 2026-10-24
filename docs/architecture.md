@@ -109,8 +109,8 @@ warns the user and points to `adamantite doctor`.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
-- `harden` prints a prompt that tells a coding agent to turn the project's coding standards
-  into custom rules and instructions. It never produces findings, so it never changes Doctor's
+- `harden` renders a prompt that tells a coding agent to turn the project's coding standards
+  into custom rules and instructions, and offers it through the resolution menu. It never produces findings, so it never changes Doctor's
   result. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
   preset, then emits any remaining doctor findings.

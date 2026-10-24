@@ -210,9 +210,9 @@ warning report and exits 0.
 
 ### `adamantite harden`
 
-Print a Markdown prompt that tells a coding agent to find the coding standards that the
-project already follows, and to put each one at the highest level of enforcement that works:
-a custom rule when a rule can check it, and a line in `CODING_STANDARDS.md` when no rule can.
+Ask a coding agent to find the coding standards that the project already follows, and to put
+each one at the highest level of enforcement that works: a custom rule when a rule can check
+it, and a line in `CODING_STANDARDS.md` when no rule can.
 
 ```sh
 adamantite harden
@@ -221,7 +221,11 @@ adamantite harden
 The prompt lists the Oxlint config, the rules folder that its `custom()` call loads, and the
 instruction files that exist: `CODING_STANDARDS.md`, `AGENTS.md`, `GLOSSARY.md`, and `docs/adr`.
 The agent shows the candidates and writes nothing until you approve them. When no human can
-approve, the agent stops at the candidates. `harden` never produces Doctor findings. See
+approve, the agent stops at the candidates.
+
+In an interactive terminal, `harden` offers the same menu as Doctor: hand off to an installed
+coding agent seeded with the prompt, copy the prompt, or do nothing. Without a terminal, it
+prints the prompt and exits 0. `harden` never produces Doctor findings. See
 [ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).
 
 ### `adamantite update`

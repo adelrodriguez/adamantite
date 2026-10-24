@@ -110,7 +110,8 @@ warns the user and points to `adamantite doctor`.
 - `init` creates selected integrations and managed scripts.
 - `doctor` assesses managed integrations and emits repair findings.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
-  into custom rules and instructions, and offers it through the resolution menu. It never produces findings, so it never changes Doctor's
+  into custom rules and instructions, and offers it through the resolution menu. After a
+  handoff, it runs Oxfmt and Oxlint as `check` does, and assesses the project as Doctor does. It never produces findings, so it never changes Doctor's
   result. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
   preset, then emits any remaining doctor findings.

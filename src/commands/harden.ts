@@ -1,6 +1,9 @@
 import process from "node:process"
 import * as Command from "effect/cli/Command"
+import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
+import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { assessProject } from "#lib/assessment/index.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -17,26 +20,26 @@ import { chooseResolution } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
 
-export default Command.make("harden").pipe(
+const scope = Flag.Directory("path", { mustExist: true }).pipe(
+  Flag.optional,
+  Flag.withDescription(
+    "Limit the session to one workspace package or folder of the project, relative to the current directory"
+  )
+)
+
+export default Command.make("harden", { scope }).pipe(
   Command.withDescription(
     "Ask a coding agent to turn the project's coding standards into custom rules and instructions"
   ),
-  Command.withHandler(() =>
+  Command.withHandler(({ scope }) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
+      const path = yield* Path.Path
       const prompter = yield* Prompter
       const terminal = yield* TerminalCapabilities
       const isInteractive = yield* terminal.isInteractive
 
-      if (isInteractive) {
-        yield* prompter.intro("💠 adamantite harden")
-      }
-
-      const packageJson = yield* readPackageJson(cwd)
-
-      if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
-        const message =
-          "`adamantite` is not installed in this project. Install it before running `adamantite harden`."
+      const failBeforeStart = Effect.fn("failBeforeStart")(function* (message: string) {
         if (isInteractive) {
           yield* prompter.log.warning(message)
           yield* prompter.outro("⚠️ Harden did not start.")
@@ -47,9 +50,37 @@ export default Command.make("harden").pipe(
           command: "harden",
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
+      })
+
+      if (isInteractive) {
+        yield* prompter.intro("💠 adamantite harden")
       }
 
-      const context = yield* readHardenContext(cwd)
+      const packageJson = yield* readPackageJson(cwd)
+
+      if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
+        return yield* failBeforeStart(
+          "`adamantite` is not installed in this project. Install it before running `adamantite harden`."
+        )
+      }
+
+      const scopeDirectory = Option.isSome(scope) ? path.resolve(cwd, scope.value) : undefined
+
+      if (scopeDirectory !== undefined) {
+        const fromRoot = path.relative(cwd, scopeDirectory)
+
+        if (
+          fromRoot === ".."
+          || fromRoot.startsWith(`..${path.sep}`)
+          || path.isAbsolute(fromRoot)
+        ) {
+          return yield* failBeforeStart(
+            `\`--path\` must be a folder inside the project. \`${scopeDirectory}\` is outside \`${cwd}\`.`
+          )
+        }
+      }
+
+      const context = yield* readHardenContext(cwd, scopeDirectory)
       const prompt = renderHardenPrompt(context, version)
 
       if (!isInteractive) {

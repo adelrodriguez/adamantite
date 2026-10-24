@@ -2,9 +2,18 @@ import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Layer from "effect/Layer"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import hardenCommand from "#commands/harden.ts"
-import { createPrompterTestContext, runCommand } from "./command-test-helpers.ts"
+import { TerminalCapabilities } from "#terminal/capabilities.ts"
+import {
+  agentByCommand,
+  createPrompterTestContext,
+  makeHandoffRunner,
+  interactiveTerminalLayer,
+  nonProbeInvocations,
+  runCommand,
+} from "./command-test-helpers.ts"
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -86,6 +95,31 @@ function runHarden(files: Record<string, string>) {
     })
 
     return { exit, prompter }
+  })
+}
+
+const claudeAgent = agentByCommand("claude")
+
+const HARDEN_FILES = { "oxlint.config.ts": CORE_CONFIG, "package.json": INSTALLED }
+
+function runInteractiveHarden(
+  prompterOptions: Parameters<typeof createPrompterTestContext>[0],
+  runnerOptions: Parameters<typeof makeHandoffRunner>[0] = {}
+) {
+  return Effect.gen(function* () {
+    const copied: string[] = []
+    const prompter = createPrompterTestContext(prompterOptions)
+    const runner = makeHandoffRunner(runnerOptions)
+    const terminal = Layer.succeed(TerminalCapabilities)({
+      copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
+      isInteractive: Effect.succeed(true),
+    })
+    const exit = yield* runCommand(hardenCommand, [], {
+      files: createFileSystemTestContext({ files: HARDEN_FILES }),
+      layers: [prompter.layer, runner.layer, terminal],
+    })
+
+    return { copied, exit, prompter, runner }
   })
 }
 
@@ -230,6 +264,162 @@ describe("harden", () => {
       expect(prompter.messages).toStrictEqual([
         "`adamantite` is not installed in this project. Install it before running `adamantite harden`.",
       ])
+    })
+  )
+
+  it.effect("offer a handoff to each installed agent, the copy, and nothing", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runInteractiveHarden({ selectResponses: ["done"] })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter).toMatchObject({
+        intros: ["💠 adamantite harden"],
+        messages: [],
+        outros: ["✅ Harden completed."],
+        selectCalls: [
+          {
+            message: "How do you want to harden this project?",
+            options: [
+              expect.objectContaining({ label: "Hand off to Claude Code" }),
+              expect.objectContaining({ label: "Hand off to Codex" }),
+              expect.objectContaining({
+                label: "Copy the Markdown prompt for a coding agent",
+                value: "copy",
+              }),
+              expect.objectContaining({ label: "Do nothing", value: "done" }),
+            ],
+          },
+        ],
+      })
+    })
+  )
+
+  it.effect("hand off to an agent seeded with the prompt and succeed", () =>
+    Effect.gen(function* () {
+      // The agent's exit code does not decide the result.
+      const { exit, prompter, runner } = yield* runInteractiveHarden(
+        { selectResponses: [claudeAgent] },
+        { agentExit: 1 }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(nonProbeInvocations(runner)).toStrictEqual([
+        expect.objectContaining({
+          args: [expect.stringMatching(/^# Adamantite harden\n[\s\S]*## Verify/)],
+          command: "claude",
+          detached: false,
+          stderr: "inherit",
+          stdin: "inherit",
+          stdout: "inherit",
+        }),
+      ])
+      expect(prompter).toMatchObject({
+        logs: [
+          {
+            level: "info",
+            message: "Handing the terminal to Claude Code. Exit the agent to return to Harden.",
+          },
+        ],
+        outros: ["✅ The Claude Code session ended."],
+      })
+    })
+  )
+
+  it.effect("print the prompt and copy it when the user chooses to copy", () =>
+    Effect.gen(function* () {
+      const { copied, exit, prompter, runner } = yield* runInteractiveHarden({
+        selectResponses: ["copy"],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(nonProbeInvocations(runner)).toStrictEqual([])
+      expect(prompter.messages).toStrictEqual([expect.stringMatching(/^# Adamantite harden\n/)])
+      expect(copied).toStrictEqual(prompter.messages)
+      expect(prompter.logs).toStrictEqual([
+        {
+          level: "success",
+          message: "The Markdown prompt was printed and sent to the terminal clipboard.",
+        },
+      ])
+    })
+  )
+
+  it.effect("say that no agent CLI is installed and still offer the copy", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runInteractiveHarden(
+        { selectResponses: ["done"] },
+        { installedCommands: [] }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "info",
+        message: expect.stringMatching(/^Harden can hand the prompt off when one of these CLIs/u),
+      })
+      expect(prompter.selectCalls).toStrictEqual([
+        expect.objectContaining({
+          options: [
+            expect.objectContaining({ value: "copy" }),
+            expect.objectContaining({ value: "done" }),
+          ],
+        }),
+      ])
+    })
+  )
+
+  it.effect("offer the copy when the agent fails to start", () =>
+    Effect.gen(function* () {
+      const { copied, exit, prompter } = yield* runInteractiveHarden(
+        { confirmResponses: [true], selectResponses: [claudeAgent] },
+        { agentExit: "not-found" }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toContainEqual({
+        level: "error",
+        message: "`claude` was not found on PATH. Install Claude Code or copy the prompt instead.",
+      })
+      expect(prompter.confirmCalls).toStrictEqual([
+        { initialValue: true, message: "Copy the Markdown prompt for a coding agent?" },
+      ])
+      expect(copied).toStrictEqual([expect.stringMatching(/^# Adamantite harden\n/)])
+    })
+  )
+
+  it.effect("fail without side effects when the user cancels the menu", () =>
+    Effect.gen(function* () {
+      const { copied, exit, prompter, runner } = yield* runInteractiveHarden({
+        cancelAtPromptIndex: 1,
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.cancels).toStrictEqual(["Harden was cancelled. Nothing was changed."])
+      expect(nonProbeInvocations(runner)).toStrictEqual([])
+      expect(copied).toStrictEqual([])
+      expect(prompter.outros).toStrictEqual([])
+    })
+  )
+
+  it.effect("fail when Adamantite is not installed in an interactive terminal", () =>
+    Effect.gen(function* () {
+      const prompter = createPrompterTestContext()
+      const exit = yield* runCommand(hardenCommand, [], {
+        files: createFileSystemTestContext({ files: { "package.json": manifest({}) } }),
+        layers: [prompter.layer, interactiveTerminalLayer],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter).toMatchObject({
+        logs: [
+          {
+            level: "warning",
+            message:
+              "`adamantite` is not installed in this project. Install it before running `adamantite harden`.",
+          },
+        ],
+        messages: [],
+        outros: ["⚠️ Harden did not start."],
+      })
     })
   )
 })

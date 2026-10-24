@@ -216,10 +216,15 @@ it, and a line in `CODING_STANDARDS.md` when no rule can.
 
 ```sh
 adamantite harden
+adamantite harden --path packages/web
 ```
 
-The prompt lists the Oxlint config, the rules folder that its `custom()` call loads, and the
-instruction files that exist: `CODING_STANDARDS.md`, `AGENTS.md`, `GLOSSARY.md`, and `docs/adr`.
+The prompt lists the Oxlint config of the root and of each workspace package, the rules folders
+that their `custom()` calls load, and the instruction files that exist: `CODING_STANDARDS.md`,
+`AGENTS.md`, `GLOSSARY.md`, and `docs/adr`. `--path` limits the session to one package or folder.
+The prompt then lists the configs of the packages in that folder, or of the package that contains
+it, the rules folders that those configs load, and the instructions of the root and of those
+packages.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
 

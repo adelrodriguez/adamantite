@@ -87,10 +87,10 @@ export default defineConfig({
 })
 `
 
-function runHarden(files: Record<string, string>) {
+function runHarden(files: Record<string, string>, args: readonly string[] = []) {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
-    const exit = yield* runCommand(hardenCommand, [], {
+    const exit = yield* runCommand(hardenCommand, args, {
       files: createFileSystemTestContext({ files }),
       layers: [prompter.layer],
     })
@@ -129,15 +129,55 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
   })
 }
 
-function runHardenPrompt(files: Record<string, string>) {
+function runHardenPrompt(files: Record<string, string>, args: readonly string[] = []) {
   return Effect.gen(function* () {
-    const { exit, prompter } = yield* runHarden(files)
+    const { exit, prompter } = yield* runHarden(files, args)
 
     expect(Exit.isSuccess(exit)).toBe(true)
     expect(prompter.messages).toHaveLength(1)
 
     return prompter.messages[0] ?? ""
   })
+}
+
+// The root and `web` load the rules of a shared tooling package, and `api` has its own rules folder.
+const MONOREPO_FILES = {
+  "AGENTS.md": "# AGENTS.md\n",
+  "oxlint.config.ts": `import { defineConfig } from "oxlint"
+import tooling from "@acme/lint"
+
+export default defineConfig({ extends: [tooling] })
+`,
+  "package.json": manifest({
+    devDependencies: { adamantite: "1.0.0" },
+    workspaces: ["packages/*", "tooling/lint"],
+  }),
+  "packages/api/oxlint.config.ts": CUSTOM_RULES_CONFIG.replace(
+    'dir: "tooling/rules", name: "acme"',
+    'dir: "rules", name: "api"'
+  ),
+  "packages/api/package.json": JSON.stringify({ name: "api" }),
+  "packages/web/AGENTS.md": "# AGENTS.md\n",
+  "packages/web/oxlint.config.ts": `import { defineConfig } from "oxlint"
+import tooling from "@acme/lint"
+
+export default defineConfig({ extends: [tooling] })
+`,
+  "packages/web/package.json": JSON.stringify({ name: "web" }),
+  "packages/web/src/index.ts": "export {}\n",
+  "tooling/lint/index.ts": `import custom from "adamantite/lint/custom"
+
+export default custom({ dir: "rules", name: "acme" })
+`,
+  "tooling/lint/package.json": JSON.stringify({ name: "@acme/lint" }),
+}
+
+function getContext(prompt: string) {
+  return {
+    configs: getListItems(getSection(prompt, "### Oxlint config")),
+    instructionFiles: getListItems(getSection(prompt, "### Instructions")),
+    rulesFolders: getListItems(getSection(prompt, "### Rules folders")),
+  }
 }
 
 describe("harden", () => {
@@ -269,6 +309,57 @@ describe("harden", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.messages).toStrictEqual([
         "`adamantite` is not installed in this project. Install it before running `adamantite harden`.",
+      ])
+    })
+  )
+
+  it.effect("list each workspace package's config, and a shared rules folder once", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(MONOREPO_FILES)
+
+      expect(getContext(prompt)).toStrictEqual({
+        configs: [
+          "- `oxlint.config.ts`",
+          "- `packages/api/oxlint.config.ts`",
+          "- `packages/web/oxlint.config.ts`",
+        ],
+        instructionFiles: ["- `AGENTS.md`", "- `packages/web/AGENTS.md`"],
+        rulesFolders: ["- `packages/api/rules`", "- `tooling/lint/rules`"],
+      })
+      expect(getSection(prompt, "## Context")).toContain(
+        "Adamantite found these files in the project and its workspace packages."
+      )
+    })
+  )
+
+  it.effect.each([
+    { args: ["--path", "packages/web"], name: "a workspace package" },
+    { args: ["--path", "packages/web/src"], name: "a folder inside a workspace package" },
+  ])("limit the context to $name with --path", ({ args }) =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(MONOREPO_FILES, args)
+
+      // The root instructions apply to every package, and the rules of `web` live in tooling.
+      expect(getContext(prompt)).toStrictEqual({
+        configs: ["- `packages/web/oxlint.config.ts`"],
+        instructionFiles: ["- `AGENTS.md`", "- `packages/web/AGENTS.md`"],
+        rulesFolders: ["- `tooling/lint/rules`"],
+      })
+      expect(getSection(prompt, "## Context")).toContain(
+        `Adamantite found these files for \`${args[1]}\`, the folder that \`--path\` selects.`
+      )
+    })
+  )
+
+  it.effect("fail with a clear message when --path is outside the project", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden(MONOREPO_FILES, ["--path", ".."])
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([
+        expect.stringMatching(
+          /^`--path` must be a folder inside the project\. `.+` is outside `.+`\.$/u
+        ),
       ])
     })
   )

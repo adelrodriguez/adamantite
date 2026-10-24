@@ -1,10 +1,13 @@
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
+import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
@@ -21,31 +24,67 @@ interface HardenContext {
   readonly instructionFiles: readonly string[]
   readonly rulesFolders: readonly string[]
   /**
+   * The folder that `--path` selects, or `null` for the whole project.
+   */
+  readonly scope: string | null
+  /**
    * Files with a `custom()` call whose `dir` is not a string literal, so only the agent can find
    * its rules folder.
    */
   readonly unresolvedCalls: readonly string[]
 }
 
-export const readHardenContext = Effect.fn("readHardenContext")(function* (cwd: string) {
+/**
+ * Reads the harden context of the root and each workspace package. A `scope` limits it to the
+ * packages inside that folder, or to the package that contains it. The rules folders that their
+ * configs load stay listed, also when a shared tooling package outside the scope owns them.
+ */
+export const readHardenContext = Effect.fn("readHardenContext")(function* (
+  cwd: string,
+  scope: string = cwd
+) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
-  const { calls, configs } = yield* discoverCustomRules([cwd])
-  // `forEach` keeps the order of `INSTRUCTION_FILES`, which `Effect.filter` loses under concurrency.
+  const contains = (folder: string, target: string) => {
+    const fromFolder = path.relative(folder, target)
+
+    return (
+      fromFolder !== ".." && !fromFolder.startsWith(`..${path.sep}`) && !path.isAbsolute(fromFolder)
+    )
+  }
+  const packageDirectories = [
+    cwd,
+    ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
+  ]
+  const packagesInScope = packageDirectories.filter((directory) => contains(scope, directory))
+  // The innermost package that contains the scope, when the scope holds no package of its own.
+  const owner = Array.sort(
+    packageDirectories.filter((directory) => contains(directory, scope)),
+    Order.mapInput(Order.flip(Order.Number), (directory: string) => directory.length)
+  ).slice(0, 1)
+  const configDirectories = packagesInScope.length > 0 ? packagesInScope : owner
+  const { calls, configs } = yield* discoverCustomRules(packageDirectories, configDirectories)
+  // The root instructions apply to every package, so a scope keeps them.
+  const instructionCandidates = [...new Set([cwd, ...configDirectories])].flatMap((directory) =>
+    INSTRUCTION_FILES.map((file) => path.join(directory, file))
+  )
+  // `forEach` keeps the order of the candidates, which `Effect.filter` loses under concurrency.
   const exists = yield* Effect.forEach(
-    INSTRUCTION_FILES,
-    (file) => fs.exists(path.join(cwd, file)).pipe(Effect.orElseSucceed(() => false)),
+    instructionCandidates,
+    (file) => fs.exists(file).pipe(Effect.orElseSucceed(() => false)),
     { concurrency: "unbounded" }
   )
-  const instructionFiles = INSTRUCTION_FILES.filter((_, index) => exists[index])
 
   return {
     configs: configs.map((config) => relative(config)),
-    instructionFiles,
+    instructionFiles: instructionCandidates
+      .filter((_, index) => exists[index])
+      .map((file) => relative(file)),
     rulesFolders: [
       ...new Set(calls.flatMap((call) => (call.dir === null ? [] : [relative(call.dir)]))),
     ],
+    scope: scope === cwd ? null : relative(scope),
     unresolvedCalls: [
       ...new Set(calls.flatMap((call) => (call.dir === null ? [relative(call.source)] : []))),
     ],
@@ -82,6 +121,10 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
     ),
     instructionFiles: renderList(context.instructionFiles, "No instruction file was found."),
     rulesFolders: renderRulesFolders(context),
+    scope:
+      context.scope === null
+        ? "Adamantite found these files in the project and its workspace packages. Paths are relative to the project root."
+        : `Adamantite found these files for \`${context.scope}\`, the folder that \`--path\` selects. Survey only the code in this folder. Paths are relative to the project root.`,
     version: adamantiteVersion,
   })
 }

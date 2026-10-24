@@ -7,7 +7,7 @@ Steps 1 to 5 are read-only. You change files only in step 6, and only for the ca
 
 ## Context
 
-Adamantite found these files at the project root.
+{{scope}}
 
 ### Oxlint config
 

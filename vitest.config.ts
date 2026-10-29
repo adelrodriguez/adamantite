@@ -18,7 +18,8 @@ export default defineConfig({
       // TEMPORARY: Vitest's module cache keys a module by its own source, but a macro inlines the
       // files that it reads, such as a `.template` file. unplugin-macros does not add those files
       // to the cache key, so an edit to only a template keeps the old output. Keep modules that
-      // import a macro out of the cache until unplugin-macros sets the key itself.
+      // import a macro out of the cache until unplugin-macros sets the key itself:
+      // https://github.com/unplugin/unplugin-macros/issues/179
       configureVitest({ defineCacheKeyGenerator }) {
         defineCacheKeyGenerator(({ sourceCode }) =>
           MACRO_IMPORT.test(sourceCode) ? false : undefined

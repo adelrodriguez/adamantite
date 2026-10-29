@@ -111,7 +111,8 @@ warns the user and points to `adamantite doctor`.
 - `doctor` assesses managed integrations and emits repair findings.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
   into custom rules and instructions, and offers it through the resolution menu. After a
-  handoff, it runs Oxfmt and Oxlint as `check` does, and assesses the project as Doctor does. It never produces findings, so it never changes Doctor's
+  handoff, it runs Oxfmt and Oxlint as `check` does, then the custom rule tests as `rule test`
+  does, then assesses the project as Doctor does. It never produces findings, so it never changes Doctor's
   result. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
   preset, then emits any remaining doctor findings.
@@ -250,8 +251,8 @@ ADR 0009. Five modules carry them:
   it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
   copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in the preset.
   `index.ts` writes the rule stub and its test in `tests/` for `adamantite rule add`, from
-  the templates beside it, and lists the tests of the loaded rules folders for
-  `adamantite rule test`.
+  the templates beside it, and builds the `node --test` command for the tests of the loaded
+  rules folders, which `adamantite rule test` and `adamantite harden` run.
 - The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
   that module to report rules folders that no `custom()` call loads, rule files that cannot
   load, and rules folders that share a plugin name.

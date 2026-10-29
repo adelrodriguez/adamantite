@@ -25,10 +25,9 @@ import {
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
 const CONFIG = {
   languages: {
-    // oxfmt cannot format Astro files, so they go to Zed's managed Prettier, which installs the
-    // listed plugins itself and keeps the project free of Prettier dependencies. Mirrors Zed's
-    // shipped default for Astro: no `formatter` key, so the default "auto" formatter picks
-    // Prettier via `allowed`, and no `parser`, which the plugin infers.
+    // oxfmt cannot format Astro files, so Zed's managed Prettier formats them and installs the
+    // listed plugins itself. Like Zed's default for Astro, there is no `formatter` key, so "auto"
+    // picks Prettier through `allowed`, and no `parser`, which the plugin infers.
     Astro: {
       format_on_save: "on",
       prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },

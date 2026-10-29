@@ -3,11 +3,9 @@ import type { OxlintConfig } from "oxlint"
 // Framework-neutral opinions: values keep their source object visible, and types come from
 // validation or narrowing instead of assertions. Use it with any other preset.
 //
-// The rules come from Adamantite's first-party plugin in plugin/, so target projects install
-// nothing extra. The specifier is an absolute file URL computed from this module's location, as in
-// the antislop preset. The source tree holds `plugin/index.ts` and the published dist tree holds
-// `plugin/index.js`, so the extension follows this module's own. Oxlint loads a TypeScript plugin
-// only in the source tree, where Node.js strips the types.
+// The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
+// extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the
+// source tree, where Node.js strips the types.
 const PLUGIN_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 
 const config: OxlintConfig = {

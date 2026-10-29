@@ -29,9 +29,6 @@ function readOption(options: Readonly<Options>, key: string) {
   return isOptionObject(first) ? first[key] : undefined
 }
 
-/**
- * Read a string array from the rule's first option object.
- */
 export function readStringArrayOption(
   options: Readonly<Options>,
   key: string
@@ -41,9 +38,6 @@ export function readStringArrayOption(
   return isStringArray(value) ? value : undefined
 }
 
-/**
- * Read a positive integer from the rule's first option object.
- */
 export function readPositiveIntegerOption(
   options: Readonly<Options>,
   key: string
@@ -53,18 +47,12 @@ export function readPositiveIntegerOption(
   return isPositiveInteger(value) ? value : undefined
 }
 
-/**
- * Read a string from the rule's first option object.
- */
 export function readStringOption(options: Readonly<Options>, key: string): string | undefined {
   const value = readOption(options, key)
 
   return isString(value) ? value : undefined
 }
 
-/**
- * Read a boolean from the rule's first option object.
- */
 export function readBooleanOption(options: Readonly<Options>, key: string): boolean | undefined {
   const value = readOption(options, key)
 

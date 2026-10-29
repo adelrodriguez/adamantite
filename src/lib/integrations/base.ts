@@ -66,11 +66,8 @@ export interface IntegrationBase<Kind extends IntegrationKind> {
 
 export interface AssessableIntegration<Error = unknown, Requirements = unknown> {
   /**
-   * Read-only diagnosis for the current project state.
-   *
-   * `assess` classifies package drift and managed state against the latest supported state. It must
-   * not mutate files. The caller reads `package.json` once and shares the parsed manifest with
-   * every assessment in the same pass.
+   * Classifies package drift and managed state against the latest supported state. It must not
+   * change files. The caller reads `package.json` one time and shares it with every assessment.
    */
   readonly assess: (
     cwd: string,

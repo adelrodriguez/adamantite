@@ -255,9 +255,6 @@ function getUnit(inside: readonly string[]) {
   return inside.length === 1 ? first.replace(/\.[^.]+$/, "") : first
 }
 
-/**
- * Find where a file sits, from its segments below the root.
- */
 export function locate(options: LayersOptions, root: string, below: readonly string[]): Location {
   const path = below.join("/")
 
@@ -614,9 +611,6 @@ function checkImport(
   }
 }
 
-/**
- * Create the rule with what it reads from the file system.
- */
 export function createLayersRule(modules: Modules): Rule {
   return {
     create(context): Visitor {

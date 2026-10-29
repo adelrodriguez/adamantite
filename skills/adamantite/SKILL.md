@@ -54,6 +54,16 @@ properties; keep the object and read its members, or split the pattern. Do not r
 `maxDepth` or `maxProperties` only to silence a report. The preset also bans type assertions
 outside tests.
 
+The `strict` preset's `adamantite/require-suppression-reason` rule reports an `oxlint-disable` or
+`eslint-disable` comment, including the `-line` and `-next-line` forms, that gives no reason after
+`--`. A single `-` is not a reason. Before you add a reason, fix the code if you can. Write the
+reason for the reader: why the rule does not apply here, not which rule it is.
+
+```ts
+// oxlint-disable-next-line no-console -- the CLI writes its report to stdout
+console.log(report)
+```
+
 The `strict` preset also loads `adamantite/layers`, which enforces one-way imports between the
 folders of a root, such as `src/lib`. The project turns it on with its layer map: each layer by
 folder name, with the layers directly below it. Imports are transitive.

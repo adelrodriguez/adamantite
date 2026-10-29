@@ -14,3 +14,4 @@
 - [ADR 0012: Harden instructs agents to turn coding standards into rules](0012-harden-instructs-agents-to-write-rules.md)
 - [ADR 0013: Import layers are a dependency graph in a first-party rule](0013-import-layers-are-a-dependency-graph.md)
 - [ADR 0014: The TypeScript preset allows only erasable syntax](0014-typescript-preset-allows-only-erasable-syntax.md)
+- [ADR 0015: The strict preset requires a reason on each suppression](0015-strict-requires-a-reason-on-each-suppression.md)

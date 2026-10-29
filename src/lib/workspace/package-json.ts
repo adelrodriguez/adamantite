@@ -25,6 +25,7 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
     const parsed = yield* parseJson(content, packagePath)
     // SAFETY: the file is the project's package.json; every manifest field is optional in
     // `PackageJson`, so any parsed JSON object satisfies it.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- No schema decodes `PackageJson` yet; see the SAFETY note.
     return parsed as PackageJson
   })
 

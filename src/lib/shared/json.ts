@@ -23,8 +23,8 @@ import { FailedToMergeConfig, FailedToParseFile } from "#lib/shared/errors.ts"
 export const parseJson = (content: string, path?: string) =>
   Effect.suspend(() => {
     const errors: ParseError[] = []
-    // SAFETY: jsonc-parser returns plain JSON data; parse failures surface through `errors`.
-    const parsed = parse(content, errors, { allowTrailingComma: true }) as JsonValue
+    // jsonc-parser returns plain JSON data; parse failures surface through `errors`.
+    const parsed: JsonValue = parse(content, errors, { allowTrailingComma: true })
 
     return errors.length > 0
       ? Effect.fail(new FailedToParseFile({ errors, path }))
@@ -195,8 +195,8 @@ function setJsonValue(
  * key also removes the comments between it and the previous value.
  */
 export function updateJsonText(content: string, next: Schema.Json): string {
-  // SAFETY: jsonc-parser returns plain JSON data; callers parse the same content first.
-  const current = parse(content, [], { allowTrailingComma: true }) as Schema.Json
+  // jsonc-parser returns plain JSON data; callers parse the same content first.
+  const current: Schema.Json = parse(content, [], { allowTrailingComma: true })
   const formattingOptions = detectFormattingOptions(content)
 
   return collectJsonChanges(current, next, []).reduce(

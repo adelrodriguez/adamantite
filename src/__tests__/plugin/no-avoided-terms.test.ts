@@ -28,7 +28,7 @@ const GLOSSARY = [
   "",
   "**Preset**:",
   "Published configuration.",
-  "_Avoid_: Plugin, template",
+  "_Avoid_: Plugin, template, manual fix",
   "",
 ].join("\n")
 
@@ -72,6 +72,22 @@ tester.run("no-avoided-terms", rule, {
         { line: 1, messageId: "name" },
         { line: 2, messageId: "name" },
         { line: 3, messageId: "name" },
+      ],
+    },
+    {
+      code: "const run = function Habit() {}\nconst Model = class Habit {}\ndeclare function HabitOf(): void",
+      errors: [
+        { line: 1, messageId: "name" },
+        { line: 2, messageId: "name" },
+        { line: 3, messageId: "name" },
+      ],
+    },
+    {
+      // A regular `-es` plural matches its singular.
+      code: "const manualFixes = []\nconst view = <p>Two manual fixes</p>",
+      errors: [
+        { message: nameMessage("manualFixes", "manual fix", "`Preset`") },
+        { line: 2, messageId: "text" },
       ],
     },
     {
@@ -131,6 +147,7 @@ describe("parseGlossary", () => {
       { name: "Vendored bundle", preferred: ["Managed plugin"] },
       { name: "dependency", preferred: ["Managed plugin"] },
       { name: "template", preferred: ["Preset"] },
+      { name: "manual fix", preferred: ["Preset"] },
     ])
   })
 
@@ -149,6 +166,17 @@ describe("splitWords", () => {
     expect(splitWords("STREAK_DAYS")).toStrictEqual(["streak", "day"])
     expect(splitWords("HTMLEntries")).toStrictEqual(["html", "entry"])
     expect(splitWords("check-in progress")).toStrictEqual(["check", "in", "progress"])
+  })
+
+  it("drop `es` only after a sibilant", () => {
+    expect(splitWords("manualFixes classes matches boxes")).toStrictEqual([
+      "manual",
+      "fix",
+      "class",
+      "match",
+      "box",
+    ])
+    expect(splitWords("cases uses names")).toStrictEqual(["case", "use", "name"])
   })
 })
 

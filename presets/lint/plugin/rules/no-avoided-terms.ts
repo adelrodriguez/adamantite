@@ -37,7 +37,7 @@ const AVOID = /^_Avoid_:\s*(.+?)\s*$/u
 
 /**
  * Split a name or a text into lowercase words, such as `["find", "streak"]` for `findStreaks`. A
- * plural becomes its singular, so `streaks` matches `streak`.
+ * regular plural becomes its singular, so `streaks` matches `streak` and `fixes` matches `fix`.
  */
 export function splitWords(text: string): string[] {
   return text
@@ -49,6 +49,11 @@ export function splitWords(text: string): string[] {
     .map((word) => {
       if (word.endsWith("ies") && word.length > 4) {
         return `${word.slice(0, -3)}y`
+      }
+
+      // `fixes`, `matches`, and `classes` drop `es`. `cases` and `uses` drop only `s`.
+      if (/(?:x|z|ch|sh|ss)es$/u.test(word)) {
+        return word.slice(0, -2)
       }
 
       return word.endsWith("s") && !word.endsWith("ss") && word.length > 3
@@ -236,7 +241,13 @@ export function createNoAvoidedTermsRule(project: Project): Rule {
         ClassDeclaration(node) {
           checkName(node.id)
         },
+        ClassExpression(node) {
+          checkName(node.id)
+        },
         FunctionDeclaration(node) {
+          checkName(node.id)
+        },
+        FunctionExpression(node) {
           checkName(node.id)
         },
         JSXText(node) {
@@ -251,6 +262,9 @@ export function createNoAvoidedTermsRule(project: Project): Rule {
               })
             }
           }
+        },
+        TSDeclareFunction(node) {
+          checkName(node.id)
         },
         TSEnumDeclaration(node) {
           checkName(node.id)

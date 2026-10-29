@@ -116,6 +116,29 @@ function assertFileContains(path: string, expected: string) {
   }
 }
 
+/**
+ * Write a custom rule and its test with `adamantite rule add`, and run the test with `adamantite
+ * rule test`. Then break the rule, and expect `rule test` to fail and name the case that broke.
+ */
+function addRuleAndRunTest(cwd: string, env: NodeJS.ProcessEnv) {
+  const rulePath = join(cwd, ".adamantite", "rules", "no-smoke.ts")
+
+  assertIncludes(
+    run(process.execPath, [cliPath, "rule", "add", "no-smoke"], { cwd, env }),
+    "Run the test with `adamantite rule test`."
+  )
+  assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
+
+  const rule = readFileSync(rulePath, "utf8")
+
+  writeFileSync(rulePath, rule.replace("DebuggerStatement", "WithStatement"))
+  assertIncludes(
+    runExpectingFailure(process.execPath, [cliPath, "rule", "test"], { cwd, env }).output,
+    "✖ debugger"
+  )
+  writeFileSync(rulePath, rule)
+}
+
 // The fixture uses npm and the monorepo fixture uses pnpm, so the smoke test covers both
 // package managers.
 const npmVersion = run("npm", ["--version"], { cwd: repoRoot }).trim()
@@ -195,6 +218,18 @@ try {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
+
+  // Knip does not see that `custom()` loads a rule file, and reports it as unused, so the rule goes
+  // in after `analyze`. The fixture has no `@types/node`, so `check` also proves that the rule test
+  // passes type-aware lint without it.
+  console.info("Running `adamantite rule add` and `adamantite rule test`...")
+  addRuleAndRunTest(fixture, fixtureEnv)
+
+  if (readFileSync(join(fixture, "package.json"), "utf8").includes('"@types/node"')) {
+    throw new Error("Expected the fixture to have no @types/node, so check proves the rule test.")
+  }
+
+  run(process.execPath, [cliPath, "check"], { cwd: fixture, env: fixtureEnv })
 
   // Init installs at the workspace root in a monorepo, and pnpm-workspace.yaml marks the
   // fixture as one.
@@ -284,6 +319,9 @@ try {
   }
 
   assertFileContains(join(monorepoFixture, "packages", "second", "package.json"), '"7.0.0"')
+
+  console.info("Running `adamantite rule add` and `adamantite rule test` in the monorepo...")
+  addRuleAndRunTest(monorepoFixture, monorepoEnv)
 
   console.info("Smoke test passed: init output is accepted by the pinned tool versions.")
 } catch (error) {

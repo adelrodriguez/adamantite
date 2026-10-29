@@ -5,7 +5,11 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand from "#commands/rule.ts"
 import { toCustomRuleStub, toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
-import { createPrompterTestContext, runCommand } from "./command-test-helpers.ts"
+import {
+  createPrompterTestContext,
+  createRunnerTestContext,
+  runCommand,
+} from "./command-test-helpers.ts"
 
 describe("rule add", () => {
   it.effect("write the stub to .adamantite/rules and its test to tests/", () =>
@@ -114,6 +118,134 @@ describe("rule add", () => {
         rule: "_helpers",
       })
       expect(files.exists(".adamantite")).toBe(false)
+    })
+  )
+})
+
+const PACKAGE_JSON = JSON.stringify({ name: "app" })
+
+function makeConfig(...customCalls: string[]) {
+  return [
+    'import custom from "adamantite/lint/custom"',
+    'import { defineConfig } from "oxlint"',
+    "",
+    `export default defineConfig({ extends: [${customCalls.join(", ")}] })`,
+    "",
+  ].join("\n")
+}
+
+describe("rule test", () => {
+  it.effect("run node --test on the tests of each rules folder that custom() loads", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/no-a.ts": "export default {}\n",
+          ".adamantite/rules/tests/_cases.ts": "export const cases = []\n",
+          ".adamantite/rules/tests/no-a.ts": "// test\n",
+          ".adamantite/rules/tests/notes.md": "# Notes\n",
+          "oxlint.config.ts": makeConfig(
+            "custom()",
+            'custom({ dir: "tooling/rules", name: "acme" })'
+          ),
+          "package.json": PACKAGE_JSON,
+          "tooling/rules/tests/no-b.ts": "// test\n",
+        },
+      })
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(ruleCommand, ["test"], {
+        files,
+        layers: [createPrompterTestContext().layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations).toStrictEqual([
+        {
+          args: ["--test", ".adamantite/rules/tests/no-a.ts", "tooling/rules/tests/no-b.ts"],
+          command: "node",
+          title: "🧪 Testing custom rules",
+        },
+      ])
+    })
+  )
+
+  it.effect("run the tests of a workspace package in a monorepo", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify({ name: "root", workspaces: ["packages/*"] }),
+          "packages/web/.adamantite/rules/tests/no-window.ts": "// test\n",
+          "packages/web/oxlint.config.ts": makeConfig('custom({ name: "web" })'),
+          "packages/web/package.json": JSON.stringify({ name: "web" }),
+        },
+      })
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(ruleCommand, ["test"], {
+        files,
+        layers: [createPrompterTestContext().layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations.map((invocation) => invocation.args)).toStrictEqual([
+        ["--test", "packages/web/.adamantite/rules/tests/no-window.ts"],
+      ])
+    })
+  )
+
+  it.effect("fail with the exit code of node --test", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/tests/no-a.ts": "// test\n",
+          "oxlint.config.ts": makeConfig("custom()"),
+          "package.json": PACKAGE_JSON,
+        },
+      })
+
+      const exit = yield* runCommand(ruleCommand, ["test"], {
+        files,
+        layers: [createPrompterTestContext().layer, createRunnerTestContext([1]).layer],
+      })
+
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
+        _tag: "CommandFailed",
+        command: "node",
+        exitCode: 1,
+      })
+    })
+  )
+
+  it.effect.each<{ files: Record<string, string>; name: string }>([
+    {
+      files: { "oxlint.config.ts": makeConfig("custom()"), "package.json": PACKAGE_JSON },
+      name: "a rules folder without tests",
+    },
+    {
+      // Oxlint does not load a rules folder that no `custom()` call names, so its tests do not run.
+      files: { ".adamantite/rules/tests/no-a.ts": "// test\n", "package.json": PACKAGE_JSON },
+      name: "tests in a folder that no custom() call loads",
+    },
+  ])("say that there are no tests, and pass, with $name", ({ files: fixture }) =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({ files: fixture })
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(ruleCommand, ["test"], {
+        files,
+        layers: [prompter.layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations).toStrictEqual([])
+      expect(prompter.logs).toStrictEqual([
+        {
+          level: "info",
+          message:
+            "No custom rule tests found. `adamantite rule add <name>` writes a rule and its test.",
+        },
+      ])
     })
   )
 })

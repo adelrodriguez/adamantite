@@ -130,6 +130,10 @@ export function createRunnerTestContext(
 
 interface HandoffRunnerOptions {
   readonly agentExit?: number | "not-found" | "spawn-error"
+  /**
+   * Exit codes of the commands that are not coding agents, such as `oxlint`. Each defaults to 0.
+   */
+  readonly commandExits?: Readonly<Record<string, number | "not-found">>
   readonly installedCommands?: readonly string[]
   readonly onAgentRun?: () => void
 }
@@ -138,8 +142,8 @@ function isProbe(invocation: { readonly args: string[] }) {
   return invocation.args[0] === "--version" || invocation.args[0] === "version"
 }
 
-// Dispatches on the invocation shape: `--version` probes answer installation,
-// and everything else is the agent spawn.
+// Dispatches on the invocation shape: `--version` probes answer installation, a command outside
+// the agent catalog answers from `commandExits`, and everything else is the agent spawn.
 export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
   const installed = options.installedCommands ?? ["claude", "codex"]
 
@@ -150,6 +154,13 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
           return installed.includes(invocation.command)
             ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
             : Effect.fail(new CliNotFound({ command: invocation.command }))
+        }
+        if (!codingAgents.some((agent) => agent.command === invocation.command)) {
+          const commandExit = options.commandExits?.[invocation.command] ?? 0
+
+          return commandExit === "not-found"
+            ? Effect.fail(new CliNotFound({ command: invocation.command }))
+            : Effect.succeed(ChildProcessSpawner.ExitCode(commandExit))
         }
         if (options.agentExit === "not-found") {
           return Effect.fail(new CliNotFound({ command: invocation.command }))

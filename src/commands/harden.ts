@@ -2,11 +2,16 @@ import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import { assessProject } from "#lib/assessment/index.ts"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { readHardenContext, renderHardenPrompt } from "#lib/hardening/index.ts"
+import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
+import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
+import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { chooseResolution } from "#terminal/resolution-menu.ts"
 
@@ -60,12 +65,53 @@ export default Command.make("harden").pipe(
         subject: "the prompt",
       })
 
-      if (resolution._tag === "Ended") {
-        yield* prompter.outro(`✅ The ${resolution.agent.name} session ended.`)
+      if (resolution._tag !== "Ended") {
+        yield* prompter.outro("✅ Harden completed.")
         return
       }
 
-      yield* prompter.outro("✅ Harden completed.")
+      const { agent } = resolution
+      const runner = yield* CommandRunner
+      // The agent's exit code says nothing about the project, so `check` and the assessment decide.
+      const checkPassed = yield* runner
+        .runAll([
+          { args: ["--check"], command: oxfmt.name, title: "✨ Checking formatting" },
+          { args: [], command: oxlint.name, title: "🔍 Linting" },
+        ])
+        .pipe(
+          Effect.as(true),
+          Effect.catchTags({
+            CliNotFound: (error) => prompter.log.error(error.message).pipe(Effect.as(false)),
+            CommandFailed: () => Effect.succeed(false),
+          })
+        )
+      const assessment = yield* assessProject(cwd)
+
+      for (const warning of assessment.warnings) {
+        yield* prompter.log.warning(warning)
+      }
+
+      if (!checkPassed) {
+        yield* prompter.log.error(`\`adamantite check\` failed after the ${agent.name} session.`)
+      }
+
+      if (assessment.findings.length > 0) {
+        yield* prompter.log.warning(`Doctor found issues after the ${agent.name} session.`)
+        yield* printFindings(assessment.findings)
+      }
+
+      if (!checkPassed || assessment.findings.length > 0) {
+        yield* prompter.outro("⚠️ Harden verification failed.")
+        return yield* new CommandFailed({
+          command: "harden",
+          exitCode: ChildProcessSpawner.ExitCode(1),
+        })
+      }
+
+      yield* prompter.log.success(
+        `\`adamantite check\` and Doctor pass after the ${agent.name} session.`
+      )
+      yield* prompter.outro("✅ Harden completed successfully!")
     }).pipe(
       Effect.catchTag("OperationCancelled", () =>
         Effect.gen(function* () {

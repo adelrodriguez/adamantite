@@ -2,7 +2,12 @@ import process from "node:process"
 import { Macros } from "unplugin-macros"
 import { defineConfig } from "vitest/config"
 
-const OXLINT_RUN_TESTS = ["src/__tests__/presets/**/*.test.ts"]
+// These tests start real processes: Oxlint runs that lint files, and Vitest runs that check the
+// module cache. They touch the host filesystem, so they stay out of the unit tests.
+const PROCESS_RUN_TESTS = [
+  "src/__tests__/presets/**/*.test.ts",
+  "src/__tests__/macro-cache.test.ts",
+]
 
 const MACRO_IMPORT = /with\s*\{\s*type:\s*["']macro["']\s*\}/
 
@@ -27,13 +32,13 @@ export default defineConfig({
       provider: "v8",
     },
     isolate: false,
-    // Oxlint-run tests are slower, so CI runs them apart from the package's
+    // Tests that start real processes are slower, so CI runs them apart from the package's
     // unit tests. `pnpm run test` runs both projects.
     projects: [
       {
         extends: true,
         test: {
-          exclude: OXLINT_RUN_TESTS,
+          exclude: PROCESS_RUN_TESTS,
           include: ["src/**/*.test.ts"],
           name: "unit",
         },
@@ -41,7 +46,7 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          include: OXLINT_RUN_TESTS,
+          include: PROCESS_RUN_TESTS,
           name: "presets",
         },
       },

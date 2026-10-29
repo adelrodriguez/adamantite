@@ -36,8 +36,9 @@ interface HardenContext {
 
 /**
  * Reads the harden context of the root and each workspace package. A `scope` limits it to the
- * packages inside that folder, or to the package that contains it. The rules folders that their
- * configs load stay listed, also when a shared tooling package outside the scope owns them.
+ * packages inside that folder, or to the package that contains it. The configs that lint them stay
+ * listed, also an ancestor config of a package without its own, and so do the rules folders that
+ * those configs load, also when a shared tooling package outside the scope owns them.
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,
@@ -63,10 +64,10 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     packageDirectories.filter((directory) => contains(directory, scope)),
     Order.mapInput(Order.flip(Order.Number), (directory: string) => directory.length)
   ).slice(0, 1)
-  const configDirectories = packagesInScope.length > 0 ? packagesInScope : owner
-  const { calls, configs } = yield* discoverCustomRules(packageDirectories, configDirectories)
+  const selectedPackages = packagesInScope.length > 0 ? packagesInScope : owner
+  const { calls, configs } = yield* discoverCustomRules(packageDirectories, selectedPackages)
   // The root instructions apply to every package, so a scope keeps them.
-  const instructionCandidates = [...new Set([cwd, ...configDirectories])].flatMap((directory) =>
+  const instructionCandidates = [...new Set([cwd, ...selectedPackages])].flatMap((directory) =>
     INSTRUCTION_FILES.map((file) => path.join(directory, file))
   )
   // `forEach` keeps the order of the candidates, which `Effect.filter` loses under concurrency.

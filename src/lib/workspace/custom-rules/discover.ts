@@ -227,14 +227,16 @@ const resolveImport = Effect.fn("resolveImport")(function* (
 })
 
 /**
- * The Oxlint config of each config directory, and the `custom()` calls that the configs reach:
- * calls in each config, and in the modules that a config imports, such as the entry module of a
- * shared tooling package. A `custom()` call in a module that no config imports does not load rules.
- * Imports resolve against all `packageDirectories`, so a config directory can be a subset.
+ * The Oxlint configs that lint the `lintedDirectories`, and the `custom()` calls that the configs
+ * reach: calls in each config, and in the modules that a config imports, such as the entry module
+ * of a shared tooling package. A `custom()` call in a module that no config imports does not load
+ * rules. As in Oxlint, a directory uses the config of the innermost package that contains it and
+ * has one. Imports resolve against all `packageDirectories`, so the linted directories can be a
+ * subset.
  */
 export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   packageDirectories: readonly string[],
-  configDirectories: readonly string[] = packageDirectories
+  lintedDirectories: readonly string[] = packageDirectories
 ) {
   const path = yield* Path.Path
   const packages = Array.getSomes(
@@ -242,13 +244,29 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
       concurrency: "unbounded",
     })
   )
-  const configs = Array.getSomes(
+  const packageConfigs = Array.getSomes(
     yield* Effect.forEach(
-      configDirectories,
+      packageDirectories,
       (directory) => readFirstFile(CONFIG_FILES.map((file) => path.join(directory, file))),
       { concurrency: "unbounded" }
     )
   )
+  const nearestConfigs = new Set(
+    lintedDirectories.flatMap((directory) =>
+      Array.sort(
+        packageConfigs.filter((config) => {
+          const configDirectory = path.dirname(config.file)
+
+          return directory === configDirectory || directory.startsWith(configDirectory + path.sep)
+        }),
+        Order.mapInput(
+          Order.flip(Order.Number),
+          (config: SourceModule) => path.dirname(config.file).length
+        )
+      ).slice(0, 1)
+    )
+  )
+  const configs = packageConfigs.filter((config) => nearestConfigs.has(config))
   const visited = new Set<string>()
   const calls: ResolvedCall[] = []
   const unresolvedImports: Array<{ readonly from: string; readonly specifier: string }> = []

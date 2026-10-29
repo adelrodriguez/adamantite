@@ -351,6 +351,23 @@ describe("harden", () => {
     })
   )
 
+  it.effect.each([
+    { args: ["--path", "packages/web"], name: "a workspace package" },
+    { args: ["--path", "packages/web/src"], name: "a folder inside a workspace package" },
+  ])("list the root config with --path for $name without a config of its own", ({ args }) =>
+    Effect.gen(function* () {
+      const { "packages/web/oxlint.config.ts": _, ...files } = MONOREPO_FILES
+      const prompt = yield* runHardenPrompt(files, args)
+
+      // Oxlint lints `web` with the nearest config, which is the root config. `api` stays out.
+      expect(getContext(prompt)).toStrictEqual({
+        configs: ["- `oxlint.config.ts`"],
+        instructionFiles: ["- `AGENTS.md`", "- `packages/web/AGENTS.md`"],
+        rulesFolders: ["- `tooling/lint/rules`"],
+      })
+    })
+  )
+
   it.effect("fail with a clear message when --path is outside the project", () =>
     Effect.gen(function* () {
       const { exit, prompter } = yield* runHarden(MONOREPO_FILES, ["--path", ".."])

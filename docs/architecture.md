@@ -222,11 +222,18 @@ locations, and options, and `valid/` and `invalid/` fixtures under
 Oxlint run.
 
 `adamantite/layers` needs a layer map from the target project, so no preset turns it on, and
-`strict` only loads the plugin for it. It is the one rule that reads files: it resolves each
+`strict` only loads the plugin for it. It is the one rule that resolves imports: it resolves each
 import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `createLayersRule`
 takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/layers/`, one for each layer model, and
 `src/__tests__/presets/layers.test.ts` lints each one in a real Oxlint run. See ADR 0013.
+
+`adamantite/import-owners` also needs options from the target project. It matches each import
+as written, so it reads no module, but it reads `package.json` and `pnpm-workspace.yaml` files to
+find the workspace root that owner paths are relative to. `createImportOwnersRule` takes that
+lookup, so its `RuleTester` test passes a fake. Its fixtures are small projects under
+`src/__tests__/presets/fixtures/import-owners/`. `src/__tests__/presets/model-fixtures.ts` lints
+the fixture projects of both rules. See ADR 0016.
 
 ## Custom rules
 

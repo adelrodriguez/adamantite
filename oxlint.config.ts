@@ -29,9 +29,12 @@ export default defineConfig({
         ...vitest.rules,
         // Describe titles name the service or error class under test, such as `NodeVersionResolver`.
         "vitest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],
-        // `RuleTester` from `oxlint/plugins-dev` declares its own `describe` and `it` blocks, so
-        // `tester.run` is a test, not setup code.
-        "vitest/require-hook": ["error", { allowedFunctionCalls: ["tester.run"] }],
+        // `RuleTester` from `oxlint/plugins-dev` and `describeModelFixtures` declare their own
+        // `describe` and `it` blocks, so their calls are tests, not setup code.
+        "vitest/require-hook": [
+          "error",
+          { allowedFunctionCalls: ["describeModelFixtures", "tester.run"] },
+        ],
       },
     },
     // A wildcard module declaration is valid only in a script file. The override is temporary:
@@ -44,6 +47,22 @@ export default defineConfig({
     },
   ],
   rules: {
+    // A wrapper owns each of these packages, so the rest of the code uses the wrapper.
+    "adamantite/import-owners": [
+      "error",
+      {
+        import: "@clack/prompts",
+        owners: [
+          "src/terminal/prompter.ts",
+          "src/terminal/__tests__/prompter.test.ts",
+          "src/commands/__tests__/command-test-helpers.ts",
+        ],
+      },
+      {
+        import: "oxc-resolver",
+        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/rules/layers.ts"],
+      },
+    ],
     // Two layer maps, from the bottom up. Each layer imports only the layers it lists and the layers
     // below those. See "Layers" in docs/architecture.md.
     "adamantite/layers": [

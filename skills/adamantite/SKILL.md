@@ -87,6 +87,28 @@ inside `lib`. A file below two roots must pass both maps. Follow the repair
 in each message. Do not add a layer to another layer's list, or add an `ignore` glob, only to
 silence a report.
 
+The `strict` preset also loads `adamantite/import-owners`, which restricts an import to the files
+and folders that own it, such as a wrapper module. The project turns it on: each option after the
+severity is one import and its owners, by path relative to the workspace root, or to the
+`package.json` folder outside a workspace. An owner folder covers every file below it, and a
+module covers its subpaths, so `zod` also covers `zod/mini`. `names` restricts only some exports
+of the module, and a namespace import or `export *` of that module is a report too.
+
+```ts
+rules: {
+  "adamantite/import-owners": [
+    "error",
+    { import: "giget", owners: ["src/lib/sources/repository/fetch.ts"] },
+    { import: "zod", owners: ["packages/utils"] },
+    { import: "react-native", names: ["Alert"], owners: ["src/shared/alerts.ts"] },
+  ],
+},
+```
+
+The rule matches the import as written, so it covers packages, not files of the project: use
+`adamantite/layers` for those. Use what the owner exports, or move the code into the owner. Do not
+add an owner only to silence a report.
+
 The `tanstack` preset needs no extra package. Its `adamantite/query-from-loader` rule reports
 TanStack Query hooks in route files (files that call `createFileRoute`, `createRoute`, or another
 route factory from `@tanstack/react-router`) that take a plain options object or a `queryOptions()` call made inside a

@@ -1,0 +1,5 @@
+{
+  "name": "fixture-pnpm-monorepo",
+  "private": true,
+  "type": "module"
+}

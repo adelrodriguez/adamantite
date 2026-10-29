@@ -39,6 +39,11 @@ A composition file below the root of a layer map, such as `router.tsx`. An entry
 layer, and no layer imports an entry.
 _Avoid_: Composition layer, entrypoint
 
+**Import owner**:
+A file or folder that the first-party rule `adamantite/import-owners` lets import a package, or
+some exports of it. Every other file uses what the owner exports.
+_Avoid_: Allowed importer, import boundary
+
 **Custom rule**:
 An Oxlint rule that the target project writes in a rules folder. The target project owns
 its correctness and the cases of its test. Adamantite owns the wiring, the authoring guidance,

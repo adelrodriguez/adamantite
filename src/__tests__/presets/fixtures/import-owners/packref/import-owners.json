@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "adamantite/import-owners": [
+      "error",
+      { "import": "giget", "owners": ["src/lib/sources/repository/fetch.ts"] },
+      { "import": "nypm", "owners": ["src/lib/manifests/package-manager-detector.ts"] }
+    ]
+  }
+}

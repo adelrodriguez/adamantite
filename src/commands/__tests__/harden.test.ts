@@ -528,7 +528,7 @@ describe("harden", () => {
         {
           level: "warning",
           message:
-            "Doctor cannot read the `dir` or `name` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
+            "Doctor cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
         },
         {
           level: "success",

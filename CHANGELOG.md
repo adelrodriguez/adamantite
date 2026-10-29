@@ -1,5 +1,43 @@
 # adamantite
 
+## 0.46.0
+
+### Minor Changes
+
+- [#536](https://github.com/adelrodriguez/adamantite/pull/536) [`e3e9cb5`](https://github.com/adelrodriguez/adamantite/commit/e3e9cb526a9dc45b1436583f8e0c6554bca2b14b) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add `adamantite harden`. It prints a Markdown prompt that tells a coding agent to find the coding
+  standards that the project already follows, drop the ones that a tool already enforces, and put
+  each remaining one at the highest level of enforcement that works: a custom rule when a rule can
+  check it, and a line in `CODING_STANDARDS.md` when no rule can. The agent writes nothing until the
+  user approves the candidates. The prompt lists the Oxlint config, the rules folder that its
+  `custom()` call loads, and the instruction files that exist.
+
+- [#549](https://github.com/adelrodriguez/adamantite/pull/549) [`ef52bf8`](https://github.com/adelrodriguez/adamantite/commit/ef52bf86fa1b3d900f01b780515e1bb7f6c7ff25) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - In an interactive terminal, `adamantite harden` offers the same menu as `adamantite doctor`: hand
+  off to an installed coding agent seeded with the harden prompt, copy the prompt, or do nothing.
+  Without a terminal, it still prints the prompt.
+
+- [#550](https://github.com/adelrodriguez/adamantite/pull/550) [`e512953`](https://github.com/adelrodriguez/adamantite/commit/e512953d3642f1a1a565e7037f9f7432a239ee7e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - After a coding agent session, `adamantite harden` runs Oxfmt and Oxlint as `adamantite check` does,
+  and assesses the project as `adamantite doctor` does. It exits 1 and says which one failed when
+  either fails. A copy of the prompt or "do nothing" exits 0 without verification. The Adamantite
+  skill now documents `harden`.
+
+- [#551](https://github.com/adelrodriguez/adamantite/pull/551) [`6789e0f`](https://github.com/adelrodriguez/adamantite/commit/6789e0f89671b5750fc9d3f66ebcd14e27908986) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - In a monorepo, the `adamantite harden` prompt lists the Oxlint config and the instruction files of
+  each workspace package, and the rules folders that their `custom()` calls load. A rules folder that
+  several configs load through a shared tooling package is listed once. The new `--path` option
+  limits the session to one package or folder, and fails with a clear message for a folder outside
+  the project.
+
+- [#553](https://github.com/adelrodriguez/adamantite/pull/553) [`888348c`](https://github.com/adelrodriguez/adamantite/commit/888348ce5c02bf4b9c6e28cb94da2d38a7bcf304) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/layers` rule. It enforces one-way imports between the folders of a root, such
+  as `src/lib`, from a layer map in the rule options. It resolves each import with
+  `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`, reports
+  a folder that is not in the map, and each message gives the repairs that the map allows. The
+  `strict` preset loads the rule, and the project turns it on with its map.
+
+### Patch Changes
+
+- [#555](https://github.com/adelrodriguez/adamantite/pull/555) [`8f8b157`](https://github.com/adelrodriguez/adamantite/commit/8f8b15700e636d51f2444b4d76114339d97f5f4f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite analyze` no longer reports custom rule files as unused files. The `adamantite/analyze` preset adds the rule files in `.adamantite/rules/` and in its `tests/` folder as Knip entry files, in the root and in each workspace package, and keeps Knip's default entry files. Knip still reports a helper file that starts with `_` when no file imports it.
+
+- [#541](https://github.com/adelrodriguez/adamantite/pull/541) [`70611d9`](https://github.com/adelrodriguez/adamantite/commit/70611d965feaa6b68b3a6bcf0cd315b141a937a9) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite rule add` no longer writes an `AGENTS.md` to the rules folder. The authoring guidance lives only in the "Custom rules" section of the Adamantite skill, and `rule add` and the `AGENTS.md` section that `init` writes point to it. An existing `.adamantite/rules/AGENTS.md` stays in place, and you can delete it.
+
 ## 0.45.0
 
 ### Minor Changes

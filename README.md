@@ -700,7 +700,8 @@ export default custom({ dir: "rules", name: "acme" })
 
 Run `adamantite rule add <name> --dir tooling/lint/rules` to add a rule to that folder.
 Doctor starts from the Oxlint config of the root and of each workspace package, and follows
-relative imports and imports of workspace packages to find the `custom()` calls. It resolves
+relative imports, `#` imports, and imports of workspace packages to find the `custom()` calls. It
+resolves them as Node.js does, so run it after you install the dependencies. It resolves
 `dir` and `name` when they are string literals.
 
 ## Requirements and boundaries

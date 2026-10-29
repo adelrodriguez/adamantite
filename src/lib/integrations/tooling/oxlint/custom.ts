@@ -72,7 +72,7 @@ export default defineIntegration({
       const warnings = [
         ...unresolvedImports.map(
           ({ from, specifier }) =>
-            `Doctor cannot resolve the import of \`${specifier}\` in \`${relative(from)}\`, so it does not check the \`custom()\` calls and rules folders behind it.`
+            `Doctor cannot resolve the import of \`${specifier}\` in \`${relative(from)}\`, so it does not check the \`custom()\` calls and rules folders behind it. For a workspace package, install the dependencies and run Doctor again.`
         ),
         ...unresolvedCalls.map(
           (call) =>

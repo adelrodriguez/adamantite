@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import hardenCommand from "#commands/harden.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
@@ -90,9 +91,14 @@ export default defineConfig({
 function runHarden(files: Record<string, string>, args: readonly string[] = []) {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
+    const context = createFileSystemTestContext({ files })
     const exit = yield* runCommand(hardenCommand, args, {
-      files: createFileSystemTestContext({ files }),
-      layers: [prompter.layer],
+      files: context,
+      // The monorepo configs import the shared tooling package.
+      layers: [
+        prompter.layer,
+        makeModuleResolverLayer(context.root, { "@acme/lint": "tooling/lint/index.ts" }),
+      ],
     })
 
     return { exit, prompter }

@@ -237,7 +237,11 @@ ADR 0009. Four modules carry them:
   module calls to import every rule file.
 - `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
   `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
-  finds the Oxlint configs and follows their imports to the `custom()` calls. `harden` uses
+  finds the Oxlint configs and follows their imports to the `custom()` calls. The
+  `ModuleResolver` service in `src/lib/workspace/module-resolver.ts` resolves each import
+  with `oxc-resolver`, as Node.js loads a config, so a workspace package resolves only after an
+  install. Tests pass a fake from `src/__tests__/module-resolver.ts`, and the smoke test
+  covers the real resolver. `harden` uses
   it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
   copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in the preset.
   `index.ts` writes the rule stub for `adamantite rule add`.

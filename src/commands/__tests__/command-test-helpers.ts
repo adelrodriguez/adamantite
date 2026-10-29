@@ -11,6 +11,7 @@ import * as Stdio from "effect/Stdio"
 import * as Terminal from "effect/Terminal"
 import { TestConsole } from "effect/testing"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import {
   type CommandFailedLike,
@@ -414,6 +415,7 @@ function makeDefaultLayer(files: FileSystemTestContext) {
   return Layer.mergeAll(
     platformLayer,
     NodeVersionResolver.layer.pipe(Layer.provide(platformLayer)),
+    makeModuleResolverLayer(files.root),
     TestConsole.layer,
     makeQuietTerminalLayer(),
     Stdio.layerTest({}),

@@ -65,10 +65,22 @@ const APP_OPTIONS = {
   root: "src",
 }
 
-const HINT = "Layer map: `adamantite/layers` options in the Oxlint config."
+function hint(root: string) {
+  return `Layer map: the \`adamantite/layers\` options for root \`${root}\` in the Oxlint config.`
+}
+
+const HINT = hint("src/lib")
+const APP_HINT = hint("src")
+
+// The `src` map above the lib map: the lib folder is one layer, below the terminal.
+const SRC_OPTIONS = {
+  entries: ["cli.ts"],
+  layers: { commands: ["terminal"], lib: [], terminal: ["lib"] },
+  root: "src",
+}
 
 function readOptions(raw: Parameters<typeof readLayersOptions>[0][number]) {
-  const options = readLayersOptions([raw])
+  const [options] = readLayersOptions([raw])
 
   if (options === undefined) {
     throw new Error("The test options have no root or layers.")
@@ -186,7 +198,7 @@ tester.run("layers", createLayersRule(MODULES), {
       errors: [
         {
           column: 0,
-          data: { folder: "cache", path: "src/lib/cache" },
+          data: { folder: "cache", path: "src/lib/cache", root: "src/lib" },
           line: 1,
           messageId: "unmappedFolder",
         },
@@ -196,7 +208,7 @@ tester.run("layers", createLayersRule(MODULES), {
     },
     {
       code: "export const value = 1",
-      errors: [{ data: { path: "src/lib/index.ts" }, messageId: "unmappedFile" }],
+      errors: [{ data: { path: "src/lib/index.ts", root: "src/lib" }, messageId: "unmappedFile" }],
       filename: lib("index.ts"),
       options: [LIB_OPTIONS],
     },
@@ -204,7 +216,7 @@ tester.run("layers", createLayersRule(MODULES), {
       code: 'import { signIn } from "#features/auth/sign-in.ts"',
       errors: [
         {
-          message: `\`features/billing\` cannot import \`features/auth\`: units in \`features\` do not import each other. Move the code that both need down to \`shared\`, or compose them in \`routes\`. ${HINT}`,
+          message: `\`features/billing\` cannot import \`features/auth\`: units in \`features\` do not import each other. Move the code that both need down to \`shared\`, or compose them in \`routes\`. ${APP_HINT}`,
         },
       ],
       filename: app("features/billing/checkout.ts"),
@@ -214,7 +226,7 @@ tester.run("layers", createLayersRule(MODULES), {
       code: 'import { Settings } from "./settings.tsx"',
       errors: [
         {
-          message: `\`routes/index\` cannot import \`routes/settings\`: units in \`routes\` do not import each other. Move the code that both need down to \`features\`. ${HINT}`,
+          message: `\`routes/index\` cannot import \`routes/settings\`: units in \`routes\` do not import each other. Move the code that both need down to \`features\`. ${APP_HINT}`,
         },
       ],
       filename: app("routes/index.tsx"),
@@ -224,7 +236,7 @@ tester.run("layers", createLayersRule(MODULES), {
       code: 'import { router } from "../../router.tsx"',
       errors: [
         {
-          message: `\`features/auth\` cannot import the entry \`router.tsx\`: no layer imports an entry. Move the code that it needs into a layer. ${HINT}`,
+          message: `\`features/auth\` cannot import the entry \`router.tsx\`: no layer imports an entry. Move the code that it needs into a layer. ${APP_HINT}`,
         },
       ],
       filename: app("features/auth/navigate.ts"),
@@ -242,7 +254,7 @@ tester.run("layers", createLayersRule(MODULES), {
     },
     {
       code: "export const value = 1",
-      errors: [{ data: { name: "feature" }, messageId: "unknownIsolate" }],
+      errors: [{ data: { name: "feature", root: "src" }, messageId: "unknownIsolate" }],
       filename: app("features/auth/index.ts"),
       options: [{ isolate: ["feature"], layers: APP_LAYERS, root: "src" }],
     },
@@ -255,6 +267,44 @@ tester.run("layers", createLayersRule(MODULES), {
       ],
       filename: lib("workspace/files.ts"),
       options: [{ layers: { shared: ["workspace"], workspace: ["shared"] }, root: "src/lib" }],
+    },
+    {
+      code: 'import { prompt } from "#terminal/prompter.ts"',
+      errors: [
+        {
+          message: `\`lib\` cannot import \`terminal\`: it is a higher layer. Move the code that this file needs down to \`lib\`, or move this file up to \`terminal\`. ${APP_HINT}`,
+        },
+      ],
+      filename: lib("shared/errors.ts"),
+      options: [SRC_OPTIONS, LIB_OPTIONS],
+    },
+    {
+      code: 'import { prompt } from "#terminal/prompter.ts"\nimport { base } from "#lib/integrations/base.ts"',
+      errors: [
+        { line: 1, messageId: "upward" },
+        { line: 2, messageId: "upward" },
+      ],
+      filename: lib("shared/errors.ts"),
+      options: [SRC_OPTIONS, LIB_OPTIONS],
+    },
+    {
+      code: 'import { base } from "../integrations/base.ts"',
+      errors: [
+        { data: { folder: "lib", path: "src/lib", root: "src" }, messageId: "unmappedFolder" },
+        { line: 1, message: /^`shared` cannot import `integrations`/u },
+      ],
+      filename: lib("shared/errors.ts"),
+      options: [{ ...SRC_OPTIONS, layers: { terminal: [] } }, LIB_OPTIONS],
+    },
+    {
+      code: "export const value = 1",
+      errors: [
+        {
+          message: `\`workspace\` imports \`shard\`, which is not a layer. ${HINT}`,
+        },
+      ],
+      filename: lib("workspace/files.ts"),
+      options: [SRC_OPTIONS, { layers: { shared: [], workspace: ["shard"] }, root: "src/lib" }],
     },
   ],
   valid: [
@@ -323,7 +373,33 @@ tester.run("layers", createLayersRule(MODULES), {
       filename: app("router.tsx"),
       options: [APP_OPTIONS],
     },
+    {
+      code: 'import { run } from "#lib/execution/run.ts"\nimport { prompt } from "#terminal/prompter.ts"',
+      filename: lib("hardening/index.ts"),
+      options: [{ ...SRC_OPTIONS, layers: { lib: ["terminal"], terminal: [] } }, LIB_OPTIONS],
+    },
+    {
+      code: 'import { errors } from "#lib/shared/errors.ts"\nimport { prompt } from "#terminal/prompter.ts"',
+      filename: app("commands/check.ts"),
+      options: [SRC_OPTIONS, LIB_OPTIONS],
+    },
   ],
+})
+
+describe("readLayersOptions", () => {
+  it("reads one map for each option object", () => {
+    expect(
+      readLayersOptions([SRC_OPTIONS, LIB_OPTIONS]).map((options) => options.rootGlob)
+    ).toStrictEqual(["src", "src/lib"])
+  })
+
+  it("leaves out a map without root or layers", () => {
+    expect(
+      readLayersOptions([{ root: "src" }, { layers: {} }, LIB_OPTIONS]).map(
+        (options) => options.rootGlob
+      )
+    ).toStrictEqual(["src/lib"])
+  })
 })
 
 describe("splitAtRoot", () => {

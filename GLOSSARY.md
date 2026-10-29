@@ -28,9 +28,10 @@ doctor and update.
 _Avoid_: Vendored bundle, dependency
 
 **Layer map**:
-The options of the first-party rule `adamantite/layers`: each layer of a folder, by folder name,
-with the layers directly below it. A layer imports the layers it lists and every layer that those
-import.
+One option object of the first-party rule `adamantite/layers`: a root folder, and each layer of
+that folder, by folder name, with the layers directly below it. A layer imports the layers it
+lists and every layer that those import. The rule takes one or more layer maps, and each map
+checks the files below its root on its own.
 _Avoid_: Layer order, boundaries
 
 **Entry**:

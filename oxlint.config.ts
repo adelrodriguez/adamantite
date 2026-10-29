@@ -42,31 +42,26 @@ export default defineConfig({
         "import/unambiguous": "off",
       },
     },
-    {
-      files: ["src/lib/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              {
-                // `adamantite/layers` checks only targets below `src/lib`, so this group also
-                // closes the parent-relative path to `src/terminal`.
-                group: ["#terminal/*", "**/terminal/*"],
-                message:
-                  "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
-              },
-            ],
-          },
-        ],
-      },
-    },
   ],
   rules: {
-    // The lib layers, from the bottom up. Each layer imports only the layers it lists and the layers
-    // below those. See "Lib layers" in docs/architecture.md.
+    // Two layer maps, from the bottom up. Each layer imports only the layers it lists and the layers
+    // below those. See "Layers" in docs/architecture.md.
     "adamantite/layers": [
       "error",
+      // Terminal interaction belongs to `commands` and the entries. Lib code returns data for
+      // commands to render. Tests share the helpers in `src/__tests__`, so this map skips them.
+      {
+        entries: ["cli.ts", "index.ts"],
+        ignore: ["**/__tests__/**"],
+        layers: {
+          lib: [],
+
+          terminal: ["lib"],
+
+          commands: ["terminal"],
+        },
+        root: "src",
+      },
       {
         layers: {
           shared: [],

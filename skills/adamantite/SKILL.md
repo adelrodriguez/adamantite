@@ -70,7 +70,9 @@ importers by glob, such as `["**/__tests__/**"]`, and `ignoreTypes: true` stops 
 type-only imports. `conditions` adds import conditions, such as the `customConditions` of
 `tsconfig.json`, which the rule does not read. The rule resolves relative imports, `#` imports, and `tsconfig.json` `paths`;
 an import that does not resolve is not checked. A file in a folder that is not in the map is a
-report. Follow the repair
+report. Each option after the severity is one layer map, so the rule can take more
+than one: a `src` map that keeps `lib` below `terminal`, and a `src/lib` map for the layers
+inside `lib`. A file below two roots must pass both maps. Follow the repair
 in each message. Do not add a layer to another layer's list, or add an `ignore` glob, only to
 silence a report.
 

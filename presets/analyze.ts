@@ -27,8 +27,19 @@ export const ignoreDependencies: SuggestedIgnoreDependencies = {
   monorepo: ["sherif"],
 }
 
+// `custom()` from `adamantite/lint/custom` loads the rule files at lint time, so no module imports
+// them. The Oxlint plugin's `entry` adds them as entry files and keeps Knip's default entry files,
+// which a top-level `entry` replaces. Knip applies it in each workspace package. Files that start
+// with `_` are helpers, so Knip still reports one that no file imports. A rules folder at another
+// path (`custom({ dir })`) needs its own patterns.
 const config: KnipConfiguration = {
   ignoreExportsUsedInFile: true,
+  oxlint: {
+    entry: [
+      ".adamantite/rules/[!_]*.{js,mjs,mts,ts}",
+      ".adamantite/rules/tests/[!_]*.{js,mjs,mts,ts}",
+    ],
+  },
   rules: {
     binaries: "error",
     catalog: "error",

@@ -113,13 +113,32 @@ describe("renderAssessmentMarkdown", () => {
 
   it("render the warning report when no findings remain", () => {
     const report = renderAssessmentMarkdown(
-      makeAssessment({ warnings: ["Skipping `tsconfig.json` setup."] }),
+      makeAssessment({
+        warnings: ["Skipping `tsconfig.json` setup.", "Skipping `.oxlintrc.json` setup."],
+      }),
       "1.2.3"
     )
 
-    expect(report).toContain("# Adamantite doctor warnings")
-    expect(report).toContain("found no repair findings")
-    expect(report).toContain("- Skipping `tsconfig.json` setup.")
-    expect(report).not.toContain("# Adamantite doctor findings")
+    expect(report).toBe(
+      [
+        "# Adamantite doctor warnings",
+        "",
+        "This project uses Adamantite 1.2.3 to manage linting, formatting, and type tooling.",
+        "`adamantite doctor` found no repair findings, but reported these warnings:",
+        "",
+        "- Skipping `tsconfig.json` setup.",
+        "- Skipping `.oxlintrc.json` setup.",
+        "",
+      ].join("\n")
+    )
+  })
+
+  it("keep placeholder-like text in warnings literal", () => {
+    const report = renderAssessmentMarkdown(
+      makeAssessment({ warnings: ["The script runs `echo {{version}} {{warnings}} $&`."] }),
+      "1.2.3"
+    )
+
+    expect(report).toContain("- The script runs `echo {{version}} {{warnings}} $&`.")
   })
 })

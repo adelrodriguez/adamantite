@@ -1,7 +1,7 @@
 import type { OxlintConfig } from "oxlint"
 
-// Framework-neutral opinions: values keep their source object visible, and types come from
-// validation or narrowing instead of assertions. Use it with any other preset.
+// Framework-neutral opinions: values keep their source object visible, types come from
+// validation or narrowing instead of assertions, and each suppression gives its reason. Use it with any other preset.
 //
 // The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
 // extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the
@@ -28,6 +28,8 @@ const config: OxlintConfig = {
     // Nested patterns past two levels and patterns that take more than five properties from one
     // object hide where values come from. Set `maxDepth` and `maxProperties` to change the limits.
     "adamantite/no-overzealous-destructuring": "error",
+    // A suppression states why the rule does not apply, after ` -- `, so a reviewer can judge it.
+    "adamantite/require-suppression-reason": "error",
     // Validate or narrow a value instead of asserting its type. `as const` stays allowed.
     "typescript/consistent-type-assertions": ["error", { assertionStyle: "never" }],
   },

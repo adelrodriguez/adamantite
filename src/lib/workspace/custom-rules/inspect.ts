@@ -20,7 +20,7 @@ const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts"
 
 /**
  * Whether a file in a rules folder is a rule. Keep this the same as `isRuleFile` in
- * `presets/lint/custom.ts`, which decides what Oxlint loads.
+ * `presets/rules/folder.ts`, which decides what Oxlint loads.
  */
 export function isRuleFile(name: string): boolean {
   const extension = /\.[^.]+$/.exec(name)?.[0] ?? ""

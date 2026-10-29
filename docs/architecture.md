@@ -239,7 +239,9 @@ ADR 0009. Five modules carry them:
   `jsPlugins` entry that points to it. Without a rules folder it returns an empty config.
 - `presets/rules/index.ts` is published as `adamantite/rules`. It re-exports `defineRule`
   and the rule types from `@oxlint/plugins`, and exports `loadRules`, which the entry
-  module calls to import every rule file. `presets/rules/testing.ts` is published as
+  module calls to import every rule file. `presets/rules/folder.ts` says what a rules folder
+  holds: the default folder and plugin name, and which files are rules. Both `custom()` and
+  `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
   `adamantite/rules/testing`. It re-exports `RuleTester` from `oxlint/plugins-dev`, connected
   to `node:test`.
 - `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
@@ -250,7 +252,8 @@ ADR 0009. Five modules carry them:
   install. Tests pass a fake from `src/__tests__/module-resolver.ts`, and the smoke test
   covers the real resolver. `harden` uses
   it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
-  copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in the preset.
+  copy of the rule file test and the defaults, and a unit test keeps them equal to
+  `presets/rules/folder.ts`.
   `index.ts` writes the rule stub and its test in `tests/` for `adamantite rule add`, from
   the templates beside it, and lists the tests of the loaded rules folders for
   `adamantite rule test`.

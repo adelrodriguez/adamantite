@@ -149,6 +149,41 @@ tester.run("import-owners", rule, {
       options: [ALERT],
     },
     {
+      code: 'type NativeAlert = import("react-native").Alert',
+      errors: [
+        {
+          data: { import: "react-native", name: "Alert", owners: ALERT_OWNERS },
+          messageId: "name",
+        },
+      ],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
+    {
+      code: 'type Static = import("react-native").Alert.AlertStatic',
+      errors: [
+        {
+          data: { import: "react-native", name: "Alert", owners: ALERT_OWNERS },
+          messageId: "name",
+        },
+      ],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
+    {
+      code: 'type Native = typeof import("react-native")',
+      errors: [{ messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
+    {
+      // A named star re-export holds the default export too.
+      code: 'export * as Native from "react-native"',
+      errors: [{ messageId: "namespace" }],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [{ ...ALERT, names: ["default"] }],
+    },
+    {
       code: 'import Native from "react-native"',
       errors: [
         {
@@ -218,6 +253,18 @@ tester.run("import-owners", rule, {
     {
       code: 'import { downloadTemplate } from "giget"',
       filename: file("src/index.ts"),
+    },
+    {
+      // A qualified type reaches only the export that it names.
+      code: 'type TextType = import("react-native").Text',
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT],
+    },
+    {
+      // `export *` does not re-export the default export.
+      code: 'export * from "react-native"',
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [{ ...ALERT, names: ["default"] }],
     },
   ],
 })

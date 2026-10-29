@@ -228,15 +228,47 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       /**
-       * Check an import that reaches every export of the module, such as `export * from` or
-       * `import()`.
+       * Check an import that reaches every export of the module, such as `import()`. A plain
+       * `export * from` reaches every export except the default export.
        */
-      function checkWhole(source: ESTree.StringLiteral) {
+      function checkWhole(source: ESTree.StringLiteral, withDefault = true) {
         for (const entry of findRestricted(source)) {
           if (entry.names === undefined) {
             reportModule(entry, source)
-          } else {
-            reportNamespace(entry, source, entry.names)
+            continue
+          }
+
+          const reached = new Set(
+            [...entry.names].filter((name) => withDefault || name !== "default")
+          )
+
+          if (reached.size > 0) {
+            reportNamespace(entry, source, reached)
+          }
+        }
+      }
+
+      /**
+       * Check a type import, such as `import("react-native").Alert`. With a qualifier it reaches
+       * only the export that the qualifier names first.
+       */
+      function checkImportType(node: ESTree.TSImportType) {
+        if (node.qualifier === null) {
+          checkWhole(node.source)
+          return
+        }
+
+        let first = node.qualifier
+
+        while (first.type === "TSQualifiedName") {
+          first = first.left
+        }
+
+        for (const entry of findRestricted(node.source)) {
+          if (entry.names === undefined) {
+            reportModule(entry, node.source)
+          } else if (entry.names.has(first.name)) {
+            reportName(entry, node.qualifier, first.name)
           }
         }
       }
@@ -283,7 +315,7 @@ export function createImportOwnersRule(project: Project): Rule {
 
       return {
         ExportAllDeclaration(node) {
-          checkWhole(node.source)
+          checkWhole(node.source, node.exported !== null)
         },
         ExportNamedDeclaration(node) {
           if (node.source !== null) {
@@ -296,9 +328,7 @@ export function createImportOwnersRule(project: Project): Rule {
             checkWhole(node.source)
           }
         },
-        TSImportType(node) {
-          checkWhole(node.source)
-        },
+        TSImportType: checkImportType,
       }
     },
     meta: {

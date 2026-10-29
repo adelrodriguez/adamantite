@@ -3,20 +3,17 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
-import * as PlatformError from "effect/PlatformError"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
-import { type CodingAgent, codingAgents } from "#lib/execution/coding-agents.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import { CliNotFound } from "#lib/shared/errors.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import {
-  type RunnerTestContext,
+  agentByCommand,
   createPrompterTestContext,
-  createRunnerTestContext,
+  makeHandoffRunner,
+  interactiveTerminalLayer,
+  nonProbeInvocations,
   runCommand,
 } from "./command-test-helpers.ts"
 
@@ -26,24 +23,6 @@ function manifest(value: PackageJson): string {
 
 function getHeadings(markdown: string) {
   return markdown.match(/^#{1,2} .+$/gm) ?? []
-}
-
-function makeInteractiveTerminalLayer() {
-  return Layer.succeed(TerminalCapabilities)({
-    copyToClipboard: () => Effect.void,
-    isInteractive: Effect.succeed(true),
-  })
-}
-
-// Drawn from the shipped catalog so a changed seed or probe form fails these tests.
-function agentByCommand(command: string): CodingAgent {
-  const agent = codingAgents.find((candidate) => candidate.command === command)
-
-  if (!agent) {
-    throw new Error(`No coding agent in the catalog with command \`${command}\``)
-  }
-
-  return agent
 }
 
 // Doctor reports no finding for format guidance in AGENTS.md, only for the script and the workflow
@@ -94,52 +73,6 @@ function runCopyResolution() {
   })
 }
 
-interface HandoffRunnerOptions {
-  readonly agentExit?: number | "not-found" | "spawn-error"
-  readonly installedCommands?: readonly string[]
-  readonly onAgentRun?: () => void
-}
-
-function isProbe(invocation: { readonly args: string[] }) {
-  return invocation.args[0] === "--version" || invocation.args[0] === "version"
-}
-
-// Dispatches on the invocation shape: `--version` probes answer installation,
-// and everything else is the agent spawn.
-function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
-  const installed = options.installedCommands ?? ["claude", "codex"]
-
-  return createRunnerTestContext({
-    implementation: (invocation) =>
-      Effect.suspend((): Effect.Effect<ChildProcessSpawner.ExitCode, CommandFailedLike> => {
-        if (isProbe(invocation)) {
-          return installed.includes(invocation.command)
-            ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
-            : Effect.fail(new CliNotFound({ command: invocation.command }))
-        }
-        if (options.agentExit === "not-found") {
-          return Effect.fail(new CliNotFound({ command: invocation.command }))
-        }
-        if (options.agentExit === "spawn-error") {
-          return Effect.fail(
-            PlatformError.systemError({
-              _tag: "PermissionDenied",
-              method: "spawn",
-              module: "FileSystem",
-              pathOrDescriptor: invocation.command,
-            })
-          )
-        }
-        options.onAgentRun?.()
-        return Effect.succeed(ChildProcessSpawner.ExitCode(options.agentExit ?? 0))
-      }),
-  })
-}
-
-function nonProbeInvocations(runner: RunnerTestContext) {
-  return runner.invocations.filter((invocation) => !isProbe(invocation))
-}
-
 // No managed integration applies to a project that has only the adamantite package.
 const NO_INTEGRATION_FILES = {
   "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
@@ -164,7 +97,7 @@ describe("doctor", () => {
     },
     {
       files: NO_INTEGRATION_FILES,
-      layers: [makeInteractiveTerminalLayer()],
+      layers: [interactiveTerminalLayer],
       logs: [{ level: "success", message: "No applicable integrations found." }],
       name: "no managed integration applies in an interactive terminal",
       outros: ["✅ Doctor completed successfully!"],
@@ -178,7 +111,7 @@ describe("doctor", () => {
     },
     {
       files: HEALTHY_FILES,
-      layers: [makeInteractiveTerminalLayer()],
+      layers: [interactiveTerminalLayer],
       logs: [{ level: "success", message: "No issues found." }],
       name: "managed state meets the oracle in an interactive terminal",
       outros: ["✅ Doctor completed successfully!"],
@@ -209,7 +142,7 @@ describe("doctor", () => {
       outros: [],
     },
     {
-      layers: [makeInteractiveTerminalLayer()],
+      layers: [interactiveTerminalLayer],
       logs: [
         {
           level: "warning",
@@ -405,7 +338,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -429,7 +362,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -472,7 +405,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -500,7 +433,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -527,7 +460,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -551,7 +484,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -572,7 +505,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -611,7 +544,7 @@ describe("doctor", () => {
 
       const exit = yield* runCommand(doctorCommand, [], {
         files,
-        layers: [prompter.layer, runner.layer, makeInteractiveTerminalLayer()],
+        layers: [prompter.layer, runner.layer, interactiveTerminalLayer],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)

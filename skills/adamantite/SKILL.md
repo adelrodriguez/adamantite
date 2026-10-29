@@ -229,7 +229,8 @@ saves.
   that it accepts in `valid`. A file in `tests/` that starts with `_` is a helper, not a test.
 - Run `adamantite rule test` after you change a rule. It runs the tests of every rules folder
   that a `custom()` call loads with `node --test`, also in a Bun project, and fails with the
-  name of each case that fails. `adamantite check` does not run rule tests.
+  name of each case that fails. `adamantite check` does not run rule tests. When a `dir` is not a
+  string literal, `rule test` cannot find that rules folder: it warns, and does not run its tests.
 - The project's Vitest or Jest run does not find the rule tests, because `tests/<name>.ts` has
   no `.test` suffix and is not in `__tests__/`. Do not rename them.
 - Oxlint caches the rules for each run. Restart the editor language server after you change a

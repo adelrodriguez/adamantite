@@ -81,7 +81,9 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
 
 /**
  * The rule tests of each rules folder that a `custom()` call loads, in sorted order. A test is a
- * file in `tests/` that would be a rule in the rules folder, so a `_` file is a helper.
+ * file in `tests/` that would be a rule in the rules folder, so a `_` file is a helper. Discovery
+ * cannot follow a `custom()` call whose `dir` is not a string literal, or an import that it cannot
+ * resolve, so `unresolvedCalls` and `unresolvedImports` name them: their tests are not in `tests`.
  */
 export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (cwd: string) {
   const path = yield* Path.Path
@@ -89,7 +91,7 @@ export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (c
     cwd,
     ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
   ]
-  const { calls } = yield* discoverCustomRules(packageDirectories)
+  const { calls, unresolvedImports } = yield* discoverCustomRules(packageDirectories)
   const testDirectories = Array.dedupe(
     calls.flatMap((call) =>
       call.dir === null ? [] : [path.join(call.dir, CUSTOM_RULE_TESTS_DIRECTORY)]
@@ -108,5 +110,11 @@ export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (c
     { concurrency: "unbounded" }
   )
 
-  return Array.sort(tests.flat(), Order.String)
+  return {
+    tests: Array.sort(tests.flat(), Order.String),
+    unresolvedCalls: Array.dedupe(
+      calls.flatMap((call) => (call.dir === null ? [call.source] : []))
+    ),
+    unresolvedImports,
+  }
 })

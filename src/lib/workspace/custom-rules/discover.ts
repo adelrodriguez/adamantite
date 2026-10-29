@@ -1,16 +1,15 @@
-import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import {
   CUSTOM_RULES_MODULE,
   findCustomRulesCalls,
   findRuntimeImports,
 } from "#lib/workspace/custom-rules/inspect.ts"
+import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const CONFIG_FILES = [
@@ -20,23 +19,14 @@ const CONFIG_FILES = [
   "oxlint.config.mjs",
 ]
 
-const MODULE_EXTENSIONS = [".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"]
-
-interface WorkspacePackage {
-  readonly directory: string
-  readonly exports: PackageJson.Exports | undefined
-  readonly main: string | undefined
-  readonly name: string
-}
-
 interface SourceModule {
   readonly content: string
   readonly file: string
 }
 
 /**
- * `unresolved` is an import of a workspace package or a relative path that Doctor cannot follow.
- * Imports of other packages are `external`.
+ * `unresolved` is an import of a relative path, a `#` subpath, or a workspace package that Doctor
+ * cannot follow. Imports of other packages are `external`.
  */
 type ResolvedImport =
   | { readonly _tag: "external" }
@@ -52,108 +42,10 @@ interface ResolvedCall {
   readonly source: string
 }
 
-/**
- * The conditions that Oxlint matches when it imports a config under Node.js.
- */
-const RUNTIME_CONDITIONS: ReadonlySet<string> = new Set(["default", "import", "node"])
-
-/**
- * The file that an export target selects at runtime: the target string, or the first matching
- * condition in declaration order, as Node.js resolves it.
- */
-function getExportTarget(target: PackageJson.Exports | undefined): string | undefined {
-  if (target === undefined || target === null) {
-    return undefined
-  }
-
-  if (Predicate.isString(target)) {
-    return target
-  }
-
-  if (Array.isArray(target)) {
-    return target.map((entry) => getExportTarget(entry)).find((entry) => entry !== undefined)
-  }
-
-  return Object.entries(target)
-    .filter(([condition]) => RUNTIME_CONDITIONS.has(condition))
-    .map(([, entry]) => getExportTarget(entry))
-    .find((entry) => entry !== undefined)
-}
-
-const PATTERN_SPECIFICITY = Order.combine(
-  Order.mapInput(Order.flip(Order.Number), ([pattern]: readonly [string, PackageJson.Exports]) =>
-    pattern.indexOf("*")
-  ),
-  Order.mapInput(
-    Order.flip(Order.Number),
-    ([pattern]: readonly [string, PackageJson.Exports]) => pattern.length
-  )
-)
-
-/**
- * The file in a workspace package that an import of `subpath` loads, relative to the package
- * directory. Follows the `exports` map, with `*` patterns, and falls back to `main` and `index` for
- * a package without one. Undefined when the package does not export the subpath.
- */
-function resolvePackageTarget(workspacePackage: WorkspacePackage, subpath: string) {
-  const { exports } = workspacePackage
-
-  if (exports === undefined) {
-    return subpath === "" ? (workspacePackage.main ?? "index") : subpath
-  }
-
-  const key = subpath === "" ? "." : `./${subpath}`
-
-  if (exports === null || Predicate.isString(exports) || Array.isArray(exports)) {
-    return key === "." ? getExportTarget(exports) : undefined
-  }
-
-  const subpaths = Object.keys(exports).some((name) => name.startsWith("."))
-    ? exports
-    : { ".": exports }
-
-  if (key in subpaths) {
-    return getExportTarget(subpaths[key])
-  }
-
-  // Node.js takes the most specific pattern: the longest prefix before `*`, then the longest key.
-  // Declaration order does not matter.
-  const patternMatch = Array.sort(Object.entries(subpaths), PATTERN_SPECIFICITY)
-    .map(([pattern, target]) => {
-      const [prefix, suffix, ...rest] = pattern.split("*")
-      const matches =
-        prefix !== undefined
-        && suffix !== undefined
-        && rest.length === 0
-        && key.startsWith(prefix)
-        && key.endsWith(suffix)
-        // Node.js requires `*` to match at least one character.
-        && key.length > prefix.length + suffix.length
-
-      return matches
-        ? { match: key.slice(prefix.length, key.length - suffix.length), target }
-        : null
-    })
-    .find((candidate) => candidate !== null)
-
-  return patternMatch === undefined
-    ? undefined
-    : getExportTarget(patternMatch.target)?.replaceAll("*", patternMatch.match)
-}
-
-const readWorkspacePackage = Effect.fn("readWorkspacePackage")(function* (directory: string) {
+const readPackageName = Effect.fn("readPackageName")(function* (directory: string) {
   const packageJson = yield* readPackageJson(directory)
 
-  if (packageJson.name === undefined) {
-    return Option.none<WorkspacePackage>()
-  }
-
-  return Option.some({
-    directory,
-    exports: packageJson.exports,
-    main: packageJson.main,
-    name: packageJson.name,
-  } satisfies WorkspacePackage)
+  return Option.fromUndefinedOr(packageJson.name)
 })
 
 /**
@@ -175,50 +67,34 @@ const readFirstFile = Effect.fn("readFirstFile")(function* (candidates: readonly
 })
 
 /**
- * Resolve an import to a source file in the project: a relative path, or a workspace package and
- * its subpaths. Other packages are not followed.
+ * Resolve an import to a source file in the project. Imports that resolve into `node_modules`, and
+ * imports of other packages that do not resolve, are not followed.
  */
 const resolveImport = Effect.fn("resolveImport")(function* (
   from: string,
   specifier: string,
-  packages: readonly WorkspacePackage[]
+  packageNames: ReadonlySet<string>
 ) {
   const path = yield* Path.Path
-  let base: string | undefined
+  const resolver = yield* ModuleResolver
+  const local =
+    specifier.startsWith(".")
+    || specifier.startsWith("#")
+    || path.isAbsolute(specifier)
+    || [...packageNames].some((name) => specifier === name || specifier.startsWith(`${name}/`))
+  const file = yield* resolver.resolve(from, specifier)
 
-  if (specifier.startsWith(".") || path.isAbsolute(specifier)) {
-    base = path.resolve(path.dirname(from), specifier)
-  } else {
-    const owner = packages.find(
-      (workspacePackage) =>
-        specifier === workspacePackage.name || specifier.startsWith(`${workspacePackage.name}/`)
-    )
-
-    if (owner === undefined) {
-      return { _tag: "external" } satisfies ResolvedImport
-    }
-
-    const target = resolvePackageTarget(owner, specifier.slice(owner.name.length + 1))
-
-    if (target === undefined) {
-      return { _tag: "unresolved" } satisfies ResolvedImport
-    }
-
-    base = path.resolve(owner.directory, target)
+  if (Option.isNone(file)) {
+    return local
+      ? ({ _tag: "unresolved" } satisfies ResolvedImport)
+      : ({ _tag: "external" } satisfies ResolvedImport)
   }
 
-  if (base.split(path.sep).includes("node_modules")) {
+  if (file.value.split(path.sep).includes("node_modules")) {
     return { _tag: "external" } satisfies ResolvedImport
   }
 
-  const directory = base
-  // A TypeScript source can import a sibling with the `.js` extension of its build output.
-  const stem = base.replace(/\.[cm]?js$/u, "")
-  const module = yield* readFirstFile([
-    base,
-    ...MODULE_EXTENSIONS.map((extension) => `${stem}${extension}`),
-    ...MODULE_EXTENSIONS.map((extension) => path.join(directory, `index${extension}`)),
-  ])
+  const module = yield* readFirstFile([file.value])
 
   return Option.match(module, {
     onNone: (): ResolvedImport => ({ _tag: "unresolved" }),
@@ -239,10 +115,15 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   lintedDirectories: readonly string[] = packageDirectories
 ) {
   const path = yield* Path.Path
-  const packages = Array.getSomes(
-    yield* Effect.forEach(packageDirectories, (directory) => readWorkspacePackage(directory), {
-      concurrency: "unbounded",
-    })
+
+  // Doctor and harden traverse again after a coding agent changes the project.
+  yield* (yield* ModuleResolver).clearCache
+  const packageNames = new Set(
+    Array.getSomes(
+      yield* Effect.forEach(packageDirectories, (directory) => readPackageName(directory), {
+        concurrency: "unbounded",
+      })
+    )
   )
   const packageConfigs = Array.getSomes(
     yield* Effect.forEach(
@@ -297,7 +178,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     )
     const resolved = yield* Effect.forEach(
       imports,
-      ({ from, specifier }) => resolveImport(from, specifier, packages),
+      ({ from, specifier }) => resolveImport(from, specifier, packageNames),
       { concurrency: "unbounded" }
     )
 

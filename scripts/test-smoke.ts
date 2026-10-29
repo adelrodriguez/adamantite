@@ -285,6 +285,61 @@ try {
 
   assertFileContains(join(monorepoFixture, "packages", "second", "package.json"), '"7.0.0"')
 
+  // Doctor resolves config imports with the real resolver. The root config loads a shared tooling
+  // package through an `exports` subpath, so Doctor reaches its rules folder only by following the
+  // installed workspace link, and reports the rule file that cannot load. The package's config
+  // imports `./rules.js`, which exists beside `rules.ts`. Node.js loads the `.js` file, so Doctor
+  // must follow it to `rules` and not to `source-rules`.
+  const lintPackage = join(monorepoFixture, "packages", "lint")
+
+  mkdirSync(join(lintPackage, "rules"), { recursive: true })
+  writeFileSync(
+    join(lintPackage, "package.json"),
+    JSON.stringify(
+      {
+        exports: { "./config": "./config.ts" },
+        name: "@adamantite-smoke/lint",
+        private: true,
+        type: "module",
+        version: "0.0.0",
+      },
+      null,
+      2
+    )
+  )
+  writeFileSync(join(lintPackage, "config.ts"), 'export { default } from "./rules.js"\n')
+  writeFileSync(
+    join(lintPackage, "rules.js"),
+    'import custom from "adamantite/lint/custom"\n\nexport default custom({ dir: "rules", name: "smoke" })\n'
+  )
+  writeFileSync(
+    join(lintPackage, "rules.ts"),
+    'import custom from "adamantite/lint/custom"\n\nexport default custom({ dir: "source-rules", name: "smoke" })\n'
+  )
+  writeFileSync(
+    join(lintPackage, "rules", "no-enum.ts"),
+    'import { defineRule } from "adamantite/rules"\n\nenum Kind { A }\n\nexport default defineRule({ create: () => ({}), meta: { kind: Kind.A } })\n'
+  )
+  run("pnpm", ["add", "--save-dev", "--workspace-root", "@adamantite-smoke/lint@workspace:*"], {
+    cwd: monorepoFixture,
+  })
+  writeFileSync(
+    join(monorepoFixture, "oxlint.config.ts"),
+    'import { defineConfig } from "oxlint"\nimport core from "adamantite/lint"\nimport smoke from "@adamantite-smoke/lint/config"\n\nexport default defineConfig({ extends: [core, smoke] })\n'
+  )
+
+  console.info("Running `adamantite doctor` against a config that imports a workspace package...")
+  const doctorOutput = spawn(process.execPath, [cliPath, "doctor"], {
+    cwd: monorepoFixture,
+    env: monorepoEnv,
+  }).output
+
+  assertIncludes(doctorOutput, "packages/lint/rules/no-enum.ts")
+
+  if (doctorOutput.includes("Doctor cannot resolve")) {
+    throw new Error(`Expected Doctor to resolve the workspace import, received:\n${doctorOutput}`)
+  }
+
   console.info("Smoke test passed: init output is accepted by the pinned tool versions.")
 } catch (error) {
   console.info(`Fixtures kept for debugging at: ${fixture} and ${monorepoFixture}`)

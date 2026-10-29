@@ -1,12 +1,14 @@
-import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { IntegrationAssessment } from "#lib/integrations/base.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
+import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 
 const ROOT = "/project"
 
@@ -36,8 +38,19 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
   ].join("\n")
 }
 
-function runAssess(files: FileSystemTestContext) {
-  return oxlintCustom.assess(ROOT).pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer)))
+/**
+ * Assess with a fake resolver: each specifier in `resolutions` resolves to that path below the
+ * root, and other relative specifiers to their exact path. The smoke test covers the real
+ * resolver.
+ */
+function runAssess(files: FileSystemTestContext, resolutions: Record<string, string> = {}) {
+  return oxlintCustom
+    .assess(ROOT)
+    .pipe(
+      Effect.provide(
+        Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions))
+      )
+    )
 }
 
 function getFindings(assessment: IntegrationAssessment) {
@@ -50,27 +63,6 @@ const CUSTOM_ACME = [
   'export default custom({ dir: "rules", name: "acme" })',
   "",
 ].join("\n")
-const EMPTY_CONFIG = "export default {}\n"
-const ENUM_FINDING = "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts"
-
-function makeToolingFiles(
-  importSpecifier: string,
-  exports: PackageJson["exports"],
-  modules: Record<string, string>
-) {
-  return createFileSystemTestContext({
-    files: {
-      "oxlint.config.ts": makeConfig("core, tooling", [`import tooling from "${importSpecifier}"`]),
-      "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
-      "tooling/lint/package.json": JSON.stringify({ exports, name: "@acme/lint" }),
-      "tooling/lint/rules/no-enum.ts": `enum Kind { A }\n${RULE}`,
-      ...Object.fromEntries(
-        Object.entries(modules).map(([file, content]) => [`tooling/lint/${file}`, content])
-      ),
-    },
-    root: ROOT,
-  })
-}
 
 describe("oxlint-custom", () => {
   it.effect("report not applicable without a rules folder or a custom() call", () =>
@@ -167,7 +159,9 @@ describe("oxlint-custom", () => {
         root: ROOT,
       })
 
-      expect(getFindings(yield* runAssess(files))).toStrictEqual([])
+      expect(
+        getFindings(yield* runAssess(files, { "./lint/rules.js": "lint/rules.ts" }))
+      ).toStrictEqual([])
     })
   )
 
@@ -217,7 +211,9 @@ describe("oxlint-custom", () => {
         root: ROOT,
       })
 
-      const findings = getFindings(yield* runAssess(files))
+      const findings = getFindings(
+        yield* runAssess(files, { "@acme/lint": "tooling/lint/index.ts" })
+      )
 
       expect(findings.map((finding) => finding.id)).toStrictEqual([
         "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts",
@@ -225,132 +221,54 @@ describe("oxlint-custom", () => {
     })
   )
 
-  it.effect("follow a workspace package subpath through its exports map", () =>
+  it.effect("clear the resolver cache before each traversal", () =>
+    Effect.gen(function* () {
+      const events: string[] = []
+      const resolverLayer = Layer.succeed(ModuleResolver)({
+        clearCache: Effect.sync(() => {
+          events.push("clear")
+        }),
+        resolve: (_from, specifier) =>
+          Effect.sync(() => {
+            events.push(specifier)
+
+            return Option.none()
+          }),
+      })
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": makeConfig("core, rules", ['import rules from "./lint/rules.ts"']),
+          "package.json": PACKAGE_JSON,
+        },
+        root: ROOT,
+      })
+      const assess = oxlintCustom
+        .assess(ROOT)
+        .pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer, resolverLayer)))
+
+      yield* assess
+      yield* assess
+
+      expect(
+        events.filter((event) => event === "clear" || event === "./lint/rules.ts")
+      ).toStrictEqual(["clear", "./lint/rules.ts", "clear", "./lint/rules.ts"])
+    })
+  )
+
+  it.effect("do not follow an import that resolves into node_modules", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "oxlint.config.ts": makeConfig("core, tooling", [
-            'import tooling from "@acme/lint/config"',
-          ]),
-          "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
-          "tooling/lint/index.ts": [
-            'import custom from "adamantite/lint/custom"',
-            "",
-            'export default custom({ dir: "rules", name: "acme" })',
-            "",
-          ].join("\n"),
-          "tooling/lint/package.json": JSON.stringify({
-            exports: { "./*": { import: "./src/*.ts" }, "./config": "./index.ts" },
-            name: "@acme/lint",
-          }),
-          "tooling/lint/rules/no-enum.ts": `enum Kind { A }\n${RULE}`,
+          "node_modules/@acme/lint/index.ts": CUSTOM_ACME,
+          "oxlint.config.ts": makeConfig("core, tooling", ['import tooling from "@acme/lint"']),
+          "package.json": PACKAGE_JSON,
         },
         root: ROOT,
       })
 
-      const findings = getFindings(yield* runAssess(files))
-
-      expect(findings.map((finding) => finding.id)).toStrictEqual([
-        "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts",
-      ])
-    })
-  )
-
-  it.effect("follow a workspace package subpath through an exports pattern", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          ".adamantite/rules/no-process-env.ts": RULE,
-          "oxlint.config.ts": makeConfig("core, tooling", [
-            'import tooling from "@acme/lint/rules"',
-          ]),
-          "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
-          "tooling/lint/package.json": JSON.stringify({
-            exports: { "./*": { import: "./src/*.ts" } },
-            name: "@acme/lint",
-          }),
-          "tooling/lint/src/rules.ts": [
-            'import custom from "adamantite/lint/custom"',
-            "",
-            'export default custom({ dir: "../../../.adamantite/rules" })',
-            "",
-          ].join("\n"),
-        },
-        root: ROOT,
-      })
-
-      expect(yield* runAssess(files)).toStrictEqual({
-        applicable: true,
-        findings: [],
-        packageActions: [],
-        warnings: [],
-      })
-    })
-  )
-
-  it.effect("select export conditions in declaration order, as Node.js does", () =>
-    Effect.gen(function* () {
-      const nodeFirst = makeToolingFiles(
-        "@acme/lint/config",
-        // oxlint-disable-next-line sort-keys -- The case tests that declaration order decides.
-        { "./config": { node: "./node.ts", import: "./import.ts" } },
-        { "import.ts": EMPTY_CONFIG, "node.ts": CUSTOM_ACME }
-      )
-      const defaultFirst = makeToolingFiles(
-        "@acme/lint",
-        { default: "./default.ts", node: "./node.ts" },
-        { "default.ts": CUSTOM_ACME, "node.ts": EMPTY_CONFIG }
-      )
-
-      for (const files of [nodeFirst, defaultFirst]) {
-        const findings = getFindings(yield* runAssess(files))
-
-        expect(findings.map((finding) => finding.id)).toStrictEqual([ENUM_FINDING])
-      }
-    })
-  )
-
-  it.effect.each([
-    [{ "./*": "./src/*.ts", "./config/*": "./config/*.ts" }],
-    // oxlint-disable-next-line sort-keys -- The case tests that key order does not decide.
-    [{ "./config/*": "./config/*.ts", "./*": "./src/*.ts" }],
-  ])("select the most specific exports pattern in any key order: %j", ([exports]) =>
-    Effect.gen(function* () {
-      const files = makeToolingFiles("@acme/lint/config/base", exports, {
-        "config/base.ts": [
-          'import custom from "adamantite/lint/custom"',
-          "",
-          'export default custom({ dir: "../rules", name: "acme" })',
-          "",
-        ].join("\n"),
-        "src/config/base.ts": EMPTY_CONFIG,
-      })
-
-      const findings = getFindings(yield* runAssess(files))
-
-      expect(findings.map((finding) => finding.id)).toStrictEqual([ENUM_FINDING])
-    })
-  )
-
-  it.effect("skip an exports pattern whose `*` would match nothing, as Node.js does", () =>
-    Effect.gen(function* () {
-      const files = makeToolingFiles(
-        "@acme/lint/foo",
-        { "./*": "./fallback/*.ts", "./foo*": "./special.ts" },
-        {
-          "fallback/foo.ts": [
-            'import custom from "adamantite/lint/custom"',
-            "",
-            'export default custom({ dir: "../rules", name: "acme" })',
-            "",
-          ].join("\n"),
-          "special.ts": EMPTY_CONFIG,
-        }
-      )
-
-      const findings = getFindings(yield* runAssess(files))
-
-      expect(findings.map((finding) => finding.id)).toStrictEqual([ENUM_FINDING])
+      expect(
+        yield* runAssess(files, { "@acme/lint": "node_modules/@acme/lint/index.ts" })
+      ).toStrictEqual({ applicable: false, warnings: [] })
     })
   )
 
@@ -377,7 +295,7 @@ describe("oxlint-custom", () => {
 
         expect(getFindings(assessment)).toStrictEqual([])
         expect(assessment.warnings).toStrictEqual([
-          "Doctor cannot resolve the import of `@acme/lint/missing` in `oxlint.config.ts`, so it does not check the `custom()` calls and rules folders behind it.",
+          "Doctor cannot resolve the import of `@acme/lint/missing` in `oxlint.config.ts`, so it does not check the `custom()` calls and rules folders behind it. For a workspace package, install the dependencies and run Doctor again.",
         ])
       })
   )

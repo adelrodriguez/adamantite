@@ -39,7 +39,6 @@ export default defineIntegration({
       if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
         return {
           applicable: false,
-          warnings: [],
         } satisfies IntegrationAssessment
       }
 

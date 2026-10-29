@@ -130,7 +130,6 @@ describe("oxfmt", () => {
 
         expect(result).toStrictEqual({
           applicable: false,
-          warnings: [],
         })
       })
     )

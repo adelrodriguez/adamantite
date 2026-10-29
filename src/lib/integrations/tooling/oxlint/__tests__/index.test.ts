@@ -62,7 +62,6 @@ describe("oxlint", () => {
 
         expect(result).toStrictEqual({
           applicable: false,
-          warnings: [],
         })
       })
     )

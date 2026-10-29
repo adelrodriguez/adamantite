@@ -48,7 +48,6 @@ export interface Finding {
 export type IntegrationAssessment =
   | {
       readonly applicable: false
-      readonly warnings: readonly string[]
     }
   | {
       readonly applicable: true

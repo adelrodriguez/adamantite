@@ -78,7 +78,7 @@ describe("effect-tsgo", () => {
 
         const result = yield* runAssess(files)
 
-        expect(result).toStrictEqual({ applicable: false, warnings: [] })
+        expect(result).toStrictEqual({ applicable: false })
       })
     )
 

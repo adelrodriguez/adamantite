@@ -57,6 +57,24 @@ describe("update", () => {
     })
   )
 
+  it.effect("leave a package alone when its range resolves to the managed version", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "package.json": manifest({ devDependencies: { knip: `^${knip.version}` } }) },
+      })
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toStrictEqual([])
+    })
+  )
+
   it.effect("leave a managed plugin alone when the config does not import its preset", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

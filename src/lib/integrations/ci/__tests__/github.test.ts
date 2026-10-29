@@ -148,7 +148,6 @@ describe("github", () => {
           yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
         ).toStrictEqual({
           applicable: false,
-          warnings: [],
         })
       })
     )

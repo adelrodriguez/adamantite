@@ -94,7 +94,6 @@ describe("knip", () => {
 
         expect(result).toStrictEqual({
           applicable: false,
-          warnings: [],
         })
       })
     )

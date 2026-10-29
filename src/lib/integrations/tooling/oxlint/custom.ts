@@ -69,7 +69,7 @@ export default defineIntegration({
         && folders.length === 0
         && unresolvedImports.length === 0
       ) {
-        return { applicable: false, warnings: [] } satisfies IntegrationAssessment
+        return { applicable: false } satisfies IntegrationAssessment
       }
 
       const unknownNameCalls = calls.filter((call) => call.name === null)

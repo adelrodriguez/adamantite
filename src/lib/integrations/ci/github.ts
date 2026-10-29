@@ -248,7 +248,7 @@ export default defineIntegration({
       const content = yield* readFileIfExists(workflowPath)
 
       if (content._tag === "None") {
-        return { applicable: false, warnings: [] } satisfies IntegrationAssessment
+        return { applicable: false } satisfies IntegrationAssessment
       }
 
       const managedScripts = getManagedScripts(packageJson)

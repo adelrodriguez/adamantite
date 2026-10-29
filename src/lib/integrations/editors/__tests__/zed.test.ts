@@ -63,7 +63,6 @@ describe("zed", () => {
         const files = makeFiles()
         expect(yield* zed.assess(ROOT, {}).pipe(provideFiles(files))).toStrictEqual({
           applicable: false,
-          warnings: [],
         })
       })
     )

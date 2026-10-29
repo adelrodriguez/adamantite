@@ -192,7 +192,7 @@ export default defineIntegration({
       const content = yield* readFileIfExists(settingsPath)
 
       if (content._tag === "None") {
-        return { applicable: false, warnings: [] } satisfies IntegrationAssessment
+        return { applicable: false } satisfies IntegrationAssessment
       }
 
       const config = yield* parseJson(content.value, settingsPath)

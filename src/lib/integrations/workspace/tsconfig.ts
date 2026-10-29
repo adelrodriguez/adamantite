@@ -41,7 +41,7 @@ export default defineIntegration({
       const managedScripts = getManagedScripts(packageJson)
 
       if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
-        return { applicable: false, warnings: [] } satisfies IntegrationAssessment
+        return { applicable: false } satisfies IntegrationAssessment
       }
 
       if (yield* checkIsMonorepo(cwd)) {

@@ -338,7 +338,6 @@ export function definePackageTooling<Error = never, Requirements = never>(option
               } satisfies IntegrationAssessment)
             : ({
                 applicable: false,
-                warnings: [],
               } satisfies IntegrationAssessment)
         }
 
@@ -422,7 +421,6 @@ export function defineConfigTooling<
               } satisfies IntegrationAssessment)
             : ({
                 applicable: false,
-                warnings: [],
               } satisfies IntegrationAssessment)
         }
 

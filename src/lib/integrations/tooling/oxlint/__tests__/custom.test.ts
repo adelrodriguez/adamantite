@@ -72,7 +72,7 @@ describe("oxlint-custom", () => {
         root: ROOT,
       })
 
-      expect(yield* runAssess(files)).toStrictEqual({ applicable: false, warnings: [] })
+      expect(yield* runAssess(files)).toStrictEqual({ applicable: false })
     })
   )
 
@@ -268,7 +268,7 @@ describe("oxlint-custom", () => {
 
       expect(
         yield* runAssess(files, { "@acme/lint": "node_modules/@acme/lint/index.ts" })
-      ).toStrictEqual({ applicable: false, warnings: [] })
+      ).toStrictEqual({ applicable: false })
     })
   )
 

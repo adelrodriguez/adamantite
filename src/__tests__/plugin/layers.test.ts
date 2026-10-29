@@ -213,6 +213,12 @@ tester.run("layers", createLayersRule(MODULES), {
       options: [LIB_OPTIONS],
     },
     {
+      code: 'import { value } from "#lib/index.ts"',
+      errors: [{ data: { path: "src/lib/index.ts", root: "src/lib" }, messageId: "unmappedFile" }],
+      filename: lib("workspace/files.ts"),
+      options: [LIB_OPTIONS],
+    },
+    {
       code: 'import { signIn } from "#features/auth/sign-in.ts"',
       errors: [
         {

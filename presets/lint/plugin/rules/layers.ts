@@ -84,13 +84,12 @@ export type Location =
 
 type LayerLocation = Extract<Location, { kind: "layer" }>
 
-export type Violation =
-  | "entry"
-  | "isolated"
-  | "sibling"
-  | "unmappedFile"
-  | "unmappedFolder"
-  | "upward"
+type UnmappedLocation = Extract<Location, { kind: "unmappedFile" | "unmappedFolder" }>
+
+/**
+ * The rule that an import from one layer to another breaks.
+ */
+type Violation = "isolated" | "sibling" | "upward"
 
 export type MapError =
   | { readonly kind: "cycle"; readonly cycle: readonly string[] }
@@ -276,22 +275,13 @@ export function locate(options: LayersOptions, root: string, below: readonly str
 }
 
 /**
- * Find the rule that an import from `from` to `to` breaks. Only layers are checked: an entry
- * imports anything, and an unmapped file is reported once on its own.
+ * Find the rule that an import from one layer to another breaks.
  */
 export function findViolation(
   layers: LayerMap,
-  from: Location,
-  to: Location
+  from: LayerLocation,
+  to: LayerLocation
 ): Violation | undefined {
-  if (from.kind !== "layer") {
-    return undefined
-  }
-
-  if (to.kind !== "layer") {
-    return to.kind
-  }
-
   if (from.layer === to.layer) {
     return from.unit === to.unit ? undefined : "isolated"
   }
@@ -364,7 +354,7 @@ function formatList(names: readonly string[]) {
  * allows no repair.
  */
 export function describeRepairs(
-  violation: "isolated" | "sibling" | "upward",
+  violation: Violation,
   lower: readonly string[],
   upper: readonly string[]
 ): string {
@@ -510,6 +500,23 @@ function formatCycle(cycle: readonly string[]) {
   return cycle.map((name) => `\`${name}\``).join(" → ")
 }
 
+function reportUnmapped(
+  context: Context,
+  node: ESTree.Program | ESTree.StringLiteral,
+  location: UnmappedLocation,
+  root: string
+) {
+  if (location.kind === "unmappedFolder") {
+    context.report({
+      data: { folder: location.folder, path: location.path, root },
+      messageId: "unmappedFolder",
+      node,
+    })
+  } else {
+    context.report({ data: { path: location.path, root }, messageId: "unmappedFile", node })
+  }
+}
+
 function reportFile(context: Context, node: ESTree.Program, file: ReportedFile) {
   const { errors, from } = file
   const root = file.options.rootGlob
@@ -528,14 +535,8 @@ function reportFile(context: Context, node: ESTree.Program, file: ReportedFile) 
     }
   }
 
-  if (from.kind === "unmappedFolder") {
-    context.report({
-      data: { folder: from.folder, path: from.path, root },
-      messageId: "unmappedFolder",
-      node,
-    })
-  } else if (from.kind === "unmappedFile") {
-    context.report({ data: { path: from.path, root }, messageId: "unmappedFile", node })
+  if (from.kind === "unmappedFile" || from.kind === "unmappedFolder") {
+    reportUnmapped(context, node, from, root)
   }
 }
 
@@ -570,45 +571,43 @@ function checkImport(
   }
 
   const to = locate(options, split.root, split.below)
-  const violation = findViolation(options.layers, from, to)
 
-  if (violation === undefined) {
-    return
-  }
-
+  // No layer imports an entry, and a file in no layer is reported where it is imported.
   if (to.kind === "entry") {
     context.report({
       data: { from: describeLayer(from), root, to: to.path },
       messageId: "entry",
       node: source,
     })
-  } else if (to.kind === "unmappedFolder") {
-    context.report({
-      data: { folder: to.folder, path: to.path, root },
-      messageId: "unmappedFolder",
-      node: source,
-    })
-  } else if (to.kind === "unmappedFile") {
-    context.report({ data: { path: to.path, root }, messageId: "unmappedFile", node: source })
-  } else if (violation === "isolated" || violation === "sibling" || violation === "upward") {
-    const repair = describeRepairs(
-      violation,
-      findLowerRepairs(options.layers, from.layer, to.layer),
-      findUpperRepairs(options.layers, from.layer, to.layer)
-    )
-
-    context.report({
-      data: {
-        from: describeLayer(from),
-        layer: from.layer,
-        repair,
-        root,
-        to: describeLayer(to),
-      },
-      messageId: violation,
-      node: source,
-    })
+    return
   }
+
+  if (to.kind !== "layer") {
+    reportUnmapped(context, source, to, root)
+    return
+  }
+
+  const violation = findViolation(options.layers, from, to)
+
+  if (violation === undefined) {
+    return
+  }
+
+  context.report({
+    data: {
+      from: describeLayer(from),
+      layer: from.layer,
+      repair: describeRepairs(
+        violation,
+        findLowerRepairs(options.layers, from.layer, to.layer),
+        findUpperRepairs(options.layers, from.layer, to.layer)
+      ),
+      root,
+      to: describeLayer(to),
+    },
+    messageId: violation,
+    node: source,
+  })
 }
 
 export function createLayersRule(modules: Modules): Rule {

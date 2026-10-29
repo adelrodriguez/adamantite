@@ -5,7 +5,11 @@ import * as Effect from "effect/Effect"
 import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
-import { checkIsSupportedPackageManager, type Script } from "#lib/workspace/package-json.ts"
+import {
+  checkIsSupportedPackageManager,
+  type Script,
+  type SupportedPackageManager,
+} from "#lib/workspace/package-json.ts"
 
 const INIT_SCRIPTS = ["check", "fix", "analyze"] as const satisfies readonly Script[]
 
@@ -16,7 +20,10 @@ type InitEditor = (typeof INIT_EDITORS)[number]
 export interface InitOptions {
   readonly agents: boolean
   readonly editors: InitEditor[]
-  readonly githubActions: boolean
+  /**
+   * The package manager that the GitHub Actions workflow runs, or `undefined` for no workflow.
+   */
+  readonly githubActions: SupportedPackageManager | undefined
   readonly installExtensions: boolean
   readonly overwriteScripts: boolean
   readonly presets: LintPreset[]
@@ -35,16 +42,11 @@ export interface InitOptionsInput {
   readonly typescript: boolean
 }
 
-interface ValidateInitOptionsContext {
-  readonly nonInteractive: boolean
-  readonly packageManager: PackageManagerName
-}
-
 export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   input: InitOptionsInput,
-  context: ValidateInitOptionsContext
+  packageManager: PackageManagerName
 ) {
-  const options: InitOptions = {
+  const options = {
     agents: input.agents,
     editors: Array.dedupe(input.editors),
     githubActions: input.githubActions,
@@ -93,17 +95,18 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  if (
-    options.githubActions
-    && context.nonInteractive
-    && !checkIsSupportedPackageManager(context.packageManager)
-  ) {
+  const githubActions =
+    options.githubActions && checkIsSupportedPackageManager(packageManager)
+      ? packageManager
+      : undefined
+
+  if (options.githubActions && githubActions === undefined) {
     return yield* new InvalidInitOptions({
-      reason: `\`--github-actions\` does not support the detected package manager \`${context.packageManager}\`. Use bun, deno, npm, pnpm, or yarn.`,
+      reason: `\`--github-actions\` does not support the detected package manager \`${packageManager}\`. Use bun, deno, npm, pnpm, or yarn.`,
     })
   }
 
-  return options
+  return { ...options, githubActions } satisfies InitOptions
 })
 
 const nonInteractive = Flag.Boolean("non-interactive").pipe(

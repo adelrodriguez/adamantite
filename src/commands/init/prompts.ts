@@ -1,6 +1,8 @@
+import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
+  checkIsSupportedPackageManager,
   getConflictingScripts,
   readPackageJson,
   MANAGED_SCRIPT_COMMANDS,
@@ -14,7 +16,8 @@ const describeScriptConflict = (conflict: ScriptConflict) =>
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
   cwd: string,
-  isMonorepo: boolean
+  isMonorepo: boolean,
+  packageManager: PackageManagerName
 ) {
   const prompter = yield* Prompter
 
@@ -166,11 +169,20 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         })
       : false
 
-  const shouldEnableGitHubActions = hasCICompatibleScripts(selectedScripts)
-    ? yield* prompter.confirm({
-        message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
-      })
-    : false
+  const canEnableGitHubActions = checkIsSupportedPackageManager(packageManager)
+
+  if (hasCICompatibleScripts(selectedScripts) && !canEnableGitHubActions) {
+    yield* prompter.log.info(
+      `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports bun, deno, npm, pnpm, and yarn.`
+    )
+  }
+
+  const shouldEnableGitHubActions =
+    hasCICompatibleScripts(selectedScripts) && canEnableGitHubActions
+      ? yield* prompter.confirm({
+          message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
+        })
+      : false
 
   const shouldAddAgentsGuidance = yield* prompter.confirm({
     initialValue: true,

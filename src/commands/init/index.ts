@@ -12,7 +12,7 @@ import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
-import { checkIsSupportedPackageManager, readPackageJson } from "#lib/workspace/package-json.ts"
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
@@ -102,17 +102,14 @@ export default Command.make("init", initCommandOptions).pipe(
 
       const input = options.nonInteractive
         ? options
-        : yield* collectInteractiveInitOptions(cwd, isMonorepo)
-      const initOptions = yield* validateInitOptions(input, {
-        nonInteractive: options.nonInteractive,
-        packageManager: packageManager.name,
-      })
+        : yield* collectInteractiveInitOptions(cwd, isMonorepo, packageManager.name)
+      const initOptions = yield* validateInitOptions(input, packageManager.name)
       const selectedScripts = initOptions.scripts
       const presets = initOptions.presets
       const selectedEditors = initOptions.editors
       const shouldSetupTypescript = initOptions.typescript
       const installExtensions = initOptions.installExtensions
-      const enableGitHubActions = initOptions.githubActions
+      const gitHubActionsPackageManager = initOptions.githubActions
       const shouldAddAgentsGuidance = initOptions.agents
 
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
@@ -188,16 +185,8 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* installEditorExtensions(selectedEditors, selectedScripts)
       }
 
-      if (enableGitHubActions) {
-        const packageManagerName = packageManager.name
-
-        if (checkIsSupportedPackageManager(packageManagerName)) {
-          yield* setupGitHubActions(cwd, packageManagerName, selectedScripts)
-        } else {
-          yield* prompter.log.warning(
-            `Skipping GitHub Actions setup: \`${packageManagerName}\` is not a supported package manager for CI workflow generation.`
-          )
-        }
+      if (gitHubActionsPackageManager !== undefined) {
+        yield* setupGitHubActions(cwd, gitHubActionsPackageManager, selectedScripts)
       }
 
       yield* prompter.log.success("Your project is now configured")

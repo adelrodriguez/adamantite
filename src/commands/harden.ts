@@ -11,7 +11,13 @@ import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { readHardenContext, renderHardenPrompt } from "#lib/hardening/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { CommandFailed } from "#lib/shared/errors.ts"
+import {
+  AdamantiteNotInNodeModules,
+  AdamantiteNotInstalled,
+  AdamantiteVersionMismatch,
+  CommandFailed,
+  ScopeOutsideProject,
+} from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readCustomRuleTestCommand } from "#lib/workspace/custom-rules/index.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
@@ -71,19 +77,6 @@ export default Command.make("harden", { scope }).pipe(
       const terminal = yield* TerminalCapabilities
       const isInteractive = yield* terminal.isInteractive
 
-      const failBeforeStart = Effect.fn("failBeforeStart")(function* (message: string) {
-        if (isInteractive) {
-          yield* prompter.log.warning(message)
-          yield* prompter.outro("⚠️ Harden did not start.")
-        } else {
-          yield* prompter.message(message)
-        }
-        return yield* new CommandFailed({
-          command: "harden",
-          exitCode: ChildProcessSpawner.ExitCode(1),
-        })
-      })
-
       if (isInteractive) {
         yield* prompter.intro("💠 adamantite harden")
       }
@@ -98,9 +91,7 @@ export default Command.make("harden", { scope }).pipe(
         && !packageJson.devDependencies?.adamantite
         && !packageJson.dependencies?.adamantite
       ) {
-        return yield* failBeforeStart(
-          "`adamantite` is not installed in this project. Install it before running `adamantite harden`."
-        )
+        return yield* new AdamantiteNotInstalled({ command: "harden" })
       }
 
       // The prompt offers the presets and rules of this version, so the project must install it.
@@ -109,15 +100,15 @@ export default Command.make("harden", { scope }).pipe(
         : yield* readInstalledVersion(cwd)
 
       if (Option.isNone(installedVersion)) {
-        return yield* failBeforeStart(
-          "`adamantite` is in `package.json` but not in `node_modules`. Install the dependencies before running `adamantite harden`."
-        )
+        return yield* new AdamantiteNotInNodeModules({ command: "harden" })
       }
 
       if (installedVersion.value !== version) {
-        return yield* failBeforeStart(
-          `This project installs Adamantite ${installedVersion.value}, but this command is Adamantite ${version}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`
-        )
+        return yield* new AdamantiteVersionMismatch({
+          command: "harden",
+          installed: installedVersion.value,
+          running: version,
+        })
       }
 
       const scopeDirectory = Option.isSome(scope) ? path.resolve(cwd, scope.value) : undefined
@@ -130,9 +121,7 @@ export default Command.make("harden", { scope }).pipe(
           || fromRoot.startsWith(`..${path.sep}`)
           || path.isAbsolute(fromRoot)
         ) {
-          return yield* failBeforeStart(
-            `\`--path\` must be a folder inside the project. \`${scopeDirectory}\` is outside \`${cwd}\`.`
-          )
+          return yield* new ScopeOutsideProject({ cwd, scope: scopeDirectory })
         }
       }
 
@@ -222,6 +211,31 @@ export default Command.make("harden", { scope }).pipe(
       )
       yield* prompter.outro("✅ Harden completed successfully!")
     }).pipe(
+      Effect.catchTag(
+        [
+          "AdamantiteNotInstalled",
+          "AdamantiteNotInNodeModules",
+          "AdamantiteVersionMismatch",
+          "ScopeOutsideProject",
+        ],
+        (error) =>
+          Effect.gen(function* () {
+            const prompter = yield* Prompter
+            const terminal = yield* TerminalCapabilities
+
+            if (yield* terminal.isInteractive) {
+              yield* prompter.log.warning(error.message)
+              yield* prompter.outro("⚠️ Harden did not start.")
+            } else {
+              yield* prompter.message(error.message)
+            }
+
+            return yield* new CommandFailed({
+              command: "harden",
+              exitCode: ChildProcessSpawner.ExitCode(1),
+            })
+          })
+      ),
       Effect.catchTag("OperationCancelled", () =>
         Effect.gen(function* () {
           const prompter = yield* Prompter

@@ -58,6 +58,47 @@ function formatParseErrors(errors: ParseError[] = []) {
     .join("\n")
 }
 
+export class AdamantiteNotInstalled extends Data.TaggedError("AdamantiteNotInstalled")<{
+  command: string
+}> {
+  override get message() {
+    return `\`adamantite\` is not installed in this project. Install it before running \`adamantite ${this.command}\`.`
+  }
+}
+
+/**
+ * The project declares Adamantite, but the package manager did not install it.
+ */
+export class AdamantiteNotInNodeModules extends Data.TaggedError("AdamantiteNotInNodeModules")<{
+  command: string
+}> {
+  override get message() {
+    return `\`adamantite\` is in \`package.json\` but not in \`node_modules\`. Install the dependencies before running \`adamantite ${this.command}\`.`
+  }
+}
+
+/**
+ * The project installs another Adamantite than the one that runs the command.
+ */
+export class AdamantiteVersionMismatch extends Data.TaggedError("AdamantiteVersionMismatch")<{
+  command: string
+  installed: string
+  running: string
+}> {
+  override get message() {
+    return `This project installs Adamantite ${this.installed}, but this command is Adamantite ${this.running}. Run the project's own Adamantite, such as \`pnpm exec adamantite ${this.command}\`, or install the dependencies again.`
+  }
+}
+
+export class ScopeOutsideProject extends Data.TaggedError("ScopeOutsideProject")<{
+  cwd: string
+  scope: string
+}> {
+  override get message() {
+    return `\`--path\` must be a folder inside the project. \`${this.scope}\` is outside \`${this.cwd}\`.`
+  }
+}
+
 export class CliNotFound extends Data.TaggedError("CliNotFound")<{
   command: string
   /**

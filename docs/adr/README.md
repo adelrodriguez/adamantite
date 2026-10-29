@@ -12,3 +12,4 @@
 - [ADR 0010: Core absorbs no plugin rules while Oxlint JS plugins are alpha](0010-core-stays-native.md)
 - [ADR 0011: The test presets scope themselves to test files](0011-test-presets-scope-themselves.md)
 - [ADR 0012: Harden instructs agents to turn coding standards into rules](0012-harden-instructs-agents-to-write-rules.md)
+- [ADR 0013: Import layers are a dependency graph in a first-party rule](0013-import-layers-are-a-dependency-graph.md)

@@ -27,6 +27,17 @@ pins its version, installs it when its preset is selected, and keeps it in sync 
 doctor and update.
 _Avoid_: Vendored bundle, dependency
 
+**Layer map**:
+The options of the first-party rule `adamantite/layers`: each layer of a folder, by folder name,
+with the layers directly below it. A layer imports the layers it lists and every layer that those
+import.
+_Avoid_: Layer order, boundaries
+
+**Entry**:
+A composition file below the root of a layer map, such as `router.tsx`. An entry imports any
+layer, and no layer imports an entry.
+_Avoid_: Composition layer, entrypoint
+
 **Custom rule**:
 An Oxlint rule that the target project writes in a rules folder. The target project owns
 its correctness and its tests. Adamantite owns the wiring and the authoring guidance. Use

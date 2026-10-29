@@ -18,7 +18,10 @@ function getImportedName(specifier: ESTree.ImportSpecifier) {
   return specifier.imported.type === "Literal" ? specifier.imported.value : specifier.imported.name
 }
 
-function isStringLiteral(node: ESTree.Expression): node is ESTree.StringLiteral {
+/**
+ * Whether an expression is a string literal, such as the source of `import("./module.ts")`.
+ */
+export function isStringLiteral(node: ESTree.Expression): node is ESTree.StringLiteral {
   return node.type === "Literal" && typeof node.value === "string"
 }
 

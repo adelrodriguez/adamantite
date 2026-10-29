@@ -27,6 +27,10 @@ function getFirstPartyRules(rules: OxlintConfig["rules"]) {
 
 const presetRules = getFirstPartyRules(strict.rules)
 
+// These rules need options from the target project, such as a layer map, so the project turns them
+// on.
+const PROJECT_RULES = ["layers"]
+
 describe("strict preset", () => {
   it("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
@@ -36,9 +40,10 @@ describe("strict preset", () => {
 })
 
 describe("first-party plugin", () => {
-  it("have each rule enabled by exactly one of the strict, react-strict, and tanstack presets", () => {
+  it("have each rule enabled by exactly one of the strict, react-strict, and tanstack presets, or by the project", () => {
     const enabled = [
       ...presetRules,
+      ...PROJECT_RULES,
       ...getFirstPartyRules(reactStrict.rules),
       ...getFirstPartyRules(tanstack.rules),
     ]

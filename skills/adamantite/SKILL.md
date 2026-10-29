@@ -48,6 +48,29 @@ properties; keep the object and read its members, or split the pattern. Do not r
 `maxDepth` or `maxProperties` only to silence a report. The preset also bans type assertions
 outside tests.
 
+The `strict` preset also loads `adamantite/layers`, which enforces one-way imports between the
+folders of a root, such as `src/lib`. The project turns it on with its layer map: each layer by
+folder name, with the layers directly below it. Imports are transitive.
+
+```ts
+rules: {
+  "adamantite/layers": [
+    "error",
+    {
+      root: "src/lib", // relative to the package.json folder
+      layers: { shared: [], workspace: ["shared"], execution: ["shared"], commands: ["workspace", "execution"] },
+    },
+  ],
+},
+```
+
+`isolate` lists layers whose folders do not import each other, such as `features`. `entries`
+lists composition files below the root, such as `["*"]` for `router.tsx`. `ignore` exempts
+importers by glob, such as `["**/__tests__/**"]`, and `ignoreTypes: true` stops counting
+type-only imports. A file in a folder that is not in the map is a report. Follow the repair
+in each message. Do not add a layer to another layer's list, or add an `ignore` glob, only to
+silence a report.
+
 The `tanstack` preset needs no extra package. Its `adamantite/query-from-loader` rule reports
 TanStack Query hooks in route files (files that call `createFileRoute`, `createRoute`, or another
 route factory from `@tanstack/react-router`) that take a plain options object or a `queryOptions()` call made inside a

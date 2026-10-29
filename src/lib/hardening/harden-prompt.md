@@ -47,7 +47,7 @@ Put each remaining candidate on the highest step that works:
 
 1. **Type or structure:** a type, a schema, a module boundary, or a stricter TypeScript option makes the mistake impossible.
 2. **Preset rule:** a rule in an Oxlint preset or plugin that the project can turn on, or an option of a rule that is already on.
-3. **Import rule:** `no-restricted-imports`, with an override for the files that the standard applies to.
+3. **Import rule:** `adamantite/layers` for one-way imports between the folders of a root, or `no-restricted-imports` with an override for the files that the standard applies to.
 4. **Custom rule:** a rule in the rules folder that checks the AST.
 5. **Instruction:** a line in `CODING_STANDARDS.md`, only when no tool can check the standard.
 

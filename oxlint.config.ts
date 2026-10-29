@@ -6,23 +6,6 @@ import node from "./presets/lint/node.ts"
 import strict from "./presets/lint/strict.ts"
 import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
-const TERMINAL_IMPORTS = {
-  group: ["#terminal/*"],
-  message:
-    "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
-}
-
-// Parent-relative paths would skip the `#lib/...` layer patterns below. `version.macro.ts` reads the
-// root `package.json`, and the GitHub workflow test reads this repository's workflows. Neither has
-// an alias.
-const PARENT_RELATIVE_IMPORTS = {
-  group: ["../**", "!../../../package.json", "!../../../../../.github/workflows/**"],
-  message: "Import other lib modules through `#lib/...`, so the lib layer rules apply.",
-}
-
-const LIB_LAYER_MESSAGE =
-  'Lib layers import only from lower layers: shared, then workspace and execution, then integrations, then assessment. Hardening sits beside integrations and imports only shared, workspace, and execution. See "Lib layers" in docs/architecture.md.'
-
 export default defineConfig({
   extends: [core, node, antislop, effect, strict],
   ignorePatterns: [
@@ -60,121 +43,16 @@ export default defineConfig({
       },
     },
     {
-      files: ["src/lib/shared/**/*.ts"],
+      files: ["src/lib/**/*.ts"],
       rules: {
         "no-restricted-imports": [
           "error",
           {
             patterns: [
-              TERMINAL_IMPORTS,
-              PARENT_RELATIVE_IMPORTS,
               {
-                group: [
-                  "#lib/workspace/**",
-                  "#lib/execution/**",
-                  "#lib/integrations/**",
-                  "#lib/assessment/**",
-                  "#lib/hardening/**",
-                ],
-                message: LIB_LAYER_MESSAGE,
-              },
-            ],
-          },
-        ],
-      },
-    },
-    {
-      files: ["src/lib/workspace/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              TERMINAL_IMPORTS,
-              PARENT_RELATIVE_IMPORTS,
-              {
-                group: [
-                  "#lib/execution/**",
-                  "#lib/integrations/**",
-                  "#lib/assessment/**",
-                  "#lib/hardening/**",
-                ],
-                message: LIB_LAYER_MESSAGE,
-              },
-            ],
-          },
-        ],
-      },
-    },
-    {
-      files: ["src/lib/execution/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              TERMINAL_IMPORTS,
-              PARENT_RELATIVE_IMPORTS,
-              {
-                group: [
-                  "#lib/workspace/**",
-                  "#lib/integrations/**",
-                  "#lib/assessment/**",
-                  "#lib/hardening/**",
-                ],
-                message: LIB_LAYER_MESSAGE,
-              },
-            ],
-          },
-        ],
-      },
-    },
-    {
-      files: ["src/lib/integrations/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              TERMINAL_IMPORTS,
-              PARENT_RELATIVE_IMPORTS,
-              {
-                group: ["#lib/assessment/**", "#lib/hardening/**"],
-                message: LIB_LAYER_MESSAGE,
-              },
-            ],
-          },
-        ],
-      },
-    },
-    // Assessment and hardening are siblings at the top, and do not import each other.
-    {
-      files: ["src/lib/assessment/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              TERMINAL_IMPORTS,
-              PARENT_RELATIVE_IMPORTS,
-              { group: ["#lib/hardening/**"], message: LIB_LAYER_MESSAGE },
-            ],
-          },
-        ],
-      },
-    },
-    {
-      files: ["src/lib/hardening/**/*.ts"],
-      rules: {
-        "no-restricted-imports": [
-          "error",
-          {
-            patterns: [
-              TERMINAL_IMPORTS,
-              PARENT_RELATIVE_IMPORTS,
-              {
-                group: ["#lib/integrations/**", "#lib/assessment/**"],
-                message: LIB_LAYER_MESSAGE,
+                group: ["#terminal/*"],
+                message:
+                  "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
               },
             ],
           },
@@ -182,4 +60,26 @@ export default defineConfig({
       },
     },
   ],
+  rules: {
+    // The lib layers, from the bottom up. Each layer imports only the layers it lists and the layers
+    // below those. See "Lib layers" in docs/architecture.md.
+    "adamantite/layers": [
+      "error",
+      {
+        layers: {
+          shared: [],
+
+          execution: ["shared"],
+          workspace: ["shared"],
+
+          // Harden is not an assessment, so `assessment` does not import `hardening`.
+          hardening: ["workspace", "execution"],
+          integrations: ["workspace", "execution"],
+
+          assessment: ["integrations"],
+        },
+        root: "src/lib",
+      },
+    ],
+  },
 })

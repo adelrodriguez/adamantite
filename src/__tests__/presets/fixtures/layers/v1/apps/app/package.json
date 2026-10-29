@@ -1,0 +1,8 @@
+{
+  "name": "@fixture/app",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  }
+}

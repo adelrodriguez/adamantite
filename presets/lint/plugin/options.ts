@@ -15,6 +15,10 @@ function isStringArray(value: OptionValue | undefined): value is string[] {
   return Array.isArray(value) && value.every((entry) => isString(entry))
 }
 
+function isBoolean(value: OptionValue | undefined): value is boolean {
+  return typeof value === "boolean"
+}
+
 function isPositiveInteger(value: OptionValue | undefined): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0
 }
@@ -47,4 +51,47 @@ export function readPositiveIntegerOption(
   const value = readOption(options, key)
 
   return isPositiveInteger(value) ? value : undefined
+}
+
+/**
+ * Read a string from the rule's first option object.
+ */
+export function readStringOption(options: Readonly<Options>, key: string): string | undefined {
+  const value = readOption(options, key)
+
+  return isString(value) ? value : undefined
+}
+
+/**
+ * Read a boolean from the rule's first option object.
+ */
+export function readBooleanOption(options: Readonly<Options>, key: string): boolean | undefined {
+  const value = readOption(options, key)
+
+  return isBoolean(value) ? value : undefined
+}
+
+/**
+ * Read an object of string arrays, such as `{ shared: [], workspace: ["shared"] }`, from the rule's
+ * first option object. Entries whose value is not a string array are dropped.
+ */
+export function readStringArrayRecordOption(
+  options: Readonly<Options>,
+  key: string
+): Record<string, string[]> | undefined {
+  const value = readOption(options, key)
+
+  if (!isOptionObject(value)) {
+    return undefined
+  }
+
+  const record: Record<string, string[]> = {}
+
+  for (const [name, entry] of Object.entries(value)) {
+    if (isStringArray(entry)) {
+      record[name] = entry
+    }
+  }
+
+  return record
 }

@@ -1,0 +1,42 @@
+{
+  "rules": {
+    "adamantite/layers": [
+      "error",
+      {
+        "root": "src/lib",
+        "ignore": [
+          "**/__tests__/**"
+        ],
+        "layers": {
+          "core": [],
+          "shared": [],
+          "layout": [
+            "core",
+            "shared"
+          ],
+          "manifests": [
+            "layout"
+          ],
+          "registries": [
+            "layout"
+          ],
+          "store": [
+            "layout"
+          ],
+          "workspace": [
+            "layout"
+          ],
+          "sources": [
+            "registries",
+            "manifests",
+            "store",
+            "workspace"
+          ],
+          "references": [
+            "sources"
+          ]
+        }
+      }
+    ]
+  }
+}

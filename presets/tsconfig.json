@@ -17,6 +17,9 @@
     "strict": true,
 
     "allowUnreachableCode": false,
+    // Node.js type stripping, Bun, and custom rule files run only erasable syntax. Core lint
+    // reports namespaces and parameter properties, but no lint rule bans `enum`.
+    "erasableSyntaxOnly": true,
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": true,
     "noImplicitOverride": true,

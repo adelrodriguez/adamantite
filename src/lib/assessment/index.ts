@@ -13,6 +13,7 @@ import type {
   PackageAction,
 } from "#lib/integrations/base.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
+import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -27,6 +28,7 @@ import { fillTemplate } from "#lib/shared/template.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const repairPromptTemplate = getRepairPromptTemplate()
+const warningReportTemplate = getWarningReportTemplate()
 
 /**
  * Every integration assessed against a project. The order fixes how findings are numbered in the
@@ -143,15 +145,10 @@ export function renderAssessmentMarkdown(
 }
 
 function renderWarningReport(warnings: readonly string[], adamantiteVersion: string): string {
-  return [
-    "# Adamantite doctor warnings",
-    "",
-    `This project uses Adamantite ${adamantiteVersion} to manage linting, formatting, and type tooling.`,
-    "`adamantite doctor` found no repair findings, but reported these warnings:",
-    "",
-    ...warnings.map((warning) => `- ${warning}`),
-    "",
-  ].join("\n")
+  return fillTemplate(warningReportTemplate, {
+    version: adamantiteVersion,
+    warnings: warnings.map((warning) => `- ${warning}`).join("\n"),
+  })
 }
 
 function renderRepairPrompt(

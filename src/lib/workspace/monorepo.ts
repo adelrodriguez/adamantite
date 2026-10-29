@@ -18,28 +18,18 @@ function unquote(value: string) {
   return value.replace(/^(["'])(.*)\1$/u, "$2")
 }
 
+// A YAML anchor or tag, such as `&packages`, can come before a value.
+function stripNodeProperties(value: string) {
+  return value.replace(/^(?:[!&]\S*\s*)+/u, "")
+}
+
 /**
- * The package patterns in a `pnpm-workspace.yaml`, in block (`- packages/*`) or flow
- * (`[packages/*]`) style.
+ * The items of a YAML list in block (`- packages/*`) or flow (`[packages/*]`) style, from the value
+ * on the line of its key and the lines after it.
  */
-export function readPnpmWorkspacePatterns(content: string): string[] {
-  const lines = content.replace(/^\uFEFF/u, "").split(/\r?\n/u)
-  const packagesIndex = lines.findIndex((line) => PNPM_PACKAGES_KEY_REGEX.test(line))
-
-  if (packagesIndex === -1) {
-    return []
-  }
-
-  // A YAML anchor or tag, such as `&packages`, can come before the value.
-  const declaration = stripYamlComment(
-    (lines[packagesIndex] ?? "").replace(PNPM_PACKAGES_KEY_REGEX, "")
-  ).replace(/^(?:[!&]\S*\s*)+/u, "")
-
-  if (declaration.startsWith("[")) {
-    const flow = [
-      declaration,
-      ...lines.slice(packagesIndex + 1).map((line) => stripYamlComment(line)),
-    ].join(" ")
+function readList(value: string, nextLines: readonly string[]): string[] {
+  if (value.startsWith("[")) {
+    const flow = [value, ...nextLines.map((line) => stripYamlComment(line))].join(" ")
     const end = flow.indexOf("]")
 
     return flow
@@ -49,19 +39,58 @@ export function readPnpmWorkspacePatterns(content: string): string[] {
       .filter((item) => item.length > 0)
   }
 
-  const patterns: string[] = []
+  const items: string[] = []
 
-  for (const line of lines.slice(packagesIndex + 1)) {
+  for (const line of nextLines) {
     const item = /^\s*-\s*(.+)$/u.exec(stripYamlComment(line))?.[1]
 
     if (item !== undefined) {
-      patterns.push(unquote(item.trim()))
+      items.push(unquote(item.trim()))
     } else if (/^\S/u.test(line) && !line.startsWith("#")) {
       break
     }
   }
 
-  return patterns
+  return items
+}
+
+/**
+ * The package patterns in a `pnpm-workspace.yaml`, in block (`- packages/*`) or flow
+ * (`[packages/*]`) style. An alias, such as `packages: *shared`, reads the list that `&shared`
+ * anchors.
+ */
+export function readPnpmWorkspacePatterns(content: string): string[] {
+  const lines = content.replace(/^\uFEFF/u, "").split(/\r?\n/u)
+  const packagesIndex = lines.findIndex((line) => PNPM_PACKAGES_KEY_REGEX.test(line))
+
+  if (packagesIndex === -1) {
+    return []
+  }
+
+  const value = stripNodeProperties(
+    stripYamlComment((lines[packagesIndex] ?? "").replace(PNPM_PACKAGES_KEY_REGEX, ""))
+  )
+  const alias = /^\*(\S+)$/u.exec(value)?.[1]
+
+  if (alias === undefined) {
+    return readList(value, lines.slice(packagesIndex + 1))
+  }
+
+  const anchor = `&${alias}`
+  const anchorIndex = lines.findIndex((line) =>
+    stripYamlComment(line).split(/\s+/u).includes(anchor)
+  )
+
+  if (anchorIndex === -1) {
+    return []
+  }
+
+  const anchored = stripYamlComment(lines[anchorIndex] ?? "")
+
+  return readList(
+    stripNodeProperties(anchored.slice(anchored.indexOf(anchor) + anchor.length).trim()),
+    lines.slice(anchorIndex + 1)
+  )
 }
 
 /**

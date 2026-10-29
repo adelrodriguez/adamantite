@@ -319,6 +319,13 @@ describe("checkIsMonorepo", () => {
       name: "pnpm anchors a flow sequence of packages",
     },
     {
+      content:
+        'workspacePackages: &workspacePackages ["packages/*"]\npackages: *workspacePackages\n',
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm aliases an anchored list of packages",
+    },
+    {
       content: "packages: &workspacePackages\n  - packages/*\n",
       expected: true,
       file: "pnpm-workspace.yaml",

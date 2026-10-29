@@ -42,6 +42,16 @@ describe("readPnpmWorkspacePatterns", () => {
     ])
   })
 
+  it.each([
+    ["flow", 'shared: &workspacePackages ["apps/*", tooling/lint]\npackages: *workspacePackages\n'],
+    [
+      "block",
+      "shared: &workspacePackages\n  - apps/*\n  - tooling/lint\npackages: *workspacePackages\n",
+    ],
+  ])("follow a YAML alias to an anchored %s list", (_, content) => {
+    expect(readPnpmWorkspacePatterns(content)).toStrictEqual(["apps/*", "tooling/lint"])
+  })
+
   it("read no pattern without a packages key", () => {
     expect(readPnpmWorkspacePatterns("catalog:\n  effect: 4.0.0\n")).toStrictEqual([])
   })

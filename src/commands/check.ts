@@ -20,14 +20,27 @@ const only = Flag.Literals("only", ["format", "lint"]).pipe(
   )
 )
 
-export default Command.make("check", { files, only }).pipe(
+// Agents copy the code that they read, so a warning that passes `check` spreads like code that
+// has no report. `check` fails on warnings unless the user allows them.
+const allowWarnings = Flag.Boolean("allow-warnings").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Pass the lint stage when Oxlint reports only warnings")
+)
+
+export default Command.make("check", { allowWarnings, files, only }).pipe(
   Command.withDescription("Check formatting, code issues, and type errors"),
-  Command.withHandler(({ files, only }) =>
+  Command.withHandler(({ allowWarnings, files, only }) =>
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
       const selected = Option.getOrUndefined(only)
       const forwardedStage = selected ?? "lint"
+      // A forwarded `--deny-warnings` or `--max-warnings` is the project's own warning policy, and
+      // Oxlint rejects `--deny-warnings` twice.
+      const forwardsWarningPolicy = forwardedArguments.some(
+        (argument) => argument === "--deny-warnings" || argument.startsWith("--max-warnings")
+      )
+      const denyWarnings = allowWarnings || forwardsWarningPolicy ? [] : ["--deny-warnings"]
 
       const stages = [
         {
@@ -36,7 +49,12 @@ export default Command.make("check", { files, only }).pipe(
           name: "format",
           title: "✨ Checking formatting",
         },
-        { args: [...files], command: oxlint.name, name: "lint", title: "🔍 Linting" },
+        {
+          args: [...files, ...denyWarnings],
+          command: oxlint.name,
+          name: "lint",
+          title: "🔍 Linting",
+        },
       ]
 
       yield* runner.runAll(

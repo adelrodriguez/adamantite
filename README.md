@@ -130,6 +130,11 @@ adamantite check
 adamantite check src
 ```
 
+`check` fails when Oxlint reports a warning, because a warning that passes is a pattern that
+agents copy. Use `--allow-warnings` to pass with warnings. A forwarded `--max-warnings` or
+`--deny-warnings`, such as `adamantite check -- --max-warnings 10`, replaces this default. To keep existing violations of a
+rule while new code follows it, turn the rule off for those files in an Oxlint override.
+
 Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
 both run:
 
@@ -291,7 +296,7 @@ Commands that invoke Knip, Oxlint, Oxfmt, or Sherif forward arguments after `--`
 
 ```sh
 adamantite analyze --strict -- --directory packages/app
-adamantite check src -- --deny-warnings
+adamantite check src -- --format github
 adamantite analyze --only monorepo -- --ignore-package package-a
 ```
 

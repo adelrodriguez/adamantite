@@ -109,11 +109,11 @@ Write only the approved candidates:
   - A comment at the top of the rule file states the standard and why it exists.
   - The test has the case that the rule must report and the case that it must accept.
 - **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
-- **Existing violations:** keep the code that a new rule reports as it is, and list the violations for the user. Set the rule to `warn`: for a custom rule, use the `rules` option of `custom()`, such as `custom({ rules: { "no-foo": "warn" } })`; for a preset rule or an import rule, set it in the Oxlint config or override that turns it on. A separate change fixes the violations and sets the rule back to `error`.
+- **Existing violations:** keep the code that a new rule reports as it is, and list the violations for the user. Keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule. A separate change fixes the violations and removes each file from the override.
 - **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard.
 - **Discovery gap:** add each approved pointer to the instruction file that the gap names.
 
 ## Verify
 
 When you wrote files, run `adamantite check`, `adamantite rule test`, and `adamantite doctor` in this order — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
-All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or set it to `warn` as step 7 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.
+All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 7 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.

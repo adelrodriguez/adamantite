@@ -93,8 +93,8 @@ const REQUIRED_PHRASES = {
     "delete the instruction of each standard that a rule now checks",
     "keep the other part as the instruction",
     "keep the code that a new rule reports as it is",
-    "for a custom rule, use the `rules` option of `custom()`",
-    "for a preset rule or an import rule, set it in the Oxlint config",
+    "turns the rule off only in the files that break it now",
+    "Do not set the rule to `warn`: `adamantite check` fails on warnings.",
     "`CODING_STANDARDS.md`",
     "add each approved pointer to the instruction file that the gap names",
   ],
@@ -102,6 +102,7 @@ const REQUIRED_PHRASES = {
     "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
     "All three must exit 0.",
     "When you changed a project check, also run that check with the project's own command",
+    "add the file to the override as step 7 says, not a disable comment",
     "When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
@@ -612,7 +613,7 @@ describe("harden", () => {
             stdout: "inherit",
           }),
           expect.objectContaining({ args: ["--check"], command: "oxfmt" }),
-          expect.objectContaining({ args: [], command: "oxlint" }),
+          expect.objectContaining({ args: ["--deny-warnings"], command: "oxlint" }),
           {
             args: ["--test", ".adamantite/rules/tests/no-foo.ts"],
             command: "node",

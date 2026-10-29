@@ -15,14 +15,14 @@ describe("check", () => {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(checkCommand, ["--only", "lint"], {
-          forwardedArguments: ["--deny-warnings"],
+          forwardedArguments: ["--format", "github"],
           layers: [runner.layer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--deny-warnings"],
+            args: ["--deny-warnings", "--format", "github"],
             command: "oxlint",
             title: "🔍 Linting",
           },
@@ -47,6 +47,62 @@ describe("check", () => {
             title: "✨ Checking formatting",
           },
         ])
+      })
+    )
+  })
+
+  describe("warnings", () => {
+    it.effect("make Oxlint fail on warnings", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        yield* runCommand(checkCommand, [], { layers: [runner.layer] })
+
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({ args: ["--deny-warnings"], command: "oxlint" })
+        )
+      })
+    )
+
+    it.effect("let Oxlint pass on warnings with --allow-warnings", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        yield* runCommand(checkCommand, ["--allow-warnings"], { layers: [runner.layer] })
+
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({ args: [], command: "oxlint" })
+        )
+      })
+    )
+
+    it.effect("pass a forwarded --deny-warnings to Oxlint one time", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        yield* runCommand(checkCommand, [], {
+          forwardedArguments: ["--deny-warnings"],
+          layers: [runner.layer],
+        })
+
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({ args: ["--deny-warnings"], command: "oxlint" })
+        )
+      })
+    )
+
+    it.effect("keep a forwarded --max-warnings threshold", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        yield* runCommand(checkCommand, [], {
+          forwardedArguments: ["--max-warnings=5"],
+          layers: [runner.layer],
+        })
+
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({ args: ["--max-warnings=5"], command: "oxlint" })
+        )
       })
     )
   })
@@ -78,7 +134,7 @@ describe("check", () => {
 
         const exit = yield* runCommand(checkCommand, ["index.ts"], {
           files,
-          forwardedArguments: ["--deny-warnings"],
+          forwardedArguments: ["--format", "github"],
           layers: [runner.layer],
         })
 
@@ -90,7 +146,7 @@ describe("check", () => {
             title: "✨ Checking formatting",
           },
           {
-            args: [join(files.root, "index.ts"), "--deny-warnings"],
+            args: [join(files.root, "index.ts"), "--deny-warnings", "--format", "github"],
             command: "oxlint",
             title: "🔍 Linting",
           },

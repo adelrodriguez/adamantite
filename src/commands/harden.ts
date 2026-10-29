@@ -162,7 +162,7 @@ export default Command.make("harden", { scope }).pipe(
       const checkPassed = yield* passes(
         runner.runAll([
           { args: ["--check"], command: oxfmt.name, title: "✨ Checking formatting" },
-          { args: [], command: oxlint.name, title: "🔍 Linting" },
+          { args: ["--deny-warnings"], command: oxlint.name, title: "🔍 Linting" },
         ])
       )
       // The Doctor warnings below already name the rules folders that discovery cannot follow.

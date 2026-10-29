@@ -26,9 +26,9 @@ The decisions:
 - Instructions do not mark which standards are enforced. A standard that becomes a rule
   leaves the instructions, and the rule file gets a comment that states the standard and why it exists,
   so each standard has one source.
-- When a new rule reports existing code, the agent lists the violations and sets the rule
-  to `warn`: through the `rules` option of `custom()` for a custom rule, or in the config
-  that turns on any other rule. A separate change fixes the code.
+- When a new rule reports existing code, the agent lists the violations, keeps the rule at
+  `error`, and turns it off for those files in an Oxlint override. A separate change fixes the
+  code. This replaced a `warn` setting when `check` started to fail on warnings (ADR 0018).
 - Nothing changes before the approval, not even a sample file: the agent confirms what a
   tool enforces by linting a counterexample that the code already has.
 - Harden is not part of Doctor. Doctor is a deterministic CI gate, and a harden session can

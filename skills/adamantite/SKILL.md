@@ -10,6 +10,7 @@ sources:
   - "adelrodriguez/adamantite:src/commands/*.ts"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/index.ts"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/stub.ts.template"
+  - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/stub.test.ts.template"
 ---
 
 # Adamantite

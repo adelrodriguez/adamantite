@@ -36,8 +36,7 @@ const TERM = /^\*\*(.+?)\*\*:\s*$/u
 const AVOID = /^_Avoid_:\s*(.+?)\s*$/u
 
 /**
- * Split a name or a text into lowercase words, such as `["find", "streak"]` for `findStreaks`. A
- * regular plural becomes its singular, so `streaks` matches `streak` and `fixes` matches `fix`.
+ * Split a name or a text into lowercase words, such as `["find", "streaks"]` for `findStreaks`.
  */
 export function splitWords(text: string): string[] {
   return text
@@ -46,24 +45,25 @@ export function splitWords(text: string): string[] {
     .toLowerCase()
     .split(/[^a-z\d]+/u)
     .filter((word) => word !== "")
-    .map((word) => {
-      if (word.endsWith("ies") && word.length > 4) {
-        return `${word.slice(0, -3)}y`
-      }
-
-      // `fixes`, `matches`, and `classes` drop `es`. `cases` and `uses` drop only `s`.
-      if (/(?:x|z|ch|sh|ss)es$/u.test(word)) {
-        return word.slice(0, -2)
-      }
-
-      return word.endsWith("s") && !word.endsWith("ss") && word.length > 3
-        ? word.slice(0, -1)
-        : word
-    })
 }
 
 /**
- * Whether `words` holds `phrase` as a run of whole words.
+ * Whether `word` is `term` or a regular plural of it, such as `streaks`, `fixes`, `caches`, or
+ * `entries`. A rule that turns plurals back into singulars cannot tell `caches` from `fixes`, so
+ * the rule builds the plurals of the term instead.
+ */
+function isWordOf(word: string | undefined, term: string) {
+  return (
+    word === term
+    || word === `${term}s`
+    || word === `${term}es`
+    || (term.endsWith("y") && word === `${term.slice(0, -1)}ies`)
+  )
+}
+
+/**
+ * Whether `words` holds `phrase` as a run of whole words. Each word of `words` can be the plural of
+ * the word of `phrase`.
  */
 export function hasPhrase(words: readonly string[], phrase: readonly string[]): boolean {
   if (phrase.length === 0) {
@@ -71,7 +71,7 @@ export function hasPhrase(words: readonly string[], phrase: readonly string[]): 
   }
 
   for (let start = 0; start + phrase.length <= words.length; start += 1) {
-    if (phrase.every((word, index) => words[start + index] === word)) {
+    if (phrase.every((word, index) => isWordOf(words[start + index], word))) {
       return true
     }
   }

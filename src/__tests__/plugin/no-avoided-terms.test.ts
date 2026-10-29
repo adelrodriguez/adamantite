@@ -161,22 +161,11 @@ describe("parseGlossary", () => {
 })
 
 describe("splitWords", () => {
-  it("split names in each case style into singular words", () => {
-    expect(splitWords("findStreaks")).toStrictEqual(["find", "streak"])
-    expect(splitWords("STREAK_DAYS")).toStrictEqual(["streak", "day"])
-    expect(splitWords("HTMLEntries")).toStrictEqual(["html", "entry"])
+  it("split names in each case style into lowercase words", () => {
+    expect(splitWords("findStreaks")).toStrictEqual(["find", "streaks"])
+    expect(splitWords("STREAK_DAYS")).toStrictEqual(["streak", "days"])
+    expect(splitWords("HTMLEntries")).toStrictEqual(["html", "entries"])
     expect(splitWords("check-in progress")).toStrictEqual(["check", "in", "progress"])
-  })
-
-  it("drop `es` only after a sibilant", () => {
-    expect(splitWords("manualFixes classes matches boxes")).toStrictEqual([
-      "manual",
-      "fix",
-      "class",
-      "match",
-      "box",
-    ])
-    expect(splitWords("cases uses names")).toStrictEqual(["case", "use", "name"])
   })
 })
 
@@ -185,5 +174,18 @@ describe("hasPhrase", () => {
     expect(hasPhrase(["vendored", "bundle", "path"], ["vendored", "bundle"])).toBe(true)
     expect(hasPhrase(["bundle", "vendored"], ["vendored", "bundle"])).toBe(false)
     expect(hasPhrase(["vendored"], [])).toBe(false)
+  })
+
+  it("match the regular plural of each word", () => {
+    expect(hasPhrase(["find", "streaks"], ["streak"])).toBe(true)
+    expect(hasPhrase(["manual", "fixes"], ["manual", "fix"])).toBe(true)
+    expect(hasPhrase(["html", "entries"], ["entry"])).toBe(true)
+    expect(hasPhrase(["caches"], ["cache"])).toBe(true)
+    expect(hasPhrase(["cases"], ["case"])).toBe(true)
+  })
+
+  it("not match a longer word", () => {
+    expect(hasPhrase(["modern"], ["mode"])).toBe(false)
+    expect(hasPhrase(["habitual"], ["habit"])).toBe(false)
   })
 })

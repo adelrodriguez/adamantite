@@ -91,11 +91,10 @@ export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (c
     cwd,
     ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
   ]
-  const { calls, unresolvedImports } = yield* discoverCustomRules(packageDirectories)
+  const { calls, unresolvedCalls, unresolvedImports } =
+    yield* discoverCustomRules(packageDirectories)
   const testDirectories = Array.dedupe(
-    calls.flatMap((call) =>
-      call.dir === null ? [] : [path.join(call.dir, CUSTOM_RULE_TESTS_DIRECTORY)]
-    )
+    calls.map((call) => path.join(call.dir, CUSTOM_RULE_TESTS_DIRECTORY))
   )
   const tests = yield* Effect.forEach(
     testDirectories,
@@ -112,9 +111,7 @@ export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (c
 
   return {
     tests: Array.sort(tests.flat(), Order.String),
-    unresolvedCalls: Array.dedupe(
-      calls.flatMap((call) => (call.dir === null ? [call.source] : []))
-    ),
+    unresolvedCalls: Array.dedupe(unresolvedCalls),
     unresolvedImports,
   }
 })

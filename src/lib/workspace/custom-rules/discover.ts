@@ -33,11 +33,18 @@ type ResolvedImport =
   | { readonly _tag: "found"; readonly module: SourceModule }
   | { readonly _tag: "unresolved" }
 
+/**
+ * A `custom()` call whose rules folder Doctor can read. A call whose `dir` only running the config
+ * can resolve is in `unresolvedCalls` instead.
+ */
 interface ResolvedCall {
   /**
-   * Absolute rules folder, or `null` when only running the config can resolve it.
+   * Absolute rules folder.
    */
-  readonly dir: string | null
+  readonly dir: string
+  /**
+   * The plugin name, or `null` when only running the config can resolve it.
+   */
   readonly name: string | null
   readonly source: string
 }
@@ -150,6 +157,8 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   const configs = packageConfigs.filter((config) => nearestConfigs.has(config))
   const visited = new Set<string>()
   const calls: ResolvedCall[] = []
+  // The module of each call whose `dir` is not a string literal, once for each call.
+  const unresolvedCalls: string[] = []
   const unresolvedImports: Array<{ readonly from: string; readonly specifier: string }> = []
   let queue = configs
 
@@ -160,13 +169,17 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
       visited.add(module.file)
 
       if (module.content.includes(CUSTOM_RULES_MODULE)) {
-        calls.push(
-          ...findCustomRulesCalls(module.file, module.content).map((call): ResolvedCall => ({
-            dir: call.dir === null ? null : path.resolve(path.dirname(module.file), call.dir),
-            name: call.name,
-            source: module.file,
-          }))
-        )
+        for (const call of findCustomRulesCalls(module.file, module.content)) {
+          if (call.dir === null) {
+            unresolvedCalls.push(module.file)
+          } else {
+            calls.push({
+              dir: path.resolve(path.dirname(module.file), call.dir),
+              name: call.name,
+              source: module.file,
+            })
+          }
+        }
       }
     }
 
@@ -195,5 +208,10 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     }
   }
 
-  return { calls, configs: configs.map((config) => config.file), unresolvedImports }
+  return {
+    calls,
+    configs: configs.map((config) => config.file),
+    unresolvedCalls,
+    unresolvedImports,
+  }
 })

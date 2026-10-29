@@ -285,6 +285,27 @@ describe("github", () => {
       })
     )
 
+    it.effect("accept a check command after tab-indented lines in a run block scalar", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- run: |",
+            "    cat > Makefile <<'EOF'",
+            "    build:",
+            "    \techo build",
+            "    EOF",
+            "    pnpm run check"
+          ),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [],
+        })
+      })
+    )
+
     it.effect("report a legacy format step in a generated matrix entry", () =>
       Effect.gen(function* () {
         const files = makeFiles({

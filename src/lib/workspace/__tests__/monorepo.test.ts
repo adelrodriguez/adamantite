@@ -27,6 +27,11 @@ describe("readPnpmWorkspacePatterns", () => {
       name: "a block list with quotes and comments",
     },
     {
+      content: 'packages: [\n  "apps/*",\n  tooling/lint\n]\n',
+      expected: ["apps/*", "tooling/lint"],
+      name: "a flow list over several lines",
+    },
+    {
       content: 'packages: &workspacePackages ["apps/*"]\n',
       expected: ["apps/*"],
       name: "a list after a YAML anchor",

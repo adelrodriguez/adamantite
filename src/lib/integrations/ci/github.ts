@@ -32,6 +32,8 @@ const MONOREPO_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+(?:check|fix):monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+(?:check|fix):monorepo|adamantite\s+monorepo)(?=\s|$)/
 const RULE_TEST_COMMAND_REGEX = /\badamantite\s+rule\s+test(?=\s|$)/
 const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
+// A YAML value in single or double quotes, such as `run: "pnpm exec adamantite rule test"`.
+const QUOTED_VALUE_REGEX = /^(["'])(.*)\1$/
 
 interface WorkflowOptions {
   packageManager: SupportedPackageManager
@@ -49,7 +51,8 @@ function hasWorkflowCommand(content: string, commandRegex: RegExp): boolean {
     }
 
     const indentation = match[1]?.length ?? 0
-    const command = (match[2] ?? "").trim()
+    const value = (match[2] ?? "").trim()
+    const command = QUOTED_VALUE_REGEX.exec(value)?.[2] ?? value
 
     if (commandRegex.test(command)) {
       return true
@@ -273,7 +276,9 @@ export default defineIntegration({
         } satisfies IntegrationAssessment
       }
 
-      if (!hasCICompatibleScripts(managedScripts)) {
+      // The `rule test` entry needs no managed script, so it alone lets Adamantite regenerate the
+      // workflow.
+      if (!hasCICompatibleScripts(managedScripts) && !hasRuleTests) {
         return {
           applicable: true,
           findings: legacyFindings,

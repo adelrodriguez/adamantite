@@ -412,6 +412,55 @@ describe("github", () => {
       })
     )
 
+    it.effect.each([
+      {
+        name: "a double-quoted run",
+        workflow: 'steps:\n  - run: pnpm run check\n  - run: "pnpm exec adamantite rule test"\n',
+      },
+      {
+        name: "a single-quoted run",
+        workflow: "steps:\n  - run: pnpm run check\n  - run: 'pnpm exec adamantite rule test'\n",
+      },
+      {
+        name: "a quoted matrix command",
+        workflow:
+          '- name: check\n  command: "pnpm run check"\n- name: rule test\n  command: "pnpm exec adamantite rule test"\n',
+      },
+    ])("accept a rule test command in $name", ({ workflow }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ ...RULE_TEST_FILES, [WORKFLOW_PATH]: workflow })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [],
+        })
+      })
+    )
+
+    it.effect("report a missing rule test command when no managed script runs in CI", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          ...RULE_TEST_FILES,
+          [WORKFLOW_PATH]: "steps:\n  - run: pnpm install\n",
+        })
+        const result = yield* github
+          .assess(ROOT, { name: "app", version: "1.0.0" })
+          .pipe(provideAssessment(files))
+
+        expect(result).toMatchObject({
+          findings: [
+            {
+              currentState:
+                "The workflow does not run `adamantite rule test`, and the project has custom rule tests.",
+              id: "outdated-adamantite-workflow",
+            },
+          ],
+          warnings: [],
+        })
+      })
+    )
+
     it.effect("accept a rule test command in a run block scalar", () =>
       Effect.gen(function* () {
         const files = makeFiles({

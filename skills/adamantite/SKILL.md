@@ -219,7 +219,11 @@ Each file in the rules folder, `.adamantite/rules/` by default, is an Oxlint rul
 project owns. `custom()` from `adamantite/lint/custom` loads the folder and enables each
 rule as `error` under the `project` plugin: `no-process-env.ts` becomes
 `project/no-process-env`. Add a file to add a rule. Delete the file to remove the rule.
-`adamantite rule add <name>` writes a correct stub.
+`adamantite rule add <name>` writes a correct stub, and a test for it in `tests/<name>.ts` in the
+rules folder. `adamantite rule test` runs the tests.
+
+Write a rule only for a pattern that recurs. A rule that guards one file costs more than it
+saves.
 
 - A file that starts with `_`, such as `_helpers.ts`, is a helper, not a rule. Subfolders are
   not read.
@@ -239,8 +243,19 @@ rule as `error` under the `project` plugin: `no-process-env.ts` becomes
   change a rule, run the lint and read all of its output.
 - To find node names, run `adamantite rule ast <file>` on real code. It prints the same
   ESTree-shaped AST that rules visit.
-- To test a rule, use `RuleTester` from `oxlint/plugins-dev`. Adamantite does not run rule
-  tests.
+- Keep the rule file thin. Put the logic in plain functions in a `_<name>.ts` helper, such as a
+  function that gets an import path and returns its layer, and test those functions directly.
+  The rule file only connects the functions to the visitors.
+- The message tells the author what to do instead, and links the standard or the doc that
+  states it, such as `CODING_STANDARDS.md` or `docs/architecture.md`.
+- The test that `rule add` writes runs the rule through `RuleTester` from
+  `adamantite/rules/testing`. Put the code that the rule reports in `invalid`, and similar code
+  that it accepts in `valid`. A file in `tests/` that starts with `_` is a helper, not a test.
+- Run `adamantite rule test` after you change a rule. It runs the tests of every rules folder
+  that a `custom()` call loads with `node --test`, also in a Bun project, and fails with the
+  name of each case that fails. `adamantite check` does not run rule tests.
+- The project's Vitest or Jest run does not find the rule tests, because `tests/<name>.ts` has
+  no `.test` suffix and is not in `__tests__/`. Do not rename them.
 - Oxlint caches the rules for each run. Restart the editor language server after you change a
   rule.
 - TypeScript does not check `.adamantite/rules/` by default, because its name starts with a dot. Add

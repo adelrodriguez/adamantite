@@ -50,7 +50,9 @@ export default defineConfig({
           {
             patterns: [
               {
-                group: ["#terminal/*"],
+                // `adamantite/layers` checks only targets below `src/lib`, so this group also
+                // closes the parent-relative path to `src/terminal`.
+                group: ["#terminal/*", "**/terminal/*"],
                 message:
                   "Terminal interaction belongs to commands/ and index.ts; lib code returns data for commands to render.",
               },

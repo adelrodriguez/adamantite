@@ -11,6 +11,7 @@ import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/ind
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
+import { getDependencyVersion } from "#lib/shared/version.macro.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,
@@ -33,6 +34,20 @@ function makeEffectFiles(oxlintConfig: string) {
         devDependencies: { "@effect/tsgo": effectTsgo.version, oxlint: "1.0.0" },
         scripts: { check: "adamantite check", prepare: "adamantite prepare" },
       }),
+    },
+  })
+}
+
+function makeSkillsLock(source: string): string {
+  return JSON.stringify({ skills: { adamantite: { source, sourceType: "local" } }, version: 1 })
+}
+
+function makeSkillFiles(files: Record<string, string>) {
+  return createFileSystemTestContext({
+    files: {
+      "node_modules/adamantite/skills/adamantite/SKILL.md": "# Adamantite 2\n",
+      "package.json": manifest({ devDependencies: { knip: knip.version } }),
+      ...files,
     },
   })
 }
@@ -272,4 +287,110 @@ describe("update", () => {
       expect(prompter.outros).toStrictEqual(["❌ Update failed"])
     })
   )
+
+  describe("Adamantite skill", () => {
+    it.effect("refresh a copy that init installed when it differs from the shipped skill", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          ".agents/skills/adamantite/SKILL.md": "# Adamantite 1\n",
+          ".claude/skills/adamantite/SKILL.md": "# Adamantite 1\n",
+          "skills-lock.json": makeSkillsLock("./node_modules/adamantite"),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer, runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toStrictEqual([
+          expect.objectContaining({
+            args: [
+              "--yes",
+              `skills@${getDependencyVersion("skills")}`,
+              "add",
+              "./node_modules/adamantite",
+              "--skill",
+              "adamantite",
+              // Every agent that reads `.agents/skills` has the copy there.
+              ...["claude-code", "codex", "cursor", "gemini-cli", "opencode"].flatMap((agent) => [
+                "--agent",
+                agent,
+              ]),
+              "--yes",
+              "--json",
+            ],
+            command: "npx",
+          }),
+        ])
+        expect(prompter.outros).toStrictEqual(["✅ Update completed successfully!"])
+      })
+    )
+
+    it.effect("leave a copy alone when it matches the shipped skill", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          ".claude/skills/adamantite/SKILL.md": "# Adamantite 2\n",
+          "skills-lock.json": makeSkillsLock("./node_modules/adamantite"),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+      })
+    )
+
+    it.effect("leave a skill alone when the user installed it from another source", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          ".claude/skills/adamantite/SKILL.md": "# Adamantite 1\n",
+          "skills-lock.json": makeSkillsLock("adelrodriguez/adamantite"),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+      })
+    )
+
+    it.effect("warn and finish the update when the refresh fails", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          ".claude/skills/adamantite/SKILL.md": "# Adamantite 1\n",
+          "skills-lock.json": makeSkillsLock("./node_modules/adamantite"),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext([1])
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer, runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.logs).toContainEqual(
+          expect.objectContaining({
+            level: "warning",
+            message: expect.stringContaining("to see why the skill refresh failed."),
+          })
+        )
+      })
+    )
+  })
 })

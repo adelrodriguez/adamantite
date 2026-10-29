@@ -83,6 +83,12 @@ Give the terminal to an installed coding agent CLI, seeded with a Markdown promp
 waits until the agent session ends.
 _Avoid_: Delegation, agent launch
 
+**Adamantite skill**:
+The agent skill that the Adamantite package ships in `skills/adamantite/`. It teaches coding
+agents how to use Adamantite and how to write custom rules. `init` copies it for the selected
+coding agents with the `skills` CLI, and `update` copies it again when it is stale.
+_Avoid_: Plugin, agent guidance
+
 **Resolution menu**:
 The terminal menu that offers a handoff to each installed coding agent, a copy of the Markdown
 prompt, or nothing.

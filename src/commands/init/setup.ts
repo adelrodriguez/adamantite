@@ -5,6 +5,8 @@ import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import type { ToolingConfigState } from "#lib/integrations/tooling/base.ts"
+import { type SkillsAgent, codingAgents } from "#lib/execution/coding-agents.ts"
+import { getSkillInstallCommand, installSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
@@ -421,6 +423,41 @@ export const setupAgentsGuidance = (
     if (result === "malformed") {
       yield* prompter.log.warning(
         "Could not update AGENTS.md because Adamantite markers are incomplete. Remove the stale ADAMANTITE marker and run adamantite init again."
+      )
+    }
+  })
+
+/**
+ * Install the Adamantite skill for the selected agents. The skill is optional, so a failure leaves
+ * a warning and initialization continues.
+ */
+export const setupSkill = (cwd: string, skillAgents: readonly SkillsAgent[]) =>
+  Effect.gen(function* () {
+    const prompter = yield* Prompter
+    const agents = codingAgents.filter((agent) => skillAgents.includes(agent.skillsAgent))
+
+    const result = yield* prompter
+      .withSpinner(() => installSkill(cwd, agents), {
+        failure: "Failed to install the Adamantite skill.",
+        start: "Installing the Adamantite skill...",
+        success: (outcome) =>
+          outcome === "installed" ? "Adamantite skill installed." : "Adamantite skill not found.",
+      })
+      .pipe(
+        Effect.catchTag(["CommandFailed", "CliNotFound", "FailedToReadFile", "PlatformError"], () =>
+          Effect.succeed("failed" as const)
+        )
+      )
+
+    if (result === "failed") {
+      yield* prompter.log.warning(
+        `Run \`${getSkillInstallCommand(agents)}\` to see why the skill install failed.`
+      )
+    }
+
+    if (result === "missing") {
+      yield* prompter.log.warning(
+        "`node_modules` has no Adamantite skill to install. Run `npx skills add adelrodriguez/adamantite --skill adamantite` to install the skill from GitHub."
       )
     }
   })

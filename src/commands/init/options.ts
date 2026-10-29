@@ -2,6 +2,7 @@ import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
+import { type SkillsAgent, codingAgents } from "#lib/execution/coding-agents.ts"
 import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
@@ -28,6 +29,7 @@ export interface InitOptions {
   readonly overwriteScripts: boolean
   readonly presets: LintPreset[]
   readonly scripts: Script[]
+  readonly skillAgents: SkillsAgent[]
   readonly typescript: boolean
 }
 
@@ -39,6 +41,7 @@ export interface InitOptionsInput {
   readonly overwriteScripts: boolean
   readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
+  readonly skillAgents: readonly SkillsAgent[]
   readonly typescript: boolean
 }
 
@@ -54,6 +57,7 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     overwriteScripts: input.overwriteScripts,
     presets: Array.dedupe(input.presets),
     scripts: Array.dedupe(input.scripts),
+    skillAgents: Array.dedupe(input.skillAgents),
     typescript: input.typescript,
   }
 
@@ -153,6 +157,16 @@ const agents = Flag.Boolean("agents").pipe(
   Flag.withDescription("Add Adamantite guidance to AGENTS.md")
 )
 
+const skillAgents = Flag.Literals(
+  "skill-agent",
+  codingAgents.map((agent) => agent.skillsAgent)
+).pipe(
+  Flag.atMost(codingAgents.length),
+  Flag.withDescription(
+    "Coding agent to install the Adamantite skill for with the skills CLI; repeatable"
+  )
+)
+
 const overwriteScripts = Flag.Boolean("overwrite-scripts").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
@@ -169,5 +183,6 @@ export const initCommandOptions = {
   overwriteScripts,
   presets,
   scripts,
+  skillAgents,
   typescript,
 }

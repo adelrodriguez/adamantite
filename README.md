@@ -40,7 +40,8 @@ and Sherif so humans and coding agents can use the same project workflow.
   follows into custom rules, and into instructions for the ones that no rule can check.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
-- **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`.
+- **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`, and install the
+  Adamantite skill for your coding agents.
 
 ## Quick start
 
@@ -51,7 +52,7 @@ npx adamantite init
 ```
 
 The interactive setup lets you choose package scripts, presets, TypeScript, editors, CI,
-and agent guidance. After setup, use the scripts written to `package.json`:
+agent guidance, and the coding agents that get the [Adamantite skill](#agent-skill). After setup, use the scripts written to `package.json`:
 
 ```sh
 bun run check
@@ -71,7 +72,8 @@ adamantite analyze
 ## Non-interactive setup
 
 Use `--non-interactive` to configure a project entirely from flags. Specify at least one
-`--script`. Repeat `--script`, `--preset`, and `--editor` to select multiple values.
+`--script`. Repeat `--script`, `--preset`, `--editor`, and `--skill-agent` to select multiple
+values.
 
 ```sh
 npx adamantite init \
@@ -84,7 +86,8 @@ npx adamantite init \
   --typescript \
   --install-extensions \
   --github-actions \
-  --agents
+  --agents \
+  --skill-agent claude-code
 ```
 
 Available setup values:
@@ -94,6 +97,7 @@ Available setup values:
 - Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`,
   `jest`, `vitest`, `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
 - Editors: `vscode` and `zed`.
+- Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, and `opencode`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
 requires an editor. GitHub Actions requires a compatible script and a supported package
@@ -249,7 +253,8 @@ adamantite doctor
 
 `update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
 `adamantite doctor` as the CI gate. After it installs packages, `update` patches Oxlint and TypeScript again for
-[the effect preset](#the-effect-preset).
+[the effect preset](#the-effect-preset). It also refreshes the [Adamantite skill](#agent-skill)
+that `init` installed when the copy differs from the skill in the installed package.
 
 ### `adamantite prepare`
 
@@ -733,16 +738,31 @@ resolves them as Node.js does, so run it after you install the dependencies. It 
 
 ## Agent skill
 
-Install the first-party Adamantite skill to teach coding agents how to initialize, assess,
-repair, and update a project:
+The Adamantite skill teaches coding agents how to initialize, assess, repair, and update a
+project, and how to write [custom rules](#custom-rules). The Adamantite package ships it.
+
+`adamantite init` asks which coding agents get the skill, and selects the agents whose CLI
+is installed. In non-interactive mode, repeat `--skill-agent` for each agent. Init runs
+the [`skills` CLI](https://github.com/vercel-labs/skills) with `npx`, and copies the skill
+from `node_modules/adamantite`, so the copy matches the installed Adamantite version:
+
+```sh
+npx skills add ./node_modules/adamantite --skill adamantite --agent claude-code --yes
+```
+
+The `skills` CLI records the skill in `skills-lock.json`. After you update Adamantite,
+`adamantite update` copies the skill again when it changed. Commit the skill folders and
+`skills-lock.json`, so every clone has the skill.
+
+To install the skill from GitHub instead:
 
 ```sh
 npx skills add adelrodriguez/adamantite --list
 npx skills add adelrodriguez/adamantite --skill adamantite
 ```
 
-The Adamantite package also ships the skill. With pnpm 12.11 or later, `pnpm install` links
-it into the agent skill directories that exist in the project, such as `.claude/skills`,
+With pnpm 12.11 or later, `pnpm install` can also link the skill that the package ships
+into the agent skill directories that exist in the project, such as `.claude/skills`,
 after you approve it. pnpm creates the directory only when the agent that runs pnpm sets an
 environment variable that identifies it, such as `CLAUDECODE` for `.claude/skills`.
 Otherwise, if no skill directory exists, the install fails, so create one before you

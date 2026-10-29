@@ -74,8 +74,9 @@ files to the repository. See `docs/agents/issue-tracker.md`.
 - Keep `init` deterministic and independent from doctor assessment.
 - Keep `assess` and `doctor` read-only. Doctor reports current state, goal criteria, and
   verification instructions. Agents or humans perform repairs.
-- Keep `update` limited to managed dependency updates. It can report doctor findings, but
-  findings do not make a successful update fail.
+- Keep `update` limited to managed dependency updates and the refresh of the Adamantite
+  skill that `init` installed. It can report doctor findings, but findings do not make a
+  successful update fail.
 - Keep tooling integration versions aligned with the corresponding versions in
   `package.json`.
 

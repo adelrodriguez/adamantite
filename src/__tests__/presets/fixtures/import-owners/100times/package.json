@@ -1,0 +1,8 @@
+{
+  "name": "fixture-100times",
+  "private": true,
+  "type": "module",
+  "workspaces": {
+    "packages": ["apps/*", "packages/*"]
+  }
+}

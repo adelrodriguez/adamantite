@@ -1,4 +1,5 @@
 import type { Plugin, Rule } from "@oxlint/plugins"
+import importOwners from "./rules/import-owners.ts"
 import layers from "./rules/layers.ts"
 import noOverzealousDestructuring from "./rules/no-overzealous-destructuring.ts"
 import noQueryDataInState from "./rules/no-query-data-in-state.ts"
@@ -8,6 +9,7 @@ import requireSuppressionReason from "./rules/require-suppression-reason.ts"
 
 interface AdamantitePlugin extends Plugin {
   readonly rules: {
+    readonly "import-owners": Rule
     readonly layers: Rule
     readonly "no-overzealous-destructuring": Rule
     readonly "no-query-data-in-state": Rule
@@ -24,6 +26,7 @@ interface AdamantitePlugin extends Plugin {
 const plugin: AdamantitePlugin = {
   meta: { name: "adamantite" },
   rules: {
+    "import-owners": importOwners,
     layers,
     "no-overzealous-destructuring": noOverzealousDestructuring,
     "no-query-data-in-state": noQueryDataInState,

@@ -1,0 +1,15 @@
+{
+  "rules": {
+    "adamantite/import-owners": [
+      "error",
+      { "import": "tryharder", "owners": ["apps/mobile/src/features", "apps/mobile/src/shared", "packages"] },
+      { "import": "@tanstack/react-query", "owners": ["apps/mobile/src/features", "apps/mobile/src/shared"] },
+      { "import": "expo-haptics", "owners": ["apps/mobile/src/features"] },
+      {
+        "import": "react-native",
+        "names": ["Alert"],
+        "owners": ["apps/mobile/src/shared/alerts.ts", "apps/mobile/src/features/*/hooks.ts", "apps/mobile/src/features/*/hooks"]
+      }
+    ]
+  }
+}

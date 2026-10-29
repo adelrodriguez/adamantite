@@ -1,0 +1,6 @@
+{
+  "name": "fixture-v1",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"]
+}

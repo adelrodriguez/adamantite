@@ -1,0 +1,5 @@
+{
+  "name": "@v1/web",
+  "private": true,
+  "type": "module"
+}

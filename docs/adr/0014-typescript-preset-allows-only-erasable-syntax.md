@@ -7,7 +7,10 @@ preset sets `erasableSyntaxOnly`.
 
 The option makes TypeScript report each syntax that has a runtime effect: `enum`, a `namespace`
 with values, parameter properties, and `import x = require()`. Node.js type stripping and Bun
-run only erasable syntax, so code that type checks also runs without a build step. The core
+run only erasable syntax, so the option removes one cause of a failed run without a build step.
+It is not a full check of runtime compatibility: a type imported without `type`, such as
+`import { Shape } from "./types.ts"` for an interface, still type checks and still fails under
+Node.js type stripping. The core
 lint preset already reports namespaces (`typescript/no-namespace`) and parameter properties
 (`typescript/parameter-properties`), but no lint rule bans `enum`. A type-level ban is the top of
 the enforcement ladder: the editor shows it, and no suppression comment turns it off file by file.

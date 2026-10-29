@@ -216,6 +216,74 @@ describe("rule test", () => {
     })
   )
 
+  it.effect("warn about a rules folder that it cannot find, and run the other tests", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/tests/no-a.ts": "// test\n",
+          "oxlint.config.ts": `const RULES_DIR = "tooling/rules"\n${makeConfig(
+            "custom()",
+            'custom({ dir: RULES_DIR, name: "acme" })'
+          )}`,
+          "package.json": PACKAGE_JSON,
+          "tooling/rules/tests/no-b.ts": "// test\n",
+        },
+      })
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(ruleCommand, ["test"], {
+        files,
+        layers: [prompter.layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs).toStrictEqual([
+        {
+          level: "warning",
+          message:
+            "`rule test` cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. It does not run the tests of that rules folder.",
+        },
+      ])
+      expect(runner.invocations.map((invocation) => invocation.args)).toStrictEqual([
+        ["--test", ".adamantite/rules/tests/no-a.ts"],
+      ])
+    })
+  )
+
+  it.effect("warn about an import that it cannot follow when it finds no tests", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": `import tooling from "./tooling/missing.ts"\n${makeConfig("tooling")}`,
+          "package.json": PACKAGE_JSON,
+        },
+      })
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(ruleCommand, ["test"], {
+        files,
+        layers: [prompter.layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations).toStrictEqual([])
+      expect(prompter.logs).toStrictEqual([
+        {
+          level: "warning",
+          message:
+            "`rule test` cannot resolve the import of `./tooling/missing.ts` in `oxlint.config.ts`, so it does not run the tests of the rules folders behind it.",
+        },
+        {
+          level: "info",
+          message:
+            "No custom rule tests found. `adamantite rule add <name>` writes a rule and its test.",
+        },
+      ])
+    })
+  )
+
   it.effect.each<{ files: Record<string, string>; name: string }>([
     {
       files: { "oxlint.config.ts": makeConfig("custom()"), "package.json": PACKAGE_JSON },

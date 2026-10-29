@@ -86,7 +86,19 @@ const test = Command.make("test").pipe(
       const path = yield* Path.Path
       const runner = yield* CommandRunner
       const cwd = process.cwd()
-      const tests = yield* listCustomRuleTests(cwd)
+      const { tests, unresolvedCalls, unresolvedImports } = yield* listCustomRuleTests(cwd)
+
+      for (const source of unresolvedCalls) {
+        yield* prompter.log.warning(
+          `\`rule test\` cannot read the \`dir\` of a \`custom()\` call in \`${path.relative(cwd, source)}\`, because it is not a string literal. It does not run the tests of that rules folder.`
+        )
+      }
+
+      for (const { from, specifier } of unresolvedImports) {
+        yield* prompter.log.warning(
+          `\`rule test\` cannot resolve the import of \`${specifier}\` in \`${path.relative(cwd, from)}\`, so it does not run the tests of the rules folders behind it.`
+        )
+      }
 
       if (tests.length === 0) {
         return yield* prompter.log.info(

@@ -52,6 +52,25 @@ describe("readPnpmWorkspacePatterns", () => {
     expect(readPnpmWorkspacePatterns(content)).toStrictEqual(["apps/*", "tooling/lint"])
   })
 
+  it("stop an aliased block list at the end of its indented mapping", () => {
+    const content = [
+      "workspacePatterns:",
+      "  active: &workspacePackages",
+      "    - apps/*",
+      "  archived:",
+      "    - packages/*",
+      "packages: *workspacePackages",
+    ].join("\n")
+
+    expect(readPnpmWorkspacePatterns(content)).toStrictEqual(["apps/*"])
+  })
+
+  it("read a block list whose items are not indented", () => {
+    expect(
+      readPnpmWorkspacePatterns("packages:\n- apps/*\n- tooling/lint\ncatalog:\n  a: 1\n")
+    ).toStrictEqual(["apps/*", "tooling/lint"])
+  })
+
   it("read no pattern without a packages key", () => {
     expect(readPnpmWorkspacePatterns("catalog:\n  effect: 4.0.0\n")).toStrictEqual([])
   })

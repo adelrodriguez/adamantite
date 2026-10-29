@@ -23,11 +23,16 @@ function stripNodeProperties(value: string) {
   return value.replace(/^(?:[!&]\S*\s*)+/u, "")
 }
 
+function getIndent(line: string) {
+  return /^\s*/u.exec(line)?.[0].length ?? 0
+}
+
 /**
- * The items of a YAML list in block (`- packages/*`) or flow (`[packages/*]`) style, from the value
- * on the line of its key and the lines after it.
+ * The items of a YAML list in block (`- packages/*`) or flow (`[packages/*]`) style, from the line
+ * of its key and the lines after it. A block list ends at the first line that is not one of its
+ * items and is not indented deeper than them.
  */
-function readList(value: string, nextLines: readonly string[]): string[] {
+function readList(keyLine: string, value: string, nextLines: readonly string[]): string[] {
   if (value.startsWith("[")) {
     const flow = [value, ...nextLines.map((line) => stripYamlComment(line))].join(" ")
     const end = flow.indexOf("]")
@@ -39,14 +44,25 @@ function readList(value: string, nextLines: readonly string[]): string[] {
       .filter((item) => item.length > 0)
   }
 
+  const keyIndent = getIndent(keyLine)
   const items: string[] = []
+  let itemIndent: number | undefined
 
   for (const line of nextLines) {
-    const item = /^\s*-\s*(.+)$/u.exec(stripYamlComment(line))?.[1]
+    const content = stripYamlComment(line)
 
-    if (item !== undefined) {
+    if (content === "") {
+      continue
+    }
+
+    const indent = getIndent(line)
+    const item = /^-\s*(.+)$/u.exec(content)?.[1]
+
+    // YAML lets the items of a block list sit at the indent of its key.
+    if (item !== undefined && indent === (itemIndent ?? Math.max(indent, keyIndent))) {
+      itemIndent = indent
       items.push(unquote(item.trim()))
-    } else if (/^\S/u.test(line) && !line.startsWith("#")) {
+    } else if (indent <= (itemIndent ?? keyIndent)) {
       break
     }
   }
@@ -73,7 +89,7 @@ export function readPnpmWorkspacePatterns(content: string): string[] {
   const alias = /^\*(\S+)$/u.exec(value)?.[1]
 
   if (alias === undefined) {
-    return readList(value, lines.slice(packagesIndex + 1))
+    return readList(lines[packagesIndex] ?? "", value, lines.slice(packagesIndex + 1))
   }
 
   const anchor = `&${alias}`
@@ -85,9 +101,11 @@ export function readPnpmWorkspacePatterns(content: string): string[] {
     return []
   }
 
-  const anchored = stripYamlComment(lines[anchorIndex] ?? "")
+  const anchorLine = lines[anchorIndex] ?? ""
+  const anchored = stripYamlComment(anchorLine)
 
   return readList(
+    anchorLine,
     stripNodeProperties(anchored.slice(anchored.indexOf(anchor) + anchor.length).trim()),
     lines.slice(anchorIndex + 1)
   )

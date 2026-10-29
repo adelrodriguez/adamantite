@@ -35,6 +35,12 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
       const runner = yield* CommandRunner
       const selected = Option.getOrUndefined(only)
       const forwardedStage = selected ?? "lint"
+      // A forwarded `--deny-warnings` or `--max-warnings` is the project's own warning policy, and
+      // Oxlint rejects `--deny-warnings` twice.
+      const forwardsWarningPolicy = forwardedArguments.some(
+        (argument) => argument === "--deny-warnings" || argument.startsWith("--max-warnings")
+      )
+      const denyWarnings = allowWarnings || forwardsWarningPolicy ? [] : ["--deny-warnings"]
 
       const stages = [
         {
@@ -44,7 +50,7 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
           title: "✨ Checking formatting",
         },
         {
-          args: [...files, ...(allowWarnings ? [] : ["--deny-warnings"])],
+          args: [...files, ...denyWarnings],
           command: oxlint.name,
           name: "lint",
           title: "🔍 Linting",

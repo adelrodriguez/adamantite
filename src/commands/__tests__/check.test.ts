@@ -75,6 +75,36 @@ describe("check", () => {
         )
       })
     )
+
+    it.effect("pass a forwarded --deny-warnings to Oxlint one time", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        yield* runCommand(checkCommand, [], {
+          forwardedArguments: ["--deny-warnings"],
+          layers: [runner.layer],
+        })
+
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({ args: ["--deny-warnings"], command: "oxlint" })
+        )
+      })
+    )
+
+    it.effect("keep a forwarded --max-warnings threshold", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        yield* runCommand(checkCommand, [], {
+          forwardedArguments: ["--max-warnings=5"],
+          layers: [runner.layer],
+        })
+
+        expect(runner.invocations).toContainEqual(
+          expect.objectContaining({ args: ["--max-warnings=5"], command: "oxlint" })
+        )
+      })
+    )
   })
 
   describe("output", () => {

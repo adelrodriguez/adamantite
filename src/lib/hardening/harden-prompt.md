@@ -79,5 +79,5 @@ Write only the approved candidates:
 
 ## Verify
 
-When you wrote files, run `adamantite check` and `adamantite doctor` — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
-Both must exit 0. When a new rule makes `check` fail, fix the rule or set it to `warn` as step 6 says, not a disable comment.
+When you wrote files, run `adamantite check`, `adamantite rule test`, and `adamantite doctor` in this order — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
+All three must exit 0. When a new rule makes `check` fail, fix the rule or set it to `warn` as step 6 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.

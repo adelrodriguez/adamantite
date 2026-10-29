@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join, sep } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
+import { toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
 import jest from "#presets/lint/jest.ts"
 import vitest from "#presets/lint/vitest.ts"
 
@@ -75,6 +76,19 @@ describe.each([
 
     expect(codes["src/math.test.ts"]).toContain(`${name}(require-top-level-describe)`)
     expect(codes["src/script.ts"]).toBeUndefined()
+  })
+
+  it("skip the rule test that rule add writes", () => {
+    // `adamantite rule test` runs `tests/<name>.ts` with `node --test`. It is not a test of the
+    // project's runner, so the test rules, such as `require-hook`, do not apply to it.
+    const codes = lint(
+      [`import preset from ${presetPath}`, "", "export default { extends: [preset] }", ""].join(
+        "\n"
+      ),
+      { ".adamantite/rules/tests/no-foo.ts": toCustomRuleTestStub("no-foo") }
+    )
+
+    expect(codes).toStrictEqual({})
   })
 
   it("apply its rules to the files and rule changes of a project override", () => {

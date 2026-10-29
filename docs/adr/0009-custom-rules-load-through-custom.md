@@ -48,8 +48,9 @@ repeat them against the pinned Oxlint:
   authoring guidance tells authors to read the lint output after a change.
 - Oxlint caches the loaded rules, so an editor language server needs a restart after a rule
   changes.
-- Doctor cannot follow a `dir` or `name` that is not a string literal. It reports a warning
-  and does not check that folder.
+- Doctor cannot follow a `dir` or `name` that is not a string literal. It reports a warning.
+  For a `dir`, it does not check that folder. For a `name`, it still checks the folder, but
+  not that the plugin name is unique.
 - Adamantite scaffolds rule tests and runs them with `adamantite rule test`, not with `check`,
   which stays Oxfmt plus Oxlint (2026-10-28, issue #525). A broken rule otherwise fails
   silently: Oxlint loads it, it reports nothing, and `check` passes. `rule add` writes

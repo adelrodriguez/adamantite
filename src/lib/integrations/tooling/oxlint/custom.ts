@@ -68,22 +68,27 @@ export default defineIntegration({
         return { applicable: false, warnings: [] } satisfies IntegrationAssessment
       }
 
-      const unresolvedCalls = calls.filter((call) => call.dir === null || call.name === null)
+      const unknownDirCalls = calls.filter((call) => call.dir === null)
+      const unknownNameCalls = calls.filter((call) => call.dir !== null && call.name === null)
       const warnings = [
         ...unresolvedImports.map(
           ({ from, specifier }) =>
             `Doctor cannot resolve the import of \`${specifier}\` in \`${relative(from)}\`, so it does not check the \`custom()\` calls and rules folders behind it. For a workspace package, install the dependencies and run Doctor again.`
         ),
-        ...unresolvedCalls.map(
+        ...unknownDirCalls.map(
           (call) =>
-            `Doctor cannot read the \`dir\` or \`name\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that rules folder.`
+            `Doctor cannot read the \`dir\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that rules folder.`
+        ),
+        ...unknownNameCalls.map(
+          (call) =>
+            `Doctor cannot read the \`name\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that its plugin name differs from the other rules folders.`
         ),
       ]
       const findings: Finding[] = []
 
-      // An unresolved call or import can load any folder, so an unloaded folder is reported only
-      // when every call and import is resolved.
-      if (unresolvedCalls.length === 0 && unresolvedImports.length === 0) {
+      // A call with an unknown `dir`, or an unresolved import, can load any folder, so an unloaded
+      // folder is reported only when every `dir` and import is resolved.
+      if (unknownDirCalls.length === 0 && unresolvedImports.length === 0) {
         for (const folder of folders) {
           if (loadedFolders.includes(folder.dir)) {
             continue

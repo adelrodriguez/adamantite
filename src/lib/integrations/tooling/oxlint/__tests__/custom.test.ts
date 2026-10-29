@@ -388,7 +388,35 @@ describe("oxlint-custom", () => {
 
         expect(getFindings(assessment)).toStrictEqual([])
         expect(assessment.warnings).toStrictEqual([
-          "Doctor cannot read the `dir` or `name` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
+          "Doctor cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
+        ])
+      })
+  )
+
+  it.effect(
+    "check the folders of a custom() call whose name doctor cannot read, and warn about the name",
+    () =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            ".adamantite/rules/no-process-env.ts": RULE,
+            "oxlint.config.ts": makeConfig('core, custom({ dir: "rules", name: NAME })', [
+              'const NAME = "acme"',
+            ]),
+            "package.json": PACKAGE_JSON,
+            "rules/no-window.ts": "export default {\n",
+          },
+          root: ROOT,
+        })
+
+        const assessment = yield* runAssess(files)
+
+        expect(getFindings(assessment).map((finding) => finding.id)).toStrictEqual([
+          "custom-rules-not-loaded:.adamantite/rules",
+          "custom-rule-cannot-load:rules/no-window.ts",
+        ])
+        expect(assessment.warnings).toStrictEqual([
+          "Doctor cannot read the `name` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that its plugin name differs from the other rules folders.",
         ])
       })
   )

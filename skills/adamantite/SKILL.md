@@ -232,6 +232,9 @@ saves.
   that a `custom()` call loads with `node --test`, also in a Bun project, and fails with the
   name of each case that fails. `adamantite check` does not run rule tests. When a `dir` is not a
   string literal, `rule test` cannot find that rules folder: it warns, and does not run its tests.
+- The Adamantite GitHub Actions workflow runs `adamantite rule test` when the project has
+  rule tests. After the first `rule add`, `adamantite doctor` reports a workflow that does not
+  run it. Follow that finding.
 - The project's Vitest or Jest run does not find the rule tests, because `tests/<name>.ts` has
   no `.test` suffix and is not in `__tests__/`. Do not rename them.
 - Oxlint caches the rules for each run. Restart the editor language server after you change a

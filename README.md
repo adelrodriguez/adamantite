@@ -99,6 +99,9 @@ Presets and TypeScript require the `check` or `fix` script. Editor extension ins
 requires an editor. GitHub Actions requires a compatible script and a supported package
 manager. Omitted boolean flags are disabled.
 
+The GitHub Actions workflow runs the `check` and `analyze` scripts that you select. When the
+project has [custom rule](#custom-rules) tests, it also runs `adamantite rule test`.
+
 Existing package scripts whose commands differ from Adamantite's are kept and reported
 instead of being replaced. The interactive initializer asks before overwriting them; in
 non-interactive mode, pass `--overwrite-scripts` to replace them. To keep custom flags,
@@ -671,11 +674,14 @@ that throws prints an error for each file, and the lint run still exits 0. Adama
 the wiring, the authoring guidance, and the test scaffold; your project owns the correctness
 of its rules and the cases of their tests. `adamantite rule add` writes a test with each rule, with `RuleTester` from
 `adamantite/rules/testing`, and `adamantite rule test` runs the tests with `node --test`, also
-in Bun projects. `adamantite check` does not run them. The "Custom rules" section of the
-[Adamantite skill](#agent-skill) has the full authoring guidance.
+in Bun projects. `adamantite check` does not run them. The GitHub Actions workflow that
+`adamantite init` writes runs them when the project has rule tests. The "Custom rules" section
+of the [Adamantite skill](#agent-skill) has the full authoring guidance.
 
 `adamantite doctor` reports a rule file that cannot load, with the reason, a rules folder
-that no `custom()` call loads, and two rules folders that use the same plugin name.
+that no `custom()` call loads, and two rules folders that use the same plugin name. It also
+reports an Adamantite workflow that does not run `adamantite rule test` when the project has
+rule tests.
 
 ### Custom rules in a monorepo
 

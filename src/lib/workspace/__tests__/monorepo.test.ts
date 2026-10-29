@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
+  checkIsMonorepo,
   getWorkspacePackageDirectories,
   readPnpmWorkspacePatterns,
   workspacePatternToRegExp,
@@ -32,6 +33,41 @@ describe("readPnpmWorkspacePatterns", () => {
   it("read a flow list over several lines", () => {
     expect(
       readPnpmWorkspacePatterns('packages: [\n  "apps/*",\n  tooling/lint\n]\n')
+    ).toStrictEqual(["apps/*", "tooling/lint"])
+  })
+
+  it("read a list after a YAML anchor", () => {
+    expect(readPnpmWorkspacePatterns('packages: &workspacePackages ["apps/*"]\n')).toStrictEqual([
+      "apps/*",
+    ])
+  })
+
+  it.each([
+    ["flow", 'shared: &workspacePackages ["apps/*", tooling/lint]\npackages: *workspacePackages\n'],
+    [
+      "block",
+      "shared: &workspacePackages\n  - apps/*\n  - tooling/lint\npackages: *workspacePackages\n",
+    ],
+  ])("follow a YAML alias to an anchored %s list", (_, content) => {
+    expect(readPnpmWorkspacePatterns(content)).toStrictEqual(["apps/*", "tooling/lint"])
+  })
+
+  it("stop an aliased block list at the end of its indented mapping", () => {
+    const content = [
+      "workspacePatterns:",
+      "  active: &workspacePackages",
+      "    - apps/*",
+      "  archived:",
+      "    - packages/*",
+      "packages: *workspacePackages",
+    ].join("\n")
+
+    expect(readPnpmWorkspacePatterns(content)).toStrictEqual(["apps/*"])
+  })
+
+  it("read a block list whose items are not indented", () => {
+    expect(
+      readPnpmWorkspacePatterns("packages:\n- apps/*\n- tooling/lint\ncatalog:\n  a: 1\n")
     ).toStrictEqual(["apps/*", "tooling/lint"])
   })
 
@@ -122,6 +158,26 @@ describe("getWorkspacePackageDirectories", () => {
       )
 
       expect(directories).toStrictEqual(["/project/apps/site"])
+    })
+  )
+
+  it.effect("read the package.json workspaces when pnpm-workspace.yaml has no packages", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
+          "packages/api/package.json": "{}",
+          "pnpm-workspace.yaml": "allowBuilds:\n  msgpackr-extract: false\n",
+        },
+        root: ROOT,
+      })
+
+      const result = yield* Effect.all([
+        checkIsMonorepo(ROOT),
+        getWorkspacePackageDirectories(ROOT),
+      ]).pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer)))
+
+      expect(result).toStrictEqual([true, ["/project/packages/api"]])
     })
   )
 })

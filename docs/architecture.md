@@ -109,7 +109,7 @@ warns the user and points to `adamantite doctor`.
   `prepare` script runs it after each install.
 - `rule add` writes a custom rule stub and its test. `rule ast` prints the AST that Oxlint
   rules visit. `rule test` runs the custom rule tests with `node --test`. `check` does not run
-  them. See ADR 0009.
+  them. The managed GitHub workflow runs `rule test` when the project has rule tests. See ADR 0009.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -230,7 +230,7 @@ takes what the rule reads from the file system, so its `RuleTester` test passes 
 ## Custom rules
 
 Custom rules are Oxlint rules that the target project writes in a rules folder. See
-ADR 0009. Four modules carry them:
+ADR 0009. Five modules carry them:
 
 - `presets/lint/custom.ts` exports `custom()`, which runs while Oxlint loads the config. It
   finds the calling file in the call stack, resolves the rules folder from it, lists the
@@ -257,6 +257,11 @@ ADR 0009. Four modules carry them:
 - The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
   that module to report rules folders that no `custom()` call loads, rule files that cannot
   load, and rules folders that share a plugin name.
+- The `github` integration in `src/lib/integrations/ci/github.ts` uses the same list of rule
+  tests as `rule test`. When the list is not empty, `init` adds a `rule test` entry to the
+  workflow matrix, and Doctor reports a workflow that does not run `adamantite rule test`. No
+  managed script runs the tests, so the entry runs the installed CLI with the package
+  manager, such as `pnpm exec adamantite rule test`.
 
 Both preset modules run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`

@@ -396,6 +396,7 @@ const resolver = new ResolverFactory({
   extensionAlias: {
     ".cjs": [".cts", ".d.cts", ".cjs"],
     ".js": [".ts", ".tsx", ".d.ts", ".js", ".jsx"],
+    ".jsx": [".tsx", ".ts", ".d.ts", ".jsx", ".js"],
     ".mjs": [".mts", ".d.mts", ".mjs"],
   },
   extensions: [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".json"],

@@ -313,6 +313,18 @@ describe("checkIsMonorepo", () => {
       name: "pnpm declares packages in a multiline flow sequence",
     },
     {
+      content: 'packages: &workspacePackages ["packages/*"]\n',
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm anchors a flow sequence of packages",
+    },
+    {
+      content: "packages: &workspacePackages\n  - packages/*\n",
+      expected: true,
+      file: "pnpm-workspace.yaml",
+      name: "pnpm anchors a block sequence of packages",
+    },
+    {
       content: JSON.stringify({ workspaces: ["packages/*"] }),
       expected: true,
       file: "package.json",

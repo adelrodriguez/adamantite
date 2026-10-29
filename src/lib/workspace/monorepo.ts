@@ -30,9 +30,10 @@ export function readPnpmWorkspacePatterns(content: string): string[] {
     return []
   }
 
+  // A YAML anchor or tag, such as `&packages`, can come before the value.
   const declaration = stripYamlComment(
     (lines[packagesIndex] ?? "").replace(PNPM_PACKAGES_KEY_REGEX, "")
-  )
+  ).replace(/^(?:[!&]\S*\s*)+/u, "")
 
   if (declaration.startsWith("[")) {
     const flow = [

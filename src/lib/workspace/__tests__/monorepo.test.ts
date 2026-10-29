@@ -36,6 +36,12 @@ describe("readPnpmWorkspacePatterns", () => {
     ).toStrictEqual(["apps/*", "tooling/lint"])
   })
 
+  it("read a list after a YAML anchor", () => {
+    expect(readPnpmWorkspacePatterns('packages: &workspacePackages ["apps/*"]\n')).toStrictEqual([
+      "apps/*",
+    ])
+  })
+
   it("read no pattern without a packages key", () => {
     expect(readPnpmWorkspacePatterns("catalog:\n  effect: 4.0.0\n")).toStrictEqual([])
   })

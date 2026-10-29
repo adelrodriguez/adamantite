@@ -9,7 +9,12 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
-import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import {
+  getCIWorkflowEntries,
+  hasCICompatibleScripts,
+  RULE_TEST_COMMANDS,
+} from "#lib/workspace/ci-scripts.ts"
+import { listCustomRuleTests } from "#lib/workspace/custom-rules/index.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   type NodeVersionSource,
@@ -25,7 +30,10 @@ const FORMAT_CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+format|deno(?:\s+(?!task\b)\S+)*\s+task\s+format)(?:\s+--)?\s+--check\b/
 const MONOREPO_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+(?:check|fix):monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+(?:check|fix):monorepo|adamantite\s+monorepo)(?=\s|$)/
+const RULE_TEST_COMMAND_REGEX = /\badamantite\s+rule\s+test(?=\s|$)/
 const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
+// A YAML value in single or double quotes, such as `run: "pnpm exec adamantite rule test"`.
+const QUOTED_VALUE_REGEX = /^(["'])(.*)\1$/
 
 interface WorkflowOptions {
   packageManager: SupportedPackageManager
@@ -43,7 +51,8 @@ function hasWorkflowCommand(content: string, commandRegex: RegExp): boolean {
     }
 
     const indentation = match[1]?.length ?? 0
-    const command = (match[2] ?? "").trim()
+    const value = (match[2] ?? "").trim()
+    const command = QUOTED_VALUE_REGEX.exec(value)?.[2] ?? value
 
     if (commandRegex.test(command)) {
       return true
@@ -87,7 +96,8 @@ function renderNodeSetup(source: NodeVersionSource): string {
           ${versionInput}`
 }
 
-function getSetupSteps(source: NodeVersionSource) {
+// `adamantite rule test` runs `node --test`, so a Deno workflow with rule tests also sets up Node.js.
+function getSetupSteps(source: NodeVersionSource, hasRuleTests: boolean) {
   return {
     bun: `${renderNodeSetup(source)}
 
@@ -106,7 +116,7 @@ function getSetupSteps(source: NodeVersionSource) {
 
       - name: Install dependencies
         run: bun install --frozen-lockfile`,
-    deno: `      - name: Setup Deno
+    deno: `${hasRuleTests ? `${renderNodeSetup(source)}\n\n` : ""}      - name: Setup Deno
         uses: denoland/setup-deno@v2
 
       - name: Install dependencies
@@ -133,10 +143,10 @@ ${renderNodeSetup(source)}
 }
 
 function generateWorkflow(
-  { packageManager, scripts }: WorkflowOptions,
+  { hasRuleTests, packageManager, scripts }: WorkflowOptions & { hasRuleTests: boolean },
   source: NodeVersionSource
 ): string | null {
-  const matrixEntries = getCIWorkflowEntries(packageManager, scripts)
+  const matrixEntries = getCIWorkflowEntries(packageManager, scripts, { hasRuleTests })
 
   if (matrixEntries.length === 0) {
     return null
@@ -177,7 +187,7 @@ ${matrixInclude}
       - name: Checkout
         uses: actions/checkout@v7
 
-${getSetupSteps(source)[packageManager]}
+${getSetupSteps(source, hasRuleTests)[packageManager]}
 
       - name: Run \${{ matrix.name }}
         run: \${{ matrix.command }}`
@@ -217,7 +227,11 @@ const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
     const workflowPath = path.join(cwd, files[0].path)
 
     const source = yield* resolver.resolve(cwd)
-    const workflowContent = generateWorkflow(options, source)
+    const { tests: ruleTests } = yield* listCustomRuleTests(cwd)
+    const workflowContent = generateWorkflow(
+      { ...options, hasRuleTests: ruleTests.length > 0 },
+      source
+    )
 
     if (!workflowContent) {
       return
@@ -241,6 +255,9 @@ export default defineIntegration({
       const hasHardcodedNodeVersion = HARDCODED_NODE_VERSION_REGEX.test(content.value)
       const isMissingCheckCommand =
         managedScripts.includes("check") && !hasWorkflowCommand(content.value, CHECK_COMMAND_REGEX)
+      const hasRuleTests = (yield* listCustomRuleTests(cwd)).tests.length > 0
+      const isMissingRuleTestCommand =
+        hasRuleTests && !hasWorkflowCommand(content.value, RULE_TEST_COMMAND_REGEX)
       const legacyFindings = [
         ...(hasWorkflowCommand(content.value, FORMAT_CHECK_COMMAND_REGEX)
           ? [legacyFormatStepFinding]
@@ -250,7 +267,7 @@ export default defineIntegration({
           : []),
       ]
 
-      if (!hasHardcodedNodeVersion && !isMissingCheckCommand) {
+      if (!hasHardcodedNodeVersion && !isMissingCheckCommand && !isMissingRuleTestCommand) {
         return {
           applicable: true,
           findings: legacyFindings,
@@ -259,7 +276,9 @@ export default defineIntegration({
         } satisfies IntegrationAssessment
       }
 
-      if (!hasCICompatibleScripts(managedScripts)) {
+      // The `rule test` entry needs no managed script, so it alone lets Adamantite regenerate the
+      // workflow.
+      if (!hasCICompatibleScripts(managedScripts) && !hasRuleTests) {
         return {
           applicable: true,
           findings: legacyFindings,
@@ -306,15 +325,37 @@ export default defineIntegration({
               ...(isMissingCheckCommand
                 ? ["The workflow does not run the managed `check` script."]
                 : []),
+              ...(isMissingRuleTestCommand
+                ? [
+                    "The workflow does not run `adamantite rule test`, and the project has custom rule tests.",
+                  ]
+                : []),
             ].join(" "),
             goal: [
-              "Make the workflow run the managed `check` script.",
+              ...(managedScripts.includes("check")
+                ? ["Make the workflow run the managed `check` script."]
+                : []),
+              ...(hasRuleTests
+                ? [
+                    "Make the workflow run `adamantite rule test`, so that CI runs the custom rule tests.",
+                  ]
+                : []),
               "Use the project's Node.js version declaration instead of a hard-coded version.",
             ],
             id: "outdated-adamantite-workflow",
             integration: "github",
             notes: [
               `The detected package manager is \`${detectedPackageManager.name}\`. Preserve unrelated workflow jobs and project-specific settings.`,
+              ...(hasRuleTests
+                ? [
+                    `With \`${detectedPackageManager.name}\`, run the custom rule tests with \`${RULE_TEST_COMMANDS[detectedPackageManager.name]}\`.`,
+                  ]
+                : []),
+              ...(hasRuleTests && detectedPackageManager.name === "deno"
+                ? [
+                    "`adamantite rule test` runs the tests with Node.js 22.18 or later, so the Deno workflow also needs an `actions/setup-node` step before the tests run.",
+                  ]
+                : []),
             ],
             title: "Outdated Adamantite workflow",
           },

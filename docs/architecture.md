@@ -206,7 +206,8 @@ loads its vendored bundle. The source tree has `plugin/index.ts` and the dist tr
 `plugin/index.js`, so the preset takes the extension from its own module URL. Rule code
 runs under the runtime that executes Oxlint in the target project, so it uses only
 runtime-neutral APIs. It imports only types from `@oxlint/plugins`, a devDependency pinned
-to the Oxlint version. `presets/lint/plugin/tsconfig.json` lets the source import rule
+to the Oxlint version. The one runtime package is `oxc-resolver`, which `adamantite/layers`
+uses, and which has Node-API bindings for Node.js and Bun. `presets/lint/plugin/tsconfig.json` lets the source import rule
 modules with their `.ts` extension, which Node.js needs to load the source plugin.
 
 Each rule has a `RuleTester` test under `src/__tests__/plugin/<rule>.test.ts` for messages,
@@ -215,8 +216,9 @@ locations, and options, and `valid/` and `invalid/` fixtures under
 Oxlint run.
 
 `adamantite/layers` needs a layer map from the target project, so no preset turns it on, and
-`strict` only loads the plugin for it. It is the one rule that reads files: it follows `#` imports
-through the nearest `package.json`. Its fixtures are small projects under
+`strict` only loads the plugin for it. It is the one rule that reads files: it resolves each
+import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `createLayersRule`
+takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/layers/`, one for each layer model, and
 `src/__tests__/presets/layers.test.ts` lints each one in a real Oxlint run. See ADR 0013.
 

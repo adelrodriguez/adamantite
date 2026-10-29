@@ -67,7 +67,9 @@ rules: {
 `isolate` lists layers whose folders do not import each other, such as `features`. `entries`
 lists composition files below the root, such as `["*"]` for `router.tsx`. `ignore` exempts
 importers by glob, such as `["**/__tests__/**"]`, and `ignoreTypes: true` stops counting
-type-only imports. A file in a folder that is not in the map is a report. Follow the repair
+type-only imports. The rule resolves relative imports, `#` imports, and `tsconfig.json` `paths`;
+an import that does not resolve is not checked. A file in a folder that is not in the map is a
+report. Follow the repair
 in each message. Do not add a layer to another layer's list, or add an `ignore` glob, only to
 silence a report.
 

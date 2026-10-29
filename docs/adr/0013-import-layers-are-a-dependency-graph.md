@@ -17,9 +17,12 @@ intends for framework-neutral first-party rules. `strict` does not turn the rule
 belongs to one project, and a rule that is on without a map would report nothing. There is no
 config helper. The project turns on `adamantite/layers` with its map in its own Oxlint config.
 
-The rule resolves relative imports with path math and `#` imports through the `imports` field of
-the nearest `package.json`, so parent-relative paths cannot bypass it. `root` is relative to the
-folder of that `package.json`, because `context.cwd` is the process working directory, and
+The rule resolves each import with `oxc-resolver`, with Node.js `imports` conditions,
+TypeScript extensions, and `tsconfig.json` `paths`, so parent-relative paths and aliases cannot
+bypass it. A first version resolved relative and `#` imports by hand, in about 110 lines that
+copied part of Node.js resolution and could not read `tsconfig.json`. An import that does not
+resolve is outside the map, because TypeScript reports it. `root` is relative to the folder of
+the nearest `package.json`, because `context.cwd` is the process working directory, and
 Oxlint passes no config folder to a rule. A file below the root that is in no layer is a report,
 so a new folder is never unrestricted. Type-only imports count unless `ignoreTypes` is set.
 
@@ -46,9 +49,10 @@ layers.
 - A typo in a layer name is a lint report on every file below the root, not a type error. A
   cycle in the map is a report too. The rule does not throw, because a rule that throws lets the
   run exit 0 (ADR 0009).
-- The rule reads `package.json` files when it lints, and caches them by folder. An editor
-  language server needs a restart after a `package.json` changes.
-- `tsconfig` `paths` aliases are not resolved. v1 entrypoint tiers and feature role file names
-  are follow-up options.
+- `oxc-resolver` is a runtime dependency with native bindings. The plugin loads it for every
+  first-party rule, not only for `layers`.
+- The rule reads files when it lints, and the resolver caches them. An editor language server
+  needs a restart after a `package.json` or `tsconfig.json` changes.
+- v1 entrypoint tiers and feature role file names are follow-up options.
 - A unit of an isolated layer is the first segment below the layer folder, so a route folder can
   import its own files. v1 isolated each route module.

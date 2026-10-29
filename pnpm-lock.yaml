@@ -193,6 +193,9 @@ importers:
       oxc-parser:
         specifier: 0.154.0
         version: 0.154.0
+      oxc-resolver:
+        specifier: 11.24.2
+        version: 11.24.2
     devDependencies:
       '@changesets/changelog-github':
         specifier: 1.0.1

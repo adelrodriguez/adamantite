@@ -1,6 +1,7 @@
 import type { Context, ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { posix } from "node:path"
+import { ResolverFactory } from "oxc-resolver"
 import { globToRegExp } from "../glob.ts"
 import { isStringLiteral } from "../imports.ts"
 import {
@@ -11,7 +12,8 @@ import {
 } from "../options.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs: Node.js built-ins that Bun also provides, and only types from packages.
+// runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver, which ships
+// Node-API bindings for both.
 
 /**
  * Each layer by folder name, with the layers directly below it. Imports are transitive: a layer
@@ -41,23 +43,18 @@ export interface LayersOptions {
   readonly root: readonly RegExp[]
 }
 
-type JsonValue = Options[number]
-type JsonObject = Exclude<JsonValue, JsonValue[] | boolean | number | string | null>
-
-function isJsonObject(value: JsonValue | undefined): value is JsonObject {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-}
-
-function isJsonString(value: JsonValue | undefined): value is string {
-  return typeof value === "string"
-}
-
 /**
- * The nearest folder with a `package.json`, and the `imports` field of that file.
+ * What the rule reads from the file system. The plugin reads real files, and unit tests pass fakes.
  */
-export interface PackageScope {
-  readonly dir: string
-  readonly imports: JsonObject
+export interface Modules {
+  /**
+   * The nearest folder above `file` that holds a `package.json`.
+   */
+  readonly findPackage: (file: string) => string | undefined
+  /**
+   * The file that `specifier` in `importer` resolves to, or undefined when it does not resolve.
+   */
+  readonly resolve: (importer: string, specifier: string) => string | undefined
 }
 
 /**
@@ -196,92 +193,6 @@ export function findMapErrors(layers: LayerMap, isolate: ReadonlySet<string>): M
   }
 
   return errors
-}
-
-function pickImportTarget(target: JsonValue | undefined): string | undefined {
-  if (isJsonString(target)) {
-    return target
-  }
-
-  let entries: JsonValue[] = []
-
-  if (Array.isArray(target)) {
-    entries = target
-  } else if (isJsonObject(target)) {
-    entries = Object.values(target)
-  }
-
-  for (const entry of entries) {
-    const picked = pickImportTarget(entry)
-
-    if (picked !== undefined) {
-      return picked
-    }
-  }
-
-  return undefined
-}
-
-/**
- * Resolve a `#` specifier through the `imports` field of `package.json`: an exact key, or the
- * pattern with the longest prefix before its `*`. A condition object gives its first string
- * target.
- */
-function resolveSubpathImport(specifier: string, imports: JsonObject): string | undefined {
-  if (Object.hasOwn(imports, specifier)) {
-    return pickImportTarget(imports[specifier])
-  }
-
-  let match: { readonly key: string; readonly rest: string } | undefined
-
-  for (const key of Object.keys(imports)) {
-    const star = key.indexOf("*")
-
-    if (star === -1 || key.includes("*", star + 1)) {
-      continue
-    }
-
-    const prefix = key.slice(0, star)
-    const suffix = key.slice(star + 1)
-
-    if (
-      specifier.length >= key.length - 1
-      && specifier.startsWith(prefix)
-      && specifier.endsWith(suffix)
-      && (match === undefined || prefix.length > match.key.indexOf("*"))
-    ) {
-      match = { key, rest: specifier.slice(prefix.length, specifier.length - suffix.length) }
-    }
-  }
-
-  if (match === undefined) {
-    return undefined
-  }
-
-  return pickImportTarget(imports[match.key])?.replaceAll("*", match.rest)
-}
-
-/**
- * Resolve an import specifier to a path with forward slashes. A relative specifier resolves from
- * the importing file, and a `#` specifier through the `imports` field of the package. Undefined for
- * a package specifier, or for a `#` specifier that maps to a package.
- */
-export function resolveImport(
-  specifier: string,
-  importer: string,
-  scope: PackageScope
-): string | undefined {
-  if (specifier.startsWith(".")) {
-    return posix.join(posix.dirname(importer), specifier)
-  }
-
-  if (!specifier.startsWith("#")) {
-    return undefined
-  }
-
-  const target = resolveSubpathImport(specifier, scope.imports)
-
-  return target?.startsWith("./") ? posix.join(scope.dir, target) : undefined
 }
 
 /**
@@ -452,43 +363,51 @@ function describeLayer(location: LayerLocation) {
   return location.unit === undefined ? location.layer : `${location.layer}/${location.unit}`
 }
 
-function readImports(file: string): JsonObject {
-  try {
-    const manifest: JsonValue = JSON.parse(readFileSync(file, "utf8"))
-    const imports = isJsonObject(manifest) ? manifest["imports"] : undefined
+const packages = new Map<string, string | undefined>()
 
-    if (isJsonObject(imports)) {
-      return imports
-    }
-  } catch {
-    // A `package.json` that does not parse has no `imports` that the rule can follow.
+function findPackage(dir: string): string | undefined {
+  if (packages.has(dir)) {
+    return packages.get(dir)
   }
 
-  return {}
+  const parent = posix.dirname(dir)
+  let found: string | undefined
+
+  if (existsSync(posix.join(dir, "package.json"))) {
+    found = dir
+  } else if (parent !== dir) {
+    found = findPackage(parent)
+  }
+
+  packages.set(dir, found)
+
+  return found
 }
 
+// TypeScript sources import `./module.js` for `./module.ts`, and `tsconfig.json` `paths` resolve
+// from the nearest config. The resolver keeps symlinked paths as they are, so they compare with
+// the paths that Oxlint lints.
+const resolver = new ResolverFactory({
+  conditionNames: ["types", "import", "node", "default"],
+  extensionAlias: {
+    ".cjs": [".cts", ".cjs"],
+    ".js": [".ts", ".tsx", ".js", ".jsx"],
+    ".mjs": [".mts", ".mjs"],
+  },
+  extensions: [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".json"],
+  symlinks: false,
+  tsconfig: "auto",
+})
+
 // Oxlint caches the loaded plugin, so an editor language server needs a restart after a
-// `package.json` changes.
-const scopes = new Map<string, PackageScope | undefined>()
+// `package.json` or `tsconfig.json` changes.
+const modules: Modules = {
+  findPackage: (file) => findPackage(posix.dirname(file)),
+  resolve: (importer, specifier) => {
+    const { path } = resolver.resolveFileSync(importer, specifier)
 
-function findPackageScope(dir: string): PackageScope | undefined {
-  if (scopes.has(dir)) {
-    return scopes.get(dir)
-  }
-
-  const file = posix.join(dir, "package.json")
-  const parent = posix.dirname(dir)
-  let scope: PackageScope | undefined
-
-  if (existsSync(file)) {
-    scope = { dir, imports: readImports(file) }
-  } else if (parent !== dir) {
-    scope = findPackageScope(parent)
-  }
-
-  scopes.set(dir, scope)
-
-  return scope
+    return path === undefined ? undefined : toPosixPath(path)
+  },
 }
 
 function isTypeOnlyImport(node: ESTree.ImportDeclaration) {
@@ -514,9 +433,10 @@ function isTypeOnlyExport(node: ESTree.ExportNamedDeclaration) {
  */
 interface LintedFile {
   readonly importer: string
+  readonly modules: Modules
   readonly options: LayersOptions
+  readonly packageDir: string
   readonly root: string
-  readonly scope: PackageScope
 }
 
 function formatCycle(cycle: readonly string[]) {
@@ -567,11 +487,12 @@ function checkImport(
     return
   }
 
-  const target = resolveImport(source.value, file.importer, file.scope)
+  // An import that does not resolve is outside the map. TypeScript reports it.
+  const target = file.modules.resolve(file.importer, source.value)
   const split =
     target === undefined
       ? undefined
-      : splitAtRoot(options.root, posix.relative(file.scope.dir, target))
+      : splitAtRoot(options.root, posix.relative(file.packageDir, target))
 
   // A target in another root, such as another app of a monorepo, is outside this map.
   if (split === undefined || split.root !== file.root) {
@@ -615,21 +536,20 @@ function checkImport(
 }
 
 /**
- * Create the rule with the function that finds the package of a folder. The plugin passes one that
- * reads `package.json` files, and unit tests pass one that does not touch the file system.
+ * Create the rule with what it reads from the file system.
  */
-export function createLayersRule(findScope: (dir: string) => PackageScope | undefined): Rule {
+export function createLayersRule(modules: Modules): Rule {
   return {
     create(context): Visitor {
       const options = readLayersOptions(context.options)
       const importer = toPosixPath(context.filename)
-      const scope = findScope(posix.dirname(importer))
+      const packageDir = modules.findPackage(importer)
 
-      if (options === undefined || scope === undefined) {
+      if (options === undefined || packageDir === undefined) {
         return {}
       }
 
-      const split = splitAtRoot(options.root, posix.relative(scope.dir, importer))
+      const split = splitAtRoot(options.root, posix.relative(packageDir, importer))
 
       if (
         split === undefined
@@ -649,7 +569,7 @@ export function createLayersRule(findScope: (dir: string) => PackageScope | unde
         }
       }
 
-      const file: LintedFile = { importer, options, root: split.root, scope }
+      const file: LintedFile = { importer, modules, options, packageDir, root: split.root }
 
       return {
         ExportAllDeclaration(node) {
@@ -712,6 +632,6 @@ export function createLayersRule(findScope: (dir: string) => PackageScope | unde
   }
 }
 
-const rule: Rule = createLayersRule(findPackageScope)
+const rule: Rule = createLayersRule(modules)
 
 export default rule

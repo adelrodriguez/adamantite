@@ -81,6 +81,11 @@ const ADAMANTITE_MODULE = {
   }),
 }
 
+// Node.js resolves `adamantite/lint` to this file, as Oxlint loads the preset.
+const ADAMANTITE_RESOLUTION = {
+  "adamantite/lint": "node_modules/adamantite/dist/presets/lint/core.js",
+}
+
 const INSTALLED = {
   ...ADAMANTITE_MODULE,
   "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
@@ -112,7 +117,10 @@ function runHarden(files: Record<string, string>, args: readonly string[] = []) 
       // The monorepo configs import the shared tooling package.
       layers: [
         prompter.layer,
-        makeModuleResolverLayer(context.root, { "@acme/lint": "tooling/lint/index.ts" }),
+        makeModuleResolverLayer(context.root, {
+          "@acme/lint": "tooling/lint/index.ts",
+          ...ADAMANTITE_RESOLUTION,
+        }),
       ],
     })
 
@@ -158,12 +166,47 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
       copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
       isInteractive: Effect.succeed(true),
     })
+    const files = createFileSystemTestContext({ files: options.files ?? HEALTHY_FILES })
     const exit = yield* runCommand(hardenCommand, [], {
-      files: createFileSystemTestContext({ files: options.files ?? HEALTHY_FILES }),
-      layers: [prompter.layer, runner.layer, terminal],
+      files,
+      layers: [
+        prompter.layer,
+        runner.layer,
+        terminal,
+        makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
+      ],
     })
 
     return { copied, exit, prompter, runner }
+  })
+}
+
+// The project is a workspace package, and the package manager installs Adamantite in the parent
+// folder.
+function runHardenHoisted() {
+  return Effect.gen(function* () {
+    const prompter = createPrompterTestContext()
+    const context = createFileSystemTestContext({
+      files: {
+        "../node_modules/adamantite/dist/presets/lint/core.js": "export default {}\n",
+        "../node_modules/adamantite/package.json": JSON.stringify({
+          name: "adamantite",
+          version: getPackageVersion(),
+        }),
+        "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+      },
+    })
+    const exit = yield* runCommand(hardenCommand, [], {
+      files: context,
+      layers: [
+        prompter.layer,
+        makeModuleResolverLayer(context.root, {
+          "adamantite/lint": "../node_modules/adamantite/dist/presets/lint/core.js",
+        }),
+      ],
+    })
+
+    return { exit, prompter }
   })
 }
 
@@ -382,13 +425,35 @@ describe("harden", () => {
     })
   )
 
+  it.effect("print the prompt when the package manager hoists Adamantite to a parent folder", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHardenHoisted()
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.messages[0]).toContain("# Adamantite harden")
+    })
+  )
+
   it.effect("print the prompt in the Adamantite repository, which does not depend on itself", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
-        "package.json": JSON.stringify({ name: "adamantite", version: "0.0.1" }),
+        "package.json": JSON.stringify({ name: "adamantite", version: getPackageVersion() }),
       })
 
       expect(prompt).toContain("# Adamantite harden")
+    })
+  )
+
+  it.effect("fail in an Adamantite checkout of another version than the one that runs", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden({
+        "package.json": JSON.stringify({ name: "adamantite", version: "0.0.1" }),
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([
+        `This project installs Adamantite 0.0.1, but this command is Adamantite ${getPackageVersion()}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`,
+      ])
     })
   )
 

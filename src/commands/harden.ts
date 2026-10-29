@@ -14,6 +14,7 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readCustomRuleTestCommand } from "#lib/workspace/custom-rules/index.ts"
+import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
@@ -21,6 +22,35 @@ import { Prompter } from "#terminal/prompter.ts"
 import { chooseResolution } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
+
+/**
+ * The version of the Adamantite that the project at `cwd` loads, or none when it is not installed.
+ * It resolves `adamantite/lint` as Oxlint loads the preset, so an install in a parent
+ * `node_modules` counts.
+ */
+const readInstalledVersion = Effect.fn("readInstalledVersion")(function* (cwd: string) {
+  const path = yield* Path.Path
+  const resolver = yield* ModuleResolver
+  const entry = yield* resolver.resolve(path.join(cwd, "package.json"), "adamantite/lint")
+
+  if (Option.isNone(entry)) {
+    return Option.none<string>()
+  }
+
+  for (
+    let directory = path.dirname(entry.value);
+    directory !== path.dirname(directory);
+    directory = path.dirname(directory)
+  ) {
+    const manifest = yield* readPackageJson(directory).pipe(Effect.option)
+
+    if (Option.isSome(manifest) && manifest.value.name === "adamantite") {
+      return Option.fromUndefinedOr(manifest.value.version)
+    }
+  }
+
+  return Option.none<string>()
+})
 
 const scope = Flag.Directory("path", { mustExist: true }).pipe(
   Flag.optional,
@@ -61,29 +91,33 @@ export default Command.make("harden", { scope }).pipe(
       const packageJson = yield* readPackageJson(cwd)
 
       // The Adamantite repository runs its own build, so it does not depend on itself.
-      if (packageJson.name !== "adamantite") {
-        if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
-          return yield* failBeforeStart(
-            "`adamantite` is not installed in this project. Install it before running `adamantite harden`."
-          )
-        }
+      const isAdamantiteRepository = packageJson.name === "adamantite"
 
-        // The prompt offers the presets and rules of this version, so the project must install it.
-        const installed = yield* readPackageJson(path.join(cwd, "node_modules", "adamantite")).pipe(
-          Effect.option
+      if (
+        !isAdamantiteRepository
+        && !packageJson.devDependencies?.adamantite
+        && !packageJson.dependencies?.adamantite
+      ) {
+        return yield* failBeforeStart(
+          "`adamantite` is not installed in this project. Install it before running `adamantite harden`."
         )
+      }
 
-        if (Option.isNone(installed)) {
-          return yield* failBeforeStart(
-            "`adamantite` is in `package.json` but not in `node_modules`. Install the dependencies before running `adamantite harden`."
-          )
-        }
+      // The prompt offers the presets and rules of this version, so the project must install it.
+      const installedVersion = isAdamantiteRepository
+        ? Option.fromUndefinedOr(packageJson.version)
+        : yield* readInstalledVersion(cwd)
 
-        if (installed.value.version !== version) {
-          return yield* failBeforeStart(
-            `This project installs Adamantite ${installed.value.version}, but this command is Adamantite ${version}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`
-          )
-        }
+      if (Option.isNone(installedVersion)) {
+        return yield* failBeforeStart(
+          "`adamantite` is in `package.json` but not in `node_modules`. Install the dependencies before running `adamantite harden`."
+        )
+      }
+
+      if (installedVersion.value !== version) {
+        return yield* failBeforeStart(
+          `This project installs Adamantite ${installedVersion.value}, but this command is Adamantite ${version}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`
+        )
       }
 
       const scopeDirectory = Option.isSome(scope) ? path.resolve(cwd, scope.value) : undefined

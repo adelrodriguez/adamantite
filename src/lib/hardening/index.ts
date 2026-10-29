@@ -114,7 +114,7 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
   return fillTemplate(hardenPromptTemplate, {
     configs: renderList(
       context.configs,
-      "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 6."
+      "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 7."
     ),
     instructionFiles: renderList(context.instructionFiles, "No instruction file was found."),
     rulesFolders: renderRulesFolders(context),

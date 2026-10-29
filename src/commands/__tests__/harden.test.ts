@@ -47,23 +47,53 @@ function getMissingPhrases(section: string, phrases: readonly string[]) {
 
 // The phrases that each section must keep, so a failure names each lost one.
 const REQUIRED_PHRASES = {
-  "## 2. Survey the code": ["This step is done when each area has its candidates"],
-  "## 3. Drop what a tool already enforces": ["lint a counterexample from step 2 where it is"],
-  "## 5. Show the candidates and wait for approval": [
+  "## 1. Explore the documentation": [
+    "the files that the instructions link to or tell agents to read",
+    "**discovery gap**",
+    "This step is done when each documentation file has its mark.",
+  ],
+  "## 2. List the written standards": [
+    "Each written standard goes on to step 4, also when the code breaks it in many places.",
+  ],
+  "## 3. Survey the code": [
+    "the command that gives the count",
+    "A rule that a commit removed is a **decision**",
+    "This step is done when each area has its candidates",
+  ],
+  "## 4. Drop what a tool already enforces": [
+    "For each written standard from step 2 and each candidate from step 3",
+    "lint a counterexample from step 3 where it is",
+    "write a config to a temporary folder outside the project",
+    "When a tool enforces only part of a written standard, keep the other part as a candidate.",
+  ],
+  "## 5. Place each candidate on the enforcement ladder": [
+    "A native rule, such as a file-name rule, comes before a custom rule",
+    "Write one combined `no-restricted-imports` for each set of files",
+    "**Project check:**",
+    "one case that the rule must report and one similar case that it must accept",
+  ],
+  "## 6. Show the candidates and wait for approval": [
+    "Score each candidate from 1 to 5",
+    "Show the candidates with a score of 4 or 5, from the highest score to the lowest.",
+    "**Decisions:**",
+    "**Discovery gaps:**",
+    "**Also considered:**",
     "This step is done when the user names the candidates to write",
     "When no human can approve",
     "Stop after this step.",
   ],
-  "## 6. Write the approved standards": [
+  "## 7. Write the approved standards": [
     "`adamantite rule add <name>`",
     'the "Custom rules" section of the Adamantite skill',
     "pass it with `--dir`",
     "states the standard and why it exists",
     "delete the instruction of each standard that a rule now checks",
+    "keep the other part as the instruction",
     "keep the code that a new rule reports as it is",
     "for a custom rule, use the `rules` option of `custom()`",
     "for a preset rule or an import rule, set it in the Oxlint config",
     "`CODING_STANDARDS.md`",
+    "add each approved pointer to the instruction file that the gap names",
   ],
   "## Verify": [
     "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
@@ -222,12 +252,13 @@ describe("harden", () => {
           "### Oxlint config",
           "### Rules folders",
           "### Instructions",
-          "## 1. List the written standards",
-          "## 2. Survey the code",
-          "## 3. Drop what a tool already enforces",
-          "## 4. Place each candidate on the enforcement ladder",
-          "## 5. Show the candidates and wait for approval",
-          "## 6. Write the approved standards",
+          "## 1. Explore the documentation",
+          "## 2. List the written standards",
+          "## 3. Survey the code",
+          "## 4. Drop what a tool already enforces",
+          "## 5. Place each candidate on the enforcement ladder",
+          "## 6. Show the candidates and wait for approval",
+          "## 7. Write the approved standards",
           "## Verify",
         ],
       ])
@@ -277,7 +308,7 @@ describe("harden", () => {
 
       expect(
         getMissingPhrases(getSection(prompt, "### Oxlint config"), [
-          "tell the user to run `adamantite init` before step 6",
+          "tell the user to run `adamantite init` before step 7",
         ])
       ).toStrictEqual([])
     })
@@ -308,7 +339,7 @@ describe("harden", () => {
   )
 
   it.effect(
-    "have the read-only phase, the approval gate, the write steps, and the verification",
+    "have the read-only phase, the exploration, the scores, the approval gate, the write steps, and the verification",
     () =>
       Effect.gen(function* () {
         const prompt = yield* runHardenPrompt({
@@ -322,7 +353,7 @@ describe("harden", () => {
         )
 
         expect(prompt.slice(0, prompt.indexOf("\n## Context\n"))).toContain(
-          "Steps 1 to 5 are read-only."
+          "Steps 1 to 6 are read-only."
         )
         expect(missing).toStrictEqual([])
       })

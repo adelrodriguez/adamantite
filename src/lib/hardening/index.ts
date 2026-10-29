@@ -62,7 +62,10 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     Order.mapInput(Order.flip(Order.Number), (directory: string) => directory.length)
   ).slice(0, 1)
   const selectedPackages = packagesInScope.length > 0 ? packagesInScope : owner
-  const { calls, configs } = yield* discoverCustomRules(packageDirectories, selectedPackages)
+  const { calls, configs, unresolvedCalls } = yield* discoverCustomRules(
+    packageDirectories,
+    selectedPackages
+  )
   // The root instructions apply to every package, so a scope keeps them.
   const instructionCandidates = [...new Set([cwd, ...selectedPackages])].flatMap((directory) =>
     INSTRUCTION_FILES.map((file) => path.join(directory, file))
@@ -79,13 +82,9 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     instructionFiles: instructionCandidates
       .filter((_, index) => exists[index])
       .map((file) => relative(file)),
-    rulesFolders: [
-      ...new Set(calls.flatMap((call) => (call.dir === null ? [] : [relative(call.dir)]))),
-    ],
+    rulesFolders: [...new Set(calls.map((call) => relative(call.dir)))],
     scope: scope === cwd ? null : relative(scope),
-    unresolvedCalls: [
-      ...new Set(calls.flatMap((call) => (call.dir === null ? [relative(call.source)] : []))),
-    ],
+    unresolvedCalls: [...new Set(unresolvedCalls.map((source) => relative(source)))],
   } satisfies HardenContext
 })
 

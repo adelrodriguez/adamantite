@@ -49,13 +49,12 @@ export default defineIntegration({
         cwd,
         ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
       ]
-      const { calls, unresolvedImports } = yield* discoverCustomRules(packageDirectories)
+      const { calls, unresolvedCalls, unresolvedImports } =
+        yield* discoverCustomRules(packageDirectories)
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )
-      const loadedFolders = Array.dedupe(
-        calls.flatMap((call) => (call.dir === null ? [] : [call.dir]))
-      )
+      const loadedFolders = Array.dedupe(calls.map((call) => call.dir))
       const folders = Array.getSomes(
         yield* Effect.forEach(
           Array.dedupe([...defaultFolders, ...loadedFolders]),
@@ -64,20 +63,24 @@ export default defineIntegration({
         )
       ).filter((folder) => folder.ruleFiles.length > 0)
 
-      if (calls.length === 0 && folders.length === 0 && unresolvedImports.length === 0) {
+      if (
+        calls.length === 0
+        && unresolvedCalls.length === 0
+        && folders.length === 0
+        && unresolvedImports.length === 0
+      ) {
         return { applicable: false, warnings: [] } satisfies IntegrationAssessment
       }
 
-      const unknownDirCalls = calls.filter((call) => call.dir === null)
-      const unknownNameCalls = calls.filter((call) => call.dir !== null && call.name === null)
+      const unknownNameCalls = calls.filter((call) => call.name === null)
       const warnings = [
         ...unresolvedImports.map(
           ({ from, specifier }) =>
             `Doctor cannot resolve the import of \`${specifier}\` in \`${relative(from)}\`, so it does not check the \`custom()\` calls and rules folders behind it. For a workspace package, install the dependencies and run Doctor again.`
         ),
-        ...unknownDirCalls.map(
-          (call) =>
-            `Doctor cannot read the \`dir\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that rules folder.`
+        ...unresolvedCalls.map(
+          (source) =>
+            `Doctor cannot read the \`dir\` of a \`custom()\` call in \`${relative(source)}\`, because it is not a string literal. Doctor does not check that rules folder.`
         ),
         ...unknownNameCalls.map(
           (call) =>
@@ -88,7 +91,7 @@ export default defineIntegration({
 
       // A call with an unknown `dir`, or an unresolved import, can load any folder, so an unloaded
       // folder is reported only when every `dir` and import is resolved.
-      if (unknownDirCalls.length === 0 && unresolvedImports.length === 0) {
+      if (unresolvedCalls.length === 0 && unresolvedImports.length === 0) {
         for (const folder of folders) {
           if (loadedFolders.includes(folder.dir)) {
             continue
@@ -134,17 +137,14 @@ export default defineIntegration({
         }
       }
 
-      const loadingCalls = calls.filter(
-        (call) =>
-          call.dir !== null
-          && folders.some((folder) => folder.dir === call.dir)
-          && call.name !== null
+      const loadingCalls = calls.flatMap(({ dir, name, source }) =>
+        name !== null && folders.some((folder) => folder.dir === dir) ? [{ dir, name, source }] : []
       )
 
       for (const [name, group] of Object.entries(
-        Array.groupBy(loadingCalls, (call) => call.name ?? "")
+        Array.groupBy(loadingCalls, (call) => call.name)
       )) {
-        const dirs = Array.dedupe(group.map((call) => call.dir ?? ""))
+        const dirs = Array.dedupe(group.map((call) => call.dir))
 
         if (dirs.length < 2) {
           continue

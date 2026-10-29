@@ -64,6 +64,10 @@ reason for the reader: why the rule does not apply here, not which rule it is.
 console.log(report)
 ```
 
+The `strict` preset's `no-warning-comments` rule reports a comment that starts with `TODO`,
+`FIXME`, `XXX`, or `HACK`. Fix the code now, or track the work in the project's issue tracker.
+Do not rename the marker or rephrase the comment only to silence the report.
+
 The `strict` preset also loads `adamantite/layers`, which enforces one-way imports between the
 folders of a root, such as `src/lib`. The project turns it on with its layer map: each layer by
 folder name, with the layers directly below it. Imports are transitive.

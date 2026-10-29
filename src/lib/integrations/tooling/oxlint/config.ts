@@ -51,7 +51,7 @@ export const LINT_PRESETS = [
 
 export type LintPreset = (typeof LINT_PRESETS)[number]
 
-function getImportName(preset: string) {
+function getImportName(preset: LintPreset | "core") {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())
 }
 
@@ -59,8 +59,8 @@ function getImportName(preset: string) {
  * The `oxlint.config.ts` that `init` writes. It always extends `custom()`, which is an empty config
  * until the project adds a rule to `.adamantite/rules`.
  */
-export function toOxlintTsConfigContent(presets: string[] = []) {
-  const presetNames = presets.includes("core") ? presets : ["core", ...presets]
+export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
+  const presetNames = ["core", ...presets] as const
   return [
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(

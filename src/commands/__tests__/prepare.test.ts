@@ -4,14 +4,17 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import prepareCommand from "#commands/prepare.ts"
-import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
+import {
+  toOxlintTsConfigContent,
+  type LintPreset,
+} from "#lib/integrations/tooling/oxlint/config.ts"
 import {
   createPrompterTestContext,
   createRunnerTestContext,
   runCommand,
 } from "./command-test-helpers.ts"
 
-function makeFiles(presets: string[], packageJson: PackageJson = {}) {
+function makeFiles(presets: readonly LintPreset[], packageJson: PackageJson = {}) {
   return createFileSystemTestContext({
     files: {
       "oxlint.config.ts": toOxlintTsConfigContent(presets),

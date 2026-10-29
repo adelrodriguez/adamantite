@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import {
   getImportedLintPresets,
   inspectRequiredOxlintConfig,
+  LINT_PRESETS,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 
@@ -81,6 +82,18 @@ describe("getImportedLintPresets", () => {
     expect(content).toContain('import reactStrict from "adamantite/lint/react-strict"')
     expect(content).toContain("extends: [core, react, reactStrict, custom()],")
     expect(getImportedLintPresets(content)).toStrictEqual(["react", "react-strict"])
+  })
+
+  it("import every preset as a valid import in a config that parses", () => {
+    const content = toOxlintTsConfigContent(LINT_PRESETS)
+
+    expect(inspectRequiredOxlintConfig(content)).toStrictEqual({ kind: "configured" })
+    expect(getImportedLintPresets(content)).toStrictEqual([...LINT_PRESETS])
+  })
+
+  it("accept only Adamantite preset names", () => {
+    // @ts-expect-error - only LintPreset names are accepted
+    expect(getImportedLintPresets(toOxlintTsConfigContent(["foo.bar"]))).toStrictEqual([])
   })
 
   it("extend core and custom() in the default config", () => {

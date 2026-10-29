@@ -12,6 +12,7 @@ import {
 import {
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
+  type LintPreset,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 import { readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -77,7 +78,7 @@ export default defineIntegration({
       } satisfies IntegrationAssessment
     }),
   config: CONFIG_FILE,
-  create: (cwd: string, presets: string[] = []) =>
+  create: (cwd: string, presets: readonly LintPreset[] = []) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
       const payload = toOxlintTsConfigContent(presets)

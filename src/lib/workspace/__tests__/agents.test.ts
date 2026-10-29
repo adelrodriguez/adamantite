@@ -89,6 +89,25 @@ describe("writeAgentsGuidance", () => {
     })
   )
 
+  it.effect("write the section without a blank list gap when no script is selected", () =>
+    Effect.gen(function* () {
+      const files = makeFiles()
+
+      yield* runWriteAgentsGuidance(files, {
+        isMonorepo: false,
+        packageManager: "bun",
+        scripts: [],
+      })
+
+      const agents = files.read("AGENTS.md")
+      expect(agents).not.toContain("Prefer the package scripts")
+      expect(agents).not.toContain(".adamantite/rules")
+      expect(agents).toContain(
+        `dependency-analysis setup.\n\n- Run \`adamantite doctor\` and follow its findings to repair managed setup.\n\n${ADAMANTITE_AGENTS_END_MARKER}`
+      )
+    })
+  )
+
   it.effect("mention monorepo checks in the analyze guidance only in a monorepo", () =>
     Effect.gen(function* () {
       const files = makeFiles()

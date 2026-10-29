@@ -5,9 +5,12 @@ import * as Path from "effect/Path"
 import * as String from "effect/String"
 import { runScriptCommand, type PackageManagerName } from "nypm"
 import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { fillTemplate } from "#lib/shared/template.ts"
+import { getAgentsSectionTemplate } from "#lib/workspace/agents-section.macro.ts" with { type: "macro" }
 import { MANAGED_SCRIPT_COMMANDS, type Script } from "#lib/workspace/package-json.ts"
 
 const AGENTS_NAME = "AGENTS.md"
+const agentsSectionTemplate = getAgentsSectionTemplate()
 
 export const ADAMANTITE_AGENTS_START_MARKER = "<!-- ADAMANTITE:START -->"
 export const ADAMANTITE_AGENTS_END_MARKER = "<!-- ADAMANTITE:END -->"
@@ -43,26 +46,23 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
     .filter((script) => scripts.includes(script))
     .map((script) => getScriptGuidance(packageManager, script, isMonorepo))
 
-  const body = [
-    "## Adamantite",
-    "",
-    "This project uses Adamantite for its managed formatting, linting, type checking, and dependency-analysis setup.",
-    "",
-    ...(selectedScriptGuidance.length > 0
-      ? [
-          "- Prefer the package scripts Adamantite added for this workspace.",
-          ...selectedScriptGuidance,
-        ]
-      : []),
-    ...(scripts.includes("check") || scripts.includes("fix")
-      ? [
-          '- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule, and follow the "Custom rules" section of the Adamantite skill.',
-        ]
-      : []),
-    "- Run `adamantite doctor` and follow its findings to repair managed setup.",
-  ].join("\n")
+  // Each slot value carries its own trailing newline, so an empty slot leaves no blank line.
+  const body = fillTemplate(agentsSectionTemplate, {
+    customRules:
+      scripts.includes("check") || scripts.includes("fix")
+        ? '- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule, and follow the "Custom rules" section of the Adamantite skill.\n'
+        : "",
+    scripts:
+      selectedScriptGuidance.length > 0
+        ? [
+            "- Prefer the package scripts Adamantite added for this workspace.",
+            ...selectedScriptGuidance,
+            "",
+          ].join("\n")
+        : "",
+  })
 
-  return [ADAMANTITE_AGENTS_START_MARKER, "", body, "", ADAMANTITE_AGENTS_END_MARKER, ""].join("\n")
+  return `${ADAMANTITE_AGENTS_START_MARKER}\n\n${body}\n${ADAMANTITE_AGENTS_END_MARKER}\n`
 }
 
 export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOptions) =>

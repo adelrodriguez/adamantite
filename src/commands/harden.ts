@@ -87,6 +87,10 @@ export default Command.make("harden").pipe(
         )
       const assessment = yield* assessProject(cwd)
 
+      for (const warning of assessment.warnings) {
+        yield* prompter.log.warning(warning)
+      }
+
       if (!checkPassed) {
         yield* prompter.log.error(`\`adamantite check\` failed after the ${agent.name} session.`)
       }

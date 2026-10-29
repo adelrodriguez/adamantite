@@ -399,6 +399,33 @@ describe("harden", () => {
     })
   )
 
+  it.effect("show the Doctor warnings and still pass when Doctor finds no issues", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runInteractiveHarden({
+        // Doctor cannot read a `dir` that is not a string literal, so it warns without a finding.
+        files: {
+          "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace('dir: "tooling/rules"', "dir: rulesDir"),
+          "package.json": INSTALLED,
+        },
+        prompter: { selectResponses: [claudeAgent] },
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.logs.filter((log) => log.level !== "info")).toStrictEqual([
+        {
+          level: "warning",
+          message:
+            "Doctor cannot read the `dir` or `name` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. Doctor does not check that rules folder.",
+        },
+        {
+          level: "success",
+          message: "`adamantite check` and Doctor pass after the Claude Code session.",
+        },
+      ])
+      expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
+    })
+  )
+
   it.effect("print the prompt and copy it when the user chooses to copy", () =>
     Effect.gen(function* () {
       const { copied, exit, prompter, runner } = yield* runInteractiveHarden({

@@ -69,6 +69,7 @@ const REQUIRED_PHRASES = {
   "## Verify": [
     "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
     "All three must exit 0.",
+    "When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
 

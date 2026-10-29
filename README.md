@@ -233,7 +233,8 @@ approve, the agent stops at the candidates.
 
 In an interactive terminal, `harden` offers the same menu as Doctor: hand off to an installed
 coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff, `harden`
-runs `check` and the Doctor assessment, and exits 1 when either fails. A copy or "do nothing"
+runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of them fails.
+A project with no rule tests passes the `rule test` step. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings. See
 [ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).
 

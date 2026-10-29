@@ -1271,6 +1271,36 @@ describe("init", () => {
       })
     )
 
+    it.effect("not offer GitHub Actions interactively with an unsupported package manager", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const prompter = createPrompterTestContext({
+          // TypeScript and the AGENTS.md guidance.
+          confirmResponses: [false, false],
+          multiselectResponses: [["check"], [], []],
+        })
+        const installer = createDependencyInstallerTestContext({
+          detectedPackageManager: { name: "aube" },
+        })
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
+          "Do you want to add a GitHub Actions workflow to run checks in CI?"
+        )
+        expect(prompter.logs).toContainEqual({
+          level: "info",
+          message:
+            "Adamantite cannot generate a GitHub Actions workflow for `aube`. It supports bun, deno, npm, pnpm, and yarn.",
+        })
+        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
+      })
+    )
+
     it.effect("continues initialization when the GitHub Actions workflow cannot be written", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()

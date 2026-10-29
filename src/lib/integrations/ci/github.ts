@@ -332,7 +332,9 @@ export default defineIntegration({
                 : []),
             ].join(" "),
             goal: [
-              "Make the workflow run the managed `check` script.",
+              ...(managedScripts.includes("check")
+                ? ["Make the workflow run the managed `check` script."]
+                : []),
               ...(hasRuleTests
                 ? [
                     "Make the workflow run `adamantite rule test`, so that CI runs the custom rule tests.",

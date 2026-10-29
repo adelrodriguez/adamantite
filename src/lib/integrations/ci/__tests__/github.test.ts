@@ -453,6 +453,11 @@ describe("github", () => {
             {
               currentState:
                 "The workflow does not run `adamantite rule test`, and the project has custom rule tests.",
+              // The project has no managed `check` script, so the finding does not ask for it.
+              goal: [
+                "Make the workflow run `adamantite rule test`, so that CI runs the custom rule tests.",
+                "Use the project's Node.js version declaration instead of a hard-coded version.",
+              ],
               id: "outdated-adamantite-workflow",
             },
           ],

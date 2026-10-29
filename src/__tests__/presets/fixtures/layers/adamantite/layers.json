@@ -3,6 +3,21 @@
     "adamantite/layers": [
       "error",
       {
+        "root": "src",
+        "layers": {
+          "lib": [],
+          "terminal": [
+            "lib"
+          ],
+          "commands": [
+            "terminal"
+          ]
+        },
+        "entries": [
+          "cli.ts"
+        ]
+      },
+      {
         "root": "src/lib",
         "layers": {
           "shared": [],

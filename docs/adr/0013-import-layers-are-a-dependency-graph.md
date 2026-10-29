@@ -34,6 +34,17 @@ where the importing file can move. It suggests an edit to the map only for a fol
 layer, because an agent that reads "edit the map" takes the shortest path and weakens the
 layers.
 
+## More than one layer map
+
+We decided (2026-10-28, issue #569) that each option after the severity is one complete layer
+map, and the rule checks each map on its own. A file below two roots, such as `src/lib/shared`
+below `src` and `src/lib`, must pass both maps. Oxlint applies one option set to each file, so
+overrides cannot give a file two maps. Adamantite needs two: a `src` map keeps `lib` below
+`terminal`, and a `src/lib` map holds the lib layers. Each message names the root of its map.
+A `maps` key was rejected because it adds a second form of the same config, and nested layers
+in one map were rejected because they make the graph, the repairs, and the messages more
+complex. `no-restricted-syntax` uses the same variadic options.
+
 ## Considered options
 
 - **Ordered levels with exceptions for each layer.** Short for packref and v1, but Adamantite

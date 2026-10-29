@@ -34,16 +34,20 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                     |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                             |
 
-## Lib layers
+## Layers
 
-The modules in `src/lib` form layers. The layer map is the `adamantite/layers` rule in
-`oxlint.config.ts`, and it is the only statement of the layers: each layer imports only the
-layers it lists and the layers below those. A layer that the map does not connect to another
+Two layer maps in the `adamantite/layers` rule in `oxlint.config.ts` are the only statement of
+the layers. Each layer imports only the layers it lists and the layers below those.
+
+The `src` map puts `lib` below `terminal`, and `terminal` below `commands`. Lib code returns
+data, and commands render it, so no lib module imports `terminal`. `cli.ts` and `index.ts` are
+entries. Tests share the helpers in `src/__tests__`, so this map does not check them.
+
+The `src/lib` map holds the lib layers. A layer that the map does not connect to another
 layer is its sibling, so `workspace` and `execution` do not import each other, and
 `assessment` does not import `hardening`: harden is not an assessment. `workspace` knows
 target-project files and package state, but not integration types such as `Finding`. An import
-that breaks the map, or a folder in `src/lib` that is not in it, fails `pnpm run check`. See
-ADR 0013.
+that breaks a map, or a folder that is not in its map, fails `pnpm run check`. See ADR 0013.
 
 Inside `integrations`, `base.ts` defines the integration and finding types.
 `tooling/base.ts` and `tooling/preset-config.ts` hold the logic that several tools share.

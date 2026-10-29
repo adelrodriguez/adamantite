@@ -19,11 +19,18 @@ RuleTester.it = it
 RuleTester.itOnly = it.only
 
 // A fake of the file system: relative imports resolve from the importer, `#` imports from
-// `/project/src`, and `#dep` to a package. `#missing/...` does not resolve. The fixture test covers
-// the real resolver.
+// `/project/src`, and `#dep` to a package. `#conditional` selects a lib layer only under the
+// `development` condition. `#missing/...` does not resolve. The fixture test covers the real
+// resolver.
 const MODULES: Modules = {
   findPackage: () => "/project",
-  resolve: (importer, specifier) => {
+  resolve: (importer, specifier, conditions) => {
+    if (specifier === "#conditional") {
+      return conditions.includes("development")
+        ? "/project/src/lib/integrations/value.ts"
+        : "/project/outside.ts"
+    }
+
     if (specifier.startsWith(".")) {
       return posix.join(posix.dirname(importer), specifier)
     }
@@ -84,6 +91,12 @@ const tester = new RuleTester({
 
 tester.run("layers", createLayersRule(MODULES), {
   invalid: [
+    {
+      code: 'import { value } from "#conditional"',
+      errors: [{ messageId: "upward" }],
+      filename: lib("workspace/conditional.ts"),
+      options: [{ ...LIB_OPTIONS, conditions: ["development"] }],
+    },
     {
       code: 'import { run } from "#lib/execution/run.ts"',
       errors: [
@@ -245,6 +258,11 @@ tester.run("layers", createLayersRule(MODULES), {
     },
   ],
   valid: [
+    {
+      code: 'import { value } from "#conditional"',
+      filename: lib("workspace/conditional.ts"),
+      options: [LIB_OPTIONS],
+    },
     {
       code: 'import { errors } from "#lib/shared/errors.ts"',
       filename: lib("workspace/files.ts"),

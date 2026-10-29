@@ -1,7 +1,7 @@
 import type { Context, ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync } from "node:fs"
 import { posix } from "node:path"
-import { ResolverFactory } from "oxc-resolver"
+import { type NapiResolveOptions, ResolverFactory } from "oxc-resolver"
 import { globToRegExp } from "../glob.ts"
 import { isStringLiteral } from "../imports.ts"
 import {
@@ -22,6 +22,11 @@ import {
 export type LayerMap = Readonly<Record<string, readonly string[]>>
 
 export interface LayersOptions {
+  /**
+   * Import conditions to match before the default ones, such as the `customConditions` of the
+   * target project's `tsconfig.json`.
+   */
+  readonly conditions: readonly string[]
   /**
    * Composition files, by glob below the root. An entry imports any layer, and no layer imports an
    * entry.
@@ -54,7 +59,11 @@ export interface Modules {
   /**
    * The file that `specifier` in `importer` resolves to, or undefined when it does not resolve.
    */
-  readonly resolve: (importer: string, specifier: string) => string | undefined
+  readonly resolve: (
+    importer: string,
+    specifier: string,
+    conditions: readonly string[]
+  ) => string | undefined
 }
 
 /**
@@ -99,6 +108,7 @@ export function readLayersOptions(options: Readonly<Options>): LayersOptions | u
   }
 
   return {
+    conditions: readStringArrayOption(options, "conditions") ?? [],
     entries: (readStringArrayOption(options, "entries") ?? []).map((glob) => globToRegExp(glob)),
     ignore: (readStringArrayOption(options, "ignore") ?? []).map((glob) => globToRegExp(glob)),
     ignoreTypes: readBooleanOption(options, "ignoreTypes") ?? false,
@@ -388,11 +398,13 @@ function findPackage(dir: string): string | undefined {
   return found
 }
 
-// TypeScript sources import `./module.js` for `./module.ts`, and `tsconfig.json` `paths` resolve
-// from the nearest config. The resolver keeps symlinked paths as they are, so they compare with
-// the paths that Oxlint lints.
-const resolver = new ResolverFactory({
-  conditionNames: ["types", "import", "node", "default"],
+const DEFAULT_CONDITIONS = ["types", "import", "node", "default"]
+
+// TypeScript substitutes the source and declaration extensions for a runtime extension, such as
+// `./view.tsx` for `./view.jsx`, and `tsconfig.json` `paths` resolve from the nearest config.
+// oxc-resolver does not read `customConditions`, so they come from the `conditions` option. The
+// resolver keeps symlinked paths as they are, so they compare with the paths that Oxlint lints.
+const resolverOptions = {
   extensionAlias: {
     ".cjs": [".cts", ".d.cts", ".cjs"],
     ".js": [".ts", ".tsx", ".d.ts", ".js", ".jsx"],
@@ -402,14 +414,38 @@ const resolver = new ResolverFactory({
   extensions: [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".json"],
   symlinks: false,
   tsconfig: "auto",
-})
+} as const satisfies NapiResolveOptions
+
+const baseResolver = new ResolverFactory({ ...resolverOptions, conditionNames: DEFAULT_CONDITIONS })
+
+// One resolver for each set of conditions. Clones share the cache of the base resolver.
+const resolvers = new Map<string, ResolverFactory>()
+
+function getResolver(conditions: readonly string[]) {
+  if (conditions.length === 0) {
+    return baseResolver
+  }
+
+  const key = conditions.join("\0")
+  let resolver = resolvers.get(key)
+
+  if (resolver === undefined) {
+    resolver = baseResolver.cloneWithOptions({
+      ...resolverOptions,
+      conditionNames: [...conditions, ...DEFAULT_CONDITIONS],
+    })
+    resolvers.set(key, resolver)
+  }
+
+  return resolver
+}
 
 // Oxlint caches the loaded plugin, so an editor language server needs a restart after a
 // `package.json` or `tsconfig.json` changes.
 const modules: Modules = {
   findPackage: (file) => findPackage(posix.dirname(file)),
-  resolve: (importer, specifier) => {
-    const { path } = resolver.resolveFileSync(importer, specifier)
+  resolve: (importer, specifier, conditions) => {
+    const { path } = getResolver(conditions).resolveFileSync(importer, specifier)
 
     return path === undefined ? undefined : toPosixPath(path)
   },
@@ -493,7 +529,7 @@ function checkImport(
   }
 
   // An import that does not resolve is outside the map. TypeScript reports it.
-  const target = file.modules.resolve(file.importer, source.value)
+  const target = file.modules.resolve(file.importer, source.value, options.conditions)
   const relative = target === undefined ? undefined : posix.relative(file.packageDir, target)
 
   // A dependency, or a file outside the package, is outside the map, even below a `.` root.
@@ -623,6 +659,7 @@ export function createLayersRule(modules: Modules): Rule {
         {
           additionalProperties: false,
           properties: {
+            conditions: { items: { type: "string" }, type: "array" },
             entries: { items: { type: "string" }, type: "array" },
             ignore: { items: { type: "string" }, type: "array" },
             ignoreTypes: { type: "boolean" },

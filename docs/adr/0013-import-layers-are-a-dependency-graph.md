@@ -21,7 +21,9 @@ The rule resolves each import with `oxc-resolver`, with Node.js `imports` condit
 TypeScript extensions, and `tsconfig.json` `paths`, so parent-relative paths and aliases cannot
 bypass it. A first version resolved relative and `#` imports by hand, in about 110 lines that
 copied part of Node.js resolution and could not read `tsconfig.json`. An import that does not
-resolve is outside the map, because TypeScript reports it. `root` is relative to the folder of
+resolve is outside the map, because TypeScript reports it. oxc-resolver does not read
+`customConditions` from `tsconfig.json`, so the `conditions` option adds them, as an explicit
+statement instead of a second reader of `tsconfig.json` and its `extends` chain. `root` is relative to the folder of
 the nearest `package.json`, because `context.cwd` is the process working directory, and
 Oxlint passes no config folder to a rule. A file below the root that is in no layer is a report,
 so a new folder is never unrestricted. Type-only imports count unless `ignoreTypes` is set.

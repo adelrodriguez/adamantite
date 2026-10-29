@@ -4,11 +4,11 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand from "#commands/rule.ts"
-import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
+import { toCustomRuleStub, toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
 import { createPrompterTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("rule add", () => {
-  it.effect("write only the stub to .adamantite/rules", () =>
+  it.effect("write the stub to .adamantite/rules and its test to tests/", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext()
       const prompter = createPrompterTestContext()
@@ -22,9 +22,22 @@ describe("rule add", () => {
       expect(files.read(".adamantite/rules/no-process-env.ts")).toBe(
         toCustomRuleStub("no-process-env")
       )
+      expect(files.read(".adamantite/rules/tests/no-process-env.ts")).toBe(
+        toCustomRuleTestStub("no-process-env")
+      )
       expect(files.exists(".adamantite/rules/AGENTS.md")).toBe(false)
-      expect(prompter.logs.filter((log) => log.level === "success")).toStrictEqual([
-        { level: "success", message: "Wrote .adamantite/rules/no-process-env.ts." },
+      expect(prompter.logs).toStrictEqual([
+        {
+          level: "success",
+          message:
+            "Wrote .adamantite/rules/no-process-env.ts and .adamantite/rules/tests/no-process-env.ts.",
+        },
+        { level: "info", message: "Run the test with `adamantite rule test`." },
+        {
+          level: "info",
+          message:
+            '`custom()` from `adamantite/lint/custom` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells you how to write the rule and its test.',
+        },
       ])
     })
   )
@@ -41,14 +54,33 @@ describe("rule add", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(files.read("tooling/lint/rules/no-window.ts")).toBe(toCustomRuleStub("no-window"))
+      expect(files.read("tooling/lint/rules/tests/no-window.ts")).toBe(
+        toCustomRuleTestStub("no-window")
+      )
       expect(files.exists(".adamantite")).toBe(false)
     })
   )
 
-  it.effect("keep an existing rule", () =>
+  it.effect.each([
+    {
+      existing: [".adamantite/rules/no-process-env.ts"],
+      name: "keep an existing rule, and write no test",
+    },
+    {
+      existing: [".adamantite/rules/tests/no-process-env.ts"],
+      name: "keep an existing test, and write no rule",
+    },
+    {
+      existing: [
+        ".adamantite/rules/no-process-env.ts",
+        ".adamantite/rules/tests/no-process-env.ts",
+      ],
+      name: "keep an existing rule and test",
+    },
+  ])("$name", ({ existing }) =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
-        files: { ".adamantite/rules/no-process-env.ts": "export default {}\n" },
+        files: Object.fromEntries(existing.map((file) => [file, "// mine\n"])),
       })
 
       const exit = yield* runCommand(ruleCommand, ["add", "no-process-env"], {
@@ -58,8 +90,12 @@ describe("rule add", () => {
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
         _tag: "CustomRuleExists",
+        paths: existing.map((file) => `${files.root}/${file}`),
       })
-      expect(files.read(".adamantite/rules/no-process-env.ts")).toBe("export default {}\n")
+      expect(files.list()).toStrictEqual(existing)
+      expect(existing.map((file) => files.read(file))).toStrictEqual(
+        existing.map(() => "// mine\n")
+      )
     })
   )
 

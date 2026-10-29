@@ -80,10 +80,17 @@ export class CommandFailed extends Data.TaggedError("CommandFailed")<{
 }
 
 export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
-  path: string
+  /**
+   * The rule file, the test file, or both.
+   */
+  paths: readonly string[]
 }> {
   override get message() {
-    return `The custom rule \`${this.path}\` already exists. Choose another name or edit the file.`
+    const files = this.paths.map((path) => `\`${path}\``).join(" and ")
+
+    return this.paths.length === 1
+      ? `${files} already exists. Choose another name, or edit the file.`
+      : `${files} already exist. Choose another name, or edit the files.`
   }
 }
 

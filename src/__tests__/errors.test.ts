@@ -2,6 +2,7 @@ import type { ParseError } from "jsonc-parser"
 import { describe, expect, it } from "@effect/vitest"
 import { parse, printParseErrorCode } from "jsonc-parser"
 import {
+  CustomRuleExists,
   FailedToInstallDependency,
   FailedToInstallExtension,
   FailedToParseFile,
@@ -25,6 +26,22 @@ function createParseErrors(count: number): ParseError[] {
 }
 
 describe("errors", () => {
+  describe("CustomRuleExists", () => {
+    it("name the one file that exists", () => {
+      expect(new CustomRuleExists({ paths: ["rules/tests/no-foo.ts"] }).message).toBe(
+        "`rules/tests/no-foo.ts` already exists. Choose another name, or edit the file."
+      )
+    })
+
+    it("name each file that exists", () => {
+      expect(
+        new CustomRuleExists({ paths: ["rules/no-foo.ts", "rules/tests/no-foo.ts"] }).message
+      ).toBe(
+        "`rules/no-foo.ts` and `rules/tests/no-foo.ts` already exist. Choose another name, or edit the files."
+      )
+    })
+  })
+
   describe("FailedToParseFile", () => {
     it("use a fallback parse message when there are no parse errors", () => {
       const error = new FailedToParseFile({ errors: [], path: "foo.json" })

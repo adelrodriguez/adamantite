@@ -2,15 +2,17 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import process from "node:process"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
-import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
+import { toCustomRuleStub, toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/lint/custom.ts")
 const RULES_MODULE = join(REPO_ROOT, "presets/rules/index.ts")
+const TESTING_MODULE = join(REPO_ROOT, "presets/rules/testing.ts")
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(
@@ -48,6 +50,16 @@ function makeRule(message: string) {
     "})",
     "",
   ].join("\n")
+}
+
+/**
+ * The stub that rule add writes, with its import pointed at this checkout.
+ */
+function makeStub() {
+  return toCustomRuleStub("no-debugger-here").replace(
+    '"adamantite/rules"',
+    JSON.stringify(RULES_MODULE)
+  )
 }
 
 function makeConfig(customCall: string, imports: readonly string[] = []) {
@@ -119,6 +131,38 @@ describe("custom preset", () => {
     write("oxlint.config.ts", makeConfig("custom()"))
 
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
+  })
+
+  describe("the test that rule add writes", () => {
+    const testPath = ".adamantite/rules/tests/no-debugger-here.ts"
+
+    function writeRuleAndTest(rule: string) {
+      write(".adamantite/rules/no-debugger-here.ts", rule)
+      write(
+        testPath,
+        toCustomRuleTestStub("no-debugger-here").replace(
+          '"adamantite/rules/testing"',
+          JSON.stringify(TESTING_MODULE)
+        )
+      )
+
+      return spawnSync(process.execPath, ["--test", testPath], { cwd: project, encoding: "utf8" })
+    }
+
+    it("pass under node --test, and report each case by name", () => {
+      const result = writeRuleAndTest(makeStub())
+
+      expect(result.status, `${result.stdout}${result.stderr}`).toBe(0)
+      expect(result.stdout).toContain("✔ const value: number = 1")
+      expect(result.stdout).toContain("✔ debugger")
+    })
+
+    it("fail and name the case when the rule does not report the invalid code", () => {
+      const result = writeRuleAndTest(makeStub().replace("DebuggerStatement", "WithStatement"))
+
+      expect(result.status).toBe(1)
+      expect(result.stdout).toContain("✖ debugger")
+    })
   })
 
   it("apply severity overrides from the rules option", () => {

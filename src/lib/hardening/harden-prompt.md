@@ -49,7 +49,8 @@ This step is done when each area has its candidates or the note "none found".
 For each written standard from step 2 and each candidate from step 3, find out whether a tool already enforces it. Read the Oxlint config, the presets and plugins that it extends, its overrides, the custom rules, `tsconfig.json`, and the checks that the project runs in CI.
 
 - When you are not sure, lint a counterexample from step 3 where it is, and read whether the lint reports it.
-- To try a rule that is not on, run Oxlint with the project config, add the rule with `-D <rule>`, and pass the files that the standard applies to. The project config, its plugins, and its overrides stay in effect. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 5.
+- To try a native rule that is not on, run Oxlint with the project config, add the rule with `-D <rule>`, and pass the files that the standard applies to. The project config, its plugins, and its overrides stay in effect. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 5.
+- `-D` cannot turn on a rule from a JS plugin, such as a custom rule or an `adamantite/*` rule. Mark the trial of such a rule as not confirmed, and do not read a run without a report as evidence.
 - When no counterexample exists, mark the enforcement as not confirmed.
 - Drop each candidate that a tool enforces fully. When a tool enforces only part of a written standard, keep the other part as a candidate.
 

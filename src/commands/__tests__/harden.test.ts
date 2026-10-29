@@ -63,7 +63,8 @@ const REQUIRED_PHRASES = {
   "## 4. Drop what a tool already enforces": [
     "For each written standard from step 2 and each candidate from step 3",
     "lint a counterexample from step 3 where it is",
-    "run Oxlint with the project config, add the rule with `-D <rule>`",
+    "To try a native rule that is not on, run Oxlint with the project config, add the rule with `-D <rule>`",
+    "`-D` cannot turn on a rule from a JS plugin",
     "A report from a rule that only the trial turns on is not enforcement",
     "When a tool enforces only part of a written standard, keep the other part as a candidate.",
   ],

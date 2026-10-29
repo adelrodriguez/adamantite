@@ -48,22 +48,29 @@ export function splitWords(text: string): string[] {
 }
 
 /**
- * Whether `word` is `term` or a regular plural of it, such as `streaks`, `fixes`, `caches`, or
- * `entries`. A rule that turns plurals back into singulars cannot tell `caches` from `fixes`, so
- * the rule builds the plurals of the term instead.
+ * Whether `plural` is `word` or a regular plural of it, such as `streaks`, `fixes`, `caches`, or
+ * `entries`. Turning plurals back into singulars cannot tell `caches` from `fixes`, so the rule
+ * builds the plurals of the shorter word instead.
  */
-function isWordOf(word: string | undefined, term: string) {
+function isPluralOf(plural: string, word: string) {
   return (
-    word === term
-    || word === `${term}s`
-    || word === `${term}es`
-    || (term.endsWith("y") && word === `${term.slice(0, -1)}ies`)
+    plural === word
+    || plural === `${word}s`
+    || plural === `${word}es`
+    || (word.endsWith("y") && plural === `${word.slice(0, -1)}ies`)
   )
 }
 
 /**
- * Whether `words` holds `phrase` as a run of whole words. Each word of `words` can be the plural of
- * the word of `phrase`.
+ * Whether two words are the same word, in the singular or a regular plural. The glossary can list
+ * either form, such as `boundaries`.
+ */
+function isSameWord(left: string | undefined, right: string) {
+  return left !== undefined && (isPluralOf(left, right) || isPluralOf(right, left))
+}
+
+/**
+ * Whether `words` holds `phrase` as a run of whole words, in the singular or a regular plural.
  */
 export function hasPhrase(words: readonly string[], phrase: readonly string[]): boolean {
   if (phrase.length === 0) {
@@ -71,7 +78,7 @@ export function hasPhrase(words: readonly string[], phrase: readonly string[]): 
   }
 
   for (let start = 0; start + phrase.length <= words.length; start += 1) {
-    if (phrase.every((word, index) => isWordOf(words[start + index], word))) {
+    if (phrase.every((word, index) => isSameWord(words[start + index], word))) {
       return true
     }
   }

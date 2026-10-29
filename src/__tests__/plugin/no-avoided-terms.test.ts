@@ -184,6 +184,11 @@ describe("hasPhrase", () => {
     expect(hasPhrase(["cases"], ["case"])).toBe(true)
   })
 
+  it("match the singular of a plural term", () => {
+    expect(hasPhrase(["layer", "boundary"], ["boundaries"])).toBe(true)
+    expect(hasPhrase(["node", "module"], ["node", "modules"])).toBe(true)
+  })
+
   it("not match a longer word", () => {
     expect(hasPhrase(["modern"], ["mode"])).toBe(false)
     expect(hasPhrase(["habitual"], ["habit"])).toBe(false)

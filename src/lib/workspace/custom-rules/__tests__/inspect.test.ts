@@ -4,7 +4,11 @@ import {
   inspectRuleFile,
   isRuleFile,
 } from "#lib/workspace/custom-rules/inspect.ts"
-import { isRuleFile as isLoadedRuleFile } from "#presets/lint/custom.ts"
+import {
+  DEFAULT_DIRECTORY,
+  DEFAULT_PLUGIN_NAME,
+  isRuleFile as isLoadedRuleFile,
+} from "#presets/rules/folder.ts"
 
 const IMPORT = 'import custom from "adamantite/lint/custom"\n'
 
@@ -27,10 +31,10 @@ describe("isRuleFile", () => {
 })
 
 describe("findCustomRulesCalls", () => {
-  it("use the default folder and name for a call without options", () => {
+  it("use the default folder and name for a call without options, as custom() does", () => {
     expect(
       findCustomRulesCalls("oxlint.config.ts", `${IMPORT}export default { extends: [custom()] }`)
-    ).toStrictEqual([{ dir: ".adamantite/rules", name: "project" }])
+    ).toStrictEqual([{ dir: DEFAULT_DIRECTORY, name: DEFAULT_PLUGIN_NAME }])
   })
 
   it("read string literal options under the local import name", () => {

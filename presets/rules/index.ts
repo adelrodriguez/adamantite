@@ -1,7 +1,7 @@
 import type { Plugin, Rule } from "@oxlint/plugins"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { DEFAULT_PLUGIN_NAME, getRuleName, listRuleFiles } from "../lint/custom.ts"
+import { DEFAULT_PLUGIN_NAME, getRuleName, listRuleFiles } from "./folder.ts"
 
 // The authoring surface for custom rules. A rule file in `.adamantite/rules/` imports from here, so
 // it needs no other dependency. This module runs under whatever runtime executes oxlint in the

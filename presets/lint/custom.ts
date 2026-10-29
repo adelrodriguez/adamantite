@@ -1,9 +1,15 @@
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, extname, isAbsolute, join, resolve } from "node:path"
+import { dirname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { DummyRule, OxlintConfig } from "oxlint"
+import {
+  DEFAULT_DIRECTORY,
+  DEFAULT_PLUGIN_NAME,
+  getRuleName,
+  listRuleFiles,
+} from "../rules/folder.ts"
 
 // Custom rules are Oxlint rules that the target project writes in its own rules folder. `custom()`
 // runs while Oxlint loads the config. It lists the rule files, enables each one, and points Oxlint
@@ -18,35 +24,7 @@ import type { DummyRule, OxlintConfig } from "oxlint"
 const MODULE_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 const RULES_MODULE_URL = new URL(`../rules/index.${MODULE_EXTENSION}`, import.meta.url).href
 
-const DEFAULT_DIRECTORY = ".adamantite/rules"
 const CACHE_DIRECTORY = join("node_modules", ".cache", "adamantite")
-
-export const DEFAULT_PLUGIN_NAME = "project"
-
-const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts", ".ts"])
-
-export function getRuleName(file: string): string {
-  return file.slice(0, -extname(file).length)
-}
-
-/**
- * Whether a file in a rules folder is a rule: it has a JavaScript or TypeScript extension, is not a
- * declaration file, and does not start with `_`.
- */
-export function isRuleFile(name: string): boolean {
-  return (
-    RULE_FILE_EXTENSIONS.has(extname(name)) && !name.startsWith("_") && !/\.d\.m?ts$/.test(name)
-  )
-}
-
-/**
- * The rule files in a rules folder. Subfolders are not read, so helpers can also live there.
- */
-export function listRuleFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && isRuleFile(entry.name))
-    .map((entry) => entry.name)
-}
 
 export interface CustomRulesOptions {
   /**

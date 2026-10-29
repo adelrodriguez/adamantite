@@ -7,6 +7,7 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import hardenCommand from "#commands/harden.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import { getPackageVersion } from "#lib/shared/version.macro.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import {
   agentByCommand,
@@ -105,7 +106,23 @@ const REQUIRED_PHRASES = {
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
 
-const INSTALLED = manifest({ devDependencies: { adamantite: "1.0.0" } })
+// `node_modules` holds the Adamantite that runs the command.
+const ADAMANTITE_MODULE = {
+  "node_modules/adamantite/package.json": JSON.stringify({
+    name: "adamantite",
+    version: getPackageVersion(),
+  }),
+}
+
+// Node.js resolves `adamantite/lint` to this file, as Oxlint loads the preset.
+const ADAMANTITE_RESOLUTION = {
+  "adamantite/lint": "node_modules/adamantite/dist/presets/lint/core.js",
+}
+
+const INSTALLED = {
+  ...ADAMANTITE_MODULE,
+  "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+}
 
 const CUSTOM_RULES_CONFIG = `import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
@@ -133,7 +150,10 @@ function runHarden(files: Record<string, string>, args: readonly string[] = []) 
       // The monorepo configs import the shared tooling package.
       layers: [
         prompter.layer,
-        makeModuleResolverLayer(context.root, { "@acme/lint": "tooling/lint/index.ts" }),
+        makeModuleResolverLayer(context.root, {
+          "@acme/lint": "tooling/lint/index.ts",
+          ...ADAMANTITE_RESOLUTION,
+        }),
       ],
     })
 
@@ -145,7 +165,7 @@ const claudeAgent = agentByCommand("claude")
 
 // Doctor finds no applicable integration in a project that has only the adamantite package, so
 // the assessment after a session passes.
-const HEALTHY_FILES = { "package.json": INSTALLED }
+const HEALTHY_FILES = INSTALLED
 
 // A config that loads `.adamantite/rules`, with one rule test, so `rule test` has a test to run.
 const RULE_TEST_FILES = {
@@ -155,7 +175,7 @@ const RULE_TEST_FILES = {
     'dir: "tooling/rules", name: "acme"',
     'name: "acme"'
   ),
-  "package.json": INSTALLED,
+  ...INSTALLED,
 }
 
 const SUCCESS_LOG = {
@@ -179,12 +199,47 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
       copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
       isInteractive: Effect.succeed(true),
     })
+    const files = createFileSystemTestContext({ files: options.files ?? HEALTHY_FILES })
     const exit = yield* runCommand(hardenCommand, [], {
-      files: createFileSystemTestContext({ files: options.files ?? HEALTHY_FILES }),
-      layers: [prompter.layer, runner.layer, terminal],
+      files,
+      layers: [
+        prompter.layer,
+        runner.layer,
+        terminal,
+        makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
+      ],
     })
 
     return { copied, exit, prompter, runner }
+  })
+}
+
+// The project is a workspace package, and the package manager installs Adamantite in the parent
+// folder.
+function runHardenHoisted() {
+  return Effect.gen(function* () {
+    const prompter = createPrompterTestContext()
+    const context = createFileSystemTestContext({
+      files: {
+        "../node_modules/adamantite/dist/presets/lint/core.js": "export default {}\n",
+        "../node_modules/adamantite/package.json": JSON.stringify({
+          name: "adamantite",
+          version: getPackageVersion(),
+        }),
+        "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+      },
+    })
+    const exit = yield* runCommand(hardenCommand, [], {
+      files: context,
+      layers: [
+        prompter.layer,
+        makeModuleResolverLayer(context.root, {
+          "adamantite/lint": "../node_modules/adamantite/dist/presets/lint/core.js",
+        }),
+      ],
+    })
+
+    return { exit, prompter }
   })
 }
 
@@ -201,6 +256,7 @@ function runHardenPrompt(files: Record<string, string>, args: readonly string[] 
 
 // The root and `web` load the rules of a shared tooling package, and `api` has its own rules folder.
 const MONOREPO_FILES = {
+  ...ADAMANTITE_MODULE,
   "AGENTS.md": "# AGENTS.md\n",
   "oxlint.config.ts": `import { defineConfig } from "oxlint"
 import tooling from "@acme/lint"
@@ -244,7 +300,7 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, prompter } = yield* runHarden({
         "oxlint.config.ts": CORE_CONFIG,
-        "package.json": INSTALLED,
+        ...INSTALLED,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -275,7 +331,7 @@ describe("harden", () => {
         "AGENTS.md": "# AGENTS.md\n",
         "docs/adr/0001-use-adamantite.md": "# Use Adamantite\n",
         "oxlint.config.ts": CUSTOM_RULES_CONFIG,
-        "package.json": INSTALLED,
+        ...INSTALLED,
       })
 
       expect(getListItems(getSection(prompt, "### Oxlint config"))).toStrictEqual([
@@ -295,7 +351,7 @@ describe("harden", () => {
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
         "oxlint.config.ts": CORE_CONFIG,
-        "package.json": INSTALLED,
+        ...INSTALLED,
       })
       const rulesFolders = getSection(prompt, "### Rules folders")
 
@@ -307,7 +363,7 @@ describe("harden", () => {
 
   it.effect("defer adamantite init to the approval when no Oxlint config exists", () =>
     Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt({ "package.json": INSTALLED })
+      const prompt = yield* runHardenPrompt(INSTALLED)
 
       expect(
         getMissingPhrases(getSection(prompt, "### Oxlint config"), [
@@ -321,7 +377,7 @@ describe("harden", () => {
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
         "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace("tooling/rules", "rules/{{version}}"),
-        "package.json": INSTALLED,
+        ...INSTALLED,
       })
 
       expect(getListItems(getSection(prompt, "### Rules folders"))).toStrictEqual([
@@ -334,7 +390,7 @@ describe("harden", () => {
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
         "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace('dir: "tooling/rules"', "dir: rulesDir"),
-        "package.json": INSTALLED,
+        ...INSTALLED,
       })
 
       expect(getSection(prompt, "### Rules folders")).toContain("`oxlint.config.ts`")
@@ -347,7 +403,7 @@ describe("harden", () => {
       Effect.gen(function* () {
         const prompt = yield* runHardenPrompt({
           "oxlint.config.ts": CORE_CONFIG,
-          "package.json": INSTALLED,
+          ...INSTALLED,
         })
         const missing = Object.entries(REQUIRED_PHRASES).flatMap(([heading, phrases]) =>
           getMissingPhrases(getSection(prompt, heading), phrases).map(
@@ -369,6 +425,68 @@ describe("harden", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.messages).toStrictEqual([
         "`adamantite` is not installed in this project. Install it before running `adamantite harden`.",
+      ])
+    })
+  )
+
+  it.effect("fail when Adamantite is in package.json but not in node_modules", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden({
+        "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([
+        "`adamantite` is in `package.json` but not in `node_modules`. Install the dependencies before running `adamantite harden`.",
+      ])
+    })
+  )
+
+  it.effect("fail when node_modules holds another Adamantite version than the one that runs", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden({
+        ...INSTALLED,
+        "node_modules/adamantite/package.json": JSON.stringify({
+          name: "adamantite",
+          version: "0.0.1",
+        }),
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([
+        `This project installs Adamantite 0.0.1, but this command is Adamantite ${getPackageVersion()}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`,
+      ])
+    })
+  )
+
+  it.effect("print the prompt when the package manager hoists Adamantite to a parent folder", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHardenHoisted()
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.messages[0]).toContain("# Adamantite harden")
+    })
+  )
+
+  it.effect("print the prompt in the Adamantite repository, which does not depend on itself", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        "package.json": JSON.stringify({ name: "adamantite", version: getPackageVersion() }),
+      })
+
+      expect(prompt).toContain("# Adamantite harden")
+    })
+  )
+
+  it.effect("fail in an Adamantite checkout of another version than the one that runs", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden({
+        "package.json": JSON.stringify({ name: "adamantite", version: "0.0.1" }),
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([
+        `This project installs Adamantite 0.0.1, but this command is Adamantite ${getPackageVersion()}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`,
       ])
     })
   )
@@ -634,6 +752,7 @@ describe("harden", () => {
       const { exit, prompter } = yield* runInteractiveHarden({
         // Knip is installed without its managed config, so Doctor reports one finding.
         files: {
+          ...ADAMANTITE_MODULE,
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
@@ -661,7 +780,7 @@ describe("harden", () => {
         // Doctor cannot read a `dir` that is not a string literal, so it warns without a finding.
         files: {
           "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace('dir: "tooling/rules"', "dir: rulesDir"),
-          "package.json": INSTALLED,
+          ...INSTALLED,
         },
         prompter: { selectResponses: [claudeAgent] },
       })

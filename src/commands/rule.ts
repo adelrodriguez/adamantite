@@ -6,9 +6,14 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { parseSync } from "oxc-parser"
+import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { FailedToParseSource } from "#lib/shared/errors.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
-import { addCustomRule, CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
+import {
+  addCustomRule,
+  CUSTOM_RULES_DIRECTORY,
+  listCustomRuleTests,
+} from "#lib/workspace/custom-rules/index.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 const astFile = Argument.File("file", { mustExist: true }).pipe(
@@ -51,24 +56,67 @@ const dir = Flag.String("dir").pipe(
 
 const add = Command.make("add", { dir, name: ruleName }).pipe(
   Command.withDescription(
-    "Write a custom rule stub. The Adamantite skill has the authoring guidance"
+    "Write a custom rule stub and its test. The Adamantite skill has the authoring guidance"
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
       const path = yield* Path.Path
       const cwd = process.cwd()
-      const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
+      const { rulePath, testPath } = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
-      yield* prompter.log.success(`Wrote ${path.relative(cwd, rulePath)}.`)
+      yield* prompter.log.success(
+        `Wrote ${path.relative(cwd, rulePath)} and ${path.relative(cwd, testPath)}.`
+      )
+      yield* prompter.log.info("Run the test with `adamantite rule test`.")
       yield* prompter.log.info(
-        '`custom()` from `adamantite/lint/custom` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells you how to write the rule.'
+        '`custom()` from `adamantite/lint/custom` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells you how to write the rule and its test.'
       )
     })
   )
 )
 
+const test = Command.make("test").pipe(
+  Command.withDescription(
+    "Run the tests of the custom rules with `node --test`. `rule add` writes a test with each rule"
+  ),
+  Command.withHandler(() =>
+    Effect.gen(function* () {
+      const prompter = yield* Prompter
+      const path = yield* Path.Path
+      const runner = yield* CommandRunner
+      const cwd = process.cwd()
+      const { tests, unresolvedCalls, unresolvedImports } = yield* listCustomRuleTests(cwd)
+
+      for (const source of unresolvedCalls) {
+        yield* prompter.log.warning(
+          `\`rule test\` cannot read the \`dir\` of a \`custom()\` call in \`${path.relative(cwd, source)}\`, because it is not a string literal. It does not run the tests of that rules folder.`
+        )
+      }
+
+      for (const { from, specifier } of unresolvedImports) {
+        yield* prompter.log.warning(
+          `\`rule test\` cannot resolve the import of \`${specifier}\` in \`${path.relative(cwd, from)}\`, so it does not run the tests of the rules folders behind it.`
+        )
+      }
+
+      if (tests.length === 0) {
+        return yield* prompter.log.info(
+          "No custom rule tests found. `adamantite rule add <name>` writes a rule and its test."
+        )
+      }
+
+      // RuleTester runs only on Node.js, so the tests run under Node.js, also in a Bun project.
+      yield* runner.run({
+        args: ["--test", ...tests.map((file) => path.relative(cwd, file))],
+        command: "node",
+        title: "🧪 Testing custom rules",
+      })
+    })
+  )
+)
+
 export default Command.make("rule").pipe(
-  Command.withDescription("Write and inspect custom Oxlint rules"),
-  Command.withSubcommands([add, ast])
+  Command.withDescription("Write, inspect, and test custom Oxlint rules"),
+  Command.withSubcommands([add, ast, test])
 )

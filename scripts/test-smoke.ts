@@ -116,6 +116,29 @@ function assertFileContains(path: string, expected: string) {
   }
 }
 
+/**
+ * Write a custom rule and its test with `adamantite rule add`, and run the test with `adamantite
+ * rule test`. Then break the rule, and expect `rule test` to fail and name the case that broke.
+ */
+function addRuleAndRunTest(cwd: string, env: NodeJS.ProcessEnv) {
+  const rulePath = join(cwd, ".adamantite", "rules", "no-smoke.ts")
+
+  assertIncludes(
+    run(process.execPath, [cliPath, "rule", "add", "no-smoke"], { cwd, env }),
+    "Run the test with `adamantite rule test`."
+  )
+  assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
+
+  const rule = readFileSync(rulePath, "utf8")
+
+  writeFileSync(rulePath, rule.replace("DebuggerStatement", "WithStatement"))
+  assertIncludes(
+    runExpectingFailure(process.execPath, [cliPath, "rule", "test"], { cwd, env }).output,
+    "✖ debugger"
+  )
+  writeFileSync(rulePath, rule)
+}
+
 // The fixture uses npm and the monorepo fixture uses pnpm, so the smoke test covers both
 // package managers.
 const npmVersion = run("npm", ["--version"], { cwd: repoRoot }).trim()
@@ -191,6 +214,15 @@ try {
     PATH: `${join(fixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
   }
 
+  console.info("Running `adamantite rule add` and `adamantite rule test`...")
+  addRuleAndRunTest(fixture, fixtureEnv)
+
+  if (readFileSync(join(fixture, "package.json"), "utf8").includes('"@types/node"')) {
+    throw new Error("Expected the fixture to have no @types/node, so check proves the rule test.")
+  }
+
+  // The fixture has no `@types/node`, so `check` also proves that the rule test passes type-aware
+  // lint without it, and `analyze` proves that Knip does not report the rule and its test.
   for (const command of ["fix", "check", "analyze"]) {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
@@ -284,6 +316,9 @@ try {
   }
 
   assertFileContains(join(monorepoFixture, "packages", "second", "package.json"), '"7.0.0"')
+
+  console.info("Running `adamantite rule add` and `adamantite rule test` in the monorepo...")
+  addRuleAndRunTest(monorepoFixture, monorepoEnv)
 
   // Doctor resolves config imports with the real resolver. The root config loads a shared tooling
   // package through an `exports` subpath, so Doctor reaches its rules folder only by following the

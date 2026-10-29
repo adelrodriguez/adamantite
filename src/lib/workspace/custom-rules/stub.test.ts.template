@@ -1,0 +1,10 @@
+import { RuleTester } from "adamantite/rules/testing"
+import rule from "../{{name}}.ts"
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+
+// `adamantite rule test` runs this file with `node --test`.
+tester.run("{{name}}", rule, {
+  invalid: [{ code: "debugger", errors: [{ messageId: "unexpected" }] }],
+  valid: ["const value: number = 1"],
+})

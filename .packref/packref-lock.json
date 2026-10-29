@@ -115,6 +115,16 @@
       },
       "tracking": "manual",
       "version": "11.24.2"
+    },
+    {
+      "name": "oxlint",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxlint/-/oxlint-1.88.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "1.88.0"
     }
   ]
 }

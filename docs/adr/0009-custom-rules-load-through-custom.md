@@ -50,7 +50,18 @@ repeat them against the pinned Oxlint:
   changes.
 - Doctor cannot follow a `dir` or `name` that is not a string literal. It reports a warning
   and does not check that folder.
-- Adamantite does not scaffold or run rule tests. The guidance points to `RuleTester` from
-  `oxlint/plugins-dev`.
+- Adamantite scaffolds rule tests and runs them with `adamantite rule test`, not with `check`,
+  which stays Oxfmt plus Oxlint (2026-10-28, issue #525). A broken rule otherwise fails
+  silently: Oxlint loads it, it reports nothing, and `check` passes. `rule add` writes
+  `tests/<name>.ts` in the rules folder. `custom()` does not read subfolders, and the default
+  Vitest and Jest patterns do not match the file, so neither loads it.
+- `rule test` runs the tests with `node --test`, not with the project's test runner. Spikes
+  against Oxlint 1.88 showed that `RuleTester` refuses Bun and that Jest in CommonJS mode
+  cannot load `oxlint/plugins-dev`. The CLI runs on Node.js, so `node --test` works in every
+  project that runs Adamantite.
+- `adamantite/rules/testing` re-exports `RuleTester` from `oxlint/plugins-dev` and connects it
+  to `node:test`, so a test needs one import and each case reports by name. Its declarations
+  export only `RuleTester`, so a type-aware lint run needs no `@types/node`. It imports
+  `oxlint` at run time, so `oxlint` is an optional peer dependency.
 - Read-only installs, such as some CI sandboxes and Yarn Plug'n'Play, use the temporary
   directory. That path is not tested.

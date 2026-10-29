@@ -41,8 +41,9 @@ _Avoid_: Composition layer, entrypoint
 
 **Custom rule**:
 An Oxlint rule that the target project writes in a rules folder. The target project owns
-its correctness and its tests. Adamantite owns the wiring and the authoring guidance. Use
-"plugin" only for the Oxlint `jsPlugins` entry that loads the rules.
+its correctness and the cases of its test. Adamantite owns the wiring, the authoring guidance,
+and the test scaffold, and runs the tests with `adamantite rule test`. Use "plugin" only for
+the Oxlint `jsPlugins` entry that loads the rules.
 _Avoid_: Custom plugin, project plugin, first-party rule
 
 **Rules folder**:

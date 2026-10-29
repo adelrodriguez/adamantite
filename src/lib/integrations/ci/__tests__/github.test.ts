@@ -1,9 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Yaml from "effect/encoding/Yaml"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
+import * as Schema from "effect/Schema"
+import * as Struct from "effect/Struct"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import github from "#lib/integrations/ci/github.ts"
@@ -70,11 +73,70 @@ function provideAssessment(files: FileSystemTestContext, packageManager: "deno" 
   )
 }
 
-function getMatrixJobs(workflow: string) {
-  return Array.from(workflow.matchAll(/- name: (.+)\n\s+command: (.+)/g), ([, name, command]) => ({
-    command,
-    name,
-  }))
+// A workflow with one job that runs these steps.
+function makeWorkflow(...steps: string[]) {
+  return [
+    "on: push",
+    "jobs:",
+    "  verify:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    ...steps.map((line) => `      ${line}`),
+    "",
+  ].join("\n")
+}
+
+// A workflow with one job that runs `${{ matrix.command }}` for these matrix entries.
+function makeMatrixWorkflow(...entries: Array<{ command: string; name: string }>) {
+  return [
+    "on: push",
+    "jobs:",
+    "  verify:",
+    "    runs-on: ubuntu-latest",
+    "    strategy:",
+    "      matrix:",
+    "        include:",
+    ...entries.flatMap(({ command, name }) => [
+      `          - name: ${name}`,
+      `            command: ${command}`,
+    ]),
+    "    steps:",
+    `      - run: \${{ matrix.command }}`,
+    "",
+  ].join("\n")
+}
+
+const GeneratedWorkflow = Schema.Struct({
+  jobs: Schema.Struct({
+    verify: Schema.Struct({
+      steps: Schema.Array(
+        Schema.Struct({
+          name: Schema.String,
+          run: Schema.optionalKey(Schema.String),
+          uses: Schema.optionalKey(Schema.String),
+          with: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+        })
+      ),
+      strategy: Schema.Struct({
+        matrix: Schema.Struct({
+          include: Schema.Array(Schema.Struct({ command: Schema.String, name: Schema.String })),
+        }),
+      }),
+    }),
+  }),
+})
+
+function readGeneratedWorkflow(files: FileSystemTestContext) {
+  return Schema.decodeUnknownSync(GeneratedWorkflow)(Yaml.parse(files.read(WORKFLOW_PATH))).jobs
+    .verify
+}
+
+function getMatrixJobs(files: FileSystemTestContext) {
+  return readGeneratedWorkflow(files).strategy.matrix.include
+}
+
+function getSetupNodeInputs(files: FileSystemTestContext) {
+  return readGeneratedWorkflow(files).steps.find((step) => step.name === "Setup Node.js")?.with
 }
 
 function provideFileResolver(files: FileSystemTestContext) {
@@ -111,10 +173,8 @@ function expectNodeVersionFileWorkflow(packageManager: "bun" | "npm" | "pnpm" | 
       })
       .pipe(provideFileResolver(files))
 
-    const content = files.read(WORKFLOW_PATH)
-    expect(content).toContain("Setup Node.js")
-    expect(content).toContain('node-version-file: ".node-version"')
-    expect(content).not.toContain('node-version: "')
+    expect(getSetupNodeInputs(files)).toMatchObject({ "node-version-file": ".node-version" })
+    expect(getSetupNodeInputs(files)).not.toHaveProperty("node-version")
   })
 }
 
@@ -125,7 +185,12 @@ describe("github", () => {
     it.effect("report hard-coded Node.js and a missing check command", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: 'node-version: "22"\nrun: pnpm format\n',
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- uses: actions/setup-node@v7",
+            "  with:",
+            '    node-version: "22"',
+            "- run: pnpm format"
+          ),
         })
         const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
 
@@ -156,12 +221,15 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           [WORKFLOW_PATH]: [
-            "# run check in CI",
+            "# run: pnpm run check",
+            "on: push",
             "jobs:",
             "  check-types:",
             "    name: check",
+            "    runs-on: ubuntu-latest",
             "    steps:",
-            "      - run: pnpm run format",
+            "      - name: pnpm run check",
+            "        run: pnpm run format",
           ].join("\n"),
         })
         const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
@@ -177,11 +245,19 @@ describe("github", () => {
       })
     )
 
-    it.effect("accept a package-manager check command", () =>
+    it.effect.each([
+      { name: "a block step", workflow: makeWorkflow("- run: pnpm run check") },
+      {
+        name: "a flow step",
+        workflow: makeWorkflow("- { name: Check, run: pnpm run check }"),
+      },
+      {
+        name: "a matrix entry",
+        workflow: makeMatrixWorkflow({ command: "pnpm run check", name: "check" }),
+      },
+    ])("accept a package-manager check command in $name", ({ workflow }) =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          [WORKFLOW_PATH]: "steps:\n  - run: pnpm run check\n",
-        })
+        const files = makeFiles({ [WORKFLOW_PATH]: workflow })
 
         expect(
           yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
@@ -194,12 +270,11 @@ describe("github", () => {
     it.effect("accept a check command in a run block scalar", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "steps:",
-            "  - run: |2-  ",
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- run: |2-  ",
             "      pnpm install --frozen-lockfile",
-            "      pnpm --filter app run check",
-          ].join("\n"),
+            "      pnpm --filter app run check"
+          ),
         })
 
         expect(
@@ -213,14 +288,10 @@ describe("github", () => {
     it.effect("report a legacy format step in a generated matrix entry", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "matrix:",
-            "  include:",
-            "    - name: check",
-            "      command: pnpm run check",
-            "    - name: format",
-            "      command: pnpm run format --check",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeMatrixWorkflow(
+            { command: "pnpm run check", name: "check" },
+            { command: "pnpm run format --check", name: "format" }
+          ),
         })
 
         expect(
@@ -235,14 +306,10 @@ describe("github", () => {
     it.effect("report a legacy monorepo step in a generated matrix entry", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "matrix:",
-            "  include:",
-            "    - name: check",
-            "      command: pnpm run check",
-            "    - name: monorepo",
-            "      command: pnpm run check:monorepo",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeMatrixWorkflow(
+            { command: "pnpm run check", name: "check" },
+            { command: "pnpm run check:monorepo", name: "monorepo" }
+          ),
         })
 
         expect(
@@ -257,12 +324,11 @@ describe("github", () => {
     it.effect("report a legacy step that runs adamantite monorepo directly", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "steps:",
-            "  - run: |",
-            "      pnpm run check",
-            "      pnpm exec adamantite monorepo -- -i react",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- run: |",
+            "    pnpm run check",
+            "    pnpm exec adamantite monorepo -- -i react"
+          ),
         })
 
         expect(
@@ -276,11 +342,7 @@ describe("github", () => {
     it.effect("report a legacy step that runs the fix:monorepo script", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "steps:",
-            "  - run: pnpm run check",
-            "  - run: npm run fix:monorepo",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check", "- run: npm run fix:monorepo"),
         })
 
         expect(
@@ -294,11 +356,10 @@ describe("github", () => {
     it.effect("not report a monorepo step for the analyze command", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "steps:",
-            "  - run: pnpm run check",
-            "  - run: pnpm exec adamantite analyze --only monorepo",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- run: pnpm run check",
+            "- run: pnpm exec adamantite analyze --only monorepo"
+          ),
         })
 
         expect(
@@ -312,12 +373,11 @@ describe("github", () => {
     it.effect("report a legacy format step that passes --check through npm", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "steps:",
-            "  - run: |",
-            "      npm run check",
-            "      npm run format -- --check",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- run: |",
+            "    npm run check",
+            "    npm run format -- --check"
+          ),
         })
 
         expect(
@@ -331,7 +391,12 @@ describe("github", () => {
     it.effect("report a legacy format step together with an outdated workflow", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: 'node-version: "22"\nrun: pnpm run format --check\n',
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- uses: actions/setup-node@v7",
+            "  with:",
+            '    node-version: "22"',
+            "- run: pnpm run format --check"
+          ),
         })
 
         expect(
@@ -342,15 +407,18 @@ describe("github", () => {
       })
     )
 
-    it.effect("ignore a format command that does not pass --check", () =>
+    it.effect("ignore a format command that does not pass --check, and commented-out lines", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [WORKFLOW_PATH]: [
-            "# pnpm run format --check",
-            "steps:",
-            "  - run: pnpm run check",
-            "  - run: pnpm run format",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeWorkflow(
+            "# - run: pnpm run format --check",
+            "- uses: actions/setup-node@v7",
+            "  with:",
+            '    # node-version: "22"',
+            '    node-version-file: ".nvmrc"',
+            "- run: pnpm run check",
+            "- run: pnpm run format"
+          ),
         })
 
         expect(
@@ -365,7 +433,7 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           ...RULE_TEST_FILES,
-          [WORKFLOW_PATH]: "steps:\n  - run: pnpm run check\n",
+          [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check"),
         })
         const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
 
@@ -392,7 +460,7 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           ...RULE_TEST_FILES,
-          [WORKFLOW_PATH]: "steps:\n  - run: deno task check\n",
+          [WORKFLOW_PATH]: makeWorkflow("- run: deno task check"),
         })
         const result = yield* github
           .assess(ROOT, packageJson)
@@ -414,16 +482,18 @@ describe("github", () => {
     it.effect.each([
       {
         name: "a double-quoted run",
-        workflow: 'steps:\n  - run: pnpm run check\n  - run: "pnpm exec adamantite rule test"\n',
+        workflow: makeWorkflow("- run: pnpm run check", '- run: "pnpm exec adamantite rule test"'),
       },
       {
         name: "a single-quoted run",
-        workflow: "steps:\n  - run: pnpm run check\n  - run: 'pnpm exec adamantite rule test'\n",
+        workflow: makeWorkflow("- run: pnpm run check", "- run: 'pnpm exec adamantite rule test'"),
       },
       {
         name: "a quoted matrix command",
-        workflow:
-          '- name: check\n  command: "pnpm run check"\n- name: rule test\n  command: "pnpm exec adamantite rule test"\n',
+        workflow: makeMatrixWorkflow(
+          { command: '"pnpm run check"', name: "check" },
+          { command: '"pnpm exec adamantite rule test"', name: "rule test" }
+        ),
       },
     ])("accept a rule test command in $name", ({ workflow }) =>
       Effect.gen(function* () {
@@ -441,7 +511,7 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           ...RULE_TEST_FILES,
-          [WORKFLOW_PATH]: "steps:\n  - run: pnpm install\n",
+          [WORKFLOW_PATH]: makeWorkflow("- run: pnpm install"),
         })
         const result = yield* github
           .assess(ROOT, { name: "app", version: "1.0.0" })
@@ -469,12 +539,11 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           ...RULE_TEST_FILES,
-          [WORKFLOW_PATH]: [
-            "steps:",
-            "  - run: |",
-            "      pnpm run check",
-            "      pnpm exec adamantite rule test",
-          ].join("\n"),
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- run: |",
+            "    pnpm run check",
+            "    pnpm exec adamantite rule test"
+          ),
         })
 
         expect(
@@ -489,7 +558,12 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           ...RULE_FILES,
-          [WORKFLOW_PATH]: 'node-version: "22"\nrun: pnpm run check\n',
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- uses: actions/setup-node@v7",
+            "  with:",
+            '    node-version: "22"',
+            "- run: pnpm run check"
+          ),
         })
         const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
 
@@ -500,9 +574,60 @@ describe("github", () => {
       })
     )
 
+    it.effect("read the steps of a job beside a job whose matrix is an expression", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: [
+            "on: push",
+            "jobs:",
+            "  test:",
+            "    runs-on: ubuntu-latest",
+            "    strategy:",
+            `      matrix: \${{ fromJSON(needs.setup.outputs.matrix) }}`,
+            "    steps:",
+            "      - run: pnpm test",
+            "  verify:",
+            "    runs-on: ubuntu-latest",
+            "    steps:",
+            "      - run: pnpm run check",
+          ].join("\n"),
+        })
+
+        expect(
+          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        ).toMatchObject({
+          findings: [],
+        })
+      })
+    )
+
+    it.effect("report a workflow that does not parse as a workflow that runs nothing", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: "jobs:\n  verify:\n    steps: [\n      run: pnpm run check\n",
+        })
+        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+
+        expect(result).toMatchObject({
+          findings: [
+            {
+              currentState: "The workflow does not run the managed `check` script.",
+              id: "outdated-adamantite-workflow",
+            },
+          ],
+        })
+      })
+    )
+
     it.effect("warn when an off-ideal workflow cannot be regenerated", () =>
       Effect.gen(function* () {
-        const files = makeFiles({ [WORKFLOW_PATH]: 'node-version: "22"\n' })
+        const files = makeFiles({
+          [WORKFLOW_PATH]: makeWorkflow(
+            "- uses: actions/setup-node@v7",
+            "  with:",
+            '    node-version: "22"'
+          ),
+        })
         const result = yield* github.assess(ROOT, {}).pipe(provideAssessment(files))
 
         expect(result).toMatchObject({
@@ -517,61 +642,123 @@ describe("github", () => {
   describe("create", () => {
     it.effect.each([
       {
-        actions: ["actions/checkout", "actions/setup-node", "oven-sh/setup-bun", "actions/cache"],
-        cache: null,
-        command: "bun run check",
-        install: "bun install --frozen-lockfile",
         packageManager: "bun",
+        steps: [
+          { name: "Checkout", uses: "actions/checkout" },
+          { name: "Setup Node.js", uses: "actions/setup-node", with: { "node-version": "lts/*" } },
+          { name: "Setup Bun", uses: "oven-sh/setup-bun" },
+          {
+            name: "Cache dependencies",
+            uses: "actions/cache",
+            with: {
+              key: `\${{ runner.os }}-bun-\${{ hashFiles('bun.lock') }}`,
+              path: "~/.bun/install/cache\nnode_modules\n",
+              "restore-keys": `\${{ runner.os }}-bun-\n`,
+            },
+          },
+          { name: "Install dependencies", run: "bun install --frozen-lockfile" },
+        ],
       },
       {
-        actions: ["actions/checkout", "actions/setup-node"],
-        cache: "npm",
-        command: "npm run check",
-        install: "npm ci",
-        packageManager: "npm",
-      },
-      {
-        actions: ["actions/checkout", "pnpm/action-setup", "actions/setup-node"],
-        cache: "pnpm",
-        command: "pnpm run check",
-        install: "pnpm install --frozen-lockfile",
-        packageManager: "pnpm",
-      },
-      {
-        actions: ["actions/checkout", "actions/setup-node"],
-        cache: "yarn",
-        command: "yarn run check",
-        install: "yarn install --frozen-lockfile",
-        packageManager: "yarn",
-      },
-      {
-        actions: ["actions/checkout", "denoland/setup-deno"],
-        cache: null,
-        command: "deno task check",
-        install: "deno install --frozen",
         packageManager: "deno",
+        steps: [
+          { name: "Checkout", uses: "actions/checkout" },
+          { name: "Setup Deno", uses: "denoland/setup-deno" },
+          { name: "Install dependencies", run: "deno install --frozen" },
+        ],
       },
-    ] as const)("set up $packageManager and run its check command", (expected) =>
+      {
+        packageManager: "npm",
+        steps: [
+          { name: "Checkout", uses: "actions/checkout" },
+          {
+            name: "Setup Node.js",
+            uses: "actions/setup-node",
+            with: { cache: "npm", "node-version": "lts/*" },
+          },
+          { name: "Install dependencies", run: "npm ci" },
+        ],
+      },
+      {
+        packageManager: "pnpm",
+        steps: [
+          { name: "Checkout", uses: "actions/checkout" },
+          { name: "Setup pnpm", uses: "pnpm/action-setup" },
+          {
+            name: "Setup Node.js",
+            uses: "actions/setup-node",
+            with: { cache: "pnpm", "node-version": "lts/*" },
+          },
+          { name: "Install dependencies", run: "pnpm install --frozen-lockfile" },
+        ],
+      },
+      {
+        packageManager: "yarn",
+        steps: [
+          { name: "Checkout", uses: "actions/checkout" },
+          {
+            name: "Setup Node.js",
+            uses: "actions/setup-node",
+            with: { cache: "yarn", "node-version": "lts/*" },
+          },
+          { name: "Install dependencies", run: "yarn install --frozen-lockfile" },
+        ],
+      },
+    ] as const)("set up $packageManager and run its check command", ({ packageManager, steps }) =>
       Effect.gen(function* () {
         const files = makeFiles()
 
         yield* github
-          .create(ROOT, { packageManager: expected.packageManager, scripts: ["check"] })
+          .create(ROOT, { packageManager, scripts: ["check"] })
           .pipe(provideFallback(files))
 
-        const workflow = files.read(WORKFLOW_PATH)
+        const workflow = readGeneratedWorkflow(files)
         expect({
-          actions: Array.from(workflow.matchAll(/uses: ([^@\s]+)@/g), ([, action]) => action),
-          cache: /cache: "(\w+)"/.exec(workflow)?.[1] ?? null,
-          install: /- name: Install dependencies\n\s+run: (.+)/.exec(workflow)?.[1],
-          jobs: getMatrixJobs(workflow),
-          run: /- name: Run .+\n\s+run: (.+)/.exec(workflow)?.[1],
+          include: workflow.strategy.matrix.include,
+          // The pin test checks the action versions.
+          steps: workflow.steps.map((step) =>
+            Struct.evolve(step, { uses: (uses) => uses?.replace(/@.+$/u, "") })
+          ),
         }).toStrictEqual({
-          actions: expected.actions,
-          cache: expected.cache,
-          install: expected.install,
-          jobs: [{ command: expected.command, name: "check" }],
-          run: `\${{ matrix.command }}`,
+          include: [
+            {
+              command:
+                packageManager === "deno" ? "deno task check" : `${packageManager} run check`,
+              name: "check",
+            },
+          ],
+          steps: [...steps, { name: `Run \${{ matrix.name }}`, run: `\${{ matrix.command }}` }],
+        })
+      })
+    )
+
+    it.effect("render the fixed workflow settings", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+
+        yield* github
+          .create(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(provideFallback(files))
+
+        expect(Yaml.parse(files.read(WORKFLOW_PATH))).toMatchObject({
+          concurrency: {
+            "cancel-in-progress": true,
+            group: `\${{ github.workflow }}-\${{ github.ref }}`,
+          },
+          jobs: {
+            verify: {
+              name: `\${{ matrix.name }}`,
+              "runs-on": "ubuntu-latest",
+              strategy: { "fail-fast": false },
+              "timeout-minutes": 10,
+            },
+          },
+          name: "adamantite",
+          on: {
+            pull_request: { types: ["opened", "synchronize", "reopened"] },
+            push: { branches: ["main"] },
+          },
+          permissions: { contents: "read" },
         })
       })
     )
@@ -622,7 +809,7 @@ describe("github", () => {
           })
           .pipe(provideFallback(files))
 
-        expect(getMatrixJobs(files.read(WORKFLOW_PATH))).toStrictEqual([
+        expect(getMatrixJobs(files)).toStrictEqual([
           { command: "bun run check", name: "check" },
           { command: "bun run analyze", name: "analyze" },
         ])
@@ -645,9 +832,7 @@ describe("github", () => {
             .create(ROOT, { packageManager, scripts: ["check", "analyze"] })
             .pipe(provideFallback(files))
 
-          expect(getMatrixJobs(files.read(WORKFLOW_PATH)).slice(2)).toStrictEqual([
-            { command, name: "rule test" },
-          ])
+          expect(getMatrixJobs(files).slice(2)).toStrictEqual([{ command, name: "rule test" }])
         })
     )
 
@@ -659,9 +844,7 @@ describe("github", () => {
           .create(ROOT, { packageManager: "pnpm", scripts: ["check"] })
           .pipe(provideFallback(files))
 
-        expect(getMatrixJobs(files.read(WORKFLOW_PATH))).toStrictEqual([
-          { command: "pnpm run check", name: "check" },
-        ])
+        expect(getMatrixJobs(files)).toStrictEqual([{ command: "pnpm run check", name: "check" }])
       })
     )
 
@@ -700,9 +883,14 @@ describe("github", () => {
           .create(ROOT, { packageManager: "deno", scripts: ["check"] })
           .pipe(provideFileResolver(files))
 
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain('node-version-file: ".node-version"')
-        expect(content.indexOf("Setup Node.js")).toBeLessThan(content.indexOf("Setup Deno"))
+        expect(readGeneratedWorkflow(files).steps.map((step) => step.name)).toStrictEqual([
+          "Checkout",
+          "Setup Node.js",
+          "Setup Deno",
+          "Install dependencies",
+          `Run \${{ matrix.name }}`,
+        ])
+        expect(getSetupNodeInputs(files)).toStrictEqual({ "node-version-file": ".node-version" })
       })
     )
 
@@ -717,9 +905,7 @@ describe("github", () => {
           })
           .pipe(provideFileResolver(files))
 
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).not.toContain("Setup Node.js")
-        expect(content).not.toContain("node-version")
+        expect(getSetupNodeInputs(files)).toBeUndefined()
       })
     )
   })
@@ -736,11 +922,10 @@ describe("github", () => {
           })
           .pipe(provideFallback(files))
 
-        const content = files.read(WORKFLOW_PATH)
-        expect(content).toContain("name: adamantite")
-        expect(content).toContain("name: check")
-        expect(content).toContain("verify:")
-        expect(content).not.toContain("Old Workflow")
+        expect(Yaml.parse(files.read(WORKFLOW_PATH))).toMatchObject({
+          jobs: { verify: { strategy: { matrix: { include: [{ name: "check" }] } } } },
+          name: "adamantite",
+        })
       })
     )
   })

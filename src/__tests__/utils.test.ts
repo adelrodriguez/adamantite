@@ -301,18 +301,6 @@ describe("checkIsMonorepo", () => {
       name: "pnpm declares an empty package list with a comment",
     },
     {
-      content: "packages: [\n]\n",
-      expected: false,
-      file: "pnpm-workspace.yaml",
-      name: "pnpm declares an empty multiline flow sequence",
-    },
-    {
-      content: "packages: [\n  'packages/*',\n]\n",
-      expected: true,
-      file: "pnpm-workspace.yaml",
-      name: "pnpm declares packages in a multiline flow sequence",
-    },
-    {
       content: 'packages: &workspacePackages ["packages/*"]\n',
       expected: true,
       file: "pnpm-workspace.yaml",

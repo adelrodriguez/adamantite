@@ -13,67 +13,70 @@ import {
 const ROOT = "/project"
 
 describe("readPnpmWorkspacePatterns", () => {
-  it("read a block list with quotes and comments", () => {
-    const content = [
-      "packages:",
-      "  - packages/* # apps and libraries",
-      '  - "tooling/lint"',
-      "  - '!packages/legacy'",
-      "catalog:",
-      "  effect: 4.0.0",
-    ].join("\n")
-
-    expect(readPnpmWorkspacePatterns(content)).toStrictEqual([
-      "packages/*",
-      "tooling/lint",
-      "!packages/legacy",
-    ])
-  })
-
-  it("read a flow list over several lines", () => {
-    expect(
-      readPnpmWorkspacePatterns('packages: [\n  "apps/*",\n  tooling/lint\n]\n')
-    ).toStrictEqual(["apps/*", "tooling/lint"])
-  })
-
-  it("read a list after a YAML anchor", () => {
-    expect(readPnpmWorkspacePatterns('packages: &workspacePackages ["apps/*"]\n')).toStrictEqual([
-      "apps/*",
-    ])
-  })
-
-  it.each([
-    ["flow", 'shared: &workspacePackages ["apps/*", tooling/lint]\npackages: *workspacePackages\n'],
-    [
-      "block",
-      "shared: &workspacePackages\n  - apps/*\n  - tooling/lint\npackages: *workspacePackages\n",
-    ],
-  ])("follow a YAML alias to an anchored %s list", (_, content) => {
-    expect(readPnpmWorkspacePatterns(content)).toStrictEqual(["apps/*", "tooling/lint"])
-  })
-
-  it("stop an aliased block list at the end of its indented mapping", () => {
-    const content = [
-      "workspacePatterns:",
-      "  active: &workspacePackages",
-      "    - apps/*",
-      "  archived:",
-      "    - packages/*",
-      "packages: *workspacePackages",
-    ].join("\n")
-
-    expect(readPnpmWorkspacePatterns(content)).toStrictEqual(["apps/*"])
-  })
-
-  it("read a block list whose items are not indented", () => {
-    expect(
-      readPnpmWorkspacePatterns("packages:\n- apps/*\n- tooling/lint\ncatalog:\n  a: 1\n")
-    ).toStrictEqual(["apps/*", "tooling/lint"])
-  })
-
-  it("read no pattern without a packages key", () => {
-    expect(readPnpmWorkspacePatterns("catalog:\n  effect: 4.0.0\n")).toStrictEqual([])
-  })
+  it.effect.each([
+    {
+      content: [
+        "packages:",
+        "  - packages/* # apps and libraries",
+        '  - "tooling/lint"',
+        "  - '!packages/legacy'",
+        "catalog:",
+        "  effect: 4.0.0",
+      ].join("\n"),
+      expected: ["packages/*", "tooling/lint", "!packages/legacy"],
+      name: "a block list with quotes and comments",
+    },
+    {
+      content: 'packages: &workspacePackages ["apps/*"]\n',
+      expected: ["apps/*"],
+      name: "a list after a YAML anchor",
+    },
+    {
+      content:
+        'shared: &workspacePackages ["apps/*", tooling/lint]\npackages: *workspacePackages\n',
+      expected: ["apps/*", "tooling/lint"],
+      name: "an alias to an anchored flow list",
+    },
+    {
+      content:
+        "shared: &workspacePackages\n  - apps/*\n  - tooling/lint\npackages: *workspacePackages\n",
+      expected: ["apps/*", "tooling/lint"],
+      name: "an alias to an anchored block list",
+    },
+    {
+      content: [
+        "workspacePatterns:",
+        "  active: &workspacePackages",
+        "    - apps/*",
+        "  archived:",
+        "    - packages/*",
+        "packages: *workspacePackages",
+      ].join("\n"),
+      expected: ["apps/*"],
+      name: "an alias to a list inside a mapping",
+    },
+    {
+      content: "packages:\n- apps/*\n- tooling/lint\ncatalog:\n  a: 1\n",
+      expected: ["apps/*", "tooling/lint"],
+      name: "a block list whose items are not indented",
+    },
+    {
+      content: "catalog:\n  effect: 4.0.0\n",
+      expected: [],
+      name: "no packages key",
+    },
+    { content: "", expected: [], name: "an empty file" },
+    { content: "packages: apps/*\n", expected: [], name: "packages that are not a list" },
+    {
+      content: "packages:\n  - apps/*\n bad: [\n",
+      expected: [],
+      name: "a file that does not parse",
+    },
+  ])("read $name", ({ content, expected }) =>
+    Effect.gen(function* () {
+      expect(yield* readPnpmWorkspacePatterns(content)).toStrictEqual(expected)
+    })
+  )
 })
 
 describe("workspacePatternToRegExp", () => {

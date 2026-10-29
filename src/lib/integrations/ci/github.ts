@@ -1,14 +1,19 @@
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
+import * as Yaml from "effect/encoding/Yaml"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Schema from "effect/Schema"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import {
   defineIntegration,
   type Finding,
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
+import { getWorkflowTemplate } from "#lib/integrations/ci/github-workflow.macro.ts" with { type: "macro" }
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { fillTemplate } from "#lib/shared/template.ts"
 import {
   getCIWorkflowEntries,
   hasCICompatibleScripts,
@@ -22,8 +27,6 @@ import {
 } from "#lib/workspace/node-version-resolver.ts"
 import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
 
-const HARDCODED_NODE_VERSION_REGEX = /^\s*node-version:\s*"?\d/m
-const BLOCK_SCALAR_REGEX = /^[>|](?:[1-9][+-]?|[+-][1-9]?)?(?:\s+#.*)?$/
 const CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
 const FORMAT_CHECK_COMMAND_REGEX =
@@ -31,58 +34,66 @@ const FORMAT_CHECK_COMMAND_REGEX =
 const MONOREPO_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+(?:check|fix):monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+(?:check|fix):monorepo|adamantite\s+monorepo)(?=\s|$)/
 const RULE_TEST_COMMAND_REGEX = /\badamantite\s+rule\s+test(?=\s|$)/
-const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
-// A YAML value in single or double quotes, such as `run: "pnpm exec adamantite rule test"`.
-const QUOTED_VALUE_REGEX = /^(["'])(.*)\1$/
+
+const workflowTemplate = getWorkflowTemplate()
+
+// Only the parts of a workflow that the assessment reads. A matrix can be an expression, such as
+// `${{ fromJSON(needs.setup.outputs.matrix) }}`, so the matrix decodes on its own.
+const Workflow = Schema.Struct({
+  jobs: Schema.Record(
+    Schema.String,
+    Schema.Struct({
+      steps: Schema.optionalKey(
+        Schema.Array(
+          Schema.Struct({
+            run: Schema.optionalKey(Schema.String),
+            with: Schema.optionalKey(
+              Schema.Struct({
+                "node-version": Schema.optionalKey(Schema.Union([Schema.String, Schema.Finite])),
+              })
+            ),
+          })
+        )
+      ),
+      strategy: Schema.optionalKey(Schema.Struct({ matrix: Schema.optionalKey(Schema.Unknown) })),
+    })
+  ),
+})
+
+const Matrix = Schema.Struct({
+  include: Schema.Array(Schema.Struct({ command: Schema.optionalKey(Schema.String) })),
+})
 
 interface WorkflowOptions {
   packageManager: SupportedPackageManager
   scripts: Script[]
 }
 
-function hasWorkflowCommand(content: string, commandRegex: RegExp): boolean {
-  const lines = content.split("\n")
+/**
+ * The commands that the workflow runs, from the `run` of each step and the `command` of each matrix
+ * `include` entry, and the `node-version` inputs of its steps. A workflow that does not parse runs
+ * nothing.
+ */
+const readWorkflow = (content: string) =>
+  Effect.try(() => Yaml.parse(content)).pipe(
+    Effect.flatMap((parsed) => Schema.decodeUnknownEffect(Workflow)(parsed)),
+    Effect.map(({ jobs }) => {
+      const jobList = Object.values(jobs)
+      const steps = jobList.flatMap((job) => job.steps ?? [])
+      const matrixCommands = jobList.flatMap((job) =>
+        Option.match(Schema.decodeUnknownOption(Matrix)(job.strategy?.matrix), {
+          onNone: () => [],
+          onSome: ({ include }) => include.flatMap((entry) => entry.command ?? []),
+        })
+      )
 
-  for (const [index, line] of lines.entries()) {
-    const match = WORKFLOW_COMMAND_REGEX.exec(line)
-
-    if (!match) {
-      continue
-    }
-
-    const indentation = match[1]?.length ?? 0
-    const value = (match[2] ?? "").trim()
-    const command = QUOTED_VALUE_REGEX.exec(value)?.[2] ?? value
-
-    if (commandRegex.test(command)) {
-      return true
-    }
-
-    if (!BLOCK_SCALAR_REGEX.test(command)) {
-      continue
-    }
-
-    for (const blockLine of lines.slice(index + 1)) {
-      const trimmed = blockLine.trim()
-
-      if (trimmed.length === 0) {
-        continue
+      return {
+        commands: [...steps.flatMap((step) => step.run ?? []), ...matrixCommands],
+        nodeVersions: steps.flatMap((step) => step.with?.["node-version"] ?? []),
       }
-
-      const blockIndentation = blockLine.length - blockLine.trimStart().length
-
-      if (blockIndentation <= indentation) {
-        break
-      }
-
-      if (commandRegex.test(trimmed)) {
-        return true
-      }
-    }
-  }
-
-  return false
-}
+    }),
+    Effect.orElseSucceed(() => ({ commands: [], nodeVersions: [] }))
+  )
 
 function renderNodeSetup(source: NodeVersionSource): string {
   const versionInput =
@@ -156,43 +167,10 @@ function generateWorkflow(
     .map((entry) => `          - name: ${entry.name}\n            command: ${entry.command}`)
     .join("\n")
 
-  const workflow = `name: adamantite
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened]
-
-permissions:
-  contents: read
-
-concurrency:
-  group: \${{ github.workflow }}-\${{ github.ref }}
-  cancel-in-progress: true
-
-jobs:
-  verify:
-    name: \${{ matrix.name }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-${matrixInclude}
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-${getSetupSteps(source, hasRuleTests)[packageManager]}
-
-      - name: Run \${{ matrix.name }}
-        run: \${{ matrix.command }}`
-
-  return `${workflow}\n`
+  return fillTemplate(workflowTemplate, {
+    matrix: matrixInclude,
+    setup: getSetupSteps(source, hasRuleTests)[packageManager],
+  })
 }
 
 const legacyFormatStepFinding: Finding = {
@@ -252,19 +230,18 @@ export default defineIntegration({
       }
 
       const managedScripts = getManagedScripts(packageJson)
-      const hasHardcodedNodeVersion = HARDCODED_NODE_VERSION_REGEX.test(content.value)
-      const isMissingCheckCommand =
-        managedScripts.includes("check") && !hasWorkflowCommand(content.value, CHECK_COMMAND_REGEX)
+      const workflow = yield* readWorkflow(content.value)
+      const runs = (commandRegex: RegExp) =>
+        workflow.commands.some((command) => commandRegex.test(command))
+      const hasHardcodedNodeVersion = workflow.nodeVersions.some((version) =>
+        /^\d/.test(String(version))
+      )
+      const isMissingCheckCommand = managedScripts.includes("check") && !runs(CHECK_COMMAND_REGEX)
       const hasRuleTests = (yield* listCustomRuleTests(cwd)).tests.length > 0
-      const isMissingRuleTestCommand =
-        hasRuleTests && !hasWorkflowCommand(content.value, RULE_TEST_COMMAND_REGEX)
+      const isMissingRuleTestCommand = hasRuleTests && !runs(RULE_TEST_COMMAND_REGEX)
       const legacyFindings = [
-        ...(hasWorkflowCommand(content.value, FORMAT_CHECK_COMMAND_REGEX)
-          ? [legacyFormatStepFinding]
-          : []),
-        ...(hasWorkflowCommand(content.value, MONOREPO_COMMAND_REGEX)
-          ? [legacyMonorepoStepFinding]
-          : []),
+        ...(runs(FORMAT_CHECK_COMMAND_REGEX) ? [legacyFormatStepFinding] : []),
+        ...(runs(MONOREPO_COMMAND_REGEX) ? [legacyMonorepoStepFinding] : []),
       ]
 
       if (!hasHardcodedNodeVersion && !isMissingCheckCommand && !isMissingRuleTestCommand) {

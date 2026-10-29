@@ -14,65 +14,6 @@ function stripYamlComment(value: string): string {
   return value.replace(/(?:^|\s+)#.*$/u, "").trim()
 }
 
-function definesPnpmWorkspacePackages(content: string): boolean {
-  const lines = content.replace(/^\uFEFF/u, "").split(/\r?\n/u)
-  const packagesIndex = lines.findIndex((line) => PNPM_PACKAGES_KEY_REGEX.test(line))
-
-  if (packagesIndex === -1) {
-    return false
-  }
-
-  const declaration = stripYamlComment(
-    (lines[packagesIndex] ?? "").replace(PNPM_PACKAGES_KEY_REGEX, "")
-  )
-
-  if (declaration === "[") {
-    for (const line of lines.slice(packagesIndex + 1)) {
-      const item = stripYamlComment(line)
-
-      if (item.length === 0) {
-        continue
-      }
-
-      return item !== "]"
-    }
-
-    return false
-  }
-
-  if (declaration && !declaration.startsWith("#")) {
-    return !/^\[\s*\]$/u.test(declaration)
-  }
-
-  for (const line of lines.slice(packagesIndex + 1)) {
-    if (/^\s*-\s*[^#\s]/u.test(line)) {
-      return true
-    }
-
-    if (/^\S/u.test(line) && !line.startsWith("#")) {
-      return false
-    }
-  }
-
-  return false
-}
-
-export const checkIsMonorepo = (cwd: string = process.cwd()) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path
-    const pnpmWorkspace = yield* readFileIfExists(path.join(cwd, "pnpm-workspace.yaml"))
-
-    if (Option.isSome(pnpmWorkspace) && definesPnpmWorkspacePackages(pnpmWorkspace.value)) {
-      return true
-    }
-
-    const packageJson = yield* readPackageJson(cwd)
-    const workspaces = packageJson.workspaces
-    const patterns = Array.isArray(workspaces) ? workspaces : workspaces?.packages
-
-    return (patterns?.length ?? 0) > 0
-  })
-
 function unquote(value: string) {
   return value.replace(/^(["'])(.*)\1$/u, "$2")
 }
@@ -121,6 +62,32 @@ export function readPnpmWorkspacePatterns(content: string): string[] {
 
   return patterns
 }
+
+/**
+ * The workspace patterns of the project: the `packages` of `pnpm-workspace.yaml`, or the
+ * `workspaces` of `package.json` when `pnpm-workspace.yaml` declares none. A `pnpm-workspace.yaml`
+ * can hold only settings, such as `allowBuilds`.
+ */
+const readWorkspacePatterns = (cwd: string) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path
+    const pnpmWorkspace = yield* readFileIfExists(path.join(cwd, "pnpm-workspace.yaml"))
+    const pnpmPatterns = Option.match(pnpmWorkspace, {
+      onNone: () => [],
+      onSome: (content) => readPnpmWorkspacePatterns(content),
+    })
+
+    if (pnpmPatterns.length > 0) {
+      return pnpmPatterns
+    }
+
+    const { workspaces } = yield* readPackageJson(cwd)
+
+    return (Array.isArray(workspaces) ? workspaces : workspaces?.packages) ?? []
+  })
+
+export const checkIsMonorepo = (cwd: string = process.cwd()) =>
+  readWorkspacePatterns(cwd).pipe(Effect.map((patterns) => patterns.length > 0))
 
 function escapeRegExp(text: string) {
   return text.replaceAll(/[$()+.[\\\]^{|}]/gu, String.raw`\$&`)
@@ -207,13 +174,7 @@ const listDirectories = (
 export const getWorkspacePackageDirectories = (cwd: string = process.cwd()) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
-    const pnpmWorkspace = yield* readFileIfExists(path.join(cwd, "pnpm-workspace.yaml"))
-    const packageJson = yield* readPackageJson(cwd)
-    const workspaces = packageJson.workspaces
-    const patterns = Option.match(pnpmWorkspace, {
-      onNone: () => (Array.isArray(workspaces) ? workspaces : (workspaces?.packages ?? [])),
-      onSome: (content) => readPnpmWorkspacePatterns(content),
-    })
+    const patterns = yield* readWorkspacePatterns(cwd)
     const includes = patterns.filter((pattern) => !pattern.startsWith("!"))
     const excludes = patterns
       .filter((pattern) => pattern.startsWith("!"))

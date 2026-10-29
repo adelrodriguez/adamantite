@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
+  checkIsMonorepo,
   getWorkspacePackageDirectories,
   readPnpmWorkspacePatterns,
   workspacePatternToRegExp,
@@ -122,6 +123,26 @@ describe("getWorkspacePackageDirectories", () => {
       )
 
       expect(directories).toStrictEqual(["/project/apps/site"])
+    })
+  )
+
+  it.effect("read the package.json workspaces when pnpm-workspace.yaml has no packages", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
+          "packages/api/package.json": "{}",
+          "pnpm-workspace.yaml": "allowBuilds:\n  msgpackr-extract: false\n",
+        },
+        root: ROOT,
+      })
+
+      const result = yield* Effect.all([
+        checkIsMonorepo(ROOT),
+        getWorkspacePackageDirectories(ROOT),
+      ]).pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer)))
+
+      expect(result).toStrictEqual([true, ["/project/packages/api"]])
     })
   )
 })

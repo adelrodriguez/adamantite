@@ -214,14 +214,6 @@ try {
     PATH: `${join(fixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
   }
 
-  for (const command of ["fix", "check", "analyze"]) {
-    console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
-    run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
-  }
-
-  // Knip does not see that `custom()` loads a rule file, and reports it as unused, so the rule goes
-  // in after `analyze`. The fixture has no `@types/node`, so `check` also proves that the rule test
-  // passes type-aware lint without it.
   console.info("Running `adamantite rule add` and `adamantite rule test`...")
   addRuleAndRunTest(fixture, fixtureEnv)
 
@@ -229,7 +221,12 @@ try {
     throw new Error("Expected the fixture to have no @types/node, so check proves the rule test.")
   }
 
-  run(process.execPath, [cliPath, "check"], { cwd: fixture, env: fixtureEnv })
+  // The fixture has no `@types/node`, so `check` also proves that the rule test passes type-aware
+  // lint without it, and `analyze` proves that Knip does not report the rule and its test.
+  for (const command of ["fix", "check", "analyze"]) {
+    console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
+    run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
+  }
 
   // Init installs at the workspace root in a monorepo, and pnpm-workspace.yaml marks the
   // fixture as one.

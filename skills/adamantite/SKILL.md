@@ -243,9 +243,11 @@ saves.
   change a rule, run the lint and read all of its output.
 - To find node names, run `adamantite rule ast <file>` on real code. It prints the same
   ESTree-shaped AST that rules visit.
-- Keep the rule file thin. Put the logic in plain functions in a `_<name>.ts` helper, such as a
-  function that gets an import path and returns its layer, and test those functions directly.
-  The rule file only connects the functions to the visitors.
+- When a rule has much logic, keep the rule file thin. Put the logic in plain functions in a
+  `_<name>.ts` helper, such as a function that gets an import path and returns its layer. The
+  rule file only connects the functions to the visitors. Test the rule through `RuleTester` as
+  usual. Test the helper functions directly only when the cases are too many for `RuleTester`.
+  Those tests import `node:test`, so type-aware lint needs `@types/node`.
 - The message tells the author what to do instead, and links the standard or the doc that
   states it, such as `CODING_STANDARDS.md` or `docs/architecture.md`.
 - The test that `rule add` writes runs the rule through `RuleTester` from

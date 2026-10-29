@@ -6,4 +6,4 @@
 
 Add `adamantite/rules/testing`, which exports `RuleTester` connected to `node:test`, so a rule test has one import and each case reports by name. `oxlint` is now an optional peer dependency.
 
-When the rule or its test exists, `rule add` writes nothing, and the error names each file that exists. The rule stub sorts its keys, so `adamantite check` accepts it without `fix`. The "Custom rules" section of the Adamantite skill now teaches `rule test`, how to put the logic of a rule in a `_<name>.ts` helper and test it directly, how to write a message that says what to do instead, and when a rule earns its place.
+When the rule or its test exists, `rule add` writes nothing, and the error names each file that exists. The rule stub sorts its keys, so `adamantite check` accepts it without `fix`. The "Custom rules" section of the Adamantite skill now teaches `rule test`, how to put the logic of a large rule in a `_<name>.ts` helper, how to write a message that says what to do instead, and when a rule earns its place.

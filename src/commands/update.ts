@@ -3,6 +3,7 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
+import { findStaleSkillAgents, getSkillInstallCommand, installSkill } from "#lib/execution/skill.ts"
 import { getPackageActions } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
@@ -83,6 +84,34 @@ export default Command.make("update").pipe(
         }
       }
 
+      // The skill that init installed is a copy, so it stays at the Adamantite version that made it.
+      const skillAgents = yield* findStaleSkillAgents(cwd).pipe(
+        Effect.catchTag(["FailedToParseFile", "FailedToReadFile"], (error) =>
+          Effect.as(
+            prompter.log.warning(`Could not check the Adamantite skill. ${error.message}`),
+            []
+          )
+        )
+      )
+
+      if (skillAgents.length > 0) {
+        yield* prompter
+          .withSpinner(() => installSkill(cwd, skillAgents), {
+            failure: "Failed to refresh the Adamantite skill.",
+            start: "Refreshing the Adamantite skill...",
+            success: "Adamantite skill refreshed.",
+          })
+          .pipe(
+            Effect.catchTag(
+              ["CommandFailed", "CliNotFound", "FailedToReadFile", "PlatformError"],
+              () =>
+                prompter.log.warning(
+                  `Run \`${getSkillInstallCommand(skillAgents)}\` to see why the skill refresh failed.`
+                )
+            )
+          )
+      }
+
       const finalAssessment = updates.length === 0 ? assessment : yield* assessProject(cwd)
 
       for (const warning of finalAssessment.warnings) {
@@ -98,7 +127,7 @@ export default Command.make("update").pipe(
         )
       }
 
-      if (updates.length === 0 && findings.length === 0) {
+      if (updates.length === 0 && skillAgents.length === 0 && findings.length === 0) {
         yield* prompter.log.success("No changes needed.")
         return "no-changes" as const
       }

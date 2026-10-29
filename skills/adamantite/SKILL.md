@@ -8,6 +8,7 @@ metadata:
 sources:
   - "adelrodriguez/adamantite:src/cli.ts"
   - "adelrodriguez/adamantite:src/commands/*.ts"
+  - "adelrodriguez/adamantite:src/lib/execution/skill.ts"
   - "adelrodriguez/adamantite:src/lib/workspace/agents-section.md"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/index.ts"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/stub.ts.template"
@@ -29,12 +30,15 @@ non-interactive setup. Setup flags require `--non-interactive`, and at least one
 npx adamantite init --non-interactive --script check --script fix --typescript --agents
 ```
 
-Repeat `--script`, `--preset`, and `--editor` for multiple values. Available values are:
+Repeat `--script`, `--preset`, `--editor`, and `--skill-agent` for multiple values. Available
+values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`, `jest`,
   `vitest`, `node`, `strict`, `antislop`, `shadcn`;
   editors: `vscode`, `zed`
+- Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, `opencode`. Init
+  installs this skill for each one with the `skills` CLI.
 - Optional flags: `--typescript`, `--install-extensions`, `--github-actions`, `--agents`,
   `--overwrite-scripts`
 
@@ -216,7 +220,8 @@ adamantite doctor
 ```
 
 `update` updates Adamantite-managed dependencies and, with the effect preset, patches Oxlint
-and TypeScript again. It then reports any remaining doctor findings. Follow those findings and review the resulting diff.
+and TypeScript again. It copies this skill again when the copy that `init` installed differs
+from the skill in the installed package. It then reports any remaining doctor findings. Follow those findings and review the resulting diff.
 
 ## Custom rules
 

@@ -26,6 +26,7 @@ import {
   setupEditors,
   setupEffectTsgo,
   setupGitHubActions,
+  setupSkill,
   setupToolConfig,
   setupTypescript,
 } from "./setup.ts"
@@ -41,8 +42,9 @@ export default Command.make("init", initCommandOptions).pipe(
     },
     {
       command:
-        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript --install-extensions --github-actions --agents",
-      description: "Configure a React project with VS Code, TypeScript, CI, and agent guidance",
+        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript --install-extensions --github-actions --agents --skill-agent claude-code",
+      description:
+        "Configure a React project with VS Code, TypeScript, CI, agent guidance, and the Adamantite skill",
     },
     {
       command: "adamantite init --non-interactive --script analyze",
@@ -90,6 +92,7 @@ export default Command.make("init", initCommandOptions).pipe(
             options.installExtensions,
             options.githubActions,
             options.agents,
+            options.skillAgents.length > 0,
             options.overwriteScripts,
           ],
           Predicate.isTruthy
@@ -111,6 +114,7 @@ export default Command.make("init", initCommandOptions).pipe(
       const installExtensions = initOptions.installExtensions
       const gitHubActionsPackageManager = initOptions.githubActions
       const shouldAddAgentsGuidance = initOptions.agents
+      const skillAgents = initOptions.skillAgents
 
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
       const hasKnip = selectedScripts.includes("analyze")
@@ -162,6 +166,11 @@ export default Command.make("init", initCommandOptions).pipe(
 
       if (shouldAddAgentsGuidance) {
         yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts, isMonorepo)
+      }
+
+      // After the install, so `node_modules` has the skill that the installed Adamantite ships.
+      if (skillAgents.length > 0) {
+        yield* setupSkill(cwd, skillAgents)
       }
 
       if (shouldSetupTypescript) {

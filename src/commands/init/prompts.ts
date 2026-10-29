@@ -1,5 +1,6 @@
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
+import { CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,
@@ -190,6 +191,21 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
       "Add Adamantite guidance to AGENTS.md so coding agents know how to run project checks?",
   })
 
+  const installedAgents = yield* (yield* CodingAgents).detectInstalled(cwd)
+  const selectedSkillAgents = yield* prompter.multiselect({
+    initialValues: codingAgents
+      .filter((agent) => installedAgents.some((installed) => installed.command === agent.command))
+      .map((agent) => agent.skillsAgent),
+    message:
+      "Install the Adamantite skill for which coding agents? It teaches them how to use Adamantite. (optional)",
+    options: codingAgents.map((agent) => ({
+      hint: agent.skillsFolder,
+      label: agent.name,
+      value: agent.skillsAgent,
+    })),
+    required: false,
+  })
+
   return {
     agents: shouldAddAgentsGuidance,
     editors: selectedEditors,
@@ -198,6 +214,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,
+    skillAgents: selectedSkillAgents,
     typescript: shouldSetupTypescript,
   } satisfies InitOptionsInput
 })

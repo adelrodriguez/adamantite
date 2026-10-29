@@ -12,6 +12,8 @@ const claudeAgent: CodingAgent = {
   command: "claude",
   name: "Claude Code",
   seedArguments: (prompt) => [prompt],
+  skillsAgent: "claude-code",
+  skillsFolder: ".claude/skills",
 }
 
 const sentinel = () => {

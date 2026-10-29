@@ -22,17 +22,17 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Module seams
 
-| Module         | Responsibility                                                                                            |
-| -------------- | --------------------------------------------------------------------------------------------------------- |
-| `commands`     | Define one CLI workflow and render its user-facing result.                                                |
-| `execution`    | Run child commands, hand off to coding agents, and carry forwarded arguments.                             |
-| `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.             |
-| `hardening`    | Find the configs, rules folders, and instructions of the project, and render the Markdown harden prompt.  |
-| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal. |
-| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                    |
-| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                      |
-| `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                     |
-| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                             |
+| Module         | Responsibility                                                                                              |
+| -------------- | ----------------------------------------------------------------------------------------------------------- |
+| `commands`     | Define one CLI workflow and render its user-facing result.                                                  |
+| `execution`    | Run child commands, hand off to coding agents, install the Adamantite skill, and carry forwarded arguments. |
+| `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.               |
+| `hardening`    | Find the configs, rules folders, and instructions of the project, and render the Markdown harden prompt.    |
+| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.   |
+| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                      |
+| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                        |
+| `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                       |
+| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                               |
 
 ## Layers
 
@@ -97,7 +97,9 @@ warns the user and points to `adamantite doctor`.
 
 - `check` and `fix` run Oxfmt and Oxlint.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
-- `init` creates selected integrations and managed scripts.
+- `init` creates selected integrations and managed scripts. It installs the Adamantite skill
+  for the selected coding agents with the `skills` CLI, from `node_modules/adamantite`, so
+  the copy matches the installed version.
 - `doctor` assesses managed integrations and emits repair findings.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
   into custom rules and instructions, and offers it through the resolution menu. After a
@@ -105,7 +107,9 @@ warns the user and points to `adamantite doctor`.
   does, then assesses the project as Doctor does. It never produces findings, so it never changes Doctor's
   result. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
-  preset, then emits any remaining doctor findings.
+  preset, copies the Adamantite skill again when the copy that `init` installed is stale, then
+  emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
+  not need it.
 - `prepare` patches Oxlint and TypeScript for the effect preset. The target project's
   `prepare` script runs it after each install.
 - `rule add` writes a custom rule stub and its test. `rule ast` prints the AST that Oxlint
@@ -132,7 +136,7 @@ src/
     shared/         errors, filesystem, and JSON helpers (bottom layer)
     workspace/      target-project state and file operations
       custom-rules/ rules folders, custom() discovery, rule file checks, and rule tests
-    execution/      child command runs, coding-agent detection and handoff, forwarded arguments
+    execution/      child command runs, coding-agent detection and handoff, the Adamantite skill, forwarded arguments
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
     assessment/     integration registry, project assessment, agent prompt (top layer)

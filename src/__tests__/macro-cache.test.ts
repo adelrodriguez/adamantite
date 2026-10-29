@@ -61,7 +61,7 @@ function runVitest(dir: string) {
       "--reporter",
       "default",
     ],
-    // Vitest prints the results only when `CI` is set.
+    // With `CI` set, Vitest prints the results, which the failure message shows.
     { cwd: dir, encoding: "utf8", env: { ...process.env, CI: "1" } }
   )
 
@@ -69,7 +69,9 @@ function runVitest(dir: string) {
     throw result.error
   }
 
-  return result.stdout + result.stderr
+  // The exit status decides, because color codes can split the summary text. A failed match shows
+  // the output in its diff.
+  return { output: result.stdout + result.stderr, status: result.status }
 }
 
 describe("macro module cache", () => {
@@ -82,10 +84,12 @@ describe("macro module cache", () => {
   it("inline the new template text after an edit to only the template", () => {
     writeMacroProject(tempDir)
     writeFileSync(join(tempDir, "src/greeting.template"), "Hello\n")
-    expect(runVitest(tempDir)).toMatch(/Tests {2}1 passed/)
+    const first = runVitest(tempDir)
+    expect(first).toMatchObject({ status: 0 })
 
     writeFileSync(join(tempDir, "src/greeting.template"), "Goodbye\n")
+    const second = runVitest(tempDir)
 
-    expect(runVitest(tempDir)).toMatch(/Tests {2}1 passed/)
+    expect(second).toMatchObject({ status: 0 })
   }, 30_000)
 })

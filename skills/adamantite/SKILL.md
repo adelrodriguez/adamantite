@@ -201,7 +201,8 @@ the candidate standards, show them to the user, and write nothing until the user
 no human can approve, stop after you show the candidates. In an interactive terminal, `harden`
 offers a handoff to an installed coding agent CLI, a copy of the prompt, or nothing. In a
 monorepo, `--path` limits the session to one workspace package or folder. After a
-handoff, it runs `check` and the Doctor assessment, and exits 1 when either fails. `harden` never
+handoff, it runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of
+them fails. `harden` never
 produces Doctor findings.
 
 ## Update

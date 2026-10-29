@@ -53,7 +53,7 @@ const REQUIRED_PHRASES = {
     "This step is done when each documentation file has its mark.",
   ],
   "## 2. List the written standards": [
-    "Each written standard goes on to step 4, also when the code breaks it in many places.",
+    "Each written standard is a candidate, and goes on to step 4",
   ],
   "## 3. Survey the code": [
     "the command that gives the count",
@@ -63,7 +63,8 @@ const REQUIRED_PHRASES = {
   "## 4. Drop what a tool already enforces": [
     "For each written standard from step 2 and each candidate from step 3",
     "lint a counterexample from step 3 where it is",
-    "write a config to a temporary folder outside the project",
+    "run Oxlint with the project config, add the rule with `-D <rule>`",
+    "A report from a rule that only the trial turns on is not enforcement",
     "When a tool enforces only part of a written standard, keep the other part as a candidate.",
   ],
   "## 5. Place each candidate on the enforcement ladder": [
@@ -98,6 +99,7 @@ const REQUIRED_PHRASES = {
   "## Verify": [
     "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
     "All three must exit 0.",
+    "When you changed a project check, also run that check with the project's own command",
     "When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>

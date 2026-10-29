@@ -31,7 +31,7 @@ This step is done when each documentation file has its mark.
 
 ## 2. List the written standards
 
-List each standard that a file marked "has standards" states, with its file and line. Each written standard goes on to step 4, also when the code breaks it in many places.
+List each standard that a file marked "has standards" states, with its file and line. Each written standard is a candidate, and goes on to step 4, also when the code breaks it in many places.
 
 ## 3. Survey the code
 
@@ -48,7 +48,8 @@ This step is done when each area has its candidates or the note "none found".
 
 For each written standard from step 2 and each candidate from step 3, find out whether a tool already enforces it. Read the Oxlint config, the presets and plugins that it extends, its overrides, the custom rules, `tsconfig.json`, and the checks that the project runs in CI.
 
-- When you are not sure, lint a counterexample from step 3 where it is, and read whether the lint reports it. To try a rule that is not on, write a config to a temporary folder outside the project, and pass it to `oxlint` with `-c`.
+- When you are not sure, lint a counterexample from step 3 where it is, and read whether the lint reports it.
+- To try a rule that is not on, run Oxlint with the project config, add the rule with `-D <rule>`, and pass the files that the standard applies to. The project config, its plugins, and its overrides stay in effect. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 5.
 - When no counterexample exists, mark the enforcement as not confirmed.
 - Drop each candidate that a tool enforces fully. When a tool enforces only part of a written standard, keep the other part as a candidate.
 
@@ -114,4 +115,4 @@ Write only the approved candidates:
 ## Verify
 
 When you wrote files, run `adamantite check`, `adamantite rule test`, and `adamantite doctor` in this order — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
-All three must exit 0. When a new rule makes `check` fail, fix the rule or set it to `warn` as step 7 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.
+All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or set it to `warn` as step 7 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.

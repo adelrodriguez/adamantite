@@ -8,6 +8,7 @@ metadata:
 sources:
   - "adelrodriguez/adamantite:src/cli.ts"
   - "adelrodriguez/adamantite:src/commands/*.ts"
+  - "adelrodriguez/adamantite:src/lib/workspace/agents-section.md"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/index.ts"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/stub.ts.template"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/stub.test.ts.template"

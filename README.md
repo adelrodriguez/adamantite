@@ -267,9 +267,12 @@ Write and inspect [custom rules](#custom-rules):
 adamantite rule add no-process-env
 adamantite rule add no-window --dir tooling/lint/rules
 adamantite rule ast src/index.ts
+adamantite rule test
 ```
 
-`rule add` writes a rule stub to `.adamantite/rules/`, or to the folder that `--dir` names.
+`rule add` writes a rule stub to `.adamantite/rules/`, or to the folder that `--dir` names, and
+a `RuleTester` test for it in `tests/` in that folder. `rule test` runs the tests of every rules
+folder that a `custom()` call loads with `node --test`, and exits with its exit code.
 `rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
 real code.
 
@@ -665,9 +668,11 @@ it to every generated config. It takes these options:
 Rule files run with Node.js type stripping, so use erasable TypeScript only: no `enum`,
 `namespace` with values, or parameter properties. Rules get no type information. A rule
 that throws prints an error for each file, and the lint run still exits 0. Adamantite owns
-the wiring and the authoring guidance; your project owns the correctness and the tests of
-its rules. To test a rule, use `RuleTester` from `oxlint/plugins-dev`. The "Custom rules"
-section of the [Adamantite skill](#agent-skill) has the full authoring guidance.
+the wiring, the authoring guidance, and the test scaffold; your project owns the correctness
+of its rules and the cases of their tests. `adamantite rule add` writes a test with each rule, with `RuleTester` from
+`adamantite/rules/testing`, and `adamantite rule test` runs the tests with `node --test`, also
+in Bun projects. `adamantite check` does not run them. The "Custom rules" section of the
+[Adamantite skill](#agent-skill) has the full authoring guidance.
 
 `adamantite doctor` reports a rule file that cannot load, with the reason, a rules folder
 that no `custom()` call loads, and two rules folders that use the same plugin name.

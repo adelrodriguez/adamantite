@@ -117,8 +117,9 @@ warns the user and points to `adamantite doctor`.
   preset, then emits any remaining doctor findings.
 - `prepare` patches Oxlint and TypeScript for the effect preset. The target project's
   `prepare` script runs it after each install.
-- `rule add` writes a custom rule stub. `rule ast` prints the AST that Oxlint rules
-  visit.
+- `rule add` writes a custom rule stub and its test. `rule ast` prints the AST that Oxlint
+  rules visit. `rule test` runs the custom rule tests with `node --test`. `check` does not run
+  them. See ADR 0009.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -130,7 +131,7 @@ presets/
   lint/             published Oxlint presets, and custom() for custom rules
     plugin/         first-party Oxlint plugin and its rules
     vendor/         vendored plugin bundles
-  rules/            published authoring module for custom rules
+  rules/            published authoring and testing modules for custom rules
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
   tsconfig.json     published TypeScript preset
@@ -139,7 +140,7 @@ src/
   lib/
     shared/         errors, filesystem, and JSON helpers (bottom layer)
     workspace/      target-project state and file operations
-      custom-rules/ rules folders, custom() discovery, and rule file checks
+      custom-rules/ rules folders, custom() discovery, rule file checks, and rule tests
     execution/      child command runs, coding-agent detection and handoff, forwarded arguments
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
@@ -240,13 +241,17 @@ ADR 0009. Four modules carry them:
   `jsPlugins` entry that points to it. Without a rules folder it returns an empty config.
 - `presets/rules/index.ts` is published as `adamantite/rules`. It re-exports `defineRule`
   and the rule types from `@oxlint/plugins`, and exports `loadRules`, which the entry
-  module calls to import every rule file.
+  module calls to import every rule file. `presets/rules/testing.ts` is published as
+  `adamantite/rules/testing`. It re-exports `RuleTester` from `oxlint/plugins-dev`, connected
+  to `node:test`.
 - `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
   `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
   finds the Oxlint configs and follows their imports to the `custom()` calls. `harden` uses
   it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
   copy of the rule file test, and a unit test keeps it equal to `isRuleFile` in the preset.
-  `index.ts` writes the rule stub for `adamantite rule add`.
+  `index.ts` writes the rule stub and its test in `tests/` for `adamantite rule add`, from
+  the templates beside it, and lists the tests of the loaded rules folders for
+  `adamantite rule test`.
 - The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
   that module to report rules folders that no `custom()` call loads, rule files that cannot
   load, and rules folders that share a plugin name.

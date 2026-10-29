@@ -60,10 +60,30 @@ export default Command.make("harden", { scope }).pipe(
 
       const packageJson = yield* readPackageJson(cwd)
 
-      if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
-        return yield* failBeforeStart(
-          "`adamantite` is not installed in this project. Install it before running `adamantite harden`."
+      // The Adamantite repository runs its own build, so it does not depend on itself.
+      if (packageJson.name !== "adamantite") {
+        if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
+          return yield* failBeforeStart(
+            "`adamantite` is not installed in this project. Install it before running `adamantite harden`."
+          )
+        }
+
+        // The prompt offers the presets and rules of this version, so the project must install it.
+        const installed = yield* readPackageJson(path.join(cwd, "node_modules", "adamantite")).pipe(
+          Effect.option
         )
+
+        if (Option.isNone(installed)) {
+          return yield* failBeforeStart(
+            "`adamantite` is in `package.json` but not in `node_modules`. Install the dependencies before running `adamantite harden`."
+          )
+        }
+
+        if (installed.value.version !== version) {
+          return yield* failBeforeStart(
+            `This project installs Adamantite ${installed.value.version}, but this command is Adamantite ${version}. Run the project's own Adamantite, such as \`pnpm exec adamantite harden\`, or install the dependencies again.`
+          )
+        }
       }
 
       const scopeDirectory = Option.isSome(scope) ? path.resolve(cwd, scope.value) : undefined

@@ -237,7 +237,12 @@ as written, so it reads no module, but it reads `package.json` and `pnpm-workspa
 find the workspace root that owner paths are relative to. `createImportOwnersRule` takes that
 lookup, so its `RuleTester` test passes a fake. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/import-owners/`. `src/__tests__/presets/model-fixtures.ts` lints
-the fixture projects of both rules. See ADR 0016.
+the fixture projects of `layers`, `import-owners`, and `no-avoided-terms`. See ADR 0016.
+
+`adamantite/no-avoided-terms` reads the nearest `GLOSSARY.md` above the linted file, and caches
+it, so an editor language server needs a restart after the glossary changes.
+`createNoAvoidedTermsRule` takes the glossary lookup, so its `RuleTester` test passes a glossary
+text. Its fixtures run under Node.js and, when Bun is installed, under Bun. See ADR 0017.
 
 ## Custom rules
 

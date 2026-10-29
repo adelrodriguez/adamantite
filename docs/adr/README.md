@@ -16,3 +16,4 @@
 - [ADR 0014: The TypeScript preset allows only erasable syntax](0014-typescript-preset-allows-only-erasable-syntax.md)
 - [ADR 0015: The strict preset requires a reason on each suppression](0015-strict-requires-a-reason-on-each-suppression.md)
 - [ADR 0016: Import owners are their own first-party rule](0016-import-owners-are-their-own-rule.md)
+- [ADR 0017: Avoided glossary terms are an opt-in first-party rule](0017-avoided-glossary-terms-are-opt-in.md)

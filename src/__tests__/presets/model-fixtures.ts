@@ -9,6 +9,13 @@ import * as Schema from "effect/Schema"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 
+const hasBun = spawnSync("bun", ["--version"]).status === 0
+
+/**
+ * The runtime that runs Oxlint, and so the rule. Bun runs only when it is installed.
+ */
+export type Runtime = "bun" | "node"
+
 /**
  * A rule's model fixtures live in one directory, with one small project for each model. Each model
  * has its own `package.json` files and a JSON config fragment that turns on the rule. A source file
@@ -28,6 +35,10 @@ export interface ModelFixtureOptions {
    * Diagnostic code as Oxlint prints it, such as `adamantite(layers)`.
    */
   readonly ruleCode: string
+  /**
+   * The runtimes that lint each model. Default: Node.js only.
+   */
+  readonly runtimes?: readonly Runtime[]
 }
 
 const OxlintJsonOutput = Schema.Struct({
@@ -44,12 +55,25 @@ function listSourceFiles(dir: string): string[] {
     .map((entry) => relative(dir, join(entry.parentPath, entry.name)).split(sep).join("/"))
 }
 
+function spawnOxlint(runtime: Runtime, args: readonly string[], cwd: string) {
+  const spawnOptions = { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 } as const
+
+  return runtime === "bun"
+    ? spawnSync("bun", [join(REPO_ROOT, "node_modules/oxlint/bin/oxlint"), ...args], spawnOptions)
+    : spawnSync(join(REPO_ROOT, "node_modules/.bin/oxlint"), args, spawnOptions)
+}
+
 /**
  * Lint one model in a real Oxlint run through the strict preset, and return the files that the rule
  * reported.
  */
-function lintModel(options: ModelFixtureOptions, tempDir: string, model: string): Set<string> {
-  const projectDir = join(tempDir, model)
+function lintModel(
+  options: ModelFixtureOptions,
+  tempDir: string,
+  model: string,
+  runtime: Runtime
+): Set<string> {
+  const projectDir = join(tempDir, runtime, model)
 
   cpSync(join(options.fixturesDir, model), projectDir, { recursive: true })
   symlinkSync(join(REPO_ROOT, "node_modules"), join(projectDir, "node_modules"))
@@ -69,10 +93,10 @@ function lintModel(options: ModelFixtureOptions, tempDir: string, model: string)
   const sourceDirs = readdirSync(join(options.fixturesDir, model), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-  const result = spawnSync(
-    join(REPO_ROOT, "node_modules/.bin/oxlint"),
+  const result = spawnOxlint(
+    runtime,
     ["-c", "oxlint.config.ts", "-f", "json", ...sourceDirs],
-    { cwd: projectDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
+    projectDir
   )
 
   if (result.error) {
@@ -97,16 +121,20 @@ function lintModel(options: ModelFixtureOptions, tempDir: string, model: string)
 }
 
 /**
- * Declare the tests for each model: every invalid file is reported, and no valid file is.
+ * Declare the tests for each model and runtime: every invalid file is reported, and no valid file
+ * is.
  */
 export function describeModelFixtures(options: ModelFixtureOptions): void {
   const models = EffectArray.sort(readdirSync(options.fixturesDir), Order.String)
+  const runtimes = (options.runtimes ?? ["node"]).filter((runtime) => runtime !== "bun" || hasBun)
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-models-"))
   const reported = new Map<string, Set<string>>()
 
   beforeAll(() => {
-    for (const model of models) {
-      reported.set(model, lintModel(options, tempDir, model))
+    for (const runtime of runtimes) {
+      for (const model of models) {
+        reported.set(`${runtime}/${model}`, lintModel(options, tempDir, model, runtime))
+      }
     }
   })
 
@@ -114,23 +142,25 @@ export function describeModelFixtures(options: ModelFixtureOptions): void {
     rmSync(tempDir, { force: true, recursive: true })
   })
 
-  describe.each(models)("%s", (model) => {
-    const files = listSourceFiles(join(options.fixturesDir, model))
+  describe.each(runtimes)("under %s", (runtime) => {
+    describe.each(models)("%s", (model) => {
+      const files = listSourceFiles(join(options.fixturesDir, model))
 
-    it("report every invalid file", () => {
-      const invalid = files.filter((file) => file.includes(".invalid."))
-      const missed = invalid.filter((file) => !reported.get(model)?.has(file))
+      it("report every invalid file", () => {
+        const invalid = files.filter((file) => file.includes(".invalid."))
+        const missed = invalid.filter((file) => !reported.get(`${runtime}/${model}`)?.has(file))
 
-      expect(invalid).not.toStrictEqual([])
-      expect(missed).toStrictEqual([])
-    })
+        expect(invalid).not.toStrictEqual([])
+        expect(missed).toStrictEqual([])
+      })
 
-    it("report no valid file", () => {
-      const valid = files.filter((file) => !file.includes(".invalid."))
-      const wrong = valid.filter((file) => reported.get(model)?.has(file))
+      it("report no valid file", () => {
+        const valid = files.filter((file) => !file.includes(".invalid."))
+        const wrong = valid.filter((file) => reported.get(`${runtime}/${model}`)?.has(file))
 
-      expect(valid).not.toStrictEqual([])
-      expect(wrong).toStrictEqual([])
+        expect(valid).not.toStrictEqual([])
+        expect(wrong).toStrictEqual([])
+      })
     })
   })
 }

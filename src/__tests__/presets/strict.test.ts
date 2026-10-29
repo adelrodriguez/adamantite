@@ -29,7 +29,7 @@ const presetRules = getFirstPartyRules(strict.rules)
 
 // These rules need options from the target project, such as a layer map, so the project turns them
 // on.
-const PROJECT_RULES = ["import-owners", "layers"]
+const PROJECT_RULES = ["import-owners", "layers", "no-avoided-terms"]
 
 describe("strict preset", () => {
   it("have fixtures for exactly the rules the preset enables", () => {

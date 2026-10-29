@@ -1,6 +1,7 @@
 import type { Plugin, Rule } from "@oxlint/plugins"
 import importOwners from "./rules/import-owners.ts"
 import layers from "./rules/layers.ts"
+import noAvoidedTerms from "./rules/no-avoided-terms.ts"
 import noOverzealousDestructuring from "./rules/no-overzealous-destructuring.ts"
 import noQueryDataInState from "./rules/no-query-data-in-state.ts"
 import noReactStateHooks from "./rules/no-react-state-hooks.ts"
@@ -11,6 +12,7 @@ interface AdamantitePlugin extends Plugin {
   readonly rules: {
     readonly "import-owners": Rule
     readonly layers: Rule
+    readonly "no-avoided-terms": Rule
     readonly "no-overzealous-destructuring": Rule
     readonly "no-query-data-in-state": Rule
     readonly "no-react-state-hooks": Rule
@@ -28,6 +30,7 @@ const plugin: AdamantitePlugin = {
   rules: {
     "import-owners": importOwners,
     layers,
+    "no-avoided-terms": noAvoidedTerms,
     "no-overzealous-destructuring": noOverzealousDestructuring,
     "no-query-data-in-state": noQueryDataInState,
     "no-react-state-hooks": noReactStateHooks,

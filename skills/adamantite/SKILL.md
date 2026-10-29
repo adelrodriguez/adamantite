@@ -114,6 +114,22 @@ The rule matches the import as written, so it covers packages, not files of the 
 `adamantite/layers` for those. Use what the owner exports, or move the code into the owner. Do not
 add an owner only to silence a report.
 
+The `strict` preset also loads `adamantite/no-avoided-terms`, which reports declared names, such
+as functions, classes, types, and variables, and JSX text that use a term that the nearest
+`GLOSSARY.md` lists after `_Avoid_:`. It skips an avoided term that is part of a glossary term,
+such as `plugin` when the glossary defines `Managed plugin`. The project turns it on. Many avoided
+terms are also normal words in code, such as `entry` or `mode`, so list each term that means
+something else in this project in `allow`:
+
+```ts
+rules: {
+  "adamantite/no-avoided-terms": ["error", { allow: ["mode", "notification"] }],
+},
+```
+
+Rename to the glossary term that the message names. Add a term to `allow` only when the code uses
+it in a sense that the glossary does not mean, not to silence one report.
+
 The `tanstack` preset needs no extra package. Its `adamantite/query-from-loader` rule reports
 TanStack Query hooks in route files (files that call `createFileRoute`, `createRoute`, or another
 route factory from `@tanstack/react-router`) that take a plain options object or a `queryOptions()` call made inside a

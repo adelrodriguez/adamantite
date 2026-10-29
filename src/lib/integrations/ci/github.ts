@@ -9,7 +9,12 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
-import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import {
+  getCIWorkflowEntries,
+  hasCICompatibleScripts,
+  RULE_TEST_COMMANDS,
+} from "#lib/workspace/ci-scripts.ts"
+import { listCustomRuleTests } from "#lib/workspace/custom-rules/index.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   type NodeVersionSource,
@@ -25,6 +30,7 @@ const FORMAT_CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+format|deno(?:\s+(?!task\b)\S+)*\s+task\s+format)(?:\s+--)?\s+--check\b/
 const MONOREPO_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+(?:check|fix):monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+(?:check|fix):monorepo|adamantite\s+monorepo)(?=\s|$)/
+const RULE_TEST_COMMAND_REGEX = /\badamantite\s+rule\s+test(?=\s|$)/
 const WORKFLOW_COMMAND_REGEX = /^(\s*)(?:-\s*)?(?:command|run):\s*(.*)$/
 
 interface WorkflowOptions {
@@ -133,10 +139,10 @@ ${renderNodeSetup(source)}
 }
 
 function generateWorkflow(
-  { packageManager, scripts }: WorkflowOptions,
+  { hasRuleTests, packageManager, scripts }: WorkflowOptions & { hasRuleTests: boolean },
   source: NodeVersionSource
 ): string | null {
-  const matrixEntries = getCIWorkflowEntries(packageManager, scripts)
+  const matrixEntries = getCIWorkflowEntries(packageManager, scripts, { hasRuleTests })
 
   if (matrixEntries.length === 0) {
     return null
@@ -217,7 +223,11 @@ const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
     const workflowPath = path.join(cwd, files[0].path)
 
     const source = yield* resolver.resolve(cwd)
-    const workflowContent = generateWorkflow(options, source)
+    const { tests: ruleTests } = yield* listCustomRuleTests(cwd)
+    const workflowContent = generateWorkflow(
+      { ...options, hasRuleTests: ruleTests.length > 0 },
+      source
+    )
 
     if (!workflowContent) {
       return
@@ -241,6 +251,9 @@ export default defineIntegration({
       const hasHardcodedNodeVersion = HARDCODED_NODE_VERSION_REGEX.test(content.value)
       const isMissingCheckCommand =
         managedScripts.includes("check") && !hasWorkflowCommand(content.value, CHECK_COMMAND_REGEX)
+      const hasRuleTests = (yield* listCustomRuleTests(cwd)).tests.length > 0
+      const isMissingRuleTestCommand =
+        hasRuleTests && !hasWorkflowCommand(content.value, RULE_TEST_COMMAND_REGEX)
       const legacyFindings = [
         ...(hasWorkflowCommand(content.value, FORMAT_CHECK_COMMAND_REGEX)
           ? [legacyFormatStepFinding]
@@ -250,7 +263,7 @@ export default defineIntegration({
           : []),
       ]
 
-      if (!hasHardcodedNodeVersion && !isMissingCheckCommand) {
+      if (!hasHardcodedNodeVersion && !isMissingCheckCommand && !isMissingRuleTestCommand) {
         return {
           applicable: true,
           findings: legacyFindings,
@@ -306,15 +319,30 @@ export default defineIntegration({
               ...(isMissingCheckCommand
                 ? ["The workflow does not run the managed `check` script."]
                 : []),
+              ...(isMissingRuleTestCommand
+                ? [
+                    "The workflow does not run `adamantite rule test`, and the project has custom rule tests.",
+                  ]
+                : []),
             ].join(" "),
             goal: [
               "Make the workflow run the managed `check` script.",
+              ...(hasRuleTests
+                ? [
+                    "Make the workflow run `adamantite rule test`, so that CI runs the custom rule tests.",
+                  ]
+                : []),
               "Use the project's Node.js version declaration instead of a hard-coded version.",
             ],
             id: "outdated-adamantite-workflow",
             integration: "github",
             notes: [
               `The detected package manager is \`${detectedPackageManager.name}\`. Preserve unrelated workflow jobs and project-specific settings.`,
+              ...(hasRuleTests
+                ? [
+                    `With \`${detectedPackageManager.name}\`, run the custom rule tests with \`${RULE_TEST_COMMANDS[detectedPackageManager.name]}\`.`,
+                  ]
+                : []),
             ],
             title: "Outdated Adamantite workflow",
           },

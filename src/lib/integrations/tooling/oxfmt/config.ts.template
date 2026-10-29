@@ -1,0 +1,4 @@
+import { defineConfig } from "oxfmt"
+import format from "adamantite/format"
+
+export default defineConfig(format)

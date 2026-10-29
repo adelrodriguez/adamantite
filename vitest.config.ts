@@ -3,7 +3,7 @@ import { Macros } from "unplugin-macros"
 import { defineConfig } from "vitest/config"
 
 // These tests lint files in real Oxlint runs.
-const OXLINT_RUN_TESTS = ["src/__tests__/presets/**/*.test.ts", "src/__tests__/lint/**/*.test.ts"]
+const OXLINT_RUN_TESTS = ["src/__tests__/presets/**/*.test.ts"]
 
 export default defineConfig({
   plugins: [Macros.vite()],

@@ -1,0 +1,12 @@
+{
+  "name": "fixture-adamantite",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#conditional": {
+      "development": "./src/lib/integrations/value.ts",
+      "default": "./outside.ts"
+    },
+    "#*": "./src/*"
+  }
+}

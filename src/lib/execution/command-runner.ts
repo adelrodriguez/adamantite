@@ -68,26 +68,19 @@ const quietNodeOptions = () =>
     .filter(Boolean)
     .join(" ")
 
-const exitCode = Effect.fn("CommandRunner.exitCode")(function* ({
-  args,
-  command,
-  cwd,
-  detached,
-  env,
-  stderr = "inherit",
-  stdin = "ignore",
-  stdout = "inherit",
-}: CommandRunOptions) {
+const exitCode = Effect.fn("CommandRunner.exitCode")(function* (options: CommandRunOptions) {
+  const { command } = options
+
   return yield* Effect.scoped(
     Effect.gen(function* () {
-      const handle = yield* ChildProcess.make(command, args, {
-        cwd,
-        detached,
-        env: { ...env, NODE_OPTIONS: quietNodeOptions() },
+      const handle = yield* ChildProcess.make(command, options.args, {
+        cwd: options.cwd,
+        detached: options.detached,
+        env: { ...options.env, NODE_OPTIONS: quietNodeOptions() },
         extendEnv: true,
-        stderr,
-        stdin,
-        stdout,
+        stderr: options.stderr ?? "inherit",
+        stdin: options.stdin ?? "ignore",
+        stdout: options.stdout ?? "inherit",
       })
 
       return yield* handle.exitCode

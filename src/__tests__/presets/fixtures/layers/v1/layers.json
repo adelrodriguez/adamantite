@@ -1,0 +1,65 @@
+{
+  "overrides": [
+    {
+      "files": [
+        "apps/{app,web}/src/**"
+      ],
+      "rules": {
+        "adamantite/layers": [
+          "error",
+          {
+            "root": "src",
+            "entries": [
+              "*"
+            ],
+            "isolate": [
+              "features",
+              "pages",
+              "routes"
+            ],
+            "layers": {
+              "shared": [],
+              "features": [
+                "shared"
+              ],
+              "pages": [
+                "features"
+              ],
+              "routes": [
+                "features"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "apps/api/src/**"
+      ],
+      "rules": {
+        "adamantite/layers": [
+          "error",
+          {
+            "root": "src",
+            "entries": [
+              "*"
+            ],
+            "isolate": [
+              "features"
+            ],
+            "layers": {
+              "shared": [],
+              "features": [
+                "shared"
+              ],
+              "routes": [
+                "features"
+              ]
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

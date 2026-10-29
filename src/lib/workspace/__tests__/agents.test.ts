@@ -204,7 +204,7 @@ describe("writeAgentsGuidance", () => {
       suffix: markerFreeContent,
       variant: Schema.Literals(["start-only", "end-only", "end-before-start"]),
     },
-    ({ isMonorepo, packageManager, prefix, scripts, suffix, variant }) =>
+    ({ prefix, suffix, variant, ...guidance }) =>
       Effect.gen(function* () {
         const existing =
           variant === "start-only"
@@ -213,6 +213,7 @@ describe("writeAgentsGuidance", () => {
               ? `${prefix}${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
               : `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
         const files = makeFiles({ "AGENTS.md": existing })
+        const { isMonorepo, packageManager, scripts } = guidance
 
         const result = yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
 

@@ -1,0 +1,33 @@
+{
+  "rules": {
+    "adamantite/layers": [
+      "error",
+      {
+        "root": "src/lib",
+        "layers": {
+          "shared": [],
+          "execution": [
+            "shared"
+          ],
+          "workspace": [
+            "shared"
+          ],
+          "hardening": [
+            "workspace",
+            "execution"
+          ],
+          "integrations": [
+            "workspace",
+            "execution"
+          ],
+          "assessment": [
+            "integrations"
+          ]
+        },
+        "conditions": [
+          "development"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "fixture-packref",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  }
+}

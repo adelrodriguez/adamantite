@@ -104,6 +104,17 @@
       },
       "tracking": "dependency",
       "version": "6.42.0"
+    },
+    {
+      "name": "oxc-resolver",
+      "registry": "npm",
+      "source": {
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/oxc-project/oxc-resolver"
+      },
+      "tracking": "manual",
+      "version": "11.24.2"
     }
   ]
 }

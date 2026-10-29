@@ -36,28 +36,14 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Lib layers
 
-The modules in `src/lib` form layers. A layer imports only from the layers below it:
-
-```mermaid
-flowchart BT
-  shared --> workspace
-  shared --> execution
-  workspace --> integrations
-  execution --> integrations
-  integrations --> assessment
-  workspace --> hardening
-  execution --> hardening
-```
-
-`workspace` and `execution` are siblings and do not import each other, and so are
-`integrations` and `hardening`. `assessment` does not import `hardening` either: harden is
-not an assessment. `workspace` knows
-target-project files and package state, but not integration types such as `Finding`.
-The `no-restricted-imports` overrides in `oxlint.config.ts` enforce the direction, so an
-import from a higher layer fails `pnpm run check`. Lib modules import other lib modules
-through `#lib/...`, not parent-relative paths, so the layer rules see every import.
-`src/__tests__/lint/lib-layers.test.ts` runs Oxlint with these overrides to check both
-import forms.
+The modules in `src/lib` form layers. The layer map is the `adamantite/layers` rule in
+`oxlint.config.ts`, and it is the only statement of the layers: each layer imports only the
+layers it lists and the layers below those. A layer that the map does not connect to another
+layer is its sibling, so `workspace` and `execution` do not import each other, and
+`assessment` does not import `hardening`: harden is not an assessment. `workspace` knows
+target-project files and package state, but not integration types such as `Finding`. An import
+that breaks the map, or a folder in `src/lib` that is not in it, fails `pnpm run check`. See
+ADR 0013.
 
 Inside `integrations`, `base.ts` defines the integration and finding types.
 `tooling/base.ts` and `tooling/preset-config.ts` hold the logic that several tools share.
@@ -220,13 +206,21 @@ loads its vendored bundle. The source tree has `plugin/index.ts` and the dist tr
 `plugin/index.js`, so the preset takes the extension from its own module URL. Rule code
 runs under the runtime that executes Oxlint in the target project, so it uses only
 runtime-neutral APIs. It imports only types from `@oxlint/plugins`, a devDependency pinned
-to the Oxlint version. `presets/lint/plugin/tsconfig.json` lets the source import rule
+to the Oxlint version. The one runtime package is `oxc-resolver`, which `adamantite/layers`
+uses, and which has Node-API bindings for Node.js and Bun. `presets/lint/plugin/tsconfig.json` lets the source import rule
 modules with their `.ts` extension, which Node.js needs to load the source plugin.
 
 Each rule has a `RuleTester` test under `src/__tests__/plugin/<rule>.test.ts` for messages,
 locations, and options, and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<rule>/` that the preset test lints in one real
 Oxlint run.
+
+`adamantite/layers` needs a layer map from the target project, so no preset turns it on, and
+`strict` only loads the plugin for it. It is the one rule that reads files: it resolves each
+import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `createLayersRule`
+takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
+`src/__tests__/presets/fixtures/layers/`, one for each layer model, and
+`src/__tests__/presets/layers.test.ts` lints each one in a real Oxlint run. See ADR 0013.
 
 ## Custom rules
 

@@ -94,6 +94,18 @@
       "version": "5.0.5"
     },
     {
+      "name": "knip",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/knip",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/webpro-nl/knip"
+      },
+      "tracking": "dependency",
+      "version": "6.42.0"
+    },
+    {
       "name": "oxc-resolver",
       "registry": "npm",
       "source": {

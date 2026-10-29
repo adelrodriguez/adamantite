@@ -249,6 +249,10 @@ rule as `error` under the `project` plugin: `no-process-env.ts` becomes
   file that calls `custom()`, so a shared tooling package can own the rules with
   `custom({ dir: "rules", name: "acme" })`. A nested Oxlint config replaces the root config, so
   a package that needs the root rules extends the root config.
+- `adamantite analyze` treats the rule files in `.adamantite/rules/` and in its `tests/` folder as
+  Knip entry files, in the root and in each workspace package. Knip still reports a helper that no
+  file imports. For a rules folder at another path, set `oxlint.entry` in `knip.config.ts` to the
+  patterns of the preset and of that folder.
 
 ## Decision guide
 

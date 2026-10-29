@@ -118,3 +118,27 @@ export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (c
     unresolvedImports,
   }
 })
+
+/**
+ * The command that runs the rule tests, with paths relative to `cwd`, or none when no test exists,
+ * and what discovery could not follow, as `listCustomRuleTests` returns it. `RuleTester` runs only
+ * on Node.js, so the tests run under Node.js, also in a Bun project.
+ */
+export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* (
+  cwd: string
+) {
+  const path = yield* Path.Path
+  const { tests, unresolvedCalls, unresolvedImports } = yield* listCustomRuleTests(cwd)
+
+  return {
+    command:
+      tests.length === 0
+        ? Option.none()
+        : Option.some({
+            args: ["--test", ...tests.map((test) => path.relative(cwd, test))],
+            command: "node",
+          }),
+    unresolvedCalls,
+    unresolvedImports,
+  }
+})

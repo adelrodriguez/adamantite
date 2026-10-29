@@ -12,7 +12,7 @@ import { readFile } from "#lib/shared/filesystem.ts"
 import {
   addCustomRule,
   CUSTOM_RULES_DIRECTORY,
-  listCustomRuleTests,
+  readCustomRuleTestCommand,
 } from "#lib/workspace/custom-rules/index.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
@@ -86,7 +86,7 @@ const test = Command.make("test").pipe(
       const path = yield* Path.Path
       const runner = yield* CommandRunner
       const cwd = process.cwd()
-      const { tests, unresolvedCalls, unresolvedImports } = yield* listCustomRuleTests(cwd)
+      const { command, unresolvedCalls, unresolvedImports } = yield* readCustomRuleTestCommand(cwd)
 
       for (const source of unresolvedCalls) {
         yield* prompter.log.warning(
@@ -100,18 +100,13 @@ const test = Command.make("test").pipe(
         )
       }
 
-      if (tests.length === 0) {
+      if (Option.isNone(command)) {
         return yield* prompter.log.info(
           "No custom rule tests found. `adamantite rule add <name>` writes a rule and its test."
         )
       }
 
-      // RuleTester runs only on Node.js, so the tests run under Node.js, also in a Bun project.
-      yield* runner.run({
-        args: ["--test", ...tests.map((file) => path.relative(cwd, file))],
-        command: "node",
-        title: "🧪 Testing custom rules",
-      })
+      yield* runner.run({ ...command.value, title: "🧪 Testing custom rules" })
     })
   )
 )

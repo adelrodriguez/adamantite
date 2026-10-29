@@ -321,6 +321,7 @@ describe("update", () => {
                 agent,
               ]),
               "--yes",
+              "--json",
             ],
             command: "npx",
           }),

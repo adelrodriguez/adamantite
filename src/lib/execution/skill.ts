@@ -64,7 +64,8 @@ export const installSkill = Effect.fn("installSkill")(function* (
 
   const runner = yield* CommandRunner
   yield* runner.run({
-    args: ["--yes", SKILLS_CLI, ...getSkillsAddArguments(agents)],
+    // In its default output mode, the CLI prints a failed skill copy but exits 0. JSON mode exits 1.
+    args: ["--yes", SKILLS_CLI, ...getSkillsAddArguments(agents), "--json"],
     command: "npx",
     cwd,
     stderr: "ignore",

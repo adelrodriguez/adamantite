@@ -64,6 +64,8 @@ function getSkillsAddArgs(...agents: string[]) {
     "adamantite",
     ...agents.flatMap((agent) => ["--agent", agent]),
     "--yes",
+    // Only JSON mode exits nonzero when a skill copy fails.
+    "--json",
   ]
 }
 
@@ -1329,7 +1331,7 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toContainEqual({
           level: "warning",
-          message: `Run \`npx ${getSkillsAddArgs("claude-code").slice(1).join(" ")}\` to see why the skill install failed.`,
+          message: `Run \`npx skills@${getDependencyVersion("skills")} add ./node_modules/adamantite --skill adamantite --agent claude-code --yes\` to see why the skill install failed.`,
         })
         expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
       })

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { IntegrationAssessment } from "#lib/integrations/base.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
+import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 
 const ROOT = "/project"
 
@@ -216,6 +218,40 @@ describe("oxlint-custom", () => {
       expect(findings.map((finding) => finding.id)).toStrictEqual([
         "custom-rule-cannot-load:tooling/lint/rules/no-enum.ts",
       ])
+    })
+  )
+
+  it.effect("clear the resolver cache before each traversal", () =>
+    Effect.gen(function* () {
+      const events: string[] = []
+      const resolverLayer = Layer.succeed(ModuleResolver)({
+        clearCache: Effect.sync(() => {
+          events.push("clear")
+        }),
+        resolve: (_from, specifier) =>
+          Effect.sync(() => {
+            events.push(specifier)
+
+            return Option.none()
+          }),
+      })
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": makeConfig("core, rules", ['import rules from "./lint/rules.ts"']),
+          "package.json": PACKAGE_JSON,
+        },
+        root: ROOT,
+      })
+      const assess = oxlintCustom
+        .assess(ROOT)
+        .pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer, resolverLayer)))
+
+      yield* assess
+      yield* assess
+
+      expect(
+        events.filter((event) => event === "clear" || event === "./lint/rules.ts")
+      ).toStrictEqual(["clear", "./lint/rules.ts", "clear", "./lint/rules.ts"])
     })
   )
 

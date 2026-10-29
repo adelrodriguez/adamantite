@@ -287,7 +287,9 @@ try {
 
   // Doctor resolves config imports with the real resolver. The root config loads a shared tooling
   // package through an `exports` subpath, so Doctor reaches its rules folder only by following the
-  // installed workspace link, and reports the rule file that cannot load.
+  // installed workspace link, and reports the rule file that cannot load. The package's config
+  // imports `./rules.js`, which exists beside `rules.ts`. Node.js loads the `.js` file, so Doctor
+  // must follow it to `rules` and not to `source-rules`.
   const lintPackage = join(monorepoFixture, "packages", "lint")
 
   mkdirSync(join(lintPackage, "rules"), { recursive: true })
@@ -305,9 +307,14 @@ try {
       2
     )
   )
+  writeFileSync(join(lintPackage, "config.ts"), 'export { default } from "./rules.js"\n')
   writeFileSync(
-    join(lintPackage, "config.ts"),
+    join(lintPackage, "rules.js"),
     'import custom from "adamantite/lint/custom"\n\nexport default custom({ dir: "rules", name: "smoke" })\n'
+  )
+  writeFileSync(
+    join(lintPackage, "rules.ts"),
+    'import custom from "adamantite/lint/custom"\n\nexport default custom({ dir: "source-rules", name: "smoke" })\n'
   )
   writeFileSync(
     join(lintPackage, "rules", "no-enum.ts"),

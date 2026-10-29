@@ -115,6 +115,9 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   lintedDirectories: readonly string[] = packageDirectories
 ) {
   const path = yield* Path.Path
+
+  // Doctor and harden traverse again after a coding agent changes the project.
+  yield* (yield* ModuleResolver).clearCache
   const packageNames = new Set(
     Array.getSomes(
       yield* Effect.forEach(packageDirectories, (directory) => readPackageName(directory), {

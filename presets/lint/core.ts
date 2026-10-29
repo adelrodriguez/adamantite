@@ -127,12 +127,6 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "no-class-assign": "error",
     "no-compare-neg-zero": "error",
     "no-cond-assign": "error",
-    "no-console": [
-      "warn",
-      {
-        allow: ["info"],
-      },
-    ],
     "no-const-assign": "error",
     "no-constant-binary-expression": "error",
     "no-constant-condition": "error",

@@ -1,8 +1,8 @@
 import type { OxlintConfig } from "oxlint"
 
 // Framework-neutral opinions: values keep their source object visible, types come from
-// validation or narrowing instead of assertions, each suppression gives its reason, and no task
-// comment marks a workaround. Use it with any other preset.
+// validation or narrowing instead of assertions, each suppression gives its reason, no debug
+// console call stays, and no task comment marks a workaround. Use it with any other preset.
 //
 // The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
 // extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the
@@ -31,6 +31,9 @@ const config: OxlintConfig = {
     "adamantite/no-overzealous-destructuring": "error",
     // A suppression states why the rule does not apply, after ` -- `, so a reviewer can judge it.
     "adamantite/require-suppression-reason": "error",
+    // A console call is debug output that stays in the code. `console.info` stays allowed for
+    // intended output.
+    "no-console": ["error", { allow: ["info"] }],
     // A TODO, FIXME, XXX, or HACK comment marks a workaround, and agents copy the workaround with
     // the comment. Fix the code now, or track the work in the issue tracker.
     "no-warning-comments": ["error", { terms: ["todo", "fixme", "xxx", "hack"] }],

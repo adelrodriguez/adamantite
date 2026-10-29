@@ -322,7 +322,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/jest`         | Jest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                            |
 | `adamantite/lint/vitest`       | Vitest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                          |
-| `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, no type assertions outside tests, a reason on each suppression, and no task comments. See [the strict preset](#the-strict-preset).                                                                                          |
+| `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, no type assertions outside tests, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                                                                        |
 | `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
 | `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
 | `adamantite/lint/custom`       | A function, `custom()`, that loads the project's own rules from `.adamantite/rules/`. See [custom rules](#custom-rules).                                                                                                                                                               |
@@ -572,6 +572,7 @@ reports them, because `Clock`, `Random`, and `Config` let tests control them. Se
   element does not count. Keep the object and read its members, or split the pattern.
 - `typescript/consistent-type-assertions` bans type assertions. `as const` stays allowed,
   and test files (`*.test.*`, `*.spec.*`, and `__tests__/`) keep the core preset's setting.
+- `no-console` reports a console call other than `console.info`.
 - `adamantite/require-suppression-reason` reports an `oxlint-disable` or `eslint-disable`
   comment, including the `-line` and `-next-line` forms, that gives no reason after `--`,
   such as `// oxlint-disable-next-line no-console -- the CLI writes its report to stdout`. A

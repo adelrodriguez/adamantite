@@ -46,12 +46,14 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
     .filter((script) => scripts.includes(script))
     .map((script) => getScriptGuidance(packageManager, script, isMonorepo))
 
-  // Each slot value carries its own trailing newline, so an empty slot leaves no blank line.
-  const body = fillTemplate(agentsSectionTemplate, {
+  // The scripts and customRules values carry their own trailing newline, so an empty value leaves
+  // no blank line.
+  return fillTemplate(agentsSectionTemplate, {
     customRules:
       scripts.includes("check") || scripts.includes("fix")
         ? '- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule, and follow the "Custom rules" section of the Adamantite skill.\n'
         : "",
+    end: ADAMANTITE_AGENTS_END_MARKER,
     scripts:
       selectedScriptGuidance.length > 0
         ? [
@@ -60,9 +62,8 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
             "",
           ].join("\n")
         : "",
+    start: ADAMANTITE_AGENTS_START_MARKER,
   })
-
-  return `${ADAMANTITE_AGENTS_START_MARKER}\n\n${body}\n${ADAMANTITE_AGENTS_END_MARKER}\n`
 }
 
 export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOptions) =>

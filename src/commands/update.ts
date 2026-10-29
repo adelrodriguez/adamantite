@@ -1,11 +1,9 @@
 import process from "node:process"
-import type { PackageJson } from "type-fest"
-import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
-import * as Result from "effect/Result"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
+import { getPackageActions } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
@@ -13,7 +11,7 @@ import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/ind
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
-import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
@@ -26,34 +24,6 @@ const knownPackages = [
   sherif,
   knip,
 ] as const satisfies readonly ToolingPackage[]
-
-interface PackageUpdate {
-  readonly currentVersion: string
-  readonly name: string
-  readonly targetVersion: string
-}
-
-function getFallbackPackageUpdates(
-  packageJson: PackageJson,
-  coveredPackages: ReadonlySet<string>
-): PackageUpdate[] {
-  return Array.filterMap(knownPackages, (pkg) => {
-    if (coveredPackages.has(pkg.name)) {
-      return Result.failVoid
-    }
-
-    const dependency =
-      packageJson.devDependencies?.[pkg.name] ?? packageJson.dependencies?.[pkg.name]
-
-    return dependency && normalizeDependencyVersion(dependency) !== pkg.version
-      ? Result.succeed({
-          currentVersion: dependency,
-          name: pkg.name,
-          targetVersion: pkg.version,
-        })
-      : Result.failVoid
-  })
-}
 
 export default Command.make("update").pipe(
   Command.withDescription("Update Adamantite-managed dependencies and report setup findings"),
@@ -68,22 +38,24 @@ export default Command.make("update").pipe(
       const assessment = yield* assessProject(cwd, packageJson)
       const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
-      const updates: PackageUpdate[] = [
-        ...packageActions.map((action) => ({
-          currentVersion:
-            action.type === "install_package" ? "not installed" : action.currentVersion,
-          name: action.package,
-          targetVersion: action.targetVersion,
-        })),
-        ...getFallbackPackageUpdates(packageJson, coveredPackages),
+      const updates = [
+        ...packageActions,
+        // A known package that the project does not install stays uninstalled.
+        ...knownPackages
+          .filter((pkg) => !coveredPackages.has(pkg.name))
+          .flatMap((pkg) => getPackageActions(packageJson, pkg, "Adamantite"))
+          .filter((action) => action.type === "update_package"),
       ]
 
       if (updates.length > 0) {
         yield* prompter.log.info("The following dependencies will be updated:")
 
-        for (const dependency of updates) {
+        for (const action of updates) {
+          const currentVersion =
+            action.type === "install_package" ? "not installed" : action.currentVersion
+
           yield* prompter.log.info(
-            `  ${dependency.name}: ${dependency.currentVersion} → ${dependency.targetVersion}`
+            `  ${action.package}: ${currentVersion} → ${action.targetVersion}`
           )
         }
 
@@ -91,7 +63,7 @@ export default Command.make("update").pipe(
           () =>
             addRootDevDependencies(
               cwd,
-              updates.map((dependency) => `${dependency.name}@${dependency.targetVersion}`)
+              updates.map((action) => `${action.package}@${action.targetVersion}`)
             ),
           {
             failure: "Failed to update dependencies",

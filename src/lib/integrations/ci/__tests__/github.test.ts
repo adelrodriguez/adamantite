@@ -56,7 +56,7 @@ function provideFallback(files: FileSystemTestContext) {
   )
 }
 
-function provideAssessment(files: FileSystemTestContext) {
+function provideAssessment(files: FileSystemTestContext, packageManager: "deno" | "pnpm" = "pnpm") {
   return Effect.provide(
     Layer.mergeAll(
       files.layer,
@@ -64,7 +64,7 @@ function provideAssessment(files: FileSystemTestContext) {
       makeModuleResolverLayer(ROOT),
       Layer.succeed(DependencyInstaller)({
         addDevDependencies: () => Effect.void,
-        detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+        detectPackageManager: () => Effect.succeed({ name: packageManager }),
       })
     )
   )
@@ -389,6 +389,29 @@ describe("github", () => {
       })
     )
 
+    it.effect("tell a Deno project that the rule test job needs a Node.js setup step", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          ...RULE_TEST_FILES,
+          [WORKFLOW_PATH]: "steps:\n  - run: deno task check\n",
+        })
+        const result = yield* github
+          .assess(ROOT, packageJson)
+          .pipe(provideAssessment(files, "deno"))
+
+        expect(result).toMatchObject({
+          findings: [
+            {
+              id: "outdated-adamantite-workflow",
+              notes: expect.arrayContaining([
+                "`adamantite rule test` runs the tests with Node.js 22.18 or later, so the Deno workflow also needs an `actions/setup-node` step before the tests run.",
+              ]),
+            },
+          ],
+        })
+      })
+    )
+
     it.effect("accept a rule test command in a run block scalar", () =>
       Effect.gen(function* () {
         const files = makeFiles({
@@ -616,7 +639,21 @@ describe("github", () => {
         })
     )
 
-    it.effect("not render a Node setup step for deno regardless of the resolved source", () =>
+    it.effect("set up Node.js for deno when the project has rule tests", () =>
+      Effect.gen(function* () {
+        const files = makeFiles(RULE_TEST_FILES)
+
+        yield* github
+          .create(ROOT, { packageManager: "deno", scripts: ["check"] })
+          .pipe(provideFileResolver(files))
+
+        const content = files.read(WORKFLOW_PATH)
+        expect(content).toContain('node-version-file: ".node-version"')
+        expect(content.indexOf("Setup Node.js")).toBeLessThan(content.indexOf("Setup Deno"))
+      })
+    )
+
+    it.effect("not render a Node setup step for deno when the project has no rule tests", () =>
       Effect.gen(function* () {
         const files = makeFiles()
 

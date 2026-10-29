@@ -93,7 +93,8 @@ function renderNodeSetup(source: NodeVersionSource): string {
           ${versionInput}`
 }
 
-function getSetupSteps(source: NodeVersionSource) {
+// `adamantite rule test` runs `node --test`, so a Deno workflow with rule tests also sets up Node.js.
+function getSetupSteps(source: NodeVersionSource, hasRuleTests: boolean) {
   return {
     bun: `${renderNodeSetup(source)}
 
@@ -112,7 +113,7 @@ function getSetupSteps(source: NodeVersionSource) {
 
       - name: Install dependencies
         run: bun install --frozen-lockfile`,
-    deno: `      - name: Setup Deno
+    deno: `${hasRuleTests ? `${renderNodeSetup(source)}\n\n` : ""}      - name: Setup Deno
         uses: denoland/setup-deno@v2
 
       - name: Install dependencies
@@ -183,7 +184,7 @@ ${matrixInclude}
       - name: Checkout
         uses: actions/checkout@v7
 
-${getSetupSteps(source)[packageManager]}
+${getSetupSteps(source, hasRuleTests)[packageManager]}
 
       - name: Run \${{ matrix.name }}
         run: \${{ matrix.command }}`
@@ -341,6 +342,11 @@ export default defineIntegration({
               ...(hasRuleTests
                 ? [
                     `With \`${detectedPackageManager.name}\`, run the custom rule tests with \`${RULE_TEST_COMMANDS[detectedPackageManager.name]}\`.`,
+                  ]
+                : []),
+              ...(hasRuleTests && detectedPackageManager.name === "deno"
+                ? [
+                    "`adamantite rule test` runs the tests with Node.js 22.18 or later, so the Deno workflow also needs an `actions/setup-node` step before the tests run.",
                   ]
                 : []),
             ],

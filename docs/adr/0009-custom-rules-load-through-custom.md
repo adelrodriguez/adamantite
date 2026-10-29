@@ -59,6 +59,9 @@ repeat them against the pinned Oxlint:
   against Oxlint 1.88 showed that `RuleTester` refuses Bun and that Jest in CommonJS mode
   cannot load `oxlint/plugins-dev`. The CLI runs on Node.js, so `node --test` works in every
   project that runs Adamantite.
+- The managed GitHub workflow runs `rule test` when the project has rule tests (issue #558),
+  so CI catches a rule that stops reporting. `check` still does not run them. A Deno workflow
+  with rule tests also sets up Node.js, because `node --test` needs it.
 - `adamantite/rules/testing` re-exports `RuleTester` from `oxlint/plugins-dev` and connects it
   to `node:test`, so a test needs one import and each case reports by name. Its declarations
   export only `RuleTester`, so a type-aware lint run needs no `@types/node`. It imports

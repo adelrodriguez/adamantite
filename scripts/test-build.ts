@@ -17,7 +17,6 @@ if (!output.includes(expectedVersion)) {
   )
 }
 
-// Report successful build verification in CI.
 console.info(`Verified built CLI: ${expectedVersion}`)
 
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-cli-"))

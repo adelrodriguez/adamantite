@@ -41,7 +41,6 @@ function getListItems(section: string) {
   return section.match(/^- .+$/gm) ?? []
 }
 
-// The phrases that are missing from a section, so a failure names each one.
 function getMissingPhrases(section: string, phrases: readonly string[]) {
   return phrases.filter((phrase) => !section.includes(phrase))
 }

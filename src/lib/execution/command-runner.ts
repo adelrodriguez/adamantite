@@ -108,7 +108,6 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
       }
     })
 
-    // A blank line separates each step's output from the one before it.
     const toSections = (steps: readonly CommandRunOptions[]) =>
       steps.map((step, index) =>
         index === 0 ? run(step) : Effect.andThen(Console.log(""), run(step))

@@ -11,26 +11,20 @@ import type { DummyRule, OxlintConfig } from "oxlint"
 //
 // Oxlint caches a plugin module by its path and drops query strings, so each rules folder gets its
 // own entry module file. The entry module imports `loadRules` by file URL, so it works from the
-// temporary directory too. The source tree holds `rules/index.ts` and the published dist tree holds
-// `rules/index.js`, so the extension follows this module's own, as in the strict preset. This module runs
-// under whatever runtime executes oxlint in the target project, so it uses only APIs that Node.js
-// and Bun both provide.
+// temporary directory too. The source tree holds `rules/index.ts` and the dist tree holds
+// `rules/index.js`, so the extension follows the extension of this module. This module runs under
+// whatever runtime executes oxlint in the target project, so it uses only APIs that Node.js and Bun
+// both provide.
 const MODULE_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 const RULES_MODULE_URL = new URL(`../rules/index.${MODULE_EXTENSION}`, import.meta.url).href
 
 const DEFAULT_DIRECTORY = ".adamantite/rules"
 const CACHE_DIRECTORY = join("node_modules", ".cache", "adamantite")
 
-/**
- * The plugin name that `custom()` uses when no `name` is given.
- */
 export const DEFAULT_PLUGIN_NAME = "project"
 
 const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts", ".ts"])
 
-/**
- * The rule name that a rule file defines: its file name without the extension.
- */
 export function getRuleName(file: string): string {
   return file.slice(0, -extname(file).length)
 }

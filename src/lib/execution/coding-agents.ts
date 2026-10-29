@@ -51,8 +51,6 @@ export interface HandoffOptions {
   readonly prompt: string
 }
 
-// Lives here instead of lib/shared/errors.ts because it carries the runner failure,
-// and shared must not depend on execution.
 export class HandoffFailed extends Data.TaggedError("HandoffFailed")<{
   readonly cause: CommandFailedLike
   readonly reason: "not-found" | "spawn-failed"
@@ -62,12 +60,10 @@ const ignoreSigint = () => {
   // Adamantite stays alive; the agent in the foreground process group handles the signal.
 }
 
-// While the agent owns the terminal, Ctrl-C is the agent's to handle. The session is
-// spawned with `detached: false` so the agent joins Adamantite's foreground process group
-// (the platform spawner would otherwise start it in a new session on POSIX, cutting it
-// off from terminal-generated SIGINT and SIGWINCH). Sharing the group means the same
-// SIGINT also reaches Adamantite's runtime, whose spawner finalizer would kill the agent
-// mid-edit — this shield discards it until the enclosing scope closes.
+// The session spawns with `detached: false`, so the agent joins Adamantite's foreground process
+// group and gets terminal SIGINT and SIGWINCH. On POSIX, the platform spawner otherwise starts it
+// in a new session. The same SIGINT also reaches Adamantite's runtime, whose spawner finalizer
+// would kill the agent mid-edit. This shield ignores SIGINT until the enclosing scope closes.
 const sigintShield = Effect.acquireRelease(
   Effect.sync(() => {
     const previous = process.listeners("SIGINT")
@@ -106,10 +102,8 @@ export class CodingAgents extends Context.Service<
     Effect.gen(function* () {
       const runner = yield* CommandRunner
 
-      // "It spawned and exited" is the installation check: the probe ignores output and exit
-      // codes, so a CLI that prints its version oddly or exits nonzero still counts as
-      // installed. Any failure to run — the command missing from PATH, a permission or
-      // resource error, or a probe that hangs past the timeout — reads as not installed.
+      // A CLI that starts and exits is installed, whatever its output or exit code. A CLI that does
+      // not start, or that runs past the timeout, is not installed.
       const isInstalled = (agent: CodingAgent, cwd: string) =>
         runner
           .exitCode({

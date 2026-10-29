@@ -3,13 +3,9 @@ import { MissingPackageVersion } from "#lib/shared/errors.ts"
 import packageJson from "../../../package.json" with { type: "json" }
 
 /**
- * Build-time macros for reading versions from this repository's `package.json`. Results are inlined
- * into the bundle, so both the CLI's own version and the tooling integration versions stay in sync
- * with what Adamantite is built against without hardcoded constants.
- *
- * These are intentionally synchronous: they run during bundling (via `with { type: "macro" }`), and
- * the resulting value is inlined at the call site. Reading `package.json` through a static JSON
- * import keeps the macros free of `await`, so consuming modules do not need top-level `await`.
+ * Build-time macros that inline versions from this repository's `package.json` into the bundle. The
+ * static JSON import keeps the macros synchronous, so importing modules do not need top-level
+ * `await`.
  */
 
 // The macros read only these fields, so the manifest's other fields keep their JSON import types.

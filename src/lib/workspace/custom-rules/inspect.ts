@@ -11,9 +11,6 @@ import {
   Visitor,
 } from "oxc-parser"
 
-/**
- * The module that exports `custom()`.
- */
 export const CUSTOM_RULES_MODULE = "adamantite/lint/custom"
 
 const DEFAULT_PLUGIN_NAME = "project"

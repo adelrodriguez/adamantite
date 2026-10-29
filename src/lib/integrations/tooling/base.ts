@@ -119,9 +119,8 @@ function getToolingConfigWarnings(
 }
 
 /**
- * The single source of truth for a tooling integration's config state. Reads the filesystem once
- * and derives the active config, remaining legacy configs, and user-facing warnings; every other
- * layer (assess and init) builds on this state instead of re-deriving it.
+ * Reads the filesystem one time and derives the active config, the remaining legacy configs, and
+ * the warnings. Assess and init use this state and do not derive it again.
  */
 export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
   cwd: string,

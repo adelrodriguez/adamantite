@@ -1,19 +1,14 @@
 /**
  * Re-vendors third-party oxlint plugins into the presets that ship them.
  *
- * Some plugins are deliberately not published to npm — their distribution model is "copy the source
- * into your repo" — so Adamantite ships a bundled build instead of declaring a dependency. Each
- * bundle inlines the plugin's dependencies so the vendored file is fully self-contained. Those
- * inlined versions are pinned by the upstream lockfile; if an upstream ever drops its lockfile, a
- * re-vendor at the same pinned ref can inline different dependency versions, so read re-vendor
- * diffs with that in mind.
+ * Some plugins are not published to npm, so Adamantite ships a bundled build that inlines the
+ * plugin's dependencies. The upstream lockfile pins those dependency versions. If an upstream drops
+ * its lockfile, a re-vendor at the same ref can inline different versions.
  *
  * Usage: node scripts/vendor-plugins.ts [name]
  *
- * Clones each upstream at its pinned commit, installs its dependencies, bundles the entry point to
- * ESM, and rewrites plugin.mjs, plugin.d.mts, and license.md in the preset's directory. After
- * bumping a pinned ref, review the upstream diff and update the rules in the owning preset if rules
- * were added, removed, or renamed (the preset's drift test will catch a mismatch).
+ * After you change a pinned ref, review the upstream diff and update the rules in the owning
+ * preset. The preset's drift test reports a mismatch.
  */
 import { execFile } from "node:child_process"
 import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises"
@@ -112,7 +107,6 @@ async function vendorPlugin(plugin: VendoredPlugin) {
     const { stdout: revParse } = await run("git", ["rev-parse", "HEAD"], cloneDir)
     const commit = revParse.trim()
 
-    // Install the plugin's dependencies so the bundler can inline them.
     await installUpstreamDependencies(cloneDir)
 
     // Strip temporary clone paths from module comments so re-vendoring produces stable diffs.

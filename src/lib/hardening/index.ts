@@ -11,9 +11,6 @@ import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
-/**
- * The instruction files that can state coding standards, and the ADR folder.
- */
 const INSTRUCTION_FILES = ["CODING_STANDARDS.md", "AGENTS.md", "GLOSSARY.md", "docs/adr"] as const
 
 /**
@@ -35,10 +32,10 @@ interface HardenContext {
 }
 
 /**
- * Reads the harden context of the root and each workspace package. A `scope` limits it to the
- * packages inside that folder, or to the package that contains it. The configs that lint them stay
- * listed, also an ancestor config of a package without its own, and so do the rules folders that
- * those configs load, also when a shared tooling package outside the scope owns them.
+ * Reads the harden context of the root and each workspace package. A `scope` keeps the packages
+ * inside that folder, or the package that contains it. The context keeps the configs that lint
+ * those packages, an ancestor config included, and the rules folders that those configs load, also
+ * when they are outside the scope.
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,

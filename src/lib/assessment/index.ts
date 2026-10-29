@@ -97,9 +97,6 @@ function collectApplicable(
   return collect(integrations, cwd, packageJson)
 }
 
-/**
- * The complete result of assessing a project against every managed integration.
- */
 export interface ProjectAssessment {
   /**
    * Names of the integrations that apply to this project. Empty means nothing is managed.

@@ -97,7 +97,6 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   }
 
   if (action === "copy") {
-    // The select already carried the intent; copy without asking again.
     yield* copyPrompt(options.prompt)
     return { _tag: "Copied" } satisfies Resolution
   }

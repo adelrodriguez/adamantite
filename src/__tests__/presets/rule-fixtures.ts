@@ -10,10 +10,9 @@ const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIRECTORY = "fixtures"
 
 /**
- * A plugin's rule fixtures live in one directory with this layout:
- *
- * <fixturesDir>/<rule>/valid/* files the rule must not report <fixturesDir>/<rule>/invalid/* files
- * the rule must report at least once
+ * A plugin's rule fixtures live in one directory. Files in `<fixturesDir>/<rule>/valid/` must not
+ * get a report from the rule. Files in `<fixturesDir>/<rule>/invalid/` must get at least one
+ * report.
  *
  * Keep one case per file, so a relaxed rule cannot hide behind another report in the same file, and
  * the file name tells which case changed.
@@ -144,9 +143,6 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
   }
 }
 
-/**
- * Select the cases of one rule and kind.
- */
 export function selectRuleFixtures(
   cases: readonly RuleFixtureCase[],
   rule: string,

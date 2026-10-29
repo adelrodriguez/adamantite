@@ -47,8 +47,6 @@ function makeSystemError(tag: PlatformError.SystemErrorTag, method: string, path
   })
 }
 
-// makeNoop fails unimplemented operations with a typed NotFound error, which a
-// Result-based test could absorb silently; die with a defect instead.
 function makeUnimplemented(method: string) {
   return () =>
     Effect.die(new Error(`FileSystem.${method} is not implemented in the test filesystem`))

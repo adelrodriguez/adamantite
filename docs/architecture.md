@@ -257,7 +257,8 @@ ADR 0009. Five modules carry them:
   tests as `rule test`. When the list is not empty, `init` adds a `rule test` entry to the
   workflow matrix, and Doctor reports a workflow that does not run `adamantite rule test`. No
   managed script runs the tests, so the entry runs the installed CLI with the package
-  manager, such as `pnpm exec adamantite rule test`.
+  manager, such as `pnpm exec adamantite rule test`. A Deno workflow with rule tests also
+  gets the Node.js setup step, because `rule test` runs `node --test`.
 
 Both preset modules run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`

@@ -17,3 +17,4 @@
 - [ADR 0015: The strict preset requires a reason on each suppression](0015-strict-requires-a-reason-on-each-suppression.md)
 - [ADR 0016: Import owners are their own first-party rule](0016-import-owners-are-their-own-rule.md)
 - [ADR 0017: The strict preset bans task comments](0017-strict-bans-task-comments.md)
+- [ADR 0018: Check fails on warnings](0018-check-fails-on-warnings.md)

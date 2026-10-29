@@ -95,7 +95,8 @@ warns the user and points to `adamantite doctor`.
 
 ## Command boundaries
 
-- `check` and `fix` run Oxfmt and Oxlint.
+- `check` and `fix` run Oxfmt and Oxlint. `check` fails on Oxlint warnings unless
+  `--allow-warnings` is set. See ADR 0018.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
 - `init` creates selected integrations and managed scripts. It installs the Adamantite skill
   for the selected coding agents with the `skills` CLI, from `node_modules/adamantite`, so

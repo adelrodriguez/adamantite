@@ -189,7 +189,7 @@ adamantite analyze
 ```
 
 - Use `check` for read-only formatting, lint, and type-error validation. `check --only lint` or `check --only format`
-  runs one stage.
+  runs one stage. `check` fails on Oxlint warnings. Fix a warning; do not add `--allow-warnings` to pass it.
 - Use `fix` for automatic Oxlint fixes followed by Oxfmt formatting. Add `--suggested`, `--dangerous`, or `--all` only
   with explicit permission after reviewing their impact. `fix --only lint` or `fix --only format` runs one stage.
 - Use `analyze` for unused dependencies, exports, and files. In a monorepo it first checks
@@ -208,7 +208,7 @@ go to Oxlint. For `analyze` they go to Knip, or to the stage that `--only` selec
 flag needs `--only monorepo`. For a permanent Sherif setting, use the `sherif` field instead.
 
 ```shell
-adamantite check src -- --deny-warnings
+adamantite check src -- --format github
 bun run analyze -- -- --directory packages/app
 adamantite analyze --only monorepo -- --ignore-package package-a
 ```

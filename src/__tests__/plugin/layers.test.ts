@@ -266,6 +266,11 @@ tester.run("layers", createLayersRule(MODULES), {
       options: [LIB_OPTIONS],
     },
     {
+      code: 'import dep from "#dep"\nimport { other } from "../../other/index.ts"',
+      filename: "/project/shared/index.ts",
+      options: [{ layers: { features: ["shared"], shared: [] }, root: "." }],
+    },
+    {
       code: 'import { missing } from "#missing/integrations/base.ts"',
       filename: lib("shared/errors.ts"),
       options: [LIB_OPTIONS],
@@ -317,6 +322,28 @@ describe("splitAtRoot", () => {
     expect(splitAtRoot(root, "apps/web/scripts/build.ts")).toBeUndefined()
     expect(splitAtRoot(root, "apps/web/src")).toBeUndefined()
   })
+
+  it.each([
+    { expected: "src/lib", relative: "src/lib/shared/use.ts" },
+    { expected: "web/src/lib", relative: "web/src/lib/shared/use.ts" },
+    { expected: "apps/web/src/lib", relative: "apps/web/src/lib/shared/use.ts" },
+  ])("matches `**` to the folders above $expected", ({ expected, relative }) => {
+    const globstar = readOptions({ layers: {}, root: "**/src/lib" }).root
+
+    expect(splitAtRoot(globstar, relative)).toStrictEqual({
+      below: ["shared", "use.ts"],
+      root: expected,
+    })
+  })
+
+  it("matches the whole package folder to the `.` root", () => {
+    const { root: packageRoot } = readOptions({ layers: {}, root: "." })
+
+    expect(splitAtRoot(packageRoot, "shared/use.ts")).toStrictEqual({
+      below: ["shared", "use.ts"],
+      root: "",
+    })
+  })
 })
 
 describe("locate", () => {
@@ -334,6 +361,18 @@ describe("locate", () => {
     },
   ])("locate $below", ({ below, expected }) => {
     expect(locate(options, "src", below.split("/"))).toStrictEqual(expected)
+  })
+
+  it("names an unmapped path below the `.` root from the package folder", () => {
+    expect(locate(options, "", ["index.ts"])).toStrictEqual({
+      kind: "unmappedFile",
+      path: "index.ts",
+    })
+    expect(locate(options, "", ["lib", "x.ts"])).toStrictEqual({
+      folder: "lib",
+      kind: "unmappedFolder",
+      path: "lib",
+    })
   })
 })
 

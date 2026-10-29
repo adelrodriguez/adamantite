@@ -38,9 +38,9 @@ export interface LayersOptions {
   readonly isolate: ReadonlySet<string>
   readonly layers: LayerMap
   /**
-   * One pattern for each segment of the root, relative to the package folder.
+   * The root glob, relative to the package folder.
    */
-  readonly root: readonly RegExp[]
+  readonly root: RegExp
 }
 
 /**
@@ -104,10 +104,12 @@ export function readLayersOptions(options: Readonly<Options>): LayersOptions | u
     ignoreTypes: readBooleanOption(options, "ignoreTypes") ?? false,
     isolate: new Set(readStringArrayOption(options, "isolate")),
     layers,
-    root: root
-      .split("/")
-      .filter((segment) => segment !== "" && segment !== ".")
-      .map((segment) => globToRegExp(segment)),
+    root: globToRegExp(
+      root
+        .split("/")
+        .filter((segment) => segment !== "" && segment !== ".")
+        .join("/")
+    ),
   }
 }
 
@@ -200,19 +202,21 @@ export function findMapErrors(layers: LayerMap, isolate: ReadonlySet<string>): M
  * root.
  */
 export function splitAtRoot(
-  root: readonly RegExp[],
+  root: RegExp,
   relative: string
 ): { readonly below: readonly string[]; readonly root: string } | undefined {
   const segments = relative.split("/")
 
-  if (
-    segments.length <= root.length
-    || !root.every((part, index) => part.test(segments[index] ?? ""))
-  ) {
-    return undefined
+  // The shortest match, so `**` matches zero or more folders above the root.
+  for (let length = 0; length < segments.length; length += 1) {
+    const folder = segments.slice(0, length).join("/")
+
+    if (root.test(folder)) {
+      return { below: segments.slice(length), root: folder }
+    }
   }
 
-  return { below: segments.slice(root.length), root: segments.slice(0, root.length).join("/") }
+  return undefined
 }
 
 function getUnit(inside: readonly string[]) {
@@ -235,11 +239,11 @@ export function locate(options: LayersOptions, root: string, below: readonly str
   const [top = "", ...inside] = below
 
   if (inside.length === 0) {
-    return { kind: "unmappedFile", path: `${root}/${path}` }
+    return { kind: "unmappedFile", path: posix.join(root, path) }
   }
 
   if (!Object.hasOwn(options.layers, top)) {
-    return { folder: top, kind: "unmappedFolder", path: `${root}/${top}` }
+    return { folder: top, kind: "unmappedFolder", path: posix.join(root, top) }
   }
 
   return { kind: "layer", layer: top, unit: options.isolate.has(top) ? getUnit(inside) : undefined }
@@ -390,9 +394,9 @@ function findPackage(dir: string): string | undefined {
 const resolver = new ResolverFactory({
   conditionNames: ["types", "import", "node", "default"],
   extensionAlias: {
-    ".cjs": [".cts", ".cjs"],
-    ".js": [".ts", ".tsx", ".js", ".jsx"],
-    ".mjs": [".mts", ".mjs"],
+    ".cjs": [".cts", ".d.cts", ".cjs"],
+    ".js": [".ts", ".tsx", ".d.ts", ".js", ".jsx"],
+    ".mjs": [".mts", ".d.mts", ".mjs"],
   },
   extensions: [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".json"],
   symlinks: false,
@@ -489,10 +493,15 @@ function checkImport(
 
   // An import that does not resolve is outside the map. TypeScript reports it.
   const target = file.modules.resolve(file.importer, source.value)
+  const relative = target === undefined ? undefined : posix.relative(file.packageDir, target)
+
+  // A dependency, or a file outside the package, is outside the map, even below a `.` root.
   const split =
-    target === undefined
+    relative === undefined
+    || relative.startsWith("../")
+    || relative.split("/").includes("node_modules")
       ? undefined
-      : splitAtRoot(options.root, posix.relative(file.packageDir, target))
+      : splitAtRoot(options.root, relative)
 
   // A target in another root, such as another app of a monorepo, is outside this map.
   if (split === undefined || split.root !== file.root) {

@@ -89,6 +89,22 @@ describe("readAgentReach", () => {
     })
   )
 
+  it.effect("read the links after a code block that shows a fence with a language", () =>
+    Effect.gen(function* () {
+      const reach = yield* readReach({
+        // A fence with text after it cannot close a block, so the block ends on the third line.
+        "AGENTS.md":
+          "```text\n```typescript\n```\n\nRead [the guide](docs/guide.md) and [the plan](docs/missing.md).\n",
+        "docs/guide.md": "# Guide\n",
+      })
+
+      expect(reach).toStrictEqual({
+        brokenLinks: [{ file: "AGENTS.md", target: "docs/missing.md" }],
+        unreached: [],
+      })
+    })
+  )
+
   it.effect("ignore the links of an example in a code block or in inline code", () =>
     Effect.gen(function* () {
       const reach = yield* readReach({

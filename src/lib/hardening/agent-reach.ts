@@ -25,9 +25,10 @@ export interface BrokenLink {
 }
 
 const MARKDOWN_EXTENSION = /\.(?:md|mdx|mdc)$/u
-// A fence opens with three or more backticks or tildes, and the same fence or the end of the file
-// closes it.
-const FENCED_BLOCK = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1[^\n]*$|(?![\s\S]))/gmu
+// A fence opens with three or more backticks or tildes. A fence of the same character that is at
+// least as long, with only spaces or tabs after it, closes it, as CommonMark says. The end of the
+// file also closes it.
+const FENCED_BLOCK = /^ {0,3}((`|~)\2{2,})[^\n]*\n[\s\S]*?(?:^ {0,3}\1\2*[\t ]*$|(?![\s\S]))/gmu
 const CODE_SPAN = /`([^`\n]+)`/gu
 const INLINE_LINK = /\]\(\s*<?([^\s)>]+)>?(?:\s[^)]*)?\)/gu
 const LINK_DEFINITION = /^ {0,3}\[[^\]]+\]:\s*<?([^\s>]+)>?/gmu

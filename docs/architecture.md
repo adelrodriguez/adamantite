@@ -107,7 +107,10 @@ warns the user and points to `adamantite doctor`.
   handoff, it runs Oxfmt and Oxlint as `check` does, then the custom rule tests as `rule test`
   does, then assesses the project as Doctor does. It never produces findings, so it never changes Doctor's
   result. The prompt lists each Markdown file that `git ls-files` gives, except the changesets
-  and the changelogs, so the agent reads all the documentation. See ADR 0012.
+  and the changelogs, so the agent reads all the documentation. `hardening/agent-reach.ts`
+  finds the files that no agent instruction file reaches, the `AGENTS.md` files that a
+  `CLAUDE.md` hides from Claude Code, and the links to missing files. After a handoff, a link
+  to a missing file that the session added fails the verification. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
   preset, copies the Adamantite skill again when the copy that `init` installed is stale, then
   emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do

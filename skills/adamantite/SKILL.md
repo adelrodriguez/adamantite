@@ -245,7 +245,7 @@ offers a handoff to an installed coding agent CLI, a copy of the prompt, or noth
 monorepo, `--path` limits the session to one workspace package or folder. `--commits` sets how many
 recent commits the agent reads for fixed mistakes, and the default is 200. After a
 handoff, it runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of
-them fails. `harden` never
+them fails, or when the session added a link to a Markdown file that does not exist. `harden` never
 produces Doctor findings.
 
 ## Update

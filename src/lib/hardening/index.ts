@@ -82,7 +82,7 @@ function isDocumentation(file: string) {
  */
 interface HardenContext {
   /**
-   * Which Markdown files the agent instruction files reach, or none when git cannot list them.
+   * Which Markdown files each `AGENTS.md` reaches, or none when git cannot list them.
    */
   readonly agentReach: Option.Option<AgentReach>
   readonly configs: readonly string[]
@@ -185,11 +185,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   return {
     agentReach: agentReach.pipe(
       Option.map((reach) => ({
-        agentFiles: reach.agentFiles.filter((file) => isSelectedFile(file)),
         brokenLinks: reach.brokenLinks.filter((link) => isSelectedFile(link.file)),
-        hiddenAgentsFiles: reach.hiddenAgentsFiles.filter((hidden) =>
-          isSelectedFile(hidden.agents)
-        ),
         unreached: reach.unreached.filter((file) => isSelectedFile(file)),
       }))
     ),
@@ -221,30 +217,20 @@ function renderList(paths: readonly string[], empty: string) {
 }
 
 function renderAgentReach(reach: AgentReach) {
-  const sections = [
-    `Coding agents load these files by themselves:\n\n${renderList(reach.agentFiles, "No agent instruction file was found.")}`,
+  const unreached =
     reach.unreached.length === 0
-      ? "Links, `@` imports, and code spans from those files reach each Markdown file."
-      : `No chain of links, \`@\` imports, or code spans from those files reaches these Markdown files:\n\n${renderList(reach.unreached, "")}`,
-  ]
+      ? "Links and code spans from each `AGENTS.md` reach each Markdown file."
+      : `No chain of links or code spans from an \`AGENTS.md\` reaches these Markdown files:\n\n${renderList(reach.unreached, "")}`
+  const brokenLinks =
+    reach.brokenLinks.length === 0
+      ? []
+      : [
+          `These links go to Markdown files that do not exist:\n\n${reach.brokenLinks
+            .map((link) => `- \`${link.file}\` links to \`${link.target}\``)
+            .join("\n")}`,
+        ]
 
-  if (reach.hiddenAgentsFiles.length > 0) {
-    sections.push(
-      `Claude Code does not read these \`AGENTS.md\` files, because a \`CLAUDE.md\` in their folder or above it does not import them:\n\n${reach.hiddenAgentsFiles
-        .map((hidden) => `- \`${hidden.agents}\`, hidden by \`${hidden.claude}\``)
-        .join("\n")}`
-    )
-  }
-
-  if (reach.brokenLinks.length > 0) {
-    sections.push(
-      `These links go to Markdown files that do not exist:\n\n${reach.brokenLinks
-        .map((link) => `- \`${link.file}\` links to \`${link.target}\``)
-        .join("\n")}`
-    )
-  }
-
-  return sections.join("\n\n")
+  return [unreached, ...brokenLinks].join("\n\n")
 }
 
 function renderRulesFolders(context: HardenContext) {
@@ -288,7 +274,7 @@ export function renderHardenPrompt(
   return fillTemplate(hardenPromptTemplate, {
     agentReach: Option.match(context.agentReach, {
       onNone: () =>
-        "Adamantite could not find which files the agent instruction files reach, because git could not list the files. Follow the links from the agent instruction files yourself.",
+        "Adamantite could not find which files each `AGENTS.md` reaches, because git could not list the files. Follow the links from each `AGENTS.md` yourself.",
       onSome: (reach) => renderAgentReach(reach),
     }),
     configs: renderList(

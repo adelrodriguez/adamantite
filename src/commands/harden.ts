@@ -211,10 +211,6 @@ export default Command.make("harden", { commits, scope }).pipe(
         onNone: () => [],
         onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
       })
-      const hiddenAgentsFiles = Option.match(reachAfter, {
-        onNone: () => [],
-        onSome: (reach) => reach.hiddenAgentsFiles,
-      })
 
       for (const warning of assessment.warnings) {
         yield* prompter.log.warning(warning)
@@ -238,12 +234,6 @@ export default Command.make("harden", { commits, scope }).pipe(
       for (const link of addedBrokenLinks) {
         yield* prompter.log.error(
           `\`${link.file}\` links to \`${link.target}\`, which does not exist, after the ${agent.name} session.`
-        )
-      }
-
-      for (const hidden of hiddenAgentsFiles) {
-        yield* prompter.log.warning(
-          `Claude Code does not read \`${hidden.agents}\`, because \`${hidden.claude}\` does not import it with \`@AGENTS.md\`.`
         )
       }
 

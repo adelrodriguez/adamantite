@@ -14,27 +14,42 @@ function readReach(files: Record<string, string>) {
 }
 
 describe("readAgentReach", () => {
-  it.effect(
-    "reach the files that links, imports, and code spans name, also through other files",
-    () =>
-      Effect.gen(function* () {
-        const reach = yield* readReach({
-          "AGENTS.md": "Read `GLOSSARY.md` and [the architecture](docs/architecture.md#layers).\n",
-          "CLAUDE.md": "@AGENTS.md\n",
-          "GLOSSARY.md": "# Glossary\n",
-          "docs/architecture.md": "See [the testing guide](./guides/testing.md).\n",
-          "docs/guides/testing.md": "# Testing\n",
-          "docs/plans/old.md": "# Old plan\n",
-          "src/README.md": "# Source\n",
-        })
-
-        expect(reach).toStrictEqual({
-          agentFiles: ["AGENTS.md", "CLAUDE.md"],
-          brokenLinks: [],
-          hiddenAgentsFiles: [],
-          unreached: ["docs/plans/old.md", "src/README.md"],
-        })
+  it.effect("reach the files that links and code spans name, also through other files", () =>
+    Effect.gen(function* () {
+      const reach = yield* readReach({
+        "AGENTS.md": "Read `GLOSSARY.md` and [the architecture](docs/architecture.md#layers).\n",
+        "GLOSSARY.md": "# Glossary\n",
+        "docs/architecture.md": "See [the testing guide](./guides/testing.md).\n",
+        "docs/guides/testing.md": "# Testing\n",
+        "docs/plans/old.md": "# Old plan\n",
+        "src/README.md": "# Source\n",
       })
+
+      expect(reach).toStrictEqual({
+        brokenLinks: [],
+        unreached: ["docs/plans/old.md", "src/README.md"],
+      })
+    })
+  )
+
+  it.effect("start from each AGENTS.md, and not from the files of one vendor", () =>
+    Effect.gen(function* () {
+      const reach = yield* readReach({
+        ".cursor/rules/style.mdc": "See `docs/style.md`.\n",
+        "CLAUDE.md": "See `docs/testing.md`.\n",
+        "docs/style.md": "# Style\n",
+        "docs/testing.md": "# Testing\n",
+        "packages/web/AGENTS.md": "See [the web guide](docs/guide.md).\n",
+        "packages/web/docs/guide.md": "# Web\n",
+      })
+
+      expect(reach.unreached).toStrictEqual([
+        ".cursor/rules/style.mdc",
+        "CLAUDE.md",
+        "docs/style.md",
+        "docs/testing.md",
+      ])
+    })
   )
 
   it.effect("reach each Markdown file directly in a folder that a file names", () =>
@@ -51,34 +66,11 @@ describe("readAgentReach", () => {
     })
   )
 
-  it.effect("start from the instruction files of each coding agent, also in subfolders", () =>
-    Effect.gen(function* () {
-      const reach = yield* readReach({
-        ".claude/rules/testing.md": "See `docs/testing.md`.\n",
-        ".cursor/rules/style.mdc": "# Style\n",
-        ".github/copilot-instructions.md": "# Copilot\n",
-        "README.md": "# Acme\n",
-        "docs/testing.md": "# Testing\n",
-        "packages/web/AGENTS.md": "# Web\n",
-      })
-
-      expect(reach).toMatchObject({
-        agentFiles: [
-          ".claude/rules/testing.md",
-          ".cursor/rules/style.mdc",
-          ".github/copilot-instructions.md",
-          "packages/web/AGENTS.md",
-        ],
-        unreached: ["README.md"],
-      })
-    })
-  )
-
   it.effect("ignore a URL, an anchor, a package name, and a code span that names no file", () =>
     Effect.gen(function* () {
       const reach = yield* readReach({
         "AGENTS.md":
-          "Use [Effect](https://effect.website), see [below](#tests), install `@effect/vitest`, and run `pnpm run check`. Ask @maintainer.\n",
+          "Use [Effect](https://effect.website), see [below](#tests), install `@effect/vitest`, and run `pnpm run check`.\n",
         "docs/testing.md": "# Testing\n",
       })
 
@@ -97,39 +89,25 @@ describe("readAgentReach", () => {
     })
   )
 
-  it.effect(
-    "list an AGENTS.md that a CLAUDE.md in its folder or above hides from Claude Code",
-    () =>
-      Effect.gen(function* () {
-        const reach = yield* readReach({
-          "AGENTS.md": "# Acme\n",
-          "CLAUDE.md": "# Claude notes\n",
-          "packages/web/AGENTS.md": "# Web\n",
-        })
-
-        expect(reach.hiddenAgentsFiles).toStrictEqual([
-          { agents: "AGENTS.md", claude: "CLAUDE.md" },
-          { agents: "packages/web/AGENTS.md", claude: "CLAUDE.md" },
-        ])
+  it.effect("ignore the links of an example in a code block or in inline code", () =>
+    Effect.gen(function* () {
+      const reach = yield* readReach({
+        "AGENTS.md": [
+          "Write a pointer like `[the guide](docs/example.md)`:",
+          "",
+          "```markdown",
+          "Read [the guide](docs/fenced.md).",
+          "```",
+          "",
+          "~~~",
+          "[style]: docs/style.md",
+          "~~~",
+          "",
+        ].join("\n"),
+        "docs/style.md": "# Style\n",
       })
-  )
 
-  it.effect.each([
-    { content: "@AGENTS.md\n", name: "imports it" },
-    { content: "# Acme\n", name: "has the same content, as a symlink does" },
-  ])("keep an AGENTS.md visible to Claude Code when the CLAUDE.md beside it $name", ({ content }) =>
-    Effect.gen(function* () {
-      const reach = yield* readReach({ "AGENTS.md": "# Acme\n", "CLAUDE.md": content })
-
-      expect(reach.hiddenAgentsFiles).toStrictEqual([])
-    })
-  )
-
-  it.effect("keep an AGENTS.md visible to Claude Code when no CLAUDE.md exists", () =>
-    Effect.gen(function* () {
-      const reach = yield* readReach({ "AGENTS.md": "# Acme\n" })
-
-      expect(reach.hiddenAgentsFiles).toStrictEqual([])
+      expect(reach).toMatchObject({ brokenLinks: [], unreached: ["docs/style.md"] })
     })
   )
 })

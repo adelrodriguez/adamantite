@@ -35,7 +35,7 @@ These are the Markdown files of the project, without the changesets and the chan
 
 Start with each `AGENTS.md` above. Coding agents start from `AGENTS.md`, so it is the only instruction file that they surely read. It must point to the other documentation of the project. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, also when the list does not have them, and the comments in the Oxlint config. A linked file outside the scope of `--path` counts: read it, but do not survey the code beside it.
 
-Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too: record the file that the link must go to.
+Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to.
 
 This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.
 

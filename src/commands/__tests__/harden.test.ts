@@ -140,7 +140,7 @@ const REQUIRED_PHRASES = {
     "Do not set the rule to `warn`: `adamantite check` fails on warnings.",
     "`CODING_STANDARDS.md`",
     "When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.",
-    "add each approved pointer to the instruction file that the gap names",
+    "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
   ],
   "## Verify": [
     "run `adamantite harden` again without a terminal, and read its agent reach",
@@ -531,24 +531,35 @@ describe("harden", () => {
     })
   )
 
-  it.effect("list the files that no agent reaches, a hidden AGENTS.md, and a broken link", () =>
+  it.effect("list the files that no AGENTS.md reaches, and a broken link", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
         "AGENTS.md": "Read [the testing guide](docs/testing.md) and `docs/architecture.md`.\n",
-        "CLAUDE.md": "# Claude notes\n",
+        "CLAUDE.md": "See `docs/style.md`.\n",
         "docs/architecture.md": "# Architecture\n",
         "docs/style.md": "# Style\n",
         ...INSTALLED,
       })
-      const reach = getSection(prompt, "### Agent reach")
 
-      expect(getListItems(reach)).toStrictEqual([
-        "- `AGENTS.md`",
+      expect(getListItems(getSection(prompt, "### Agent reach"))).toStrictEqual([
         "- `CLAUDE.md`",
         "- `docs/style.md`",
-        "- `AGENTS.md`, hidden by `CLAUDE.md`",
         "- `AGENTS.md` links to `docs/testing.md`",
       ])
+    })
+  )
+
+  it.effect("list a link to a file that the git index has and the working tree does not", () =>
+    Effect.gen(function* () {
+      const { prompter } = yield* runHarden(
+        { "AGENTS.md": "Read [the guide](docs/guide.md).\n", ...INSTALLED },
+        [],
+        { indexOnlyFiles: ["docs/guide.md"] }
+      )
+
+      expect(getListItems(getSection(prompter.messages[0] ?? "", "### Agent reach"))).toStrictEqual(
+        ["- `AGENTS.md` links to `docs/guide.md`"]
+      )
     })
   )
 
@@ -557,7 +568,7 @@ describe("harden", () => {
       const prompt = yield* runHardenPrompt({ "AGENTS.md": "# Acme\n", ...INSTALLED })
 
       expect(getSection(prompt, "### Agent reach")).toContain(
-        "Links, `@` imports, and code spans from those files reach each Markdown file."
+        "Links and code spans from each `AGENTS.md` reach each Markdown file."
       )
     })
   )
@@ -575,7 +586,7 @@ describe("harden", () => {
         "Git could not list the files of this project."
       )
       expect(getSection(prompter.messages[0] ?? "", "### Agent reach")).toContain(
-        "Follow the links from the agent instruction files yourself."
+        "Follow the links from each `AGENTS.md` yourself."
       )
     })
   )
@@ -1115,25 +1126,6 @@ describe("harden", () => {
         },
       ])
       expect(prompter.outros).toStrictEqual(["⚠️ Harden verification failed."])
-    })
-  )
-
-  it.effect("warn and still pass when a CLAUDE.md hides AGENTS.md after the session", () =>
-    Effect.gen(function* () {
-      const { exit, prompter } = yield* runInteractiveHarden({
-        files: { "AGENTS.md": "# Acme\n", "CLAUDE.md": "# Claude notes\n", ...HEALTHY_FILES },
-        prompter: { selectResponses: [claudeAgent] },
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs.filter((log) => log.level !== "info")).toStrictEqual([
-        {
-          level: "warning",
-          message:
-            "Claude Code does not read `AGENTS.md`, because `CLAUDE.md` does not import it with `@AGENTS.md`.",
-        },
-        SUCCESS_LOG,
-      ])
     })
   )
 

@@ -137,16 +137,10 @@ The written coding standards of a target project, in `CODING_STANDARDS.md`, `AGE
 read them, but no tool checks them.
 _Avoid_: Prose, docs
 
-**Agent instruction file**:
-An instruction file that a coding agent loads by itself at the start of a session, such as
-`AGENTS.md`, `CLAUDE.md`, `.claude/rules`, or `.cursor/rules`. An agent finds the other
-documentation only through the links, `@` imports, and code-span paths of these files.
-_Avoid_: Entry file, root instructions
-
 **Discovery gap**:
-A file that states a coding standard, but that no chain of references from an agent instruction
-file reaches, so no coding agent finds the standard. An `AGENTS.md` that a `CLAUDE.md` hides from
-Claude Code, and a link to a file that does not exist, are discovery gaps too.
+A file that states a coding standard, but that no chain of links or code-span paths from an
+`AGENTS.md` reaches, so a coding agent that starts from `AGENTS.md` never finds the standard. A link
+to a file that does not exist is a discovery gap too.
 _Avoid_: Orphan doc, missing pointer
 
 **Standards file**:

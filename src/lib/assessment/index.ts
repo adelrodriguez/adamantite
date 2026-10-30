@@ -23,6 +23,7 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
+import agents from "#lib/integrations/workspace/agents.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -43,6 +44,7 @@ const managedIntegrations = [
   sherif,
   tsgolint,
   tsconfig,
+  agents,
   github,
   zed,
 ] as const

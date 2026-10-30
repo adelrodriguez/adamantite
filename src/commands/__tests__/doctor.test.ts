@@ -43,6 +43,7 @@ const geminiAgent = agentByCommand("gemini")
 function makeFindingsFixture() {
   return createFileSystemTestContext({
     files: {
+      "AGENTS.md": "# AGENTS.md\n",
       "package.json": manifest({
         devDependencies: { adamantite: "1.0.0", knip: knip.version },
         scripts: { analyze: "adamantite analyze" },
@@ -79,6 +80,7 @@ const NO_INTEGRATION_FILES = {
 }
 
 const HEALTHY_FILES = {
+  "AGENTS.md": "# AGENTS.md\n",
   "knip.config.ts": toKnipTsConfigContent(),
   "package.json": manifest({
     devDependencies: { adamantite: "1.0.0", knip: knip.version },
@@ -175,6 +177,7 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          "AGENTS.md": "# AGENTS.md\n",
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
@@ -190,6 +193,23 @@ describe("doctor", () => {
         ["# Adamantite doctor findings", "## 1. Missing knip configuration", "## Verify"],
       ])
       expect(prompter).toMatchObject({ intros: [], notes: [], outros: [] })
+    })
+  )
+
+  it.effect("report a project root without AGENTS.md", () =>
+    Effect.gen(function* () {
+      const { "AGENTS.md": _agents, ...files } = HEALTHY_FILES
+      const prompter = createPrompterTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files: createFileSystemTestContext({ files }),
+        layers: [prompter.layer],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages.map(getHeadings)).toStrictEqual([
+        ["# Adamantite doctor findings", "## 1. Missing AGENTS.md", "## Verify"],
+      ])
     })
   )
 

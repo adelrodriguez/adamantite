@@ -754,6 +754,7 @@ describe("harden", () => {
         // Knip is installed without its managed config, so Doctor reports one finding.
         files: {
           ...ADAMANTITE_MODULE,
+          "AGENTS.md": "# AGENTS.md\n",
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: knip.version },
             scripts: { analyze: "adamantite analyze" },

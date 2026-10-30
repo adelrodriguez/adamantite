@@ -604,12 +604,12 @@ describe("harden", () => {
       })
   )
 
-  it.effect("tell the agent to read the last 200 commits by default", () =>
+  it.effect("tell the agent to read the last 200 commits of the project folder by default", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt(INSTALLED)
 
       expect(getSection(prompt, "## 4. Read the fix history")).toContain(
-        '`git log -n 200 --no-merges --format="%h %s"`'
+        '`git log -n 200 --no-merges --format="%h %s" -- .`'
       )
     })
   )
@@ -625,6 +625,19 @@ describe("harden", () => {
 
       expect(getSection(prompt, "## 4. Read the fix history")).toContain(
         '`git log -n 50 --no-merges --format="%h %s" -- packages/web`'
+      )
+    })
+  )
+
+  it.effect("quote a --path folder that the shell would split or reject", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({ "src/(app)/page.ts": "export {}\n", ...INSTALLED }, [
+        "--path",
+        "src/(app)",
+      ])
+
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        `\`git log -n 200 --no-merges --format="%h %s" -- 'src/(app)'\``
       )
     })
   )

@@ -185,6 +185,16 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   } satisfies HardenContext
 })
 
+const SHELL_SAFE = /^[\w./-]+$/u
+
+/**
+ * Quotes a path for a POSIX shell when it has a character that the shell splits or reads, such as a
+ * space or a parenthesis.
+ */
+function quoteShellArgument(argument: string) {
+  return SHELL_SAFE.test(argument) ? argument : `'${argument.replaceAll("'", "'\\''")}'`
+}
+
 function renderList(paths: readonly string[], empty: string) {
   return paths.length === 0 ? empty : paths.map((file) => `- \`${file}\``).join("\n")
 }
@@ -224,7 +234,8 @@ export function renderHardenPrompt(
   context: HardenContext,
   { adamantiteVersion, commits }: RenderHardenPromptOptions
 ): string {
-  const fixHistoryScope = context.scope === null ? "" : ` -- ${context.scope}`
+  // `.` keeps the history to the project folder when the project is a folder of a larger repository.
+  const fixHistoryPath = quoteShellArgument(context.scope ?? ".")
 
   return fillTemplate(hardenPromptTemplate, {
     configs: renderList(
@@ -236,7 +247,7 @@ export function renderHardenPrompt(
         "Git could not list the files of this project. Find the Markdown files with a file search, and leave out the dependencies, the build output, the changesets, and the changelogs.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
-    fixHistoryCommand: `\`git log -n ${commits} --no-merges --format="%h %s"${fixHistoryScope}\``,
+    fixHistoryCommand: `\`git log -n ${commits} --no-merges --format="%h %s" -- ${fixHistoryPath}\``,
     instructionFiles: renderList(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."

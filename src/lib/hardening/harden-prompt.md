@@ -53,7 +53,7 @@ This step is done when each area has its candidates or the note "none found".
 
 ## 4. Read the fix history
 
-A mistake that a commit fixed, and that other code repeats, is a standard that a rule can hold. Read the commits that this command lists. When the history has fewer commits, read all of them, and say how many you read.
+A mistake that a commit fixed, and that other code repeats, is a standard that a rule can hold. Run this command from the project root, and read the commits that it lists. When the history has fewer commits, read all of them, and say how many you read.
 
 {{fixHistoryCommand}}
 

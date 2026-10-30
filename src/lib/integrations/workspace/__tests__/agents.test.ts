@@ -38,7 +38,7 @@ describe("agents", () => {
               id: "missing-agents-md",
               integration: "agents",
               notes: [
-                "`AGENTS.md` is the instruction file that all coding agents read. Claude Code reads it when the project has no `CLAUDE.md`.",
+                "`AGENTS.md` is the instruction file that most coding agents read, such as Codex and Cursor. Claude Code reads it when the project has no `CLAUDE.md`. Gemini CLI reads it only when `context.fileName` in its settings names it.",
                 "To create the file with an Adamantite section that lists the package scripts, run `adamantite init --non-interactive --script analyze --script check --agents`.",
               ],
               title: "Missing AGENTS.md",

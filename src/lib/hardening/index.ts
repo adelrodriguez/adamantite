@@ -204,20 +204,39 @@ function renderRulesFolders(context: HardenContext) {
 }
 
 /**
- * The Markdown prompt that a coding agent follows to harden the project. Code renders only the
- * detected files; `harden-prompt.md` holds the rest.
+ * The number of recent commits that the agent reads for fixed mistakes when `--commits` is not set.
  */
-export function renderHardenPrompt(context: HardenContext, adamantiteVersion: string): string {
+export const DEFAULT_FIX_HISTORY_COMMITS = 200
+
+interface RenderHardenPromptOptions {
+  readonly adamantiteVersion: string
+  /**
+   * The number of recent commits that the agent reads for fixed mistakes.
+   */
+  readonly commits: number
+}
+
+/**
+ * The Markdown prompt that a coding agent follows to harden the project. Code renders only the
+ * detected files and the commands; `harden-prompt.md` holds the rest.
+ */
+export function renderHardenPrompt(
+  context: HardenContext,
+  { adamantiteVersion, commits }: RenderHardenPromptOptions
+): string {
+  const fixHistoryScope = context.scope === null ? "" : ` -- ${context.scope}`
+
   return fillTemplate(hardenPromptTemplate, {
     configs: renderList(
       context.configs,
-      "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 8."
+      "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 9."
     ),
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>
         "Git could not list the files of this project. Find the Markdown files with a file search, and leave out the dependencies, the build output, the changesets, and the changelogs.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
+    fixHistoryCommand: `\`git log -n ${commits} --no-merges --format="%h %s"${fixHistoryScope}\``,
     instructionFiles: renderList(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."

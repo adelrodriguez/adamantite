@@ -62,7 +62,7 @@ const REQUIRED_PHRASES = {
     "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
   ],
   "## 2. List the written standards": [
-    "Each written standard is a candidate, and goes on to step 4",
+    "Each written standard is a candidate, and goes on to step 5",
   ],
   "## 3. Survey the code": [
     "the command that gives the count",
@@ -70,16 +70,25 @@ const REQUIRED_PHRASES = {
     "A rule that a commit removed is a **decision**",
     "This step is done when each area has its candidates",
   ],
-  "## 4. Drop what a tool already enforces": [
-    "For each written standard from step 2 and each candidate from step 3",
-    "lint a counterexample from step 3 where it is",
+  "## 4. Read the fix history": [
+    "Name the mistake in one sentence",
+    "Skip the fixes of logic that only one place has",
+    "Find the commit that added the mistake",
+    "two or more fixes have it",
+    "The code before the fix is the case that the rule must report",
+    "When the history has fewer commits, read all of them",
+    "This step is done when each fix has its mark",
+  ],
+  "## 5. Drop what a tool already enforces": [
+    "For each written standard from step 2 and each candidate from steps 3 and 4",
+    "lint a counterexample from step 3 or 4 where it is",
     "make a **trial copy** outside the project",
     "The project itself stays unchanged.",
     "A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second.",
     "A report from a rule that only the trial turns on is not enforcement",
     "When a tool enforces only part of a written standard, keep the other part as a candidate.",
   ],
-  "## 5. Find the gaps in the existing rules": [
+  "## 6. Find the gaps in the existing rules": [
     "This step starts from the rules that the project already has",
     "`require()`, `import()`, `export … from`, `import type`, and the path aliases",
     "When the code does not have the form yet, make a trial copy as step 4 says",
@@ -92,7 +101,8 @@ const REQUIRED_PHRASES = {
     "is not a candidate: list it under **Decisions** as a report for the maintainers of that package",
     'This step is done when each rule has its gaps or the note "none found".',
   ],
-  "## 6. Place each candidate on the enforcement ladder": [
+  "## 7. Place each candidate on the enforcement ladder": [
+    "For a candidate from step 4, use the code before and after one of its fixes.",
     "A native rule, such as a file-name rule, comes before a custom rule",
     "Write one combined `no-restricted-imports` for each set of files",
     "**Project check:**",
@@ -100,7 +110,8 @@ const REQUIRED_PHRASES = {
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
   ],
-  "## 7. Show the candidates and wait for approval": [
+  "## 8. Show the candidates and wait for approval": [
+    "or the fix commits",
     "each rule with many suppressions, and each gap in a shipped rule that no option can close",
     "Score each candidate from 1 to 5",
     "Show the candidates with a score of 4 or 5, from the highest score to the lowest.",
@@ -111,7 +122,7 @@ const REQUIRED_PHRASES = {
     "When no human can approve",
     "Stop after this step.",
   ],
-  "## 8. Write the approved standards": [
+  "## 9. Write the approved standards": [
     "**Gap in a custom rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail",
     "When no file has the form, tell the user that the change is not verified.",
     "Do not change a rule that a preset or plugin ships.",
@@ -133,7 +144,7 @@ const REQUIRED_PHRASES = {
     "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
     "All three must exit 0.",
     "When you changed a project check, also run that check with the project's own command",
-    "add the file to the override as step 8 says, not a disable comment",
+    "add the file to the override as step 9 says, not a disable comment",
     "When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
@@ -409,11 +420,12 @@ describe("harden", () => {
           "## 1. Explore the documentation",
           "## 2. List the written standards",
           "## 3. Survey the code",
-          "## 4. Drop what a tool already enforces",
-          "## 5. Find the gaps in the existing rules",
-          "## 6. Place each candidate on the enforcement ladder",
-          "## 7. Show the candidates and wait for approval",
-          "## 8. Write the approved standards",
+          "## 4. Read the fix history",
+          "## 5. Drop what a tool already enforces",
+          "## 6. Find the gaps in the existing rules",
+          "## 7. Place each candidate on the enforcement ladder",
+          "## 8. Show the candidates and wait for approval",
+          "## 9. Write the approved standards",
           "## Verify",
         ],
       ])
@@ -541,7 +553,7 @@ describe("harden", () => {
 
       expect(
         getMissingPhrases(getSection(prompt, "### Oxlint config"), [
-          "tell the user to run `adamantite init` before step 8",
+          "tell the user to run `adamantite init` before step 9",
         ])
       ).toStrictEqual([])
     })
@@ -586,10 +598,44 @@ describe("harden", () => {
         )
 
         expect(prompt.slice(0, prompt.indexOf("\n## Context\n"))).toContain(
-          "Steps 1 to 7 are read-only."
+          "Steps 1 to 8 are read-only."
         )
         expect(missing).toStrictEqual([])
       })
+  )
+
+  it.effect("tell the agent to read the last 200 commits by default", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(INSTALLED)
+
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        '`git log -n 200 --no-merges --format="%h %s"`'
+      )
+    })
+  )
+
+  it.effect("read the number of commits that --commits gives, in the folder of --path", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(MONOREPO_FILES, [
+        "--commits",
+        "50",
+        "--path",
+        "packages/web",
+      ])
+
+      expect(getSection(prompt, "## 4. Read the fix history")).toContain(
+        '`git log -n 50 --no-merges --format="%h %s" -- packages/web`'
+      )
+    })
+  )
+
+  it.effect("fail when --commits is not a positive number", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden(INSTALLED, ["--commits", "0"])
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([])
+    })
   )
 
   it.effect("fail when Adamantite is not installed", () =>

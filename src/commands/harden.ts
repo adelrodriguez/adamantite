@@ -6,9 +6,14 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import { assessProject } from "#lib/assessment/index.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { readHardenContext, renderHardenPrompt } from "#lib/hardening/index.ts"
+import {
+  DEFAULT_FIX_HISTORY_COMMITS,
+  readHardenContext,
+  renderHardenPrompt,
+} from "#lib/hardening/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import {
@@ -65,11 +70,21 @@ const scope = Flag.Directory("path", { mustExist: true }).pipe(
   )
 )
 
-export default Command.make("harden", { scope }).pipe(
+const commits = Flag.Int("commits").pipe(
+  Flag.withSchema(
+    Schema.Int.pipe(
+      Schema.check(Schema.isGreaterThan(0, { message: "`--commits` must be a positive number" }))
+    )
+  ),
+  Flag.withDefault(DEFAULT_FIX_HISTORY_COMMITS),
+  Flag.withDescription("Set how many recent commits the agent reads for fixed mistakes")
+)
+
+export default Command.make("harden", { commits, scope }).pipe(
   Command.withDescription(
     "Ask a coding agent to turn the project's coding standards into custom rules and instructions"
   ),
-  Command.withHandler(({ scope }) =>
+  Command.withHandler(({ commits, scope }) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
       const path = yield* Path.Path
@@ -126,7 +141,7 @@ export default Command.make("harden", { scope }).pipe(
       }
 
       const context = yield* readHardenContext(cwd, scopeDirectory)
-      const prompt = renderHardenPrompt(context, version)
+      const prompt = renderHardenPrompt(context, { adamantiteVersion: version, commits })
 
       if (!isInteractive) {
         yield* prompter.message(prompt)

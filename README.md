@@ -229,6 +229,7 @@ it, and a line in `CODING_STANDARDS.md` when no rule can.
 ```sh
 adamantite harden
 adamantite harden --path packages/web
+adamantite harden --commits 500
 ```
 
 The prompt lists the Oxlint config of the root and of each workspace package, the rules folders
@@ -239,7 +240,9 @@ one.
 `--path` limits the session to one package or folder. The prompt then lists the configs of the
 packages in that folder, or of the package that contains it, the rules folders that those configs
 load, the `AGENTS.md` of the root and of those packages, and the Markdown files of those packages
-and of the root.
+and of the root. The agent also reads the fix commits of the last 200 commits, or of the number
+that `--commits` gives, and a mistake that the fixes repeat becomes a candidate. With `--path`, it
+reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
 

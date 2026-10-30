@@ -3,7 +3,7 @@
 This project uses Adamantite {{version}} to manage linting, formatting, and type tooling.
 `adamantite harden` asks you to find the coding standards that this project already follows, and to put each one on the highest step of the enforcement ladder that works.
 
-Steps 1 to 7 are read-only. You change files only in step 8, and only for the candidates that the user approves.
+Steps 1 to 8 are read-only. You change files only in step 9, and only for the candidates that the user approves.
 
 ## Context
 
@@ -37,7 +37,7 @@ This step is done when each file in the documentation list, and each file that t
 
 ## 2. List the written standards
 
-List each standard that a file marked "has standards" states, with its file and line. Each written standard is a candidate, and goes on to step 4, also when the code breaks it in many places.
+List each standard that a file marked "has standards" states, with its file and line. Each written standard is a candidate, and goes on to step 5, also when the code breaks it in many places.
 
 ## 3. Survey the code
 
@@ -51,23 +51,37 @@ Survey these areas: file names and placement, import direction, naming, API use,
 
 This step is done when each area has its candidates or the note "none found".
 
-## 4. Drop what a tool already enforces
+## 4. Read the fix history
 
-For each written standard from step 2 and each candidate from step 3, find out whether a tool already enforces it. Read the Oxlint config, the presets and plugins that it extends, its overrides, the custom rules, `tsconfig.json`, and the checks that the project runs in CI.
+A mistake that a commit fixed, and that other code repeats, is a standard that a rule can hold. Read the commits that this command lists. When the history has fewer commits, read all of them, and say how many you read.
 
-- When you are not sure, lint a counterexample from step 3 where it is, and read whether the lint reports it.
+{{fixHistoryCommand}}
+
+- Find the commits that fix a mistake: a bug fix, a revert, or a correction after a review. Read the diff of each one with `git show <commit>`.
+- Name the mistake in one sentence, in terms of the code, such as "an `await` in a `forEach` callback" or "a date that the code parses without a time zone". Skip the fixes of logic that only one place has.
+- Find the commit that added the mistake, for example with `git log -L` or `git blame <commit>^ -- <file>`. Record it with the fix.
+- A mistake is a candidate when two or more fixes have it, or when one fix has it and the code still has the same form in other places. List each fix with its commit, and each other place with its file and line.
+- The code before the fix is the case that the rule must report, and the code after the fix is the case that it must accept. Read the code before the fix with `git show <commit>^:<file>`.
+
+This step is done when each fix has its mark: "candidate", "one-off", or "not a code mistake".
+
+## 5. Drop what a tool already enforces
+
+For each written standard from step 2 and each candidate from steps 3 and 4, find out whether a tool already enforces it. Read the Oxlint config, the presets and plugins that it extends, its overrides, the custom rules, `tsconfig.json`, and the checks that the project runs in CI.
+
+- When you are not sure, lint a counterexample from step 3 or 4 where it is, and read whether the lint reports it.
 - To try a rule that is not on, or a rule with options, make a **trial copy** outside the project: copy the files that git does not ignore, as they are now, with their uncommitted changes: `git ls-files -z --cached --others --exclude-standard | rsync -a --from0 --files-from=- --ignore-missing-args ./ <folder>`. Then link each `node_modules` folder of the project into the same place in the copy. In the copy, change the Oxlint config that lints the candidate's files: the root config, or the config of the workspace package when the package has its own. Add one file with the case that the rule must report and one file with the case that it must accept, and run Oxlint from the folder of that config. The project itself stays unchanged.
-- A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second. Oxlint accepts a rule name that does not exist, so a run without a report is not evidence. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 6.
+- A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second. Oxlint accepts a rule name that does not exist, so a run without a report is not evidence. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 7.
 - When no counterexample exists, mark the enforcement as not confirmed.
 - Drop each candidate that a tool enforces fully. When a tool enforces only part of a written standard, keep the other part as a candidate.
 
 This step is done when each written standard and each candidate is marked as enforced, partly enforced, not enforced, or not confirmed, with the rule or the lint output as evidence.
 
-## 5. Find the gaps in the existing rules
+## 6. Find the gaps in the existing rules
 
-Step 4 starts from the standards. This step starts from the rules that the project already has: each custom rule, each `adamantite/layers` map, each `adamantite/import-owners` option, and each `no-restricted-imports` setting and its overrides.
+Step 5 starts from the standards. This step starts from the rules that the project already has: each custom rule, each `adamantite/layers` map, each `adamantite/import-owners` option, and each `no-restricted-imports` setting and its overrides.
 
-- **Forms that a rule misses:** list the forms of the same mistake that the rule does not report. For an import rule, check `require()`, `import()`, `export … from`, `import type`, and the path aliases of `tsconfig.json`. For a custom rule, read its logic and check the other syntax of the same mistake, such as a call through a variable, optional chaining, a computed member, or a re-export. Search the code for each form, and lint a file that has it. When the code does not have the form yet, make a trial copy as step 4 says, with the project config as it is. Add one file with a form that the rule reports, as the control, and one file with the missed form. The gap is confirmed when the rule reports the control and does not report the missed form. When no trial can show it, mark the gap as not confirmed: the failing test case of step 8 confirms it.
+- **Forms that a rule misses:** list the forms of the same mistake that the rule does not report. For an import rule, check `require()`, `import()`, `export … from`, `import type`, and the path aliases of `tsconfig.json`. For a custom rule, read its logic and check the other syntax of the same mistake, such as a call through a variable, optional chaining, a computed member, or a re-export. Search the code for each form, and lint a file that has it. When the code does not have the form yet, make a trial copy as step 5 says, with the project config as it is. Add one file with a form that the rule reports, as the control, and one file with the missed form. The gap is confirmed when the rule reports the control and does not report the missed form. When no trial can show it, mark the gap as not confirmed: the failing test case of step 9 confirms it.
 - **Files that a rule misses:** for each `files` glob of an override, list the files that the standard applies to and that the glob does not match, such as a new folder or another file extension.
 - **Cases that a test misses:** for each custom rule, list the forms from the first item that its test does not have.
 - **Overrides that can shrink:** for each file in an override that turns a rule off, read the file and find the code that the rule reports. Mark the file as "still breaks the rule", "no longer breaks the rule", or "not confirmed". The files that no longer break the rule are a candidate: remove them from the override.
@@ -77,7 +91,7 @@ Each gap is a candidate on the step of the rule that it extends: a wider custom 
 
 This step is done when each rule has its gaps or the note "none found".
 
-## 6. Place each candidate on the enforcement ladder
+## 7. Place each candidate on the enforcement ladder
 
 Put each remaining candidate on the highest step that works:
 
@@ -88,11 +102,11 @@ Put each remaining candidate on the highest step that works:
 5. **Custom rule:** a rule in the rules folder that checks the AST.
 6. **Instruction:** a line in `CODING_STANDARDS.md`, only when no tool can check the standard.
 
-For each rule, give one case that the rule must report and one similar case that it must accept. Say what the rule guarantees and what it does not, such as "bans named exports, but does not require a default export". When the rule checks only part of the standard, say which part stays an instruction.
+For each rule, give one case that the rule must report and one similar case that it must accept. For a candidate from step 4, use the code before and after one of its fixes. Say what the rule guarantees and what it does not, such as "bans named exports, but does not require a default export". When the rule checks only part of the standard, say which part stays an instruction.
 
-A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 7, and propose no rule for it.
+A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 8, and propose no rule for it.
 
-## 7. Show the candidates and wait for approval
+## 8. Show the candidates and wait for approval
 
 Score each candidate from 1 to 5:
 
@@ -105,7 +119,7 @@ Score each candidate from 1 to 5:
 Show the candidates with a score of 4 or 5, from the highest score to the lowest. Show each one with:
 
 - the standard in one sentence
-- its source: the instruction file and line, or the code only
+- its source: the instruction file and line, the code only, or the fix commits
 - the number of places that follow it, its scope, and the counterexamples
 - its step on the ladder, and the rule, option, or instruction that you propose
 - the case that the rule must report, and the case that it must accept
@@ -114,7 +128,7 @@ Show the candidates with a score of 4 or 5, from the highest score to the lowest
 
 Then show three short lists:
 
-- **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 6, each rule with many suppressions, and each gap in a shipped rule that no option can close. Give the instruction, the code, and the choice that the maintainer must make.
+- **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 7, each rule with many suppressions, and each gap in a shipped rule that no option can close. Give the instruction, the code, and the choice that the maintainer must make.
 - **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to.
 - **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
 
@@ -122,7 +136,7 @@ Ask the user which candidates to write. This step is done when the user names th
 
 When no human can approve, for example in CI or in an unattended session, the candidates are the result of the run. Stop after this step.
 
-## 8. Write the approved standards
+## 9. Write the approved standards
 
 Write only the approved candidates:
 
@@ -142,4 +156,4 @@ Write only the approved candidates:
 ## Verify
 
 When you wrote files, run `adamantite check`, `adamantite rule test`, and `adamantite doctor` in this order — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
-All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 8 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.
+All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 9 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.

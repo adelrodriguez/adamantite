@@ -3,7 +3,7 @@
 This project uses Adamantite {{version}} to manage linting, formatting, and type tooling.
 `adamantite harden` asks you to find the coding standards that this project already follows, and to put each one on the highest step of the enforcement ladder that works.
 
-Steps 1 to 6 are read-only. You change files only in step 7, and only for the candidates that the user approves.
+Steps 1 to 7 are read-only. You change files only in step 8, and only for the candidates that the user approves.
 
 ## Context
 
@@ -57,13 +57,27 @@ For each written standard from step 2 and each candidate from step 3, find out w
 
 - When you are not sure, lint a counterexample from step 3 where it is, and read whether the lint reports it.
 - To try a rule that is not on, or a rule with options, make a **trial copy** outside the project: copy the files that git does not ignore, as they are now, with their uncommitted changes: `git ls-files -z --cached --others --exclude-standard | rsync -a --from0 --files-from=- --ignore-missing-args ./ <folder>`. Then link each `node_modules` folder of the project into the same place in the copy. In the copy, change the Oxlint config that lints the candidate's files: the root config, or the config of the workspace package when the package has its own. Add one file with the case that the rule must report and one file with the case that it must accept, and run Oxlint from the folder of that config. The project itself stays unchanged.
-- A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second. Oxlint accepts a rule name that does not exist, so a run without a report is not evidence. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 5.
+- A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second. Oxlint accepts a rule name that does not exist, so a run without a report is not evidence. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 6.
 - When no counterexample exists, mark the enforcement as not confirmed.
 - Drop each candidate that a tool enforces fully. When a tool enforces only part of a written standard, keep the other part as a candidate.
 
 This step is done when each written standard and each candidate is marked as enforced, partly enforced, not enforced, or not confirmed, with the rule or the lint output as evidence.
 
-## 5. Place each candidate on the enforcement ladder
+## 5. Find the gaps in the existing rules
+
+Step 4 starts from the standards. This step starts from the rules that the project already has: each custom rule, each `adamantite/layers` map, each `adamantite/import-owners` option, and each `no-restricted-imports` setting and its overrides.
+
+- **Forms that a rule misses:** list the forms of the same mistake that the rule does not report. For an import rule, check `require()`, `import()`, `export … from`, `import type`, and the path aliases of `tsconfig.json`. For a custom rule, read its logic and check the other syntax of the same mistake, such as a call through a variable, optional chaining, a computed member, or a re-export. Search the code for each form, and lint a file that has it. When the code does not have the form yet, mark the gap as not confirmed: the failing test case of step 8 confirms it.
+- **Files that a rule misses:** for each `files` glob of an override, list the files that the standard applies to and that the glob does not match, such as a new folder or another file extension.
+- **Cases that a test misses:** for each custom rule, list the forms from the first item that its test does not have.
+- **Overrides that can shrink:** for each file in an override that turns a rule off, read the file and find the code that the rule reports. Mark the file as "still breaks the rule", "no longer breaks the rule", or "not confirmed". The files that no longer break the rule are a candidate: remove them from the override.
+- **Suppressions:** count the `oxlint-disable` comments of each rule, for example with `rg -n "oxlint-disable"`. Many suppressions of one rule are a **decision**: the rule is too wide, or the standard has exceptions that the rule must know.
+
+Each gap that you can confirm is a candidate on the step of the rule that it extends: a wider rule, a new option, a new test case, or a smaller override.
+
+This step is done when each rule has its gaps or the note "none found".
+
+## 6. Place each candidate on the enforcement ladder
 
 Put each remaining candidate on the highest step that works:
 
@@ -76,9 +90,9 @@ Put each remaining candidate on the highest step that works:
 
 For each rule, give one case that the rule must report and one similar case that it must accept. Say what the rule guarantees and what it does not, such as "bans named exports, but does not require a default export". When the rule checks only part of the standard, say which part stays an instruction.
 
-A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 6, and propose no rule for it.
+A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 7, and propose no rule for it.
 
-## 6. Show the candidates and wait for approval
+## 7. Show the candidates and wait for approval
 
 Score each candidate from 1 to 5:
 
@@ -100,7 +114,7 @@ Show the candidates with a score of 4 or 5, from the highest score to the lowest
 
 Then show three short lists:
 
-- **Decisions:** each written standard that the code does not follow, each rule that a commit removed, and each choice from step 5. Give the instruction, the code, and the choice that the maintainer must make.
+- **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 6, and each rule with many suppressions. Give the instruction, the code, and the choice that the maintainer must make.
 - **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to.
 - **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
 
@@ -108,7 +122,7 @@ Ask the user which candidates to write. This step is done when the user names th
 
 When no human can approve, for example in CI or in an unattended session, the candidates are the result of the run. Stop after this step.
 
-## 7. Write the approved standards
+## 8. Write the approved standards
 
 Write only the approved candidates:
 
@@ -117,6 +131,7 @@ Write only the approved candidates:
   - The rule message says what to do instead.
   - A comment at the top of the rule file states the standard and why it exists.
   - The test has the case that the rule must report and the case that it must accept.
+- **Gap in an existing rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail. Then change the rule until the test passes. To shrink an override, remove only the files that no longer break the rule.
 - **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
 - **Existing violations:** keep the code that a new rule reports as it is, and list the violations for the user. Keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule. A separate change fixes the violations and removes each file from the override.
 - **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.
@@ -125,4 +140,4 @@ Write only the approved candidates:
 ## Verify
 
 When you wrote files, run `adamantite check`, `adamantite rule test`, and `adamantite doctor` in this order — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
-All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 7 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.
+All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 8 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.

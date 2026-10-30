@@ -233,10 +233,13 @@ adamantite harden --path packages/web
 
 The prompt lists the Oxlint config of the root and of each workspace package, the rules folders
 that their `custom()` calls load, and the instruction files that exist: `CODING_STANDARDS.md`,
-`AGENTS.md`, `GLOSSARY.md`, and `docs/adr`. `--path` limits the session to one package or folder.
-The prompt then lists the configs of the packages in that folder, or of the package that contains
-it, the rules folders that those configs load, and the instructions of the root and of those
-packages.
+`AGENTS.md`, `CLAUDE.md`, `.claude/CLAUDE.md`, `.claude/rules`, `.cursor/rules`,
+`.github/copilot-instructions.md`, `GLOSSARY.md`, and `docs/adr`. It also lists each Markdown file
+that `git ls-files` gives, except the changesets and the changelogs, and the agent reads each one.
+`--path` limits the session to one package or folder. The prompt then lists the configs of the
+packages in that folder, or of the package that contains it, the rules folders that those configs
+load, the instructions of the root and of those packages, and the Markdown files of those packages
+and of the root.
 The agent shows the candidates and writes nothing until you approve them. When no human can
 approve, the agent stops at the candidates.
 

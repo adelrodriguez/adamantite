@@ -235,13 +235,15 @@ To turn the coding standards that the project follows into custom rules, run:
 ```shell
 adamantite harden
 adamantite harden --path packages/web
+adamantite harden --commits 500
 ```
 
 In a non-interactive run, `harden` prints a Markdown prompt and exits 0. Follow the prompt: list
 the candidate standards, show them to the user, and write nothing until the user approves. When
 no human can approve, stop after you show the candidates. In an interactive terminal, `harden`
 offers a handoff to an installed coding agent CLI, a copy of the prompt, or nothing. In a
-monorepo, `--path` limits the session to one workspace package or folder. After a
+monorepo, `--path` limits the session to one workspace package or folder. `--commits` sets how many
+recent commits the agent reads for fixed mistakes, and the default is 200. After a
 handoff, it runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of
 them fails. `harden` never
 produces Doctor findings.

@@ -82,7 +82,7 @@ const REQUIRED_PHRASES = {
   "## 5. Find the gaps in the existing rules": [
     "This step starts from the rules that the project already has",
     "`require()`, `import()`, `export … from`, `import type`, and the path aliases",
-    "When the code does not have the form yet, mark the gap as not confirmed",
+    "When the code does not have the form yet, try the form in a trial copy, as step 4 says.",
     "the files that the standard applies to and that the glob does not match",
     "list the forms from the first item that its test does not have",
     '"still breaks the rule", "no longer breaks the rule", or "not confirmed"',

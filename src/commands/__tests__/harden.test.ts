@@ -55,9 +55,9 @@ function getMissingPhrases(section: string, phrases: readonly string[]) {
 // The phrases that each section must keep, so a failure names each lost one.
 const REQUIRED_PHRASES = {
   "## 1. Explore the documentation": [
-    "the files that the instructions link to or tell agents to read, and that are not Markdown",
+    "the files that the instructions link to or tell agents to read, also when the list does not have them",
     "**discovery gap**",
-    "This step is done when each file in the documentation list has its mark.",
+    "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
   ],
   "## 2. List the written standards": [
     "Each written standard is a candidate, and goes on to step 4",
@@ -158,9 +158,24 @@ const MARKDOWN_FILE = /\.(?:md|mdx|mdc)$/u
  * A `git` that lists the Markdown files of the test project, as `git ls-files -z` prints them. Git
  * lists only the files inside the project, so the files of a parent folder stay out.
  */
-function makeGitLayer(files: Record<string, string>, exitCode = 0) {
+interface GitOptions {
+  readonly exitCode?: number
+  /**
+   * Files that the git index has and the working tree does not, as after a delete that is not
+   * staged, or in a sparse checkout.
+   */
+  readonly indexOnlyFiles?: readonly string[]
+}
+
+function makeGitLayer(
+  files: Record<string, string>,
+  { exitCode = 0, indexOnlyFiles = [] }: GitOptions = {}
+) {
   const output = Array.sort(
-    Object.keys(files).filter((file) => MARKDOWN_FILE.test(file) && !file.startsWith("../")),
+    [
+      ...Object.keys(files).filter((file) => MARKDOWN_FILE.test(file) && !file.startsWith("../")),
+      ...indexOnlyFiles,
+    ],
     Order.String
   )
     .map((file) => `${file}\0`)
@@ -189,7 +204,11 @@ function makeGitLayer(files: Record<string, string>, exitCode = 0) {
   )
 }
 
-function runHarden(files: Record<string, string>, args: readonly string[] = [], gitExitCode = 0) {
+function runHarden(
+  files: Record<string, string>,
+  args: readonly string[] = [],
+  git: GitOptions = {}
+) {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
     const context = createFileSystemTestContext({ files })
@@ -198,7 +217,7 @@ function runHarden(files: Record<string, string>, args: readonly string[] = [], 
       // The monorepo configs import the shared tooling package.
       layers: [
         prompter.layer,
-        makeGitLayer(files, gitExitCode),
+        makeGitLayer(files, git),
         makeModuleResolverLayer(context.root, {
           "@acme/lint": "tooling/lint/index.ts",
           ...ADAMANTITE_RESOLUTION,
@@ -443,9 +462,25 @@ describe("harden", () => {
       expect(
         getMissingPhrases(getSection(prompt, "## 1. Explore the documentation"), [
           "read each file in the documentation list above",
-          "This step is done when each file in the documentation list has its mark.",
+          "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
         ])
       ).toStrictEqual([])
+    })
+  )
+
+  it.effect("leave out a file that the git index has and the working tree does not", () =>
+    Effect.gen(function* () {
+      const { prompter } = yield* runHarden(
+        { "docs/current.md": "# Current\n", ...INSTALLED },
+        [],
+        {
+          indexOnlyFiles: ["docs/removed.md"],
+        }
+      )
+
+      expect(
+        getListItems(getSection(prompter.messages[0] ?? "", "### Documentation"))
+      ).toStrictEqual(["- `docs/current.md`"])
     })
   )
 
@@ -454,7 +489,7 @@ describe("harden", () => {
       const { exit, prompter } = yield* runHarden(
         { "docs/errors.md": "# Errors\n", ...INSTALLED },
         [],
-        128
+        { exitCode: 128 }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)

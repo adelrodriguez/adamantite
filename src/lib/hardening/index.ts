@@ -31,7 +31,8 @@ const INSTRUCTION_FILES = [
 
 /**
  * The Markdown files below `cwd` that git tracks, and the new files that git does not ignore, as
- * paths relative to `cwd`. None when git cannot list them, for example outside a repository.
+ * paths relative to `cwd`. Some tracked files can be missing from the working tree. None when git
+ * cannot list them, for example outside a repository.
  */
 const listMarkdownFiles = Effect.fn("listMarkdownFiles")(
   function* (cwd: string) {
@@ -160,14 +161,27 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     return innermost === cwd || selectedPackages.includes(innermost)
   }
   const markdownFiles = yield* listMarkdownFiles(cwd)
+  // The git index also has the files that a delete or a sparse checkout left out of the working
+  // tree, and the agent cannot read those.
+  const documentationFiles = yield* Effect.transposeOption(
+    markdownFiles.pipe(
+      Option.map((files) =>
+        Effect.forEach(
+          files.filter((file) => isDocumentation(file) && isSelected(path.join(cwd, file))),
+          (file) =>
+            fs.exists(path.join(cwd, file)).pipe(
+              Effect.orElseSucceed(() => false),
+              Effect.map((exists) => (exists ? [file] : []))
+            ),
+          { concurrency: "unbounded" }
+        ).pipe(Effect.map((files) => files.flat()))
+      )
+    )
+  )
 
   return {
     configs: configs.map((config) => relative(config)),
-    documentationFiles: markdownFiles.pipe(
-      Option.map((files) =>
-        files.filter((file) => isDocumentation(file) && isSelected(path.join(cwd, file)))
-      )
-    ),
+    documentationFiles,
     instructionFiles: instructionCandidates
       .filter((_, index) => exists[index])
       .map((file) => relative(file)),

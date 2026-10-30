@@ -29,11 +29,11 @@ These are the Markdown files of the project, without the changesets and the chan
 
 ## 1. Explore the documentation
 
-Start with the instruction files. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, and that are not Markdown, and the comments in the Oxlint config.
+Start with the instruction files. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, also when the list does not have them, and the comments in the Oxlint config. A linked file outside the scope of `--path` counts: read it, but do not survey the code beside it.
 
 Mark each file as "has standards" or "no standards". A file that states a standard, but that no instruction file points to, is a **discovery gap**: an agent that reads only the instructions never finds its standards. Record the file, its standards, and the instruction file that should point to it.
 
-This step is done when each file in the documentation list has its mark.
+This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.
 
 ## 2. List the written standards
 

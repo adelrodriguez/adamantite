@@ -7,6 +7,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
@@ -33,6 +34,10 @@ import { Prompter } from "#terminal/prompter.ts"
 import { chooseResolution } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
+
+function getLinkKey(link: BrokenLink) {
+  return `${link.file}\0${link.target}`
+}
 
 /**
  * The version of the Adamantite that the project at `cwd` loads, or none when it is not installed.
@@ -193,6 +198,19 @@ export default Command.make("harden", { commits, scope }).pipe(
             )
           )
       const assessment = yield* assessProject(cwd)
+      // A link that was broken before the session is a gap that the user may not have approved, so
+      // only a link that the session added fails the verification.
+      const brokenBefore = new Set(
+        Option.match(context.agentReach, {
+          onNone: () => [],
+          onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
+        })
+      )
+      const reachAfter = (yield* readHardenContext(cwd, scopeDirectory)).agentReach
+      const addedBrokenLinks = Option.match(reachAfter, {
+        onNone: () => [],
+        onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
+      })
 
       for (const warning of assessment.warnings) {
         yield* prompter.log.warning(warning)
@@ -213,7 +231,18 @@ export default Command.make("harden", { commits, scope }).pipe(
         yield* printFindings(assessment.findings)
       }
 
-      if (!checkPassed || !ruleTestPassed || assessment.findings.length > 0) {
+      for (const link of addedBrokenLinks) {
+        yield* prompter.log.error(
+          `\`${link.file}\` links to \`${link.target}\`, which does not exist, after the ${agent.name} session.`
+        )
+      }
+
+      if (
+        !checkPassed
+        || !ruleTestPassed
+        || assessment.findings.length > 0
+        || addedBrokenLinks.length > 0
+      ) {
         yield* prompter.outro("⚠️ Harden verification failed.")
         return yield* new CommandFailed({
           command: "harden",

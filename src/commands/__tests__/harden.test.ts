@@ -9,7 +9,7 @@ import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
-import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import hardenCommand from "#commands/harden.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -57,6 +57,8 @@ const REQUIRED_PHRASES = {
   "## 1. Explore the documentation": [
     "Start with each `AGENTS.md` above.",
     "It must point to the other documentation of the project.",
+    "that the agent reach above lists as not reached, is a **discovery gap**",
+    "Each link to a Markdown file that does not exist is a discovery gap too.",
     "the files that the instructions link to or tell agents to read, also when the list does not have them",
     "**discovery gap**",
     "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
@@ -138,9 +140,10 @@ const REQUIRED_PHRASES = {
     "Do not set the rule to `warn`: `adamantite check` fails on warnings.",
     "`CODING_STANDARDS.md`",
     "When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.",
-    "add each approved pointer to the instruction file that the gap names",
+    "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
   ],
   "## Verify": [
+    "run `adamantite harden` again without a terminal, and read its agent reach",
     "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
     "All three must exit 0.",
     "When you changed a project check, also run that check with the project's own command",
@@ -187,8 +190,9 @@ export default defineConfig({
 const MARKDOWN_FILE = /\.(?:md|mdx|mdc)$/u
 
 /**
- * A `git` that lists the Markdown files of the test project, as `git ls-files -z` prints them. Git
- * lists only the files inside the project, so the files of a parent folder stay out.
+ * A `git` that lists the Markdown files of the test project when it runs, as `git ls-files -z`
+ * prints them. Git lists only the files inside the project, so the files of a parent folder stay
+ * out.
  */
 interface GitOptions {
   readonly exitCode?: number
@@ -200,18 +204,19 @@ interface GitOptions {
 }
 
 function makeGitLayer(
-  files: Record<string, string>,
+  files: FileSystemTestContext,
   { exitCode = 0, indexOnlyFiles = [] }: GitOptions = {}
 ) {
-  const output = Array.sort(
-    [
-      ...Object.keys(files).filter((file) => MARKDOWN_FILE.test(file) && !file.startsWith("../")),
-      ...indexOnlyFiles,
-    ],
-    Order.String
-  )
-    .map((file) => `${file}\0`)
-    .join("")
+  const getOutput = () =>
+    Array.sort(
+      [
+        ...files.list().filter((file) => MARKDOWN_FILE.test(file) && !file.startsWith("../")),
+        ...indexOnlyFiles,
+      ],
+      Order.String
+    )
+      .map((file) => `${file}\0`)
+      .join("")
 
   return Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
     ChildProcessSpawner.make((command) =>
@@ -227,7 +232,7 @@ function makeGitLayer(
               pid: ChildProcessSpawner.ProcessId(1),
               stderr: Stream.empty,
               stdin: Sink.drain,
-              stdout: Stream.make(new TextEncoder().encode(exitCode === 0 ? output : "")),
+              stdout: Stream.make(new TextEncoder().encode(exitCode === 0 ? getOutput() : "")),
               unref: Effect.succeed(Effect.void),
             })
           )
@@ -249,7 +254,7 @@ function runHarden(
       // The monorepo configs import the shared tooling package.
       layers: [
         prompter.layer,
-        makeGitLayer(files, git),
+        makeGitLayer(context, git),
         makeModuleResolverLayer(context.root, {
           "@acme/lint": "tooling/lint/index.ts",
           ...ADAMANTITE_RESOLUTION,
@@ -286,6 +291,10 @@ const SUCCESS_LOG = {
 
 interface InteractiveHardenOptions {
   readonly files?: Record<string, string>
+  /**
+   * What the agent changes in the project during the session.
+   */
+  readonly onSession?: (files: FileSystemTestContext) => void
   readonly prompter?: Parameters<typeof createPrompterTestContext>[0]
   readonly runner?: Parameters<typeof makeHandoffRunner>[0]
 }
@@ -294,19 +303,22 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
   return Effect.gen(function* () {
     const copied: string[] = []
     const prompter = createPrompterTestContext(options.prompter)
-    const runner = makeHandoffRunner(options.runner)
+    const files = createFileSystemTestContext({ files: options.files ?? HEALTHY_FILES })
+    const runner = makeHandoffRunner({
+      ...options.runner,
+      onAgentRun: () => options.onSession?.(files),
+    })
     const terminal = Layer.succeed(TerminalCapabilities)({
       copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
       isInteractive: Effect.succeed(true),
     })
-    const files = createFileSystemTestContext({ files: options.files ?? HEALTHY_FILES })
     const exit = yield* runCommand(hardenCommand, [], {
       files,
       layers: [
         prompter.layer,
         runner.layer,
         terminal,
-        makeGitLayer(options.files ?? HEALTHY_FILES),
+        makeGitLayer(files),
         makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
       ],
     })
@@ -333,7 +345,7 @@ function runHardenHoisted() {
       files: context,
       layers: [
         prompter.layer,
-        makeGitLayer(files),
+        makeGitLayer(context),
         makeModuleResolverLayer(context.root, {
           "adamantite/lint": "../node_modules/adamantite/dist/presets/lint/core.js",
         }),
@@ -417,6 +429,7 @@ describe("harden", () => {
           "### Rules folders",
           "### Instructions",
           "### Documentation",
+          "### Agent reach",
           "## 1. Explore the documentation",
           "## 2. List the written standards",
           "## 3. Survey the code",
@@ -518,6 +531,48 @@ describe("harden", () => {
     })
   )
 
+  it.effect("list the files that no AGENTS.md reaches, and a broken link", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        "AGENTS.md": "Read [the testing guide](docs/testing.md) and `docs/architecture.md`.\n",
+        "CLAUDE.md": "See `docs/style.md`.\n",
+        "docs/architecture.md": "# Architecture\n",
+        "docs/style.md": "# Style\n",
+        ...INSTALLED,
+      })
+
+      expect(getListItems(getSection(prompt, "### Agent reach"))).toStrictEqual([
+        "- `CLAUDE.md`",
+        "- `docs/style.md`",
+        "- `AGENTS.md` links to `docs/testing.md`",
+      ])
+    })
+  )
+
+  it.effect("list a link to a file that the git index has and the working tree does not", () =>
+    Effect.gen(function* () {
+      const { prompter } = yield* runHarden(
+        { "AGENTS.md": "Read [the guide](docs/guide.md).\n", ...INSTALLED },
+        [],
+        { indexOnlyFiles: ["docs/guide.md"] }
+      )
+
+      expect(getListItems(getSection(prompter.messages[0] ?? "", "### Agent reach"))).toStrictEqual(
+        ["- `AGENTS.md` links to `docs/guide.md`"]
+      )
+    })
+  )
+
+  it.effect("say that each Markdown file is reached when no file is out of reach", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({ "AGENTS.md": "# Acme\n", ...INSTALLED })
+
+      expect(getSection(prompt, "### Agent reach")).toContain(
+        "Links and code spans from each `AGENTS.md` reach each Markdown file."
+      )
+    })
+  )
+
   it.effect("tell the agent to find the Markdown files when git cannot list them", () =>
     Effect.gen(function* () {
       const { exit, prompter } = yield* runHarden(
@@ -529,6 +584,9 @@ describe("harden", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(getSection(prompter.messages[0] ?? "", "### Documentation")).toContain(
         "Git could not list the files of this project."
+      )
+      expect(getSection(prompter.messages[0] ?? "", "### Agent reach")).toContain(
+        "Follow the links from each `AGENTS.md` yourself."
       )
     })
   )
@@ -746,6 +804,48 @@ describe("harden", () => {
       expect(getSection(prompt, "## Context")).toContain(
         "Adamantite found these files in the project and its workspace packages."
       )
+    })
+  )
+
+  it.effect(
+    "start the reach of --path from the AGENTS.md of the root and the selected package",
+    () =>
+      Effect.gen(function* () {
+        // Only the `api` instructions link to the shared guide, and an agent in `web` does not read them.
+        const files = {
+          ...MONOREPO_FILES,
+          "docs/shared.md": "# Shared\n",
+          "packages/api/AGENTS.md": "Read [the shared guide](../../docs/shared.md).\n",
+        }
+        const scoped = yield* runHardenPrompt(files, ["--path", "packages/web"])
+        const whole = yield* runHardenPrompt(files)
+
+        expect(getListItems(getSection(scoped, "### Agent reach"))).toContain("- `docs/shared.md`")
+        expect(getListItems(getSection(whole, "### Agent reach"))).not.toContain(
+          "- `docs/shared.md`"
+        )
+      })
+  )
+
+  it.effect("start the reach of --path also from the AGENTS.md of a parent package", () =>
+    Effect.gen(function* () {
+      // `packages/web/admin` is a workspace package inside `web`, and an agent in it reads the
+      // instructions of `web` too.
+      const prompt = yield* runHardenPrompt(
+        {
+          ...MONOREPO_FILES,
+          "docs/web.md": "# Web standards\n",
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0" },
+            workspaces: ["packages/*", "packages/web/admin", "tooling/lint"],
+          }),
+          "packages/web/AGENTS.md": "Read [the web standards](../../docs/web.md).\n",
+          "packages/web/admin/package.json": JSON.stringify({ name: "admin" }),
+        },
+        ["--path", "packages/web/admin"]
+      )
+
+      expect(getListItems(getSection(prompt, "### Agent reach"))).not.toContain("- `docs/web.md`")
     })
   )
 
@@ -1046,6 +1146,29 @@ describe("harden", () => {
         SUCCESS_LOG,
       ])
       expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
+    })
+  )
+
+  it.effect("fail and name the link when the session adds a link to a missing file", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runInteractiveHarden({
+        // The broken link that the project had before the session does not fail it.
+        files: { "AGENTS.md": "Read [the old guide](docs/old.md).\n", ...HEALTHY_FILES },
+        onSession: (files) => {
+          files.write("AGENTS.md", `${files.read("AGENTS.md")}Read [the style](docs/style.md).\n`)
+        },
+        prompter: { selectResponses: [claudeAgent] },
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.logs.filter((log) => log.level !== "info")).toStrictEqual([
+        {
+          level: "error",
+          message:
+            "`AGENTS.md` links to `docs/style.md`, which does not exist, after the Claude Code session.",
+        },
+      ])
+      expect(prompter.outros).toStrictEqual(["⚠️ Harden verification failed."])
     })
   )
 

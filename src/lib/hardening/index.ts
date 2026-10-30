@@ -9,6 +9,7 @@ import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stream from "effect/Stream"
 import * as String from "effect/String"
+import { type AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
@@ -80,6 +81,10 @@ function isDocumentation(file: string) {
  * The files that a harden session starts from. Paths are relative to the project root.
  */
 interface HardenContext {
+  /**
+   * Which Markdown files each `AGENTS.md` reaches, or none when git cannot list them.
+   */
+  readonly agentReach: Option.Option<AgentReach>
   readonly configs: readonly string[]
   /**
    * The Markdown files of the project, or none when git cannot list them.
@@ -154,14 +159,14 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
 
     return innermost === cwd || selectedPackages.includes(innermost)
   }
-  const markdownFiles = yield* listMarkdownFiles(cwd)
+  const isSelectedFile = (file: string) => isSelected(path.join(cwd, file))
   // The git index also has the files that a delete or a sparse checkout left out of the working
   // tree, and the agent cannot read those.
-  const documentationFiles = yield* Effect.transposeOption(
-    markdownFiles.pipe(
+  const markdownFiles = yield* Effect.transposeOption(
+    (yield* listMarkdownFiles(cwd)).pipe(
       Option.map((files) =>
         Effect.forEach(
-          files.filter((file) => isDocumentation(file) && isSelected(path.join(cwd, file))),
+          files.filter((file) => isDocumentation(file)),
           (file) =>
             fs.exists(path.join(cwd, file)).pipe(
               Effect.orElseSucceed(() => false),
@@ -172,10 +177,37 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
       )
     )
   )
+  // A root file can link to the files of each package, so the reach reads the whole project. It
+  // starts from the `AGENTS.md` files that an agent in the scope reads: the ones in the folders
+  // above the scope, and the ones inside it, but not the ones of a sibling package.
+  const isReadInScope = (file: string) => {
+    const folder = path.dirname(path.join(cwd, file))
+
+    return contains(folder, scope) || contains(scope, folder)
+  }
+  const agentReach = yield* Effect.transposeOption(
+    markdownFiles.pipe(
+      Option.map((files) =>
+        readAgentReach(
+          cwd,
+          files,
+          files.filter((file) => path.basename(file) === AGENTS_FILE && isReadInScope(file))
+        )
+      )
+    )
+  )
 
   return {
+    agentReach: agentReach.pipe(
+      Option.map((reach) => ({
+        brokenLinks: reach.brokenLinks.filter((link) => isSelectedFile(link.file)),
+        unreached: reach.unreached.filter((file) => isSelectedFile(file)),
+      }))
+    ),
     configs: configs.map((config) => relative(config)),
-    documentationFiles,
+    documentationFiles: markdownFiles.pipe(
+      Option.map((files) => files.filter((file) => isSelectedFile(file)))
+    ),
     instructionFiles: instructionCandidates
       .filter((_, index) => exists[index])
       .map((file) => relative(file)),
@@ -197,6 +229,23 @@ function quoteShellArgument(argument: string) {
 
 function renderList(paths: readonly string[], empty: string) {
   return paths.length === 0 ? empty : paths.map((file) => `- \`${file}\``).join("\n")
+}
+
+function renderAgentReach(reach: AgentReach) {
+  const unreached =
+    reach.unreached.length === 0
+      ? "Links and code spans from each `AGENTS.md` reach each Markdown file."
+      : `No chain of links or code spans from an \`AGENTS.md\` reaches these Markdown files:\n\n${renderList(reach.unreached, "")}`
+  const brokenLinks =
+    reach.brokenLinks.length === 0
+      ? []
+      : [
+          `These links go to Markdown files that do not exist:\n\n${reach.brokenLinks
+            .map((link) => `- \`${link.file}\` links to \`${link.target}\``)
+            .join("\n")}`,
+        ]
+
+  return [unreached, ...brokenLinks].join("\n\n")
 }
 
 function renderRulesFolders(context: HardenContext) {
@@ -238,6 +287,11 @@ export function renderHardenPrompt(
   const fixHistoryPath = quoteShellArgument(context.scope ?? ".")
 
   return fillTemplate(hardenPromptTemplate, {
+    agentReach: Option.match(context.agentReach, {
+      onNone: () =>
+        "Adamantite could not find which files each `AGENTS.md` reaches, because git could not list the files. Follow the links from each `AGENTS.md` yourself.",
+      onSome: (reach) => renderAgentReach(reach),
+    }),
     configs: renderList(
       context.configs,
       "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 9."

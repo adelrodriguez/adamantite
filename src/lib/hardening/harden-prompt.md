@@ -27,11 +27,15 @@ These are the Markdown files of the project, without the changesets and the chan
 
 {{documentationFiles}}
 
+### Agent reach
+
+{{agentReach}}
+
 ## 1. Explore the documentation
 
 Start with each `AGENTS.md` above. Coding agents start from `AGENTS.md`, so it is the only instruction file that they surely read. It must point to the other documentation of the project. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, also when the list does not have them, and the comments in the Oxlint config. A linked file outside the scope of `--path` counts: read it, but do not survey the code beside it.
 
-Mark each file as "has standards" or "no standards". A file that states a standard, but that no chain of links from an `AGENTS.md` reaches, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it.
+Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to.
 
 This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.
 
@@ -129,7 +133,7 @@ Show the candidates with a score of 4 or 5, from the highest score to the lowest
 Then show three short lists:
 
 - **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 7, each rule with many suppressions, and each gap in a shipped rule that no option can close. Give the instruction, the code, and the choice that the maintainer must make.
-- **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to.
+- **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to. For a broken link, propose the correct target.
 - **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
 
 Ask the user which candidates to write. This step is done when the user names the candidates to write, or approves none.
@@ -151,9 +155,11 @@ Write only the approved candidates:
 - **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
 - **Existing violations:** keep the code that a new rule reports as it is, and list the violations for the user. Keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule. A separate change fixes the violations and removes each file from the override.
 - **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.
-- **Discovery gap:** add each approved pointer to the instruction file that the gap names.
+- **Discovery gap:** add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link. Fix each approved broken link.
 
 ## Verify
 
 When you wrote files, run `adamantite check`, `adamantite rule test`, and `adamantite doctor` in this order — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
 All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 9 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.
+
+When you changed the documentation, run `adamantite harden` again without a terminal, and read its agent reach. Each discovery gap that you closed must be gone, and no link that you added may go to a file that does not exist.

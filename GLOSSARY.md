@@ -137,6 +137,12 @@ The written coding standards of a target project, in `CODING_STANDARDS.md`, `AGE
 read them, but no tool checks them.
 _Avoid_: Prose, docs
 
+**Discovery gap**:
+A file that states a coding standard, but that no chain of links or code-span paths from an
+`AGENTS.md` reaches, so a coding agent that starts from `AGENTS.md` never finds the standard. A link
+to a file that does not exist is a discovery gap too.
+_Avoid_: Orphan doc, missing pointer
+
 **Standards file**:
 `CODING_STANDARDS.md` in the target project. It holds the coding standards that no tool can
 check.

@@ -240,7 +240,8 @@ one.
 `--path` limits the session to one package or folder. The prompt then lists the configs of the
 packages in that folder, or of the package that contains it, the rules folders that those configs
 load, the `AGENTS.md` of the root and of those packages, and the Markdown files of those packages
-and of the root. The agent also reads the fix commits of the last 200 commits, or of the number
+and of the root. The prompt also lists the Markdown files that no chain of links or code-span paths
+from an `AGENTS.md` reaches, and each link to a missing file. The agent also reads the fix commits of the last 200 commits, or of the number
 that `--commits` gives, and a mistake that the fixes repeat becomes a candidate. With `--path`, it
 reads only the commits that change that folder.
 The agent shows the candidates and writes nothing until you approve them. When no human can
@@ -249,7 +250,8 @@ approve, the agent stops at the candidates.
 In an interactive terminal, `harden` offers the same menu as Doctor: hand off to an installed
 coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff, `harden`
 runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of them fails.
-A project with no rule tests passes the `rule test` step. A copy or "do nothing"
+It also exits 1 when the session added a link to a Markdown file that does not exist. A project with
+no rule tests passes the `rule test` step. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings. See
 [ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).
 

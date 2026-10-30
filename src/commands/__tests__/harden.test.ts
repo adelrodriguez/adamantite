@@ -87,6 +87,8 @@ const REQUIRED_PHRASES = {
     "list the forms from the first item that its test does not have",
     '"still breaks the rule", "no longer breaks the rule", or "not confirmed"',
     "Many suppressions of one rule are a **decision**",
+    "A gap that is not confirmed is a candidate too",
+    "is not a candidate: list it under **Decisions** as a report for the maintainers of that package",
     'This step is done when each rule has its gaps or the note "none found".',
   ],
   "## 6. Place each candidate on the enforcement ladder": [
@@ -98,7 +100,7 @@ const REQUIRED_PHRASES = {
     "is a decision, not a candidate",
   ],
   "## 7. Show the candidates and wait for approval": [
-    "each rule with many suppressions",
+    "each rule with many suppressions, and each gap in a shipped rule that no option can close",
     "Score each candidate from 1 to 5",
     "Show the candidates with a score of 4 or 5, from the highest score to the lowest.",
     "**Decisions:**",
@@ -109,7 +111,9 @@ const REQUIRED_PHRASES = {
     "Stop after this step.",
   ],
   "## 8. Write the approved standards": [
-    "add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail",
+    "**Gap in a custom rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail",
+    "When no file has the form, tell the user that the change is not verified.",
+    "Do not change a rule that a preset or plugin ships.",
     "remove only the files that no longer break the rule",
     "`adamantite rule add <name>`",
     'the "Custom rules" section of the Adamantite skill',

@@ -73,7 +73,7 @@ Step 4 starts from the standards. This step starts from the rules that the proje
 - **Overrides that can shrink:** for each file in an override that turns a rule off, read the file and find the code that the rule reports. Mark the file as "still breaks the rule", "no longer breaks the rule", or "not confirmed". The files that no longer break the rule are a candidate: remove them from the override.
 - **Suppressions:** count the `oxlint-disable` comments of each rule, for example with `rg -n "oxlint-disable"`. Many suppressions of one rule are a **decision**: the rule is too wide, or the standard has exceptions that the rule must know.
 
-Each gap that you can confirm is a candidate on the step of the rule that it extends: a wider rule, a new option, a new test case, or a smaller override.
+Each gap is a candidate on the step of the rule that it extends: a wider custom rule, a new option, a new test case, a wider glob, or a smaller override. A gap that is not confirmed is a candidate too: show it with the mark "not confirmed". A gap in a rule that a preset or plugin ships, and that no option of the rule can close, is not a candidate: list it under **Decisions** as a report for the maintainers of that package.
 
 This step is done when each rule has its gaps or the note "none found".
 
@@ -114,7 +114,7 @@ Show the candidates with a score of 4 or 5, from the highest score to the lowest
 
 Then show three short lists:
 
-- **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 6, and each rule with many suppressions. Give the instruction, the code, and the choice that the maintainer must make.
+- **Decisions:** each written standard that the code does not follow, each rule that a commit removed, each choice from step 6, each rule with many suppressions, and each gap in a shipped rule that no option can close. Give the instruction, the code, and the choice that the maintainer must make.
 - **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to.
 - **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
 
@@ -131,7 +131,9 @@ Write only the approved candidates:
   - The rule message says what to do instead.
   - A comment at the top of the rule file states the standard and why it exists.
   - The test has the case that the rule must report and the case that it must accept.
-- **Gap in an existing rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail. Then change the rule until the test passes. To shrink an override, remove only the files that no longer break the rule.
+- **Gap in a custom rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail. Then change the rule until the test passes.
+- **Gap in the config of a rule,** such as a layer map, an import-owners option, a `no-restricted-imports` path, or an override glob: change the Oxlint config. Then lint a file that has the missed form, and read the report. When no file has the form, tell the user that the change is not verified. Do not change a rule that a preset or plugin ships.
+- **Override that can shrink:** remove only the files that no longer break the rule.
 - **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
 - **Existing violations:** keep the code that a new rule reports as it is, and list the violations for the user. Keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule. A separate change fixes the violations and removes each file from the override.
 - **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.

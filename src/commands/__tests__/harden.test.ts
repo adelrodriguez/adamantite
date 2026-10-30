@@ -79,7 +79,20 @@ const REQUIRED_PHRASES = {
     "A report from a rule that only the trial turns on is not enforcement",
     "When a tool enforces only part of a written standard, keep the other part as a candidate.",
   ],
-  "## 5. Place each candidate on the enforcement ladder": [
+  "## 5. Find the gaps in the existing rules": [
+    "This step starts from the rules that the project already has",
+    "`require()`, `import()`, `export … from`, `import type`, and the path aliases",
+    "When the code does not have the form yet, make a trial copy as step 4 says",
+    "The gap is confirmed when the rule reports the control and does not report the missed form.",
+    "the files that the standard applies to and that the glob does not match",
+    "list the forms from the first item that its test does not have",
+    '"still breaks the rule", "no longer breaks the rule", or "not confirmed"',
+    "Many suppressions of one rule are a **decision**",
+    "A gap that is not confirmed is a candidate too",
+    "is not a candidate: list it under **Decisions** as a report for the maintainers of that package",
+    'This step is done when each rule has its gaps or the note "none found".',
+  ],
+  "## 6. Place each candidate on the enforcement ladder": [
     "A native rule, such as a file-name rule, comes before a custom rule",
     "Write one combined `no-restricted-imports` for each set of files",
     "**Project check:**",
@@ -87,7 +100,8 @@ const REQUIRED_PHRASES = {
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
   ],
-  "## 6. Show the candidates and wait for approval": [
+  "## 7. Show the candidates and wait for approval": [
+    "each rule with many suppressions, and each gap in a shipped rule that no option can close",
     "Score each candidate from 1 to 5",
     "Show the candidates with a score of 4 or 5, from the highest score to the lowest.",
     "**Decisions:**",
@@ -97,7 +111,11 @@ const REQUIRED_PHRASES = {
     "When no human can approve",
     "Stop after this step.",
   ],
-  "## 7. Write the approved standards": [
+  "## 8. Write the approved standards": [
+    "**Gap in a custom rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail",
+    "When no file has the form, tell the user that the change is not verified.",
+    "Do not change a rule that a preset or plugin ships.",
+    "remove only the files that no longer break the rule",
     "`adamantite rule add <name>`",
     'the "Custom rules" section of the Adamantite skill',
     "pass it with `--dir`",
@@ -115,7 +133,7 @@ const REQUIRED_PHRASES = {
     "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
     "All three must exit 0.",
     "When you changed a project check, also run that check with the project's own command",
-    "add the file to the override as step 7 says, not a disable comment",
+    "add the file to the override as step 8 says, not a disable comment",
     "When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
@@ -392,9 +410,10 @@ describe("harden", () => {
           "## 2. List the written standards",
           "## 3. Survey the code",
           "## 4. Drop what a tool already enforces",
-          "## 5. Place each candidate on the enforcement ladder",
-          "## 6. Show the candidates and wait for approval",
-          "## 7. Write the approved standards",
+          "## 5. Find the gaps in the existing rules",
+          "## 6. Place each candidate on the enforcement ladder",
+          "## 7. Show the candidates and wait for approval",
+          "## 8. Write the approved standards",
           "## Verify",
         ],
       ])
@@ -522,7 +541,7 @@ describe("harden", () => {
 
       expect(
         getMissingPhrases(getSection(prompt, "### Oxlint config"), [
-          "tell the user to run `adamantite init` before step 7",
+          "tell the user to run `adamantite init` before step 8",
         ])
       ).toStrictEqual([])
     })
@@ -553,7 +572,7 @@ describe("harden", () => {
   )
 
   it.effect(
-    "have the read-only phase, the exploration, the scores, the approval gate, the write steps, and the verification",
+    "have the read-only phase, the exploration, the rule audit, the scores, the approval gate, the write steps, and the verification",
     () =>
       Effect.gen(function* () {
         const prompt = yield* runHardenPrompt({
@@ -567,7 +586,7 @@ describe("harden", () => {
         )
 
         expect(prompt.slice(0, prompt.indexOf("\n## Context\n"))).toContain(
-          "Steps 1 to 6 are read-only."
+          "Steps 1 to 7 are read-only."
         )
         expect(missing).toStrictEqual([])
       })

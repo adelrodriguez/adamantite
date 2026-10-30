@@ -40,6 +40,7 @@ Survey these areas: file names and placement, import direction, naming, API use,
 - A pattern is a candidate when the code follows it in several places and has few counterexamples. List each counterexample with its file and line.
 - Give the scope of each count as globs, and the command that gives the count, such as an `rg` command. Count source, tests, and generated code apart.
 - If the GitHub CLI `gh` is available and authenticated, read the review comments of recent merged pull requests. A correction that reviewers repeat is a strong sign of a standard.
+- A construct that the code never uses is not a standard by itself. It needs an instruction, a review comment, or a commit that states it.
 - Read the git history of the Oxlint config, for example with `git log -p -- oxlint.config.ts`. A rule that a commit removed is a **decision** that the maintainer already made, not a candidate.
 
 This step is done when each area has its candidates or the note "none found".
@@ -49,8 +50,8 @@ This step is done when each area has its candidates or the note "none found".
 For each written standard from step 2 and each candidate from step 3, find out whether a tool already enforces it. Read the Oxlint config, the presets and plugins that it extends, its overrides, the custom rules, `tsconfig.json`, and the checks that the project runs in CI.
 
 - When you are not sure, lint a counterexample from step 3 where it is, and read whether the lint reports it.
-- To try a native rule that is not on, run Oxlint with the project config, add the rule with `-D <rule>`, and pass the files that the standard applies to. The project config, its plugins, and its overrides stay in effect. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 5.
-- `-D` cannot turn on a rule from a JS plugin, such as a custom rule or an `adamantite/*` rule. Mark the trial of such a rule as not confirmed, and do not read a run without a report as evidence.
+- To try a rule that is not on, or a rule with options, make a **trial copy** outside the project: extract the tracked files with `git archive HEAD | tar -x -C <folder>`, and link each `node_modules` folder of the project into the same place in the copy. In the copy, change the Oxlint config at its root, add one file with the case that the rule must report and one file with the case that it must accept, and run Oxlint from the copy's root. The project itself stays unchanged.
+- A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second. Oxlint accepts a rule name that does not exist, so a run without a report is not evidence. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 5.
 - When no counterexample exists, mark the enforcement as not confirmed.
 - Drop each candidate that a tool enforces fully. When a tool enforces only part of a written standard, keep the other part as a candidate.
 
@@ -67,7 +68,9 @@ Put each remaining candidate on the highest step that works:
 5. **Custom rule:** a rule in the rules folder that checks the AST.
 6. **Instruction:** a line in `CODING_STANDARDS.md`, only when no tool can check the standard.
 
-For each rule, give one case that the rule must report and one similar case that it must accept. When the rule checks only part of the standard, say which part stays an instruction.
+For each rule, give one case that the rule must report and one similar case that it must accept. Say what the rule guarantees and what it does not, such as "bans named exports, but does not require a default export". When the rule checks only part of the standard, say which part stays an instruction.
+
+A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 6, and propose no rule for it.
 
 ## 6. Show the candidates and wait for approval
 
@@ -75,7 +78,7 @@ Score each candidate from 1 to 5:
 
 - **5:** a real standard, with correct counts, that no tool enforces, on the right step, with a precise rule. The maintainer can approve it as it is.
 - **4:** real and useful, with one small problem, such as a count that is not exact.
-- **3:** real but of low value, or it needs a decision before it is useful.
+- **3:** real but of low value.
 - **2:** mostly enforced already, wrong evidence, or many false positives.
 - **1:** not a standard.
 
@@ -91,7 +94,7 @@ Show the candidates with a score of 4 or 5, from the highest score to the lowest
 
 Then show three short lists:
 
-- **Decisions:** each written standard that the code does not follow, and each rule that a commit removed. Give the instruction, the code, and the choice that the maintainer must make.
+- **Decisions:** each written standard that the code does not follow, each rule that a commit removed, and each choice from step 5. Give the instruction, the code, and the choice that the maintainer must make.
 - **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to.
 - **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
 

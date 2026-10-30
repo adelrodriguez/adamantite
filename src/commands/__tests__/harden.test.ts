@@ -58,14 +58,16 @@ const REQUIRED_PHRASES = {
   ],
   "## 3. Survey the code": [
     "the command that gives the count",
+    "A construct that the code never uses is not a standard by itself.",
     "A rule that a commit removed is a **decision**",
     "This step is done when each area has its candidates",
   ],
   "## 4. Drop what a tool already enforces": [
     "For each written standard from step 2 and each candidate from step 3",
     "lint a counterexample from step 3 where it is",
-    "To try a native rule that is not on, run Oxlint with the project config, add the rule with `-D <rule>`",
-    "`-D` cannot turn on a rule from a JS plugin",
+    "make a **trial copy** outside the project",
+    "The project itself stays unchanged.",
+    "A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second.",
     "A report from a rule that only the trial turns on is not enforcement",
     "When a tool enforces only part of a written standard, keep the other part as a candidate.",
   ],
@@ -74,6 +76,8 @@ const REQUIRED_PHRASES = {
     "Write one combined `no-restricted-imports` for each set of files",
     "**Project check:**",
     "one case that the rule must report and one similar case that it must accept",
+    "Say what the rule guarantees and what it does not",
+    "is a decision, not a candidate",
   ],
   "## 6. Show the candidates and wait for approval": [
     "Score each candidate from 1 to 5",

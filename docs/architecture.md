@@ -27,7 +27,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `commands`     | Define one CLI workflow and render its user-facing result.                                                  |
 | `execution`    | Run child commands, hand off to coding agents, install the Adamantite skill, and carry forwarded arguments. |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.               |
-| `hardening`    | Find the configs, rules folders, and instructions of the project, and render the Markdown harden prompt.    |
+| `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, and render the prompt.    |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.   |
 | `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                      |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                        |
@@ -106,7 +106,8 @@ warns the user and points to `adamantite doctor`.
   into custom rules and instructions, and offers it through the resolution menu. After a
   handoff, it runs Oxfmt and Oxlint as `check` does, then the custom rule tests as `rule test`
   does, then assesses the project as Doctor does. It never produces findings, so it never changes Doctor's
-  result. See ADR 0012.
+  result. The prompt lists each Markdown file that `git ls-files` gives, except the changesets
+  and the changelogs, so the agent reads all the documentation. See ADR 0012.
 - `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
   preset, copies the Adamantite skill again when the copy that `init` installed is stale, then
   emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do

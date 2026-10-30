@@ -133,7 +133,8 @@ _Avoid_: Best practice, guideline
 
 **Instructions**:
 The written coding standards of a target project, in `CODING_STANDARDS.md`, `AGENTS.md`,
-`GLOSSARY.md`, and the ADRs. Agents read them, but no tool checks them.
+`GLOSSARY.md`, and the ADRs. Agents start from `AGENTS.md`, which points to the others. Agents
+read them, but no tool checks them.
 _Avoid_: Prose, docs
 
 **Standards file**:

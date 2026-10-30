@@ -1,8 +1,14 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
+import * as Order from "effect/Order"
+import * as ChildProcess from "effect/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Sink from "effect/Sink"
+import * as Stream from "effect/Stream"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import hardenCommand from "#commands/harden.ts"
@@ -49,9 +55,11 @@ function getMissingPhrases(section: string, phrases: readonly string[]) {
 // The phrases that each section must keep, so a failure names each lost one.
 const REQUIRED_PHRASES = {
   "## 1. Explore the documentation": [
-    "the files that the instructions link to or tell agents to read",
+    "Start with each `AGENTS.md` above.",
+    "It must point to the other documentation of the project.",
+    "the files that the instructions link to or tell agents to read, also when the list does not have them",
     "**discovery gap**",
-    "This step is done when each documentation file has its mark.",
+    "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
   ],
   "## 2. List the written standards": [
     "Each written standard is a candidate, and goes on to step 4",
@@ -100,6 +108,7 @@ const REQUIRED_PHRASES = {
     "turns the rule off only in the files that break it now",
     "Do not set the rule to `warn`: `adamantite check` fails on warnings.",
     "`CODING_STANDARDS.md`",
+    "When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.",
     "add each approved pointer to the instruction file that the gap names",
   ],
   "## Verify": [
@@ -146,7 +155,63 @@ export default defineConfig({
 })
 `
 
-function runHarden(files: Record<string, string>, args: readonly string[] = []) {
+const MARKDOWN_FILE = /\.(?:md|mdx|mdc)$/u
+
+/**
+ * A `git` that lists the Markdown files of the test project, as `git ls-files -z` prints them. Git
+ * lists only the files inside the project, so the files of a parent folder stay out.
+ */
+interface GitOptions {
+  readonly exitCode?: number
+  /**
+   * Files that the git index has and the working tree does not, as after a delete that is not
+   * staged, or in a sparse checkout.
+   */
+  readonly indexOnlyFiles?: readonly string[]
+}
+
+function makeGitLayer(
+  files: Record<string, string>,
+  { exitCode = 0, indexOnlyFiles = [] }: GitOptions = {}
+) {
+  const output = Array.sort(
+    [
+      ...Object.keys(files).filter((file) => MARKDOWN_FILE.test(file) && !file.startsWith("../")),
+      ...indexOnlyFiles,
+    ],
+    Order.String
+  )
+    .map((file) => `${file}\0`)
+    .join("")
+
+  return Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
+    ChildProcessSpawner.make((command) =>
+      ChildProcess.isStandardCommand(command) && command.command === "git"
+        ? Effect.succeed(
+            ChildProcessSpawner.makeHandle({
+              all: Stream.empty,
+              exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(exitCode)),
+              getInputFd: () => Sink.drain,
+              getOutputFd: () => Stream.empty,
+              isRunning: Effect.succeed(false),
+              kill: () => Effect.void,
+              pid: ChildProcessSpawner.ProcessId(1),
+              stderr: Stream.empty,
+              stdin: Sink.drain,
+              stdout: Stream.make(new TextEncoder().encode(exitCode === 0 ? output : "")),
+              unref: Effect.succeed(Effect.void),
+            })
+          )
+        : Effect.die("Harden tests spawn only git")
+    )
+  )
+}
+
+function runHarden(
+  files: Record<string, string>,
+  args: readonly string[] = [],
+  git: GitOptions = {}
+) {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
     const context = createFileSystemTestContext({ files })
@@ -155,6 +220,7 @@ function runHarden(files: Record<string, string>, args: readonly string[] = []) 
       // The monorepo configs import the shared tooling package.
       layers: [
         prompter.layer,
+        makeGitLayer(files, git),
         makeModuleResolverLayer(context.root, {
           "@acme/lint": "tooling/lint/index.ts",
           ...ADAMANTITE_RESOLUTION,
@@ -211,6 +277,7 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
         prompter.layer,
         runner.layer,
         terminal,
+        makeGitLayer(options.files ?? HEALTHY_FILES),
         makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
       ],
     })
@@ -224,20 +291,20 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
 function runHardenHoisted() {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
-    const context = createFileSystemTestContext({
-      files: {
-        "../node_modules/adamantite/dist/presets/lint/core.js": "export default {}\n",
-        "../node_modules/adamantite/package.json": JSON.stringify({
-          name: "adamantite",
-          version: getPackageVersion(),
-        }),
-        "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
-      },
-    })
+    const files = {
+      "../node_modules/adamantite/dist/presets/lint/core.js": "export default {}\n",
+      "../node_modules/adamantite/package.json": JSON.stringify({
+        name: "adamantite",
+        version: getPackageVersion(),
+      }),
+      "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
+    }
+    const context = createFileSystemTestContext({ files })
     const exit = yield* runCommand(hardenCommand, [], {
       files: context,
       layers: [
         prompter.layer,
+        makeGitLayer(files),
         makeModuleResolverLayer(context.root, {
           "adamantite/lint": "../node_modules/adamantite/dist/presets/lint/core.js",
         }),
@@ -262,7 +329,9 @@ function runHardenPrompt(files: Record<string, string>, args: readonly string[] 
 // The root and `web` load the rules of a shared tooling package, and `api` has its own rules folder.
 const MONOREPO_FILES = {
   ...ADAMANTITE_MODULE,
+  ".changeset/add-web.md": '---\n"web": patch\n---\n',
   "AGENTS.md": "# AGENTS.md\n",
+  "docs/architecture.md": "# Architecture\n",
   "oxlint.config.ts": `import { defineConfig } from "oxlint"
 import tooling from "@acme/lint"
 
@@ -272,6 +341,7 @@ export default defineConfig({ extends: [tooling] })
     devDependencies: { adamantite: "1.0.0" },
     workspaces: ["packages/*", "tooling/lint"],
   }),
+  "packages/api/README.md": "# api\n",
   "packages/api/oxlint.config.ts": CUSTOM_RULES_CONFIG.replace(
     'dir: "tooling/rules", name: "acme"',
     'dir: "rules", name: "api"'
@@ -295,6 +365,7 @@ export default custom({ dir: "rules", name: "acme" })
 function getContext(prompt: string) {
   return {
     configs: getListItems(getSection(prompt, "### Oxlint config")),
+    documentationFiles: getListItems(getSection(prompt, "### Documentation")),
     instructionFiles: getListItems(getSection(prompt, "### Instructions")),
     rulesFolders: getListItems(getSection(prompt, "### Rules folders")),
   }
@@ -316,6 +387,7 @@ describe("harden", () => {
           "### Oxlint config",
           "### Rules folders",
           "### Instructions",
+          "### Documentation",
           "## 1. Explore the documentation",
           "## 2. List the written standards",
           "## 3. Survey the code",
@@ -345,10 +417,88 @@ describe("harden", () => {
       expect(getListItems(getSection(prompt, "### Rules folders"))).toStrictEqual([
         "- `tooling/rules`",
       ])
-      expect(getListItems(getSection(prompt, "### Instructions"))).toStrictEqual([
-        "- `AGENTS.md`",
-        "- `docs/adr`",
+      expect(getListItems(getSection(prompt, "### Instructions"))).toStrictEqual(["- `AGENTS.md`"])
+    })
+  )
+
+  it.effect(
+    "start the instructions from AGENTS.md, and list the other instruction files as docs",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* runHardenPrompt({
+          ".cursor/rules/testing.mdc": "# Testing\n",
+          "AGENTS.md": "# AGENTS.md\n",
+          "CLAUDE.md": "@AGENTS.md\n",
+          "CODING_STANDARDS.md": "# Coding standards\n",
+          ...INSTALLED,
+        })
+
+        expect(getContext(prompt)).toMatchObject({
+          documentationFiles: [
+            "- `.cursor/rules/testing.mdc`",
+            "- `AGENTS.md`",
+            "- `CLAUDE.md`",
+            "- `CODING_STANDARDS.md`",
+          ],
+          instructionFiles: ["- `AGENTS.md`"],
+        })
+      })
+  )
+
+  it.effect("list each Markdown file that git lists, except changesets and changelogs", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        ".changeset/add-cart.md": '---\n"acme": patch\n---\n',
+        "CHANGELOG.md": "# acme\n",
+        "CONTRIBUTING.md": "# Contributing\n",
+        "docs/guides/errors.mdx": "# Errors\n",
+        "packages/cart/CHANGELOG.md": "# cart\n",
+        "src/cart/README.md": "# Cart\n",
+        ...INSTALLED,
+      })
+
+      expect(getListItems(getSection(prompt, "### Documentation"))).toStrictEqual([
+        "- `CONTRIBUTING.md`",
+        "- `docs/guides/errors.mdx`",
+        "- `src/cart/README.md`",
       ])
+      expect(
+        getMissingPhrases(getSection(prompt, "## 1. Explore the documentation"), [
+          "read each file in the documentation list above",
+          "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
+        ])
+      ).toStrictEqual([])
+    })
+  )
+
+  it.effect("leave out a file that the git index has and the working tree does not", () =>
+    Effect.gen(function* () {
+      const { prompter } = yield* runHarden(
+        { "docs/current.md": "# Current\n", ...INSTALLED },
+        [],
+        {
+          indexOnlyFiles: ["docs/removed.md"],
+        }
+      )
+
+      expect(
+        getListItems(getSection(prompter.messages[0] ?? "", "### Documentation"))
+      ).toStrictEqual(["- `docs/current.md`"])
+    })
+  )
+
+  it.effect("tell the agent to find the Markdown files when git cannot list them", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden(
+        { "docs/errors.md": "# Errors\n", ...INSTALLED },
+        [],
+        { exitCode: 128 }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getSection(prompter.messages[0] ?? "", "### Documentation")).toContain(
+        "Git could not list the files of this project."
+      )
     })
   )
 
@@ -362,7 +512,7 @@ describe("harden", () => {
 
       expect(rulesFolders).toContain("adamantite/lint/custom")
       expect(rulesFolders).toContain(".adamantite/rules")
-      expect(getSection(prompt, "### Instructions")).toContain("No instruction file was found.")
+      expect(getSection(prompt, "### Instructions")).toContain("No `AGENTS.md` was found.")
     })
   )
 
@@ -506,6 +656,12 @@ describe("harden", () => {
           "- `packages/api/oxlint.config.ts`",
           "- `packages/web/oxlint.config.ts`",
         ],
+        documentationFiles: [
+          "- `AGENTS.md`",
+          "- `docs/architecture.md`",
+          "- `packages/api/README.md`",
+          "- `packages/web/AGENTS.md`",
+        ],
         instructionFiles: ["- `AGENTS.md`", "- `packages/web/AGENTS.md`"],
         rulesFolders: ["- `packages/api/rules`", "- `tooling/lint/rules`"],
       })
@@ -522,9 +678,15 @@ describe("harden", () => {
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt(MONOREPO_FILES, args)
 
-      // The root instructions apply to every package, and the rules of `web` live in tooling.
+      // The root instructions and docs apply to every package, and the rules of `web` live in
+      // tooling.
       expect(getContext(prompt)).toStrictEqual({
         configs: ["- `packages/web/oxlint.config.ts`"],
+        documentationFiles: [
+          "- `AGENTS.md`",
+          "- `docs/architecture.md`",
+          "- `packages/web/AGENTS.md`",
+        ],
         instructionFiles: ["- `AGENTS.md`", "- `packages/web/AGENTS.md`"],
         rulesFolders: ["- `tooling/lint/rules`"],
       })
@@ -545,6 +707,11 @@ describe("harden", () => {
       // Oxlint lints `web` with the nearest config, which is the root config. `api` stays out.
       expect(getContext(prompt)).toStrictEqual({
         configs: ["- `oxlint.config.ts`"],
+        documentationFiles: [
+          "- `AGENTS.md`",
+          "- `docs/architecture.md`",
+          "- `packages/web/AGENTS.md`",
+        ],
         instructionFiles: ["- `AGENTS.md`", "- `packages/web/AGENTS.md`"],
         rulesFolders: ["- `tooling/lint/rules`"],
       })

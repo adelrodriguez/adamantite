@@ -827,6 +827,28 @@ describe("harden", () => {
       })
   )
 
+  it.effect("start the reach of --path also from the AGENTS.md of a parent package", () =>
+    Effect.gen(function* () {
+      // `packages/web/admin` is a workspace package inside `web`, and an agent in it reads the
+      // instructions of `web` too.
+      const prompt = yield* runHardenPrompt(
+        {
+          ...MONOREPO_FILES,
+          "docs/web.md": "# Web standards\n",
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0" },
+            workspaces: ["packages/*", "packages/web/admin", "tooling/lint"],
+          }),
+          "packages/web/AGENTS.md": "Read [the web standards](../../docs/web.md).\n",
+          "packages/web/admin/package.json": JSON.stringify({ name: "admin" }),
+        },
+        ["--path", "packages/web/admin"]
+      )
+
+      expect(getListItems(getSection(prompt, "### Agent reach"))).not.toContain("- `docs/web.md`")
+    })
+  )
+
   it.effect.each([
     { args: ["--path", "packages/web"], name: "a workspace package" },
     { args: ["--path", "packages/web/src"], name: "a folder inside a workspace package" },

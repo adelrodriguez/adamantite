@@ -21,13 +21,19 @@ Steps 1 to 6 are read-only. You change files only in step 7, and only for the ca
 
 {{instructionFiles}}
 
+### Documentation
+
+These are the Markdown files of the project, without the changesets and the changelogs.
+
+{{documentationFiles}}
+
 ## 1. Explore the documentation
 
-The instruction files above are where you start, not the full list. Read them. Then read the other documentation of the project: the files that the instructions link to or tell agents to read, the files in `docs/`, `CONTRIBUTING.md`, the comments in the Oxlint config, and the README of each workspace package.
+Start with the instruction files. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, and that are not Markdown, and the comments in the Oxlint config.
 
 Mark each file as "has standards" or "no standards". A file that states a standard, but that no instruction file points to, is a **discovery gap**: an agent that reads only the instructions never finds its standards. Record the file, its standards, and the instruction file that should point to it.
 
-This step is done when each documentation file has its mark.
+This step is done when each file in the documentation list has its mark.
 
 ## 2. List the written standards
 

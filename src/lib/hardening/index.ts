@@ -1,8 +1,14 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import { pipe } from "effect/Function"
+import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
+import * as ChildProcess from "effect/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Stream from "effect/Stream"
+import * as String from "effect/String"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
@@ -11,13 +17,79 @@ import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
-const INSTRUCTION_FILES = ["CODING_STANDARDS.md", "AGENTS.md", "GLOSSARY.md", "docs/adr"] as const
+const INSTRUCTION_FILES = [
+  "CODING_STANDARDS.md",
+  "AGENTS.md",
+  "CLAUDE.md",
+  ".claude/CLAUDE.md",
+  ".claude/rules",
+  ".cursor/rules",
+  ".github/copilot-instructions.md",
+  "GLOSSARY.md",
+  "docs/adr",
+] as const
+
+/**
+ * The Markdown files below `cwd` that git tracks, and the new files that git does not ignore, as
+ * paths relative to `cwd`. None when git cannot list them, for example outside a repository.
+ */
+const listMarkdownFiles = Effect.fn("listMarkdownFiles")(
+  function* (cwd: string) {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const handle = yield* spawner.spawn(
+      ChildProcess.make(
+        "git",
+        [
+          "ls-files",
+          "-z",
+          "--cached",
+          "--others",
+          "--exclude-standard",
+          "--",
+          "*.md",
+          "*.mdx",
+          "*.mdc",
+        ],
+        { cwd, stderr: "ignore", stdin: "ignore" }
+      )
+    )
+    const [output, exitCode] = yield* Effect.all(
+      [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
+      { concurrency: "unbounded" }
+    )
+
+    const files = pipe(
+      output,
+      String.split("\0"),
+      Array.filter((file) => String.isNonEmpty(file))
+    )
+
+    // Git prints nothing to stdout when it fails, so only the exit code tells an error apart.
+    return Option.liftPredicate(files, () => exitCode === 0)
+  },
+  Effect.scoped,
+  Effect.orElseSucceed(() => Option.none<string[]>())
+)
+
+/**
+ * Changesets and changelogs record releases, not coding standards. Git separates the folders of a
+ * path with `/` on each platform.
+ */
+function isDocumentation(file: string) {
+  const segments = file.split("/")
+
+  return !segments.includes(".changeset") && segments.at(-1) !== "CHANGELOG.md"
+}
 
 /**
  * The files that a harden session starts from. Paths are relative to the project root.
  */
 interface HardenContext {
   readonly configs: readonly string[]
+  /**
+   * The Markdown files of the project, or none when git cannot list them.
+   */
+  readonly documentationFiles: Option.Option<readonly string[]>
   readonly instructionFiles: readonly string[]
   readonly rulesFolders: readonly string[]
   /**
@@ -35,7 +107,8 @@ interface HardenContext {
  * Reads the harden context of the root and each workspace package. A `scope` keeps the packages
  * inside that folder, or the package that contains it. The context keeps the configs that lint
  * those packages, an ancestor config included, and the rules folders that those configs load, also
- * when they are outside the scope.
+ * when they are outside the scope. A scope also keeps the Markdown files outside each workspace
+ * package, because the root documentation applies to every package.
  */
 export const readHardenContext = Effect.fn("readHardenContext")(function* (
   cwd: string,
@@ -77,8 +150,24 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     { concurrency: "unbounded" }
   )
 
+  // The innermost package that contains the file owns it.
+  const isSelected = (file: string) => {
+    const [innermost = cwd] = Array.sort(
+      packageDirectories.filter((directory) => contains(directory, file)),
+      Order.mapInput(Order.flip(Order.Number), (directory: string) => directory.length)
+    )
+
+    return innermost === cwd || selectedPackages.includes(innermost)
+  }
+  const markdownFiles = yield* listMarkdownFiles(cwd)
+
   return {
     configs: configs.map((config) => relative(config)),
+    documentationFiles: markdownFiles.pipe(
+      Option.map((files) =>
+        files.filter((file) => isDocumentation(file) && isSelected(path.join(cwd, file)))
+      )
+    ),
     instructionFiles: instructionCandidates
       .filter((_, index) => exists[index])
       .map((file) => relative(file)),
@@ -116,6 +205,11 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
       context.configs,
       "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 7."
     ),
+    documentationFiles: Option.match(context.documentationFiles, {
+      onNone: () =>
+        "Git could not list the files of this project. Find the Markdown files with a file search, and leave out the dependencies, the build output, the changesets, and the changelogs.",
+      onSome: (files) => renderList(files, "The project has no Markdown file."),
+    }),
     instructionFiles: renderList(context.instructionFiles, "No instruction file was found."),
     rulesFolders: renderRulesFolders(context),
     scope:

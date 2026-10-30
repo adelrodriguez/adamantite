@@ -55,6 +55,8 @@ function getMissingPhrases(section: string, phrases: readonly string[]) {
 // The phrases that each section must keep, so a failure names each lost one.
 const REQUIRED_PHRASES = {
   "## 1. Explore the documentation": [
+    "Start with each `AGENTS.md` above.",
+    "It must point to the other documentation of the project.",
     "the files that the instructions link to or tell agents to read, also when the list does not have them",
     "**discovery gap**",
     "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
@@ -106,6 +108,7 @@ const REQUIRED_PHRASES = {
     "turns the rule off only in the files that break it now",
     "Do not set the rule to `warn`: `adamantite check` fails on warnings.",
     "`CODING_STANDARDS.md`",
+    "When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.",
     "add each approved pointer to the instruction file that the gap names",
   ],
   "## Verify": [
@@ -414,32 +417,32 @@ describe("harden", () => {
       expect(getListItems(getSection(prompt, "### Rules folders"))).toStrictEqual([
         "- `tooling/rules`",
       ])
-      expect(getListItems(getSection(prompt, "### Instructions"))).toStrictEqual([
-        "- `AGENTS.md`",
-        "- `docs/adr`",
-      ])
+      expect(getListItems(getSection(prompt, "### Instructions"))).toStrictEqual(["- `AGENTS.md`"])
     })
   )
 
-  it.effect("list the instruction files of each coding agent", () =>
-    Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt({
-        ".claude/CLAUDE.md": "# Claude\n",
-        ".claude/rules/testing.md": "# Testing\n",
-        ".cursor/rules/testing.mdc": "# Testing\n",
-        ".github/copilot-instructions.md": "# Copilot\n",
-        "CLAUDE.md": "@AGENTS.md\n",
-        ...INSTALLED,
-      })
+  it.effect(
+    "start the instructions from AGENTS.md, and list the other instruction files as docs",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* runHardenPrompt({
+          ".cursor/rules/testing.mdc": "# Testing\n",
+          "AGENTS.md": "# AGENTS.md\n",
+          "CLAUDE.md": "@AGENTS.md\n",
+          "CODING_STANDARDS.md": "# Coding standards\n",
+          ...INSTALLED,
+        })
 
-      expect(getListItems(getSection(prompt, "### Instructions"))).toStrictEqual([
-        "- `CLAUDE.md`",
-        "- `.claude/CLAUDE.md`",
-        "- `.claude/rules`",
-        "- `.cursor/rules`",
-        "- `.github/copilot-instructions.md`",
-      ])
-    })
+        expect(getContext(prompt)).toMatchObject({
+          documentationFiles: [
+            "- `.cursor/rules/testing.mdc`",
+            "- `AGENTS.md`",
+            "- `CLAUDE.md`",
+            "- `CODING_STANDARDS.md`",
+          ],
+          instructionFiles: ["- `AGENTS.md`"],
+        })
+      })
   )
 
   it.effect("list each Markdown file that git lists, except changesets and changelogs", () =>
@@ -509,7 +512,7 @@ describe("harden", () => {
 
       expect(rulesFolders).toContain("adamantite/lint/custom")
       expect(rulesFolders).toContain(".adamantite/rules")
-      expect(getSection(prompt, "### Instructions")).toContain("No instruction file was found.")
+      expect(getSection(prompt, "### Instructions")).toContain("No `AGENTS.md` was found.")
     })
   )
 

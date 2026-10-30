@@ -17,17 +17,11 @@ import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
-const INSTRUCTION_FILES = [
-  "CODING_STANDARDS.md",
-  "AGENTS.md",
-  "CLAUDE.md",
-  ".claude/CLAUDE.md",
-  ".claude/rules",
-  ".cursor/rules",
-  ".github/copilot-instructions.md",
-  "GLOSSARY.md",
-  "docs/adr",
-] as const
+/**
+ * Each coding agent starts from `AGENTS.md`, and `AGENTS.md` points to the other documentation.
+ * Harden does not read the instruction files of one vendor, such as `CLAUDE.md`, as instructions.
+ */
+const AGENTS_FILE = "AGENTS.md"
 
 /**
  * The Markdown files below `cwd` that git tracks, and the new files that git does not ignore, as
@@ -141,8 +135,8 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     selectedPackages
   )
   // The root instructions apply to every package, so a scope keeps them.
-  const instructionCandidates = [...new Set([cwd, ...selectedPackages])].flatMap((directory) =>
-    INSTRUCTION_FILES.map((file) => path.join(directory, file))
+  const instructionCandidates = [...new Set([cwd, ...selectedPackages])].map((directory) =>
+    path.join(directory, AGENTS_FILE)
   )
   // `forEach` keeps the order of the candidates, which `Effect.filter` loses under concurrency.
   const exists = yield* Effect.forEach(
@@ -224,7 +218,10 @@ export function renderHardenPrompt(context: HardenContext, adamantiteVersion: st
         "Git could not list the files of this project. Find the Markdown files with a file search, and leave out the dependencies, the build output, the changesets, and the changelogs.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
-    instructionFiles: renderList(context.instructionFiles, "No instruction file was found."),
+    instructionFiles: renderList(
+      context.instructionFiles,
+      "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."
+    ),
     rulesFolders: renderRulesFolders(context),
     scope:
       context.scope === null

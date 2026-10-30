@@ -29,9 +29,9 @@ These are the Markdown files of the project, without the changesets and the chan
 
 ## 1. Explore the documentation
 
-Start with the instruction files. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, also when the list does not have them, and the comments in the Oxlint config. A linked file outside the scope of `--path` counts: read it, but do not survey the code beside it.
+Start with each `AGENTS.md` above. Coding agents start from `AGENTS.md`, so it is the only instruction file that they surely read. It must point to the other documentation of the project. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, also when the list does not have them, and the comments in the Oxlint config. A linked file outside the scope of `--path` counts: read it, but do not survey the code beside it.
 
-Mark each file as "has standards" or "no standards". A file that states a standard, but that no instruction file points to, is a **discovery gap**: an agent that reads only the instructions never finds its standards. Record the file, its standards, and the instruction file that should point to it.
+Mark each file as "has standards" or "no standards". A file that states a standard, but that no chain of links from an `AGENTS.md` reaches, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it.
 
 This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.
 
@@ -119,7 +119,7 @@ Write only the approved candidates:
   - The test has the case that the rule must report and the case that it must accept.
 - **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
 - **Existing violations:** keep the code that a new rule reports as it is, and list the violations for the user. Keep the rule at `error`, and add an `overrides` entry to the Oxlint config that turns the rule off only in the files that break it now, such as `{ files: ["src/legacy/cart.ts"], rules: { "project/no-foo": "off" } }`. Do not set the rule to `warn`: `adamantite check` fails on warnings. New files must follow the rule. A separate change fixes the violations and removes each file from the override.
-- **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard.
+- **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.
 - **Discovery gap:** add each approved pointer to the instruction file that the gap names.
 
 ## Verify

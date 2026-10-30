@@ -18,6 +18,7 @@
           "effect/Arbitrary",
           "effect/ByteSize",
           "effect/cli",
+          "effect/encoding/Yaml",
           "effect/FileSystem",
           "effect/Path",
           "effect/PlatformError",

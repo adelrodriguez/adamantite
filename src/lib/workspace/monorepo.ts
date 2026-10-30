@@ -2,114 +2,26 @@ import type * as FileSystem from "effect/FileSystem"
 import process from "node:process"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Yaml from "effect/encoding/Yaml"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Schema from "effect/Schema"
 import type { FailedToReadFile } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfExists } from "#lib/shared/filesystem.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
-const PNPM_PACKAGES_KEY_REGEX = /^(?:packages|"packages"|'packages')\s*:/u
-
-function stripYamlComment(value: string): string {
-  return value.replace(/(?:^|\s+)#.*$/u, "").trim()
-}
-
-function unquote(value: string) {
-  return value.replace(/^(["'])(.*)\1$/u, "$2")
-}
-
-// A YAML anchor or tag, such as `&packages`, can come before a value.
-function stripNodeProperties(value: string) {
-  return value.replace(/^(?:[!&]\S*\s*)+/u, "")
-}
-
-function getIndent(line: string) {
-  return /^\s*/u.exec(line)?.[0].length ?? 0
-}
+const PnpmWorkspace = Schema.Struct({ packages: Schema.Array(Schema.String) })
 
 /**
- * The items of a YAML list in block (`- packages/*`) or flow (`[packages/*]`) style, from the line
- * of its key and the lines after it. A block list ends at the first line that is not one of its
- * items and is not indented deeper than them.
+ * The package patterns in a `pnpm-workspace.yaml`. A file that does not parse, or that has no
+ * `packages` list, declares none.
  */
-function readList(keyLine: string, value: string, nextLines: readonly string[]): string[] {
-  if (value.startsWith("[")) {
-    const flow = [value, ...nextLines.map((line) => stripYamlComment(line))].join(" ")
-    const end = flow.indexOf("]")
-
-    return flow
-      .slice(1, end === -1 ? undefined : end)
-      .split(",")
-      .map((item) => unquote(item.trim()))
-      .filter((item) => item.length > 0)
-  }
-
-  const keyIndent = getIndent(keyLine)
-  const items: string[] = []
-  let itemIndent: number | undefined
-
-  for (const line of nextLines) {
-    const content = stripYamlComment(line)
-
-    if (content === "") {
-      continue
-    }
-
-    const indent = getIndent(line)
-    const item = /^-\s*(.+)$/u.exec(content)?.[1]
-
-    // YAML lets the items of a block list sit at the indent of its key.
-    if (item !== undefined && indent === (itemIndent ?? Math.max(indent, keyIndent))) {
-      itemIndent = indent
-      items.push(unquote(item.trim()))
-    } else if (indent <= (itemIndent ?? keyIndent)) {
-      break
-    }
-  }
-
-  return items
-}
-
-/**
- * The package patterns in a `pnpm-workspace.yaml`, in block (`- packages/*`) or flow
- * (`[packages/*]`) style. An alias, such as `packages: *shared`, reads the list that `&shared`
- * anchors.
- */
-export function readPnpmWorkspacePatterns(content: string): string[] {
-  const lines = content.replace(/^\uFEFF/u, "").split(/\r?\n/u)
-  const packagesIndex = lines.findIndex((line) => PNPM_PACKAGES_KEY_REGEX.test(line))
-
-  if (packagesIndex === -1) {
-    return []
-  }
-
-  const value = stripNodeProperties(
-    stripYamlComment((lines[packagesIndex] ?? "").replace(PNPM_PACKAGES_KEY_REGEX, ""))
+export const readPnpmWorkspacePatterns = (content: string) =>
+  Effect.try(() => Yaml.parse(content)).pipe(
+    Effect.flatMap((parsed) => Schema.decodeUnknownEffect(PnpmWorkspace)(parsed)),
+    Effect.map(({ packages }) => packages),
+    Effect.orElseSucceed(() => [])
   )
-  const alias = /^\*(\S+)$/u.exec(value)?.[1]
-
-  if (alias === undefined) {
-    return readList(lines[packagesIndex] ?? "", value, lines.slice(packagesIndex + 1))
-  }
-
-  const anchor = `&${alias}`
-  const anchorIndex = lines.findIndex((line) =>
-    stripYamlComment(line).split(/\s+/u).includes(anchor)
-  )
-
-  if (anchorIndex === -1) {
-    return []
-  }
-
-  const anchorLine = lines[anchorIndex] ?? ""
-  const anchored = stripYamlComment(anchorLine)
-
-  return readList(
-    anchorLine,
-    stripNodeProperties(anchored.slice(anchored.indexOf(anchor) + anchor.length).trim()),
-    lines.slice(anchorIndex + 1)
-  )
-}
 
 /**
  * The workspace patterns of the project: the `packages` of `pnpm-workspace.yaml`, or the
@@ -120,10 +32,9 @@ const readWorkspacePatterns = (cwd: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const pnpmWorkspace = yield* readFileIfExists(path.join(cwd, "pnpm-workspace.yaml"))
-    const pnpmPatterns = Option.match(pnpmWorkspace, {
-      onNone: () => [],
-      onSome: (content) => readPnpmWorkspacePatterns(content),
-    })
+    const pnpmPatterns = Option.isSome(pnpmWorkspace)
+      ? yield* readPnpmWorkspacePatterns(pnpmWorkspace.value)
+      : []
 
     if (pnpmPatterns.length > 0) {
       return pnpmPatterns

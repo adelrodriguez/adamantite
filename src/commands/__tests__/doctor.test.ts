@@ -225,7 +225,17 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".github/workflows/adamantite.yml": "node-version: 22\n",
+          ".github/workflows/adamantite.yml": [
+            "on: push",
+            "jobs:",
+            "  verify:",
+            "    runs-on: ubuntu-latest",
+            "    steps:",
+            "      - uses: actions/setup-node@v7",
+            "        with:",
+            "          node-version: 22",
+            "",
+          ].join("\n"),
           "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
         },
       })
@@ -250,7 +260,15 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".github/workflows/adamantite.yml": "steps:\n  - run: pnpm run format --check\n",
+          ".github/workflows/adamantite.yml": [
+            "on: push",
+            "jobs:",
+            "  verify:",
+            "    runs-on: ubuntu-latest",
+            "    steps:",
+            "      - run: pnpm run format --check",
+            "",
+          ].join("\n"),
           "AGENTS.md": LEGACY_FORMAT_AGENTS_GUIDANCE,
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0" },

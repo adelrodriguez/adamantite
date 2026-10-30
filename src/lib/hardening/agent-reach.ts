@@ -49,15 +49,16 @@ function matchAll(content: string, pattern: RegExp) {
 }
 
 /**
- * Reads which Markdown files each `AGENTS.md` reaches. A Markdown link resolves from the folder of
- * its file, or from the root when it starts with `/`. A code span resolves from the folder of its
- * file, then from the root, because instructions often name a root path. A reference to a folder
- * reaches each Markdown file directly in it. A fenced code block holds examples, so its links and
- * paths do not count, and a link inside a code span is an example too.
+ * Reads which Markdown files the given `AGENTS.md` files reach. A Markdown link resolves from the
+ * folder of its file, or from the root when it starts with `/`. A code span resolves from the
+ * folder of its file, then from the root, because instructions often name a root path. A reference
+ * to a folder reaches each Markdown file directly in it. A fenced code block holds examples, so its
+ * links and paths do not count, and a link inside a code span is an example too.
  */
 export const readAgentReach = Effect.fn("readAgentReach")(function* (
   cwd: string,
-  files: readonly string[]
+  files: readonly string[],
+  agentsFiles: readonly string[]
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
@@ -113,7 +114,6 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
     ),
   ]
 
-  const agentsFiles = files.filter((file) => posix.basename(file) === "AGENTS.md")
   const reached = new Set(agentsFiles)
   const queue = [...agentsFiles]
 

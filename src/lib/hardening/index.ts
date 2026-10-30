@@ -177,9 +177,19 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
       )
     )
   )
-  // A root file can reach the files of each package, so the reach starts from the whole project.
+  // A root file can link to the files of each package, so the reach reads the whole project. It
+  // starts from the `AGENTS.md` files that an agent in the scope reads: the root and the selected
+  // packages, and not their siblings.
   const agentReach = yield* Effect.transposeOption(
-    markdownFiles.pipe(Option.map((files) => readAgentReach(cwd, files)))
+    markdownFiles.pipe(
+      Option.map((files) =>
+        readAgentReach(
+          cwd,
+          files,
+          files.filter((file) => path.basename(file) === AGENTS_FILE && isSelectedFile(file))
+        )
+      )
+    )
   )
 
   return {

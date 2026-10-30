@@ -8,9 +8,13 @@ import { readAgentReach } from "#lib/hardening/agent-reach.ts"
 function readReach(files: Record<string, string>) {
   const context = createFileSystemTestContext({ files })
 
-  return readAgentReach(context.root, Object.keys(files)).pipe(
-    Effect.provide(Layer.mergeAll(context.layer, Path.layer))
-  )
+  const paths = Object.keys(files)
+
+  return readAgentReach(
+    context.root,
+    paths,
+    paths.filter((file) => file.split("/").at(-1) === "AGENTS.md")
+  ).pipe(Effect.provide(Layer.mergeAll(context.layer, Path.layer)))
 }
 
 describe("readAgentReach", () => {
@@ -32,7 +36,7 @@ describe("readAgentReach", () => {
     })
   )
 
-  it.effect("start from each AGENTS.md, and not from the files of one vendor", () =>
+  it.effect("start from the given AGENTS.md files, and not from the files of one vendor", () =>
     Effect.gen(function* () {
       const reach = yield* readReach({
         ".cursor/rules/style.mdc": "See `docs/style.md`.\n",

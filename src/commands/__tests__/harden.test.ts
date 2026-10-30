@@ -807,6 +807,26 @@ describe("harden", () => {
     })
   )
 
+  it.effect(
+    "start the reach of --path from the AGENTS.md of the root and the selected package",
+    () =>
+      Effect.gen(function* () {
+        // Only the `api` instructions link to the shared guide, and an agent in `web` does not read them.
+        const files = {
+          ...MONOREPO_FILES,
+          "docs/shared.md": "# Shared\n",
+          "packages/api/AGENTS.md": "Read [the shared guide](../../docs/shared.md).\n",
+        }
+        const scoped = yield* runHardenPrompt(files, ["--path", "packages/web"])
+        const whole = yield* runHardenPrompt(files)
+
+        expect(getListItems(getSection(scoped, "### Agent reach"))).toContain("- `docs/shared.md`")
+        expect(getListItems(getSection(whole, "### Agent reach"))).not.toContain(
+          "- `docs/shared.md`"
+        )
+      })
+  )
+
   it.effect.each([
     { args: ["--path", "packages/web"], name: "a workspace package" },
     { args: ["--path", "packages/web/src"], name: "a folder inside a workspace package" },

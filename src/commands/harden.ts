@@ -16,6 +16,8 @@ import {
   readHardenContext,
   renderHardenPrompt,
 } from "#lib/hardening/index.ts"
+import { readOverrides } from "#lib/hardening/overrides.ts"
+import { readSuppressions } from "#lib/hardening/suppressions.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import {
   AdamantiteNotInNodeModules,
@@ -146,7 +148,17 @@ export default Command.make("harden", { commits, scope }).pipe(
       }
 
       const context = yield* readHardenContext(cwd, scopeDirectory)
-      const prompt = renderHardenPrompt(context, { adamantiteVersion: version, commits })
+      // These reads change no file in the project, so they run together.
+      const [overrides, suppressions] = yield* Effect.all(
+        [readOverrides(cwd, context.configs, context.scope), readSuppressions(cwd, context.scope)],
+        { concurrency: "unbounded" }
+      )
+      const prompt = renderHardenPrompt(context, {
+        adamantiteVersion: version,
+        commits,
+        overrides,
+        suppressions,
+      })
 
       if (!isInteractive) {
         yield* prompter.message(prompt)

@@ -1,16 +1,14 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
-import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import * as ChildProcess from "effect/process/ChildProcess"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import * as Stream from "effect/Stream"
-import * as String from "effect/String"
+import type { OverridesReport } from "#lib/hardening/overrides.ts"
+import type { RuleSuppressions } from "#lib/hardening/suppressions.ts"
 import { type AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
+import { listProjectFiles } from "#lib/hardening/project-files.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
@@ -23,49 +21,6 @@ const hardenPromptTemplate = getHardenPromptTemplate()
  * Harden does not read the instruction files of one vendor, such as `CLAUDE.md`, as instructions.
  */
 const AGENTS_FILE = "AGENTS.md"
-
-/**
- * The Markdown files below `cwd` that git tracks, and the new files that git does not ignore, as
- * paths relative to `cwd`. Some tracked files can be missing from the working tree. None when git
- * cannot list them, for example outside a repository.
- */
-const listMarkdownFiles = Effect.fn("listMarkdownFiles")(
-  function* (cwd: string) {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-    const handle = yield* spawner.spawn(
-      ChildProcess.make(
-        "git",
-        [
-          "ls-files",
-          "-z",
-          "--cached",
-          "--others",
-          "--exclude-standard",
-          "--",
-          "*.md",
-          "*.mdx",
-          "*.mdc",
-        ],
-        { cwd, stderr: "ignore", stdin: "ignore" }
-      )
-    )
-    const [output, exitCode] = yield* Effect.all(
-      [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
-      { concurrency: "unbounded" }
-    )
-
-    const files = pipe(
-      output,
-      String.split("\0"),
-      Array.filter((file) => String.isNonEmpty(file))
-    )
-
-    // Git prints nothing to stdout when it fails, so only the exit code tells an error apart.
-    return Option.liftPredicate(files, () => exitCode === 0)
-  },
-  Effect.scoped,
-  Effect.orElseSucceed(() => Option.none<string[]>())
-)
 
 /**
  * Changesets and changelogs record releases, not coding standards. Git separates the folders of a
@@ -168,7 +123,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     // The git index also has the files that a delete or a sparse checkout left out of the working
     // tree, and the agent cannot read those.
     const markdownFiles = yield* Effect.transposeOption(
-      (yield* listMarkdownFiles(cwd)).pipe(
+      (yield* listProjectFiles(cwd, ["*.md", "*.mdx", "*.mdc"])).pipe(
         Option.map((files) =>
           Effect.forEach(
             files.filter((file) => isDocumentation(file)),
@@ -278,6 +233,83 @@ function renderRulesFolders(context: HardenContext) {
 }
 
 /**
+ * The locations of the disable comments that the prompt shows for each rule. The agent reads the
+ * other comments with the command in the fallback text.
+ */
+const SHOWN_SUPPRESSIONS = 5
+
+function renderSuppressions(suppressions: Option.Option<readonly RuleSuppressions[]>) {
+  return Option.match(suppressions, {
+    onNone: () =>
+      'Adamantite could not count the comments that turn a rule off, because Oxlint could not list the files that it lints. Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`, and leave out the files that the config ignores.',
+    onSome: (rules) => {
+      if (rules.length === 0) {
+        return "No `oxlint-disable` or `eslint-disable` comment turns a rule off."
+      }
+
+      const lines = rules.map(({ locations, rule }) => {
+        const name = Option.match(rule, {
+          onNone: () => "All rules",
+          onSome: (ruleName) => `\`${ruleName}\``,
+        })
+        const shown = locations
+          .slice(0, SHOWN_SUPPRESSIONS)
+          .map((location) => `\`${location}\``)
+          .join(", ")
+        const more =
+          locations.length > SHOWN_SUPPRESSIONS
+            ? `, and ${locations.length - SHOWN_SUPPRESSIONS} more`
+            : ""
+
+        return `- ${name}: ${locations.length} ${locations.length === 1 ? "comment" : "comments"}, in ${shown}${more}`
+      })
+
+      return [
+        "Adamantite counted the `oxlint-disable` and `eslint-disable` comments of each rule in the files that Oxlint lints. Oxlint obeys both. A comment that names no rule turns off all rules.",
+        "",
+        ...lines,
+      ].join("\n")
+    },
+  })
+}
+
+const OVERRIDE_MARKS = {
+  breaks: "still breaks the rule",
+  clean: "no longer breaks the rule",
+  missing: "does not exist",
+} as const
+
+function renderOverrides(report: OverridesReport) {
+  if (report._tag === "Failed") {
+    return [
+      "Adamantite could not lint the files of the overrides that turn a rule off:",
+      "",
+      "```text",
+      report.reason,
+      "```",
+      "",
+      "For each file in an override that turns a rule off, read the file and find the code that the rule reports.",
+    ].join("\n")
+  }
+
+  if (report.rules.length === 0) {
+    return "No override in the Oxlint config turns a rule off for files that it names."
+  }
+
+  return [
+    "Adamantite turned each rule on again in a copy of the project, and linted each file that an override names and turns the rule off for. Paths are relative to the project root. An override that code builds, such as a spread, is not in this list.",
+    "",
+    ...report.rules.map(({ config, files, globs, rule }) =>
+      [
+        `- \`${rule}\` in \`${config}\`:`,
+        ...files.map(({ file, mark }) => `  - \`${file}\`: ${OVERRIDE_MARKS[mark]}`),
+        ...globs.map((glob) => `  - \`${glob}\`: a glob, so Adamantite did not lint its files`),
+      ].join("\n")
+    ),
+  ].join("\n")
+}
+
+/**
  * The number of recent commits that the agent reads for fixed mistakes when `--commits` is not set.
  */
 export const DEFAULT_FIX_HISTORY_COMMITS = 200
@@ -288,15 +320,17 @@ interface RenderHardenPromptOptions {
    * The number of recent commits that the agent reads for fixed mistakes.
    */
   readonly commits: number
+  readonly overrides: OverridesReport
+  readonly suppressions: Option.Option<readonly RuleSuppressions[]>
 }
 
 /**
- * The Markdown prompt that a coding agent follows to harden the project. Code renders only the
- * detected files and the commands; `harden-prompt.md` holds the rest.
+ * The Markdown prompt that a coding agent follows to harden the project. Code renders the detected
+ * files, the facts that Adamantite computes, and the commands; `harden-prompt.md` holds the rest.
  */
 export function renderHardenPrompt(
   context: HardenContext,
-  { adamantiteVersion, commits }: RenderHardenPromptOptions
+  { adamantiteVersion, commits, overrides, suppressions }: RenderHardenPromptOptions
 ): string {
   // `.` keeps the history to the project folder when the project is a folder of a larger repository.
   const fixHistoryPath = quoteShellArgument(context.scope ?? ".")
@@ -321,11 +355,13 @@ export function renderHardenPrompt(
       context.instructionFiles,
       "No `AGENTS.md` was found. Each file that states a standard is a discovery gap, and the root `AGENTS.md` must point to it."
     ),
+    overrides: renderOverrides(overrides),
     rulesFolders: renderRulesFolders(context),
     scope:
       context.scope === null
         ? "Adamantite found these files in the project and its workspace packages. Paths are relative to the project root."
         : `Adamantite found these files for \`${context.scope}\`, the folder that \`--path\` selects. Survey only the code in this folder. Paths are relative to the project root.`,
+    suppressions: renderSuppressions(suppressions),
     version: adamantiteVersion,
   })
 }

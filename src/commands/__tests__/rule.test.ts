@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import ruleCommand from "#commands/rule.ts"
+import ruleCommand, { renderTrial } from "#commands/rule.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { toCustomRuleStub, toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
 import {
@@ -359,6 +359,75 @@ describe("rule ast", () => {
         path: `${files.root}/src/broken.ts`,
       })
       expect(prompter.messages).toStrictEqual([])
+    })
+  )
+})
+
+describe("rule try", () => {
+  const reportCase = {
+    expected: "reported",
+    path: "src/cart.ts",
+    source: Option.some("/tmp/before.ts"),
+  } as const
+  const acceptCase = { expected: "accepted", path: "src/cart.ts", source: Option.none() } as const
+  const report = { column: 1, line: 1, message: "'node:fs' import is restricted from being used." }
+
+  it("show each case with its verdict and the reports of the rule", () => {
+    expect(
+      renderTrial("no-restricted-imports", { _tag: "Error", options: [{ paths: ["node:fs"] }] }, [
+        { case: reportCase, config: "oxlint.config.ts", diagnostics: [report] },
+        { case: acceptCase, config: "oxlint.config.ts", diagnostics: [report] },
+      ])
+    ).toBe(
+      [
+        'Trial of `no-restricted-imports` at ["error",{"paths":["node:fs"]}], in `oxlint.config.ts`.',
+        "",
+        "✓ `src/cart.ts` from `/tmp/before.ts`: reported, as expected.",
+        "    1:1  'node:fs' import is restricted from being used.",
+        "✗ `src/cart.ts`: reported, but it must be accepted.",
+        "    1:1  'node:fs' import is restricted from being used.",
+        "",
+        "1 of 2 cases is not as expected.",
+      ].join("\n")
+    )
+  })
+
+  it("say that the trial keeps the project setting, and that each case is as expected", () => {
+    expect(
+      renderTrial("no-console", { _tag: "Current" }, [
+        { case: acceptCase, config: "packages/web/oxlint.config.ts", diagnostics: [] },
+      ])
+    ).toBe(
+      [
+        "Trial of `no-console` as the project config sets it, in `packages/web/oxlint.config.ts`.",
+        "",
+        "✓ `src/cart.ts`: accepted, as expected.",
+        "",
+        "Each case is as expected.",
+      ].join("\n")
+    )
+  })
+
+  it.effect.each([
+    {
+      args: ["--current", "--options", "[]", "--report", "src/cart.ts"],
+      error: { _tag: "InvalidTrialOptions" },
+      name: "reject --current with --options",
+    },
+    {
+      args: ["--report", "../cart.ts"],
+      error: { _tag: "InvalidTrialCase", value: "../cart.ts" },
+      name: "reject a case outside the project",
+    },
+  ])("$name before it copies the project", ({ args, error }) =>
+    Effect.gen(function* () {
+      // The test spawner dies on each process, so the error comes before the copy.
+      const exit = yield* runCommand(ruleCommand, ["try", "no-console", ...args], {
+        files: createFileSystemTestContext(),
+        layers: [createPrompterTestContext().layer],
+      })
+
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject(error)
     })
   )
 })

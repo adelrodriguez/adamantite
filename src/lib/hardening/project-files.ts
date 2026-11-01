@@ -1,0 +1,42 @@
+import * as Array from "effect/Array"
+import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
+import * as Option from "effect/Option"
+import * as ChildProcess from "effect/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Stream from "effect/Stream"
+import * as String from "effect/String"
+
+/**
+ * The files below `cwd` that git tracks, and the new files that git does not ignore, as paths
+ * relative to `cwd` with `/` between folders. `pathspecs` limits the list, such as `["*.md"]`. Some
+ * tracked files can be missing from the working tree. None when git cannot list them, for example
+ * outside a repository.
+ */
+export const listProjectFiles = Effect.fn("listProjectFiles")(
+  function* (cwd: string, pathspecs: readonly string[] = []) {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+    const handle = yield* spawner.spawn(
+      ChildProcess.make(
+        "git",
+        ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...pathspecs],
+        { cwd, stderr: "ignore", stdin: "ignore" }
+      )
+    )
+    const [output, exitCode] = yield* Effect.all(
+      [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
+      { concurrency: "unbounded" }
+    )
+
+    const files = pipe(
+      output,
+      String.split("\0"),
+      Array.filter((file) => String.isNonEmpty(file))
+    )
+
+    // Git prints nothing to stdout when it fails, so only the exit code tells an error apart.
+    return Option.liftPredicate(files, () => exitCode === 0)
+  },
+  Effect.scoped,
+  Effect.orElseSucceed(() => Option.none<string[]>())
+)

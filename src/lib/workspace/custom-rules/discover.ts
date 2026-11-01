@@ -13,7 +13,7 @@ import {
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
-const CONFIG_FILES = [
+export const CONFIG_FILES = [
   "oxlint.config.ts",
   "oxlint.config.mts",
   "oxlint.config.js",

@@ -30,7 +30,9 @@ The decisions:
   `error`, and turns it off for those files in an Oxlint override. A separate change fixes the
   code. This replaced a `warn` setting when `check` started to fail on warnings (ADR 0018).
 - Nothing changes before the approval, not even a sample file: the agent confirms what a
-  tool enforces by linting a counterexample that the code already has.
+  tool enforces by linting a counterexample that the code already has. ADR 0020 changed how:
+  `adamantite rule try` lints the counterexample, or a case that the code does not have yet,
+  in a copy of the project.
 - Harden is not part of Doctor. Doctor is a deterministic CI gate, and a harden session can
   give a different result on each run, so harden never produces findings. Its context and
   prompt live in `src/lib/hardening`, beside `assessment`, because hardening does not

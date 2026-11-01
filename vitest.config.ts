@@ -2,11 +2,13 @@ import process from "node:process"
 import { Macros } from "unplugin-macros"
 import { defineConfig } from "vitest/config"
 
-// These tests start real processes: Oxlint runs that lint files, and Vitest runs that check the
-// module cache. They touch the host filesystem, so they stay out of the unit tests.
+// These tests start real processes: Oxlint runs that lint files, rule trials in a copy of a
+// project, and Vitest runs that check the module cache. They touch the host filesystem, so they
+// stay out of the unit tests.
 const PROCESS_RUN_TESTS = [
   "src/__tests__/presets/**/*.test.ts",
   "src/__tests__/macro-cache.test.ts",
+  "src/__tests__/trial.test.ts",
 ]
 
 const MACRO_IMPORT = /with\s*\{\s*type:\s*["']macro["']\s*\}/

@@ -5,9 +5,17 @@ import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import { parseSync } from "oxc-parser"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { FailedToParseSource } from "#lib/shared/errors.ts"
+import {
+  parseTrialCase,
+  type TrialCaseResult,
+  type TrialSetting,
+  tryRule,
+} from "#lib/hardening/trial.ts"
+import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import {
@@ -112,7 +120,156 @@ const test = Command.make("test").pipe(
   )
 )
 
+const trialRule = Argument.String("rule").pipe(
+  Argument.withDescription(
+    "The full rule name, such as no-restricted-imports, typescript/no-explicit-any, or project/no-foo"
+  )
+)
+
+const report = Flag.String("report").pipe(
+  Flag.atLeast(1),
+  Flag.withDescription(
+    "A case that has the mistake, so the rule must report it: a project path, or <path>=<file> to lint the content of <file> at <path>. Repeat the flag for more cases"
+  )
+)
+
+const accept = Flag.String("accept").pipe(
+  Flag.atLeast(0),
+  Flag.withDescription(
+    "A case that is correct code, so the rule must not report it, in the same form as --report"
+  )
+)
+
+const trialOptions = Flag.String("options").pipe(
+  Flag.withSchema(Schema.fromJsonString(Schema.Array(Schema.Json))),
+  Flag.optional,
+  Flag.withDescription(
+    'The rule options that come after the severity, as a JSON array, such as \'[{"paths":["node:fs"]}]\'. The trial sets the rule to error'
+  )
+)
+
+const current = Flag.Boolean("current").pipe(
+  Flag.withDefault(false),
+  Flag.withDescription("Keep the rule setting of the project config, to see what it reports now")
+)
+
+function describeSetting(rule: string, setting: TrialSetting) {
+  return setting._tag === "Current"
+    ? `\`${rule}\` as the project config sets it`
+    : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
+}
+
+function isAsExpected(result: TrialCaseResult) {
+  return result.diagnostics.length > 0 === (result.case.expected === "reported")
+}
+
+/**
+ * The verdict of a trial: one line for each case, with the reports of the rule below it.
+ */
+export function renderTrial(
+  rule: string,
+  setting: TrialSetting,
+  results: readonly TrialCaseResult[]
+): string {
+  const configs = [...new Set(results.map((result) => `\`${result.config}\``))].join(", ")
+  const lines = results.map((result) => {
+    const name = Option.match(result.case.source, {
+      onNone: () => `\`${result.case.path}\``,
+      onSome: (source) => `\`${result.case.path}\` from \`${source}\``,
+    })
+    const outcome = result.diagnostics.length > 0 ? "reported" : "accepted"
+    const verdict = isAsExpected(result)
+      ? `✓ ${name}: ${outcome}, as expected.`
+      : `✗ ${name}: ${outcome}, but it must be ${result.case.expected}.`
+
+    return [
+      verdict,
+      ...result.diagnostics.map(
+        (diagnostic) => `    ${diagnostic.line}:${diagnostic.column}  ${diagnostic.message}`
+      ),
+    ].join("\n")
+  })
+  const failures = results.filter((result) => !isAsExpected(result)).length
+  const summary =
+    failures === 0
+      ? "Each case is as expected."
+      : results.length === 1
+        ? "The case is not as expected."
+        : `${failures} of ${results.length} cases ${failures === 1 ? "is" : "are"} not as expected.`
+
+  return [
+    `Trial of ${describeSetting(rule, setting)}, in ${configs}.`,
+    "",
+    ...lines,
+    "",
+    summary,
+  ].join("\n")
+}
+
+const trial = Command.make("try", {
+  accept,
+  current,
+  options: trialOptions,
+  report,
+  rule: trialRule,
+}).pipe(
+  Command.withDescription(
+    "Lint cases in a copy of the project with one rule setting, and show whether the rule reports each case. The project stays unchanged. Exit code 0: each case is as expected. 1: a case is not. 2: the trial is not evidence"
+  ),
+  Command.withHandler(({ accept, current, options, report, rule }) =>
+    Effect.gen(function* () {
+      const prompter = yield* Prompter
+
+      if (current && Option.isSome(options)) {
+        return yield* new InvalidTrialOptions({
+          reason: "Give `--options` or `--current`, not both.",
+        })
+      }
+
+      const cases = yield* Effect.all([
+        ...report.map((value) => parseTrialCase(value, "reported")),
+        ...accept.map((value) => parseTrialCase(value, "accepted")),
+      ])
+      const setting: TrialSetting = current
+        ? { _tag: "Current" }
+        : { _tag: "Error", options: Option.getOrElse(options, () => []) }
+      const results = yield* tryRule({ cases, cwd: process.cwd(), rule, setting }).pipe(
+        Effect.catchTag(
+          [
+            "TrialCaseIgnored",
+            "TrialCaseUnparsable",
+            "TrialConfigNotFound",
+            "TrialLintFailed",
+            "TrialProjectUnlisted",
+            "TrialRuleNotFound",
+          ],
+          (error) =>
+            prompter.log.error(error.message).pipe(
+              Effect.andThen(
+                Effect.fail(
+                  new CommandFailed({
+                    command: "rule try",
+                    exitCode: ChildProcessSpawner.ExitCode(2),
+                  })
+                )
+              )
+            )
+        )
+      )
+
+      yield* prompter.message(renderTrial(rule, setting, results))
+
+      if (!results.every((result) => isAsExpected(result))) {
+        return yield* new CommandFailed({
+          command: "rule try",
+          exitCode: ChildProcessSpawner.ExitCode(1),
+        })
+      }
+    })
+  )
+)
+
 export default Command.make("rule").pipe(
   Command.withDescription("Write, inspect, and test custom Oxlint rules"),
-  Command.withSubcommands([add, ast, test])
+  Command.withSubcommands([add, ast, test, trial])
 )

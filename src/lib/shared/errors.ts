@@ -294,6 +294,23 @@ export class InvalidInitOptions extends Data.TaggedError("InvalidInitOptions")<{
   }
 }
 
+export class InvalidTrialCase extends Data.TaggedError("InvalidTrialCase")<{
+  reason: string
+  value: string
+}> {
+  override get message() {
+    return `Invalid case \`${this.value}\`. ${this.reason}`
+  }
+}
+
+export class InvalidTrialOptions extends Data.TaggedError("InvalidTrialOptions")<{
+  reason: string
+}> {
+  override get message() {
+    return `Invalid trial options. ${this.reason}`
+  }
+}
+
 export class InvalidRuleName extends Data.TaggedError("InvalidRuleName")<{
   rule: string
 }> {
@@ -351,6 +368,68 @@ export class PassthroughNotSupported extends Data.TaggedError("PassthroughNotSup
 }> {
   override get message() {
     return `Command \`adamantite ${this.command}\` does not invoke a single underlying CLI and cannot accept passthrough arguments.`
+  }
+}
+
+/**
+ * A case of a trial that the config that lints it ignores, so Oxlint does not lint it.
+ */
+export class TrialCaseIgnored extends Data.TaggedError("TrialCaseIgnored")<{
+  path: string
+}> {
+  override get message() {
+    return `The trial is not evidence: the Oxlint config ignores \`${this.path}\`. Put the case at a path that the config lints.`
+  }
+}
+
+export class TrialCaseUnparsable extends Data.TaggedError("TrialCaseUnparsable")<{
+  errors: readonly string[]
+  path: string
+}> {
+  override get message() {
+    return [
+      `The trial is not evidence: Oxlint cannot parse \`${this.path}\`.`,
+      ...this.errors.map((error) => `- ${error}`),
+    ].join("\n")
+  }
+}
+
+export class TrialConfigNotFound extends Data.TaggedError("TrialConfigNotFound")<{
+  path: string
+}> {
+  override get message() {
+    return `The trial is not evidence: no Oxlint config lints \`${this.path}\`. Run \`adamantite init\` first.`
+  }
+}
+
+/**
+ * Oxlint did not lint the cases, for example because the config does not load.
+ */
+export class TrialLintFailed extends Data.TaggedError("TrialLintFailed")<{
+  output: string
+}> {
+  override get message() {
+    return `The trial is not evidence: Oxlint failed.\n${this.output}`
+  }
+}
+
+/**
+ * The trial copies the files that git lists, so a project that git cannot list has no trial.
+ */
+export class TrialProjectUnlisted extends Data.TaggedError("TrialProjectUnlisted")<{
+  cwd: string
+}> {
+  override get message() {
+    return `The trial needs git to list the files of \`${this.cwd}\`. Run it in a git repository.`
+  }
+}
+
+export class TrialRuleNotFound extends Data.TaggedError("TrialRuleNotFound")<{
+  detail: string
+  rule: string
+}> {
+  override get message() {
+    return `The trial is not evidence: the rule \`${this.rule}\` does not exist. Oxlint says: ${this.detail}`
   }
 }
 

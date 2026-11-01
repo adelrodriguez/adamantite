@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { getProjectDirectory, OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand, getProjectDirectory } from "#lib/execution/oxlint-entry.ts"
 
 const CWD = "/somewhere/else"
 
@@ -32,16 +32,27 @@ describe("oxlint-entry", () => {
       ).toBe("C:\\project")
     })
 
+    it("take the project that a command names, also for an entry in a package runner cache", () => {
+      expect(
+        getProjectDirectory(
+          "/home/user/.npm/_npx/1a2b/node_modules/adamantite/dist/oxlint.js",
+          CWD,
+          "/project"
+        )
+      ).toBe("/project")
+    })
+
     it("take the working directory for an entry outside node_modules", () => {
       expect(getProjectDirectory("/adamantite/src/oxlint.ts", CWD)).toBe(CWD)
     })
   })
 
-  describe("OXLINT_COMMAND", () => {
-    it("start the entry beside the CLI module with Node.js, named oxlint", () => {
-      expect(OXLINT_COMMAND).toStrictEqual({
+  describe("getOxlintCommand", () => {
+    it("start the entry beside the CLI module with Node.js, and name the project", () => {
+      expect(getOxlintCommand("/project")).toStrictEqual({
         args: [expect.stringMatching(/[/\\]oxlint\.js$/u)],
         command: "node",
+        env: { ADAMANTITE_PROJECT: "/project" },
         name: "oxlint",
       })
     })

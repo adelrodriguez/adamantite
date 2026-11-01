@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import process from "node:process"
 import { stripVTControlCharacters } from "node:util"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -6,9 +7,10 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import checkCommand from "#commands/check.ts"
-import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
+const OXLINT = getOxlintCommand(process.cwd())
 describe("check", () => {
   describe("stage flags", () => {
     it.effect("run only the lint stage when selected", () =>
@@ -23,8 +25,8 @@ describe("check", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--deny-warnings", "--format", "github"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--deny-warnings", "--format", "github"],
             title: "🔍 Linting",
           },
         ])
@@ -61,8 +63,8 @@ describe("check", () => {
 
         expect(runner.invocations).toContainEqual(
           expect.objectContaining({
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--deny-warnings"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--deny-warnings"],
           })
         )
       })
@@ -75,7 +77,7 @@ describe("check", () => {
         yield* runCommand(checkCommand, ["--allow-warnings"], { layers: [runner.layer] })
 
         expect(runner.invocations).toContainEqual(
-          expect.objectContaining({ ...OXLINT_COMMAND, args: [...OXLINT_COMMAND.args] })
+          expect.objectContaining({ ...OXLINT, args: [...OXLINT.args] })
         )
       })
     )
@@ -91,8 +93,8 @@ describe("check", () => {
 
         expect(runner.invocations).toContainEqual(
           expect.objectContaining({
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--deny-warnings"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--deny-warnings"],
           })
         )
       })
@@ -109,8 +111,8 @@ describe("check", () => {
 
         expect(runner.invocations).toContainEqual(
           expect.objectContaining({
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--max-warnings=5"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--max-warnings=5"],
           })
         )
       })
@@ -156,9 +158,9 @@ describe("check", () => {
             title: "✨ Checking formatting",
           },
           {
-            ...OXLINT_COMMAND,
+            ...OXLINT,
             args: [
-              ...OXLINT_COMMAND.args,
+              ...OXLINT.args,
               join(files.root, "index.ts"),
               "--deny-warnings",
               "--format",

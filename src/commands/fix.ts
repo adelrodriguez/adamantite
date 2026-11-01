@@ -1,3 +1,4 @@
+import process from "node:process"
 import * as Array from "effect/Array"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
@@ -6,7 +7,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { InvalidFixOptions } from "#lib/shared/errors.ts"
 
@@ -43,6 +44,7 @@ export default Command.make("fix", { all, dangerous, files, only, suggested }).p
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
+      const oxlintCommand = getOxlintCommand(process.cwd())
       const selected = Option.getOrUndefined(only)
 
       if (selected === "format" && (all || dangerous || suggested)) {
@@ -65,9 +67,9 @@ export default Command.make("fix", { all, dangerous, files, only, suggested }).p
           title: "✨ Formatting",
         },
         lint: {
-          ...OXLINT_COMMAND,
+          ...oxlintCommand,
           args: [
-            ...OXLINT_COMMAND.args,
+            ...oxlintCommand.args,
             ...Array.dedupe([
               "--fix",
               ...(suggested || all ? ["--fix-suggestions"] : []),

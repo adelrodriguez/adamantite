@@ -1,13 +1,15 @@
 import { join } from "node:path"
+import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
-import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
+const OXLINT = getOxlintCommand(process.cwd())
 describe("fix", () => {
   describe("default invocation", () => {
     it.effect("lint before formatting", () =>
@@ -19,8 +21,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--fix"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--fix"],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -42,7 +44,7 @@ describe("fix", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toStrictEqual([
-          ...OXLINT_COMMAND.args,
+          ...OXLINT.args,
           "--fix",
           "--fix-suggestions",
           "--fix-dangerously",
@@ -64,8 +66,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--fix", "--fix-suggestions", "--deny-warnings"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--fix", "--fix-suggestions", "--deny-warnings"],
             title: "🔧 Fixing lint issues",
           },
         ])
@@ -124,8 +126,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--fix", join(files.root, "index.ts")],
+            ...OXLINT,
+            args: [...OXLINT.args, "--fix", join(files.root, "index.ts")],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -151,8 +153,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--fix", "--fix-dangerously", "--deny-warnings"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--fix", "--fix-dangerously", "--deny-warnings"],
             title: "🔧 Fixing lint issues",
           },
           {

@@ -34,13 +34,18 @@ whole process, and both failed on this repository with `ResolverFactory is not a
 For a replaced binding, the entry sets the variable, imports `bindings.js`, and deletes the
 variable. JS plugins load later, through dynamic imports in `cli.js`.
 
-`check`, `fix`, and `harden` start the entry with `node`. The VS Code integration sets
-`oxc.path.oxlint`, and the Zed integration sets `lsp.oxlint.binary`. Neither extension starts the
-language server with a working directory in the project, so the entry finds the project from its
-own path: the folder above the first `node_modules` folder. An entry outside `node_modules`,
-such as `node src/oxlint.ts` in this repository, uses the working directory. The package has no
-bin for the entry, so no user script depends on it, and Adamantite can remove the proxy when
-Oxlint loads these builds on its own.
+`check`, `fix`, and `harden` start the entry with `node` and name the project in
+`ADAMANTITE_PROJECT`. The CLI can run from a package runner cache, such as `npm exec` or
+`pnpm dlx`, so the entry path does not show the project. Editors name no project. The VS Code
+integration sets `oxc.path.oxlint` to the relative path `node_modules/adamantite/dist/oxlint.js`,
+which the Oxc extension resolves against the first workspace folder. The extension expands no
+`${workspaceFolder}`, and it starts the language server without a working directory in the
+project. The Zed integration sets `lsp.oxlint.binary`, and Zed starts the server in the worktree
+root, so the same relative path resolves. Without a named project, the entry takes the folder
+above the first `node_modules` folder in its path. An entry outside `node_modules`, such as
+`node src/oxlint.ts` in this repository, uses the working directory. The package has no bin for
+the entry, so no user script depends on it, and Adamantite can remove the proxy when Oxlint loads
+these builds on its own.
 
 ## Considered options
 

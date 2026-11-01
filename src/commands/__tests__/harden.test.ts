@@ -1,3 +1,4 @@
+import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
@@ -12,7 +13,7 @@ import * as Stream from "effect/Stream"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import hardenCommand from "#commands/harden.ts"
-import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
@@ -24,6 +25,8 @@ import {
   nonProbeInvocations,
   runCommand,
 } from "./command-test-helpers.ts"
+
+const OXLINT = getOxlintCommand(process.cwd())
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
@@ -964,8 +967,8 @@ describe("harden", () => {
           }),
           expect.objectContaining({ args: ["--check"], command: "oxfmt" }),
           expect.objectContaining({
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--deny-warnings"],
+            ...OXLINT,
+            args: [...OXLINT.args, "--deny-warnings"],
           }),
           {
             args: ["--test", ".adamantite/rules/tests/no-foo.ts"],

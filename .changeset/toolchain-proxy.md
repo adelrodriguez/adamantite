@@ -11,6 +11,6 @@ Run Oxlint with the Effect builds of `@effect/tsgo` without patching `node_modul
 To upgrade an existing project:
 
 - Remove `adamantite prepare` from the `prepare` script in `package.json`, and delete the script when nothing else is left. `adamantite prepare` now does nothing, and a later release removes it. `adamantite doctor` reports the script.
-- Point your editor at the entry. In `.vscode/settings.json`, set `"oxc.path.oxlint": "${workspaceFolder}/node_modules/adamantite/dist/oxlint.js"`. In `.zed/settings.json`, set `lsp.oxlint.binary` to `{ "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp"] }`. `adamantite update` does not change editor settings.
+- Point your editor at the entry. In `.vscode/settings.json`, set `"oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js"`. In `.zed/settings.json`, set `lsp.oxlint.binary` to `{ "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp"] }`. `adamantite update` does not change editor settings.
 - Replace a plain `oxlint` call, such as in a lint-staged config, with `adamantite check --only lint`. Plain `oxlint` cannot load the effect preset.
 - The patch had also put the Effect quick fixes, refactors, and hovers into the `tsc` of editors. Adamantite no longer patches TypeScript. To keep those features, run `npx effect-tsgo patch --typescript` yourself after each install.

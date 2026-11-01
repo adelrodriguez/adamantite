@@ -6,14 +6,18 @@ import * as NodePath from "@effect/platform-node/NodePath"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
-import { getProjectDirectory } from "#lib/execution/oxlint-entry.ts"
+import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/execution/oxlint-entry.ts"
 import { resolveToolchain } from "#lib/integrations/tooling/oxlint/toolchain.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 
 // Run Oxlint with the toolchain of the project, and pass every argument through. Editors and
 // `adamantite check` start this file in place of `oxlint`.
 
-const project = getProjectDirectory(process.argv[1] ?? "", process.cwd())
+const project = getProjectDirectory(
+  process.argv[1] ?? "",
+  process.cwd(),
+  process.env[PROJECT_VARIABLE]
+)
 const result = await Effect.runPromise(
   resolveToolchain(project).pipe(
     Effect.result,

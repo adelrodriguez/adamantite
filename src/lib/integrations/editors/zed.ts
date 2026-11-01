@@ -92,8 +92,8 @@ const CONFIG = {
         },
       },
     },
-    // Zed starts the language server without a working directory in the project, so the entry finds
-    // the project from its own path. The entry loads the toolchain of the project.
+    // Zed starts the language server in the worktree root, so the relative entry path resolves. The
+    // entry finds the project from that path and loads the project's toolchain.
     oxlint: {
       binary: { arguments: ["node_modules/adamantite/dist/oxlint.js", "--lsp"], path: "node" },
       initialization_options: {

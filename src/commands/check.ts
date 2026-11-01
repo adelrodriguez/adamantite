@@ -1,3 +1,4 @@
+import process from "node:process"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
@@ -5,7 +6,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
@@ -33,6 +34,7 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
+      const oxlintCommand = getOxlintCommand(process.cwd())
       const selected = Option.getOrUndefined(only)
       const forwardedStage = selected ?? "lint"
       // A forwarded `--deny-warnings` or `--max-warnings` is the project's own warning policy, and
@@ -52,8 +54,8 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
           title: "✨ Checking formatting",
         },
         lint: {
-          ...OXLINT_COMMAND,
-          args: [...OXLINT_COMMAND.args, ...files, ...denyWarnings, ...forwardedTo("lint")],
+          ...oxlintCommand,
+          args: [...oxlintCommand.args, ...files, ...denyWarnings, ...forwardedTo("lint")],
           title: "🔍 Linting",
         },
       }

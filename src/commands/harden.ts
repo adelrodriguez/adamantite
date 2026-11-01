@@ -10,7 +10,7 @@ import * as Schema from "effect/Schema"
 import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
   readHardenContext,
@@ -168,6 +168,7 @@ export default Command.make("harden", { commits, scope }).pipe(
 
       const { agent } = resolution
       const runner = yield* CommandRunner
+      const oxlintCommand = getOxlintCommand(cwd)
       // A step that fails or cannot start fails the verification, and the later steps still run.
       const passes = (step: ReturnType<typeof runner.run>) =>
         step.pipe(
@@ -183,8 +184,8 @@ export default Command.make("harden", { commits, scope }).pipe(
         runner.runAll([
           { args: ["--check"], command: oxfmt.name, title: "✨ Checking formatting" },
           {
-            ...OXLINT_COMMAND,
-            args: [...OXLINT_COMMAND.args, "--deny-warnings"],
+            ...oxlintCommand,
+            args: [...oxlintCommand.args, "--deny-warnings"],
             title: "🔍 Linting",
           },
         ])

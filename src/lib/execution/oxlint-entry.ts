@@ -7,22 +7,37 @@ import { fileURLToPath } from "node:url"
 const OXLINT_ENTRY = fileURLToPath(new URL("oxlint.js", import.meta.url))
 
 /**
- * The `CommandRunner` command for Oxlint. Arguments go after `args`.
+ * The variable through which a command names the project that the entry runs Oxlint for.
  */
-export const OXLINT_COMMAND = {
-  args: [OXLINT_ENTRY],
-  command: "node",
-  name: "oxlint",
-} as const
+export const PROJECT_VARIABLE = "ADAMANTITE_PROJECT"
 
 /**
- * The project that the entry runs Oxlint for: the folder above the first `node_modules` folder in
- * the path that started the entry. Editors start language servers without a working directory in
- * the project, so the path decides. The first `node_modules` also covers a package manager store
- * inside the project, such as `node_modules/.pnpm/`. The Adamantite repository starts the entry as
- * `src/oxlint.ts`, outside `node_modules`, so there the project is `cwd`.
+ * The `CommandRunner` command that runs Oxlint for the project at `project`. Arguments go after
+ * `args`. The command names the project, because the CLI can run from a package runner cache, such
+ * as `npm exec` or `pnpm dlx`, outside the project.
  */
-export function getProjectDirectory(entry: string, cwd: string): string {
+export function getOxlintCommand(project: string) {
+  return {
+    args: [OXLINT_ENTRY],
+    command: "node",
+    env: { [PROJECT_VARIABLE]: project },
+    name: "oxlint",
+  } as const
+}
+
+/**
+ * The project that the entry runs Oxlint for. A command names it through `PROJECT_VARIABLE`, as
+ * `named`. An editor names no project and starts the entry from the project's `node_modules`, so
+ * the project is the folder above the first `node_modules` folder in the entry path. The first
+ * `node_modules` also covers a package manager store inside the project, such as
+ * `node_modules/.pnpm/`. The Adamantite repository starts the entry as `src/oxlint.ts`, outside
+ * `node_modules`, so there the project is `cwd`.
+ */
+export function getProjectDirectory(entry: string, cwd: string, named?: string): string {
+  if (named !== undefined && named !== "") {
+    return named
+  }
+
   const indexes = [entry.indexOf("/node_modules/"), entry.indexOf("\\node_modules\\")].filter(
     (index) => index !== -1
   )

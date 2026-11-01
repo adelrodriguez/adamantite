@@ -1,7 +1,9 @@
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
+import * as Path from "effect/Path"
 import { ResolverFactory } from "oxc-resolver"
 
 export class ModuleResolver extends Context.Service<
@@ -44,3 +46,21 @@ export class ModuleResolver extends Context.Service<
     }
   })
 }
+
+/**
+ * The folder of the package `name` that Node.js finds from the package at `from`, or none when it
+ * is not installed.
+ */
+export const resolvePackageDirectory = Effect.fn("resolvePackageDirectory")(function* (
+  from: string,
+  name: string
+) {
+  const path = yield* Path.Path
+  const resolver = yield* ModuleResolver
+  const manifest = yield* resolver.resolve(path.join(from, "package.json"), `${name}/package.json`)
+
+  return pipe(
+    manifest,
+    Option.map((file) => path.dirname(file))
+  )
+})

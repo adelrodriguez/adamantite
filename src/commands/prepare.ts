@@ -1,19 +1,10 @@
-import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 
+// `adamantite prepare` patched Oxlint for the effect preset after each install. The toolchain proxy
+// replaced the patch, so the command does nothing. It stays until #444, because existing `prepare`
+// scripts still run it, and Doctor tells those projects to remove it.
 export default Command.make("prepare").pipe(
-  Command.withDescription(
-    "Patch Oxlint and TypeScript for the effect preset. The `prepare` script runs it after each install"
-  ),
-  Command.withHandler(() =>
-    Effect.gen(function* () {
-      const cwd = process.cwd()
-
-      if (yield* effectTsgo.detect(cwd)) {
-        yield* effectTsgo.patch(cwd, { quiet: false })
-      }
-    })
-  )
+  Command.withDescription("Do nothing. Remove `adamantite prepare` from the `prepare` script"),
+  Command.withHandler(() => Effect.void)
 )

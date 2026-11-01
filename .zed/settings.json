@@ -157,6 +157,10 @@
       }
     },
     "oxlint": {
+      "binary": {
+        "arguments": ["src/oxlint.ts", "--lsp"],
+        "path": "node"
+      },
       "initialization_options": {
         "settings": {
           "configPath": null,

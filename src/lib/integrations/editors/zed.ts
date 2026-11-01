@@ -92,7 +92,10 @@ const CONFIG = {
         },
       },
     },
+    // Zed starts the language server in the worktree root, so the relative entry path resolves. The
+    // entry finds the project from that path and loads the project's toolchain.
     oxlint: {
+      binary: { arguments: ["node_modules/adamantite/dist/oxlint.js", "--lsp"], path: "node" },
       initialization_options: {
         settings: {
           configPath: null,
@@ -184,6 +187,27 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
   return Object.fromEntries([...Object.entries(config), ["languages", languages]])
 }
 
+// Adamantite owns the command that starts Oxlint, so the update replaces it instead of merging
+// the user's `binary.arguments` into it.
+function setOxlintBinary(config: Schema.JsonObject): Schema.JsonObject {
+  const lsp = checkIsJsonObject(config.lsp) ? config.lsp : {}
+  const oxlint = checkIsJsonObject(lsp.oxlint) ? lsp.oxlint : {}
+
+  return Object.fromEntries([
+    ...Object.entries(config),
+    [
+      "lsp",
+      Object.fromEntries([
+        ...Object.entries(lsp),
+        [
+          "oxlint",
+          Object.fromEntries([...Object.entries(oxlint), ["binary", CONFIG.lsp.oxlint.binary]]),
+        ],
+      ]),
+    ],
+  ])
+}
+
 export default defineIntegration({
   assess: (cwd: string, _packageJson: PackageJson) =>
     Effect.gen(function* () {
@@ -250,7 +274,7 @@ export default defineIntegration({
       }
 
       const mergedConfig = yield* mergeConfig(CONFIG, existingConfig)
-      const newConfig = deduplicateManagedFormatters(mergedConfig)
+      const newConfig = setOxlintBinary(deduplicateManagedFormatters(mergedConfig))
 
       yield* writeFile(settingsPath, updateJsonText(zedFile, newConfig))
     }),

@@ -23,6 +23,10 @@ export interface CommandRunOptions {
    * Variables to set for the child, on top of this process's environment.
    */
   readonly env?: Readonly<Record<string, string>>
+  /**
+   * The tool that the heading names, when `command` only starts it, such as `node` for Oxlint.
+   */
+  readonly name?: string
   readonly stderr?: "ignore" | "inherit"
   readonly stdin?: "ignore" | "inherit"
   readonly stdout?: "ignore" | "inherit"
@@ -98,7 +102,7 @@ export class CommandRunner extends Context.Service<CommandRunner, CommandRunnerS
   static make(exitCode: CommandRunnerService["exitCode"]): CommandRunnerService {
     const run = Effect.fn("CommandRunner.run")(function* (options: CommandRunOptions) {
       if (options.title !== undefined) {
-        yield* printHeading(options.title, options.command)
+        yield* printHeading(options.title, options.name ?? options.command)
       }
 
       const code = yield* exitCode(options)

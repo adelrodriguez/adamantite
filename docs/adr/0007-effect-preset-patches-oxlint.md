@@ -1,5 +1,8 @@
 # The effect preset patches Oxlint, and its rules are curated
 
+ADR 0019 replaces the patch lane below: Adamantite now runs Oxlint through a toolchain proxy, and
+nothing patches `node_modules`. The curation still applies.
+
 The `effect` preset reports misuse of Effect through
 [`@effect/tsgo`](https://github.com/Effect-TS/tsgo), the Effect Language Service for
 TypeScript-Go. We decided (2026-10-03, issue #485) that `@effect/tsgo` is a managed plugin

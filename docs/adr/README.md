@@ -18,3 +18,4 @@
 - [ADR 0016: Import owners are their own first-party rule](0016-import-owners-are-their-own-rule.md)
 - [ADR 0017: The strict preset bans task comments](0017-strict-bans-task-comments.md)
 - [ADR 0018: Check fails on warnings](0018-check-fails-on-warnings.md)
+- [ADR 0019: Oxlint runs through a toolchain proxy](0019-oxlint-runs-through-a-toolchain-proxy.md)

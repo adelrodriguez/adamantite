@@ -21,7 +21,6 @@ import {
   addScripts,
   installDependencies,
   installEditorExtensions,
-  patchEffectTsgo,
   setupAgentsGuidance,
   setupEditors,
   setupEffectTsgo,
@@ -180,12 +179,6 @@ export default Command.make("init", initCommandOptions).pipe(
       // After the TypeScript setup, so a `tsconfig.json` that init creates gets the plugin entry.
       if (presets.includes("effect")) {
         yield* setupEffectTsgo(cwd)
-      }
-
-      // Init installs the pinned lint tools even when it keeps an existing config, so a project
-      // that already uses the effect preset needs the patch too. The step checks for the preset.
-      if (hasOxlint) {
-        yield* patchEffectTsgo(cwd)
       }
 
       yield* setupEditors(cwd, selectedEditors)

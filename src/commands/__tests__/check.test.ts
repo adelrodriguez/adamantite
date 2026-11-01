@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import process from "node:process"
 import { stripVTControlCharacters } from "node:util"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -6,8 +7,10 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import checkCommand from "#commands/check.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
+const OXLINT = getOxlintCommand(process.cwd())
 describe("check", () => {
   describe("stage flags", () => {
     it.effect("run only the lint stage when selected", () =>
@@ -22,8 +25,8 @@ describe("check", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--deny-warnings", "--format", "github"],
-            command: "oxlint",
+            ...OXLINT,
+            args: [...OXLINT.args, "--deny-warnings", "--format", "github"],
             title: "🔍 Linting",
           },
         ])
@@ -59,7 +62,10 @@ describe("check", () => {
         yield* runCommand(checkCommand, [], { layers: [runner.layer] })
 
         expect(runner.invocations).toContainEqual(
-          expect.objectContaining({ args: ["--deny-warnings"], command: "oxlint" })
+          expect.objectContaining({
+            ...OXLINT,
+            args: [...OXLINT.args, "--deny-warnings"],
+          })
         )
       })
     )
@@ -71,7 +77,7 @@ describe("check", () => {
         yield* runCommand(checkCommand, ["--allow-warnings"], { layers: [runner.layer] })
 
         expect(runner.invocations).toContainEqual(
-          expect.objectContaining({ args: [], command: "oxlint" })
+          expect.objectContaining({ ...OXLINT, args: [...OXLINT.args] })
         )
       })
     )
@@ -86,7 +92,10 @@ describe("check", () => {
         })
 
         expect(runner.invocations).toContainEqual(
-          expect.objectContaining({ args: ["--deny-warnings"], command: "oxlint" })
+          expect.objectContaining({
+            ...OXLINT,
+            args: [...OXLINT.args, "--deny-warnings"],
+          })
         )
       })
     )
@@ -101,7 +110,10 @@ describe("check", () => {
         })
 
         expect(runner.invocations).toContainEqual(
-          expect.objectContaining({ args: ["--max-warnings=5"], command: "oxlint" })
+          expect.objectContaining({
+            ...OXLINT,
+            args: [...OXLINT.args, "--max-warnings=5"],
+          })
         )
       })
     )
@@ -146,8 +158,14 @@ describe("check", () => {
             title: "✨ Checking formatting",
           },
           {
-            args: [join(files.root, "index.ts"), "--deny-warnings", "--format", "github"],
-            command: "oxlint",
+            ...OXLINT,
+            args: [
+              ...OXLINT.args,
+              join(files.root, "index.ts"),
+              "--deny-warnings",
+              "--format",
+              "github",
+            ],
             title: "🔍 Linting",
           },
         ])
@@ -165,10 +183,9 @@ describe("check", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
-        expect(runner.invocations.map((invocation) => invocation.command)).toStrictEqual([
-          "oxfmt",
-          "oxlint",
-        ])
+        expect(
+          runner.invocations.map((invocation) => invocation.name ?? invocation.command)
+        ).toStrictEqual(["oxfmt", "oxlint"])
       })
     )
   })

@@ -230,7 +230,7 @@ describe("update", () => {
     })
   )
 
-  it.effect("patch for the effect preset after an update that does not touch @effect/tsgo", () =>
+  it.effect("update the effect preset's tools and run no patch", () =>
     Effect.gen(function* () {
       const files = makeEffectFiles(toOxlintTsConfigContent(["effect"]))
       const prompter = createPrompterTestContext()
@@ -245,46 +245,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls[0]?.packages).toContain(`oxlint@${oxlint.version}`)
       expect(installer.calls[0]?.packages).not.toContain(`@effect/tsgo@${effectTsgo.version}`)
-      expect(runner.invocations).toStrictEqual([
-        expect.objectContaining({
-          args: ["patch", "--oxlint", "--typescript"],
-          command: "effect-tsgo",
-        }),
-      ])
-    })
-  )
-
-  it.effect("skip the patch without the effect preset", () =>
-    Effect.gen(function* () {
-      const files = makeEffectFiles(toOxlintTsConfigContent([]))
-      const prompter = createPrompterTestContext()
-      const installer = createDependencyInstallerTestContext()
-      const runner = createRunnerTestContext()
-
-      const exit = yield* runCommand(updateCommand, [], {
-        files,
-        layers: [prompter.layer, installer.layer, runner.layer],
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toStrictEqual([])
-    })
-  )
-
-  it.effect("fail when the patch fails after an update", () =>
-    Effect.gen(function* () {
-      const files = makeEffectFiles(toOxlintTsConfigContent(["effect"]))
-      const prompter = createPrompterTestContext()
-      const installer = createDependencyInstallerTestContext()
-      const runner = createRunnerTestContext([1])
-
-      const exit = yield* runCommand(updateCommand, [], {
-        files,
-        layers: [prompter.layer, installer.layer, runner.layer],
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.outros).toStrictEqual(["❌ Update failed"])
     })
   )
 

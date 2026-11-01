@@ -70,6 +70,12 @@ A managed integration for a package and its configuration, such as Oxlint, Oxfmt
 Sherif, or Tsgolint.
 _Avoid_: Dependency adapter
 
+**Toolchain**:
+The Oxlint package, native binding, and type-aware backend that Adamantite runs Oxlint with for
+one target project. Each part is the installed one, or a replacement, such as the Effect build
+from `@effect/tsgo`.
+_Avoid_: Patch, setup
+
 **Managed script**:
 A `package.json` script whose command is owned by Adamantite.
 _Avoid_: User script, package command

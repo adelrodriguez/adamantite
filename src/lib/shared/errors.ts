@@ -135,6 +135,31 @@ export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
   }
 }
 
+/**
+ * The installed `@effect/tsgo` has no Effect build of the installed Oxlint or oxlint-tsgolint.
+ */
+export class EffectBuildMissing extends Data.TaggedError("EffectBuildMissing")<{
+  effectVersion: string
+  supported: readonly string[]
+  tool: "oxlint" | "oxlint-tsgolint"
+  version: string
+}> {
+  override get message() {
+    return `The effect preset needs the @effect/tsgo build of ${this.tool} ${this.version}. @effect/tsgo ${this.effectVersion} has builds for ${this.tool} ${this.supported.join(", ")}. Run \`adamantite update\`.`
+  }
+}
+
+/**
+ * `@effect/tsgo` publishes no Effect build of Oxlint for this platform, such as Linux with musl.
+ */
+export class EffectPlatformUnsupported extends Data.TaggedError("EffectPlatformUnsupported")<{
+  platform: string
+}> {
+  override get message() {
+    return `@effect/tsgo has no Effect build of Oxlint for ${this.platform}, so Oxlint cannot load the effect preset here.`
+  }
+}
+
 export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDirectory")<{
   path?: string
   cause?: unknown
@@ -297,6 +322,18 @@ export class OperationCancelled extends Data.TaggedError("OperationCancelled")<{
   override get message() {
     const detail = this.reason ? ` Reason: ${this.reason}` : ""
     return `Operation cancelled.${detail}`
+  }
+}
+
+/**
+ * A package that Oxlint needs does not resolve from the project.
+ */
+export class PackageNotInstalled extends Data.TaggedError("PackageNotInstalled")<{
+  packageName: string
+  project: string
+}> {
+  override get message() {
+    return `\`${this.packageName}\` is not installed in \`${this.project}\`. Install the dependencies, or run \`adamantite update\`.`
   }
 }
 

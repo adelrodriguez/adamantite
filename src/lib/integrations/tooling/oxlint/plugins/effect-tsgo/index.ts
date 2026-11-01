@@ -1,14 +1,7 @@
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
-import {
-  checkImportsLintPreset,
-  defineManagedPlugin,
-} from "#lib/integrations/tooling/oxlint/plugins/define.ts"
-import { runPatch } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/patch.ts"
-import {
-  assessPrepareScript,
-  updatePrepareScript,
-} from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/prepare-script.ts"
+import { defineManagedPlugin } from "#lib/integrations/tooling/oxlint/plugins/define.ts"
+import { assessPrepareScript } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/prepare-script.ts"
 import {
   assessTsconfigPlugin,
   updateTsconfigPlugin,
@@ -27,24 +20,11 @@ export default defineManagedPlugin({
         warnings: tsconfig.warnings,
       }
     }),
-  /**
-   * Whether the project needs the patch: `oxlint.config.ts` imports the `effect` preset. How the
-   * project runs Oxlint does not matter, because Oxlint cannot load the preset unpatched.
-   */
-  detect: (cwd: string) => checkImportsLintPreset(cwd, "effect"),
   name: NAME,
-  patch: runPatch,
   preset: "effect",
   /**
-   * Write the `prepare` script that runs `adamantite prepare`, and the language service entry in
-   * `tsconfig.json`.
+   * Write the language service entry in `tsconfig.json`.
    */
-  update: (cwd: string) =>
-    Effect.gen(function* () {
-      return {
-        prepare: yield* updatePrepareScript(cwd),
-        tsconfig: yield* updateTsconfigPlugin(cwd),
-      }
-    }),
+  update: (cwd: string) => updateTsconfigPlugin(cwd),
   version: getDependencyVersion("@effect/tsgo"),
 })

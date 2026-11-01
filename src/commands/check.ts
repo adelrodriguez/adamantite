@@ -1,3 +1,4 @@
+import process from "node:process"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
@@ -5,8 +6,8 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to check (optional)"),
@@ -33,6 +34,7 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
     Effect.gen(function* () {
       const forwardedArguments = yield* ForwardedArguments
       const runner = yield* CommandRunner
+      const oxlintCommand = getOxlintCommand(process.cwd())
       const selected = Option.getOrUndefined(only)
       const forwardedStage = selected ?? "lint"
       // A forwarded `--deny-warnings` or `--max-warnings` is the project's own warning policy, and
@@ -42,29 +44,24 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
       )
       const denyWarnings = allowWarnings || forwardsWarningPolicy ? [] : ["--deny-warnings"]
 
-      const stages = [
-        {
-          args: ["--check", ...files],
+      const forwardedTo = (stage: typeof forwardedStage) =>
+        stage === forwardedStage ? forwardedArguments : []
+
+      const stages = {
+        format: {
+          args: ["--check", ...files, ...forwardedTo("format")],
           command: oxfmt.name,
-          name: "format",
           title: "✨ Checking formatting",
         },
-        {
-          args: [...files, ...denyWarnings],
-          command: oxlint.name,
-          name: "lint",
+        lint: {
+          ...oxlintCommand,
+          args: [...oxlintCommand.args, ...files, ...denyWarnings, ...forwardedTo("lint")],
           title: "🔍 Linting",
         },
-      ]
+      }
 
       yield* runner.runAll(
-        stages
-          .filter((stage) => selected === undefined || stage.name === selected)
-          .map((stage) => ({
-            args: [...stage.args, ...(stage.name === forwardedStage ? forwardedArguments : [])],
-            command: stage.command,
-            title: stage.title,
-          }))
+        selected === undefined ? [stages.format, stages.lint] : [stages[selected]]
       )
     })
   )

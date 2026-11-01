@@ -132,7 +132,8 @@ export function createRunnerTestContext(
 interface HandoffRunnerOptions {
   readonly agentExit?: number | "not-found" | "spawn-error"
   /**
-   * Exit codes of the commands that are not coding agents, such as `oxlint`. Each defaults to 0.
+   * Exit codes of the commands that are not coding agents, by their `name` or `command`, such as
+   * `oxlint`. Each defaults to 0.
    */
   readonly commandExits?: Readonly<Record<string, number | "not-found">>
   readonly installedCommands?: readonly string[]
@@ -157,7 +158,7 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
             : Effect.fail(new CliNotFound({ command: invocation.command }))
         }
         if (!codingAgents.some((agent) => agent.command === invocation.command)) {
-          const commandExit = options.commandExits?.[invocation.command] ?? 0
+          const commandExit = options.commandExits?.[invocation.name ?? invocation.command] ?? 0
 
           return commandExit === "not-found"
             ? Effect.fail(new CliNotFound({ command: invocation.command }))

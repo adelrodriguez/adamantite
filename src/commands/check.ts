@@ -5,8 +5,8 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
   Argument.withDescription("Specific files to check (optional)"),
@@ -42,29 +42,24 @@ export default Command.make("check", { allowWarnings, files, only }).pipe(
       )
       const denyWarnings = allowWarnings || forwardsWarningPolicy ? [] : ["--deny-warnings"]
 
-      const stages = [
-        {
-          args: ["--check", ...files],
+      const forwardedTo = (stage: typeof forwardedStage) =>
+        stage === forwardedStage ? forwardedArguments : []
+
+      const stages = {
+        format: {
+          args: ["--check", ...files, ...forwardedTo("format")],
           command: oxfmt.name,
-          name: "format",
           title: "✨ Checking formatting",
         },
-        {
-          args: [...files, ...denyWarnings],
-          command: oxlint.name,
-          name: "lint",
+        lint: {
+          ...OXLINT_COMMAND,
+          args: [...OXLINT_COMMAND.args, ...files, ...denyWarnings, ...forwardedTo("lint")],
           title: "🔍 Linting",
         },
-      ]
+      }
 
       yield* runner.runAll(
-        stages
-          .filter((stage) => selected === undefined || stage.name === selected)
-          .map((stage) => ({
-            args: [...stage.args, ...(stage.name === forwardedStage ? forwardedArguments : [])],
-            command: stage.command,
-            title: stage.title,
-          }))
+        selected === undefined ? [stages.format, stages.lint] : [stages[selected]]
       )
     })
   )

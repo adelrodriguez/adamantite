@@ -145,12 +145,12 @@ hosted product needs written permission from the copyright holder. Tell the user
 select the preset.
 
 The `effect` preset needs the `@effect/tsgo` package, which `init` installs at a pinned
-version and doctor and `update` keep in sync. Its rules exist only in Oxlint binaries that
-`adamantite prepare` patched, so the `prepare` script in `package.json` must run
-`adamantite prepare`; without the patch, Oxlint stops with `Unknown plugin: 'effecttsgo'`.
-Do not remove the patch or the preset to get past that error: run `adamantite prepare`. If a
-production-only install fails at `adamantite prepare`, add `--ignore-scripts` to that
-install instead of changing the script. `tsconfig.json` needs
+version and doctor and `update` keep in sync. Its rules exist only in the Effect builds of
+Oxlint that `@effect/tsgo` ships, and Adamantite loads them when it runs Oxlint. Run Oxlint
+through `adamantite check` or `adamantite fix`: a plain `oxlint` call stops with
+`Unknown plugin: 'effecttsgo'`. Do not remove the preset to get past that error. A `prepare`
+script that runs `adamantite prepare` is left over from earlier versions, so remove that
+command from the script. `tsconfig.json` needs
 `{ "name": "@effect/language-service", "diagnostics": false }` in `compilerOptions.plugins`,
 and `knip.config.ts` needs `ignoreDependencies.effect`. To allow an unstable Effect module
 on purpose, add it to `allowedUnstableApis` in that tsconfig entry. Do not turn off

@@ -1,12 +1,9 @@
-import { join } from "node:path"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { type CommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -44,33 +41,18 @@ function makeConfiguredFiles(overrides: Record<string, string> = {}) {
     "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
     "package.json": makePackageJson({
       devDependencies: { "@effect/tsgo": effectTsgo.version },
-      scripts: { check: "adamantite check", prepare: PREPARE },
+      scripts: { check: "adamantite check" },
     }),
     "tsconfig.json": CONFIGURED_TSCONFIG,
     ...overrides,
   })
 }
 
-function makeRunner(exitCode: number) {
-  const invocations: CommandRunOptions[] = []
-  const layer = Layer.succeed(
-    CommandRunner,
-    CommandRunner.make((options) =>
-      Effect.sync(() => {
-        invocations.push(options)
-        return ChildProcessSpawner.ExitCode(exitCode)
-      })
-    )
-  )
-
-  return { invocations, layer }
-}
-
 describe("effect-tsgo", () => {
   describe("assess", () => {
     it.effect("report not applicable when the config does not import the effect preset", () =>
       Effect.gen(function* () {
-        // No package, prepare script, or tsconfig entry: each would be a finding with the preset.
+        // No package or tsconfig entry: each would be a finding with the preset.
         const files = makeFiles({
           "oxlint.config.ts": toOxlintTsConfigContent([]),
           "package.json": makePackageJson({ scripts: { check: "adamantite check" } }),
@@ -82,7 +64,7 @@ describe("effect-tsgo", () => {
       })
     )
 
-    it.effect("report nothing when the package, patch step, and tsconfig entry are in place", () =>
+    it.effect("report nothing when the package and the tsconfig entry are in place", () =>
       Effect.gen(function* () {
         const files = makeConfiguredFiles()
 
@@ -97,7 +79,7 @@ describe("effect-tsgo", () => {
       })
     )
 
-    it.effect("report the package, patch step, and tsconfig entry when all are missing", () =>
+    it.effect("report the package and the tsconfig entry when both are missing", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
@@ -111,10 +93,6 @@ describe("effect-tsgo", () => {
           findings: [
             { id: "missing-@effect/tsgo" },
             {
-              currentState: expect.stringContaining("has no `prepare` script"),
-              id: "missing-effect-tsgo-prepare",
-            },
-            {
               currentState: expect.stringContaining("does not configure"),
               id: "missing-effect-language-service-plugin",
             },
@@ -124,42 +102,18 @@ describe("effect-tsgo", () => {
       })
     )
 
-    it.effect("report a prepare script that does not run adamantite prepare", () =>
-      Effect.gen(function* () {
-        for (const prepare of ["husky", "effect-tsgo patch --oxlint --typescript"]) {
-          const files = makeConfiguredFiles({
-            "package.json": makePackageJson({
-              devDependencies: { "@effect/tsgo": effectTsgo.version },
-              scripts: { check: "adamantite check", prepare },
-            }),
-          })
-
-          const result = yield* runAssess(files)
-
-          expect(result).toMatchObject({
-            findings: [
-              {
-                currentState: `The \`prepare\` script (\`${prepare}\`) does not run \`${PREPARE}\`.`,
-                id: "missing-effect-tsgo-prepare",
-              },
-            ],
-          })
-        }
-      })
-    )
-
-    it.effect("accept adamantite prepare next to other prepare commands", () =>
+    it.effect("report a prepare script that still runs adamantite prepare", () =>
       Effect.gen(function* () {
         const files = makeConfiguredFiles({
           "package.json": makePackageJson({
             devDependencies: { "@effect/tsgo": effectTsgo.version },
-            scripts: { check: "adamantite check", prepare: `${PREPARE} && husky` },
+            scripts: { check: "adamantite check", prepare: `${PREPARE} && (husky)` },
           }),
         })
 
         const result = yield* runAssess(files)
 
-        expect(result).toMatchObject({ findings: [] })
+        expect(result).toMatchObject({ findings: [{ id: "legacy-adamantite-prepare" }] })
       })
     )
 
@@ -189,7 +143,7 @@ describe("effect-tsgo", () => {
         const files = makeConfiguredFiles({
           "package.json": makePackageJson({
             devDependencies: { "@effect/tsgo": effectTsgo.version },
-            scripts: { check: "adamantite check", prepare: PREPARE },
+            scripts: { check: "adamantite check" },
             workspaces: ["packages/*"],
           }),
           "tsconfig.json": "{}",
@@ -203,37 +157,6 @@ describe("effect-tsgo", () => {
           packageActions: [],
           warnings: [expect.stringContaining("in a monorepo, add")],
         })
-      })
-    )
-  })
-
-  describe("patch", () => {
-    it.effect("run effect-tsgo patch for Oxlint and TypeScript", () =>
-      Effect.gen(function* () {
-        for (const [quiet, output] of [
-          [true, "ignore"],
-          [false, "inherit"],
-        ] as const) {
-          const runner = makeRunner(0)
-
-          yield* effectTsgo
-            .patch(ROOT, { quiet })
-            .pipe(Effect.provide(Layer.merge(runner.layer, Path.layer)))
-
-          expect(runner.invocations).toStrictEqual([
-            expect.objectContaining({
-              args: ["patch", "--oxlint", "--typescript"],
-              command: "effect-tsgo",
-              cwd: ROOT,
-              stderr: output,
-              stdout: output,
-            }),
-          ])
-          // A runner such as `pnpm dlx` does not put the project's executables on `PATH`.
-          expect(runner.invocations[0]?.env?.["PATH"]).toMatch(
-            new RegExp(`^${join(ROOT, "node_modules", ".bin")}`, "u")
-          )
-        }
       })
     )
   })

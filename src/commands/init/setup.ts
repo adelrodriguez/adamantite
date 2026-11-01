@@ -189,58 +189,25 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
   })
 
 /**
- * Set up the parts of the `effect` preset that are not the package: the `prepare` script that runs
- * `adamantite prepare` after each install, and the language service entry in `tsconfig.json`.
+ * Set up the part of the `effect` preset that is not the package: the language service entry in
+ * `tsconfig.json`.
  */
 export const setupEffectTsgo = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const result = yield* effectTsgo.update(cwd)
 
-    if (result.prepare === "merged") {
-      yield* prompter.log.info(
-        "Added `adamantite prepare` to the start of your existing `prepare` script."
-      )
-    }
-
-    if (result.tsconfig === "monorepo") {
+    if (result === "monorepo") {
       yield* prompter.log.info(
         "In a monorepo, add the Effect language service entry to each package's `tsconfig.json` or to a shared base config. Run `adamantite doctor` for the reference entry."
       )
     }
 
-    if (result.tsconfig === "missing") {
+    if (result === "missing") {
       yield* prompter.log.warning(
         "No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry."
       )
     }
-  })
-
-/**
- * Patch Oxlint and TypeScript for the `effect` preset. Init installed the packages before it wrote
- * the `prepare` script, so the script has not run yet.
- */
-export const patchEffectTsgo = (cwd: string) =>
-  Effect.gen(function* () {
-    const prompter = yield* Prompter
-
-    if (!(yield* effectTsgo.detect(cwd))) {
-      return
-    }
-
-    yield* prompter
-      .withSpinner(() => effectTsgo.patch(cwd, { quiet: true }), {
-        failure: "Failed to patch Oxlint and TypeScript.",
-        start: "Patching Oxlint and TypeScript with @effect/tsgo...",
-        success: "Oxlint and TypeScript patched with @effect/tsgo.",
-      })
-      .pipe(
-        Effect.catchTag(["CommandFailed", "CliNotFound", "PlatformError"], () =>
-          prompter.log.warning(
-            "Run `adamantite prepare` to see why the patch failed. Oxlint cannot load the `effect` preset until it succeeds."
-          )
-        )
-      )
   })
 
 export const setupEditors = (cwd: string, editors: string[]) =>

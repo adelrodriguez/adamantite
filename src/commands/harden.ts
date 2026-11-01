@@ -10,13 +10,13 @@ import * as Schema from "effect/Schema"
 import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
+import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
   readHardenContext,
   renderHardenPrompt,
 } from "#lib/hardening/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import {
   AdamantiteNotInNodeModules,
   AdamantiteNotInstalled,
@@ -182,7 +182,11 @@ export default Command.make("harden", { commits, scope }).pipe(
       const checkPassed = yield* passes(
         runner.runAll([
           { args: ["--check"], command: oxfmt.name, title: "✨ Checking formatting" },
-          { args: ["--deny-warnings"], command: oxlint.name, title: "🔍 Linting" },
+          {
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--deny-warnings"],
+            title: "🔍 Linting",
+          },
         ])
       )
       // The Doctor warnings below already name the rules folders that discovery cannot follow.

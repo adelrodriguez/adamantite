@@ -5,6 +5,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
+import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 describe("fix", () => {
@@ -18,8 +19,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--fix"],
-            command: "oxlint",
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix"],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -41,6 +42,7 @@ describe("fix", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toStrictEqual([
+          ...OXLINT_COMMAND.args,
           "--fix",
           "--fix-suggestions",
           "--fix-dangerously",
@@ -62,8 +64,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--fix", "--fix-suggestions", "--deny-warnings"],
-            command: "oxlint",
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix", "--fix-suggestions", "--deny-warnings"],
             title: "🔧 Fixing lint issues",
           },
         ])
@@ -122,8 +124,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--fix", join(files.root, "index.ts")],
-            command: "oxlint",
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix", join(files.root, "index.ts")],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -149,8 +151,8 @@ describe("fix", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations).toStrictEqual([
           {
-            args: ["--fix", "--fix-dangerously", "--deny-warnings"],
-            command: "oxlint",
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--fix", "--fix-dangerously", "--deny-warnings"],
             title: "🔧 Fixing lint issues",
           },
           {
@@ -172,11 +174,10 @@ describe("fix", () => {
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxlint", exitCode: 1 })
-        expect(runner.invocations.map((invocation) => invocation.command)).toStrictEqual([
-          "oxlint",
-          "oxfmt",
-        ])
+        expect(error).toMatchObject({ _tag: "CommandFailed", command: "node", exitCode: 1 })
+        expect(
+          runner.invocations.map((invocation) => invocation.name ?? invocation.command)
+        ).toStrictEqual(["oxlint", "oxfmt"])
       })
     )
 

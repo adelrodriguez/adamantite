@@ -121,13 +121,13 @@ jobs:
           effect_tsgo_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['@effect/tsgo']")"
           effect_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).dependencies.effect")"
           npm install "oxlint-tsgolint@${tsgolint_version}" "@effect/tsgo@${effect_tsgo_version}" "effect@${effect_version}"
-          # The effecttsgo rules exist only in the patched binaries: see ADR 0007.
-          ./node_modules/.bin/effect-tsgo patch --oxlint --typescript
+          # The effecttsgo rules exist only in the Effect builds, which the toolchain entry loads
+          # without a patch: see ADR 0019.
           printf '%s\n' '{ "compilerOptions": { "strict": true, "module": "esnext", "moduleResolution": "bundler" } }' > tsconfig.json
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import effect from "adamantite/lint/effect"' '' 'export default defineConfig({ extends: [effect] })' > oxlint.config.ts
           printf '%s\n' 'import * as Effect from "effect/Effect"' '' 'export function run() {' '  Effect.log("lost")' '}' > bad.ts
-          if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.ts > oxlint-output.txt 2>&1; then
-            echo "Expected effect diagnostics from the packaged preset and the patched Oxlint to fail the lint run"
+          if node node_modules/adamantite/dist/oxlint.js -c oxlint.config.ts bad.ts > oxlint-output.txt 2>&1; then
+            echo "Expected effect diagnostics from the packaged preset and the toolchain entry to fail the lint run"
             cat oxlint-output.txt
             exit 1
           fi

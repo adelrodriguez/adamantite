@@ -58,10 +58,6 @@ const RootPackageJson = Schema.Struct({
   devDependencies: Schema.Record(Schema.String, Schema.String),
 })
 const decodeRootPackageJson = Schema.decodeUnknownSync(Schema.fromJsonString(RootPackageJson))
-const UpstreamJson = Schema.Struct({
-  tags: Schema.Struct({ typescript: Schema.Struct({ latest: Schema.String }) }),
-})
-const decodeUpstreamJson = Schema.decodeUnknownSync(Schema.fromJsonString(UpstreamJson))
 
 const upstreamRules = CATEGORY_PRESETS.flatMap((category) =>
   Object.keys(
@@ -82,10 +78,11 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the files with the effect preset in one real Oxlint run. Oxlint, oxlint-tsgolint, and
- * `effect` resolve from the repository's `node_modules`, which the `prepare` script patched.
+ * Lint the files with the effect preset in one real Oxlint run, through the toolchain entry.
+ * Oxlint, `@effect/tsgo`, and `effect` resolve from the repository's `node_modules`, which nothing
+ * patches. `jsPlugins` adds plugins next to the preset.
  */
-function lint(files: Record<string, string>) {
+function lint(files: Record<string, string>, jsPlugins: readonly string[] = []) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-effect-"))
 
   try {
@@ -111,14 +108,21 @@ function lint(files: Record<string, string>) {
         'import { defineConfig } from "oxlint"',
         `import effect from ${JSON.stringify(join(REPO_ROOT, "presets/lint/effect.ts"))}`,
         "",
-        "export default defineConfig({ extends: [effect] })",
+        `export default defineConfig({ extends: [effect], jsPlugins: ${JSON.stringify(jsPlugins)} })`,
         "",
       ].join("\n")
     )
 
     const result = spawnSync(
-      join(REPO_ROOT, "node_modules/.bin/oxlint"),
-      ["-c", "oxlint.config.ts", "-f", "json", ...Object.keys(files)],
+      process.execPath,
+      [
+        join(REPO_ROOT, "src/oxlint.ts"),
+        "-c",
+        "oxlint.config.ts",
+        "-f",
+        "json",
+        ...Object.keys(files).filter((file) => file.endsWith(".ts")),
+      ],
       { cwd: tempDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
     )
 
@@ -151,9 +155,8 @@ describe("effect preset", () => {
     expect(presetRules.filter((rule) => EXCLUDED_RULES.has(rule))).toStrictEqual([])
   })
 
-  // The platform package keeps the compiler for its latest TypeScript version at `lib/tsc`,
-  // and every other patched binary at `artifacts/<tool>/<version>`.
-  it("ship patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript", () => {
+  // The toolchain loads the Effect builds from `artifacts/<tool>/<version>` of the platform package.
+  it("ship Effect builds for the pinned Oxlint and oxlint-tsgolint", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
     )
@@ -162,18 +165,14 @@ describe("effect preset", () => {
         `@effect/tsgo-${process.platform}-${process.arch}/package.json`
       )
     )
-    const { tags } = decodeUpstreamJson(
-      readFileSync(join(platformDirectory, "lib", "upstream.json"), "utf8")
-    )
-    const missing = ["oxlint", "oxlint-tsgolint", "typescript"]
+    const missing = ["oxlint", "oxlint-tsgolint"]
       .map((tool) => `${tool}/${devDependencies[tool]}`)
-      .filter((artifact) => artifact !== `typescript/${tags.typescript.latest}`)
       .filter((artifact) => !existsSync(join(platformDirectory, "artifacts", artifact)))
 
     expect(missing).toStrictEqual([])
   })
 
-  it("report Effect misuse through the patched Oxlint", () => {
+  it("report Effect misuse through the toolchain entry", () => {
     const diagnostics = lint({
       "bad.ts": [
         'import * as Effect from "effect/Effect"',
@@ -194,5 +193,34 @@ describe("effect preset", () => {
     expect(diagnostics.map(({ code, filename }) => ({ code, filename }))).toStrictEqual([
       { code: `${NAMESPACE}(floating-effect)`, filename: "bad.ts" },
     ])
+  })
+
+  // The Effect binding loads through `NAPI_RS_NATIVE_LIBRARY_PATH`, which every napi-rs package
+  // reads. The plugin loads `oxc-parser`, which the entry does not load itself, so the plugin fails
+  // to load when the variable outlives the Oxlint binding.
+  it("load a JS plugin that loads a napi-rs package next to the Effect binding", () => {
+    const diagnostics = lint(
+      {
+        "bad.ts": [
+          'import * as Effect from "effect/Effect"',
+          "",
+          "export function run() {",
+          '  Effect.log("lost")',
+          "}",
+          "",
+        ].join("\n"),
+        "napi-plugin.mjs": [
+          'import { parseSync } from "oxc-parser"',
+          "",
+          'parseSync("probe.js", "1")',
+          "",
+          'export default { meta: { name: "napi" }, rules: {} }',
+          "",
+        ].join("\n"),
+      },
+      ["./napi-plugin.mjs"]
+    )
+
+    expect(diagnostics.map(({ code }) => code)).toStrictEqual([`${NAMESPACE}(floating-effect)`])
   })
 })

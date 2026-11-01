@@ -45,6 +45,11 @@ const CONFIG = {
   "editor.defaultFormatter": "oxc.oxc-vscode",
   "editor.formatOnPaste": true,
   "editor.formatOnSave": true,
+  // The entry runs Oxlint with the project's toolchain. The Oxc extension starts a `.js` path with
+  // Node.js, without a working directory in the project, so the entry finds the project from its
+  // own path.
+  // `${workspaceFolder}` is a VS Code variable, so the template literal escapes it.
+  "oxc.path.oxlint": `\${workspaceFolder}/node_modules/adamantite/dist/oxlint.js`,
   "oxc.typeAware": true,
 } as const
 

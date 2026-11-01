@@ -78,6 +78,9 @@ describe("vscode", () => {
 
         expect(config).toHaveProperty(["editor.formatOnSave"])
         expect(config["editor.formatOnSave"]).toBe(true)
+        expect(config["oxc.path.oxlint"]).toBe(
+          `\${workspaceFolder}/node_modules/adamantite/dist/oxlint.js`
+        )
       })
     )
   })

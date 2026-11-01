@@ -15,9 +15,12 @@ invoke target-project operations.
 services. Other external behavior, such as prompts and child commands, is also behind
 services so command behavior can be tested without changing a real project.
 
-Tsdown bundles the CLI and presets into `dist`. Unplugin macros expands compile-time
-package metadata and terminal-title values during builds and Vitest source transforms.
-The `bin/adamantite` executable loads the bundled CLI. Repository tests run with Vitest
+Tsdown bundles the CLI, the Oxlint entry, and the presets into `dist`. Unplugin macros expands
+compile-time package metadata and terminal-title values during builds and Vitest source
+transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint.ts` builds to
+`dist/oxlint.js`, beside the CLI bundle, and runs Oxlint with the project's toolchain. The
+entry imports no macro module, so this repository runs it from source with
+`node src/oxlint.ts`. See ADR 0019. Repository tests run with Vitest
 under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Module seams
@@ -95,8 +98,9 @@ warns the user and points to `adamantite doctor`.
 
 ## Command boundaries
 
-- `check` and `fix` run Oxfmt and Oxlint. `check` fails on Oxlint warnings unless
-  `--allow-warnings` is set. See ADR 0018.
+- `check` and `fix` run Oxfmt and Oxlint. They start Oxlint through the entry `dist/oxlint.js`
+  with `node`, so Oxlint runs with the project's toolchain. `check` fails on Oxlint warnings
+  unless `--allow-warnings` is set. See ADR 0018 and ADR 0019.
 - `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
 - `init` creates selected integrations and managed scripts. It installs the Adamantite skill
   for the selected coding agents with the `skills` CLI, from `node_modules/adamantite`, so
@@ -111,12 +115,12 @@ warns the user and points to `adamantite doctor`.
   finds the files that no chain of links from an `AGENTS.md` reaches, and the links to missing
   files. After a handoff, a link to a missing file that the session added fails the
   verification. See ADR 0012.
-- `update` updates managed dependencies, patches Oxlint and TypeScript again for the effect
-  preset, copies the Adamantite skill again when the copy that `init` installed is stale, then
+- `update` updates managed dependencies, copies the Adamantite skill again when the copy that
+  `init` installed is stale, then
   emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
   not need it.
-- `prepare` patches Oxlint and TypeScript for the effect preset. The target project's
-  `prepare` script runs it after each install.
+- `prepare` does nothing. It patched Oxlint for the effect preset before the toolchain proxy,
+  and existing `prepare` scripts still run it. #444 removes it.
 - `rule add` writes a custom rule stub and its test. `rule ast` prints the AST that Oxlint
   rules visit. `rule test` runs the custom rule tests with `node --test`. `check` does not run
   them. The managed GitHub workflow runs `rule test` when the project has rule tests. See ADR 0009.
@@ -149,6 +153,7 @@ src/
   terminal/         user prompting, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
+  oxlint.ts         entry that runs Oxlint with the project's toolchain
 ```
 
 ## Dependency version invariant
@@ -171,20 +176,21 @@ in `jsPlugins`, and Oxlint resolves it from the target project. The pin is the d
 version in `package.json`. See ADR 0003.
 
 `@effect/tsgo` for the `effect` preset is a managed plugin too, but it is not a `jsPlugins`
-package. Its `effecttsgo` rules exist only after `effect-tsgo patch --oxlint --typescript`
-replaces the Oxlint and TypeScript binaries in `node_modules`. While the preset is imported,
-`adamantite prepare` runs the patch from the target project's `prepare` script, and `init`
-and `update` run it after they install packages. The `@effect/tsgo` integration also manages
-that `prepare` script and the `@effect/language-service` entry in `tsconfig.json`. It lives in
-`plugins/effect-tsgo/`: `index.ts` is one `defineManagedPlugin` call, and
-`prepare-script.ts`, `tsconfig.ts`, and `patch.ts` hold one concern each.
-`defineManagedPlugin` takes an optional `assess` for findings beyond the package, which runs
-only while the plugin applies, and keeps other options, such as `detect`, `update`, and
-`patch`, as methods of the integration. The
-helpers do not import `index.ts` or each other. The Knip integration requires
+package. Its `effecttsgo` rules exist only in the Effect builds of the Oxlint binding and
+oxlint-tsgolint that the package ships. The toolchain in `tooling/oxlint/toolchain.ts` loads
+those builds when the project installs `@effect/tsgo`, and the entry `src/oxlint.ts` runs
+Oxlint with them. See ADR 0019. The `@effect/tsgo` integration also manages the
+`@effect/language-service` entry in `tsconfig.json`, and reports a `prepare` script that still
+runs `adamantite prepare`. It lives in `plugins/effect-tsgo/`: `index.ts` is one
+`defineManagedPlugin` call, and `prepare-script.ts`, `tsconfig.ts`, and `toolchain.ts` hold one
+concern each. `defineManagedPlugin` takes an optional `assess` for findings beyond the package,
+which runs only while the plugin applies, and keeps other options, such as `update`, as methods
+of the integration. The helpers do not import `index.ts` or each other. `tooling/oxlint/toolchain.ts`
+imports `toolchain.ts` and not `index.ts`, because `index.ts` imports a macro module and the
+entry runs from source in this repository. The Knip integration requires
 `ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
-`@effect/tsgo` ships patched binaries for the pinned Oxlint, oxlint-tsgolint, and TypeScript
-versions. See ADR 0007.
+`@effect/tsgo` ships Effect builds for the pinned Oxlint and oxlint-tsgolint versions. See ADR
+0007 for the curation.
 
 ## Vendored bundles
 

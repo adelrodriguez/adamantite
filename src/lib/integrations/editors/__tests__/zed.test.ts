@@ -12,6 +12,7 @@ const SETTINGS_PATH = ".zed/settings.json"
 
 const OXFMT_FORMATTER = { language_server: { name: "oxfmt" } }
 const OXC_FIX_ALL = { code_action: "source.fixAll.oxc" }
+const OXLINT_ENTRY = "node_modules/adamantite/dist/oxlint.js"
 
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
@@ -78,7 +79,10 @@ describe("zed", () => {
         expect(yield* zed.detect(ROOT).pipe(provideFiles(files))).toBe(true)
         expect(JSON.parse(files.read(SETTINGS_PATH))).toMatchObject({
           lsp: {
-            oxlint: { initialization_options: { settings: { run: "onType", typeAware: true } } },
+            oxlint: {
+              binary: { arguments: [OXLINT_ENTRY, "--lsp"], path: "node" },
+              initialization_options: { settings: { run: "onType", typeAware: true } },
+            },
           },
         })
       })
@@ -200,6 +204,28 @@ describe("zed", () => {
           OXC_FIX_ALL,
           formatter,
         ])
+      })
+    )
+
+    it.effect("replace the Oxlint binary of the existing config with the toolchain entry", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [SETTINGS_PATH]: JSON.stringify({
+            lsp: {
+              oxlint: {
+                binary: { arguments: ["--lsp"], path: "node_modules/.bin/oxlint" },
+                initialization_options: { settings: { run: "onSave" } },
+              },
+            },
+          }),
+        })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        expect(JSON.parse(files.read(SETTINGS_PATH)).lsp.oxlint.binary).toStrictEqual({
+          arguments: [OXLINT_ENTRY, "--lsp"],
+          path: "node",
+        })
       })
     )
 

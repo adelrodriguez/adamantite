@@ -12,6 +12,7 @@ import * as Stream from "effect/Stream"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import hardenCommand from "#commands/harden.ts"
+import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
@@ -962,7 +963,10 @@ describe("harden", () => {
             stdout: "inherit",
           }),
           expect.objectContaining({ args: ["--check"], command: "oxfmt" }),
-          expect.objectContaining({ args: ["--deny-warnings"], command: "oxlint" }),
+          expect.objectContaining({
+            ...OXLINT_COMMAND,
+            args: [...OXLINT_COMMAND.args, "--deny-warnings"],
+          }),
           {
             args: ["--test", ".adamantite/rules/tests/no-foo.ts"],
             command: "node",
@@ -989,11 +993,9 @@ describe("harden", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(nonProbeInvocations(runner).map((invocation) => invocation.command)).toStrictEqual([
-        "claude",
-        "oxfmt",
-        "oxlint",
-      ])
+      expect(
+        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
+      ).toStrictEqual(["claude", "oxfmt", "oxlint"])
       expect(prompter.logs).toContainEqual(SUCCESS_LOG)
       expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
     })
@@ -1027,12 +1029,9 @@ describe("harden", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(nonProbeInvocations(runner).map((invocation) => invocation.command)).toStrictEqual([
-        "claude",
-        "oxfmt",
-        "oxlint",
-        "node",
-      ])
+      expect(
+        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
+      ).toStrictEqual(["claude", "oxfmt", "oxlint", "node"])
       expect(prompter.logs.filter((log) => log.level === "error")).toStrictEqual([
         { level: "error", message: "`adamantite check` failed after the Claude Code session." },
         {
@@ -1232,9 +1231,9 @@ describe("harden", () => {
         { initialValue: true, message: "Copy the Markdown prompt for a coding agent?" },
       ])
       expect(copied).toStrictEqual([expect.stringMatching(/^# Adamantite harden\n/)])
-      expect(nonProbeInvocations(runner).map((invocation) => invocation.command)).toStrictEqual([
-        "claude",
-      ])
+      expect(
+        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
+      ).toStrictEqual(["claude"])
     })
   )
 

@@ -8,7 +8,6 @@ import { getPackageActions } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
@@ -73,15 +72,6 @@ export default Command.make("update").pipe(
           }
         )
         yield* prompter.log.success("Dependencies updated successfully.")
-
-        // A named install does not run the `prepare` script, which reapplies the @effect/tsgo patch.
-        if (yield* effectTsgo.detect(cwd)) {
-          yield* prompter.withSpinner(() => effectTsgo.patch(cwd, { quiet: true }), {
-            failure: "Failed to patch Oxlint and TypeScript. Run `adamantite prepare` to see why.",
-            start: "Patching Oxlint and TypeScript with @effect/tsgo...",
-            success: "Oxlint and TypeScript patched with @effect/tsgo.",
-          })
-        }
       }
 
       // The skill that init installed is a copy, so it stays at the Adamantite version that made it.

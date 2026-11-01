@@ -6,8 +6,8 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { OXLINT_COMMAND } from "#lib/execution/oxlint-entry.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { InvalidFixOptions } from "#lib/shared/errors.ts"
 
 const files = Argument.File("files", { mustExist: true }).pipe(
@@ -55,34 +55,33 @@ export default Command.make("fix", { all, dangerous, files, only, suggested }).p
       const targets = Array.dedupe(files)
       const forwardedStage = selected ?? "lint"
 
-      const stages = [
-        {
-          args: Array.dedupe([
-            "--fix",
-            ...(suggested || all ? ["--fix-suggestions"] : []),
-            ...(dangerous || all ? ["--fix-dangerously"] : []),
-            ...targets,
-          ]),
-          command: oxlint.name,
-          name: "lint",
-          title: "🔧 Fixing lint issues",
-        },
-        {
-          args: ["--write", ...targets],
+      const forwardedTo = (stage: typeof forwardedStage) =>
+        stage === forwardedStage ? forwardedArguments : []
+
+      const stages = {
+        format: {
+          args: ["--write", ...targets, ...forwardedTo("format")],
           command: oxfmt.name,
-          name: "format",
           title: "✨ Formatting",
         },
-      ]
+        lint: {
+          ...OXLINT_COMMAND,
+          args: [
+            ...OXLINT_COMMAND.args,
+            ...Array.dedupe([
+              "--fix",
+              ...(suggested || all ? ["--fix-suggestions"] : []),
+              ...(dangerous || all ? ["--fix-dangerously"] : []),
+              ...targets,
+            ]),
+            ...forwardedTo("lint"),
+          ],
+          title: "🔧 Fixing lint issues",
+        },
+      }
 
       yield* runner.runAll(
-        stages
-          .filter((stage) => selected === undefined || stage.name === selected)
-          .map((stage) => ({
-            args: [...stage.args, ...(stage.name === forwardedStage ? forwardedArguments : [])],
-            command: stage.command,
-            title: stage.title,
-          }))
+        selected === undefined ? [stages.lint, stages.format] : [stages[selected]]
       )
     })
   )

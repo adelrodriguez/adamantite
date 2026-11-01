@@ -29,6 +29,7 @@ const EXCLUDED_RULES = new Set([
   "node-builtin-import",
   "prefer-effect-array",
   "prefer-effect-record",
+  "prefer-effect-string",
   "prefer-schema-over-json",
   "process-env",
   "schema-sync",

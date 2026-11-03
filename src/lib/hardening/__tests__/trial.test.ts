@@ -23,14 +23,20 @@ describe("parseTrialCase", () => {
     })
   )
 
-  it.effect.each(["../outside.ts", "/abs/cart.ts", ".", "=/tmp/a.ts", "src/cart.ts="])(
-    "reject %s",
-    (value) =>
-      Effect.gen(function* () {
-        const error = yield* parseTrialCase(value, "reported").pipe(Effect.flip)
+  it.effect.each([
+    "../outside.ts",
+    "/abs/cart.ts",
+    "C:/cart.ts",
+    "C:\\cart.ts",
+    ".",
+    "=/tmp/a.ts",
+    "src/cart.ts=",
+  ])("reject %s", (value) =>
+    Effect.gen(function* () {
+      const error = yield* parseTrialCase(value, "reported").pipe(Effect.flip)
 
-        expect(error).toMatchObject({ _tag: "InvalidTrialCase", value })
-      })
+      expect(error).toMatchObject({ _tag: "InvalidTrialCase", value })
+    })
   )
 })
 

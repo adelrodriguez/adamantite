@@ -48,7 +48,8 @@ interface HardenContext {
   readonly instructionFiles: readonly string[]
   readonly rulesFolders: readonly string[]
   /**
-   * The folder that `--path` selects, or `null` for the whole project.
+   * The folder that `--path` selects, relative to the project root with `/` between folders, as git
+   * and Oxlint list files, or `null` for the whole project.
    */
   readonly scope: string | null
   /**
@@ -182,7 +183,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     ),
     instructionFiles: instructionFiles.map((file) => relative(file)),
     rulesFolders: [...new Set(calls.map((call) => relative(call.dir)))],
-    scope: scope === cwd ? null : relative(scope),
+    scope: scope === cwd ? null : relative(scope).split(path.sep).join("/"),
     unresolvedCalls: [...new Set(unresolvedCalls.map((source) => relative(source)))],
   } satisfies HardenContext
 })

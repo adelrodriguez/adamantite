@@ -1,5 +1,5 @@
 import type * as Schema from "effect/Schema"
-import { posix } from "node:path"
+import { posix, win32 } from "node:path"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -26,7 +26,7 @@ import {
 } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { CONFIG_FILES } from "#lib/workspace/custom-rules/discover.ts"
-import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
+import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 /**
  * What a case must get from the rule: a report, because it has the mistake, or no report, because
@@ -100,7 +100,14 @@ export function parseTrialCase(
     return Effect.fail(new InvalidTrialCase({ reason: "Give a path, or `<path>=<file>`.", value }))
   }
 
-  if (posix.isAbsolute(path) || path === ".." || path.startsWith("../") || path === ".") {
+  // A drive path, such as `C:/src/a.ts`, is absolute only on Windows.
+  if (
+    posix.isAbsolute(path)
+    || win32.isAbsolute(path)
+    || path === ".."
+    || path.startsWith("../")
+    || path === "."
+  ) {
     return Effect.fail(
       new InvalidTrialCase({
         reason: "The path must be a file inside the project, relative to the project root.",
@@ -234,10 +241,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       { concurrency: 16, discard: true }
     )
 
-    const packages = [
-      cwd,
-      ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
-    ]
+    const packages = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
     // A file of the project outside each `node_modules` folder, such as a workspace package, has a
     // copy. A real path can differ from `cwd` in a folder link, such as `/var` on macOS.
     const root = yield* fs.realPath(cwd)
@@ -404,8 +408,11 @@ export const tryRule = Effect.fn("tryRule")(
           Option.isNone(trialCase.source)
           && !(yield* fs.exists(path.join(copy, trialCase.path)))
         ) {
+          // The copy has only the files that git lists.
           return yield* new InvalidTrialCase({
-            reason: "The project has no such file. Use `<path>=<file>` to lint other content.",
+            reason: (yield* fs.exists(path.join(cwd, trialCase.path)))
+              ? "Git ignores this file, so the copy of the project does not have it. Use `<path>=<file>` to lint its content."
+              : "The project has no such file. Use `<path>=<file>` to lint other content.",
             value: trialCase.path,
           })
         }

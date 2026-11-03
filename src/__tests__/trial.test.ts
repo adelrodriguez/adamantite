@@ -311,6 +311,22 @@ describe("rule trials in a real project", () => {
       })
   )
 
+  it.live("say that git ignores a project file that the copy does not have", () =>
+    Effect.gen(function* () {
+      write(".gitignore", "node_modules\nsrc/local.ts\n")
+      write("src/local.ts", "console.log(1)\n")
+
+      const failure = yield* runTrial("no-console", { _tag: "Error", options: [] }, [
+        makeCase("src/local.ts", "reported"),
+      ]).pipe(Effect.flip)
+
+      expect(failure).toMatchObject({
+        _tag: "InvalidTrialCase",
+        reason: expect.stringContaining("Git ignores this file"),
+      })
+    })
+  )
+
   it.live.each([
     {
       error: "TrialRuleNotFound",

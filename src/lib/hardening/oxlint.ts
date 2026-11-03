@@ -1,6 +1,7 @@
 import process from "node:process"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
@@ -31,7 +32,12 @@ const OxlintReport = Schema.Struct({
 
 const decodeOxlintReport = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintReport))
 
-const OxlintRules = Schema.Array(Schema.Struct({ scope: Schema.String }))
+const OxlintRules = Schema.Array(Schema.Struct({ scope: Schema.String, value: Schema.String }))
+
+/**
+ * A diagnostic code, such as `eslint(no-debugger)`: the plugin that reports, and the rule name.
+ */
+const DIAGNOSTIC_CODE = /^(?<plugin>[^()]+)\((?<name>[^()]+)\)$/u
 
 const decodeOxlintRules = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintRules))
 
@@ -59,12 +65,36 @@ export function splitRuleName(rule: string): { readonly name: string; readonly p
 }
 
 /**
- * Whether a diagnostic `code`, such as `eslint(no-debugger)`, comes from the rule. Oxlint reports
- * some rules under the plugin that implements them, such as `typescript/no-restricted-imports` as
- * `eslint(no-restricted-imports)`, so only the rule name must match.
+ * The plugins and the rules that Oxlint has built in, as a config names them, such as `jsx-a11y`
+ * and `jsx-a11y/alt-text`.
  */
-export function isReportOf(code: string, rule: string): boolean {
-  return code.endsWith(`(${splitRuleName(rule).name})`)
+export interface BuiltInRules {
+  readonly plugins: ReadonlySet<string>
+  readonly rules: ReadonlySet<string>
+}
+
+/**
+ * Whether a diagnostic `code`, such as `eslint(no-debugger)`, comes from the rule. Oxlint reports a
+ * rule under its plugin. A built-in rule that Oxlint does not list, such as
+ * `typescript/no-restricted-imports`, is an alias of the rule of another built-in plugin, and
+ * Oxlint reports it under that plugin, as `eslint(no-restricted-imports)`.
+ */
+export function isReportOf(code: string, rule: string, builtIns: BuiltInRules): boolean {
+  const { name, plugin } = splitRuleName(rule)
+  const reporter = DIAGNOSTIC_CODE.exec(code)?.groups
+
+  if (reporter?.["name"] !== name) {
+    return false
+  }
+
+  const reportingPlugin = reporter["plugin"] ?? ""
+
+  return (
+    reportingPlugin === plugin
+    || (builtIns.plugins.has(plugin)
+      && !builtIns.rules.has(`${plugin}/${name}`)
+      && builtIns.plugins.has(reportingPlugin))
+  )
 }
 
 /**
@@ -113,20 +143,11 @@ const runOxlint = Effect.fn("runOxlint")(
 )
 
 /**
- * Lints `files` in `cwd` with Oxlint, and returns its JSON report. `config` is a config file in
- * `cwd`. Without it, Oxlint finds the config.
+ * Lints `files` in `cwd` with Oxlint, and returns its JSON report. Oxlint finds the config of each
+ * file.
  */
-export const lintFiles = Effect.fn("lintFiles")(function* (
-  cwd: string,
-  files: readonly string[],
-  config?: string
-) {
-  const { output, stdout } = yield* runOxlint(cwd, [
-    ...(config === undefined ? [] : ["-c", config]),
-    "-f",
-    "json",
-    ...files,
-  ])
+export const lintFiles = Effect.fn("lintFiles")(function* (cwd: string, files: readonly string[]) {
+  const { output, stdout } = yield* runOxlint(cwd, ["-f", "json", ...files])
   const start = stdout.search(JSON_REPORT_START)
   const report = start === -1 ? Option.none() : decodeOxlintReport(stdout.slice(start))
 
@@ -144,14 +165,9 @@ export const lintFiles = Effect.fn("lintFiles")(function* (
  */
 export const listLintedFiles = Effect.fn("listLintedFiles")(function* (
   cwd: string,
-  files: readonly string[] = [],
-  config?: string
+  files: readonly string[] = []
 ) {
-  const { exitCode, output, stdout } = yield* runOxlint(cwd, [
-    ...(config === undefined ? [] : ["-c", config]),
-    "--debug=files",
-    ...files,
-  ])
+  const { exitCode, output, stdout } = yield* runOxlint(cwd, ["--debug=files", ...files])
 
   if (exitCode !== 0) {
     return yield* new TrialLintFailed({ output })
@@ -164,13 +180,12 @@ export const listLintedFiles = Effect.fn("listLintedFiles")(function* (
 })
 
 /**
- * The plugins that Oxlint has built in, as a config names them, such as `jsx-a11y`. Run it in an
- * empty folder, so no config loads, with the toolchain of `project`.
+ * The plugins and the rules that Oxlint has built in, with the toolchain of `project`. Oxlint runs
+ * in an empty folder, so no config loads.
  */
-export const listBuiltInPlugins = Effect.fn("listBuiltInPlugins")(function* (
-  folder: string,
-  project: string
-) {
+export const listBuiltInRules = Effect.fn("listBuiltInRules")(function* (project: string) {
+  const fs = yield* FileSystem.FileSystem
+  const folder = yield* fs.makeTempDirectoryScoped({ prefix: "adamantite-rules-" })
   const { output, stdout } = yield* runOxlint(folder, ["--rules", "-f", "json"], project)
   const rules = decodeOxlintRules(stdout)
 
@@ -178,5 +193,14 @@ export const listBuiltInPlugins = Effect.fn("listBuiltInPlugins")(function* (
     return yield* new TrialLintFailed({ output })
   }
 
-  return new Set(rules.value.map((rule) => rule.scope.replaceAll("_", "-")))
-})
+  // `--rules` names a plugin with `_`, such as `jsx_a11y`, and a config names it with `-`.
+  const named = rules.value.map(({ scope, value }) => ({
+    plugin: scope.replaceAll("_", "-"),
+    value,
+  }))
+
+  return {
+    plugins: new Set(named.map((rule) => rule.plugin)),
+    rules: new Set(named.map((rule) => `${rule.plugin}/${rule.value}`)),
+  } satisfies BuiltInRules
+}, Effect.scoped)

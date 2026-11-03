@@ -128,9 +128,10 @@ warns the user and points to `adamantite doctor`.
   rules visit. `rule test` runs the custom rule tests with `node --test`. `check` does not run
   them. The managed GitHub workflow runs `rule test` when the project has rule tests. See ADR 0009.
 - `rule try` runs a trial: `hardening/trial.ts` copies the files that git lists to a temporary
-  folder, writes a config beside the config that lints the cases, and lints the cases with
-  Oxlint. The copy gets a real `node_modules` folder with a link to each entry of the project
-  folder, so the entry module that `custom()` writes stays in the copy. It exits 0 when each case
+  folder, puts a trial config in place of the config that lints the cases, and lints the cases
+  with Oxlint from the root of the copy. The copy gets a real `node_modules` folder with a link
+  to each entry of the project folder, so the entry module that `custom()` writes stays in the
+  copy. A link to a workspace package goes to the copy of the package. It exits 0 when each case
   is as expected, 1 when a case is not, and 2 when the trial is not evidence. See ADR 0020.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle

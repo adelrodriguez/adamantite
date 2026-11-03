@@ -11,8 +11,17 @@ program computes. See [#607](https://github.com/adelrodriguez/adamantite/issues/
 The decisions:
 
 - `adamantite rule try` runs a trial. It copies the files that git lists to a temporary folder,
-  writes a config beside the config that lints the cases, lints the cases, and deletes the copy.
-  The project stays unchanged.
+  puts a trial config in place of the config that lints the cases, lints the cases, and deletes
+  the copy. The project stays unchanged.
+- Oxlint runs from the root of the copy, as a project lint does. The trial config takes the name
+  of the config that it replaces, and imports that config under a new name. So the root config
+  gives the options that only a root config can set, such as `typeAware`, and the nearest config
+  gives the rules of each case.
+- A report counts only when it comes from the plugin and the name of the rule. A built-in rule
+  that Oxlint does not list, such as `typescript/no-restricted-imports`, is an alias, and Oxlint
+  reports it under the plugin of the rule that it resolves to.
+- A link in `node_modules` to a workspace package goes to the copy of the package, so a config
+  that imports a shared tooling package loads the copied rules.
 - The trial changes the config, not the command line. Oxlint ignores `-D` for a rule that does
   not exist and for a JS plugin rule. It also ignores a built-in rule whose plugin the config
   does not turn on, so the trial override turns on that plugin.
@@ -24,7 +33,9 @@ The decisions:
 - The harden prompt shows two more facts in its Context section: the disable comments of each
   rule in the files that Oxlint lints, and a mark for each file of an override that turns a rule
   off. The mark comes from a trial that removes the rule from that override only, so the setting
-  of the earlier layers applies again and Adamantite does not resolve the rule options.
+  of the earlier layers applies again and Adamantite does not resolve the rule options. A file
+  that Oxlint did not lint, because the config ignores it or it does not parse, gets its own mark,
+  and never the mark "no longer breaks the rule".
 - Adamantite still does not resolve the effective Oxlint config, as ADR 0012 decided. Oxlint
   runs each trial. The override reader parses the config without running it, and it reads only
   the overrides that list their files as strings.

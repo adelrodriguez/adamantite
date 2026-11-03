@@ -11,9 +11,9 @@ import {
   type ObjectProperty,
   type Program,
 } from "oxc-parser"
-import { isReportOf, lintFiles } from "#lib/hardening/oxlint.ts"
-import { makeProjectCopy, renderOverrideTrialConfig } from "#lib/hardening/trial.ts"
-import { readFile, writeFile } from "#lib/shared/filesystem.ts"
+import { isReportOf, lintFiles, listBuiltInRules, listLintedFiles } from "#lib/hardening/oxlint.ts"
+import { makeProjectCopy, renderOverrideTrialConfig, replaceConfig } from "#lib/hardening/trial.ts"
+import { readFile } from "#lib/shared/filesystem.ts"
 
 /**
  * An entry of `overrides` in an Oxlint config that turns one or more rules off.
@@ -32,9 +32,10 @@ export interface RuleOffOverride {
 
 /**
  * What Adamantite found for one file of an override that turns a rule off: the rule still reports
- * the file, the rule no longer reports it, or the file does not exist.
+ * the file, the rule no longer reports it, the config ignores it, it does not parse, or it does not
+ * exist. Only a file that Oxlint linted and parsed can be clean.
  */
-export type OverrideFileMark = "breaks" | "clean" | "missing"
+export type OverrideFileMark = "breaks" | "clean" | "ignored" | "missing" | "unparsable"
 
 /**
  * The files for which an override turns a rule off, with paths relative to the project root.
@@ -273,49 +274,56 @@ export const readOverrides = Effect.fn("readOverrides")(
       )
     )
     const linted = entries.filter((entry) => entry.literals.some((file) => existing.has(file)))
-    // The reports of each rule on each file, as `<rule>\0<file>`.
-    const breaks = new Set<string>()
+    const marks = new Map<string, OverrideFileMark>()
 
     if (linted.length > 0) {
+      const builtIns = yield* listBuiltInRules(cwd)
       const copy = yield* makeProjectCopy(cwd)
 
       for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
-        const forConfig = linted.filter((entry) => entry.config === config)
-        const folder = path.join(copy, path.dirname(config))
-        const trialConfig = `oxlint.trial.config${path.extname(config)}`
         const removals = new Map<number, string[]>()
 
-        for (const entry of forConfig) {
+        for (const entry of linted.filter((candidate) => candidate.config === config)) {
           removals.set(entry.index, [...(removals.get(entry.index) ?? []), entry.rule])
         }
 
-        yield* writeFile(
-          path.join(folder, trialConfig),
-          renderOverrideTrialConfig({ config: path.basename(config), removals })
+        yield* replaceConfig(path.join(copy, config), (base) =>
+          renderOverrideTrialConfig({ config: base, removals })
         )
+      }
 
-        const files = Array.dedupe(forConfig.flatMap((entry) => entry.literals)).filter((file) =>
-          existing.has(file)
-        )
-        const report = yield* lintFiles(
-          folder,
-          files.map((file) =>
-            path.relative(folder, path.join(copy, file)).split(path.sep).join("/")
-          ),
-          trialConfig
-        )
+      // Oxlint runs from the root, as a project lint does, so each file gets the options of the
+      // root config and the rules of its nearest config.
+      const files = Array.dedupe(linted.flatMap((entry) => entry.literals)).filter((file) =>
+        existing.has(file)
+      )
+      const report = yield* lintFiles(copy, files)
+      const listed = new Set(
+        report.number_of_files < files.length ? yield* listLintedFiles(copy, files) : files
+      )
+      const unparsable = new Set(
+        report.diagnostics
+          .filter((diagnostic) => diagnostic.code === undefined)
+          .map((diagnostic) => diagnostic.filename)
+      )
 
-        for (const diagnostic of report.diagnostics) {
-          const file = path
-            .relative(copy, path.join(folder, diagnostic.filename))
-            .split(path.sep)
-            .join("/")
+      for (const entry of linted) {
+        for (const file of entry.literals.filter((literal) => existing.has(literal))) {
+          const breaks = report.diagnostics.some(
+            (diagnostic) =>
+              diagnostic.filename === file
+              && diagnostic.code !== undefined
+              && isReportOf(diagnostic.code, entry.rule, builtIns)
+          )
+          const mark: OverrideFileMark = listed.has(file)
+            ? unparsable.has(file)
+              ? "unparsable"
+              : breaks
+                ? "breaks"
+                : "clean"
+            : "ignored"
 
-          for (const entry of forConfig) {
-            if (diagnostic.code !== undefined && isReportOf(diagnostic.code, entry.rule)) {
-              breaks.add(`${entry.rule}\0${file}`)
-            }
-          }
+          marks.set(`${entry.rule}\0${file}`, mark)
         }
       }
     }
@@ -328,11 +336,7 @@ export const readOverrides = Effect.fn("readOverrides")(
           config: entry.config,
           files: entry.literals.map((file) => ({
             file,
-            mark: existing.has(file)
-              ? breaks.has(`${entry.rule}\0${file}`)
-                ? "breaks"
-                : "clean"
-              : "missing",
+            mark: marks.get(`${entry.rule}\0${file}`) ?? "missing",
           })),
           globs: entry.globs,
           rule: entry.rule,

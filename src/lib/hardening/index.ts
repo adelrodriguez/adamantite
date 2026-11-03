@@ -276,7 +276,9 @@ function renderSuppressions(suppressions: Option.Option<readonly RuleSuppression
 const OVERRIDE_MARKS = {
   breaks: "still breaks the rule",
   clean: "no longer breaks the rule",
+  ignored: "the config ignores it, so Oxlint did not lint it",
   missing: "does not exist",
+  unparsable: "does not parse, so Oxlint did not lint it",
 } as const
 
 function renderOverrides(report: OverridesReport) {

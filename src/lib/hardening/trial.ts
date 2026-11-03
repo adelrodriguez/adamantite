@@ -8,7 +8,7 @@ import * as Path from "effect/Path"
 import {
   isReportOf,
   lintFiles,
-  listBuiltInPlugins,
+  listBuiltInRules,
   listLintedFiles,
   splitRuleName,
 } from "#lib/hardening/oxlint.ts"
@@ -77,10 +77,11 @@ export interface TrialCaseResult {
 }
 
 /**
- * The file name of the config that a trial writes beside the config that lints the cases. It
- * imports that config, so the config keeps its own name and folder.
+ * The file name that a trial gives the config that lints the cases, in the copy. The trial config
+ * takes the name of that config, so Oxlint finds it in the same way, and it imports the config
+ * under this name.
  */
-const TRIAL_CONFIG_NAME = "oxlint.trial.config"
+const BASE_CONFIG_NAME = "oxlint.trial-base.config"
 
 /**
  * Parses a case of `rule try`: a project path, or `<path>=<file>` to lint the content of `<file>`
@@ -112,9 +113,10 @@ export function parseTrialCase(
 }
 
 /**
- * The config that a trial writes beside the config that lints the cases. An override at the end of
- * the list wins, so the trial setting replaces the setting of the project for the cases. Oxlint
- * ignores a built-in rule whose plugin the config does not turn on, so the override turns it on.
+ * The config that a trial writes in place of the config that lints the cases. An override at the
+ * end of the list wins, so the trial setting replaces the setting of the project for the cases.
+ * Oxlint ignores a built-in rule whose plugin the config does not turn on, so the override turns it
+ * on.
  */
 export function renderTrialConfig(options: {
   readonly config: string
@@ -143,6 +145,22 @@ export function renderTrialConfig(options: {
     "",
   ].join("\n")
 }
+
+/**
+ * Replaces `config` in the copy with the trial config that `render` gives for the name of the moved
+ * config. The moved config stays in its folder, so its relative imports and `custom()` calls work.
+ */
+export const replaceConfig = Effect.fn("replaceConfig")(function* (
+  config: string,
+  render: (base: string) => string
+) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const base = `${BASE_CONFIG_NAME}${path.extname(config)}`
+
+  yield* fs.rename(config, path.join(path.dirname(config), base))
+  yield* writeFile(config, render(base))
+})
 
 /**
  * The config that turns each rule on again in each override that turns it off. It removes only the
@@ -183,7 +201,8 @@ export function renderOverrideTrialConfig(options: {
  *
  * Each `node_modules` folder of the copy is a real folder with a link to each entry of the project
  * folder, except `.cache`. `custom()` writes its entry module to `node_modules/.cache`, so the
- * module stays in the copy and leaves with it.
+ * module stays in the copy and leaves with it. An entry that links to a workspace package links to
+ * the copy of the package, so a config that imports the package loads the copy.
  */
 export const makeProjectCopy = Effect.fn("makeProjectCopy")(
   function* (cwd: string) {
@@ -219,22 +238,79 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       cwd,
       ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
     ]
+    // A file of the project outside each `node_modules` folder, such as a workspace package, has a
+    // copy. A real path can differ from `cwd` in a folder link, such as `/var` on macOS.
+    const root = yield* fs.realPath(cwd)
+    const toCopy = (file: string) => {
+      const relative = path.relative(root, file)
+
+      return Option.liftPredicate(
+        path.join(copy, relative),
+        () =>
+          relative !== ""
+          && relative !== ".."
+          && !relative.startsWith(`..${path.sep}`)
+          && !path.isAbsolute(relative)
+          && !relative.split(path.sep).includes("node_modules")
+      )
+    }
+    // The packages of a `node_modules` folder, with the packages of each scope folder, such as
+    // `@acme/ui`, in place of the folder.
+    const listPackages = Effect.fnUntraced(function* (modules: string) {
+      const entries = yield* readDirectoryIfExists(modules)
+      const packages = yield* Effect.forEach(
+        Option.getOrElse(entries, () => []).filter((entry) => entry !== ".cache"),
+        Effect.fnUntraced(function* (entry) {
+          const isScope =
+            entry.startsWith("@")
+            && !(yield* fs.readLink(path.join(modules, entry)).pipe(
+              Effect.as(true),
+              Effect.orElseSucceed(() => false)
+            ))
+          const scoped = isScope
+            ? yield* readDirectoryIfExists(path.join(modules, entry))
+            : Option.none()
+
+          return Option.match(scoped, {
+            onNone: () => [entry],
+            onSome: (names) => names.map((name) => `${entry}/${name}`),
+          })
+        }),
+        { concurrency: "unbounded" }
+      )
+
+      return entries.pipe(Option.as(packages.flat()))
+    })
 
     yield* Effect.forEach(
       packages,
       Effect.fnUntraced(function* (directory) {
         const modules = path.join(directory, "node_modules")
-        const entries = yield* readDirectoryIfExists(modules)
         const target = path.join(copy, path.relative(cwd, directory), "node_modules")
+        const entries = yield* listPackages(modules)
 
         if (Option.isSome(entries)) {
           yield* fs.makeDirectory(target, { recursive: true })
-          yield* Effect.forEach(
-            entries.value.filter((entry) => entry !== ".cache"),
-            (entry) => fs.symlink(path.join(modules, entry), path.join(target, entry)),
-            { discard: true }
-          )
         }
+
+        yield* Effect.forEach(
+          Option.getOrElse(entries, () => []),
+          Effect.fnUntraced(function* (entry) {
+            const source = path.join(modules, entry)
+            // A broken link has no real path, so the copy links to the same missing file.
+            const resolved = yield* fs.realPath(source).pipe(Effect.option)
+
+            yield* fs.makeDirectory(path.dirname(path.join(target, entry)), { recursive: true })
+            yield* fs.symlink(
+              resolved.pipe(
+                Option.flatMap((file) => toCopy(file)),
+                Option.getOrElse(() => source)
+              ),
+              path.join(target, entry)
+            )
+          }),
+          { discard: true }
+        )
       }),
       { discard: true }
     )
@@ -305,13 +381,9 @@ export const tryRule = Effect.fn("tryRule")(
     const path = yield* Path.Path
     const { cases, cwd, rule, setting } = options
     const { name: ruleName, plugin } = splitRuleName(rule)
-    const builtInPlugins = yield* fs
-      .makeTempDirectoryScoped({ prefix: "adamantite-rules-" })
-      .pipe(Effect.flatMap((folder) => listBuiltInPlugins(folder, cwd)))
+    const builtIns = yield* listBuiltInRules(cwd)
     const copy = yield* makeProjectCopy(cwd)
     const toProjectPath = (file: string) => path.relative(copy, file).split(path.sep).join("/")
-    const getTrialConfig = (config: string) =>
-      setting._tag === "Error" ? `${TRIAL_CONFIG_NAME}${path.extname(config)}` : undefined
     // Oxlint fails to load a config with a rule or a plugin that does not exist. Only a trial
     // config can add a rule that the project config does not have.
     const toRuleNotFound = (error: CliNotFound | TrialLintFailed) => {
@@ -347,8 +419,8 @@ export const tryRule = Effect.fn("tryRule")(
         return {
           case: trialCase,
           config: config.value,
-          // Oxlint prints the path of each file relative to the folder that it runs in.
-          file: path
+          // The `files` of an override are relative to the folder of its config.
+          configFile: path
             .relative(path.dirname(config.value), path.join(copy, trialCase.path))
             .split(path.sep)
             .join("/"),
@@ -359,16 +431,15 @@ export const tryRule = Effect.fn("tryRule")(
 
     if (setting._tag === "Error") {
       for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
-        yield* writeFile(
-          path.join(path.dirname(config), `${TRIAL_CONFIG_NAME}${path.extname(config)}`),
+        yield* replaceConfig(config, (base) =>
           renderTrialConfig({
-            config: path.basename(config),
+            config: base,
             files: Array.dedupe(
-              linted.filter((entry) => entry.config === config).map((entry) => entry.file)
+              linted.filter((entry) => entry.config === config).map((entry) => entry.configFile)
             ),
             plugin: Option.liftPredicate(
               plugin,
-              (name) => name !== "eslint" && builtInPlugins.has(name)
+              (name) => name !== "eslint" && builtIns.plugins.has(name)
             ),
             rule,
             settingOptions: setting.options,
@@ -400,26 +471,21 @@ export const tryRule = Effect.fn("tryRule")(
         yield* writeFile(target, yield* readFile(source))
       }
 
-      const diagnostics = yield* Effect.forEach(
-        Array.dedupe(round.map((entry) => entry.config)),
-        Effect.fnUntraced(function* (config) {
-          const folder = path.dirname(config)
-          const files = round.filter((entry) => entry.config === config).map((entry) => entry.file)
-          const report = yield* lintFiles(folder, files, getTrialConfig(config)).pipe(
-            Effect.mapError((error) => toRuleNotFound(error))
-          )
-
-          if (report.number_of_files < files.length) {
-            const listed = new Set(yield* listLintedFiles(folder, files, getTrialConfig(config)))
-            const ignored = files.find((file) => !listed.has(file)) ?? files[0] ?? ""
-
-            return yield* new TrialCaseIgnored({ path: toProjectPath(path.join(folder, ignored)) })
-          }
-
-          return { config, diagnostics: report.diagnostics }
-        }),
-        { concurrency: 1 }
+      // Oxlint runs from the root, as a project lint does, so the root config gives the options
+      // that only a root config can set, such as `typeAware`, and the nearest config gives the
+      // rules of each case.
+      const files = round.map((entry) => entry.case.path)
+      const report = yield* lintFiles(copy, files).pipe(
+        Effect.mapError((error) => toRuleNotFound(error))
       )
+
+      if (report.number_of_files < files.length) {
+        const listed = new Set(yield* listLintedFiles(copy, files))
+
+        return yield* new TrialCaseIgnored({
+          path: files.find((file) => !listed.has(file)) ?? files[0] ?? "",
+        })
+      }
 
       yield* Effect.forEach(
         placed,
@@ -432,10 +498,9 @@ export const tryRule = Effect.fn("tryRule")(
       )
 
       for (const entry of round) {
-        const reports = diagnostics
-          .filter((report) => report.config === entry.config)
-          .flatMap((report) => report.diagnostics)
-          .filter((diagnostic) => diagnostic.filename === entry.file)
+        const reports = report.diagnostics.filter(
+          (diagnostic) => diagnostic.filename === entry.case.path
+        )
         const parseErrors = reports.filter((diagnostic) => diagnostic.code === undefined)
 
         if (parseErrors.length > 0) {
@@ -450,7 +515,8 @@ export const tryRule = Effect.fn("tryRule")(
           config: toProjectPath(entry.config),
           diagnostics: reports
             .filter(
-              (diagnostic) => diagnostic.code !== undefined && isReportOf(diagnostic.code, rule)
+              (diagnostic) =>
+                diagnostic.code !== undefined && isReportOf(diagnostic.code, rule, builtIns)
             )
             .map((diagnostic) => ({
               column: diagnostic.labels[0]?.span.column ?? 1,

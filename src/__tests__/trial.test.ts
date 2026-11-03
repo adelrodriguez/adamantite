@@ -43,6 +43,32 @@ const NO_DEBUGGER_RULE = [
   "",
 ].join("\n")
 
+const SILENT_RULE = [
+  `import { defineRule } from ${JSON.stringify(RULES_MODULE)}`,
+  "",
+  "export default defineRule({",
+  '  meta: { messages: { unexpected: "No console here." }, type: "problem" },',
+  "  createOnce() {",
+  "    return {}",
+  "  },",
+  "})",
+  "",
+].join("\n")
+
+// A workspace package that loads its own rules, and a root config that imports it by name.
+const WORKSPACE_FILES = {
+  "oxlint.config.ts":
+    'import { defineConfig } from "oxlint"\nimport tooling from "tooling"\n\nexport default defineConfig({ extends: [tooling] })\n',
+  "package.json": JSON.stringify({ name: "app", type: "module", workspaces: ["packages/*"] }),
+  "packages/tooling/.adamantite/rules/no-debugger-here.ts": NO_DEBUGGER_RULE,
+  "packages/tooling/index.ts": `import custom from ${JSON.stringify(CUSTOM_PRESET)}\n\nexport default custom()\n`,
+  "packages/tooling/package.json": JSON.stringify({
+    exports: "./index.ts",
+    name: "tooling",
+    type: "module",
+  }),
+}
+
 const EFFECT_CONFIG = [
   'import { defineConfig } from "oxlint"',
   `import effect from ${JSON.stringify(join(REPO_ROOT, "presets/lint/effect.ts"))}`,
@@ -212,6 +238,79 @@ describe("rule trials in a real project", () => {
     })
   )
 
+  it.live("load a workspace package of the config from the copy", () =>
+    Effect.gen(function* () {
+      for (const [file, content] of Object.entries(WORKSPACE_FILES)) {
+        write(file, content)
+      }
+
+      symlinkSync("../packages/tooling", join(project, "node_modules/tooling"))
+
+      const before = listProject()
+      const results = yield* runTrial("project/no-debugger-here", { _tag: "Current" }, [
+        makeCase("src/legacy.ts", "reported"),
+      ])
+
+      expect(getReportCounts(results)).toStrictEqual([1])
+      // `custom()` in the package writes its entry module to the copy, not to the project.
+      expect(listProject()).toStrictEqual(before)
+    })
+  )
+
+  it.live("count only the reports of the plugin of the rule", () =>
+    Effect.gen(function* () {
+      write(".adamantite/rules/no-console.ts", SILENT_RULE)
+      write(
+        "oxlint.config.ts",
+        makeConfig('{ extends: [custom()], rules: { "no-console": "error" } }')
+      )
+
+      const results = yield* runTrial("project/no-console", { _tag: "Current" }, [
+        makeCase("src/log.ts", "reported", writeCase("log.ts", "console.log(1)\n")),
+      ])
+
+      expect(getReportCounts(results)).toStrictEqual([0])
+    })
+  )
+
+  it.live.each([
+    { name: "the project setting", setting: { _tag: "Current" } },
+    { name: "a trial setting", setting: { _tag: "Error", options: [] } },
+  ] satisfies ReadonlyArray<{ name: string; setting: TrialSetting }>)(
+    "keep the root options for a case under a nested config, with $name",
+    ({ setting }) =>
+      Effect.gen(function* () {
+        // Oxlint starts the type-aware backend from `node_modules/.bin`.
+        mkdirSync(join(project, "node_modules/.bin"))
+
+        for (const name of ["oxlint-tsgolint", ".bin/tsgolint"]) {
+          symlinkSync(join(REPO_ROOT, "node_modules", name), join(project, "node_modules", name))
+        }
+
+        write(
+          "tsconfig.json",
+          '{ "compilerOptions": { "strict": true }, "include": ["**/*.ts"] }\n'
+        )
+        write("oxlint.config.ts", makeConfig("{ options: { typeAware: true } }"))
+        write(
+          "packages/web/oxlint.config.ts",
+          makeConfig(
+            '{ plugins: ["typescript"], rules: { "typescript/no-floating-promises": "error" } }'
+          )
+        )
+
+        const results = yield* runTrial("typescript/no-floating-promises", setting, [
+          makeCase(
+            "packages/web/src/a.ts",
+            "reported",
+            writeCase("floating.ts", "Promise.resolve(1)\nexport {}\n")
+          ),
+        ])
+
+        expect(getReportCounts(results)).toStrictEqual([1])
+      })
+  )
+
   it.live.each([
     {
       error: "TrialRuleNotFound",
@@ -274,6 +373,38 @@ describe("rule trials in a real project", () => {
         ],
       })
       expect(listProject()).toStrictEqual(before)
+    })
+  )
+
+  it.live("mark the files of an override that the config ignores or that do not parse", () =>
+    Effect.gen(function* () {
+      write(
+        "oxlint.config.ts",
+        makeConfig(
+          '{ extends: [custom()], ignorePatterns: ["src/generated/**"], overrides: [{ files: ["src/generated/old.ts", "src/broken.ts"], rules: { "project/no-debugger-here": "off" } }] }'
+        )
+      )
+      write("src/generated/old.ts", "export function stop() {\n  debugger\n}\n")
+      write("src/broken.ts", "export const = ;\n")
+
+      const report = yield* readOverrides(project, ["oxlint.config.ts"], null).pipe(
+        Effect.provide(TEST_LAYER)
+      )
+
+      expect(report).toStrictEqual({
+        _tag: "Linted",
+        rules: [
+          {
+            config: "oxlint.config.ts",
+            files: [
+              { file: "src/generated/old.ts", mark: "ignored" },
+              { file: "src/broken.ts", mark: "unparsable" },
+            ],
+            globs: [],
+            rule: "project/no-debugger-here",
+          },
+        ],
+      })
     })
   )
 })

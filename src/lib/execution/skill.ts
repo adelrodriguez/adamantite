@@ -82,8 +82,10 @@ export const installSkill = Effect.fn("installSkill")(function* (
  */
 export const findStaleSkillAgents = Effect.fn("findStaleSkillAgents")(function* (cwd: string) {
   const path = yield* Path.Path
-  const lock = yield* readFileIfExists(path.join(cwd, "skills-lock.json"))
-  const shipped = yield* readShippedSkill(cwd)
+  const [lock, shipped] = yield* Effect.all(
+    [readFileIfExists(path.join(cwd, "skills-lock.json")), readShippedSkill(cwd)],
+    { concurrency: "unbounded" }
+  )
 
   if (Option.isNone(lock) || Option.isNone(shipped)) {
     return []

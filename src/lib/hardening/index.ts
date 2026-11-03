@@ -14,7 +14,7 @@ import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" 
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
-import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
+import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
@@ -124,31 +124,85 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
       fromFolder !== ".." && !fromFolder.startsWith(`..${path.sep}`) && !path.isAbsolute(fromFolder)
     )
   }
-  const packageDirectories = [
-    cwd,
-    ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
-  ]
-  const packagesInScope = packageDirectories.filter((directory) => contains(scope, directory))
-  // The innermost package that contains the scope, when the scope holds no package of its own.
-  const owner = Array.sort(
-    packageDirectories.filter((directory) => contains(directory, scope)),
-    Order.mapInput(Order.flip(Order.Number), (directory: string) => directory.length)
-  ).slice(0, 1)
-  const selectedPackages = packagesInScope.length > 0 ? packagesInScope : owner
-  const { calls, configs, unresolvedCalls } = yield* discoverCustomRules(
-    packageDirectories,
-    selectedPackages
-  )
-  // The root instructions apply to every package, so a scope keeps them.
-  const instructionCandidates = [...new Set([cwd, ...selectedPackages])].map((directory) =>
-    path.join(directory, AGENTS_FILE)
-  )
-  // `forEach` keeps the order of the candidates, which `Effect.filter` loses under concurrency.
-  const exists = yield* Effect.forEach(
-    instructionCandidates,
-    (file) => fs.exists(file).pipe(Effect.orElseSucceed(() => false)),
-    { concurrency: "unbounded" }
-  )
+  const readPackages = Effect.gen(function* () {
+    const packageDirectories = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
+    const packagesInScope = packageDirectories.filter((directory) => contains(scope, directory))
+    // The innermost package that contains the scope, when the scope holds no package of its own.
+    const owner = Array.sort(
+      packageDirectories.filter((directory) => contains(directory, scope)),
+      Order.mapInput(Order.flip(Order.Number), (directory: string) => directory.length)
+    ).slice(0, 1)
+    const selectedPackages = packagesInScope.length > 0 ? packagesInScope : owner
+    // The root instructions apply to every package, so a scope keeps them.
+    const instructionCandidates = [...new Set([cwd, ...selectedPackages])].map((directory) =>
+      path.join(directory, AGENTS_FILE)
+    )
+    const [discovery, exists] = yield* Effect.all(
+      [
+        discoverCustomRules(packageDirectories, selectedPackages),
+        // `forEach` keeps the order of the candidates, which `Effect.filter` loses under concurrency.
+        Effect.forEach(
+          instructionCandidates,
+          (file) => fs.exists(file).pipe(Effect.orElseSucceed(() => false)),
+          { concurrency: "unbounded" }
+        ),
+      ],
+      { concurrency: "unbounded" }
+    )
+
+    return {
+      discovery,
+      instructionFiles: instructionCandidates.filter((_, index) => exists[index]),
+      packageDirectories,
+      selectedPackages,
+    }
+  })
+  // A root file can link to the files of each package, so the reach reads the whole project. It
+  // starts from the `AGENTS.md` files that an agent in the scope reads: the ones in the folders
+  // above the scope, and the ones inside it, but not the ones of a sibling package.
+  const isReadInScope = (file: string) => {
+    const folder = path.dirname(path.join(cwd, file))
+
+    return contains(folder, scope) || contains(scope, folder)
+  }
+  const readDocumentation = Effect.gen(function* () {
+    // The git index also has the files that a delete or a sparse checkout left out of the working
+    // tree, and the agent cannot read those.
+    const markdownFiles = yield* Effect.transposeOption(
+      (yield* listMarkdownFiles(cwd)).pipe(
+        Option.map((files) =>
+          Effect.forEach(
+            files.filter((file) => isDocumentation(file)),
+            (file) =>
+              fs.exists(path.join(cwd, file)).pipe(
+                Effect.orElseSucceed(() => false),
+                Effect.map((exists) => (exists ? [file] : []))
+              ),
+            { concurrency: "unbounded" }
+          ).pipe(Effect.map((files) => files.flat()))
+        )
+      )
+    )
+    const agentReach = yield* Effect.transposeOption(
+      markdownFiles.pipe(
+        Option.map((files) =>
+          readAgentReach(
+            cwd,
+            files,
+            files.filter((file) => path.basename(file) === AGENTS_FILE && isReadInScope(file))
+          )
+        )
+      )
+    )
+
+    return { agentReach, markdownFiles }
+  })
+  // Git lists the Markdown files while discovery reads the workspace packages.
+  const [
+    { discovery, instructionFiles, packageDirectories, selectedPackages },
+    { agentReach, markdownFiles },
+  ] = yield* Effect.all([readPackages, readDocumentation], { concurrency: "unbounded" })
+  const { calls, configs, unresolvedCalls } = discovery
 
   // The innermost package that contains the file owns it.
   const isSelected = (file: string) => {
@@ -160,42 +214,6 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     return innermost === cwd || selectedPackages.includes(innermost)
   }
   const isSelectedFile = (file: string) => isSelected(path.join(cwd, file))
-  // The git index also has the files that a delete or a sparse checkout left out of the working
-  // tree, and the agent cannot read those.
-  const markdownFiles = yield* Effect.transposeOption(
-    (yield* listMarkdownFiles(cwd)).pipe(
-      Option.map((files) =>
-        Effect.forEach(
-          files.filter((file) => isDocumentation(file)),
-          (file) =>
-            fs.exists(path.join(cwd, file)).pipe(
-              Effect.orElseSucceed(() => false),
-              Effect.map((exists) => (exists ? [file] : []))
-            ),
-          { concurrency: "unbounded" }
-        ).pipe(Effect.map((files) => files.flat()))
-      )
-    )
-  )
-  // A root file can link to the files of each package, so the reach reads the whole project. It
-  // starts from the `AGENTS.md` files that an agent in the scope reads: the ones in the folders
-  // above the scope, and the ones inside it, but not the ones of a sibling package.
-  const isReadInScope = (file: string) => {
-    const folder = path.dirname(path.join(cwd, file))
-
-    return contains(folder, scope) || contains(scope, folder)
-  }
-  const agentReach = yield* Effect.transposeOption(
-    markdownFiles.pipe(
-      Option.map((files) =>
-        readAgentReach(
-          cwd,
-          files,
-          files.filter((file) => path.basename(file) === AGENTS_FILE && isReadInScope(file))
-        )
-      )
-    )
-  )
 
   return {
     agentReach: agentReach.pipe(
@@ -208,9 +226,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     documentationFiles: markdownFiles.pipe(
       Option.map((files) => files.filter((file) => isSelectedFile(file)))
     ),
-    instructionFiles: instructionCandidates
-      .filter((_, index) => exists[index])
-      .map((file) => relative(file)),
+    instructionFiles: instructionFiles.map((file) => relative(file)),
     rulesFolders: [...new Set(calls.map((call) => relative(call.dir)))],
     scope: scope === cwd ? null : relative(scope),
     unresolvedCalls: [...new Set(unresolvedCalls.map((source) => relative(source)))],

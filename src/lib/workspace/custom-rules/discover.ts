@@ -1,5 +1,6 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
@@ -59,18 +60,23 @@ const readPackageName = Effect.fn("readPackageName")(function* (directory: strin
  * The first candidate file that exists, with its content.
  */
 const readFirstFile = Effect.fn("readFirstFile")(function* (candidates: readonly string[]) {
-  for (const candidate of candidates) {
-    const content = yield* readFileIfExists(candidate).pipe(
-      // A directory cannot be read as a file.
-      Effect.orElseSucceed(() => Option.none<string>())
-    )
+  const modules = yield* Effect.forEach(
+    candidates,
+    (candidate) =>
+      readFileIfExists(candidate).pipe(
+        Effect.map((content: Option.Option<string>) =>
+          pipe(
+            content,
+            Option.map((value): SourceModule => ({ content: value, file: candidate }))
+          )
+        ),
+        // A directory cannot be read as a file.
+        Effect.orElseSucceed(() => Option.none<SourceModule>())
+      ),
+    { concurrency: "unbounded" }
+  )
 
-    if (Option.isSome(content)) {
-      return Option.some({ content: content.value, file: candidate })
-    }
-  }
-
-  return Option.none<SourceModule>()
+  return Array.head(Array.getSomes(modules))
 })
 
 /**
@@ -125,20 +131,21 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
 
   // Doctor and harden traverse again after a coding agent changes the project.
   yield* (yield* ModuleResolver).clearCache
-  const packageNames = new Set(
-    Array.getSomes(
-      yield* Effect.forEach(packageDirectories, (directory) => readPackageName(directory), {
+  const [names, configsByPackage] = yield* Effect.all(
+    [
+      Effect.forEach(packageDirectories, (directory) => readPackageName(directory), {
         concurrency: "unbounded",
-      })
-    )
+      }),
+      Effect.forEach(
+        packageDirectories,
+        (directory) => readFirstFile(CONFIG_FILES.map((file) => path.join(directory, file))),
+        { concurrency: "unbounded" }
+      ),
+    ],
+    { concurrency: "unbounded" }
   )
-  const packageConfigs = Array.getSomes(
-    yield* Effect.forEach(
-      packageDirectories,
-      (directory) => readFirstFile(CONFIG_FILES.map((file) => path.join(directory, file))),
-      { concurrency: "unbounded" }
-    )
-  )
+  const packageNames = new Set(Array.getSomes(names))
+  const packageConfigs = Array.getSomes(configsByPackage)
   const nearestConfigs = new Set(
     lintedDirectories.flatMap((directory) =>
       Array.sort(

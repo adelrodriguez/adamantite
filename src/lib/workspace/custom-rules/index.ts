@@ -12,7 +12,7 @@ import {
   getStubTemplate,
   getTestStubTemplate,
 } from "#lib/workspace/custom-rules/stub.macro.ts" with { type: "macro" }
-import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
+import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 const stubTemplate = getStubTemplate()
 const testStubTemplate = getTestStubTemplate()
@@ -87,10 +87,7 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
  */
 export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (cwd: string) {
   const path = yield* Path.Path
-  const packageDirectories = [
-    cwd,
-    ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
-  ]
+  const packageDirectories = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
   const { calls, unresolvedCalls, unresolvedImports } =
     yield* discoverCustomRules(packageDirectories)
   const testDirectories = Array.dedupe(

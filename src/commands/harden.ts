@@ -190,8 +190,17 @@ export default Command.make("harden", { commits, scope }).pipe(
           },
         ])
       )
-      // The Doctor warnings below already name the rules folders that discovery cannot follow.
-      const { command: ruleTestCommand } = yield* readCustomRuleTestCommand(cwd)
+      // These reads change no file, so they run together. The Doctor warnings below already name
+      // the rules folders that discovery cannot follow.
+      const [{ command: ruleTestCommand }, assessment, { agentReach: reachAfter }] =
+        yield* Effect.all(
+          [
+            readCustomRuleTestCommand(cwd),
+            assessProject(cwd),
+            readHardenContext(cwd, scopeDirectory),
+          ],
+          { concurrency: "unbounded" }
+        )
       // `rule test` passes when the project has no rule tests.
       const ruleTestPassed = Option.isNone(ruleTestCommand)
         ? true
@@ -202,7 +211,6 @@ export default Command.make("harden", { commits, scope }).pipe(
               )
             )
           )
-      const assessment = yield* assessProject(cwd)
       // A link that was broken before the session is a gap that the user may not have approved, so
       // only a link that the session added fails the verification.
       const brokenBefore = new Set(
@@ -211,7 +219,6 @@ export default Command.make("harden", { commits, scope }).pipe(
           onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
         })
       )
-      const reachAfter = (yield* readHardenContext(cwd, scopeDirectory)).agentReach
       const addedBrokenLinks = Option.match(reachAfter, {
         onNone: () => [],
         onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),

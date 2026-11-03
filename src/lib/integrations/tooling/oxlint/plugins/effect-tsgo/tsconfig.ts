@@ -4,7 +4,13 @@ import * as Path from "effect/Path"
 import type { Finding } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
-import { checkIsJsonArray, checkIsJsonObject, parseJson, updateJsonText } from "#lib/shared/json.ts"
+import {
+  checkIsJsonArray,
+  checkIsJsonObject,
+  parseJson,
+  stringifyJson,
+  updateJsonText,
+} from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 const TSCONFIG_FILE = "tsconfig.json"
@@ -39,7 +45,7 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
     return {
       findings: [],
       warnings: [
-        `Skipping the root \`${TSCONFIG_FILE}\` check for \`${integration}\`: in a monorepo, add \`${JSON.stringify(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\` in each package's \`${TSCONFIG_FILE}\` or in a shared base config.`,
+        `Skipping the root \`${TSCONFIG_FILE}\` check for \`${integration}\`: in a monorepo, add \`${yield* stringifyJson(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\` in each package's \`${TSCONFIG_FILE}\` or in a shared base config.`,
       ],
     }
   }
@@ -68,7 +74,7 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
         ? `\`${TSCONFIG_FILE}\` does not configure the \`${LANGUAGE_SERVICE}\` plugin.`
         : `The \`${LANGUAGE_SERVICE}\` plugin in \`${TSCONFIG_FILE}\` reports its own diagnostics, so \`tsc\` and the editor repeat every Oxlint report.`,
     goal: [
-      `Add \`${JSON.stringify(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\` in \`${TSCONFIG_FILE}\`, or set \`diagnostics\` to \`false\` in the existing entry. Keep every other plugin and option.`,
+      `Add \`${yield* stringifyJson(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\` in \`${TSCONFIG_FILE}\`, or set \`diagnostics\` to \`false\` in the existing entry. Keep every other plugin and option.`,
     ],
     id: "missing-effect-language-service-plugin",
     integration,

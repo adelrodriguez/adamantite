@@ -4,6 +4,7 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { updateTsconfigPlugin } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/tsconfig.ts"
+import { parseJson, stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
@@ -23,7 +24,7 @@ describe("tsconfig", () => {
     it.effect("append the entry and keep other plugins and options", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "tsconfig.json": JSON.stringify({
+          "tsconfig.json": yield* stringifyJson({
             compilerOptions: { plugins: [{ name: "other" }], strict: true },
             extends: "adamantite/typescript",
           }),
@@ -32,7 +33,7 @@ describe("tsconfig", () => {
         const result = yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
 
         expect(result).toBe("updated")
-        expect(JSON.parse(files.read("tsconfig.json"))).toStrictEqual({
+        expect(yield* parseJson(files.read("tsconfig.json"))).toStrictEqual({
           compilerOptions: {
             plugins: [{ name: "other" }, { diagnostics: false, name: "@effect/language-service" }],
             strict: true,
@@ -45,7 +46,7 @@ describe("tsconfig", () => {
     it.effect("turn off diagnostics in an existing entry and keep its options", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "tsconfig.json": JSON.stringify({
+          "tsconfig.json": yield* stringifyJson({
             compilerOptions: {
               plugins: [{ allowedUnstableApis: ["effect/cli"], name: "@effect/language-service" }],
             },
@@ -54,7 +55,7 @@ describe("tsconfig", () => {
 
         yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
 
-        expect(JSON.parse(files.read("tsconfig.json"))).toStrictEqual({
+        expect(yield* parseJson(files.read("tsconfig.json"))).toStrictEqual({
           compilerOptions: {
             plugins: [
               {
@@ -113,7 +114,7 @@ describe("tsconfig", () => {
     it.effect("fail on plugins that are not an array", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "tsconfig.json": JSON.stringify({ compilerOptions: { plugins: {} } }),
+          "tsconfig.json": yield* stringifyJson({ compilerOptions: { plugins: {} } }),
         })
 
         const result = yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files), Effect.result)

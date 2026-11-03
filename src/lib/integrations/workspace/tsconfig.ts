@@ -7,7 +7,7 @@ import * as Predicate from "effect/Predicate"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
+import { formatJson, mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
@@ -69,7 +69,7 @@ export default defineIntegration({
               id: "missing-tsconfig",
               integration: "tsconfig",
               reference: {
-                content: `${JSON.stringify(CONFIG, null, 2)}\n`,
+                content: `${yield* formatJson(CONFIG)}\n`,
                 language: "json",
               },
               title: "Missing TypeScript configuration",
@@ -99,7 +99,7 @@ export default defineIntegration({
                 id: "missing-adamantite-tsconfig-extends",
                 integration: "tsconfig",
                 reference: {
-                  content: `${JSON.stringify(CONFIG, null, 2)}\n`,
+                  content: `${yield* formatJson(CONFIG)}\n`,
                   language: "json",
                 },
                 title: "TypeScript preset is not configured",

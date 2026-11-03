@@ -4,6 +4,7 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import prepareCommand from "#commands/prepare.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import {
   createPrompterTestContext,
   createRunnerTestContext,
@@ -20,7 +21,7 @@ describe("prepare", () => {
         files: createFileSystemTestContext({
           files: {
             "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
-            "package.json": JSON.stringify({
+            "package.json": yield* stringifyJson({
               name: "test-project",
               scripts: { check: "adamantite check", prepare: "adamantite prepare" },
             }),

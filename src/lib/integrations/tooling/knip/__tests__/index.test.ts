@@ -5,6 +5,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
+import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
@@ -29,7 +30,7 @@ describe("knip", () => {
     it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             devDependencies: { knip: knip.version },
             name: "test-project",
             scripts: { analyze: "adamantite analyze" },
@@ -51,7 +52,7 @@ describe("knip", () => {
     it.effect("create a monorepo config that assess accepts", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             devDependencies: { knip: knip.version },
             name: "test-project",
             scripts: { analyze: "adamantite analyze" },
@@ -76,17 +77,13 @@ describe("knip", () => {
     it.effect("report not applicable when the managed analyze script is absent", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                knip: knip.version,
-              },
-              name: "test-project",
-              version: "1.0.0",
+          "package.json": yield* formatJson({
+            devDependencies: {
+              knip: knip.version,
             },
-            null,
-            2
-          ),
+            name: "test-project",
+            version: "1.0.0",
+          }),
         })
 
         const result = yield* runAssess(files)
@@ -101,7 +98,7 @@ describe("knip", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           "knip.config.ts": toKnipTsConfigContent(),
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
             workspaces: ["packages/*"],
@@ -126,7 +123,7 @@ describe("knip", () => {
             "const config: KnipConfig = analyze",
             'const config: KnipConfig = { ...analyze, ignoreDependencies: ["@internal/*"], ignoreBinaries: ["sherif"] }'
           ),
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
             workspaces: ["packages/*"],
@@ -167,7 +164,7 @@ describe("knip", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           "knip.config.ts": config,
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
             workspaces: ["packages/*"],
@@ -187,7 +184,7 @@ describe("knip", () => {
             isMonorepo: true,
             usesEffectPreset: false,
           }).replace("import analyze, { ignoreDependencies } from", "import analyze from"),
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
             workspaces: ["packages/*"],
@@ -206,7 +203,7 @@ describe("knip", () => {
       "require the effect ignore list when oxlint.config.ts imports the effect preset",
       () =>
         Effect.gen(function* () {
-          const packageJson = JSON.stringify({
+          const packageJson = yield* stringifyJson({
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
           })
@@ -241,7 +238,7 @@ describe("knip", () => {
 
     it.effect("require both ignore lists in a monorepo that uses the effect preset", () =>
       Effect.gen(function* () {
-        const packageJson = JSON.stringify({
+        const packageJson = yield* stringifyJson({
           devDependencies: { knip: knip.version },
           scripts: { analyze: "adamantite analyze" },
           workspaces: ["packages/*"],
@@ -277,21 +274,17 @@ describe("knip", () => {
     it.effect("report a finding when a legacy config is active", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "knip.json": JSON.stringify({ entry: ["src/index.ts"] }, null, 2),
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                knip: knip.version,
-              },
-              name: "test-project",
-              scripts: {
-                analyze: "adamantite analyze",
-              },
-              version: "1.0.0",
+          "knip.json": yield* formatJson({ entry: ["src/index.ts"] }),
+          "package.json": yield* formatJson({
+            devDependencies: {
+              knip: knip.version,
             },
-            null,
-            2
-          ),
+            name: "test-project",
+            scripts: {
+              analyze: "adamantite analyze",
+            },
+            version: "1.0.0",
+          }),
         })
 
         const result = yield* runAssess(files)

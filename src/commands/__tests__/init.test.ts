@@ -18,6 +18,7 @@ import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
+import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/workspace/agents.ts"
 import {
@@ -368,7 +369,10 @@ describe("init", () => {
     it.effect("keep an existing prepare script, and warn about the missing tsconfig.json", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
-          "package.json": JSON.stringify({ name: "test-project", scripts: { prepare: "husky" } }),
+          "package.json": yield* stringifyJson({
+            name: "test-project",
+            scripts: { prepare: "husky" },
+          }),
         })
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
@@ -553,19 +557,15 @@ describe("init", () => {
           "",
         ].join("\n")
         const files = createInitTestContext({
-          ".vscode/settings.json": JSON.stringify({ "editor.tabSize": 4 }, null, 2),
+          ".vscode/settings.json": yield* formatJson({ "editor.tabSize": 4 }),
           "oxfmt.config.ts": originalOxfmtConfig,
-          "tsconfig.json": JSON.stringify(
-            {
-              compilerOptions: {
-                paths: {
-                  "@/*": ["src/*"],
-                },
+          "tsconfig.json": yield* formatJson({
+            compilerOptions: {
+              paths: {
+                "@/*": ["src/*"],
               },
             },
-            null,
-            2
-          ),
+          }),
         })
 
         const prompter = createPrompterTestContext({
@@ -639,7 +639,7 @@ describe("init", () => {
       (field) =>
         Effect.gen(function* () {
           const files = createInitTestContext({
-            "package.json": JSON.stringify({
+            "package.json": yield* stringifyJson({
               [field]: { adamantite: "file:../adamantite.tgz" },
               name: "test-project",
               version: "1.0.0",
@@ -919,15 +919,11 @@ describe("init", () => {
     it.effect("replace conflicting scripts when overwriting is confirmed interactively", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
-          "package.json": JSON.stringify(
-            {
-              name: "test-project",
-              scripts: { check: "tsc && eslint ." },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
+          "package.json": yield* formatJson({
+            name: "test-project",
+            scripts: { check: "tsc && eslint ." },
+            version: "1.0.0",
+          }),
         })
 
         const prompter = createPrompterTestContext({
@@ -958,15 +954,11 @@ describe("init", () => {
     it.effect("preserve conflicting scripts when overwriting is declined interactively", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
-          "package.json": JSON.stringify(
-            {
-              name: "test-project",
-              scripts: { check: "tsc && eslint ." },
-              version: "1.0.0",
-            },
-            null,
-            2
-          ),
+          "package.json": yield* formatJson({
+            name: "test-project",
+            scripts: { check: "tsc && eslint ." },
+            version: "1.0.0",
+          }),
         })
 
         const prompter = createPrompterTestContext({
@@ -996,15 +988,11 @@ describe("init", () => {
       () =>
         Effect.gen(function* () {
           const files = createInitTestContext({
-            "package.json": JSON.stringify(
-              {
-                name: "test-project",
-                scripts: { check: "adamantite check" },
-                version: "1.0.0",
-              },
-              null,
-              2
-            ),
+            "package.json": yield* formatJson({
+              name: "test-project",
+              scripts: { check: "adamantite check" },
+              version: "1.0.0",
+            }),
           })
 
           // Only the typescript, CI, and agents confirms should fire; an overwrite
@@ -1278,7 +1266,7 @@ describe("init", () => {
         const files = createInitTestContext({
           "knip.config.ts":
             'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = { entry: ["src/index.ts"] }\n\nexport default config\n',
-          "knip.json": JSON.stringify({ entry: ["src/main.ts"] }, null, 2),
+          "knip.json": yield* formatJson({ entry: ["src/main.ts"] }),
         })
 
         const prompter = createPrompterTestContext({

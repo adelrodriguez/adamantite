@@ -47,8 +47,6 @@ const EXCLUDED_RULES = new Set([
   "prefer-schema-tagged-error",
   "type-union-to-schema-union",
   "yield-in-call-argument",
-  // It reports `JSON.stringify` of plain data, which cannot fail.
-  "global-json-in-effect",
   // `Effect.Service` exists only in Effect v3.
   "missing-effect-service-dependency",
 ])

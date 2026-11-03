@@ -7,6 +7,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
+import { formatJson, parseJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
@@ -73,11 +74,10 @@ describe("vscode", () => {
         const exists = yield* vscode.detect(ROOT).pipe(provideFiles(files))
         expect(exists).toBe(true)
 
-        const config = JSON.parse(files.read(".vscode/settings.json"))
+        const config = yield* parseJson(files.read(".vscode/settings.json"))
 
-        expect(config).toHaveProperty(["editor.formatOnSave"])
-        expect(config["editor.formatOnSave"]).toBe(true)
-        expect(config["oxc.path.oxlint"]).toBe("node_modules/adamantite/dist/oxlint.js")
+        expect(config).toHaveProperty(["editor.formatOnSave"], true)
+        expect(config).toHaveProperty(["oxc.path.oxlint"], "node_modules/adamantite/dist/oxlint.js")
       })
     )
   })
@@ -86,33 +86,29 @@ describe("vscode", () => {
     it.effect("update an existing .vscode/settings.json config", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          ".vscode/settings.json": JSON.stringify(
-            {
-              "editor.tabSize": 4,
-              "files.autoSave": "afterDelay",
-            },
-            null,
-            2
-          ),
+          ".vscode/settings.json": yield* formatJson({
+            "editor.tabSize": 4,
+            "files.autoSave": "afterDelay",
+          }),
         })
 
         const existsBefore = yield* vscode.detect(ROOT).pipe(provideFiles(files))
         expect(existsBefore).toBe(true)
         yield* vscode.update(ROOT).pipe(provideFiles(files))
 
-        const config = JSON.parse(files.read(".vscode/settings.json"))
+        const config = yield* parseJson(files.read(".vscode/settings.json"))
 
-        expect(config["editor.tabSize"]).toBe(4)
-        expect(config["files.autoSave"]).toBe("afterDelay")
-        expect(config["editor.formatOnSave"]).toBe(true)
-        expect(config["editor.formatOnPaste"]).toBe(true)
+        expect(config).toHaveProperty(["editor.tabSize"], 4)
+        expect(config).toHaveProperty(["files.autoSave"], "afterDelay")
+        expect(config).toHaveProperty(["editor.formatOnSave"], true)
+        expect(config).toHaveProperty(["editor.formatOnPaste"], true)
       })
     )
 
     it.effect("remain idempotent across repeated updates", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          ".vscode/settings.json": JSON.stringify({ "editor.tabSize": 4 }, null, 2),
+          ".vscode/settings.json": yield* formatJson({ "editor.tabSize": 4 }),
         })
 
         yield* vscode.update(ROOT).pipe(provideFiles(files))

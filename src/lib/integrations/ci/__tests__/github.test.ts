@@ -10,6 +10,7 @@ import * as Struct from "effect/Struct"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import github from "#lib/integrations/ci/github.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   type NodeVersionSource,
@@ -585,7 +586,7 @@ describe("github", () => {
         expect(result).toMatchObject({
           findings: [{ currentState: "The workflow contains a hard-coded Node.js version." }],
         })
-        expect(JSON.stringify(result)).not.toContain("rule test")
+        expect(yield* stringifyJson(result)).not.toContain("rule test")
       })
     )
 

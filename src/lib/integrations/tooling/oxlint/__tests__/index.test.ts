@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { formatJson } from "#lib/shared/json.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
@@ -88,7 +89,7 @@ describe("oxlint", () => {
     it.effect("report a finding when a legacy config is active", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          ".oxlintrc.json": JSON.stringify({ rules: { semi: "error" } }, null, 2),
+          ".oxlintrc.json": yield* formatJson({ rules: { semi: "error" } }),
           "package.json": makePackageJson({
             devDependencies: { oxlint: oxlint.version },
             scripts: { check: "adamantite check" },

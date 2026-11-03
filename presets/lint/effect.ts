@@ -79,6 +79,7 @@ const config: OxlintConfig = {
     "effecttsgo/global-console-in-effect": "error",
     "effecttsgo/global-date-in-effect": "error",
     "effecttsgo/global-fetch-in-effect": "error",
+    "effecttsgo/global-json-in-effect": "error",
     "effecttsgo/global-random-in-effect": "error",
     "effecttsgo/global-timers-in-effect": "error",
     "effecttsgo/instance-of-schema": "error",

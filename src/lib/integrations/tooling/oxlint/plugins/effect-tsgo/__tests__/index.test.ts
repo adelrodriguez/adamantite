@@ -5,6 +5,7 @@ import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
@@ -119,7 +120,7 @@ describe("effect-tsgo", () => {
     it.effect("report a language service entry that reports its own diagnostics", () =>
       Effect.gen(function* () {
         const files = makeConfiguredFiles({
-          "tsconfig.json": JSON.stringify({
+          "tsconfig.json": yield* stringifyJson({
             compilerOptions: { plugins: [{ name: "@effect/language-service" }] },
           }),
         })

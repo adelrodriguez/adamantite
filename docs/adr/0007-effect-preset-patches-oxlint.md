@@ -79,10 +79,9 @@ bump of one of those pins fails until a compatible `@effect/tsgo` release is pin
    `prefer-effect-array`, `prefer-effect-record`, and `prefer-effect-string` report each native
    array, `Object`, and `String` method. The `-in-effect` variants are in the preset: inside
    Effect code, `Clock`, `Random`, and `Config` let tests control time, randomness, and
-   configuration. `global-json-in-effect` is not in the preset. It reports `JSON.stringify` of
-   plain data, which cannot fail. On this repository, it reported 101 calls with
-   `@effect/tsgo` 0.64.1: 99 were `JSON.stringify` of plain data, and 2 were `JSON.parse` in test
-   assertions.
+   configuration, and `global-json-in-effect` turns a `JSON.parse` or `JSON.stringify` that
+   throws into a typed failure. Adamantite encodes JSON with `stringifyJson` and `formatJson` from
+   `src/lib/shared/json.ts`, and parses it with `parseJson`.
 2. No rule that Adamantite already enables reports the same defect. `unnecessary-arrow-block`
    repeats `arrow-body-style`. `strict-boolean-expressions` is a general TypeScript rule, so
    the core or strict preset decides it.

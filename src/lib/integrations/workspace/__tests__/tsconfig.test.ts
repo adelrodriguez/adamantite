@@ -6,6 +6,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
+import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
@@ -25,7 +26,7 @@ describe("tsconfig", () => {
 
     it.effect("report a missing root config outside a monorepo", () =>
       Effect.gen(function* () {
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson) })
+        const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
         const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
 
         expect(result).toMatchObject({
@@ -42,8 +43,8 @@ describe("tsconfig", () => {
     ])("report a config with $name", ({ config }) =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify(packageJson),
-          "tsconfig.json": JSON.stringify(config),
+          "package.json": yield* stringifyJson(packageJson),
+          "tsconfig.json": yield* stringifyJson(config),
         })
         const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
 
@@ -58,8 +59,8 @@ describe("tsconfig", () => {
       Effect.gen(function* () {
         for (const preset of ["adamantite/typescript", ["./base.json", "adamantite/typescript"]]) {
           const files = makeFiles({
-            "package.json": JSON.stringify(packageJson),
-            "tsconfig.json": JSON.stringify({ extends: preset }),
+            "package.json": yield* stringifyJson(packageJson),
+            "tsconfig.json": yield* stringifyJson({ extends: preset }),
           })
           const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
 
@@ -71,7 +72,7 @@ describe("tsconfig", () => {
     it.effect("return monorepo guidance instead of a root finding", () =>
       Effect.gen(function* () {
         const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
-        const files = makeFiles({ "package.json": JSON.stringify(monorepoPackageJson) })
+        const files = makeFiles({ "package.json": yield* stringifyJson(monorepoPackageJson) })
         const result = yield* tsconfig.assess(ROOT, monorepoPackageJson).pipe(provideFiles(files))
 
         expect(result).toMatchObject({
@@ -87,7 +88,7 @@ describe("tsconfig", () => {
     it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
         const packageJson = { scripts: { check: "adamantite check" } }
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson) })
+        const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
 
         yield* tsconfig.create(ROOT).pipe(provideFiles(files))
 
@@ -125,7 +126,7 @@ describe("tsconfig", () => {
       },
     ])("$name", ({ expected, input }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ "tsconfig.json": JSON.stringify({ extends: input }, null, 2) })
+        const files = makeFiles({ "tsconfig.json": yield* formatJson({ extends: input }) })
 
         yield* tsconfig.update(ROOT).pipe(provideFiles(files))
 
@@ -218,7 +219,7 @@ describe("tsconfig update properties", () => {
     ({ config, extendsValue }) =>
       Effect.gen(function* () {
         const original = extendsValue === null ? config : { ...config, extends: extendsValue }
-        const files = makeFiles({ "tsconfig.json": JSON.stringify(original) })
+        const files = makeFiles({ "tsconfig.json": yield* stringifyJson(original) })
 
         yield* tsconfig.update(ROOT).pipe(provideFiles(files))
 
@@ -246,7 +247,7 @@ describe("tsconfig update properties", () => {
     ({ config, extendsValue }) =>
       Effect.gen(function* () {
         const original = extendsValue === null ? config : { ...config, extends: extendsValue }
-        const files = makeFiles({ "tsconfig.json": JSON.stringify(original) })
+        const files = makeFiles({ "tsconfig.json": yield* stringifyJson(original) })
 
         yield* tsconfig.update(ROOT).pipe(provideFiles(files))
         const afterFirst = files.read("tsconfig.json")

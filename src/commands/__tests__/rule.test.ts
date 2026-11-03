@@ -4,6 +4,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand from "#commands/rule.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { toCustomRuleStub, toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
 import {
   createPrompterTestContext,
@@ -173,10 +174,10 @@ describe("rule test", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "package.json": JSON.stringify({ name: "root", workspaces: ["packages/*"] }),
+          "package.json": yield* stringifyJson({ name: "root", workspaces: ["packages/*"] }),
           "packages/web/.adamantite/rules/tests/no-window.ts": "// test\n",
           "packages/web/oxlint.config.ts": makeConfig('custom({ name: "web" })'),
-          "packages/web/package.json": JSON.stringify({ name: "web" }),
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
       })
       const runner = createRunnerTestContext()

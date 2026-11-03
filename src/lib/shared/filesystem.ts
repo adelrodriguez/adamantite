@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import { FailedToCreateDirectory, FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
+import { formatJson } from "#lib/shared/json.ts"
 
 export const ensureDirectory = (path: string) =>
   FileSystem.FileSystem.pipe(
@@ -58,4 +59,4 @@ export const writeFile = (path: string, content: string) =>
  * Adamantite-managed JSON file uses.
  */
 export const writeJsonFile = (path: string, value: Schema.Json) =>
-  writeFile(path, `${JSON.stringify(value, null, 2)}\n`)
+  formatJson(value).pipe(Effect.flatMap((content) => writeFile(path, `${content}\n`)))

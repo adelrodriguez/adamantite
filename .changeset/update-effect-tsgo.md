@@ -2,9 +2,12 @@
 "adamantite": minor
 ---
 
-Update `@effect/tsgo` to 0.64.1, and enable 12 new rules in the effect preset
+Update `@effect/tsgo` to 0.64.1, and enable 13 new rules in the effect preset
 
-The effect preset enables these new `@effect/tsgo` rules. `effect-try-without-catch` reports `Effect.try` and `Effect.tryPromise` without a `catch` handler, whose failures become a generic `UnknownError`. Use the object form `{ try, catch }` and map the cause to a typed error.
+The effect preset enables these new `@effect/tsgo` rules:
+
+- `effect-try-without-catch` reports `Effect.try` and `Effect.tryPromise` without a `catch` handler, whose failures become a generic `UnknownError`. Use the object form `{ try, catch }` and map the cause to a typed error.
+- `global-json-in-effect` reports `JSON.parse` and `JSON.stringify` inside Effect generators, because they throw instead of failing with a typed error. Use `Schema.fromJsonString(schema)` with `Schema.decodeEffect` or `Schema.encodeEffect`.
 
 The other new rules report a combinator or construct that has a direct replacement:
 
@@ -20,7 +23,7 @@ The other new rules report a combinator or construct that has a direct replaceme
 - `result-match-to-from-result` reports a `Result.match` that only turns a success into `Effect.succeed` and a failure into `Effect.fail`. Use `Effect.fromResult`.
 - `suspend-fail-to-fail-sync` reports `Effect.suspend` around a single `Effect.fail` or `Effect.die`. Use `Effect.failSync` or `Effect.dieSync`.
 
-The preset does not enable `global-json-in-effect`, which reports `JSON.stringify` of plain data that cannot fail, or the style preferences `type-union-to-schema-union` and `yield-in-call-argument`.
+The preset does not enable `global-json`, which reports `JSON` calls outside Effect code, or the style preferences `type-union-to-schema-union` and `yield-in-call-argument`.
 
 To upgrade an existing project:
 

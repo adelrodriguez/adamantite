@@ -62,6 +62,22 @@ export default defineConfig({
         import: "oxc-resolver",
         owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/rules/layers.ts"],
       },
+      // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
+      // integration takes them from the `Project`. Harden reads them for its own scope.
+      {
+        import: "#lib/workspace/custom-rules/discover.ts",
+        names: ["discoverCustomRules"],
+        owners: ["src/lib/workspace/project.ts", "src/lib/hardening/index.ts"],
+      },
+      {
+        import: "#lib/workspace/monorepo.ts",
+        names: ["readWorkspace"],
+        owners: [
+          "src/lib/workspace/project.ts",
+          "src/lib/hardening/index.ts",
+          "src/lib/workspace/__tests__/monorepo.test.ts",
+        ],
+      },
     ],
     // Two layer maps, from the bottom up. Each layer imports only the layers it lists and the layers
     // below those. See "Layers" in docs/architecture.md.

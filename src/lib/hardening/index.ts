@@ -137,11 +137,10 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     const instructionCandidates = [...new Set([cwd, ...selectedPackages])].map((directory) =>
       path.join(directory, AGENTS_FILE)
     )
-    const [discovery, exists] = yield* Effect.all(
+    const [discovery, instructionFiles] = yield* Effect.all(
       [
         discoverCustomRules(packageDirectories, selectedPackages),
-        // `forEach` keeps the order of the candidates, which `Effect.filter` loses under concurrency.
-        Effect.forEach(
+        Effect.filter(
           instructionCandidates,
           (file) => fs.exists(file).pipe(Effect.orElseSucceed(() => false)),
           { concurrency: "unbounded" }
@@ -152,7 +151,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
 
     return {
       discovery,
-      instructionFiles: instructionCandidates.filter((_, index) => exists[index]),
+      instructionFiles,
       packageDirectories,
       selectedPackages,
     }

@@ -287,6 +287,26 @@ describe("rule trials in a real project", () => {
     })
   )
 
+  it.live("try an alias whose plugin the config does not turn on", () =>
+    Effect.gen(function* () {
+      write("oxlint.config.ts", makeConfig('{ plugins: ["import"] }'))
+
+      const results = yield* runTrial(
+        "typescript/no-restricted-imports",
+        { _tag: "Error", options: [{ paths: ["node:fs"] }] },
+        [
+          makeCase(
+            "src/cart.ts",
+            "reported",
+            writeCase("cart.ts", 'import fs from "node:fs"\nexport const cart = fs\n')
+          ),
+        ]
+      )
+
+      expect(getReportCounts(results)).toStrictEqual([1])
+    })
+  )
+
   it.live("count only the reports of the plugin of the rule", () =>
     Effect.gen(function* () {
       write(".adamantite/rules/no-console.ts", SILENT_RULE)

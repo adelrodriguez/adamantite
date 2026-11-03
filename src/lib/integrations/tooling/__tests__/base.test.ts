@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
@@ -27,7 +26,7 @@ function detect(
   configFiles: typeof FILES | typeof SINGLE_LEGACY_FILES = FILES
 ) {
   return detectToolingConfig(ROOT, "tool", configFiles).pipe(
-    Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+    Effect.provide([files.layer, Path.layer])
   )
 }
 

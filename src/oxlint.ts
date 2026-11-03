@@ -4,7 +4,6 @@ import { pathToFileURL } from "node:url"
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
 import * as NodePath from "@effect/platform-node/NodePath"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Result from "effect/Result"
 import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/execution/oxlint-entry.ts"
 import { resolveToolchain } from "#lib/integrations/tooling/oxlint/toolchain.ts"
@@ -21,7 +20,7 @@ const project = getProjectDirectory(
 const result = await Effect.runPromise(
   resolveToolchain(project).pipe(
     Effect.result,
-    Effect.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer, ModuleResolver.layer))
+    Effect.provide([NodeFileSystem.layer, NodePath.layer, ModuleResolver.layer])
   )
 )
 

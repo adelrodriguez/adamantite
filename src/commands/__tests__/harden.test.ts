@@ -15,6 +15,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import hardenCommand from "#commands/harden.ts"
 import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import {
@@ -338,7 +339,7 @@ function runHardenHoisted() {
     const prompter = createPrompterTestContext()
     const files = {
       "../node_modules/adamantite/dist/presets/lint/core.js": "export default {}\n",
-      "../node_modules/adamantite/package.json": JSON.stringify({
+      "../node_modules/adamantite/package.json": yield* stringifyJson({
         name: "adamantite",
         version: getPackageVersion(),
       }),
@@ -741,7 +742,7 @@ describe("harden", () => {
     Effect.gen(function* () {
       const { exit, prompter } = yield* runHarden({
         ...INSTALLED,
-        "node_modules/adamantite/package.json": JSON.stringify({
+        "node_modules/adamantite/package.json": yield* stringifyJson({
           name: "adamantite",
           version: "0.0.1",
         }),
@@ -766,7 +767,7 @@ describe("harden", () => {
   it.effect("print the prompt in the Adamantite repository, which does not depend on itself", () =>
     Effect.gen(function* () {
       const prompt = yield* runHardenPrompt({
-        "package.json": JSON.stringify({ name: "adamantite", version: getPackageVersion() }),
+        "package.json": yield* stringifyJson({ name: "adamantite", version: getPackageVersion() }),
       })
 
       expect(prompt).toContain("# Adamantite harden")
@@ -776,7 +777,7 @@ describe("harden", () => {
   it.effect("fail in an Adamantite checkout of another version than the one that runs", () =>
     Effect.gen(function* () {
       const { exit, prompter } = yield* runHarden({
-        "package.json": JSON.stringify({ name: "adamantite", version: "0.0.1" }),
+        "package.json": yield* stringifyJson({ name: "adamantite", version: "0.0.1" }),
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -844,7 +845,7 @@ describe("harden", () => {
             workspaces: ["packages/*", "packages/web/admin", "tooling/lint"],
           }),
           "packages/web/AGENTS.md": "Read [the web standards](../../docs/web.md).\n",
-          "packages/web/admin/package.json": JSON.stringify({ name: "admin" }),
+          "packages/web/admin/package.json": yield* stringifyJson({ name: "admin" }),
         },
         ["--path", "packages/web/admin"]
       )

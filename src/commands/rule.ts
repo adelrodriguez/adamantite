@@ -9,6 +9,7 @@ import { parseSync } from "oxc-parser"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { FailedToParseSource } from "#lib/shared/errors.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
+import { formatJson } from "#lib/shared/json.ts"
 import {
   addCustomRule,
   CUSTOM_RULES_DIRECTORY,
@@ -38,7 +39,7 @@ const ast = Command.make("ast", { file: astFile }).pipe(
         })
       }
 
-      yield* prompter.message(JSON.stringify(result.program, null, 2))
+      yield* prompter.message(yield* formatJson(result.program))
     })
   )
 )

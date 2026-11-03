@@ -23,6 +23,7 @@ const EXCLUDED_RULES = new Set([
   "global-console",
   "global-date",
   "global-fetch",
+  "global-json",
   "global-random",
   "global-timers",
   "new-promise",
@@ -30,7 +31,6 @@ const EXCLUDED_RULES = new Set([
   "prefer-effect-array",
   "prefer-effect-record",
   "prefer-effect-string",
-  "prefer-schema-over-json",
   "process-env",
   "schema-sync",
   // A rule that Adamantite enables reports the same defect, or core or strict decides it.
@@ -45,6 +45,8 @@ const EXCLUDED_RULES = new Set([
   "missed-pipeable-opportunity",
   "new-schema-class",
   "prefer-schema-tagged-error",
+  "type-union-to-schema-union",
+  "yield-in-call-argument",
   // `Effect.Service` exists only in Effect v3.
   "missing-effect-service-dependency",
 ])

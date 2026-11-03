@@ -8,6 +8,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 
 const ROOT = "/project"
@@ -46,11 +47,7 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
 function runAssess(files: FileSystemTestContext, resolutions: Record<string, string> = {}) {
   return oxlintCustom
     .assess(ROOT)
-    .pipe(
-      Effect.provide(
-        Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions))
-      )
-    )
+    .pipe(Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions)]))
 }
 
 function getFindings(assessment: IntegrationAssessment) {
@@ -198,14 +195,14 @@ describe("oxlint-custom", () => {
         files: {
           "oxlint.config.ts": makeConfig("core, tooling", ['import tooling from "@acme/lint"']),
           "package.json": MONOREPO_PACKAGE_JSON,
-          "packages/web/package.json": JSON.stringify({ name: "web" }),
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
           "tooling/lint/index.ts": [
             'import custom from "adamantite/lint/custom"',
             "",
             'export default custom({ dir: "rules", name: "acme" })',
             "",
           ].join("\n"),
-          "tooling/lint/package.json": JSON.stringify({ name: "@acme/lint" }),
+          "tooling/lint/package.json": yield* stringifyJson({ name: "@acme/lint" }),
           "tooling/lint/rules/no-enum.ts": `enum Kind { A }\n${RULE}`,
         },
         root: ROOT,
@@ -244,7 +241,7 @@ describe("oxlint-custom", () => {
       })
       const assess = oxlintCustom
         .assess(ROOT)
-        .pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer, resolverLayer)))
+        .pipe(Effect.provide([files.layer, Path.layer, resolverLayer]))
 
       yield* assess
       yield* assess
@@ -282,8 +279,11 @@ describe("oxlint-custom", () => {
             "oxlint.config.ts": makeConfig("core, tooling", [
               'import tooling from "@acme/lint/missing"',
             ]),
-            "package.json": JSON.stringify({ name: "test-monorepo", workspaces: ["tooling/lint"] }),
-            "tooling/lint/package.json": JSON.stringify({
+            "package.json": yield* stringifyJson({
+              name: "test-monorepo",
+              workspaces: ["tooling/lint"],
+            }),
+            "tooling/lint/package.json": yield* stringifyJson({
               exports: { "./config": "./index.ts" },
               name: "@acme/lint",
             }),
@@ -307,7 +307,7 @@ describe("oxlint-custom", () => {
           "oxlint.config.ts": toOxlintTsConfigContent(),
           "package.json": MONOREPO_PACKAGE_JSON,
           "packages/web/.adamantite/rules/no-window.ts": RULE,
-          "packages/web/package.json": JSON.stringify({ name: "web" }),
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
         root: ROOT,
       })
@@ -332,7 +332,7 @@ describe("oxlint-custom", () => {
           "packages/web/oxlint.config.ts": makeConfig("root, custom()", [
             'import root from "../../oxlint.config.ts"',
           ]),
-          "packages/web/package.json": JSON.stringify({ name: "web" }),
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
         root: ROOT,
       })
@@ -360,7 +360,7 @@ describe("oxlint-custom", () => {
           "packages/web/oxlint.config.ts": makeConfig('root, custom({ name: "web" })', [
             'import root from "../../oxlint.config.ts"',
           ]),
-          "packages/web/package.json": JSON.stringify({ name: "web" }),
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
         root: ROOT,
       })

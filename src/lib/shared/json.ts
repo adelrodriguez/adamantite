@@ -4,8 +4,8 @@ import { defu } from "defu"
 import * as Effect from "effect/Effect"
 import * as Equal from "effect/Equal"
 
-import type * as Schema from "effect/Schema"
 import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import {
   type FormattingOptions,
   type JSONPath,
@@ -30,6 +30,21 @@ export const parseJson = (content: string, path?: string) =>
       ? Effect.fail(new FailedToParseFile({ errors, path }))
       : Effect.succeed(parsed)
   })
+
+const JsonText = Schema.fromJsonString(Schema.Unknown)
+const IndentedJsonText = Schema.fromJsonString(Schema.Unknown, { space: 2 })
+
+/**
+ * Encodes a value as JSON text on one line. A value that JSON cannot hold fails with a
+ * `SchemaError`.
+ */
+export const stringifyJson = Schema.encodeEffect(JsonText)
+
+/**
+ * Encodes a value as JSON text with two-space indentation, the format of every file that Adamantite
+ * creates. A value that JSON cannot hold fails with a `SchemaError`.
+ */
+export const formatJson = Schema.encodeEffect(IndentedJsonText)
 
 export const checkIsJsonObject = (
   value: JsonValue | Schema.Json | undefined

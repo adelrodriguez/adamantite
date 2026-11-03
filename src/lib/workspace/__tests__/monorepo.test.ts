@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import {
   checkIsMonorepo,
   getWorkspacePackageDirectories,
@@ -106,7 +106,7 @@ describe("getWorkspacePackageDirectories", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "package.json": JSON.stringify({ workspaces: ["packages/**", "!packages/legacy"] }),
+          "package.json": yield* stringifyJson({ workspaces: ["packages/**", "!packages/legacy"] }),
           "packages/group/web/node_modules/dependency/package.json": "{}",
           "packages/group/web/package.json": "{}",
           "packages/legacy/package.json": "{}",
@@ -115,7 +115,7 @@ describe("getWorkspacePackageDirectories", () => {
       })
 
       const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+        Effect.provide([files.layer, Path.layer])
       )
 
       expect(directories).toStrictEqual(["/project/packages/group/web"])
@@ -126,7 +126,7 @@ describe("getWorkspacePackageDirectories", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             workspaces: ["packages/*", "tooling/**", "docs", "!packages/legacy"],
           }),
           "packages/README.md": "# Packages\n",
@@ -138,7 +138,7 @@ describe("getWorkspacePackageDirectories", () => {
       })
 
       const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+        Effect.provide([files.layer, Path.layer])
       )
 
       expect(directories).toStrictEqual([
@@ -154,7 +154,7 @@ describe("getWorkspacePackageDirectories", () => {
       const files = createFileSystemTestContext({
         files: {
           "apps/site/package.json": "{}",
-          "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
+          "package.json": yield* stringifyJson({ workspaces: ["packages/*"] }),
           "packages/api/package.json": "{}",
           "pnpm-workspace.yaml": "packages:\n  - apps/*\n",
         },
@@ -162,7 +162,7 @@ describe("getWorkspacePackageDirectories", () => {
       })
 
       const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+        Effect.provide([files.layer, Path.layer])
       )
 
       expect(directories).toStrictEqual(["/project/apps/site"])
@@ -173,7 +173,7 @@ describe("getWorkspacePackageDirectories", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "package.json": JSON.stringify({ workspaces: ["packages/*"] }),
+          "package.json": yield* stringifyJson({ workspaces: ["packages/*"] }),
           "packages/api/package.json": "{}",
           "pnpm-workspace.yaml": "allowBuilds:\n  msgpackr-extract: false\n",
         },
@@ -183,7 +183,7 @@ describe("getWorkspacePackageDirectories", () => {
       const result = yield* Effect.all([
         checkIsMonorepo(ROOT),
         getWorkspacePackageDirectories(ROOT),
-      ]).pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer)))
+      ]).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(result).toStrictEqual([true, ["/project/packages/api"]])
     })

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import zed from "#lib/integrations/editors/zed.ts"
+import { formatJson, parseJson, stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
@@ -19,7 +19,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  return Effect.provide([files.layer, Path.layer])
 }
 
 describe("zed", () => {
@@ -27,7 +27,7 @@ describe("zed", () => {
     it.effect("report stale oxfmt settings and preserve changed values", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({
+          [SETTINGS_PATH]: yield* stringifyJson({
             lsp: {
               oxfmt: {
                 initialization_options: {
@@ -77,7 +77,7 @@ describe("zed", () => {
         yield* zed.create(ROOT).pipe(provideFiles(files))
 
         expect(yield* zed.detect(ROOT).pipe(provideFiles(files))).toBe(true)
-        expect(JSON.parse(files.read(SETTINGS_PATH))).toMatchObject({
+        expect(yield* parseJson(files.read(SETTINGS_PATH))).toMatchObject({
           lsp: {
             oxlint: {
               binary: { arguments: [OXLINT_ENTRY, "--lsp"], path: "node" },
@@ -93,7 +93,7 @@ describe("zed", () => {
     it.effect("deduplicate formatter entries for managed languages", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({
+          [SETTINGS_PATH]: yield* stringifyJson({
             languages: {
               JavaScript: {
                 formatter: [
@@ -107,19 +107,19 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = JSON.parse(files.read(SETTINGS_PATH))
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config.languages.JavaScript.formatter).toStrictEqual([
-          { language_server: { name: "oxfmt" } },
-          { code_action: "source.fixAll.oxc" },
-        ])
+        expect(config).toHaveProperty(
+          ["languages", "JavaScript", "formatter"],
+          [{ language_server: { name: "oxfmt" } }, { code_action: "source.fixAll.oxc" }]
+        )
       })
     )
 
     it.effect("preserve repeated values in user-owned arrays", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({
+          [SETTINGS_PATH]: yield* stringifyJson({
             languages: {
               JavaScript: {
                 formatter: [{ language_server: { name: "oxfmt" } }],
@@ -137,13 +137,16 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = JSON.parse(files.read(SETTINGS_PATH))
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config.lsp.custom.initialization_options.arguments).toStrictEqual([
-          "--flag",
-          "--flag",
-        ])
-        expect(config.languages.JavaScript.formatter).toStrictEqual([OXFMT_FORMATTER, OXC_FIX_ALL])
+        expect(config).toHaveProperty(
+          ["lsp", "custom", "initialization_options", "arguments"],
+          ["--flag", "--flag"]
+        )
+        expect(config).toHaveProperty(
+          ["languages", "JavaScript", "formatter"],
+          [OXFMT_FORMATTER, OXC_FIX_ALL]
+        )
       })
     )
 
@@ -151,21 +154,21 @@ describe("zed", () => {
       Effect.gen(function* () {
         const formatter = [{ external: "custom" }, { external: "custom" }]
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({ languages: { Svelte: { formatter } } }),
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Svelte: { formatter } } }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = JSON.parse(files.read(SETTINGS_PATH))
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config.languages.Svelte.formatter).toStrictEqual(formatter)
+        expect(config).toHaveProperty(["languages", "Svelte", "formatter"], formatter)
       })
     )
 
     it.effect("deduplicate prettier plugins for the managed Astro entry", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({
+          [SETTINGS_PATH]: yield* stringifyJson({
             languages: {
               Astro: { prettier: { allowed: true, plugins: ["prettier-plugin-astro"] } },
             },
@@ -174,10 +177,13 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = JSON.parse(files.read(SETTINGS_PATH))
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config.languages.Astro.formatter).toBeUndefined()
-        expect(config.languages.Astro.prettier.plugins).toStrictEqual(["prettier-plugin-astro"])
+        expect(config).not.toHaveProperty(["languages", "Astro", "formatter"])
+        expect(config).toHaveProperty(
+          ["languages", "Astro", "prettier", "plugins"],
+          ["prettier-plugin-astro"]
+        )
       })
     )
 
@@ -190,27 +196,26 @@ describe("zed", () => {
           },
         }
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({
+          [SETTINGS_PATH]: yield* stringifyJson({
             languages: { JavaScript: { formatter: [formatter, formatter] } },
           }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = JSON.parse(files.read(SETTINGS_PATH))
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config.languages.JavaScript.formatter).toStrictEqual([
-          OXFMT_FORMATTER,
-          OXC_FIX_ALL,
-          formatter,
-        ])
+        expect(config).toHaveProperty(
+          ["languages", "JavaScript", "formatter"],
+          [OXFMT_FORMATTER, OXC_FIX_ALL, formatter]
+        )
       })
     )
 
     it.effect("replace the Oxlint binary of the existing config with the toolchain entry", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({
+          [SETTINGS_PATH]: yield* stringifyJson({
             lsp: {
               oxlint: {
                 binary: { arguments: ["--lsp"], path: "node_modules/.bin/oxlint" },
@@ -222,17 +227,20 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        expect(JSON.parse(files.read(SETTINGS_PATH)).lsp.oxlint.binary).toStrictEqual({
-          arguments: [OXLINT_ENTRY, "--lsp"],
-          path: "node",
-        })
+        expect(yield* parseJson(files.read(SETTINGS_PATH))).toHaveProperty(
+          ["lsp", "oxlint", "binary"],
+          {
+            arguments: [OXLINT_ENTRY, "--lsp"],
+            path: "node",
+          }
+        )
       })
     )
 
     it.effect("remain idempotent across repeated updates", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [SETTINGS_PATH]: JSON.stringify({ ui_font_size: 14 }, null, 2),
+          [SETTINGS_PATH]: yield* formatJson({ ui_font_size: 14 }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
@@ -241,7 +249,7 @@ describe("zed", () => {
         const secondUpdate = files.read(SETTINGS_PATH)
 
         expect(secondUpdate).toBe(firstUpdate)
-        expect(JSON.parse(secondUpdate).ui_font_size).toBe(14)
+        expect(yield* parseJson(secondUpdate)).toHaveProperty(["ui_font_size"], 14)
       })
     )
 

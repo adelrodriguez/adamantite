@@ -10,7 +10,13 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
+import {
+  formatJson,
+  mergeConfig,
+  parseJson,
+  stringifyJson,
+  updateJsonText,
+} from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
 import { printTitle } from "#terminal/title.ts"
@@ -35,7 +41,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  return Effect.provide([files.layer, Path.layer])
 }
 
 function makeTerminalLayer(columns?: number) {
@@ -47,6 +53,7 @@ function makeTerminalLayer(columns?: number) {
       readInput: Effect.never,
       readLine: Effect.never,
       rows: Effect.succeed(24),
+      size: Effect.never,
     })
   )
 }
@@ -258,9 +265,9 @@ describe("updateJsonText", () => {
     { current: plainJson, next: plainJson },
     ({ current, next }) =>
       Effect.gen(function* () {
-        const parsed = yield* parseJson(updateJsonText(JSON.stringify(current, null, 2), next))
+        const parsed = yield* parseJson(updateJsonText(yield* formatJson(current), next))
         // JSON has no negative zero, so compare with the parsed JSON form of `next`.
-        const expected = yield* parseJson(JSON.stringify(next))
+        const expected = yield* parseJson(yield* stringifyJson(next))
 
         expect(parsed).toStrictEqual(expected)
       }),
@@ -364,7 +371,7 @@ describe("checkIsMonorepo", () => {
   ])("return $expected when $name", ({ content, expected, file }) =>
     Effect.gen(function* () {
       const files = makeFiles({
-        "package.json": JSON.stringify({ name: "test-package" }),
+        "package.json": yield* stringifyJson({ name: "test-package" }),
         [file]: content,
       })
 

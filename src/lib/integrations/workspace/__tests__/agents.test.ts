@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import agents from "#lib/integrations/workspace/agents.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
@@ -12,7 +12,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  return Effect.provide([files.layer, Path.layer])
 }
 
 describe("agents", () => {
@@ -23,7 +23,7 @@ describe("agents", () => {
 
     it.effect("report a missing AGENTS.md at the project root", () =>
       Effect.gen(function* () {
-        const files = makeFiles({ "package.json": JSON.stringify(packageJson) })
+        const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
         const result = yield* agents.assess(ROOT, packageJson).pipe(provideFiles(files))
 
         expect(result).toStrictEqual({
@@ -57,7 +57,7 @@ describe("agents", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           "AGENTS.md": content,
-          "package.json": JSON.stringify(packageJson),
+          "package.json": yield* stringifyJson(packageJson),
         })
         const result = yield* agents.assess(ROOT, packageJson).pipe(provideFiles(files))
 
@@ -75,8 +75,8 @@ describe("agents", () => {
         const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
         const files = makeFiles({
           "AGENTS.md": "# Monorepo\n",
-          "package.json": JSON.stringify(monorepoPackageJson),
-          "packages/web/package.json": JSON.stringify({ name: "web" }),
+          "package.json": yield* stringifyJson(monorepoPackageJson),
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         })
         const result = yield* agents.assess(ROOT, monorepoPackageJson).pipe(provideFiles(files))
 
@@ -87,7 +87,7 @@ describe("agents", () => {
     it.effect("not apply when the project has no managed script", () =>
       Effect.gen(function* () {
         const unmanagedPackageJson = { scripts: { check: "tsc --noEmit" } }
-        const files = makeFiles({ "package.json": JSON.stringify(unmanagedPackageJson) })
+        const files = makeFiles({ "package.json": yield* stringifyJson(unmanagedPackageJson) })
         const result = yield* agents.assess(ROOT, unmanagedPackageJson).pipe(provideFiles(files))
 
         expect(result).toStrictEqual({ applicable: false })

@@ -1,10 +1,10 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
+import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
@@ -14,7 +14,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  return Effect.provide([files.layer, Path.layer])
 }
 
 function runAssess(files: FileSystemTestContext) {
@@ -33,17 +33,13 @@ describe("sherif", () => {
     it.effect("report not applicable when managed monorepo scripts are absent", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify(
-            {
-              devDependencies: {
-                sherif: sherif.version,
-              },
-              name: "test-project",
-              version: "1.0.0",
+          "package.json": yield* formatJson({
+            devDependencies: {
+              sherif: sherif.version,
             },
-            null,
-            2
-          ),
+            name: "test-project",
+            version: "1.0.0",
+          }),
         })
 
         const result = yield* runAssess(files)
@@ -57,7 +53,7 @@ describe("sherif", () => {
     it.effect("report missing package for a managed analyze script in a monorepo", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             name: "test-project",
             scripts: { analyze: "adamantite analyze" },
             workspaces: ["packages/*"],
@@ -76,7 +72,7 @@ describe("sherif", () => {
     it.effect("report not applicable for a managed analyze script outside a monorepo", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": JSON.stringify({
+          "package.json": yield* stringifyJson({
             name: "test-project",
             scripts: { analyze: "adamantite analyze" },
           }),

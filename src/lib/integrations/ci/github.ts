@@ -12,6 +12,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { getWorkflowTemplate } from "#lib/integrations/ci/github-workflow.macro.ts" with { type: "macro" }
+import { FailedToParseYaml } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import {
@@ -74,8 +75,11 @@ interface WorkflowOptions {
  * `include` entry, and the `node-version` inputs of its steps. A workflow that does not parse runs
  * nothing.
  */
-const readWorkflow = (content: string) =>
-  Effect.try(() => Yaml.parse(content)).pipe(
+const readWorkflow = (content: string, path: string) =>
+  Effect.try({
+    catch: (cause) => new FailedToParseYaml({ cause, path }),
+    try: () => Yaml.parse(content),
+  }).pipe(
     Effect.flatMap((parsed) => Schema.decodeUnknownEffect(Workflow)(parsed)),
     Effect.map(({ jobs }) => {
       const jobList = Object.values(jobs)
@@ -230,7 +234,7 @@ export default defineIntegration({
       }
 
       const managedScripts = getManagedScripts(packageJson)
-      const workflow = yield* readWorkflow(content.value)
+      const workflow = yield* readWorkflow(content.value, workflowPath)
       const runs = (commandRegex: RegExp) =>
         workflow.commands.some((command) => commandRegex.test(command))
       const hasHardcodedNodeVersion = workflow.nodeVersions.some((version) =>

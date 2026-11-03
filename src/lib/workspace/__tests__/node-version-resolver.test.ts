@@ -7,6 +7,7 @@ import * as PlatformError from "effect/PlatformError"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 
 const ROOT = "/project"
@@ -255,7 +256,9 @@ describe("NodeVersionResolver", () => {
     { manifest: declaringManifest },
     ({ manifest }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ "package.json": JSON.stringify({ name: "pkg", ...manifest }) })
+        const files = makeFiles({
+          "package.json": yield* stringifyJson({ name: "pkg", ...manifest }),
+        })
 
         const source = yield* runResolve(files)
 
@@ -269,7 +272,9 @@ describe("NodeVersionResolver", () => {
     { manifest: nonDeclaringManifest },
     ({ manifest }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ "package.json": JSON.stringify({ name: "pkg", ...manifest }) })
+        const files = makeFiles({
+          "package.json": yield* stringifyJson({ name: "pkg", ...manifest }),
+        })
 
         const source = yield* runResolve(files)
 
@@ -283,7 +288,7 @@ describe("NodeVersionResolver", () => {
     { value: Schema.MutableJson },
     ({ value }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ "package.json": JSON.stringify(value) })
+        const files = makeFiles({ "package.json": yield* stringifyJson(value) })
 
         const source = yield* runResolve(files)
 

@@ -1,10 +1,10 @@
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { formatJson } from "#lib/shared/json.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
@@ -14,7 +14,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  return Effect.provide([files.layer, Path.layer])
 }
 
 function runAssess(files: FileSystemTestContext) {
@@ -89,7 +89,7 @@ describe("oxlint", () => {
     it.effect("report a finding when a legacy config is active", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          ".oxlintrc.json": JSON.stringify({ rules: { semi: "error" } }, null, 2),
+          ".oxlintrc.json": yield* formatJson({ rules: { semi: "error" } }),
           "package.json": makePackageJson({
             devDependencies: { oxlint: oxlint.version },
             scripts: { check: "adamantite check" },

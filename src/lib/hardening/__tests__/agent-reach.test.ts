@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { readAgentReach } from "#lib/hardening/agent-reach.ts"
@@ -14,7 +13,7 @@ function readReach(files: Record<string, string>) {
     context.root,
     paths,
     paths.filter((file) => file.split("/").at(-1) === "AGENTS.md")
-  ).pipe(Effect.provide(Layer.mergeAll(context.layer, Path.layer)))
+  ).pipe(Effect.provide([context.layer, Path.layer]))
 }
 
 describe("readAgentReach", () => {

@@ -10,6 +10,7 @@ import * as Struct from "effect/Struct"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import github from "#lib/integrations/ci/github.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   type NodeVersionSource,
@@ -49,28 +50,24 @@ function makeResolverLayer(source: NodeVersionSource) {
 }
 
 function provideFallback(files: FileSystemTestContext) {
-  return Effect.provide(
-    Layer.mergeAll(
-      files.layer,
-      Path.layer,
-      makeModuleResolverLayer(ROOT),
-      makeResolverLayer({ _tag: "Version", value: "lts/*" })
-    )
-  )
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    makeModuleResolverLayer(ROOT),
+    makeResolverLayer({ _tag: "Version", value: "lts/*" }),
+  ])
 }
 
 function provideAssessment(files: FileSystemTestContext, packageManager: "deno" | "pnpm" = "pnpm") {
-  return Effect.provide(
-    Layer.mergeAll(
-      files.layer,
-      Path.layer,
-      makeModuleResolverLayer(ROOT),
-      Layer.succeed(DependencyInstaller)({
-        addDevDependencies: () => Effect.void,
-        detectPackageManager: () => Effect.succeed({ name: packageManager }),
-      })
-    )
-  )
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    makeModuleResolverLayer(ROOT),
+    Layer.succeed(DependencyInstaller)({
+      addDevDependencies: () => Effect.void,
+      detectPackageManager: () => Effect.succeed({ name: packageManager }),
+    }),
+  ])
 }
 
 // A workflow with one job that runs these steps.
@@ -140,14 +137,12 @@ function getSetupNodeInputs(files: FileSystemTestContext) {
 }
 
 function provideFileResolver(files: FileSystemTestContext) {
-  return Effect.provide(
-    Layer.mergeAll(
-      files.layer,
-      Path.layer,
-      makeModuleResolverLayer(ROOT),
-      makeResolverLayer({ _tag: "File", path: ".node-version" })
-    )
-  )
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    makeModuleResolverLayer(ROOT),
+    makeResolverLayer({ _tag: "File", path: ".node-version" }),
+  ])
 }
 
 function getPinnedActions(workflow: string) {
@@ -591,7 +586,7 @@ describe("github", () => {
         expect(result).toMatchObject({
           findings: [{ currentState: "The workflow contains a hard-coded Node.js version." }],
         })
-        expect(JSON.stringify(result)).not.toContain("rule test")
+        expect(yield* stringifyJson(result)).not.toContain("rule test")
       })
     )
 

@@ -5,8 +5,8 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import {
   checkIsMonorepo,
-  getWorkspacePackageDirectories,
   readPnpmWorkspacePatterns,
+  readWorkspace,
   workspacePatternToRegExp,
 } from "#lib/workspace/monorepo.ts"
 
@@ -101,7 +101,7 @@ describe("workspacePatternToRegExp", () => {
   })
 })
 
-describe("getWorkspacePackageDirectories", () => {
+describe("readWorkspace", () => {
   it.effect("find nested packages with ** and leave out excluded packages", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -114,11 +114,12 @@ describe("getWorkspacePackageDirectories", () => {
         root: ROOT,
       })
 
-      const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide([files.layer, Path.layer])
-      )
+      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
-      expect(directories).toStrictEqual(["/project/packages/group/web"])
+      expect(workspace).toStrictEqual({
+        isMonorepo: true,
+        packageDirectories: ["/project/packages/group/web"],
+      })
     })
   )
 
@@ -137,15 +138,16 @@ describe("getWorkspacePackageDirectories", () => {
         root: ROOT,
       })
 
-      const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide([files.layer, Path.layer])
-      )
+      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
-      expect(directories).toStrictEqual([
-        "/project/packages/api",
-        "/project/packages/web",
-        "/project/tooling/lint",
-      ])
+      expect(workspace).toStrictEqual({
+        isMonorepo: true,
+        packageDirectories: [
+          "/project/packages/api",
+          "/project/packages/web",
+          "/project/tooling/lint",
+        ],
+      })
     })
   )
 
@@ -161,11 +163,12 @@ describe("getWorkspacePackageDirectories", () => {
         root: ROOT,
       })
 
-      const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide([files.layer, Path.layer])
-      )
+      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
-      expect(directories).toStrictEqual(["/project/apps/site"])
+      expect(workspace).toStrictEqual({
+        isMonorepo: true,
+        packageDirectories: ["/project/apps/site"],
+      })
     })
   )
 
@@ -180,12 +183,43 @@ describe("getWorkspacePackageDirectories", () => {
         root: ROOT,
       })
 
-      const result = yield* Effect.all([
-        checkIsMonorepo(ROOT),
-        getWorkspacePackageDirectories(ROOT),
-      ]).pipe(Effect.provide([files.layer, Path.layer]))
+      const result = yield* Effect.all([checkIsMonorepo(ROOT), readWorkspace(ROOT)]).pipe(
+        Effect.provide([files.layer, Path.layer])
+      )
 
-      expect(result).toStrictEqual([true, ["/project/packages/api"]])
+      expect(result).toStrictEqual([
+        true,
+        { isMonorepo: true, packageDirectories: ["/project/packages/api"] },
+      ])
+    })
+  )
+
+  it.effect("call a project with patterns a monorepo before any package exists", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": "{}",
+          "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        },
+        root: ROOT,
+      })
+
+      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+
+      expect(workspace).toStrictEqual({ isMonorepo: true, packageDirectories: [] })
+    })
+  )
+
+  it.effect("find no packages in a project without workspace patterns", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "package.json": "{}", "packages/api/package.json": "{}" },
+        root: ROOT,
+      })
+
+      const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
+
+      expect(workspace).toStrictEqual({ isMonorepo: false, packageDirectories: [] })
     })
   )
 })

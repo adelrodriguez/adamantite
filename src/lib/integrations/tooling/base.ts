@@ -5,6 +5,7 @@ import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { Project } from "#lib/workspace/project.ts"
 import {
   defineIntegration,
   type Finding,
@@ -13,7 +14,7 @@ import {
   type PackageAction,
   type ToolingPackage,
 } from "#lib/integrations/base.ts"
-import { readFile, writeFile } from "#lib/shared/filesystem.ts"
+import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   getManagedScripts,
@@ -299,7 +300,7 @@ function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Scrip
  * A tooling integration that only manages a package version, with no config file (Sherif and
  * Tsgolint). Oxlint's managed plugins build on it through `defineManagedPlugin`.
  */
-export function definePackageTooling<Error = never, Requirements = never>(options: {
+export function definePackageTooling(options: {
   /**
    * Findings for retired managed scripts. While any exist, the integration stays applicable and
    * reports them so the scripts get removed.
@@ -308,7 +309,7 @@ export function definePackageTooling<Error = never, Requirements = never>(option
   /**
    * An extra condition for requiring the package, checked after the managed scripts.
    */
-  readonly isRequired?: (cwd: string) => Effect.Effect<boolean, Error, Requirements>
+  readonly isRequired?: (project: Project) => boolean
   /**
    * Whether the package is required only in a detected monorepo.
    */
@@ -319,26 +320,19 @@ export function definePackageTooling<Error = never, Requirements = never>(option
   readonly version: string
 }) {
   return defineIntegration({
-    assess: (cwd: string, packageJson: PackageJson) =>
-      Effect.gen(function* () {
+    assess: (project: Project) =>
+      Effect.sync((): IntegrationAssessment => {
+        const { packageJson } = project
         const isApplicable =
           checkHasManagedScript(packageJson, options.scripts)
-          && (!options.monorepoOnly || (yield* checkIsMonorepo(cwd)))
-          && (options.isRequired === undefined || (yield* options.isRequired(cwd)))
-
+          && (!options.monorepoOnly || project.workspace.isMonorepo)
+          && (options.isRequired === undefined || options.isRequired(project))
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 
         if (!isApplicable) {
           return legacyFindings.length > 0
-            ? ({
-                applicable: true,
-                findings: [...legacyFindings],
-                packageActions: [],
-                warnings: [],
-              } satisfies IntegrationAssessment)
-            : ({
-                applicable: false,
-              } satisfies IntegrationAssessment)
+            ? { applicable: true, findings: [...legacyFindings], packageActions: [], warnings: [] }
+            : { applicable: false }
         }
 
         const packageActions = getPackageActions(packageJson, options, options.purpose)
@@ -348,7 +342,7 @@ export function definePackageTooling<Error = never, Requirements = never>(option
           findings: [...getPackageFindings(packageActions, options.name), ...legacyFindings],
           packageActions,
           warnings: [],
-        } satisfies IntegrationAssessment
+        }
       }),
     kind: "tooling",
     name: options.name,
@@ -363,30 +357,39 @@ export interface ToolingWorkspace {
   readonly isMonorepo: boolean
 }
 
-export const detectToolingWorkspace = Effect.fn("detectToolingWorkspace")(function* (cwd: string) {
-  return { isMonorepo: yield* checkIsMonorepo(cwd) } satisfies ToolingWorkspace
+/**
+ * The project facts that a tooling integration derives its workspace from. An assessment takes them
+ * from the project, and `init` reads them when it creates a config.
+ */
+export interface ToolingFacts {
+  readonly isMonorepo: boolean
+  /**
+   * The content of the root `oxlint.config.ts`, or none when it does not exist.
+   */
+  readonly lintConfig: Option.Option<string>
+}
+
+const readToolingFacts = Effect.fn("readToolingFacts")(function* (cwd: string) {
+  const path = yield* Path.Path
+  const [isMonorepo, lintConfig] = yield* Effect.all(
+    [checkIsMonorepo(cwd), readFileIfExists(path.join(cwd, "oxlint.config.ts"))],
+    { concurrency: "unbounded" }
+  )
+
+  return { isMonorepo, lintConfig } satisfies ToolingFacts
 })
 
 /**
  * A tooling integration that manages a package version and a TypeScript config file with legacy
  * JSON predecessors (Knip, Oxfmt).
  */
-export function defineConfigTooling<
-  Workspace extends ToolingWorkspace,
-  Error,
-  Requirements,
->(options: {
+export function defineConfigTooling<Workspace extends ToolingWorkspace>(options: {
   /**
    * The config file content `init` writes and doctor findings reference. It can depend on the
    * workspace.
    */
   readonly configContent: (workspace: Workspace) => string
   readonly configFiles: ToolingConfigFiles
-  /**
-   * Read the workspace facts for `configContent` and `inspectConfig`. Use `detectToolingWorkspace`
-   * when the config depends only on the monorepo shape.
-   */
-  readonly detectWorkspace: (cwd: string) => Effect.Effect<Workspace, Error, Requirements>
   readonly inspectConfig: (content: string, workspace: Workspace) => RequiredConfigInspection
   /**
    * Findings for retired managed scripts. While any exist, the integration stays applicable and
@@ -397,6 +400,10 @@ export function defineConfigTooling<
   readonly purpose: string
   readonly scripts: readonly Script[]
   readonly version: string
+  /**
+   * Derive the workspace for `configContent` and `inspectConfig` from the project facts.
+   */
+  readonly workspace: (facts: ToolingFacts) => Workspace
 }) {
   const files: readonly IntegrationFile[] = [
     { path: options.configFiles.config, type: "config" },
@@ -407,7 +414,7 @@ export function defineConfigTooling<
   const detect = (cwd: string) => detectToolingConfig(cwd, options.name, options.configFiles)
 
   return defineIntegration({
-    assess: (cwd: string, packageJson: PackageJson) =>
+    assess: ({ cwd, lintConfig, packageJson, workspace: { isMonorepo } }: Project) =>
       Effect.gen(function* () {
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 
@@ -424,9 +431,8 @@ export function defineConfigTooling<
               } satisfies IntegrationAssessment)
         }
 
-        const [state, workspace] = yield* Effect.all([detect(cwd), options.detectWorkspace(cwd)], {
-          concurrency: "unbounded",
-        })
+        const state = yield* detect(cwd)
+        const workspace = options.workspace({ isMonorepo, lintConfig })
         const packageActions = getPackageActions(packageJson, options, options.purpose)
         const configContent = options.configContent(workspace)
         const inspection =
@@ -456,7 +462,7 @@ export function defineConfigTooling<
         const path = yield* Path.Path
         yield* writeFile(
           path.join(cwd, options.configFiles.config),
-          options.configContent(yield* options.detectWorkspace(cwd))
+          options.configContent(options.workspace(yield* readToolingFacts(cwd)))
         )
       }),
     detect,

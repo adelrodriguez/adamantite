@@ -2,6 +2,7 @@ import type { JsonObject, JsonValue } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import type { Finding } from "#lib/integrations/base.ts"
+import type { Project } from "#lib/workspace/project.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import {
@@ -38,10 +39,10 @@ function findLanguageServicePlugin(plugins: JsonValue | undefined) {
  * its own diagnostics. A monorepo gets guidance instead, as the tsconfig integration does.
  */
 export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* (
-  cwd: string,
+  { cwd, workspace }: Project,
   integration: string
 ) {
-  if (yield* checkIsMonorepo(cwd)) {
+  if (workspace.isMonorepo) {
     return {
       findings: [],
       warnings: [

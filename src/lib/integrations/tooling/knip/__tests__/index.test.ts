@@ -2,11 +2,12 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 
@@ -15,12 +16,12 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer])
+  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
 }
 
 function runAssess(files: FileSystemTestContext) {
-  return readPackageJson(ROOT).pipe(
-    Effect.flatMap((packageJson) => knip.assess(ROOT, packageJson)),
+  return readProject(ROOT).pipe(
+    Effect.flatMap((project) => knip.assess(project)),
     provideFiles(files)
   )
 }

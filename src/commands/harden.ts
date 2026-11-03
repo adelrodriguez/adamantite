@@ -28,6 +28,7 @@ import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "m
 import { readCustomRuleTestCommand } from "#lib/workspace/custom-rules/index.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
@@ -190,17 +191,17 @@ export default Command.make("harden", { commits, scope }).pipe(
           },
         ])
       )
-      // These reads change no file, so they run together. The Doctor warnings below already name
-      // the rules folders that discovery cannot follow.
-      const [{ command: ruleTestCommand }, assessment, { agentReach: reachAfter }] =
-        yield* Effect.all(
-          [
-            readCustomRuleTestCommand(cwd),
-            assessProject(cwd),
-            readHardenContext(cwd, scopeDirectory),
-          ],
-          { concurrency: "unbounded" }
-        )
+      // These reads change no file, so they run together, and the rule tests and the assessment
+      // share one read of the project. The Doctor warnings below already name the rules folders
+      // that discovery cannot follow.
+      const [project, { agentReach: reachAfter }] = yield* Effect.all(
+        [readProject(cwd), readHardenContext(cwd, scopeDirectory)],
+        { concurrency: "unbounded" }
+      )
+      const [{ command: ruleTestCommand }, assessment] = yield* Effect.all(
+        [readCustomRuleTestCommand(project), assessProject(project)],
+        { concurrency: "unbounded" }
+      )
       // `rule test` passes when the project has no rule tests.
       const ruleTestPassed = Option.isNone(ruleTestCommand)
         ? true

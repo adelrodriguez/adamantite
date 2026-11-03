@@ -2,8 +2,10 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import agents from "#lib/integrations/workspace/agents.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 
@@ -12,7 +14,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer])
+  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
 }
 
 describe("agents", () => {
@@ -24,7 +26,10 @@ describe("agents", () => {
     it.effect("report a missing AGENTS.md at the project root", () =>
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
-        const result = yield* agents.assess(ROOT, packageJson).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => agents.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toStrictEqual({
           applicable: true,
@@ -59,7 +64,10 @@ describe("agents", () => {
           "AGENTS.md": content,
           "package.json": yield* stringifyJson(packageJson),
         })
-        const result = yield* agents.assess(ROOT, packageJson).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => agents.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toStrictEqual({
           applicable: true,
@@ -78,7 +86,10 @@ describe("agents", () => {
           "package.json": yield* stringifyJson(monorepoPackageJson),
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         })
-        const result = yield* agents.assess(ROOT, monorepoPackageJson).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT, monorepoPackageJson).pipe(
+          Effect.flatMap((project) => agents.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toMatchObject({ applicable: true, findings: [] })
       })
@@ -88,7 +99,10 @@ describe("agents", () => {
       Effect.gen(function* () {
         const unmanagedPackageJson = { scripts: { check: "tsc --noEmit" } }
         const files = makeFiles({ "package.json": yield* stringifyJson(unmanagedPackageJson) })
-        const result = yield* agents.assess(ROOT, unmanagedPackageJson).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT, unmanagedPackageJson).pipe(
+          Effect.flatMap((project) => agents.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toStrictEqual({ applicable: false })
       })

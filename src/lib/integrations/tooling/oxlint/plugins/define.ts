@@ -1,30 +1,8 @@
-import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
-import * as Path from "effect/Path"
 import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
+import type { Project } from "#lib/workspace/project.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
-import { getImportedLintPresets, type LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
-
-const OXLINT_CONFIG_FILE = "oxlint.config.ts"
-
-/**
- * Whether `oxlint.config.ts` imports the lint preset, such as `effect` for
- * `adamantite/lint/effect`.
- */
-export const checkImportsLintPreset = Effect.fn("checkImportsLintPreset")(function* (
-  cwd: string,
-  preset: string
-) {
-  const path = yield* Path.Path
-  const content = yield* readFileIfExists(path.join(cwd, OXLINT_CONFIG_FILE))
-
-  return Option.match(content, {
-    onNone: () => false,
-    onSome: (value) => getImportedLintPresets(value).includes(preset),
-  })
-})
+import { checkImportsLintPreset, type LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 
 interface ManagedPluginOptions<AssessError, AssessRequirements> {
   /**
@@ -32,8 +10,7 @@ interface ManagedPluginOptions<AssessError, AssessRequirements> {
    * assessed only while the plugin applies.
    */
   readonly assess?: (
-    cwd: string,
-    packageJson: PackageJson
+    project: Project
   ) => Effect.Effect<
     { readonly findings: readonly Finding[]; readonly warnings: readonly string[] },
     AssessError,
@@ -59,7 +36,7 @@ export function defineManagedPlugin<
 >(options: ManagedPluginOptions<AssessError, AssessRequirements> & Extensions) {
   const { assess: assessMore, name, preset, version, ...extensions } = options
   const tooling = definePackageTooling({
-    isRequired: (cwd) => checkImportsLintPreset(cwd, preset),
+    isRequired: ({ lintConfig }) => checkImportsLintPreset(lintConfig, preset),
     name,
     purpose: `the \`adamantite/lint/${preset}\` preset`,
     scripts: ["check", "fix"],
@@ -69,15 +46,15 @@ export function defineManagedPlugin<
   return {
     ...extensions,
     ...tooling,
-    assess: (cwd: string, packageJson: PackageJson) =>
+    assess: (project: Project) =>
       Effect.gen(function* () {
-        const assessment = yield* tooling.assess(cwd, packageJson)
+        const assessment = yield* tooling.assess(project)
 
         if (!assessment.applicable || assessMore === undefined) {
           return assessment
         }
 
-        const more = yield* assessMore(cwd, packageJson)
+        const more = yield* assessMore(project)
 
         return {
           ...assessment,

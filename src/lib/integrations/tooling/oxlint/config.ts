@@ -124,6 +124,14 @@ export function getImportedLintPresets(content: string): string[] {
   )
 }
 
+/**
+ * Whether the `oxlint.config.ts` content imports the lint preset, such as `effect` for
+ * `adamantite/lint/effect`. A missing config imports none.
+ */
+export function checkImportsLintPreset(lintConfig: Option.Option<string>, preset: string): boolean {
+  return Option.exists(lintConfig, (content) => getImportedLintPresets(content).includes(preset))
+}
+
 function getStaticPropertyName(key: PropertyKey) {
   if (key.type === "Identifier") {
     return pipe(key.name, Option.some)

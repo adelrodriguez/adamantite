@@ -15,6 +15,7 @@ import {
   CUSTOM_RULES_DIRECTORY,
   readCustomRuleTestCommand,
 } from "#lib/workspace/custom-rules/index.ts"
+import { readProject } from "#lib/workspace/project.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 const astFile = Argument.File("file", { mustExist: true }).pipe(
@@ -87,7 +88,9 @@ const test = Command.make("test").pipe(
       const path = yield* Path.Path
       const runner = yield* CommandRunner
       const cwd = process.cwd()
-      const { command, unresolvedCalls, unresolvedImports } = yield* readCustomRuleTestCommand(cwd)
+      const { command, unresolvedCalls, unresolvedImports } = yield* readCustomRuleTestCommand(
+        yield* readProject(cwd)
+      )
 
       for (const source of unresolvedCalls) {
         yield* prompter.log.warning(

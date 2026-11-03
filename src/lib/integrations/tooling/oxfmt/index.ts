@@ -1,4 +1,4 @@
-import { defineConfigTooling, detectToolingWorkspace } from "#lib/integrations/tooling/base.ts"
+import { defineConfigTooling } from "#lib/integrations/tooling/base.ts"
 import {
   inspectRequiredOxfmtConfig,
   toOxfmtTsConfigContent,
@@ -11,7 +11,6 @@ export default defineConfigTooling({
     config: "oxfmt.config.ts",
     legacyConfigs: [".oxfmtrc.json", ".oxfmtrc.jsonc"],
   },
-  detectWorkspace: detectToolingWorkspace,
   inspectConfig: inspectRequiredOxfmtConfig,
   legacyFindings: (packageJson) =>
     packageJson.scripts?.format === "adamantite format"
@@ -33,4 +32,5 @@ export default defineConfigTooling({
   purpose: "the managed `check` and `fix` scripts",
   scripts: ["check", "fix"],
   version: getDependencyVersion("oxfmt"),
+  workspace: ({ isMonorepo }) => ({ isMonorepo }),
 })

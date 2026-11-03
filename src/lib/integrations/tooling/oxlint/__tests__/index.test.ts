@@ -3,9 +3,10 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { formatJson } from "#lib/shared/json.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 
@@ -14,12 +15,12 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer])
+  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
 }
 
 function runAssess(files: FileSystemTestContext) {
-  return readPackageJson(ROOT).pipe(
-    Effect.flatMap((packageJson) => oxlint.assess(ROOT, packageJson)),
+  return readProject(ROOT).pipe(
+    Effect.flatMap((project) => oxlint.assess(project)),
     provideFiles(files)
   )
 }

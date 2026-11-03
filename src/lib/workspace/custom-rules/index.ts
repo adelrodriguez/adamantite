@@ -4,15 +4,15 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
+import type { CustomRuleDiscovery } from "#lib/workspace/custom-rules/discover.ts"
+import type { Project } from "#lib/workspace/project.ts"
 import { CustomRuleExists, FailedToReadFile, InvalidRuleName } from "#lib/shared/errors.ts"
 import { ensureDirectory, readDirectoryIfExists, writeFile } from "#lib/shared/filesystem.ts"
-import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { isRuleFile } from "#lib/workspace/custom-rules/inspect.ts"
 import {
   getStubTemplate,
   getTestStubTemplate,
 } from "#lib/workspace/custom-rules/stub.macro.ts" with { type: "macro" }
-import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 const stubTemplate = getStubTemplate()
 const testStubTemplate = getTestStubTemplate()
@@ -83,15 +83,14 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
  * The rule tests of each rules folder that a `custom()` call loads, in sorted order. A test is a
  * file in `tests/` that would be a rule in the rules folder, so a `_` file is a helper. Discovery
  * cannot follow a `custom()` call whose `dir` is not a string literal, or an import that it cannot
- * resolve, so `unresolvedCalls` and `unresolvedImports` name them: their tests are not in `tests`.
+ * resolve, so the tests of those rules folders are not in the result.
  */
-export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (cwd: string) {
+export const findCustomRuleTests = Effect.fn("findCustomRuleTests")(function* (
+  customRules: CustomRuleDiscovery
+) {
   const path = yield* Path.Path
-  const packageDirectories = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
-  const { calls, unresolvedCalls, unresolvedImports } =
-    yield* discoverCustomRules(packageDirectories)
   const testDirectories = Array.dedupe(
-    calls.map((call) => path.join(call.dir, CUSTOM_RULE_TESTS_DIRECTORY))
+    customRules.calls.map((call) => path.join(call.dir, CUSTOM_RULE_TESTS_DIRECTORY))
   )
   const tests = yield* Effect.forEach(
     testDirectories,
@@ -106,23 +105,20 @@ export const listCustomRuleTests = Effect.fn("listCustomRuleTests")(function* (c
     { concurrency: "unbounded" }
   )
 
-  return {
-    tests: Array.sort(tests.flat(), Order.String),
-    unresolvedCalls: Array.dedupe(unresolvedCalls),
-    unresolvedImports,
-  }
+  return Array.sort(tests.flat(), Order.String)
 })
 
 /**
- * The command that runs the rule tests, with paths relative to `cwd`, or none when no test exists,
- * and what discovery could not follow, as `listCustomRuleTests` returns it. `RuleTester` runs only
- * on Node.js, so the tests run under Node.js, also in a Bun project.
+ * The command that runs the rule tests, with paths relative to the project root, or none when no
+ * test exists, and the `custom()` calls and imports that discovery could not follow. `RuleTester`
+ * runs only on Node.js, so the tests run under Node.js, also in a Bun project.
  */
-export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* (
-  cwd: string
-) {
+export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(function* ({
+  customRules,
+  cwd,
+}: Project) {
   const path = yield* Path.Path
-  const { tests, unresolvedCalls, unresolvedImports } = yield* listCustomRuleTests(cwd)
+  const tests = yield* findCustomRuleTests(customRules)
 
   return {
     command:
@@ -132,7 +128,7 @@ export const readCustomRuleTestCommand = Effect.fn("readCustomRuleTestCommand")(
             args: ["--test", ...tests.map((test) => path.relative(cwd, test))],
             command: "node",
           }),
-    unresolvedCalls,
-    unresolvedImports,
+    unresolvedCalls: Array.dedupe(customRules.unresolvedCalls),
+    unresolvedImports: customRules.unresolvedImports,
   }
 })

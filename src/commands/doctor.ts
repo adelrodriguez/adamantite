@@ -6,6 +6,7 @@ import { assessProject, renderAssessmentMarkdown } from "#lib/assessment/index.t
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
@@ -55,7 +56,7 @@ export default Command.make("doctor").pipe(
         })
       }
 
-      const assessment = yield* assessProject(cwd, initialPackageJson)
+      const assessment = yield* assessProject(yield* readProject(cwd, initialPackageJson))
 
       if (isInteractive) {
         for (const warning of assessment.warnings) {
@@ -104,7 +105,7 @@ export default Command.make("doctor").pipe(
       }
 
       const { agent } = resolution
-      const after = yield* assessProject(cwd)
+      const after = yield* assessProject(yield* readProject(cwd))
 
       if (after.findings.length === 0) {
         yield* prompter.log.success(`All findings were resolved by ${agent.name}.`)

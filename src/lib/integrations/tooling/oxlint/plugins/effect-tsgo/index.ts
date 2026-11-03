@@ -1,5 +1,5 @@
-import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
+import type { Project } from "#lib/workspace/project.ts"
 import { defineManagedPlugin } from "#lib/integrations/tooling/oxlint/plugins/define.ts"
 import { assessPrepareScript } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/prepare-script.ts"
 import {
@@ -11,12 +11,12 @@ import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type:
 const NAME = "@effect/tsgo"
 
 export default defineManagedPlugin({
-  assess: (cwd: string, packageJson: PackageJson) =>
+  assess: (project: Project) =>
     Effect.gen(function* () {
-      const tsconfig = yield* assessTsconfigPlugin(cwd, NAME)
+      const tsconfig = yield* assessTsconfigPlugin(project, NAME)
 
       return {
-        findings: [...assessPrepareScript(packageJson, NAME), ...tsconfig.findings],
+        findings: [...assessPrepareScript(project.packageJson, NAME), ...tsconfig.findings],
         warnings: tsconfig.warnings,
       }
     }),

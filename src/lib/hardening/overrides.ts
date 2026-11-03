@@ -11,7 +11,7 @@ import {
   type ObjectProperty,
   type Program,
 } from "oxc-parser"
-import { isReportOf, lintFiles, listBuiltInRules, listLintedFiles } from "#lib/hardening/oxlint.ts"
+import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfig } from "#lib/hardening/trial.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
 
@@ -277,7 +277,14 @@ export const readOverrides = Effect.fn("readOverrides")(
     const marks = new Map<string, OverrideFileMark>()
 
     if (linted.length > 0) {
-      const builtIns = yield* listBuiltInRules(cwd)
+      const resolved = new Map(
+        yield* Effect.forEach(
+          Array.dedupe(linted.map((entry) => entry.rule)),
+          (rule) =>
+            resolveRule(rule, cwd).pipe(Effect.map((resolution) => [rule, resolution] as const)),
+          { concurrency: "unbounded" }
+        )
+      )
       const copy = yield* makeProjectCopy(cwd)
 
       for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
@@ -308,12 +315,15 @@ export const readOverrides = Effect.fn("readOverrides")(
       )
 
       for (const entry of linted) {
+        const rule = resolved.get(entry.rule)
+
         for (const file of entry.literals.filter((literal) => existing.has(literal))) {
           const breaks = report.diagnostics.some(
             (diagnostic) =>
               diagnostic.filename === file
               && diagnostic.code !== undefined
-              && isReportOf(diagnostic.code, entry.rule, builtIns)
+              && rule !== undefined
+              && isReportOf(diagnostic.code, rule)
           )
           const mark: OverrideFileMark = listed.has(file)
             ? unparsable.has(file)

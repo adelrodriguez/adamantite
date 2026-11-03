@@ -131,7 +131,8 @@ warns the user and points to `adamantite doctor`.
   folder, puts a trial config in place of the config that lints the cases, and lints the cases
   with Oxlint from the root of the copy. The copy gets a real `node_modules` folder with a link
   to each entry of the project folder, so the entry module that `custom()` writes stays in the
-  copy. A link to a workspace package goes to the copy of the package. It exits 0 when each case
+  copy. A link to a workspace package goes to the copy of the package, with the files that git
+  ignores in it, such as build output. It exits 0 when each case
   is as expected, 1 when a case is not, and 2 when the trial is not evidence. See ADR 0020.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle

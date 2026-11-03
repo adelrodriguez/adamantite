@@ -17,11 +17,15 @@ The decisions:
   of the config that it replaces, and imports that config under a new name. So the root config
   gives the options that only a root config can set, such as `typeAware`, and the nearest config
   gives the rules of each case.
-- A report counts only when it comes from the plugin and the name of the rule. A built-in rule
-  that Oxlint does not list, such as `typescript/no-restricted-imports`, is an alias, and Oxlint
-  reports it under the plugin of the rule that it resolves to.
+- A report counts only when it comes from the plugin and the name of the rule, as Oxlint resolves
+  them. Oxlint prints the config of an empty folder that turns on the rule, and names the rule as
+  it reports it: `@typescript-eslint/no-explicit-any` as `typescript/no-explicit-any`, and
+  `typescript/no-restricted-imports` as `no-restricted-imports`. A rule that this config cannot
+  load is a rule of a JS plugin, and keeps its name.
 - A link in `node_modules` to a workspace package goes to the copy of the package, so a config
-  that imports a shared tooling package loads the copied rules.
+  that imports a shared tooling package loads the copied rules. The copy of a linked package also
+  has the files that git ignores in it, outside `node_modules`, such as the build output that its
+  `exports` name.
 - The trial changes the config, not the command line. Oxlint ignores `-D` for a rule that does
   not exist and for a JS plugin rule. It also ignores a built-in rule whose plugin the config
   does not turn on, so the trial override turns on that plugin.

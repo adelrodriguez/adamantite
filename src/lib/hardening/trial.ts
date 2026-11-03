@@ -8,11 +8,11 @@ import * as Path from "effect/Path"
 import {
   isReportOf,
   lintFiles,
-  listBuiltInRules,
+  resolveRule,
   listLintedFiles,
   splitRuleName,
 } from "#lib/hardening/oxlint.ts"
-import { listProjectFiles } from "#lib/hardening/project-files.ts"
+import { listIgnoredFiles, listProjectFiles } from "#lib/hardening/project-files.ts"
 import {
   type CliNotFound,
   FailedToWriteFile,
@@ -245,11 +245,11 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
     // A file of the project outside each `node_modules` folder, such as a workspace package, has a
     // copy. A real path can differ from `cwd` in a folder link, such as `/var` on macOS.
     const root = yield* fs.realPath(cwd)
-    const toCopy = (file: string) => {
+    const toProjectFolder = (file: string) => {
       const relative = path.relative(root, file)
 
       return Option.liftPredicate(
-        path.join(copy, relative),
+        relative,
         () =>
           relative !== ""
           && relative !== ".."
@@ -286,7 +286,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       return entries.pipe(Option.as(packages.flat()))
     })
 
-    yield* Effect.forEach(
+    const linked = yield* Effect.forEach(
       packages,
       Effect.fnUntraced(function* (directory) {
         const modules = path.join(directory, "node_modules")
@@ -297,26 +297,49 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
           yield* fs.makeDirectory(target, { recursive: true })
         }
 
-        yield* Effect.forEach(
+        return yield* Effect.forEach(
           Option.getOrElse(entries, () => []),
           Effect.fnUntraced(function* (entry) {
             const source = path.join(modules, entry)
             // A broken link has no real path, so the copy links to the same missing file.
-            const resolved = yield* fs.realPath(source).pipe(Effect.option)
+            const folder = (yield* fs.realPath(source).pipe(Effect.option)).pipe(
+              Option.flatMap((file) => toProjectFolder(file))
+            )
 
             yield* fs.makeDirectory(path.dirname(path.join(target, entry)), { recursive: true })
             yield* fs.symlink(
-              resolved.pipe(
-                Option.flatMap((file) => toCopy(file)),
-                Option.getOrElse(() => source)
-              ),
+              Option.match(folder, {
+                onNone: () => source,
+                onSome: (relative) => path.join(copy, relative),
+              }),
               path.join(target, entry)
             )
+
+            return folder
           }),
-          { discard: true }
+          { concurrency: 1 }
         )
       }),
-      { discard: true }
+      { concurrency: 1 }
+    )
+    // A linked package can load files that git ignores, such as the build output that its
+    // `exports` name, so the copy of the package has them too.
+    const ignored = yield* Effect.forEach(
+      Array.dedupe(Array.getSomes(linked.flat())),
+      (folder) =>
+        listIgnoredFiles(cwd, folder.split(path.sep).join("/")).pipe(
+          Effect.map((files) => Option.getOrElse(files, () => []))
+        ),
+      { concurrency: "unbounded" }
+    )
+
+    yield* Effect.forEach(
+      Array.dedupe(ignored.flat()),
+      (file) =>
+        fs
+          .makeDirectory(path.dirname(path.join(copy, file)), { recursive: true })
+          .pipe(Effect.andThen(fs.copyFile(path.join(cwd, file), path.join(copy, file)))),
+      { concurrency: 16, discard: true }
     )
 
     return copy
@@ -385,7 +408,7 @@ export const tryRule = Effect.fn("tryRule")(
     const path = yield* Path.Path
     const { cases, cwd, rule, setting } = options
     const { name: ruleName, plugin } = splitRuleName(rule)
-    const builtIns = yield* listBuiltInRules(cwd)
+    const resolved = yield* resolveRule(rule, cwd)
     const copy = yield* makeProjectCopy(cwd)
     const toProjectPath = (file: string) => path.relative(copy, file).split(path.sep).join("/")
     // Oxlint fails to load a config with a rule or a plugin that does not exist. Only a trial
@@ -445,8 +468,8 @@ export const tryRule = Effect.fn("tryRule")(
               linted.filter((entry) => entry.config === config).map((entry) => entry.configFile)
             ),
             plugin: Option.liftPredicate(
-              plugin,
-              (name) => name !== "eslint" && builtIns.plugins.has(name)
+              resolved.plugin,
+              (name) => resolved.builtIn && name !== "eslint"
             ),
             rule,
             settingOptions: setting.options,
@@ -522,8 +545,7 @@ export const tryRule = Effect.fn("tryRule")(
           config: toProjectPath(entry.config),
           diagnostics: reports
             .filter(
-              (diagnostic) =>
-                diagnostic.code !== undefined && isReportOf(diagnostic.code, rule, builtIns)
+              (diagnostic) => diagnostic.code !== undefined && isReportOf(diagnostic.code, resolved)
             )
             .map((diagnostic) => ({
               column: diagnostic.labels[0]?.span.column ?? 1,

@@ -1,14 +1,18 @@
 import process from "node:process"
+import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
+import * as Path from "effect/Path"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import { CliNotFound, TrialLintFailed } from "#lib/shared/errors.ts"
+import { writeFile } from "#lib/shared/filesystem.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 
 /**
  * Oxlint prints a line, such as "No files found to lint.", before its JSON report.
@@ -34,12 +38,11 @@ const decodeOxlintReport = Schema.decodeUnknownOption(Schema.fromJsonString(Oxli
 
 const OxlintRules = Schema.Array(Schema.Struct({ scope: Schema.String, value: Schema.String }))
 
-/**
- * A diagnostic code, such as `eslint(no-debugger)`: the plugin that reports, and the rule name.
- */
-const DIAGNOSTIC_CODE = /^(?<plugin>[^()]+)\((?<name>[^()]+)\)$/u
-
 const decodeOxlintRules = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintRules))
+
+const OxlintConfig = Schema.Struct({ rules: Schema.Record(Schema.String, Schema.Unknown) })
+
+const decodeOxlintConfig = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintConfig))
 
 /**
  * The command that runs Oxlint for a project. It starts the toolchain entry that the build writes
@@ -65,36 +68,22 @@ export function splitRuleName(rule: string): { readonly name: string; readonly p
 }
 
 /**
- * The plugins and the rules that Oxlint has built in, as a config names them, such as `jsx-a11y`
- * and `jsx-a11y/alt-text`.
+ * A rule as Oxlint reports it. Oxlint resolves the name of a built-in rule, so it reports
+ * `@typescript-eslint/no-explicit-any` as `typescript(no-explicit-any)`, and
+ * `typescript/no-restricted-imports` as `eslint(no-restricted-imports)`. A rule of a JS plugin
+ * keeps the name that the config gives it.
  */
-export interface BuiltInRules {
-  readonly plugins: ReadonlySet<string>
-  readonly rules: ReadonlySet<string>
+export interface ResolvedRule {
+  readonly builtIn: boolean
+  readonly name: string
+  readonly plugin: string
 }
 
 /**
- * Whether a diagnostic `code`, such as `eslint(no-debugger)`, comes from the rule. Oxlint reports a
- * rule under its plugin. A built-in rule that Oxlint does not list, such as
- * `typescript/no-restricted-imports`, is an alias of the rule of another built-in plugin, and
- * Oxlint reports it under that plugin, as `eslint(no-restricted-imports)`.
+ * Whether a diagnostic `code`, such as `eslint(no-debugger)`, comes from the rule.
  */
-export function isReportOf(code: string, rule: string, builtIns: BuiltInRules): boolean {
-  const { name, plugin } = splitRuleName(rule)
-  const reporter = DIAGNOSTIC_CODE.exec(code)?.groups
-
-  if (reporter?.["name"] !== name) {
-    return false
-  }
-
-  const reportingPlugin = reporter["plugin"] ?? ""
-
-  return (
-    reportingPlugin === plugin
-    || (builtIns.plugins.has(plugin)
-      && !builtIns.rules.has(`${plugin}/${name}`)
-      && builtIns.plugins.has(reportingPlugin))
-  )
+export function isReportOf(code: string, rule: ResolvedRule): boolean {
+  return code === `${rule.plugin}(${rule.name})`
 }
 
 /**
@@ -180,27 +169,49 @@ export const listLintedFiles = Effect.fn("listLintedFiles")(function* (
 })
 
 /**
- * The plugins and the rules that Oxlint has built in, with the toolchain of `project`. Oxlint runs
- * in an empty folder, so no config loads.
+ * The rule as Oxlint reports it, with the toolchain of `project`. Oxlint prints the config of an
+ * empty folder that turns on the rule and each built-in plugin, and names the rule as it resolves
+ * it. A rule that this config cannot load is a rule of a JS plugin.
  */
-export const listBuiltInRules = Effect.fn("listBuiltInRules")(function* (project: string) {
+export const resolveRule = Effect.fn("resolveRule")(function* (rule: string, project: string) {
   const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
   const folder = yield* fs.makeTempDirectoryScoped({ prefix: "adamantite-rules-" })
-  const { output, stdout } = yield* runOxlint(folder, ["--rules", "-f", "json"], project)
-  const rules = decodeOxlintRules(stdout)
+  const listed = yield* runOxlint(folder, ["--rules", "-f", "json"], project)
+  const rules = decodeOxlintRules(listed.stdout)
 
   if (Option.isNone(rules)) {
-    return yield* new TrialLintFailed({ output })
+    return yield* new TrialLintFailed({ output: listed.output })
   }
 
-  // `--rules` names a plugin with `_`, such as `jsx_a11y`, and a config names it with `-`.
-  const named = rules.value.map(({ scope, value }) => ({
-    plugin: scope.replaceAll("_", "-"),
-    value,
-  }))
+  // `--rules` and `--print-config` name a plugin with `_`, such as `jsx_a11y`, and a config and a
+  // report name it with `-`.
+  const plugins = Array.dedupe(rules.value.map((entry) => entry.scope.replaceAll("_", "-")))
+  const { name, plugin } = splitRuleName(rule)
 
-  return {
-    plugins: new Set(named.map((rule) => rule.plugin)),
-    rules: new Set(named.map((rule) => `${rule.plugin}/${rule.value}`)),
-  } satisfies BuiltInRules
+  yield* writeFile(
+    path.join(folder, ".oxlintrc.json"),
+    yield* stringifyJson({
+      categories: { correctness: "off" },
+      plugins,
+      rules: { [rule]: "error" },
+    })
+  )
+
+  const printed = yield* runOxlint(folder, ["--print-config"], project)
+  const resolved = decodeOxlintConfig(printed.stdout).pipe(
+    Option.flatMap((config) =>
+      Array.findFirst(Object.keys(config.rules), (key) => splitRuleName(key).name === name)
+    ),
+    Option.map((key) => splitRuleName(key))
+  )
+
+  return Option.match(resolved, {
+    onNone: (): ResolvedRule => ({ builtIn: false, name, plugin }),
+    onSome: (key): ResolvedRule => ({
+      builtIn: true,
+      name: key.name,
+      plugin: key.plugin.replaceAll("_", "-"),
+    }),
+  })
 }, Effect.scoped)

@@ -8,20 +8,18 @@ import * as Stream from "effect/Stream"
 import * as String from "effect/String"
 
 /**
- * The files below `cwd` that git tracks, and the new files that git does not ignore, as paths
- * relative to `cwd` with `/` between folders. `pathspecs` limits the list, such as `["*.md"]`. Some
- * tracked files can be missing from the working tree. None when git cannot list them, for example
- * outside a repository.
+ * The files that `git ls-files` lists with `args` in `cwd`, as paths relative to `cwd` with `/`
+ * between folders. None when git cannot list them, for example outside a repository.
  */
-export const listProjectFiles = Effect.fn("listProjectFiles")(
-  function* (cwd: string, pathspecs: readonly string[] = []) {
+const listGitFiles = Effect.fn("listGitFiles")(
+  function* (cwd: string, args: readonly string[]) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const handle = yield* spawner.spawn(
-      ChildProcess.make(
-        "git",
-        ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", ...pathspecs],
-        { cwd, stderr: "ignore", stdin: "ignore" }
-      )
+      ChildProcess.make("git", ["ls-files", "-z", ...args], {
+        cwd,
+        stderr: "ignore",
+        stdin: "ignore",
+      })
     )
     const [output, exitCode] = yield* Effect.all(
       [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
@@ -40,3 +38,26 @@ export const listProjectFiles = Effect.fn("listProjectFiles")(
   Effect.scoped,
   Effect.orElseSucceed(() => Option.none<string[]>())
 )
+
+/**
+ * The files below `cwd` that git tracks, and the new files that git does not ignore. `pathspecs`
+ * limits the list, such as `["*.md"]`. Some tracked files can be missing from the working tree.
+ */
+export function listProjectFiles(cwd: string, pathspecs: readonly string[] = []) {
+  return listGitFiles(cwd, ["--cached", "--others", "--exclude-standard", "--", ...pathspecs])
+}
+
+/**
+ * The files in `folder`, a folder relative to `cwd`, that git ignores, such as build output,
+ * without the files of `node_modules` folders.
+ */
+export function listIgnoredFiles(cwd: string, folder: string) {
+  return listGitFiles(cwd, [
+    "--others",
+    "--ignored",
+    "--exclude-standard",
+    "--",
+    folder,
+    ":(exclude,glob)**/node_modules/**",
+  ])
+}

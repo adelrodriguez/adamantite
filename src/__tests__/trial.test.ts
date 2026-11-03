@@ -69,6 +69,19 @@ const WORKSPACE_FILES = {
   }),
 }
 
+// The same package with its config in build output that git ignores.
+const BUILT_WORKSPACE_FILES = {
+  ...WORKSPACE_FILES,
+  ".gitignore": "node_modules\ndist\n",
+  "packages/tooling/dist/index.js": `import custom from ${JSON.stringify(CUSTOM_PRESET)}\n\nexport default custom({ dir: "../.adamantite/rules" })\n`,
+  "packages/tooling/index.ts": null,
+  "packages/tooling/package.json": JSON.stringify({
+    exports: "./dist/index.js",
+    name: "tooling",
+    type: "module",
+  }),
+}
+
 const EFFECT_CONFIG = [
   'import { defineConfig } from "oxlint"',
   `import effect from ${JSON.stringify(join(REPO_ROOT, "presets/lint/effect.ts"))}`,
@@ -238,10 +251,15 @@ describe("rule trials in a real project", () => {
     })
   )
 
-  it.live("load a workspace package of the config from the copy", () =>
+  it.live.each([
+    { files: WORKSPACE_FILES, name: "its source" },
+    { files: BUILT_WORKSPACE_FILES, name: "build output that git ignores" },
+  ])("load a workspace package of the config from the copy, with $name", ({ files }) =>
     Effect.gen(function* () {
-      for (const [file, content] of Object.entries(WORKSPACE_FILES)) {
-        write(file, content)
+      for (const [file, content] of Object.entries(files)) {
+        if (content !== null) {
+          write(file, content)
+        }
       }
 
       symlinkSync("../packages/tooling", join(project, "node_modules/tooling"))
@@ -254,6 +272,18 @@ describe("rule trials in a real project", () => {
       expect(getReportCounts(results)).toStrictEqual([1])
       // `custom()` in the package writes its entry module to the copy, not to the project.
       expect(listProject()).toStrictEqual(before)
+    })
+  )
+
+  it.live("report a built-in rule under a namespace that Oxlint resolves", () =>
+    Effect.gen(function* () {
+      const results = yield* runTrial(
+        "@typescript-eslint/no-explicit-any",
+        { _tag: "Error", options: [] },
+        [makeCase("src/value.ts", "reported", writeCase("value.ts", "export type Value = any\n"))]
+      )
+
+      expect(getReportCounts(results)).toStrictEqual([1])
     })
   )
 

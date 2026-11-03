@@ -1,7 +1,6 @@
 import { posix } from "node:path"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
-import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 
 /**
@@ -131,15 +130,15 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       .filter((target) => MARKDOWN_EXTENSION.test(target) && !listed.has(target))
       .map((target) => ({ file, target }))
   )
-  const brokenLinks = yield* pipe(
+  // A Markdown file that git ignores still exists.
+  const brokenLinks = yield* Effect.filter(
     linksToMarkdown,
-    // A Markdown file that git ignores still exists.
-    Effect.filter((link) =>
+    (link) =>
       fs.exists(path.join(cwd, link.target)).pipe(
         Effect.map((exists) => !exists),
         Effect.orElseSucceed(() => true)
-      )
-    )
+      ),
+    { concurrency: "unbounded" }
   )
 
   return {

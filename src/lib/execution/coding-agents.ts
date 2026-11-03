@@ -160,11 +160,11 @@ export class CodingAgents extends Context.Service<
 
       return CodingAgents.of({
         detectInstalled: Effect.fn("CodingAgents.detectInstalled")((cwd) =>
-          // `Effect.filter` collects in completion order under concurrency; `forEach` keeps
-          // the registry order the menu depends on.
-          Effect.forEach(codingAgents, (agent) => isInstalled(agent, cwd), {
+          // `Effect.filter` keeps the registry order that the menu depends on, also when the
+          // probes finish out of order.
+          Effect.filter(codingAgents, (agent) => isInstalled(agent, cwd), {
             concurrency: "unbounded",
-          }).pipe(Effect.map((installed) => codingAgents.filter((_, index) => installed[index])))
+          })
         ),
         handoff: Effect.fn("CodingAgents.handoff")(
           function* ({ agent, cwd, prompt }) {

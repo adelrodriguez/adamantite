@@ -11,7 +11,7 @@ import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
 import { inspectRuleFile, isRuleFile } from "#lib/workspace/custom-rules/inspect.ts"
-import { checkIsMonorepo, getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
+import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 const NAME = "oxlint-custom"
 
@@ -45,10 +45,7 @@ export default defineIntegration({
     Effect.gen(function* () {
       const path = yield* Path.Path
       const relative = (target: string) => path.relative(cwd, target) || "."
-      const packageDirectories = [
-        cwd,
-        ...((yield* checkIsMonorepo(cwd)) ? yield* getWorkspacePackageDirectories(cwd) : []),
-      ]
+      const packageDirectories = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
       const { calls, unresolvedCalls, unresolvedImports } =
         yield* discoverCustomRules(packageDirectories)
       const defaultFolders = packageDirectories.map((directory) =>
@@ -112,29 +109,33 @@ export default defineIntegration({
         }
       }
 
-      for (const folder of folders) {
-        for (const file of folder.ruleFiles) {
-          const rulePath = path.join(folder.dir, file)
-          const problems = inspectRuleFile(rulePath, yield* readFile(rulePath))
+      const rules = yield* Effect.forEach(
+        folders.flatMap((folder) => folder.ruleFiles.map((file) => path.join(folder.dir, file))),
+        (rulePath) =>
+          readFile(rulePath).pipe(
+            Effect.map((content) => ({ problems: inspectRuleFile(rulePath, content), rulePath }))
+          ),
+        { concurrency: "unbounded" }
+      )
 
-          if (problems.length === 0) {
-            continue
-          }
-
-          findings.push({
-            currentState: `\`${relative(rulePath)}\` cannot load as a rule, so the whole lint run fails with "Failed to parse oxlint configuration file":\n${problems.map((problem) => `  - ${problem}`).join("\n")}`,
-            goal: [
-              "The file parses, uses only TypeScript that type stripping can erase (no `enum`, `namespace` with values, parameter properties, or `import x = require()`), and exports the rule as default.",
-              "Keep the behavior of the rule.",
-            ],
-            id: `custom-rule-cannot-load:${relative(rulePath)}`,
-            integration: NAME,
-            notes: [
-              "A file that starts with `_` is a helper, not a rule. Rename a helper file so that it starts with `_`.",
-            ],
-            title: `Custom rule \`${relative(rulePath)}\` cannot load`,
-          })
+      for (const { problems, rulePath } of rules) {
+        if (problems.length === 0) {
+          continue
         }
+
+        findings.push({
+          currentState: `\`${relative(rulePath)}\` cannot load as a rule, so the whole lint run fails with "Failed to parse oxlint configuration file":\n${problems.map((problem) => `  - ${problem}`).join("\n")}`,
+          goal: [
+            "The file parses, uses only TypeScript that type stripping can erase (no `enum`, `namespace` with values, parameter properties, or `import x = require()`), and exports the rule as default.",
+            "Keep the behavior of the rule.",
+          ],
+          id: `custom-rule-cannot-load:${relative(rulePath)}`,
+          integration: NAME,
+          notes: [
+            "A file that starts with `_` is a helper, not a rule. Rename a helper file so that it starts with `_`.",
+          ],
+          title: `Custom rule \`${relative(rulePath)}\` cannot load`,
+        })
       }
 
       const loadingCalls = calls.flatMap(({ dir, name, source }) =>

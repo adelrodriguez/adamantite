@@ -5,6 +5,7 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
+import * as Result from "effect/Result"
 import {
   EffectBuildMissing,
   EffectPlatformUnsupported,
@@ -93,23 +94,29 @@ export const resolveEffectToolchain = Effect.fn("resolveEffectToolchain")(functi
     return yield* new PackageNotInstalled({ packageName: "oxlint-tsgolint", project })
   }
 
-  const effectVersion = yield* readVersion(tsgo.value)
+  const [effectVersion, tsgolintVersion, oxlintVersion] = yield* Effect.all(
+    [readVersion(tsgo.value), readVersion(tsgolint.value), readVersion(oxlint)],
+    { concurrency: "unbounded" }
+  )
   const tsgolintFile = process.platform === "win32" ? "tsgolint.exe" : "tsgolint"
+  // `Result.all` takes the first failure in input order, so a project that has no build of either
+  // version always gets the backend error.
+  const artifacts = yield* Effect.all(
+    [
+      findArtifact(
+        platformDirectory.value,
+        effectVersion,
+        "oxlint-tsgolint",
+        tsgolintVersion,
+        (file) => file === tsgolintFile
+      ),
+      findArtifact(platformDirectory.value, effectVersion, "oxlint", oxlintVersion, (file) =>
+        file.endsWith(".node")
+      ),
+    ],
+    { concurrency: "unbounded", mode: "result" }
+  )
+  const [backend, binding] = yield* Effect.fromResult(Result.all(artifacts))
 
-  return Option.some<EffectToolchain>({
-    backend: yield* findArtifact(
-      platformDirectory.value,
-      effectVersion,
-      "oxlint-tsgolint",
-      yield* readVersion(tsgolint.value),
-      (file) => file === tsgolintFile
-    ),
-    binding: yield* findArtifact(
-      platformDirectory.value,
-      effectVersion,
-      "oxlint",
-      yield* readVersion(oxlint),
-      (file) => file.endsWith(".node")
-    ),
-  })
+  return Option.some<EffectToolchain>({ backend, binding })
 })

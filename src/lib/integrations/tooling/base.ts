@@ -424,9 +424,10 @@ export function defineConfigTooling<
               } satisfies IntegrationAssessment)
         }
 
-        const state = yield* detect(cwd)
+        const [state, workspace] = yield* Effect.all([detect(cwd), options.detectWorkspace(cwd)], {
+          concurrency: "unbounded",
+        })
         const packageActions = getPackageActions(packageJson, options, options.purpose)
-        const workspace = yield* options.detectWorkspace(cwd)
         const configContent = options.configContent(workspace)
         const inspection =
           state.active?.format === "ts"

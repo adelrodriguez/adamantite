@@ -69,10 +69,13 @@ function formatIgnoreDependencies(lists: readonly IgnoreList[]) {
 
 export const detectKnipWorkspace = Effect.fn("detectKnipWorkspace")(function* (cwd: string) {
   const path = yield* Path.Path
-  const lintConfig = yield* readFileIfExists(path.join(cwd, "oxlint.config.ts"))
+  const [lintConfig, workspace] = yield* Effect.all(
+    [readFileIfExists(path.join(cwd, "oxlint.config.ts")), detectToolingWorkspace(cwd)],
+    { concurrency: "unbounded" }
+  )
 
   return {
-    ...(yield* detectToolingWorkspace(cwd)),
+    ...workspace,
     usesEffectPreset: Option.match(lintConfig, {
       onNone: () => false,
       onSome: (content) => getImportedLintPresets(content).includes("effect"),

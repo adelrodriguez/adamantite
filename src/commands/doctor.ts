@@ -55,7 +55,7 @@ export default Command.make("doctor").pipe(
         })
       }
 
-      const assessment = yield* assessProject(cwd)
+      const assessment = yield* assessProject(cwd, initialPackageJson)
 
       if (isInteractive) {
         for (const warning of assessment.warnings) {

@@ -29,10 +29,11 @@ function makeManifest(name: string, version: string) {
 }
 
 /**
- * A project with Oxlint `oxlintVersion` and oxlint-tsgolint 7.0.2004 installed, and the Effect
- * builds that @effect/tsgo 0.63.0 ships for Oxlint 1.88.0 and 1.89.0.
+ * A project with Oxlint `oxlintVersion` and oxlint-tsgolint `tsgolintVersion` installed, and the
+ * Effect builds that @effect/tsgo 0.63.0 ships for Oxlint 1.88.0 and 1.89.0 and oxlint-tsgolint
+ * 7.0.2004.
  */
-function makeFiles(oxlintVersion = "1.88.0") {
+function makeFiles(oxlintVersion = "1.88.0", tsgolintVersion = "7.0.2004") {
   return createFileSystemTestContext({
     files: Object.fromEntries([
       [`${ARTIFACTS}/oxlint-tsgolint/7.0.2004/${TSGOLINT}`, ""],
@@ -40,7 +41,10 @@ function makeFiles(oxlintVersion = "1.88.0") {
       [`${ARTIFACTS}/oxlint/1.89.0/oxlint.${PLATFORM}.node`, ""],
       [`node_modules/${PLATFORM_PACKAGE}/package.json`, makeManifest(PLATFORM_PACKAGE, "0.63.0")],
       ["node_modules/@effect/tsgo/package.json", makeManifest("@effect/tsgo", "0.63.0")],
-      ["node_modules/oxlint-tsgolint/package.json", makeManifest("oxlint-tsgolint", "7.0.2004")],
+      [
+        "node_modules/oxlint-tsgolint/package.json",
+        makeManifest("oxlint-tsgolint", tsgolintVersion),
+      ],
       ["node_modules/oxlint/package.json", makeManifest("oxlint", oxlintVersion)],
       ["package.json", makeManifest("app", "1.0.0")],
     ]),
@@ -107,6 +111,21 @@ describe("toolchain", () => {
           "The effect preset needs the @effect/tsgo build of oxlint 1.91.0. @effect/tsgo 0.63.0 has builds for oxlint 1.88.0, 1.89.0. Run `adamantite update`."
         )
       })
+  )
+
+  it.effect("name the backend when @effect/tsgo has no build of either installed version", () =>
+    Effect.gen(function* () {
+      const error = yield* runResolve(makeFiles("1.91.0", "7.0.3000"), EFFECT_PACKAGES).pipe(
+        Effect.flip
+      )
+
+      expect(error).toMatchObject({
+        _tag: "EffectBuildMissing",
+        supported: ["7.0.2004"],
+        tool: "oxlint-tsgolint",
+        version: "7.0.3000",
+      })
+    })
   )
 
   it.effect("fail for a platform that @effect/tsgo publishes no build for", () =>

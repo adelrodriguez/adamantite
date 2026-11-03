@@ -35,7 +35,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  return Effect.provide([files.layer, Path.layer])
 }
 
 function makeTerminalLayer(columns?: number) {
@@ -47,6 +47,7 @@ function makeTerminalLayer(columns?: number) {
       readInput: Effect.never,
       readLine: Effect.never,
       rows: Effect.succeed(24),
+      size: Effect.never,
     })
   )
 }

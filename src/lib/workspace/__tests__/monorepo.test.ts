@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
@@ -115,7 +114,7 @@ describe("getWorkspacePackageDirectories", () => {
       })
 
       const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+        Effect.provide([files.layer, Path.layer])
       )
 
       expect(directories).toStrictEqual(["/project/packages/group/web"])
@@ -138,7 +137,7 @@ describe("getWorkspacePackageDirectories", () => {
       })
 
       const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+        Effect.provide([files.layer, Path.layer])
       )
 
       expect(directories).toStrictEqual([
@@ -162,7 +161,7 @@ describe("getWorkspacePackageDirectories", () => {
       })
 
       const directories = yield* getWorkspacePackageDirectories(ROOT).pipe(
-        Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+        Effect.provide([files.layer, Path.layer])
       )
 
       expect(directories).toStrictEqual(["/project/apps/site"])
@@ -183,7 +182,7 @@ describe("getWorkspacePackageDirectories", () => {
       const result = yield* Effect.all([
         checkIsMonorepo(ROOT),
         getWorkspacePackageDirectories(ROOT),
-      ]).pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer)))
+      ]).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(result).toStrictEqual([true, ["/project/packages/api"]])
     })

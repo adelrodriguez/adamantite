@@ -6,7 +6,7 @@ import * as Yaml from "effect/encoding/Yaml"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import type { FailedToReadFile } from "#lib/shared/errors.ts"
+import { FailedToParseYaml, type FailedToReadFile } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfExists } from "#lib/shared/filesystem.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
@@ -17,7 +17,10 @@ const PnpmWorkspace = Schema.Struct({ packages: Schema.Array(Schema.String) })
  * `packages` list, declares none.
  */
 export const readPnpmWorkspacePatterns = (content: string) =>
-  Effect.try(() => Yaml.parse(content)).pipe(
+  Effect.try({
+    catch: (cause) => new FailedToParseYaml({ cause, path: "pnpm-workspace.yaml" }),
+    try: () => Yaml.parse(content),
+  }).pipe(
     Effect.flatMap((parsed) => Schema.decodeUnknownEffect(PnpmWorkspace)(parsed)),
     Effect.map(({ packages }) => packages),
     Effect.orElseSucceed(() => [])

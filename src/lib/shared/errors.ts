@@ -220,6 +220,15 @@ export class FailedToParseFile extends Data.TaggedError("FailedToParseFile")<{
   }
 }
 
+export class FailedToParseYaml extends Data.TaggedError("FailedToParseYaml")<{
+  path: string
+  cause: unknown
+}> {
+  override get message() {
+    return `Failed to parse \`${this.path}\`.${formatCauseDetail(this.cause)}`
+  }
+}
+
 export class FailedToParseSource extends Data.TaggedError("FailedToParseSource")<{
   path: string
   errors: readonly string[]

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import type { Script } from "#lib/workspace/package-json.ts"
@@ -16,7 +15,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide(Layer.mergeAll(files.layer, Path.layer))
+  return Effect.provide([files.layer, Path.layer])
 }
 
 describe("vscode", () => {

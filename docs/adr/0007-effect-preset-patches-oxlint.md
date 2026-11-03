@@ -63,22 +63,26 @@ Oxlint unpatched after an update (#486). So the managed plugin manages more than
 `@effect/tsgo` ships patched binaries only for some Oxlint, oxlint-tsgolint, and TypeScript
 versions. The platform package `@effect/tsgo-<platform>` keeps the compiler for the
 TypeScript version that `lib/upstream.json` tags as `latest` at `lib/tsc`, and every other
-patched binary in `artifacts/<tool>/<version>/`. With `@effect/tsgo` 0.63.0, `latest` is
-TypeScript 7.0.2, so the patched `tsc --version` prints `7.0.2+effect-tsgo.0.63.0`. A
+patched binary in `artifacts/<tool>/<version>/`. With `@effect/tsgo` 0.64.1, `latest` is
+TypeScript 7.0.2, so the patched `tsc --version` prints `7.0.2+effect-tsgo.0.64.1`. A
 test asserts that each pinned version has a patched binary in one of those places. Thus, a
 bump of one of those pins fails until a compatible `@effect/tsgo` release is pinned too.
 
 ## Curation
 
-`@effect/tsgo` 0.48.0 has 120 rules in four categories, 0.54.0 has 128, and 0.63.0 has 134. A
-rule is in the preset only when all of these conditions are true:
+`@effect/tsgo` 0.48.0 has 120 rules in four categories, 0.54.0 has 128, 0.63.0 has 134, and
+0.64.1 has 144. A rule is in the preset only when all of these conditions are true:
 
 1. It reports Effect code. It does not ban a platform API in code that is not Effect code,
    such as `async-function`, `new-promise`, `node-builtin-import`, or the variants of
-   `global-date` and `process-env` for code outside Effect. `prefer-effect-array`,
-   `prefer-effect-record`, and `prefer-effect-string` report each native array, `Object`, and
-   `String` method. The `-in-effect` variants are in the preset: inside Effect code, `Clock`,
-   `Random`, and `Config` let tests control time, randomness, and configuration.
+   `global-date`, `global-json`, and `process-env` for code outside Effect.
+   `prefer-effect-array`, `prefer-effect-record`, and `prefer-effect-string` report each native
+   array, `Object`, and `String` method. The `-in-effect` variants are in the preset: inside
+   Effect code, `Clock`, `Random`, and `Config` let tests control time, randomness, and
+   configuration. `global-json-in-effect` is not in the preset. It reports `JSON.stringify` of
+   plain data, which cannot fail. On this repository, it reported 101 calls with
+   `@effect/tsgo` 0.64.1: 99 were `JSON.stringify` of plain data, and 2 were `JSON.parse` in test
+   assertions.
 2. No rule that Adamantite already enables reports the same defect. `unnecessary-arrow-block`
    repeats `arrow-body-style`. `strict-boolean-expressions` is a general TypeScript rule, so
    the core or strict preset decides it.
@@ -90,8 +94,9 @@ rule is in the preset only when all of these conditions are true:
 4. It applies to Effect v4. `missing-effect-service-dependency` checks `Effect.Service`, which
    exists only in v3.
 
-`missed-pipeable-opportunity`, `new-schema-class`, and `prefer-schema-tagged-error` are style
-preferences that report no defect, so they are not in the preset. `Data.TaggedError` is
+`missed-pipeable-opportunity`, `new-schema-class`, `prefer-schema-tagged-error`,
+`type-union-to-schema-union`, and `yield-in-call-argument` are style preferences that report no
+defect, so they are not in the preset. `Data.TaggedError` is
 correct when an error is not encoded. All the other correctness, anti-pattern, and style
 rules are in the preset, including `any-unknown-in-error-context`,
 `unsafe-effect-type-assertion`, and `map-map-error-to-map-both`, which upstream turns off by

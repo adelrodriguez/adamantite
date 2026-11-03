@@ -1,7 +1,6 @@
 import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
-import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import { FailedToCreateDirectory, FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 
@@ -25,7 +24,7 @@ export const readFile = (path: string) =>
 export const readFileIfExists = (path: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readFileString(path)),
-    Effect.map((content) => pipe(content, Option.some)),
+    Effect.asSome,
     Effect.catch((error) =>
       error.reason._tag === "NotFound"
         ? Effect.succeedNone
@@ -40,7 +39,7 @@ export const readFileIfExists = (path: string) =>
 export const readDirectoryIfExists = (path: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readDirectory(path)),
-    Effect.map((entries) => pipe(entries, Option.some)),
+    Effect.asSome,
     Effect.catch((error) =>
       error.reason._tag === "NotFound" || error.reason._tag === "BadResource"
         ? Effect.succeed(Option.none<string[]>())

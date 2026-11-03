@@ -49,28 +49,24 @@ function makeResolverLayer(source: NodeVersionSource) {
 }
 
 function provideFallback(files: FileSystemTestContext) {
-  return Effect.provide(
-    Layer.mergeAll(
-      files.layer,
-      Path.layer,
-      makeModuleResolverLayer(ROOT),
-      makeResolverLayer({ _tag: "Version", value: "lts/*" })
-    )
-  )
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    makeModuleResolverLayer(ROOT),
+    makeResolverLayer({ _tag: "Version", value: "lts/*" }),
+  ])
 }
 
 function provideAssessment(files: FileSystemTestContext, packageManager: "deno" | "pnpm" = "pnpm") {
-  return Effect.provide(
-    Layer.mergeAll(
-      files.layer,
-      Path.layer,
-      makeModuleResolverLayer(ROOT),
-      Layer.succeed(DependencyInstaller)({
-        addDevDependencies: () => Effect.void,
-        detectPackageManager: () => Effect.succeed({ name: packageManager }),
-      })
-    )
-  )
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    makeModuleResolverLayer(ROOT),
+    Layer.succeed(DependencyInstaller)({
+      addDevDependencies: () => Effect.void,
+      detectPackageManager: () => Effect.succeed({ name: packageManager }),
+    }),
+  ])
 }
 
 // A workflow with one job that runs these steps.
@@ -140,14 +136,12 @@ function getSetupNodeInputs(files: FileSystemTestContext) {
 }
 
 function provideFileResolver(files: FileSystemTestContext) {
-  return Effect.provide(
-    Layer.mergeAll(
-      files.layer,
-      Path.layer,
-      makeModuleResolverLayer(ROOT),
-      makeResolverLayer({ _tag: "File", path: ".node-version" })
-    )
-  )
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    makeModuleResolverLayer(ROOT),
+    makeResolverLayer({ _tag: "File", path: ".node-version" }),
+  ])
 }
 
 function getPinnedActions(workflow: string) {

@@ -46,11 +46,7 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
 function runAssess(files: FileSystemTestContext, resolutions: Record<string, string> = {}) {
   return oxlintCustom
     .assess(ROOT)
-    .pipe(
-      Effect.provide(
-        Layer.mergeAll(files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions))
-      )
-    )
+    .pipe(Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions)]))
 }
 
 function getFindings(assessment: IntegrationAssessment) {
@@ -244,7 +240,7 @@ describe("oxlint-custom", () => {
       })
       const assess = oxlintCustom
         .assess(ROOT)
-        .pipe(Effect.provide(Layer.mergeAll(files.layer, Path.layer, resolverLayer)))
+        .pipe(Effect.provide([files.layer, Path.layer, resolverLayer]))
 
       yield* assess
       yield* assess

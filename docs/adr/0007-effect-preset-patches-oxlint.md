@@ -63,15 +63,15 @@ Oxlint unpatched after an update (#486). So the managed plugin manages more than
 `@effect/tsgo` ships patched binaries only for some Oxlint, oxlint-tsgolint, and TypeScript
 versions. The platform package `@effect/tsgo-<platform>` keeps the compiler for the
 TypeScript version that `lib/upstream.json` tags as `latest` at `lib/tsc`, and every other
-patched binary in `artifacts/<tool>/<version>/`. With `@effect/tsgo` 0.64.1, `latest` is
-TypeScript 7.0.2, so the patched `tsc --version` prints `7.0.2+effect-tsgo.0.64.1`. A
+patched binary in `artifacts/<tool>/<version>/`. With `@effect/tsgo` 0.67.1, `latest` is
+TypeScript 7.0.2, so the patched `tsc --version` prints `7.0.2+effect-tsgo.0.67.1`. A
 test asserts that each pinned version has a patched binary in one of those places. Thus, a
 bump of one of those pins fails until a compatible `@effect/tsgo` release is pinned too.
 
 ## Curation
 
 `@effect/tsgo` 0.48.0 has 120 rules in four categories, 0.54.0 has 128, 0.63.0 has 134, and
-0.64.1 has 144. A rule is in the preset only when all of these conditions are true:
+0.64.1 has 144, and 0.67.1 has 145. A rule is in the preset only when all of these conditions are true:
 
 1. It reports Effect code. It does not ban a platform API in code that is not Effect code,
    such as `async-function`, `new-promise`, `node-builtin-import`, or the variants of

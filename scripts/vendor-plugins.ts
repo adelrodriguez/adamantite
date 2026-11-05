@@ -112,7 +112,7 @@ async function vendorPlugin(plugin: VendoredPlugin) {
     // Strip temporary clone paths from module comments so re-vendoring produces stable diffs.
     const cloneDirPattern = new RegExp(`^// \\S*${path.basename(cloneDir)}/`, "gmu")
     const rawBundle = await bundlePlugin(plugin, cloneDir)
-    const bundle = rawBundle.replace(cloneDirPattern, "// ")
+    const bundle = rawBundle.replaceAll(cloneDirPattern, "// ")
     const banner = `// Vendored build of the ${plugin.name} oxlint plugin.
 // Source: ${plugin.repoUrl.replace(/\.git$/, "")} (MIT) at commit ${commit}.
 // Its dependencies (MIT) are inlined so this file is self-contained.

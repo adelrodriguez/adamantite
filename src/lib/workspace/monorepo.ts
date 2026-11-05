@@ -130,13 +130,13 @@ const listDirectories = (
   })
 
 /**
- * The absolute directories of the workspace packages, without the root. A package is a directory
- * with a `package.json` that matches an include pattern and no `!` exclusion pattern.
+ * The absolute directories of the workspace packages that the patterns select, without the root. A
+ * package is a directory with a `package.json` that matches an include pattern and no `!` exclusion
+ * pattern.
  */
-export const getWorkspacePackageDirectories = (cwd: string = process.cwd()) =>
+const findPackageDirectories = (cwd: string, patterns: readonly string[]) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
-    const patterns = yield* readWorkspacePatterns(cwd)
     const includes = patterns.filter((pattern) => !pattern.startsWith("!"))
     const excludes = patterns
       .filter((pattern) => pattern.startsWith("!"))
@@ -166,4 +166,29 @@ export const getWorkspacePackageDirectories = (cwd: string = process.cwd()) =>
     )
 
     return packages.flat()
+  })
+
+/**
+ * The workspace shape of the project. A project that declares workspace patterns is a monorepo,
+ * also before any package exists.
+ */
+export interface Workspace {
+  readonly isMonorepo: boolean
+  /**
+   * The absolute directories of the workspace packages, without the root.
+   */
+  readonly packageDirectories: readonly string[]
+}
+
+/**
+ * Reads the workspace patterns one time, and finds the workspace packages that they select.
+ */
+export const readWorkspace = (cwd: string) =>
+  Effect.gen(function* () {
+    const patterns = yield* readWorkspacePatterns(cwd)
+
+    return {
+      isMonorepo: patterns.length > 0,
+      packageDirectories: yield* findPackageDirectories(cwd, patterns),
+    } satisfies Workspace
   })

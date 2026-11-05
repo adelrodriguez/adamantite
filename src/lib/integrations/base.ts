@@ -1,5 +1,5 @@
 import type * as Effect from "effect/Effect"
-import type { PackageJson } from "type-fest"
+import type { Project } from "#lib/workspace/project.ts"
 
 export type IntegrationKind = "tooling" | "workspace" | "editor" | "ci"
 
@@ -66,12 +66,11 @@ export interface IntegrationBase<Kind extends IntegrationKind> {
 export interface AssessableIntegration<Error = unknown, Requirements = unknown> {
   /**
    * Classifies package drift and managed state against the latest supported state. It must not
-   * change files. The caller reads `package.json` one time and shares it with every assessment.
+   * change files. The caller reads the project one time and shares it with every assessment, so
+   * read the workspace, the root `oxlint.config.ts`, and the custom rules from `project`, not from
+   * the filesystem.
    */
-  readonly assess: (
-    cwd: string,
-    packageJson: PackageJson
-  ) => Effect.Effect<IntegrationAssessment, Error, Requirements>
+  readonly assess: (project: Project) => Effect.Effect<IntegrationAssessment, Error, Requirements>
 }
 
 export function defineIntegration<const T extends IntegrationBase<IntegrationKind>>(

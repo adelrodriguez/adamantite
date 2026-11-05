@@ -1,5 +1,20 @@
-import { describe, expect, it } from "vitest"
-import { type ProjectAssessment, renderAssessmentMarkdown } from "#lib/assessment/index.ts"
+import { describe, expect, it } from "@effect/vitest"
+import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
+import * as Layer from "effect/Layer"
+import * as Path from "effect/Path"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import {
+  assessProject,
+  type ProjectAssessment,
+  renderAssessmentMarkdown,
+} from "#lib/assessment/index.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
+import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { readProject } from "#lib/workspace/project.ts"
+
+const ROOT = "/project"
 
 function makeAssessment(value: Partial<ProjectAssessment>): ProjectAssessment {
   return {
@@ -141,4 +156,89 @@ describe("renderAssessmentMarkdown", () => {
 
     expect(report).toContain("- The script runs `echo {{version}} {{warnings}} $&`.")
   })
+})
+
+describe("assessProject", () => {
+  it.effect("read the shared project facts one time for every integration", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/no-foo.ts": "export default {}\n",
+          ".github/workflows/adamantite.yml":
+            "jobs:\n  check:\n    steps:\n      - run: pnpm run check\n",
+          "oxlint.config.ts": [
+            'import core from "adamantite/lint"',
+            'import custom from "adamantite/lint/custom"',
+            'import effect from "adamantite/lint/effect"',
+            'import shadcn from "adamantite/lint/shadcn"',
+            "export default { extends: [core, effect, shadcn, custom()] }",
+            "",
+          ].join("\n"),
+          "package.json": yield* stringifyJson({
+            devDependencies: { adamantite: "1.0.0" },
+            scripts: {
+              analyze: "adamantite analyze",
+              check: "adamantite check",
+              fix: "adamantite fix",
+            },
+          }),
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
+          "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        },
+        root: ROOT,
+      })
+      const reads: string[] = []
+      const discoveries: string[] = []
+      const fileSystem = Layer.effect(FileSystem.FileSystem)(
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem
+
+          return {
+            ...fs,
+            readFileString: (path: string, encoding?: string) => {
+              reads.push(path)
+              return fs.readFileString(path, encoding)
+            },
+          }
+        })
+      ).pipe(Layer.provide(files.layer))
+
+      const assessment = yield* readProject(ROOT).pipe(
+        Effect.flatMap((project) => assessProject(project)),
+        Effect.provide([
+          fileSystem,
+          Path.layer,
+          makeModuleResolverLayer(
+            ROOT,
+            {},
+            Effect.sync(() => {
+              discoveries.push("discovery")
+            })
+          ),
+          Layer.succeed(DependencyInstaller)({
+            addDevDependencies: () => Effect.void,
+            detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+          }),
+        ])
+      )
+
+      expect(assessment.applicableIntegrations).toStrictEqual([
+        "knip",
+        "oxfmt",
+        "oxlint",
+        "oxlint-custom",
+        "@shadcn/lint",
+        "@effect/tsgo",
+        "sherif",
+        "oxlint-tsgolint",
+        "tsconfig",
+        "agents",
+        "github",
+      ])
+      expect(reads.filter((path) => path === `${ROOT}/pnpm-workspace.yaml`)).toHaveLength(1)
+      // The project reads the root config, and custom rule discovery reads it as an Oxlint config.
+      expect(reads.filter((path) => path === `${ROOT}/oxlint.config.ts`)).toHaveLength(2)
+      expect(discoveries).toHaveLength(1)
+    })
+  )
 })

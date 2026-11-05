@@ -1,7 +1,7 @@
-import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
+import type { Project } from "#lib/workspace/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
@@ -10,7 +10,7 @@ const files = [{ path: "AGENTS.md", type: "config" }] as const
 export default defineIntegration({
   // In a monorepo, Doctor runs at the root and checks only the root. A package can have its own
   // `AGENTS.md`, but Doctor does not require it.
-  assess: (cwd: string, packageJson: PackageJson) =>
+  assess: ({ cwd, packageJson }: Project) =>
     Effect.gen(function* () {
       const managedScripts = getManagedScripts(packageJson)
 

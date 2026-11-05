@@ -1,6 +1,5 @@
 import type * as FileSystem from "effect/FileSystem"
 import type * as Path from "effect/Path"
-import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
@@ -12,6 +11,7 @@ import type {
   IntegrationKind,
   PackageAction,
 } from "#lib/integrations/base.ts"
+import type { Project } from "#lib/workspace/project.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
 import github from "#lib/integrations/ci/github.ts"
@@ -26,7 +26,6 @@ import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import agents from "#lib/integrations/workspace/agents.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const repairPromptTemplate = getRepairPromptTemplate()
 const warningReportTemplate = getWarningReportTemplate()
@@ -60,15 +59,14 @@ interface NamedAssessment {
 
 const collect = Effect.fn("collectApplicableAssessments")(function* (
   integrations: readonly AnyAssessableIntegration[],
-  cwd: string,
-  packageJson: PackageJson
+  project: Project
 ) {
   return yield* Effect.forEach(
     integrations,
     (integration) =>
       // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- `collectApplicable` restores the precise channels.
       integration
-        .assess(cwd, packageJson)
+        .assess(project)
         .pipe(
           Effect.map((assessment) =>
             assessment.applicable
@@ -85,20 +83,15 @@ const collect = Effect.fn("collectApplicableAssessments")(function* (
 // direct `Effect.forEach` inference loses over the heterogeneous registry tuple.
 function collectApplicable<const I extends AnyAssessableIntegration>(
   integrations: readonly I[],
-  cwd: string,
-  packageJson: PackageJson
+  project: Project
 ): Effect.Effect<
   NamedAssessment[],
   Effect.Error<ReturnType<I["assess"]>>,
   Effect.Services<ReturnType<I["assess"]>> | FileSystem.FileSystem | Path.Path
 >
-function collectApplicable(
-  integrations: readonly AnyAssessableIntegration[],
-  cwd: string,
-  packageJson: PackageJson
-) {
+function collectApplicable(integrations: readonly AnyAssessableIntegration[], project: Project) {
   // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The overload above declares the precise channels.
-  return collect(integrations, cwd, packageJson)
+  return collect(integrations, project)
 }
 
 export interface ProjectAssessment {
@@ -115,15 +108,11 @@ export interface ProjectAssessment {
 }
 
 /**
- * Assess every managed integration. Reads `package.json` unless a parsed manifest is provided, so a
- * reassessment after an agent session or dependency update sees the mutations.
+ * Assess every managed integration against one read of the project. A reassessment after an agent
+ * session or a dependency update reads the project again, so it sees the changes.
  */
-export const assessProject = Effect.fn("assessProject")(function* (
-  cwd: string,
-  manifest?: PackageJson
-) {
-  const packageJson = manifest ?? (yield* readPackageJson(cwd))
-  const applicable = yield* collectApplicable(managedIntegrations, cwd, packageJson)
+export const assessProject = Effect.fn("assessProject")(function* (project: Project) {
+  const applicable = yield* collectApplicable(managedIntegrations, project)
 
   return {
     applicableIntegrations: applicable.map(({ name }) => name),

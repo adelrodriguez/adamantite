@@ -10,6 +10,7 @@ import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
+import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 
@@ -45,9 +46,10 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
  * resolver.
  */
 function runAssess(files: FileSystemTestContext, resolutions: Record<string, string> = {}) {
-  return oxlintCustom
-    .assess(ROOT)
-    .pipe(Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions)]))
+  return readProject(ROOT).pipe(
+    Effect.flatMap((project) => oxlintCustom.assess(project)),
+    Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions)])
+  )
 }
 
 function getFindings(assessment: IntegrationAssessment) {
@@ -239,9 +241,10 @@ describe("oxlint-custom", () => {
         },
         root: ROOT,
       })
-      const assess = oxlintCustom
-        .assess(ROOT)
-        .pipe(Effect.provide([files.layer, Path.layer, resolverLayer]))
+      const assess = readProject(ROOT).pipe(
+        Effect.flatMap((project) => oxlintCustom.assess(project)),
+        Effect.provide([files.layer, Path.layer, resolverLayer])
+      )
 
       yield* assess
       yield* assess

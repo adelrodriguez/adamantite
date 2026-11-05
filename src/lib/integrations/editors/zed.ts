@@ -1,10 +1,10 @@
 import type * as Schema from "effect/Schema"
-import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import type { Project } from "#lib/workspace/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import {
@@ -209,7 +209,7 @@ function setOxlintBinary(config: Schema.JsonObject): Schema.JsonObject {
 }
 
 export default defineIntegration({
-  assess: (cwd: string, _packageJson: PackageJson) =>
+  assess: ({ cwd }: Project) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
       const settingsPath = path.join(cwd, files[0].path)

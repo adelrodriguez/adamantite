@@ -16,6 +16,7 @@ import {
   type NodeVersionSource,
   NodeVersionResolver,
 } from "#lib/workspace/node-version-resolver.ts"
+import { readProject } from "#lib/workspace/project.ts"
 import testWorkflow from "../../../../../.github/workflows/test.yml?raw"
 
 const ROOT = "/project"
@@ -187,7 +188,10 @@ describe("github", () => {
             "- run: pnpm format"
           ),
         })
-        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files)
+        )
 
         expect(result).toMatchObject({
           applicable: true,
@@ -205,7 +209,10 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles()
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toStrictEqual({
           applicable: false,
         })
@@ -227,7 +234,10 @@ describe("github", () => {
             "        run: pnpm run format",
           ].join("\n"),
         })
-        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files)
+        )
 
         expect(result).toMatchObject({
           findings: [
@@ -255,7 +265,10 @@ describe("github", () => {
         const files = makeFiles({ [WORKFLOW_PATH]: workflow })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -273,7 +286,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -294,7 +310,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -311,7 +330,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           applicable: true,
           findings: [{ id: "legacy-format-workflow-step" }],
@@ -329,7 +351,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           applicable: true,
           findings: [{ id: "legacy-monorepo-workflow-step" }],
@@ -348,7 +373,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [{ id: "legacy-monorepo-workflow-step" }],
         })
@@ -362,7 +390,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [{ id: "legacy-monorepo-workflow-step" }],
         })
@@ -379,7 +410,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -397,7 +431,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [{ id: "legacy-format-workflow-step" }],
         })
@@ -416,7 +453,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [{ id: "outdated-adamantite-workflow" }, { id: "legacy-format-workflow-step" }],
         })
@@ -438,7 +478,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -451,7 +494,10 @@ describe("github", () => {
           ...RULE_TEST_FILES,
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check"),
         })
-        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files)
+        )
 
         expect(result).toMatchObject({
           applicable: true,
@@ -478,9 +524,10 @@ describe("github", () => {
           ...RULE_TEST_FILES,
           [WORKFLOW_PATH]: makeWorkflow("- run: deno task check"),
         })
-        const result = yield* github
-          .assess(ROOT, packageJson)
-          .pipe(provideAssessment(files, "deno"))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files, "deno")
+        )
 
         expect(result).toMatchObject({
           findings: [
@@ -516,7 +563,10 @@ describe("github", () => {
         const files = makeFiles({ ...RULE_TEST_FILES, [WORKFLOW_PATH]: workflow })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -529,9 +579,10 @@ describe("github", () => {
           ...RULE_TEST_FILES,
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm install"),
         })
-        const result = yield* github
-          .assess(ROOT, { name: "app", version: "1.0.0" })
-          .pipe(provideAssessment(files))
+        const result = yield* readProject(ROOT, { name: "app", version: "1.0.0" }).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files)
+        )
 
         expect(result).toMatchObject({
           findings: [
@@ -563,7 +614,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -581,7 +635,10 @@ describe("github", () => {
             "- run: pnpm run check"
           ),
         })
-        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files)
+        )
 
         expect(result).toMatchObject({
           findings: [{ currentState: "The workflow contains a hard-coded Node.js version." }],
@@ -610,7 +667,10 @@ describe("github", () => {
         })
 
         expect(
-          yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
         ).toMatchObject({
           findings: [],
         })
@@ -622,7 +682,10 @@ describe("github", () => {
         const files = makeFiles({
           [WORKFLOW_PATH]: "jobs:\n  verify:\n    steps: [\n      run: pnpm run check\n",
         })
-        const result = yield* github.assess(ROOT, packageJson).pipe(provideAssessment(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files)
+        )
 
         expect(result).toMatchObject({
           findings: [
@@ -644,7 +707,10 @@ describe("github", () => {
             '    node-version: "22"'
           ),
         })
-        const result = yield* github.assess(ROOT, {}).pipe(provideAssessment(files))
+        const result = yield* readProject(ROOT, {}).pipe(
+          Effect.flatMap((project) => github.assess(project)),
+          provideAssessment(files)
+        )
 
         expect(result).toMatchObject({
           applicable: true,

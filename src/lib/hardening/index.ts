@@ -14,7 +14,7 @@ import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" 
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
-import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
+import { readWorkspace } from "#lib/workspace/monorepo.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
@@ -125,7 +125,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
     )
   }
   const readPackages = Effect.gen(function* () {
-    const packageDirectories = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
+    const packageDirectories = [cwd, ...(yield* readWorkspace(cwd)).packageDirectories]
     const packagesInScope = packageDirectories.filter((directory) => contains(scope, directory))
     // The innermost package that contains the scope, when the scope holds no package of its own.
     const owner = Array.sort(

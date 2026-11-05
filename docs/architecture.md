@@ -75,6 +75,14 @@ goal criteria, and optional reference content or notes. The agent or the human c
 target project. A later Doctor run confirms whether the project reached the goal state.
 Tooling config generators produce only the current setup for `init` and Doctor reference
 content. They do not convert existing configs or generate patches.
+
+An assessment reads the target project one time. `readProject` in `src/lib/workspace/project.ts`
+reads `package.json`, the workspace packages, the root `oxlint.config.ts`, and the custom rules
+that the Oxlint configs load, and each integration's `assess` takes that `Project`. Only
+`project.ts` and harden import `readWorkspace` and `discoverCustomRules`, and
+`adamantite/import-owners` enforces it. A `Project` is a snapshot, so a reassessment after a
+handoff or an install reads a new one.
+
 Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
 installed coding agent CLI or to copy the combined Markdown prompt. The resolution menu in
 `src/terminal/resolution-menu.ts` offers these choices, so other commands can offer them with

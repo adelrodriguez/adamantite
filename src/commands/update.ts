@@ -12,6 +12,7 @@ import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
@@ -35,7 +36,7 @@ export default Command.make("update").pipe(
       yield* prompter.intro("💠 adamantite update")
 
       const packageJson = yield* readPackageJson(cwd)
-      const assessment = yield* assessProject(cwd, packageJson)
+      const assessment = yield* assessProject(yield* readProject(cwd, packageJson))
       const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
       const updates = [
@@ -102,7 +103,8 @@ export default Command.make("update").pipe(
           )
       }
 
-      const finalAssessment = updates.length === 0 ? assessment : yield* assessProject(cwd)
+      const finalAssessment =
+        updates.length === 0 ? assessment : yield* assessProject(yield* readProject(cwd))
 
       for (const warning of finalAssessment.warnings) {
         yield* prompter.log.warning(warning)

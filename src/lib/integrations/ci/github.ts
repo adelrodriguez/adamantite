@@ -1,4 +1,3 @@
-import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Yaml from "effect/encoding/Yaml"
 import * as FileSystem from "effect/FileSystem"
@@ -20,13 +19,14 @@ import {
   hasCICompatibleScripts,
   RULE_TEST_COMMANDS,
 } from "#lib/workspace/ci-scripts.ts"
-import { listCustomRuleTests } from "#lib/workspace/custom-rules/index.ts"
+import { findCustomRuleTests } from "#lib/workspace/custom-rules/index.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
   type NodeVersionSource,
   NodeVersionResolver,
 } from "#lib/workspace/node-version-resolver.ts"
 import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
+import { type Project, readProject } from "#lib/workspace/project.ts"
 
 const CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
@@ -208,8 +208,10 @@ const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
     const resolver = yield* NodeVersionResolver
     const workflowPath = path.join(cwd, files[0].path)
 
-    const source = yield* resolver.resolve(cwd)
-    const { tests: ruleTests } = yield* listCustomRuleTests(cwd)
+    const [source, project] = yield* Effect.all([resolver.resolve(cwd), readProject(cwd)], {
+      concurrency: "unbounded",
+    })
+    const ruleTests = yield* findCustomRuleTests(project.customRules)
     const workflowContent = generateWorkflow(
       { ...options, hasRuleTests: ruleTests.length > 0 },
       source
@@ -223,7 +225,7 @@ const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
   })
 
 export default defineIntegration({
-  assess: (cwd: string, packageJson: PackageJson) =>
+  assess: ({ customRules, cwd, packageJson }: Project) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
       const workflowPath = path.join(cwd, files[0].path)
@@ -241,7 +243,7 @@ export default defineIntegration({
         /^\d/.test(String(version))
       )
       const isMissingCheckCommand = managedScripts.includes("check") && !runs(CHECK_COMMAND_REGEX)
-      const hasRuleTests = (yield* listCustomRuleTests(cwd)).tests.length > 0
+      const hasRuleTests = (yield* findCustomRuleTests(customRules)).length > 0
       const isMissingRuleTestCommand = hasRuleTests && !runs(RULE_TEST_COMMAND_REGEX)
       const legacyFindings = [
         ...(runs(FORMAT_CHECK_COMMAND_REGEX) ? [legacyFormatStepFinding] : []),

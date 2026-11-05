@@ -5,8 +5,10 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 
@@ -15,7 +17,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer])
+  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
 }
 
 describe("tsconfig", () => {
@@ -27,7 +29,10 @@ describe("tsconfig", () => {
     it.effect("report a missing root config outside a monorepo", () =>
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
-        const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toMatchObject({
           applicable: true,
@@ -46,7 +51,10 @@ describe("tsconfig", () => {
           "package.json": yield* stringifyJson(packageJson),
           "tsconfig.json": yield* stringifyJson(config),
         })
-        const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT, packageJson).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toMatchObject({
           applicable: true,
@@ -62,7 +70,10 @@ describe("tsconfig", () => {
             "package.json": yield* stringifyJson(packageJson),
             "tsconfig.json": yield* stringifyJson({ extends: preset }),
           })
-          const result = yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))
+          const result = yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => tsconfig.assess(project)),
+            provideFiles(files)
+          )
 
           expect(result).toMatchObject({ applicable: true, findings: [] })
         }
@@ -73,7 +84,10 @@ describe("tsconfig", () => {
       Effect.gen(function* () {
         const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
         const files = makeFiles({ "package.json": yield* stringifyJson(monorepoPackageJson) })
-        const result = yield* tsconfig.assess(ROOT, monorepoPackageJson).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT, monorepoPackageJson).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toMatchObject({
           applicable: true,
@@ -92,7 +106,12 @@ describe("tsconfig", () => {
 
         yield* tsconfig.create(ROOT).pipe(provideFiles(files))
 
-        expect(yield* tsconfig.assess(ROOT, packageJson).pipe(provideFiles(files))).toStrictEqual({
+        expect(
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => tsconfig.assess(project)),
+            provideFiles(files)
+          )
+        ).toStrictEqual({
           applicable: true,
           findings: [],
           packageActions: [],

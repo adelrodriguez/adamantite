@@ -1,20 +1,20 @@
-import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { Project } from "#lib/workspace/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import {
   detectToolingConfig,
   getConfigFindings,
   getPackageActions,
   getPackageFindings,
-  type RequiredConfigInspection,
 } from "#lib/integrations/tooling/base.ts"
 import {
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
   type LintPreset,
 } from "#lib/integrations/tooling/oxlint/config.ts"
-import { readFile, writeFile } from "#lib/shared/filesystem.ts"
+import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
@@ -33,7 +33,7 @@ const VERSION = getDependencyVersion("oxlint")
 const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 
 export default defineIntegration({
-  assess: (cwd: string, packageJson: PackageJson) =>
+  assess: ({ cwd, lintConfig, packageJson }: Project) =>
     Effect.gen(function* () {
       const managedScripts = getManagedScripts(packageJson)
 
@@ -50,14 +50,14 @@ export default defineIntegration({
         "the managed lint scripts"
       )
 
-      const activeConfig = state.active
-      let inspection: RequiredConfigInspection | undefined
-
-      if (activeConfig?.format === "ts") {
-        const content = yield* readFile(activeConfig.path)
-        inspection = inspectRequiredOxlintConfig(content)
-      }
-
+      // The active TypeScript config is `oxlint.config.ts`, which the project holds.
+      const inspection =
+        state.active?.format === "ts"
+          ? lintConfig.pipe(
+              Option.map((content) => inspectRequiredOxlintConfig(content)),
+              Option.getOrUndefined
+            )
+          : undefined
       const configContent = toOxlintTsConfigContent()
 
       return {

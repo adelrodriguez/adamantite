@@ -222,3 +222,5 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     unresolvedImports,
   }
 })
+
+export type CustomRuleDiscovery = Effect.Success<ReturnType<typeof discoverCustomRules>>

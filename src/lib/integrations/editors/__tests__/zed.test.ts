@@ -3,8 +3,10 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import { formatJson, parseJson, stringifyJson } from "#lib/shared/json.ts"
+import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 
@@ -19,7 +21,7 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer])
+  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
 }
 
 describe("zed", () => {
@@ -27,6 +29,7 @@ describe("zed", () => {
     it.effect("report stale oxfmt settings and preserve changed values", () =>
       Effect.gen(function* () {
         const files = makeFiles({
+          "package.json": "{}",
           [SETTINGS_PATH]: yield* stringifyJson({
             lsp: {
               oxfmt: {
@@ -42,7 +45,10 @@ describe("zed", () => {
           }),
         })
 
-        const result = yield* zed.assess(ROOT, {}).pipe(provideFiles(files))
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => zed.assess(project)),
+          provideFiles(files)
+        )
 
         expect(result).toMatchObject({
           applicable: true,
@@ -61,8 +67,13 @@ describe("zed", () => {
 
     it.effect("ignore a missing settings file", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
-        expect(yield* zed.assess(ROOT, {}).pipe(provideFiles(files))).toStrictEqual({
+        const files = makeFiles({ "package.json": "{}" })
+        expect(
+          yield* readProject(ROOT).pipe(
+            Effect.flatMap((project) => zed.assess(project)),
+            provideFiles(files)
+          )
+        ).toStrictEqual({
           applicable: false,
         })
       })

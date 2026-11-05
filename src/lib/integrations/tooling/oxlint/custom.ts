@@ -2,16 +2,15 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { Project } from "#lib/workspace/project.ts"
 import {
   defineIntegration,
   type Finding,
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
-import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
 import { inspectRuleFile, isRuleFile } from "#lib/workspace/custom-rules/inspect.ts"
-import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 const NAME = "oxlint-custom"
 
@@ -41,13 +40,12 @@ const readRulesFolder = Effect.fn("readRulesFolder")(function* (dir: string) {
 })
 
 export default defineIntegration({
-  assess: (cwd: string) =>
+  assess: ({ customRules, cwd, workspace }: Project) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
       const relative = (target: string) => path.relative(cwd, target) || "."
-      const packageDirectories = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
-      const { calls, unresolvedCalls, unresolvedImports } =
-        yield* discoverCustomRules(packageDirectories)
+      const packageDirectories = [cwd, ...workspace.packageDirectories]
+      const { calls, unresolvedCalls, unresolvedImports } = customRules
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )

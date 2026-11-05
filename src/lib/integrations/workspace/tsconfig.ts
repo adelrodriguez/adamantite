@@ -1,14 +1,14 @@
-import type { JsonObject, JsonValue, PackageJson } from "type-fest"
+import type { JsonObject, JsonValue } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import type { Project } from "#lib/workspace/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { formatJson, mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
@@ -36,7 +36,7 @@ function mergeExtends(existing: JsonValue | undefined) {
 }
 
 export default defineIntegration({
-  assess: (cwd: string, packageJson: PackageJson) =>
+  assess: ({ cwd, packageJson, workspace }: Project) =>
     Effect.gen(function* () {
       const managedScripts = getManagedScripts(packageJson)
 
@@ -44,7 +44,7 @@ export default defineIntegration({
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      if (yield* checkIsMonorepo(cwd)) {
+      if (workspace.isMonorepo) {
         return {
           applicable: true,
           findings: [],

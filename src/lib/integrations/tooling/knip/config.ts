@@ -1,14 +1,10 @@
-import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
-import * as Path from "effect/Path"
-import {
-  detectToolingWorkspace,
-  type RequiredConfigInspection,
-  type ToolingWorkspace,
+import type {
+  RequiredConfigInspection,
+  ToolingFacts,
+  ToolingWorkspace,
 } from "#lib/integrations/tooling/base.ts"
-import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
+import { checkImportsLintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 export interface KnipWorkspace extends ToolingWorkspace {
   /**
@@ -67,21 +63,12 @@ function formatIgnoreDependencies(lists: readonly IgnoreList[]) {
     : `[${lists.map((list) => `...ignoreDependencies.${list}`).join(", ")}]`
 }
 
-export const detectKnipWorkspace = Effect.fn("detectKnipWorkspace")(function* (cwd: string) {
-  const path = yield* Path.Path
-  const [lintConfig, workspace] = yield* Effect.all(
-    [readFileIfExists(path.join(cwd, "oxlint.config.ts")), detectToolingWorkspace(cwd)],
-    { concurrency: "unbounded" }
-  )
-
+export function toKnipWorkspace({ isMonorepo, lintConfig }: ToolingFacts): KnipWorkspace {
   return {
-    ...workspace,
-    usesEffectPreset: Option.match(lintConfig, {
-      onNone: () => false,
-      onSome: (content) => getImportedLintPresets(content).includes("effect"),
-    }),
-  } satisfies KnipWorkspace
-})
+    isMonorepo,
+    usesEffectPreset: checkImportsLintPreset(lintConfig, "effect"),
+  }
+}
 
 /**
  * In a monorepo the config must also ignore Sherif: `adamantite analyze` runs it, and Knip has no

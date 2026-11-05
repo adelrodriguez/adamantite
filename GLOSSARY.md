@@ -160,6 +160,13 @@ or structure, a preset rule, an import rule, a custom rule, and an instruction. 
 the highest step that can hold it.
 _Avoid_: Pyramid, enforcement level
 
+**Trial**:
+A lint of cases in a copy of the target project, with one rule at the setting that the trial
+gives, or as the config sets it. A case is code that the rule must report or must accept.
+`adamantite rule try` runs a trial, and the project stays unchanged. A trial that cannot lint the
+cases, such as a trial of a rule that does not exist, is not evidence.
+_Avoid_: Dry run, sandbox, trial copy
+
 **Harden**:
 Find the coding standards that a target project follows, and move each one up the
 enforcement ladder after the user approves it. A coding agent does the work, and Adamantite

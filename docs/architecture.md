@@ -25,17 +25,17 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Module seams
 
-| Module         | Responsibility                                                                                              |
-| -------------- | ----------------------------------------------------------------------------------------------------------- |
-| `commands`     | Define one CLI workflow and render its user-facing result.                                                  |
-| `execution`    | Run child commands, hand off to coding agents, install the Adamantite skill, and carry forwarded arguments. |
-| `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.               |
-| `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, and render the prompt.    |
-| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.   |
-| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                      |
-| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                        |
-| `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                       |
-| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                               |
+| Module         | Responsibility                                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `commands`     | Define one CLI workflow and render its user-facing result.                                                                                        |
+| `execution`    | Run child commands, hand off to coding agents, install the Adamantite skill, and carry forwarded arguments.                                       |
+| `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
+| `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
+| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.                                         |
+| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                                                            |
+| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                                                              |
+| `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                                                             |
+| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
 
 ## Layers
 
@@ -122,7 +122,10 @@ warns the user and points to `adamantite doctor`.
   and the changelogs, so the agent reads all the documentation. `hardening/agent-reach.ts`
   finds the files that no chain of links from an `AGENTS.md` reaches, and the links to missing
   files. After a handoff, a link to a missing file that the session added fails the
-  verification. See ADR 0012.
+  verification. `hardening/suppressions.ts` counts the disable comments of each rule in the
+  files that Oxlint lints, and `hardening/overrides.ts` marks each file of an override that turns
+  a rule off, after a trial that turns the rule on again. The prompt shows both as data. See ADR
+  0012 and ADR 0020.
 - `update` updates managed dependencies, copies the Adamantite skill again when the copy that
   `init` installed is stale, then
   emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
@@ -132,6 +135,13 @@ warns the user and points to `adamantite doctor`.
 - `rule add` writes a custom rule stub and its test. `rule ast` prints the AST that Oxlint
   rules visit. `rule test` runs the custom rule tests with `node --test`. `check` does not run
   them. The managed GitHub workflow runs `rule test` when the project has rule tests. See ADR 0009.
+- `rule try` runs a trial: `hardening/trial.ts` copies the files that git lists to a temporary
+  folder, puts a trial config in place of the config that lints the cases, and lints the cases
+  with Oxlint from the root of the copy. The copy gets a real `node_modules` folder with a link
+  to each entry of the project folder, so the entry module that `custom()` writes stays in the
+  copy. A link to a workspace package goes to the copy of the package, with the files that git
+  ignores in it, such as build output. It exits 0 when each case
+  is as expected, 1 when a case is not, and 2 when the trial is not evidence. See ADR 0020.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -157,7 +167,7 @@ src/
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
     assessment/     integration registry, project assessment, agent prompt (top layer)
-    hardening/      harden context and harden prompt
+    hardening/      harden context, harden prompt, rule facts, and rule trials
   terminal/         user prompting, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary

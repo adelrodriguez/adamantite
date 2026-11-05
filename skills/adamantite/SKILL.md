@@ -246,7 +246,9 @@ monorepo, `--path` limits the session to one workspace package or folder. `--com
 recent commits the agent reads for fixed mistakes, and the default is 200. After a
 handoff, it runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of
 them fails, or when the session added a link to a Markdown file that does not exist. `harden` never
-produces Doctor findings.
+produces Doctor findings. The prompt lists the disable comments of each rule, and marks each file
+of an override that turns a rule off. Use `adamantite rule try` for each trial that the prompt
+asks for.
 
 ## Update
 
@@ -291,6 +293,12 @@ saves.
   change a rule, run the lint and read all of its output.
 - To find node names, run `adamantite rule ast <file>` on real code. It prints the same
   ESTree-shaped AST that rules visit.
+- To see what a rule reports before you change the config, run
+  `adamantite rule try <rule> --report <case> --accept <case>`, with `--options '<json array>'`
+  for the options after the severity, or `--current` for the setting of the config. A case is a
+  project path, or `<path>=<file>` to lint the content of `<file>` at `<path>`. It lints the
+  cases in a copy of the project, and exits 2 when the trial is not evidence, such as for a rule
+  that does not exist.
 - When a rule has much logic, keep the rule file thin. Put the logic in plain functions in a
   `_<name>.ts` helper, such as a function that gets an import path and returns its layer. The
   rule file only connects the functions to the visitors. Test the rule through `RuleTester` as

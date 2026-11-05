@@ -31,6 +31,14 @@ These are the Markdown files of the project, without the changesets and the chan
 
 {{agentReach}}
 
+### Suppressions
+
+{{suppressions}}
+
+### Overrides that turn a rule off
+
+{{overrides}}
+
 ## 1. Explore the documentation
 
 Start with each `AGENTS.md` above. Coding agents start from `AGENTS.md`, so it is the only instruction file that they surely read. It must point to the other documentation of the project. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, also when the list does not have them, and the comments in the Oxlint config. A linked file outside the scope of `--path` counts: read it, but do not survey the code beside it.
@@ -73,9 +81,13 @@ This step is done when each fix has its mark: "candidate", "one-off", or "not a 
 
 For each written standard from step 2 and each candidate from steps 3 and 4, find out whether a tool already enforces it. Read the Oxlint config, the presets and plugins that it extends, its overrides, the custom rules, `tsconfig.json`, and the checks that the project runs in CI.
 
-- When you are not sure, lint a counterexample from step 3 or 4 where it is, and read whether the lint reports it.
-- To try a rule that is not on, or a rule with options, make a **trial copy** outside the project: copy the files that git does not ignore, as they are now, with their uncommitted changes: `git ls-files -z --cached --others --exclude-standard | rsync -a --from0 --files-from=- --ignore-missing-args ./ <folder>`. Then link each `node_modules` folder of the project into the same place in the copy. In the copy, change the Oxlint config that lints the candidate's files: the root config, or the config of the workspace package when the package has its own. Add one file with the case that the rule must report and one file with the case that it must accept, and run Oxlint from the folder of that config. The project itself stays unchanged.
-- A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second. Oxlint accepts a rule name that does not exist, so a run without a report is not evidence. A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 7.
+- To see whether the config reports a case, or to try a rule that is not on, or a rule with other options, run `adamantite rule try`. It lints the cases in a copy of the project, so the project stays unchanged.
+  - `adamantite rule try <rule> --current --report <case>` shows what the config reports now. Use a counterexample from step 3 or 4 as the case.
+  - `adamantite rule try <rule> [--options '<json array>'] --report <case> --accept <case>` tries a new rule or new options. The options are the items that come after the severity.
+
+  A case is a project path, such as `src/cart.ts`, or `<path>=<file>` to lint the content of `<file>` at `<path>`, such as `src/cart.ts=/tmp/before.ts`. Write the case files outside the project. Exit 2 means that the trial is not evidence: read its reason.
+
+- A report from a rule that only the trial turns on is not enforcement: the rule is a proposal for step 7.
 - When no counterexample exists, mark the enforcement as not confirmed.
 - Drop each candidate that a tool enforces fully. When a tool enforces only part of a written standard, keep the other part as a candidate.
 
@@ -85,11 +97,11 @@ This step is done when each written standard and each candidate is marked as enf
 
 Step 5 starts from the standards. This step starts from the rules that the project already has: each custom rule, each `adamantite/layers` map, each `adamantite/import-owners` option, and each `no-restricted-imports` setting and its overrides.
 
-- **Forms that a rule misses:** list the forms of the same mistake that the rule does not report. For an import rule, check `require()`, `import()`, `export … from`, `import type`, and the path aliases of `tsconfig.json`. For a custom rule, read its logic and check the other syntax of the same mistake, such as a call through a variable, optional chaining, a computed member, or a re-export. Search the code for each form, and lint a file that has it. When the code does not have the form yet, make a trial copy as step 5 says, with the project config as it is. Add one file with a form that the rule reports, as the control, and one file with the missed form. The gap is confirmed when the rule reports the control and does not report the missed form. When no trial can show it, mark the gap as not confirmed: the failing test case of step 9 confirms it.
+- **Forms that a rule misses:** list the forms of the same mistake that the rule does not report. For an import rule, check `require()`, `import()`, `export … from`, `import type`, and the path aliases of `tsconfig.json`. For a custom rule, read its logic and check the other syntax of the same mistake, such as a call through a variable, optional chaining, a computed member, or a re-export. Search the code for each form, and lint a file that has it. When the code does not have the form yet, run `adamantite rule try <rule> --current --report <control> --report <missed form>`, with a form that the rule reports as the control. The gap is confirmed when it reports the control and does not report the missed form. When no trial can show it, mark the gap as not confirmed: the failing test case of step 9 confirms it.
 - **Files that a rule misses:** for each `files` glob of an override, list the files that the standard applies to and that the glob does not match, such as a new folder or another file extension.
 - **Cases that a test misses:** for each custom rule, list the forms from the first item that its test does not have.
-- **Overrides that can shrink:** for each file in an override that turns a rule off, read the file and find the code that the rule reports. Mark the file as "still breaks the rule", "no longer breaks the rule", or "not confirmed". The files that no longer break the rule are a candidate: remove them from the override.
-- **Suppressions:** count the `oxlint-disable` comments of each rule, for example with `rg -n "oxlint-disable"`. Many suppressions of one rule are a **decision**: the rule is too wide, or the standard has exceptions that the rule must know.
+- **Overrides that can shrink:** each file that the overrides above mark "no longer breaks the rule" or "does not exist" is a candidate: remove it from the override. A file that Oxlint did not lint, because the config ignores it or it does not parse, is not evidence. Check it yourself.
+- **Suppressions:** read the counts in the suppressions above. Many suppressions of one rule are a **decision**: the rule is too wide, or the standard has exceptions that the rule must know.
 
 Each gap is a candidate on the step of the rule that it extends: a wider custom rule, a new option, a new test case, a wider glob, or a smaller override. A gap that is not confirmed is a candidate too: show it with the mark "not confirmed". A gap in a rule that a preset or plugin ships, and that no option of the rule can close, is not a candidate: list it under **Decisions** as a report for the maintainers of that package.
 

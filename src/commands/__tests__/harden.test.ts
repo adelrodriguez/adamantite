@@ -88,21 +88,22 @@ const REQUIRED_PHRASES = {
   ],
   "## 5. Drop what a tool already enforces": [
     "For each written standard from step 2 and each candidate from steps 3 and 4",
-    "lint a counterexample from step 3 or 4 where it is",
-    "make a **trial copy** outside the project",
-    "The project itself stays unchanged.",
-    "A trial is valid only when the rule reports the first file at the severity that you set, and accepts the second.",
+    "run `adamantite rule try`",
+    "`adamantite rule try <rule> --current --report <case>` shows what the config reports now",
+    "`adamantite rule try <rule> [--options '<json array>'] --report <case> --accept <case>`",
+    "or `<path>=<file>` to lint the content of `<file>` at `<path>`",
+    "Exit 2 means that the trial is not evidence",
     "A report from a rule that only the trial turns on is not enforcement",
     "When a tool enforces only part of a written standard, keep the other part as a candidate.",
   ],
   "## 6. Find the gaps in the existing rules": [
     "This step starts from the rules that the project already has",
     "`require()`, `import()`, `export … from`, `import type`, and the path aliases",
-    "When the code does not have the form yet, make a trial copy as step 5 says",
-    "The gap is confirmed when the rule reports the control and does not report the missed form.",
+    "run `adamantite rule try <rule> --current --report <control> --report <missed form>`",
+    "The gap is confirmed when it reports the control and does not report the missed form.",
     "the files that the standard applies to and that the glob does not match",
     "list the forms from the first item that its test does not have",
-    '"still breaks the rule", "no longer breaks the rule", or "not confirmed"',
+    'each file that the overrides above mark "no longer breaks the rule" or "does not exist" is a candidate',
     "Many suppressions of one rule are a **decision**",
     "A gap that is not confirmed is a candidate too",
     "is not a candidate: list it under **Decisions** as a report for the maintainers of that package",
@@ -195,61 +196,93 @@ export default defineConfig({
 const MARKDOWN_FILE = /\.(?:md|mdx|mdc)$/u
 
 /**
- * A `git` that lists the Markdown files of the test project when it runs, as `git ls-files -z`
- * prints them. Git lists only the files inside the project, so the files of a parent folder stay
- * out.
+ * A `git` and an Oxlint entry that list the files of the test project, as `git ls-files -z` and
+ * `oxlint --debug=files` print them. A `*.md` pathspec keeps only the Markdown files. Each lists
+ * only the files inside the project, so the files of a parent folder stay out.
  */
-interface GitOptions {
+interface ProcessOptions {
   readonly exitCode?: number
   /**
    * Files that the git index has and the working tree does not, as after a delete that is not
    * staged, or in a sparse checkout.
    */
   readonly indexOnlyFiles?: readonly string[]
+  /**
+   * Files that an ignore pattern of the Oxlint config matches, so `oxlint` does not list them.
+   */
+  readonly lintIgnoredFiles?: readonly string[]
+  readonly oxlintExitCode?: number
 }
 
-function makeGitLayer(
+function makeHandle(exitCode: number, stdout: string) {
+  return ChildProcessSpawner.makeHandle({
+    all: Stream.empty,
+    exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(exitCode)),
+    getInputFd: () => Sink.drain,
+    getOutputFd: () => Stream.empty,
+    isRunning: Effect.succeed(false),
+    kill: () => Effect.void,
+    pid: ChildProcessSpawner.ProcessId(1),
+    stderr: Stream.empty,
+    stdin: Sink.drain,
+    stdout: Stream.make(new TextEncoder().encode(stdout)),
+    unref: Effect.succeed(Effect.void),
+  })
+}
+
+function makeProcessLayer(
   files: FileSystemTestContext,
-  { exitCode = 0, indexOnlyFiles = [] }: GitOptions = {}
+  {
+    exitCode = 0,
+    indexOnlyFiles = [],
+    lintIgnoredFiles = [],
+    oxlintExitCode = 0,
+  }: ProcessOptions = {}
 ) {
-  const getOutput = () =>
+  const listFiles = () =>
     Array.sort(
-      [
-        ...files.list().filter((file) => MARKDOWN_FILE.test(file) && !file.startsWith("../")),
-        ...indexOnlyFiles,
-      ],
+      files.list().filter((file) => !file.startsWith("../")),
       Order.String
     )
+  const getGitOutput = (args: ChildProcess.StandardCommand["args"]) =>
+    Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
+      .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
       .map((file) => `${file}\0`)
+      .join("")
+  const getOxlintOutput = () =>
+    listFiles()
+      .filter((file) => !lintIgnoredFiles.includes(file))
+      .map((file) => `${file}\n`)
       .join("")
 
   return Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
-    ChildProcessSpawner.make((command) =>
-      ChildProcess.isStandardCommand(command) && command.command === "git"
-        ? Effect.succeed(
-            ChildProcessSpawner.makeHandle({
-              all: Stream.empty,
-              exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(exitCode)),
-              getInputFd: () => Sink.drain,
-              getOutputFd: () => Stream.empty,
-              isRunning: Effect.succeed(false),
-              kill: () => Effect.void,
-              pid: ChildProcessSpawner.ProcessId(1),
-              stderr: Stream.empty,
-              stdin: Sink.drain,
-              stdout: Stream.make(new TextEncoder().encode(exitCode === 0 ? getOutput() : "")),
-              unref: Effect.succeed(Effect.void),
-            })
-          )
-        : Effect.die("Harden tests spawn only git")
-    )
+    ChildProcessSpawner.make((command) => {
+      if (ChildProcess.isStandardCommand(command) && command.command === "git") {
+        return Effect.succeed(
+          makeHandle(exitCode, exitCode === 0 ? getGitOutput(command.args) : "")
+        )
+      }
+
+      if (
+        ChildProcess.isStandardCommand(command)
+        && command.command === OXLINT.command
+        && command.args[0] === OXLINT.args[0]
+        && command.args.includes("--debug=files")
+      ) {
+        return Effect.succeed(
+          makeHandle(oxlintExitCode, oxlintExitCode === 0 ? getOxlintOutput() : "")
+        )
+      }
+
+      return Effect.die("Harden tests spawn only git, and oxlint to list the files")
+    })
   )
 }
 
 function runHarden(
   files: Record<string, string>,
   args: readonly string[] = [],
-  git: GitOptions = {}
+  processes: ProcessOptions = {}
 ) {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
@@ -259,7 +292,7 @@ function runHarden(
       // The monorepo configs import the shared tooling package.
       layers: [
         prompter.layer,
-        makeGitLayer(context, git),
+        makeProcessLayer(context, processes),
         makeModuleResolverLayer(context.root, {
           "@acme/lint": "tooling/lint/index.ts",
           ...ADAMANTITE_RESOLUTION,
@@ -323,7 +356,7 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
         prompter.layer,
         runner.layer,
         terminal,
-        makeGitLayer(files),
+        makeProcessLayer(files),
         makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
       ],
     })
@@ -350,7 +383,7 @@ function runHardenHoisted() {
       files: context,
       layers: [
         prompter.layer,
-        makeGitLayer(context),
+        makeProcessLayer(context),
         makeModuleResolverLayer(context.root, {
           "adamantite/lint": "../node_modules/adamantite/dist/presets/lint/core.js",
         }),
@@ -435,6 +468,8 @@ describe("harden", () => {
           "### Instructions",
           "### Documentation",
           "### Agent reach",
+          "### Suppressions",
+          "### Overrides that turn a rule off",
           "## 1. Explore the documentation",
           "## 2. List the written standards",
           "## 3. Survey the code",
@@ -592,6 +627,118 @@ describe("harden", () => {
       )
       expect(getSection(prompter.messages[0] ?? "", "### Agent reach")).toContain(
         "Follow the links from each `AGENTS.md` yourself."
+      )
+    })
+  )
+
+  it.effect("count the disable comments of each rule in the source files", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({
+        "docs/rules.md": "Use `// oxlint-disable-next-line no-console` with a reason.\n",
+        "oxlint.config.ts": CORE_CONFIG,
+        "src/a.ts": [
+          "// oxlint-disable-next-line no-console -- the CLI prints",
+          "console.log(1)",
+          "// eslint-disable-next-line no-console, typescript/no-explicit-any",
+          "export const value: any = console.log(2)",
+          'export const text = "// oxlint-disable-line no-console"',
+          "",
+        ].join("\n"),
+        "src/b.tsx": "/* oxlint-disable */\nexport const b = <div />\n",
+        ...INSTALLED,
+      })
+
+      expect(getListItems(getSection(prompt, "### Suppressions"))).toStrictEqual([
+        "- `no-console`: 2 comments, in `src/a.ts:1`, `src/a.ts:3`",
+        "- All rules: 1 comment, in `src/b.tsx:1`",
+        "- `typescript/no-explicit-any`: 1 comment, in `src/a.ts:3`",
+      ])
+    })
+  )
+
+  it.effect("leave out the disable comments of the files that the Oxlint config ignores", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden(
+        {
+          "oxlint.config.ts": CORE_CONFIG,
+          "src/a.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
+          "src/fixtures/bad.ts": "// oxlint-disable-next-line no-alert\nalert(1)\n",
+          ...INSTALLED,
+        },
+        [],
+        { lintIgnoredFiles: ["src/fixtures/bad.ts"] }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(
+        getListItems(getSection(prompter.messages[0] ?? "", "### Suppressions"))
+      ).toStrictEqual(["- `no-console`: 1 comment, in `src/a.ts:1`"])
+    })
+  )
+
+  it.effect("tell the agent to count the disable comments when Oxlint cannot list its files", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden(
+        { "oxlint.config.ts": CORE_CONFIG, ...INSTALLED },
+        [],
+        { oxlintExitCode: 1 }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getSection(prompter.messages[0] ?? "", "### Suppressions")).toContain(
+        'Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`'
+      )
+    })
+  )
+
+  it.effect("count only the disable comments inside the folder that --path selects", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt(
+        {
+          "oxlint.config.ts": CORE_CONFIG,
+          "packages/api/src/a.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
+          "packages/web/src/a.ts": "// oxlint-disable-next-line no-alert\nalert(1)\n",
+          ...INSTALLED,
+        },
+        ["--path", "packages/web"]
+      )
+
+      expect(getListItems(getSection(prompt, "### Suppressions"))).toStrictEqual([
+        "- `no-alert`: 1 comment, in `packages/web/src/a.ts:1`",
+      ])
+    })
+  )
+
+  it.effect("say that no comment turns a rule off", () =>
+    Effect.gen(function* () {
+      const prompt = yield* runHardenPrompt({ "oxlint.config.ts": CORE_CONFIG, ...INSTALLED })
+
+      expect(getSection(prompt, "### Suppressions")).toContain(
+        "No `oxlint-disable` or `eslint-disable` comment turns a rule off."
+      )
+      expect(getSection(prompt, "### Overrides that turn a rule off")).toContain(
+        "No override in the Oxlint config turns a rule off for files that it names."
+      )
+    })
+  )
+
+  it.effect("mark the missing files and the globs of an override without a lint", () =>
+    Effect.gen(function* () {
+      // The test `git` dies on any other command, so the marks come without an Oxlint run.
+      const prompt = yield* runHardenPrompt({
+        "oxlint.config.ts": CORE_CONFIG.replace(
+          "extends: [core],",
+          'extends: [core],\n  overrides: [{ files: ["src/gone.ts", "**/*.test.ts"], rules: { "no-console": "off", "no-alert": "error" } }],'
+        ),
+        ...INSTALLED,
+      })
+
+      expect(getSection(prompt, "### Overrides that turn a rule off")).toContain(
+        [
+          "- `no-console` in `oxlint.config.ts`:",
+          "  - `src/gone.ts`: does not exist",
+          "  - `**/*.test.ts`: a glob, so Adamantite did not lint its files",
+        ].join("\n")
       )
     })
   )

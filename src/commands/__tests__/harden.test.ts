@@ -4,6 +4,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as ChildProcess from "effect/process/ChildProcess"
@@ -330,6 +331,14 @@ const SUCCESS_LOG = {
 interface InteractiveHardenOptions {
   readonly files?: Record<string, string>
   /**
+   * Called when custom rule discovery starts.
+   */
+  readonly onDiscovery?: () => void
+  /**
+   * Called with the path of each file that Harden reads as text.
+   */
+  readonly onReadFile?: (path: string) => void
+  /**
    * What the agent changes in the project during the session.
    */
   readonly onSession?: (files: FileSystemTestContext) => void
@@ -350,14 +359,32 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
       copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
       isInteractive: Effect.succeed(true),
     })
+    const fileSystem = Layer.effect(FileSystem.FileSystem)(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+
+        return {
+          ...fs,
+          readFileString: (path: string, encoding?: string) => {
+            options.onReadFile?.(path)
+            return fs.readFileString(path, encoding)
+          },
+        }
+      })
+    ).pipe(Layer.provide(files.layer))
     const exit = yield* runCommand(hardenCommand, [], {
       files,
       layers: [
+        fileSystem,
         prompter.layer,
         runner.layer,
         terminal,
         makeProcessLayer(files),
-        makeModuleResolverLayer(files.root, ADAMANTITE_RESOLUTION),
+        makeModuleResolverLayer(
+          files.root,
+          ADAMANTITE_RESOLUTION,
+          Effect.sync(() => options.onDiscovery?.())
+        ),
       ],
     })
 
@@ -1133,6 +1160,41 @@ describe("harden", () => {
             SUCCESS_LOG,
           ],
           outros: ["✅ Harden completed successfully!"],
+        })
+      })
+  )
+
+  it.effect(
+    "read the workspace and discover the custom rules one time before and one time after the session",
+    () =>
+      Effect.gen(function* () {
+        const workspaceFile = `${createFileSystemTestContext().root}/pnpm-workspace.yaml`
+        const counts = { discoveries: 0, workspaceReads: 0 }
+        let beforeSession = { ...counts }
+
+        yield* runInteractiveHarden({
+          files: {
+            ...RULE_TEST_FILES,
+            "packages/web/package.json": yield* stringifyJson({ name: "web" }),
+            "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+          },
+          onDiscovery: () => {
+            counts.discoveries += 1
+          },
+          onReadFile: (path) => {
+            if (path === workspaceFile) {
+              counts.workspaceReads += 1
+            }
+          },
+          onSession: () => {
+            beforeSession = { ...counts }
+          },
+          prompter: { selectResponses: [claudeAgent] },
+        })
+
+        expect({ afterSession: counts, beforeSession }).toStrictEqual({
+          afterSession: { discoveries: 2, workspaceReads: 2 },
+          beforeSession: { discoveries: 1, workspaceReads: 1 },
         })
       })
   )

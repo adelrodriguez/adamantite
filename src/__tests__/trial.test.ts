@@ -9,6 +9,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import { readOverrides } from "#lib/hardening/overrides.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
@@ -82,6 +83,19 @@ const BUILT_WORKSPACE_FILES = {
   }),
 }
 
+// The same package with a dependency in its own `node_modules`, which git ignores, so the copy
+// links it.
+const WORKSPACE_DEPENDENCY_FILES = {
+  ...WORKSPACE_FILES,
+  "packages/tooling/index.ts": `import custom from ${JSON.stringify(CUSTOM_PRESET)}\nimport { name } from "rules-name"\n\nexport default custom({ name })\n`,
+  "packages/tooling/node_modules/rules-name/index.js": 'export const name = "project"\n',
+  "packages/tooling/node_modules/rules-name/package.json": JSON.stringify({
+    exports: "./index.js",
+    name: "rules-name",
+    type: "module",
+  }),
+}
+
 const EFFECT_CONFIG = [
   'import { defineConfig } from "oxlint"',
   `import effect from ${JSON.stringify(join(REPO_ROOT, "presets/lint/effect.ts"))}`,
@@ -99,6 +113,9 @@ function makeConfig(body: string) {
     "",
   ].join("\n")
 }
+
+// The fixtures without a workspace package declare no workspace.
+const NO_WORKSPACE: Workspace = { isMonorepo: false, packageDirectories: [] }
 
 function makeCase(filePath: string, expected: TrialCase["expected"], source?: string): TrialCase {
   return { expected, path: filePath, source: Option.fromUndefinedOr(source) }
@@ -130,8 +147,13 @@ describe("rule trials in a real project", () => {
     return EffectArray.sort(readdirSync(project, { recursive: true }).map(String), Order.String)
   }
 
-  function runTrial(rule: string, setting: TrialSetting, trialCases: readonly TrialCase[]) {
-    return tryRule({ cases: trialCases, cwd: project, rule, setting }).pipe(
+  function runTrial(
+    rule: string,
+    setting: TrialSetting,
+    trialCases: readonly TrialCase[],
+    workspace = NO_WORKSPACE
+  ) {
+    return tryRule({ cases: trialCases, cwd: project, rule, setting, workspace }).pipe(
       Effect.provide(TEST_LAYER)
     )
   }
@@ -254,6 +276,7 @@ describe("rule trials in a real project", () => {
   it.live.each([
     { files: WORKSPACE_FILES, name: "its source" },
     { files: BUILT_WORKSPACE_FILES, name: "build output that git ignores" },
+    { files: WORKSPACE_DEPENDENCY_FILES, name: "a dependency of the package that git ignores" },
   ])("load a workspace package of the config from the copy, with $name", ({ files }) =>
     Effect.gen(function* () {
       for (const [file, content] of Object.entries(files)) {
@@ -265,9 +288,12 @@ describe("rule trials in a real project", () => {
       symlinkSync("../packages/tooling", join(project, "node_modules/tooling"))
 
       const before = listProject()
-      const results = yield* runTrial("project/no-debugger-here", { _tag: "Current" }, [
-        makeCase("src/legacy.ts", "reported"),
-      ])
+      const results = yield* runTrial(
+        "project/no-debugger-here",
+        { _tag: "Current" },
+        [makeCase("src/legacy.ts", "reported")],
+        { isMonorepo: true, packageDirectories: [join(project, "packages/tooling")] }
+      )
 
       expect(getReportCounts(results)).toStrictEqual([1])
       // `custom()` in the package writes its entry module to the copy, not to the project.
@@ -419,7 +445,7 @@ describe("rule trials in a real project", () => {
   it.live("mark each file of an override that turns a rule off", () =>
     Effect.gen(function* () {
       const before = listProject()
-      const report = yield* readOverrides(project, ["oxlint.config.ts"], null).pipe(
+      const report = yield* readOverrides(project, NO_WORKSPACE, ["oxlint.config.ts"], null).pipe(
         Effect.provide(TEST_LAYER)
       )
 
@@ -453,7 +479,7 @@ describe("rule trials in a real project", () => {
       write("src/generated/old.ts", "export function stop() {\n  debugger\n}\n")
       write("src/broken.ts", "export const = ;\n")
 
-      const report = yield* readOverrides(project, ["oxlint.config.ts"], null).pipe(
+      const report = yield* readOverrides(project, NO_WORKSPACE, ["oxlint.config.ts"], null).pipe(
         Effect.provide(TEST_LAYER)
       )
 

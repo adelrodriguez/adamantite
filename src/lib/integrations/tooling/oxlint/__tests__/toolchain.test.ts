@@ -39,6 +39,7 @@ function makeFiles(oxlintVersion = "1.88.0", tsrsVersion = TSRS_VERSION) {
       [`${ARTIFACTS}/tsrs/${TSRS_VERSION}/lib.d.ts`, ""],
       [`${ARTIFACTS}/oxlint/1.88.0/oxlint.${PLATFORM}.node`, ""],
       [`${ARTIFACTS}/oxlint/1.89.0/oxlint.${PLATFORM}.node`, ""],
+      ["node_modules/.bin/tsrs-lint.cmd", ""],
       [`node_modules/${PLATFORM_PACKAGE}/package.json`, makeManifest(PLATFORM_PACKAGE, "0.67.1")],
       ["node_modules/@effect/tsgo/package.json", makeManifest("@effect/tsgo", "0.67.1")],
       ["node_modules/tsrs/package.json", makeManifest("tsrs", tsrsVersion)],
@@ -51,11 +52,42 @@ function makeFiles(oxlintVersion = "1.88.0", tsrsVersion = TSRS_VERSION) {
 
 function runResolve(
   files: ReturnType<typeof makeFiles>,
-  packages: Readonly<Record<string, string>>
+  packages: Readonly<Record<string, string>>,
+  project = ROOT
 ) {
-  return resolveToolchain(ROOT).pipe(
+  return resolveToolchain(project).pipe(
     Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages)])
   )
+}
+
+/**
+ * Run `effect` as Node.js runs it on Windows, and restore the real platform after it.
+ */
+function onWindows<A, E, R>(effect: Effect.Effect<A, E, R>) {
+  const platform = process.platform
+
+  return Effect.acquireUseRelease(
+    Effect.sync(() => Object.defineProperty(process, "platform", { value: "win32" })),
+    () => effect,
+    () => Effect.sync(() => Object.defineProperty(process, "platform", { value: platform }))
+  )
+}
+
+/**
+ * A monorepo that installs Oxlint and tsrs at the root, where the package manager writes the
+ * `tsrs-lint` bin as `launcher`, and a workspace package at `packages/app`.
+ */
+function makeWindowsFiles(launcher: string) {
+  return createFileSystemTestContext({
+    files: {
+      [`node_modules/.bin/${launcher}`]: "",
+      "node_modules/oxlint/package.json": makeManifest("oxlint", "1.91.0"),
+      "node_modules/tsrs/package.json": makeManifest("tsrs", TSRS_VERSION),
+      "package.json": makeManifest("monorepo", "1.0.0"),
+      "packages/app/package.json": makeManifest("app", "1.0.0"),
+    },
+    root: ROOT,
+  })
 }
 
 describe("toolchain", () => {
@@ -72,6 +104,32 @@ describe("toolchain", () => {
         },
         binding: { _tag: "Stock" },
         oxlint: `${ROOT}/node_modules/oxlint`,
+      })
+    })
+  )
+
+  it.effect(
+    "start the tsrs-lint launcher of the root installation for a workspace package on Windows",
+    () =>
+      Effect.gen(function* () {
+        const toolchain = yield* onWindows(
+          runResolve(makeWindowsFiles("tsrs-lint.cmd"), STOCK_PACKAGES, `${ROOT}/packages/app`)
+        )
+
+        expect(toolchain.backend).toStrictEqual({
+          OXLINT_TSGOLINT_PATH: `${ROOT}/node_modules/.bin/tsrs-lint.cmd`,
+        })
+      })
+  )
+
+  it.effect("start the .exe launcher that Bun writes for tsrs-lint on Windows", () =>
+    Effect.gen(function* () {
+      const toolchain = yield* onWindows(
+        runResolve(makeWindowsFiles("tsrs-lint.exe"), STOCK_PACKAGES)
+      )
+
+      expect(toolchain.backend).toStrictEqual({
+        OXLINT_TSGOLINT_PATH: `${ROOT}/node_modules/.bin/tsrs-lint.exe`,
       })
     })
   )

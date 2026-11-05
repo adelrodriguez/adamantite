@@ -242,8 +242,9 @@ describe("rule trials in a real project", () => {
 
   it.live("run a rule of the effect preset with the Effect toolchain of the project", () =>
     Effect.gen(function* () {
-      // A plain `oxlint` fails to load a config with the `effecttsgo` plugin.
-      for (const name of ["@effect", "effect"]) {
+      // A plain `oxlint` fails to load a config with the `effecttsgo` plugin. The Effect toolchain
+      // takes the Effect build of the tsrs version that the project installs.
+      for (const name of ["@effect", "effect", "tsrs"]) {
         symlinkSync(join(REPO_ROOT, "node_modules", name), join(project, "node_modules", name))
       }
 
@@ -356,12 +357,8 @@ describe("rule trials in a real project", () => {
     "keep the root options for a case under a nested config, with $name",
     ({ setting }) =>
       Effect.gen(function* () {
-        // Oxlint starts the type-aware backend from `node_modules/.bin`.
-        mkdirSync(join(project, "node_modules/.bin"))
-
-        for (const name of ["oxlint-tsgolint", ".bin/tsgolint"]) {
-          symlinkSync(join(REPO_ROOT, "node_modules", name), join(project, "node_modules", name))
-        }
+        // The entry starts the type-aware backend from the `tsrs` package of the project.
+        symlinkSync(join(REPO_ROOT, "node_modules", "tsrs"), join(project, "node_modules", "tsrs"))
 
         write(
           "tsconfig.json",

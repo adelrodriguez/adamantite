@@ -112,10 +112,10 @@
     "oxfmt": "0.76.0",
     "oxlint": "1.91.0",
     "oxlint-plugin-react-doctor": "0.9.18",
-    "oxlint-tsgolint": "7.0.2005",
     "sherif": "1.13.0",
     "skills": "1.7.4",
     "tsdown": "0.23.1",
+    "tsrs": "0.21.0-ts7.1.0-beta",
     "type-fest": "5.10.0",
     "typescript": "7.0.2",
     "unplugin-macros": "0.23.3",
@@ -123,10 +123,14 @@
   },
   "peerDependencies": {
     "oxlint": ">=1.88.0",
+    "tsrs": ">=0.21.0-ts7.1.0-beta",
     "typescript": ">=7"
   },
   "peerDependenciesMeta": {
     "oxlint": {
+      "optional": true
+    },
+    "tsrs": {
       "optional": true
     }
   },

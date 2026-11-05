@@ -15,7 +15,7 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
 import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
-import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
+import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
@@ -142,7 +142,7 @@ describe("init", () => {
             packages: [
               "adamantite",
               `oxlint@${oxlint.version}`,
-              `oxlint-tsgolint@${tsgolint.version}`,
+              `tsrs@${tsrs.version}`,
               `oxfmt@${oxfmt.version}`,
               `knip@${knip.version}`,
             ],
@@ -616,7 +616,7 @@ describe("init", () => {
             packages: [
               "adamantite",
               `oxlint@${oxlint.version}`,
-              `oxlint-tsgolint@${tsgolint.version}`,
+              `tsrs@${tsrs.version}`,
               `oxfmt@${oxfmt.version}`,
             ],
           },
@@ -659,7 +659,7 @@ describe("init", () => {
               options: { silent: true, workspace: false },
               packages: [
                 `oxlint@${oxlint.version}`,
-                `oxlint-tsgolint@${tsgolint.version}`,
+                `tsrs@${tsrs.version}`,
                 `oxfmt@${oxfmt.version}`,
               ],
             },
@@ -701,7 +701,7 @@ describe("init", () => {
             packages: [
               "adamantite",
               `oxlint@${oxlint.version}`,
-              `oxlint-tsgolint@${tsgolint.version}`,
+              `tsrs@${tsrs.version}`,
               `oxfmt@${oxfmt.version}`,
               `knip@${knip.version}`,
             ],

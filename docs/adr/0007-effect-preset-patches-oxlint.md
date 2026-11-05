@@ -60,8 +60,8 @@ Oxlint unpatched after an update (#486). So the managed plugin manages more than
   that name. The analyze preset exports `ignoreDependencies.effect`, `init` sets it, and
   doctor requires it while `oxlint.config.ts` imports the preset.
 
-`@effect/tsgo` ships patched binaries only for some Oxlint, oxlint-tsgolint, and TypeScript
-versions. The platform package `@effect/tsgo-<platform>` keeps the compiler for the
+`@effect/tsgo` ships patched binaries only for some Oxlint, tsrs, and TypeScript versions.
+Before ADR 0021, it also needed a patched oxlint-tsgolint. The platform package `@effect/tsgo-<platform>` keeps the compiler for the
 TypeScript version that `lib/upstream.json` tags as `latest` at `lib/tsc`, and every other
 patched binary in `artifacts/<tool>/<version>/`. With `@effect/tsgo` 0.67.1, `latest` is
 TypeScript 7.0.2, so the patched `tsc --version` prints `7.0.2+effect-tsgo.0.67.1`. A

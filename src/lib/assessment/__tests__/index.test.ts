@@ -230,7 +230,7 @@ describe("assessProject", () => {
         "@shadcn/lint",
         "@effect/tsgo",
         "sherif",
-        "oxlint-tsgolint",
+        "tsrs",
         "tsconfig",
         "agents",
         "github",

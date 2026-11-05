@@ -268,8 +268,9 @@ try {
     PATH: `${join(monorepoFixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
   }
 
-  // Exit 0 proves Knip, under the preset defaults, reports neither `sherif` nor
-  // `oxlint-tsgolint` as an unused devDependency: no script or import references them.
+  // Exit 0 proves Knip, under the preset defaults, reports neither `sherif` nor `tsrs` as an unused
+  // devDependency, although no script or import references them. `tsrs` is an optional peer of
+  // Adamantite, which Knip counts as a use.
   console.info("Running `adamantite analyze --only unused` in the monorepo fixture...")
   const unusedOutput = run(process.execPath, [cliPath, "analyze", "--only", "unused"], {
     cwd: monorepoFixture,

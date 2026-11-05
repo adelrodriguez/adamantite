@@ -136,16 +136,21 @@ export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
 }
 
 /**
- * The installed `@effect/tsgo` has no Effect build of the installed Oxlint or oxlint-tsgolint.
+ * The installed `@effect/tsgo` has no Effect build of the installed Oxlint or tsrs.
  */
 export class EffectBuildMissing extends Data.TaggedError("EffectBuildMissing")<{
   effectVersion: string
   supported: readonly string[]
-  tool: "oxlint" | "oxlint-tsgolint"
+  tool: "oxlint" | "tsrs"
   version: string
 }> {
   override get message() {
-    return `The effect preset needs the @effect/tsgo build of ${this.tool} ${this.version}. @effect/tsgo ${this.effectVersion} has builds for ${this.tool} ${this.supported.join(", ")}. Run \`adamantite update\`.`
+    const builds =
+      this.supported.length === 0
+        ? `has no builds of ${this.tool}`
+        : `has builds for ${this.tool} ${this.supported.join(", ")}`
+
+    return `The effect preset needs the @effect/tsgo build of ${this.tool} ${this.version}. @effect/tsgo ${this.effectVersion} ${builds}. Run \`adamantite update\`.`
   }
 }
 

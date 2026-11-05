@@ -65,7 +65,7 @@ files to the repository. See `docs/agents/issue-tracker.md`.
   `managedPlugins` registry in `integrations/tooling/oxlint/plugins/index.ts` are the
   exceptions.
 - Keep packages that belong to a host tool under that tool's folder: companion packages
-  beside it (`tooling/oxlint/tsgolint.ts`) and managed plugins in `plugins/`. Add a managed
+  beside it (`tooling/oxlint/tsrs.ts`) and managed plugins in `plugins/`. Add a managed
   plugin with `defineManagedPlugin` and register it in `managedPlugins`.
 - Put behavior that one tool owns in that tool's folder, for example
   `integrations/tooling/knip/config.ts`. Put behavior that several tools share in

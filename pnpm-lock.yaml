@@ -238,13 +238,10 @@ importers:
         version: 0.76.0
       oxlint:
         specifier: 1.91.0
-        version: 1.91.0(oxlint-tsgolint@7.0.2005)
+        version: 1.91.0
       oxlint-plugin-react-doctor:
         specifier: 0.9.18
         version: 0.9.18
-      oxlint-tsgolint:
-        specifier: 7.0.2005
-        version: 7.0.2005
       sherif:
         specifier: 1.13.0
         version: 1.13.0
@@ -254,6 +251,9 @@ importers:
       tsdown:
         specifier: 0.23.1
         version: 0.23.1(oxc-resolver@11.24.2)(typescript@7.0.2)
+      tsrs:
+        specifier: 0.21.0-ts7.1.0-beta
+        version: 0.21.0-ts7.1.0-beta
       type-fest:
         specifier: 5.10.0
         version: 5.10.0
@@ -952,36 +952,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@oxlint-tsgolint/darwin-arm64@7.0.2005':
-    resolution: {integrity: sha512-VqDZxcZVjlonNLuuvraVNgDQt+1ndwa4yJo8OqsK4HYh/61ba9IlMStCVfi/aaIqRoDhNbAKC8gdcTrXqnb+Ug==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@oxlint-tsgolint/darwin-x64@7.0.2005':
-    resolution: {integrity: sha512-4kUfLRNYoVpv0Tm3jPYrvxyfOc/LmdvFC3pKZ4tL6K7lA7K/VS81SAtmxRzbYXYSyb3SBWhwsuX+df4neqzxxA==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@oxlint-tsgolint/linux-arm64@7.0.2005':
-    resolution: {integrity: sha512-rhUNcPsBlKvhXtrbhbBUidtRBRdJ8fbEHN9H5Q5N59gby18ruGuDA7KUxl7oRnUzp797uykYQhkBDm+0KpfK/Q==}
-    cpu: [arm64]
-    os: [linux]
-
-  '@oxlint-tsgolint/linux-x64@7.0.2005':
-    resolution: {integrity: sha512-tKs9yinDQZOHygM0e8EJnjTU3mzJtdfkOZP6Udu82iLMePUSHOhTJ9zzU/mSd1hQxURI4LTRRiFhfzC+PzwdNA==}
-    cpu: [x64]
-    os: [linux]
-
-  '@oxlint-tsgolint/win32-arm64@7.0.2005':
-    resolution: {integrity: sha512-VYPnu1gjfbSv+ROhuyNfMs382D4zQU2ZRc8Uc3nuEZo1k2kf+1KfTrg4hrlWh73h9GI+dUWyo+DYCQzUBlPwcQ==}
-    cpu: [arm64]
-    os: [win32]
-
-  '@oxlint-tsgolint/win32-x64@7.0.2005':
-    resolution: {integrity: sha512-ekU89cTGy9fpQzuvxIsFHrnoP8XoFjGIRgPEW6eqgY2NYjGy9pwpjF79o04WXRMJFKRrcaVqkZXUUBdLsqpQDw==}
-    cpu: [x64]
-    os: [win32]
-
   '@oxlint/binding-android-arm-eabi@1.91.0':
     resolution: {integrity: sha512-eOqJUUS1MCqIoUUxMIkuwaqIdKaHr1SXYA0CQI95UUrF8jwQylQH33bBmnqhZfvWXKlRB2Ylx/+Sbk/ctEqzZQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1273,6 +1243,52 @@ packages:
     resolution: {integrity: sha512-Ei5RqUWgV96HrezTEyDbScy0wZN+17dNo59Am8/3ncv0YIaIxApkiX5LkM488wxe4a1Imdi09nhjFxblxwLMSQ==}
     engines: {node: '>=20.12.0'}
     hasBin: true
+
+  '@tsrs/darwin-arm64@0.21.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-qBHxa+LmrNu/XYZjqLXV4qQPsHzxSI+dQTISxXuxyBaxtJVDwCwGAq9rVHKgaUX3U0bsyb8FyC1JIZFu4+EqZQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@tsrs/darwin-x64@0.21.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-7WUGrCYqz94dRpSTungOh90LL/5NhhnLQrMQqRYvmirHcp1sRlcVziJ2w+cynKwQ81/I2UajsNiKho/YSObcyA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@tsrs/linux-arm64-gnu@0.21.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-bNWkz4lu+bOzl+sl9btE4pQ0RbLkv0Zm4FE2oKvBrt56vCnl7khcAcsqpSxBXApOkp5OwvyyY+XuOGuROBt7yg==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@tsrs/linux-arm64-musl@0.21.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-TwvKTiOD8Fwb3HB+CrhnpYgKf7He1BobtjefTja0iGAzDtfaiGwoF06zLUdmey27kmCmxjBPybS45VRyZBkQnQ==}
+    engines: {node: '>=16.20.0'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@tsrs/linux-x64-gnu@0.21.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-0OAYWOp33xHJbY/zwowbq4IKg1aCzD98sb2ksZb/1um2l28HYhJyhMEEsNczLpUFipQDE+zVBNkFoBML/KRNvA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@tsrs/linux-x64-musl@0.21.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-OtYmWa1tzjSt/bXxotPBrPrzlfZqz+azkkfotmuYMQfxiOgmRRm7cl022iV4lE21EOUicqp0NAnuDGDLfDlNBg==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@tsrs/win32-x64@0.21.0-ts7.1.0-beta':
+    resolution: {integrity: sha512-ITwz3wOx161DNwEC4qYrrRwWgQyZQR4Os/GA3g67dKml0CQ4LPWHXniCzXrMagwYyH2vBBhPYT+7o+bKDj0qtA==}
+    engines: {node: '>=16.20.0'}
+    cpu: [x64]
+    os: [win32]
 
   '@tybys/wasm-util@0.10.3':
     resolution: {integrity: sha512-F3fo1MYrRJYL3zER0OUOmkutjr1Vp23m7OsSgp7nq4SP6OqX6C/56XFIPAl5bt3zaBRjmW7SGz3u/6LwFpYcOg==}
@@ -1858,10 +1874,6 @@ packages:
     resolution: {integrity: sha512-1mfeb/jzXnduWOZJxrvdJjvKT0pFNKrNFYcPO4ncpFAnfW41M0mLz/23lAFzHb0knNLYayEgIQ5DjI4ZfFe+DQ==}
     engines: {node: ^20.19.0 || >=22.13.0}
 
-  oxlint-tsgolint@7.0.2005:
-    resolution: {integrity: sha512-6ccPGu4u4J9bwYPHXBFPee3RZrX3BboRdU7k14zRDDB1lvN3O7J/vPRFdaEfa1+CWx4xnQQOp4ctoaF66oO0uw==}
-    hasBin: true
-
   oxlint@1.91.0:
     resolution: {integrity: sha512-vjy/cBZcEFcYh3dbxUoQK+bjc+QaY3ZWo86aJkZ5YAwp/HyiqP7dTdNgbvcIVJafhAH5sZbTqBp4sZcicEZngA==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -2098,6 +2110,11 @@ packages:
 
   tslib@2.8.1:
     resolution: {integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==}
+
+  tsrs@0.21.0-ts7.1.0-beta:
+    resolution: {integrity: sha512-4aafVQhCMlJ9Qhjm3wT/a0o21HO7ajTDA6cSCnP4PVNU1fhQ2rTXLxJxEbhonz969Hh8s+dYOlFpaO4GoJMzDA==}
+    engines: {node: '>=16.20.0'}
+    hasBin: true
 
   type-fest@5.10.0:
     resolution: {integrity: sha512-NoSdpq/WEiAg5sjmBkmV/hfxv6HJH4NqPNrqjtSO5CwRmpsDfaf4begxW34KdJykH/l1yHtwBWQkCRdoXO8mPA==}
@@ -2814,24 +2831,6 @@ snapshots:
   '@oxfmt/binding-win32-x64-msvc@0.76.0':
     optional: true
 
-  '@oxlint-tsgolint/darwin-arm64@7.0.2005':
-    optional: true
-
-  '@oxlint-tsgolint/darwin-x64@7.0.2005':
-    optional: true
-
-  '@oxlint-tsgolint/linux-arm64@7.0.2005':
-    optional: true
-
-  '@oxlint-tsgolint/linux-x64@7.0.2005':
-    optional: true
-
-  '@oxlint-tsgolint/win32-arm64@7.0.2005':
-    optional: true
-
-  '@oxlint-tsgolint/win32-x64@7.0.2005':
-    optional: true
-
   '@oxlint/binding-android-arm-eabi@1.91.0':
     optional: true
 
@@ -2976,6 +2975,27 @@ snapshots:
   '@shaderfrog/glsl-parser@7.0.1': {}
 
   '@tanstack/intent@0.5.5': {}
+
+  '@tsrs/darwin-arm64@0.21.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/darwin-x64@0.21.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-arm64-gnu@0.21.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-arm64-musl@0.21.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-x64-gnu@0.21.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/linux-x64-musl@0.21.0-ts7.1.0-beta':
+    optional: true
+
+  '@tsrs/win32-x64@0.21.0-ts7.1.0-beta':
+    optional: true
 
   '@tybys/wasm-util@0.10.3':
     dependencies:
@@ -3483,16 +3503,7 @@ snapshots:
       lightningcss: 1.33.0
       oxc-parser: 0.148.0
 
-  oxlint-tsgolint@7.0.2005:
-    optionalDependencies:
-      '@oxlint-tsgolint/darwin-arm64': 7.0.2005
-      '@oxlint-tsgolint/darwin-x64': 7.0.2005
-      '@oxlint-tsgolint/linux-arm64': 7.0.2005
-      '@oxlint-tsgolint/linux-x64': 7.0.2005
-      '@oxlint-tsgolint/win32-arm64': 7.0.2005
-      '@oxlint-tsgolint/win32-x64': 7.0.2005
-
-  oxlint@1.91.0(oxlint-tsgolint@7.0.2005):
+  oxlint@1.91.0:
     optionalDependencies:
       '@oxlint/binding-android-arm-eabi': 1.91.0
       '@oxlint/binding-android-arm64': 1.91.0
@@ -3513,7 +3524,6 @@ snapshots:
       '@oxlint/binding-win32-arm64-msvc': 1.91.0
       '@oxlint/binding-win32-ia32-msvc': 1.91.0
       '@oxlint/binding-win32-x64-msvc': 1.91.0
-      oxlint-tsgolint: 7.0.2005
 
   package-manager-detector@1.8.0: {}
 
@@ -3701,6 +3711,16 @@ snapshots:
 
   tslib@2.8.1:
     optional: true
+
+  tsrs@0.21.0-ts7.1.0-beta:
+    optionalDependencies:
+      '@tsrs/darwin-arm64': 0.21.0-ts7.1.0-beta
+      '@tsrs/darwin-x64': 0.21.0-ts7.1.0-beta
+      '@tsrs/linux-arm64-gnu': 0.21.0-ts7.1.0-beta
+      '@tsrs/linux-arm64-musl': 0.21.0-ts7.1.0-beta
+      '@tsrs/linux-x64-gnu': 0.21.0-ts7.1.0-beta
+      '@tsrs/linux-x64-musl': 0.21.0-ts7.1.0-beta
+      '@tsrs/win32-x64': 0.21.0-ts7.1.0-beta
 
   type-fest@5.10.0:
     dependencies:

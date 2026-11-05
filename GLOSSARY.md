@@ -67,7 +67,7 @@ _Avoid_: Plugin, preset
 
 **Tooling integration**:
 A managed integration for a package and its configuration, such as Oxlint, Oxfmt, Knip,
-Sherif, or Tsgolint.
+Sherif, or tsrs.
 _Avoid_: Dependency adapter
 
 **Toolchain**:

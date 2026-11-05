@@ -32,9 +32,7 @@ if (Result.isFailure(result)) {
 const { backend, binding, oxlint } = result.success
 const importOxlint = (file: string) => import(pathToFileURL(join(oxlint, "dist", file)).href)
 
-if (backend._tag === "Replaced") {
-  process.env["OXLINT_TSGOLINT_PATH"] = backend.path
-}
+Object.assign(process.env, backend)
 
 // Oxlint loads its binding from `NAPI_RS_NATIVE_LIBRARY_PATH` once, when `bindings.js` loads. Every
 // napi-rs package reads the same variable, such as `oxc-resolver` in a JS plugin, so it must not

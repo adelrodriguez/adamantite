@@ -158,7 +158,7 @@ describe("effect preset", () => {
   })
 
   // The toolchain loads the Effect builds from `artifacts/<tool>/<version>` of the platform package.
-  it("ship Effect builds for the pinned Oxlint and oxlint-tsgolint", () => {
+  it("ship Effect builds for the pinned Oxlint and tsrs", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
     )
@@ -167,7 +167,7 @@ describe("effect preset", () => {
         `@effect/tsgo-${process.platform}-${process.arch}/package.json`
       )
     )
-    const missing = ["oxlint", "oxlint-tsgolint"]
+    const missing = ["oxlint", "tsrs"]
       .map((tool) => `${tool}/${devDependencies[tool]}`)
       .filter((artifact) => !existsSync(join(platformDirectory, "artifacts", artifact)))
 

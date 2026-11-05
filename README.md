@@ -503,7 +503,7 @@ simpler replacement (`catch-all-to-map-error`). The rules come from
 TypeScript-Go, and need Oxlint's type-aware mode.
 
 The rules are not a JavaScript plugin. They exist only in the Effect builds of the Oxlint
-binding and oxlint-tsgolint, which `@effect/tsgo` ships. When the project installs
+binding and tsrs, which `@effect/tsgo` ships. When the project installs
 `@effect/tsgo`, Adamantite runs Oxlint with those builds. Nothing changes in
 `node_modules`, so an install needs no extra step. These run Oxlint with the builds:
 
@@ -526,8 +526,8 @@ When you select the preset, `adamantite init` does these steps:
 
 `adamantite doctor` reports each missing part, and `adamantite update` keeps
 `@effect/tsgo` on its pinned version. Each `@effect/tsgo` release has Effect builds only for
-some Oxlint and oxlint-tsgolint versions, so Adamantite moves the pins together. With an
-Oxlint or oxlint-tsgolint version that the pinned `@effect/tsgo` has no build of, Oxlint
+some Oxlint and tsrs versions, so Adamantite moves the pins together. With an
+Oxlint or tsrs version that the pinned `@effect/tsgo` has no build of, Oxlint
 does not start, and the message names the versions that it supports. `@effect/tsgo` has no
 builds for Linux with musl.
 

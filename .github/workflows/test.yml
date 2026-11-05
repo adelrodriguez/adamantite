@@ -117,10 +117,10 @@ jobs:
             exit 1
           fi
           grep "react-doctor(no-effect-event-handler)" oxlint-output.txt
-          tsgolint_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['oxlint-tsgolint']")"
+          tsrs_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.tsrs")"
           effect_tsgo_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['@effect/tsgo']")"
           effect_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).dependencies.effect")"
-          npm install "oxlint-tsgolint@${tsgolint_version}" "@effect/tsgo@${effect_tsgo_version}" "effect@${effect_version}"
+          npm install "tsrs@${tsrs_version}" "@effect/tsgo@${effect_tsgo_version}" "effect@${effect_version}"
           # The effecttsgo rules exist only in the Effect builds, which the toolchain entry loads
           # without a patch: see ADR 0019.
           printf '%s\n' '{ "compilerOptions": { "strict": true, "module": "esnext", "moduleResolution": "bundler" } }' > tsconfig.json

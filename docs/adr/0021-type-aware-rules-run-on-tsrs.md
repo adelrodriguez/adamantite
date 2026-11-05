@@ -58,5 +58,12 @@ unused devDependency.
 - tsrs does not support the Go profiling variables of tsgolint, such as `OXLINT_TSGOLINT_CPU`.
 - The packaged Effect builds do not run on Linux with musl. The stock `tsrs` package has musl
   builds.
+- The type-aware rules do not run on Windows ARM64. tsrs 0.21.0 publishes no `@tsrs/win32-arm64`
+  package, so `tsrs-lint` fails with "This platform is not supported". `@effect/tsgo` 0.67.1 ships
+  no tsrs build for Windows ARM64, so the `effect` preset fails with `EffectBuildMissing`.
+  oxlint-tsgolint did support Windows ARM64. We accepted this gap (2026-11-05, PR #620) and wait
+  for the upstream fix. [oxc-project/tsrs#903](https://github.com/oxc-project/tsrs/pull/903) adds
+  the package, and no published tsrs release includes it yet. Remove this note when the pinned
+  `tsrs` and `@effect/tsgo` both ship Windows ARM64 builds.
 - When Oxlint finds tsrs by itself, the backend of a project without the `effect` preset needs no
   variable.

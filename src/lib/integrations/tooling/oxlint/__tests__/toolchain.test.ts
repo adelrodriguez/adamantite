@@ -202,6 +202,33 @@ describe("toolchain", () => {
     })
   )
 
+  it.effect("say that @effect/tsgo has no builds of tsrs for a platform without them", () =>
+    Effect.gen(function* () {
+      // @effect/tsgo 0.67.1 ships no tsrs builds for Windows ARM64, because tsrs has no build for
+      // it yet.
+      const files = createFileSystemTestContext({
+        files: {
+          [`${ARTIFACTS}/oxlint/1.88.0/oxlint.${PLATFORM}.node`]: "",
+          [`node_modules/${PLATFORM_PACKAGE}/package.json`]: makeManifest(
+            PLATFORM_PACKAGE,
+            "0.67.1"
+          ),
+          "node_modules/@effect/tsgo/package.json": makeManifest("@effect/tsgo", "0.67.1"),
+          "node_modules/oxlint/package.json": makeManifest("oxlint", "1.88.0"),
+          "node_modules/tsrs/package.json": makeManifest("tsrs", TSRS_VERSION),
+          "package.json": makeManifest("app", "1.0.0"),
+        },
+        root: ROOT,
+      })
+
+      const error = yield* runResolve(files, EFFECT_PACKAGES).pipe(Effect.flip)
+
+      expect(error.message).toBe(
+        `The effect preset needs the @effect/tsgo build of tsrs ${TSRS_VERSION}. @effect/tsgo 0.67.1 has no builds of tsrs. Run \`adamantite update\`.`
+      )
+    })
+  )
+
   it.effect("fail for a platform that @effect/tsgo publishes no build for", () =>
     Effect.gen(function* () {
       const packages = Object.fromEntries(

@@ -16,7 +16,8 @@ A toolchain is the Oxlint package, its native binding, and its type-aware backen
 is `Stock`, so Oxlint finds its own file, or `Replaced` with a path. A project that installs
 `@effect/tsgo` gets the Effect builds of the installed Oxlint and oxlint-tsgolint versions from
 the platform package `@effect/tsgo-<platform>`. Every other project runs Oxlint as it is
-installed.
+installed. ADR 0021 moved the backend to tsrs: the backend is now the variables that make Oxlint
+start tsrs, and the Effect build of tsrs replaces the Effect build of oxlint-tsgolint.
 
 The installed package decides, not the import of `adamantite/lint/effect`. This repository
 imports its presets by relative path, and a monorepo can import the preset in a nested config.
@@ -76,6 +77,5 @@ these builds on its own.
 - On a small target project with the `effect` preset, the entry takes 0.50 to 0.51 s, against
   0.40 to 0.41 s for the patched Oxlint (5 runs each). The difference is the Effect runtime and the
   module resolver that the entry loads before Oxlint.
-- When Oxlint finds `tsrs-lint` itself, or runs tsrs inside its process, the backend becomes
-  `Stock` again for projects without the `effect` preset, and the entry changes nothing for
-  them.
+- When Oxlint finds `tsrs-lint` itself, or runs tsrs inside its process, projects without the
+  `effect` preset need no backend variable, and the entry changes nothing for them. See ADR 0021.

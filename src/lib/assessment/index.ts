@@ -21,7 +21,7 @@ import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
-import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
+import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import agents from "#lib/integrations/workspace/agents.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
@@ -41,7 +41,7 @@ const managedIntegrations = [
   oxlintCustom,
   ...managedPlugins,
   sherif,
-  tsgolint,
+  tsrs,
   tsconfig,
   agents,
   github,

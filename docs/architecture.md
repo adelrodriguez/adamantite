@@ -185,7 +185,7 @@ src/
 A tooling integration records the version that Adamantite installs in target projects.
 When the corresponding dependency version in `package.json` increases, update the version
 in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit under
-`tooling/oxlint/`: Tsgolint beside the integration, managed plugins in `plugins/`.
+`tooling/oxlint/`: tsrs beside the integration, managed plugins in `plugins/`.
 
 ## Managed plugins
 
@@ -201,9 +201,10 @@ version in `package.json`. See ADR 0003.
 
 `@effect/tsgo` for the `effect` preset is a managed plugin too, but it is not a `jsPlugins`
 package. Its `effecttsgo` rules exist only in the Effect builds of the Oxlint binding and
-oxlint-tsgolint that the package ships. The toolchain in `tooling/oxlint/toolchain.ts` loads
-those builds when the project installs `@effect/tsgo`, and the entry `src/oxlint.ts` runs
-Oxlint with them. See ADR 0019. The `@effect/tsgo` integration also manages the
+tsrs that the package ships. The toolchain in `tooling/oxlint/toolchain.ts` loads those builds
+when the project installs `@effect/tsgo`, and the entry `src/oxlint.ts` runs Oxlint with them.
+Every other project runs the type-aware rules on the installed `tsrs`, which the `tsrs`
+integration in `tooling/oxlint/tsrs.ts` pins. See ADR 0019 and ADR 0021. The `@effect/tsgo` integration also manages the
 `@effect/language-service` entry in `tsconfig.json`, and reports a `prepare` script that still
 runs `adamantite prepare`. It lives in `plugins/effect-tsgo/`: `index.ts` is one
 `defineManagedPlugin` call, and `prepare-script.ts`, `tsconfig.ts`, and `toolchain.ts` hold one
@@ -213,7 +214,7 @@ of the integration. The helpers do not import `index.ts` or each other. `tooling
 imports `toolchain.ts` and not `index.ts`, because `index.ts` imports a macro module and the
 entry runs from source in this repository. The Knip integration requires
 `ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
-`@effect/tsgo` ships Effect builds for the pinned Oxlint and oxlint-tsgolint versions. See ADR
+`@effect/tsgo` ships Effect builds for the pinned Oxlint and tsrs versions. See ADR
 0007 for the curation.
 
 ## Vendored bundles

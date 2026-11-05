@@ -136,12 +136,12 @@ export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
 }
 
 /**
- * The installed `@effect/tsgo` has no Effect build of the installed Oxlint or oxlint-tsgolint.
+ * The installed `@effect/tsgo` has no Effect build of the installed Oxlint or tsrs.
  */
 export class EffectBuildMissing extends Data.TaggedError("EffectBuildMissing")<{
   effectVersion: string
   supported: readonly string[]
-  tool: "oxlint" | "oxlint-tsgolint"
+  tool: "oxlint" | "tsrs"
   version: string
 }> {
   override get message() {

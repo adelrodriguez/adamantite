@@ -20,3 +20,4 @@
 - [ADR 0018: Check fails on warnings](0018-check-fails-on-warnings.md)
 - [ADR 0019: Oxlint runs through a toolchain proxy](0019-oxlint-runs-through-a-toolchain-proxy.md)
 - [ADR 0020: Harden computes facts, and the prompt keeps judgment](0020-harden-computes-facts.md)
+- [ADR 0021: The type-aware rules run on tsrs](0021-type-aware-rules-run-on-tsrs.md)

@@ -21,7 +21,10 @@ const NAME = "@effect/tsgo"
  * The Effect builds that replace the Oxlint native binding and the type-aware backend.
  */
 export interface EffectToolchain {
-  readonly backend: string
+  /**
+   * The variables that make the Effect binding start the Effect build of tsrs.
+   */
+  readonly backend: Readonly<Record<string, string>>
   readonly binding: string
 }
 
@@ -67,9 +70,9 @@ const findArtifact = Effect.fn("findArtifact")(function* (
 })
 
 /**
- * The Effect builds of the Oxlint binding and tsgolint for the installed Oxlint and oxlint-tsgolint
- * versions. They come from the `@effect/tsgo` platform package, so the project needs no patch. None
- * when the project does not install `@effect/tsgo`.
+ * The Effect builds of the Oxlint binding and tsrs for the installed Oxlint and tsrs versions. They
+ * come from the `@effect/tsgo` platform package, so the project needs no patch. None when the
+ * project does not install `@effect/tsgo`.
  */
 export const resolveEffectToolchain = Effect.fn("resolveEffectToolchain")(function* (
   project: string,
@@ -88,17 +91,17 @@ export const resolveEffectToolchain = Effect.fn("resolveEffectToolchain")(functi
     return yield* new EffectPlatformUnsupported({ platform })
   }
 
-  const tsgolint = yield* resolvePackageDirectory(oxlint, "oxlint-tsgolint")
+  const tsrs = yield* resolvePackageDirectory(project, "tsrs")
 
-  if (Option.isNone(tsgolint)) {
-    return yield* new PackageNotInstalled({ packageName: "oxlint-tsgolint", project })
+  if (Option.isNone(tsrs)) {
+    return yield* new PackageNotInstalled({ packageName: "tsrs", project })
   }
 
-  const [effectVersion, tsgolintVersion, oxlintVersion] = yield* Effect.all(
-    [readVersion(tsgo.value), readVersion(tsgolint.value), readVersion(oxlint)],
+  const [effectVersion, tsrsVersion, oxlintVersion] = yield* Effect.all(
+    [readVersion(tsgo.value), readVersion(tsrs.value), readVersion(oxlint)],
     { concurrency: "unbounded" }
   )
-  const tsgolintFile = process.platform === "win32" ? "tsgolint.exe" : "tsgolint"
+  const tsrsFile = process.platform === "win32" ? "tsrs.exe" : "tsrs"
   // `Result.all` takes the first failure in input order, so a project that has no build of either
   // version always gets the backend error.
   const artifacts = yield* Effect.all(
@@ -106,9 +109,9 @@ export const resolveEffectToolchain = Effect.fn("resolveEffectToolchain")(functi
       findArtifact(
         platformDirectory.value,
         effectVersion,
-        "oxlint-tsgolint",
-        tsgolintVersion,
-        (file) => file === tsgolintFile
+        "tsrs",
+        tsrsVersion,
+        (file) => file === tsrsFile
       ),
       findArtifact(platformDirectory.value, effectVersion, "oxlint", oxlintVersion, (file) =>
         file.endsWith(".node")
@@ -118,5 +121,9 @@ export const resolveEffectToolchain = Effect.fn("resolveEffectToolchain")(functi
   )
   const [backend, binding] = yield* Effect.fromResult(Result.all(artifacts))
 
-  return Option.some<EffectToolchain>({ backend, binding })
+  // With the mode `tsrs`, the Effect binding starts the backend as `<path> --lint headless`.
+  return Option.some<EffectToolchain>({
+    backend: { EFFECT_TSGO_TSGOLINT_MODE: "tsrs", EFFECT_TSGO_TSGOLINT_PATH: backend },
+    binding,
+  })
 })

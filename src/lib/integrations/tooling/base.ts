@@ -302,8 +302,8 @@ function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Scrip
  */
 export function definePackageTooling(options: {
   /**
-   * Findings for retired managed scripts. While any exist, the integration stays applicable and
-   * reports them so the scripts get removed.
+   * Findings for retired managed scripts or packages. While any exist, the integration stays
+   * applicable and reports them so the scripts get removed.
    */
   readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   /**
@@ -392,8 +392,8 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
   readonly configFiles: ToolingConfigFiles
   readonly inspectConfig: (content: string, workspace: Workspace) => RequiredConfigInspection
   /**
-   * Findings for retired managed scripts. While any exist, the integration stays applicable and
-   * reports them so the scripts get removed.
+   * Findings for retired managed scripts or packages. While any exist, the integration stays
+   * applicable and reports them so the scripts get removed.
    */
   readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   readonly name: string

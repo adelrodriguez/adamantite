@@ -25,7 +25,7 @@ export function assessPrepareScript(packageJson: PackageJson, integration: strin
       id: "legacy-adamantite-prepare",
       integration,
       notes: [
-        "Adamantite runs Oxlint with the Effect builds of the binding and oxlint-tsgolint, so nothing patches `node_modules` after an install.",
+        "Adamantite runs Oxlint with the Effect builds of the binding and tsrs, so nothing patches `node_modules` after an install.",
         "A later release removes `adamantite prepare`, and a `prepare` script that still runs it then fails the install.",
       ],
       title: "Legacy adamantite prepare step",

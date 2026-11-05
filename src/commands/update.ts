@@ -8,7 +8,7 @@ import { getPackageActions } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
+import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -20,7 +20,7 @@ import { Prompter } from "#terminal/prompter.ts"
 // which the assessment already covers.
 const knownPackages = [
   oxlint,
-  tsgolint,
+  tsrs,
   oxfmt,
   sherif,
   knip,

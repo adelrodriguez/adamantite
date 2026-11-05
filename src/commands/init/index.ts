@@ -7,7 +7,7 @@ import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
-import tsgolint from "#lib/integrations/tooling/oxlint/tsgolint.ts"
+import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
@@ -130,7 +130,7 @@ export default Command.make("init", initCommandOptions).pipe(
       if (hasOxlint) {
         dependencies.push(
           `${oxlint.name}@${oxlint.version}`,
-          `${tsgolint.name}@${tsgolint.version}`,
+          `${tsrs.name}@${tsrs.version}`,
           `${oxfmt.name}@${oxfmt.version}`,
           // A preset with a managed plugin loads that plugin from the target project.
           ...managedPlugins

@@ -5,10 +5,10 @@ import type { OxlintConfig } from "oxlint"
 // combinators that have a direct replacement.
 //
 // @effect/tsgo is a managed plugin, but it is not a `jsPlugins` package. The rules are native
-// type-aware rules that exist only in the Effect builds of the Oxlint binding and oxlint-tsgolint,
+// type-aware rules that exist only in the Effect builds of the Oxlint binding and tsrs,
 // which @effect/tsgo ships. Adamantite runs Oxlint through its toolchain proxy, which loads those
 // builds when the project installs @effect/tsgo. Plain `oxlint` stops with
-// "Unknown plugin: 'effecttsgo'". See ADR 0019.
+// "Unknown plugin: 'effecttsgo'". See ADR 0019 and ADR 0021.
 //
 // The rules read their options, such as `allowedUnstableApis`, from the `@effect/language-service`
 // plugin entry in `tsconfig.json`.

@@ -119,6 +119,7 @@ const config: OxlintConfig = {
     "effecttsgo/match-boolean-to-is-success": "error",
     "effecttsgo/match-effect-to-map-both": "error",
     "effecttsgo/match-effect-to-match": "error",
+    "effecttsgo/match-to-result-or-option": "error",
     "effecttsgo/multiple-catch-tag": "error",
     "effecttsgo/nested-effect-gen-yield": "error",
     "effecttsgo/option-match-to-from-option": "error",

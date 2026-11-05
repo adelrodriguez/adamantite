@@ -370,10 +370,9 @@ describe("checkIsMonorepo", () => {
     },
   ])("return $expected when $name", ({ content, expected, file }) =>
     Effect.gen(function* () {
-      const files = makeFiles({
-        "package.json": yield* stringifyJson({ name: "test-package" }),
-        [file]: content,
-      })
+      // A case for `package.json` replaces the default one.
+      const defaults = { "package.json": yield* stringifyJson({ name: "test-package" }) }
+      const files = makeFiles({ ...defaults, [file]: content })
 
       const result = yield* checkIsMonorepo(ROOT).pipe(provideFiles(files))
 

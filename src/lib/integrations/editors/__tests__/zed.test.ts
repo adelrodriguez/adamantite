@@ -29,7 +29,6 @@ describe("zed", () => {
     it.effect("report stale oxfmt settings and preserve changed values", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "package.json": "{}",
           [SETTINGS_PATH]: yield* stringifyJson({
             lsp: {
               oxfmt: {
@@ -43,6 +42,7 @@ describe("zed", () => {
               },
             },
           }),
+          "package.json": "{}",
         })
 
         const result = yield* readProject(ROOT).pipe(

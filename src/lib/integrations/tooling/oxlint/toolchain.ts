@@ -1,5 +1,6 @@
 import process from "node:process"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { resolveEffectToolchain } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/toolchain.ts"
@@ -21,7 +22,8 @@ export type ToolchainPart =
 export interface Toolchain {
   /**
    * The variables that make Oxlint start tsrs as its type-aware backend. Oxlint does not find tsrs
-   * by itself. None when the project does not install tsrs.
+   * by itself. None when the project does not install tsrs, or when Windows has no launcher for
+   * it.
    */
   readonly backend: Readonly<Record<string, string>>
   readonly binding: ToolchainPart
@@ -30,6 +32,37 @@ export interface Toolchain {
    */
   readonly oxlint: string
 }
+
+/**
+ * The launchers that package managers write for the `tsrs-lint` bin on Windows, which cannot start
+ * the bin script itself: `.cmd` from npm and pnpm, and `.exe` from Bun.
+ */
+const WINDOWS_LAUNCHERS = ["tsrs-lint.cmd", "tsrs-lint.exe"]
+
+/**
+ * The nearest `tsrs-lint` launcher in a `node_modules/.bin` folder from `project` up to the root,
+ * as Oxlint looks for its own backend on Windows. A workspace package often uses the launcher of
+ * the root installation.
+ */
+const findWindowsLauncher = Effect.fn("findWindowsLauncher")(function* (project: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const candidates: string[] = []
+
+  for (let folder = project; ; folder = path.dirname(folder)) {
+    candidates.push(
+      ...WINDOWS_LAUNCHERS.map((name) => path.join(folder, "node_modules", ".bin", name))
+    )
+
+    if (path.dirname(folder) === folder) {
+      break
+    }
+  }
+
+  return yield* Effect.findFirst(candidates, (candidate) =>
+    fs.exists(candidate).pipe(Effect.orElseSucceed(() => false))
+  )
+})
 
 /**
  * The toolchain for the project at `project`. A project that installs `@effect/tsgo` gets the
@@ -56,17 +89,16 @@ export const resolveToolchain = Effect.fn("resolveToolchain")(function* (project
   }
 
   const tsrs = yield* resolvePackageDirectory(project, "tsrs")
-  // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` script adds the `--lint`
-  // flag of tsrs. Windows cannot start the script itself, so it gets the `.cmd` file that the
-  // package manager writes for the bin.
-  const backend = Option.match(tsrs, {
+  // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` bin adds the `--lint` flag
+  // of tsrs.
+  const launcher = Option.isNone(tsrs)
+    ? Option.none<string>()
+    : process.platform === "win32"
+      ? yield* findWindowsLauncher(project)
+      : Option.some(path.join(tsrs.value, "bin", "tsrs-lint"))
+  const backend = Option.match(launcher, {
     onNone: () => ({}),
-    onSome: (directory) => ({
-      OXLINT_TSGOLINT_PATH:
-        process.platform === "win32"
-          ? path.join(project, "node_modules", ".bin", "tsrs-lint.cmd")
-          : path.join(directory, "bin", "tsrs-lint"),
-    }),
+    onSome: (file) => ({ OXLINT_TSGOLINT_PATH: file }),
   })
 
   return { backend, binding: { _tag: "Stock" }, oxlint: oxlint.value } satisfies Toolchain

@@ -19,8 +19,10 @@ Oxlint does not find tsrs by itself, so every project with tsrs gets a variable:
   `<path> --lint headless`.
 - Every other project gets `OXLINT_TSGOLINT_PATH`, set to the `tsrs-lint` bin of the installed
   `tsrs` package. Oxlint starts the backend as `<path> headless`, and `tsrs-lint` adds the
-  `--lint` flag. Windows cannot start that Node script, so it gets
-  `node_modules/.bin/tsrs-lint.cmd`.
+  `--lint` flag. Windows cannot start that Node script, so it gets the launcher that the package
+  manager writes: `tsrs-lint.cmd` from npm and pnpm, or `tsrs-lint.exe` from Bun. The entry takes
+  the nearest launcher in a `node_modules/.bin` folder from the project up, as Oxlint looks for
+  its own backend, so a workspace package can use the launcher of the root installation.
 - A project without tsrs gets no variable, so Oxlint runs as it is installed and fails only when
   it runs a type-aware rule. Doctor reports the missing package.
 

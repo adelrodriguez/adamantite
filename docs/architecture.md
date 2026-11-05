@@ -78,10 +78,16 @@ content. They do not convert existing configs or generate patches.
 
 An assessment reads the target project one time. `readProject` in `src/lib/workspace/project.ts`
 reads `package.json`, the workspace packages, the root `oxlint.config.ts`, and the custom rules
-that the Oxlint configs load, and each integration's `assess` takes that `Project`. Only
-`project.ts` and harden import `readWorkspace` and `discoverCustomRules`, and
-`adamantite/import-owners` enforces it. A `Project` is a snapshot, so a reassessment after a
-handoff or an install reads a new one.
+that the Oxlint configs load, and each integration's `assess` takes that `Project`. A `Project`
+is a snapshot, so a reassessment after a handoff or an install reads a new one.
+
+A command that reads the workspace outside an assessment reads it one time for each phase and
+passes the `Workspace` down. `harden` reads it before the session, and takes `project.workspace`
+from its `readProject` after the session, because the agent can change the project. `rule try`
+reads it one time. The functions in `src/lib/hardening` take the `Workspace` as a parameter and
+do not read it. Only `project.ts`, `commands/harden.ts`, and `commands/rule.ts` import
+`readWorkspace`, and only `project.ts` and `hardening/index.ts` import `discoverCustomRules`, for
+the scope of a harden session. `adamantite/import-owners` enforces both lists.
 
 Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
 installed coding agent CLI or to copy the combined Markdown prompt. The resolution menu in

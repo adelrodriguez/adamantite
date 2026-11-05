@@ -63,18 +63,23 @@ export default defineConfig({
         owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/rules/layers.ts"],
       },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
-      // integration takes them from the `Project`. Harden reads them for its own scope.
+      // integration takes them from the `Project`. Harden discovers the custom rules of its own
+      // scope.
       {
         import: "#lib/workspace/custom-rules/discover.ts",
         names: ["discoverCustomRules"],
         owners: ["src/lib/workspace/project.ts", "src/lib/hardening/index.ts"],
       },
+      // A command that reads the workspace outside an assessment reads it one time for each phase,
+      // and passes the `Workspace` down. Harden reads again after the session, because the agent
+      // can change the project.
       {
         import: "#lib/workspace/monorepo.ts",
         names: ["readWorkspace"],
         owners: [
           "src/lib/workspace/project.ts",
-          "src/lib/hardening/index.ts",
+          "src/commands/harden.ts",
+          "src/commands/rule.ts",
           "src/lib/workspace/__tests__/monorepo.test.ts",
         ],
       },

@@ -23,6 +23,7 @@ import {
   CUSTOM_RULES_DIRECTORY,
   readCustomRuleTestCommand,
 } from "#lib/workspace/custom-rules/index.ts"
+import { readWorkspace } from "#lib/workspace/monorepo.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
@@ -236,7 +237,14 @@ const trial = Command.make("try", {
       const setting: TrialSetting = current
         ? { _tag: "Current" }
         : { _tag: "Error", options: Option.getOrElse(options, () => []) }
-      const results = yield* tryRule({ cases, cwd: process.cwd(), rule, setting }).pipe(
+      const cwd = process.cwd()
+      const results = yield* tryRule({
+        cases,
+        cwd,
+        rule,
+        setting,
+        workspace: yield* readWorkspace(cwd),
+      }).pipe(
         Effect.catchTag(
           [
             "TrialCaseIgnored",

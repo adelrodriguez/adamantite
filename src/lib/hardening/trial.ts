@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { Workspace } from "#lib/workspace/monorepo.ts"
 import {
   isReportOf,
   lintFiles,
@@ -26,7 +27,6 @@ import {
 } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { CONFIG_FILES } from "#lib/workspace/custom-rules/discover.ts"
-import { getWorkspacePackageDirectories } from "#lib/workspace/monorepo.ts"
 
 /**
  * What a case must get from the rule: a report, because it has the mistake, or no report, because
@@ -203,8 +203,8 @@ export function renderOverrideTrialConfig(options: {
 
 /**
  * A copy of the project in a temporary folder that the scope removes. It has the files that git
- * lists, with their uncommitted changes, and the dependencies of the root and the workspace
- * packages. A file that git ignores, such as generated code, is not in the copy.
+ * lists, with their uncommitted changes, and the dependencies of the root and the packages of
+ * `workspace`. A file that git ignores, such as generated code, is not in the copy.
  *
  * Each `node_modules` folder of the copy is a real folder with a link to each entry of the project
  * folder, except `.cache`. `custom()` writes its entry module to `node_modules/.cache`, so the
@@ -212,7 +212,7 @@ export function renderOverrideTrialConfig(options: {
  * the copy of the package, so a config that imports the package loads the copy.
  */
 export const makeProjectCopy = Effect.fn("makeProjectCopy")(
-  function* (cwd: string) {
+  function* (cwd: string, workspace: Workspace) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const files = yield* listProjectFiles(cwd)
@@ -241,7 +241,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       { concurrency: 16, discard: true }
     )
 
-    const packages = [cwd, ...(yield* getWorkspacePackageDirectories(cwd))]
+    const packages = [cwd, ...workspace.packageDirectories]
     // A file of the project outside each `node_modules` folder, such as a workspace package, has a
     // copy. A real path can differ from `cwd` in a folder link, such as `/var` on macOS.
     const root = yield* fs.realPath(cwd)
@@ -403,13 +403,14 @@ export const tryRule = Effect.fn("tryRule")(
     readonly cwd: string
     readonly rule: string
     readonly setting: TrialSetting
+    readonly workspace: Workspace
   }) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
-    const { cases, cwd, rule, setting } = options
+    const { cases, cwd, rule, setting, workspace } = options
     const { name: ruleName, plugin } = splitRuleName(rule)
     const resolved = yield* resolveRule(rule, cwd)
-    const copy = yield* makeProjectCopy(cwd)
+    const copy = yield* makeProjectCopy(cwd, workspace)
     const toProjectPath = (file: string) => path.relative(copy, file).split(path.sep).join("/")
     // Oxlint fails to load a config with a rule or a plugin that does not exist. Only a trial
     // config can add a rule that the project config does not have.

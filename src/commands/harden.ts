@@ -14,6 +14,7 @@ import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
   readHardenContext,
+  readHardenReach,
   renderHardenPrompt,
 } from "#lib/hardening/index.ts"
 import { readOverrides } from "#lib/hardening/overrides.ts"
@@ -29,6 +30,7 @@ import {
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readCustomRuleTestCommand } from "#lib/workspace/custom-rules/index.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
+import { readWorkspace } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
@@ -148,10 +150,15 @@ export default Command.make("harden", { commits, scope }).pipe(
         }
       }
 
-      const context = yield* readHardenContext(cwd, scopeDirectory)
+      // Each step before the session takes this read of the workspace.
+      const workspace = yield* readWorkspace(cwd)
+      const context = yield* readHardenContext(cwd, workspace, scopeDirectory)
       // These reads change no file in the project, so they run together.
       const [overrides, suppressions] = yield* Effect.all(
-        [readOverrides(cwd, context.configs, context.scope), readSuppressions(cwd, context.scope)],
+        [
+          readOverrides(cwd, workspace, context.configs, context.scope),
+          readSuppressions(cwd, context.scope),
+        ],
         { concurrency: "unbounded" }
       )
       const prompt = renderHardenPrompt(context, {
@@ -203,15 +210,17 @@ export default Command.make("harden", { commits, scope }).pipe(
           },
         ])
       )
-      // These reads change no file, so they run together, and the rule tests and the assessment
-      // share one read of the project. The Doctor warnings below already name the rules folders
-      // that discovery cannot follow.
-      const [project, { agentReach: reachAfter }] = yield* Effect.all(
-        [readProject(cwd), readHardenContext(cwd, scopeDirectory)],
-        { concurrency: "unbounded" }
-      )
-      const [{ command: ruleTestCommand }, assessment] = yield* Effect.all(
-        [readCustomRuleTestCommand(project), assessProject(project)],
+      // The session can change the project, so the checks after it read the project again. The
+      // agent reach, the rule tests, and the assessment share that one read, and they change no
+      // file, so they run together. The Doctor warnings below already name the rules folders that
+      // discovery cannot follow.
+      const project = yield* readProject(cwd)
+      const [reachAfter, { command: ruleTestCommand }, assessment] = yield* Effect.all(
+        [
+          readHardenReach(cwd, project.workspace, scopeDirectory),
+          readCustomRuleTestCommand(project),
+          assessProject(project),
+        ],
         { concurrency: "unbounded" }
       )
       // `rule test` passes when the project has no rule tests.

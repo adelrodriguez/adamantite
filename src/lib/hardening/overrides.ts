@@ -11,6 +11,7 @@ import {
   type ObjectProperty,
   type Program,
 } from "oxc-parser"
+import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfig } from "#lib/hardening/trial.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
@@ -234,7 +235,7 @@ export function findRuleOffOverrides(file: string, content: string): RuleOffOver
  * linted. One Oxlint run covers each config.
  */
 export const readOverrides = Effect.fn("readOverrides")(
-  function* (cwd: string, configs: readonly string[], scope: string | null) {
+  function* (cwd: string, workspace: Workspace, configs: readonly string[], scope: string | null) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
     const isInScope = (file: string) =>
@@ -285,7 +286,7 @@ export const readOverrides = Effect.fn("readOverrides")(
           { concurrency: "unbounded" }
         )
       )
-      const copy = yield* makeProjectCopy(cwd)
+      const copy = yield* makeProjectCopy(cwd, workspace)
 
       for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
         const removals = new Map<number, string[]>()

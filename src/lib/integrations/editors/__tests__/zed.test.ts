@@ -57,6 +57,7 @@ describe("zed", () => {
               currentState: expect.stringContaining("configPath"),
               id: "legacy-zed-oxfmt-settings",
             },
+            { id: "zed-oxlint-entry" },
           ],
         })
         if (result.applicable) {

@@ -10,6 +10,8 @@ import {
   type ProjectAssessment,
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
+import vscode from "#lib/integrations/editors/vscode.ts"
+import zed from "#lib/integrations/editors/zed.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { readProject } from "#lib/workspace/project.ts"
@@ -159,63 +161,127 @@ describe("renderAssessmentMarkdown", () => {
 })
 
 describe("assessProject", () => {
+  it.effect.each([vscode, zed])(
+    "clear the $name finding after the settings are repaired",
+    (editor) =>
+      Effect.gen(function* () {
+        const settingsPath = `.${editor.name}/settings.json`
+        const files = createFileSystemTestContext({
+          files: {
+            "package.json": "{}",
+            [settingsPath]: '{ /* Keep this comment */ "projectSetting": true }',
+          },
+          root: ROOT,
+        })
+        const provideFiles = Effect.provide([
+          files.layer,
+          Path.layer,
+          makeModuleResolverLayer(ROOT),
+        ])
+        const assess = readProject(ROOT).pipe(
+          Effect.flatMap((project) => editor.assess(project)),
+          provideFiles
+        )
+
+        expect(yield* assess).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("no value"),
+              goal: [expect.stringContaining("Preserve every other setting")],
+              id: `${editor.name}-oxlint-entry`,
+              reference: {
+                content: expect.stringContaining("node_modules/adamantite/dist/oxlint.js"),
+                language: "json",
+              },
+            },
+          ],
+        })
+
+        yield* editor.update(ROOT).pipe(provideFiles)
+
+        expect(yield* assess).toMatchObject({ applicable: true, findings: [] })
+        expect(files.read(settingsPath)).toContain("/* Keep this comment */")
+        expect(files.read(settingsPath)).toContain('"projectSetting": true')
+      })
+  )
+
+  it.effect.each([vscode, zed])("reject invalid $name settings", (editor) =>
+    Effect.gen(function* () {
+      for (const { content, error } of [
+        { content: "[]", error: "InvalidConfigFormat" },
+        { content: "{", error: "FailedToParseFile" },
+      ]) {
+        const files = createFileSystemTestContext({
+          files: { "package.json": "{}", [`.${editor.name}/settings.json`]: content },
+          root: ROOT,
+        })
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => editor.assess(project)),
+          Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)]),
+          Effect.flip
+        )
+        expect(result).toMatchObject({ _tag: error })
+      }
+    })
+  )
+
   it.effect.each([
-    { editor: "vscode", settings: "{}", finding: "vscode-oxlint-entry" },
+    { editor: "vscode", finding: "vscode-oxlint-entry", settings: "{}" },
     {
       editor: "vscode",
+      finding: "vscode-oxlint-entry",
       settings: '{ "oxc.path.oxlint": "node_modules/oxlint/bin/oxlint" }',
-      finding: "vscode-oxlint-entry",
     },
     {
       editor: "vscode",
-      settings:
-        '{ "oxc.path.oxlint": "${workspaceFolder}/node_modules/adamantite/dist/oxlint.js" }',
       finding: "vscode-oxlint-entry",
+      settings: `{ "oxc.path.oxlint": "\${workspaceFolder}/node_modules/adamantite/dist/oxlint.js" }`,
     },
-    { editor: "vscode", settings: '{ "oxc.path.oxlint": false }', finding: "vscode-oxlint-entry" },
+    { editor: "vscode", finding: "vscode-oxlint-entry", settings: '{ "oxc.path.oxlint": false }' },
     {
       editor: "vscode",
+      finding: undefined,
       settings:
         '{ /* Project settings */ "oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js", }',
-      finding: undefined,
     },
-    { editor: "vscode", settings: undefined, finding: undefined },
-    { editor: "zed", settings: "{}", finding: "zed-oxlint-entry" },
+    { editor: "vscode", finding: undefined, settings: undefined },
+    { editor: "zed", finding: "zed-oxlint-entry", settings: "{}" },
     {
       editor: "zed",
-      settings: '{ "lsp": { "oxlint": { "binary": { "path": "oxlint" } } } }',
       finding: "zed-oxlint-entry",
+      settings: '{ "lsp": { "oxlint": { "binary": { "path": "oxlint" } } } }',
     },
     {
       editor: "zed",
+      finding: "zed-oxlint-entry",
       settings:
         '{ "lsp": { "oxlint": { "binary": { "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js"] } } } }',
-      finding: "zed-oxlint-entry",
     },
     {
       editor: "zed",
+      finding: "zed-oxlint-entry",
       settings:
         '{ "lsp": { "oxlint": { "binary": { "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp", "--fix"] } } } }',
-      finding: "zed-oxlint-entry",
     },
-    { editor: "zed", settings: '{ "lsp": false }', finding: "zed-oxlint-entry" },
+    { editor: "zed", finding: "zed-oxlint-entry", settings: '{ "lsp": false }' },
     {
       editor: "zed",
+      finding: undefined,
       settings:
         '{ "lsp": { "oxlint": { "binary": { "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp"] } } } }',
-      finding: undefined,
     },
-    { editor: "zed", settings: undefined, finding: undefined },
+    { editor: "zed", finding: undefined, settings: undefined },
   ])("assess $editor settings $settings without changing files", ({ editor, settings, finding }) =>
     Effect.gen(function* () {
       const settingsPath = `.${editor}/settings.json`
       const files = createFileSystemTestContext({
-        files: {
-          "package.json": "{}",
-          ...(settings === undefined ? {} : { [settingsPath]: settings }),
-        },
+        files: { "package.json": "{}" },
         root: ROOT,
       })
+      if (settings !== undefined) {
+        files.write(settingsPath, settings)
+      }
       const before = files.list().map((file) => [file, files.read(file)])
       files.makeReadOnly(ROOT)
 

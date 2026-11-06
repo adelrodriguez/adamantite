@@ -1,11 +1,16 @@
 import type * as Schema from "effect/Schema"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Equal from "effect/Equal"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { Project } from "#lib/workspace/project.ts"
-import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type Finding,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
@@ -17,8 +22,10 @@ import {
 import {
   checkIsJsonArray,
   checkIsJsonObject,
+  formatJson,
   mergeConfig,
   parseJson,
+  stringifyJson,
   updateJsonText,
 } from "#lib/shared/json.ts"
 
@@ -220,12 +227,25 @@ export default defineIntegration({
       }
 
       const config = yield* parseJson(content.value, settingsPath)
-      const staleKeys = checkIsJsonObject(config) ? findStaleOxfmtSettingKeys(config) : []
+
+      if (!checkIsJsonObject(config)) {
+        return yield* new InvalidConfigFormat({ path: settingsPath })
+      }
+
+      const staleKeys = findStaleOxfmtSettingKeys(config)
+      const lsp = checkIsJsonObject(config.lsp) ? config.lsp : undefined
+      const oxlint = checkIsJsonObject(lsp?.oxlint) ? lsp.oxlint : undefined
+      const binary = oxlint?.binary
+      const expected = CONFIG.lsp.oxlint.binary
+      const usesEntry =
+        checkIsJsonObject(binary)
+        && binary.path === expected.path
+        && Equal.equals(binary.arguments, expected.arguments)
 
       return {
         applicable: true,
-        findings:
-          staleKeys.length === 0
+        findings: [
+          ...(staleKeys.length === 0
             ? []
             : [
                 {
@@ -238,7 +258,25 @@ export default defineIntegration({
                   integration: "zed",
                   title: "Legacy Zed oxfmt settings",
                 },
-              ],
+              ]),
+          ...(usesEntry
+            ? []
+            : [
+                {
+                  currentState: `\`${files[0].path}\` sets \`lsp.oxlint.binary\` to ${binary === undefined ? "no value" : `\`${yield* stringifyJson(binary)}\``}. Zed does not start Oxlint through Adamantite's Oxlint entry.`,
+                  goal: [
+                    `Set \`lsp.oxlint.binary\` to \`${yield* stringifyJson(expected)}\` in \`${files[0].path}\`. Preserve every other setting.`,
+                  ],
+                  id: "zed-oxlint-entry",
+                  integration: "zed",
+                  reference: {
+                    content: `${yield* formatJson({ lsp: { oxlint: { binary: expected } } })}\n`,
+                    language: "json",
+                  },
+                  title: "Zed does not use the Oxlint entry",
+                } satisfies Finding,
+              ]),
+        ],
         packageActions: [],
         warnings: [],
       } satisfies IntegrationAssessment

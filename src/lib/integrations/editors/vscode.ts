@@ -3,15 +3,29 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { Script } from "#lib/workspace/package-json.ts"
+import type { Project } from "#lib/workspace/project.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { defineIntegration } from "#lib/integrations/base.ts"
+import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import {
   FailedToInstallExtension,
   InvalidConfigFormat,
   VscodeCliNotFound,
 } from "#lib/shared/errors.ts"
-import { ensureDirectory, readFile, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
+import {
+  ensureDirectory,
+  readFile,
+  readFileIfExists,
+  writeFile,
+  writeJsonFile,
+} from "#lib/shared/filesystem.ts"
+import {
+  checkIsJsonObject,
+  formatJson,
+  mergeConfig,
+  parseJson,
+  stringifyJson,
+  updateJsonText,
+} from "#lib/shared/json.ts"
 
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 const CONFIG = {
@@ -54,6 +68,49 @@ const CONFIG = {
 } as const
 
 export default defineIntegration({
+  assess: ({ cwd }: Project) =>
+    Effect.gen(function* () {
+      const path = yield* Path.Path
+      const settingsPath = path.join(cwd, files[0].path)
+      const content = yield* readFileIfExists(settingsPath)
+
+      if (content._tag === "None") {
+        return { applicable: false } satisfies IntegrationAssessment
+      }
+
+      const config = yield* parseJson(content.value, settingsPath)
+
+      if (!checkIsJsonObject(config)) {
+        return yield* new InvalidConfigFormat({ path: settingsPath })
+      }
+
+      const current = config["oxc.path.oxlint"]
+      const expected = CONFIG["oxc.path.oxlint"]
+
+      return {
+        applicable: true,
+        findings:
+          current === expected
+            ? []
+            : [
+                {
+                  currentState: `\`${files[0].path}\` sets \`oxc.path.oxlint\` to ${current === undefined ? "no value" : `\`${yield* stringifyJson(current)}\``}. VS Code does not start Oxlint through Adamantite's Oxlint entry.`,
+                  goal: [
+                    `Set \`oxc.path.oxlint\` to \`${expected}\` in \`${files[0].path}\`. Preserve every other setting.`,
+                  ],
+                  id: "vscode-oxlint-entry",
+                  integration: "vscode",
+                  reference: {
+                    content: `${yield* formatJson({ "oxc.path.oxlint": expected })}\n`,
+                    language: "json",
+                  },
+                  title: "VS Code does not use the Oxlint entry",
+                },
+              ],
+        packageActions: [],
+        warnings: [],
+      } satisfies IntegrationAssessment
+    }),
   config: files[0].path,
   create: (cwd: string) =>
     Effect.gen(function* () {

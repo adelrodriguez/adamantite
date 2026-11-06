@@ -5,6 +5,7 @@ import type { Project } from "#lib/workspace/project.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
 import github from "#lib/integrations/ci/github.ts"
+import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
@@ -35,6 +36,7 @@ const managedIntegrations = [
   tsconfig,
   agents,
   github,
+  vscode,
   zed,
 ] as const
 

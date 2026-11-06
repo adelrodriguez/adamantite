@@ -8,6 +8,8 @@ Run Oxlint with the Effect builds of `@effect/tsgo` without patching `node_modul
 
 `adamantite init` and `adamantite update` no longer run `effect-tsgo patch`, and `init` no longer writes a `prepare` script. The VS Code integration sets `oxc.path.oxlint`, and the Zed integration sets `lsp.oxlint.binary`, so editors start the same entry.
 
+`adamantite doctor` reports an existing VS Code or Zed settings file that does not start Oxlint through the entry. Each finding gives the current value and the required setting. Doctor does not change the settings files.
+
 To upgrade an existing project:
 
 - Remove `adamantite prepare` from the `prepare` script in `package.json`, and delete the script when nothing else is left. `adamantite prepare` now does nothing, and a later release removes it. `adamantite doctor` reports the script.

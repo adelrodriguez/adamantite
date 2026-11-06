@@ -1,3 +1,4 @@
+import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -11,7 +12,15 @@ import { readProject } from "#lib/workspace/project.ts"
 const ROOT = "/project"
 
 function makeFiles(files?: Record<string, string>) {
-  return createFileSystemTestContext({ files, root: ROOT })
+  const target = `${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : process.platform === "win32" ? "-msvc" : ""}`
+  return createFileSystemTestContext({
+    files: {
+      "/usr/bin/ldd": "GNU libc",
+      [`node_modules/oxlint/dist/oxlint.${target}.node`]: "",
+      ...files,
+    },
+    root: ROOT,
+  })
 }
 
 function provideFiles(files: FileSystemTestContext) {

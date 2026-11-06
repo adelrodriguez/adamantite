@@ -1,5 +1,216 @@
 # adamantite
 
+## 0.46.0
+
+### Minor Changes
+
+- [#536](https://github.com/adelrodriguez/adamantite/pull/536) [`e3e9cb5`](https://github.com/adelrodriguez/adamantite/commit/e3e9cb526a9dc45b1436583f8e0c6554bca2b14b) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add `adamantite harden`. It prints a Markdown prompt that tells a coding agent to find the coding
+  standards that the project already follows, drop the ones that a tool already enforces, and put
+  each remaining one at the highest level of enforcement that works: a custom rule when a rule can
+  check it, and a line in `CODING_STANDARDS.md` when no rule can. The agent writes nothing until the
+  user approves the candidates. The prompt lists the Oxlint config, the rules folder that its
+  `custom()` call loads, and the instruction files that exist.
+
+- [#594](https://github.com/adelrodriguez/adamantite/pull/594) [`69adf33`](https://github.com/adelrodriguez/adamantite/commit/69adf33d2ee44ec3ecec7290302bf05597a9a992) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite check` now fails when Oxlint reports a warning. Pass `--allow-warnings` to keep the old
+  behavior. A project with warnings, such as reports of the rules that a preset
+  sets to `warn`, fails `check` after the update. `adamantite harden` now keeps a new rule at `error` and
+  turns it off in an Oxlint override for the files that break it, in place of a `warn` setting.
+
+- [#566](https://github.com/adelrodriguez/adamantite/pull/566) [`1d07fe0`](https://github.com/adelrodriguez/adamantite/commit/1d07fe093102ac21b2da2a8fdbfa1dcdc9847745) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - The GitHub Actions workflow that `adamantite init` writes now runs `adamantite rule test` when the project has custom rule tests, so a rule that stops reporting fails CI. `adamantite doctor` reports an Adamantite workflow that does not run `adamantite rule test` when the project has rule tests. Follow the finding to add the step. A Deno workflow with rule tests also gets a Node.js setup step, because the tests run with `node --test`.
+
+- [#549](https://github.com/adelrodriguez/adamantite/pull/549) [`ef52bf8`](https://github.com/adelrodriguez/adamantite/commit/ef52bf86fa1b3d900f01b780515e1bb7f6c7ff25) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - In an interactive terminal, `adamantite harden` offers the same menu as `adamantite doctor`: hand
+  off to an installed coding agent seeded with the harden prompt, copy the prompt, or do nothing.
+  Without a terminal, it still prints the prompt.
+
+- [#567](https://github.com/adelrodriguez/adamantite/pull/567) [`97c4c87`](https://github.com/adelrodriguez/adamantite/commit/97c4c8746bf3a9b6d77fd6db4556a73b7c9ab74e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - After an agent session, `adamantite harden` now also runs the custom rule tests, as `adamantite rule test` does: first `check`, then `rule test`, then the Doctor assessment. When a rule test fails, `harden` says "`adamantite rule test` failed after the <agent> session." and exits 1. A project with no rule tests passes this step. The "Verify" section of the harden prompt tells the agent to run the three commands in the same order.
+
+- [#550](https://github.com/adelrodriguez/adamantite/pull/550) [`e512953`](https://github.com/adelrodriguez/adamantite/commit/e512953d3642f1a1a565e7037f9f7432a239ee7e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - After a coding agent session, `adamantite harden` runs Oxfmt and Oxlint as `adamantite check` does,
+  and assesses the project as `adamantite doctor` does. It exits 1 and says which one failed when
+  either fails. A copy of the prompt or "do nothing" exits 0 without verification. The Adamantite
+  skill now documents `harden`.
+
+- [#551](https://github.com/adelrodriguez/adamantite/pull/551) [`6789e0f`](https://github.com/adelrodriguez/adamantite/commit/6789e0f89671b5750fc9d3f66ebcd14e27908986) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - In a monorepo, the `adamantite harden` prompt lists the Oxlint config and the instruction files of
+  each workspace package, and the rules folders that their `custom()` calls load. A rules folder that
+  several configs load through a shared tooling package is listed once. The new `--path` option
+  limits the session to one package or folder, and fails with a clear message for a folder outside
+  the project.
+
+- [#585](https://github.com/adelrodriguez/adamantite/pull/585) [`2d617d7`](https://github.com/adelrodriguez/adamantite/commit/2d617d7099f1fec35a6de798e702b170e37a789f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/import-owners` rule. It restricts an import to the files and folders that own
+  it, such as `{ import: "giget", owners: ["src/lib/sources/repository/fetch.ts"] }`, and each
+  message names the owners. A module covers its subpaths, `names` restricts only some exports, such
+  as the `react-native` `Alert`, and owner paths are relative to the workspace root, so a monorepo
+  can name an owner package such as `packages/utils`. The `strict` preset loads the rule, and the
+  project turns it on with its owners.
+
+- [#589](https://github.com/adelrodriguez/adamantite/pull/589) [`1199f9e`](https://github.com/adelrodriguez/adamantite/commit/1199f9ed9acf5ae841c2d62d9c2dc329a34123f5) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite init` now installs the Adamantite skill for the coding agents that you select. The interactive setup selects the agents whose CLI is installed, and `--skill-agent <agent>` selects them in non-interactive mode. Init runs the `skills` CLI with `npx` and copies the skill from `node_modules/adamantite`, so the skill matches the installed Adamantite version. `adamantite update` copies the skill again when it differs from the skill in the installed package.
+
+- [#553](https://github.com/adelrodriguez/adamantite/pull/553) [`888348c`](https://github.com/adelrodriguez/adamantite/commit/888348ce5c02bf4b9c6e28cb94da2d38a7bcf304) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/layers` rule. It enforces one-way imports between the folders of a root, such
+  as `src/lib`, from a layer map in the rule options. Each option is one layer map, so a project can
+  check nested roots, such as `src` and `src/lib`, with one map each. It resolves each import with
+  `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`, reports a folder that is not in
+  the map, and each message gives the repairs that the map allows and names the root of the map.
+  The `strict` preset loads the rule, and the project turns it on with its maps.
+
+- [#584](https://github.com/adelrodriguez/adamantite/pull/584) [`0307a7f`](https://github.com/adelrodriguez/adamantite/commit/0307a7f2f202c4158e28a48de545418ea7d4e844) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add the `adamantite/require-suppression-reason` rule, and turn it on in the `strict` preset. It
+  reports an `oxlint-disable` or `eslint-disable` comment, including the `-line` and `-next-line`
+  forms, that gives no reason after `--`, such as
+  `// oxlint-disable-next-line no-console -- the CLI writes its report to stdout`. A single `-` is not
+  a reason. A project that selects `strict` gets a report on each suppression without a reason after
+  the update.
+
+- [#610](https://github.com/adelrodriguez/adamantite/pull/610) [`7637c46`](https://github.com/adelrodriguez/adamantite/commit/7637c46a640135dd1db1fc9571a66bdf99b92cd5) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add `adamantite rule try`, which lints cases in a copy of the project with one rule setting and shows whether the rule reports each case. It exits 0 when each case is as expected, 1 when a case is not, and 2 when the trial is not evidence, such as for a rule that does not exist. The `adamantite harden` prompt now uses it instead of a trial copy that the agent makes by hand, and shows the disable comments of each rule and the files that an override no longer needs.
+
+- [#557](https://github.com/adelrodriguez/adamantite/pull/557) [`6a94929`](https://github.com/adelrodriguez/adamantite/commit/6a94929389d1f86353690f20cca15a12824d8409) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite rule add <name>` now also writes `tests/<name>.ts` in the rules folder: a `RuleTester` test with one valid case and one invalid case. A new command, `adamantite rule test`, runs the tests of every rules folder that a `custom()` call loads with `node --test`, and exits with its exit code. It warns about a `custom()` call whose `dir` is not a string literal, and an import that it cannot follow, because it cannot run the tests behind them. The tests run under Node.js in every project, Bun projects too, and the project's own Vitest or Jest run does not find them. `adamantite check` does not run them.
+
+  Add `adamantite/rules/testing`, which exports `RuleTester` connected to `node:test`, so a rule test has one import and each case reports by name. `oxlint` is now an optional peer dependency.
+
+  When the rule or its test exists, `rule add` writes nothing, and the error names each file that exists. The rule stub sorts its keys, so `adamantite check` accepts it without `fix`. The "Custom rules" section of the Adamantite skill now teaches `rule test`, how to put the logic of a large rule in a `_<name>.ts` helper, how to write a message that says what to do instead, and when a rule earns its place.
+
+- [#595](https://github.com/adelrodriguez/adamantite/pull/595) [`5dffe50`](https://github.com/adelrodriguez/adamantite/commit/5dffe508a8333aa0f9cea82b4daee9a3061db15b) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Move `no-console` from the core preset to the `strict` preset, and set it to `error`.
+  `console.info` stays allowed. A project that selects `strict` gets a lint error on each other
+  console call after the update. The repair is a fix, or a suppression with a reason, such as
+  `// oxlint-disable-next-line no-console -- the CLI writes its report to stdout`. A project without
+  `strict` no longer gets `no-console` reports.
+
+- [#593](https://github.com/adelrodriguez/adamantite/pull/593) [`5c39759`](https://github.com/adelrodriguez/adamantite/commit/5c397591c84a41b51b3ef99bf306ced9900e882d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Turn on `no-warning-comments` in the `strict` preset. It reports a comment that starts with
+  `TODO`, `FIXME`, `XXX`, or `HACK`. A project that selects `strict` gets a report on each such
+  comment after the update. The repair is a fix to the code, or an issue in the project's issue
+  tracker in place of the comment.
+
+- [#608](https://github.com/adelrodriguez/adamantite/pull/608) [`587eb6c`](https://github.com/adelrodriguez/adamantite/commit/587eb6c83079b8195111ea3fc6797ab1a07a0979) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Run Oxlint with the Effect builds of `@effect/tsgo` without patching `node_modules`
+
+  `adamantite check`, `fix`, and `harden` now start Oxlint through `node_modules/adamantite/dist/oxlint.js`. When the project installs `@effect/tsgo`, this entry loads the Effect builds of the Oxlint binding and oxlint-tsgolint for the installed versions. Nothing patches `node_modules` anymore, so the effect preset works after any install, also with a read-only package store, and a production-only install no longer fails at the `prepare` script.
+
+  `adamantite init` and `adamantite update` no longer run `effect-tsgo patch`, and `init` no longer writes a `prepare` script. The VS Code integration sets `oxc.path.oxlint`, and the Zed integration sets `lsp.oxlint.binary`, so editors start the same entry.
+
+  `adamantite doctor` reports an existing VS Code or Zed settings file that does not start Oxlint through the entry. Each finding gives the current value and the required setting. Doctor does not change the settings files.
+
+  To upgrade an existing project:
+
+  - Remove `adamantite prepare` from the `prepare` script in `package.json`, and delete the script when nothing else is left. `adamantite prepare` now does nothing, and a later release removes it. `adamantite doctor` reports the script.
+  - Point your editor at the entry. In `.vscode/settings.json`, set `"oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js"`. In `.zed/settings.json`, set `lsp.oxlint.binary` to `{ "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp"] }`. `adamantite update` does not change editor settings.
+  - Replace a plain `oxlint` call, such as in a lint-staged config, with `adamantite check --only lint`. Plain `oxlint` cannot load the effect preset.
+  - The patch had also put the Effect quick fixes, refactors, and hovers into the `tsc` of editors. Adamantite no longer patches TypeScript. To keep those features, run `npx effect-tsgo patch --typescript` yourself after each install.
+
+- [#620](https://github.com/adelrodriguez/adamantite/pull/620) [`94783b5`](https://github.com/adelrodriguez/adamantite/commit/94783b5cac2bd8e842009a39944dec24b5c95ace) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Run Oxlint's type-aware rules on [tsrs](https://github.com/oxc-project/tsrs) instead of oxlint-tsgolint. `adamantite init` and `adamantite update` install the pinned `tsrs` 0.21.0-ts7.1.0-beta, and `adamantite check`, `adamantite fix`, and the editor settings start it through the Oxlint entry `dist/oxlint.js`. With the `effect` preset, the entry starts the Effect build of tsrs that `@effect/tsgo` ships, so the `effecttsgo` rules run on tsrs too.
+
+  On this repository, the full lint takes about 45% less time on tsrs.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update` to install `tsrs`.
+  - Remove `oxlint-tsgolint` from `package.json`, and install again. `adamantite doctor` reports it while it stays.
+  - Expect small differences in type-check results. tsrs 0.21.0 ports TypeScript 7.1 beta, so a project that pins TypeScript 7.0 can get results that differ from `tsc`.
+  - A plain `oxlint --type-aware` call no longer finds a backend. Run `adamantite check --only lint` instead.
+  - On Windows ARM64, the type-aware rules no longer run, because tsrs has no Windows ARM64 build yet. [oxc-project/tsrs#903](https://github.com/oxc-project/tsrs/pull/903) adds it for a later tsrs release. Until then, a project that lints on Windows ARM64 can stay on the previous Adamantite version, which runs oxlint-tsgolint.
+
+- [#583](https://github.com/adelrodriguez/adamantite/pull/583) [`2792b65`](https://github.com/adelrodriguez/adamantite/commit/2792b65e289f61eca096fa93e001a865ba3248e4) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - The `adamantite/typescript` preset sets `erasableSyntaxOnly`, so TypeScript reports `enum`, a
+  `namespace` with values, parameter properties, and `import x = require()`. Node.js type stripping
+  and Bun run only erasable syntax, so TypeScript now reports this syntax before a run fails. This can break an existing project: a project
+  that uses this syntax fails type checking after the update. Rewrite the code, for example an
+  `enum` as an `as const` object, or set `"erasableSyntaxOnly": false` in the project's own
+  `tsconfig.json`.
+
+- [#605](https://github.com/adelrodriguez/adamantite/pull/605) [`b89bbe1`](https://github.com/adelrodriguez/adamantite/commit/b89bbe159101584c517f20e1d8388f0952fc2c22) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update `@effect/tsgo` to 0.67.1, and enable 14 new rules in the effect preset
+
+  The effect preset enables these new `@effect/tsgo` rules:
+
+  - `effect-try-without-catch` reports `Effect.try` and `Effect.tryPromise` without a `catch` handler, whose failures become a generic `UnknownError`. Use the object form `{ try, catch }` and map the cause to a typed error.
+  - `global-json-in-effect` reports `JSON.parse` and `JSON.stringify` inside Effect generators, because they throw instead of failing with a typed error. Use `Schema.fromJsonString(schema)` with `Schema.decodeEffect` or `Schema.encodeEffect`.
+
+  The other new rules report a combinator or construct that has a direct replacement:
+
+  - `effect-succeed-with-undefined` reports `Effect.succeed(undefined)`. Use `Effect.undefined`.
+  - `fail-cause-to-constructor` reports `Effect.failCause` or `Effect.failCauseSync` around a single `Cause.fail` or `Cause.die`. Use `Effect.fail`, `Effect.die`, `Effect.failSync`, or `Effect.dieSync`.
+  - `flat-map-identity-to-flatten` reports `Effect.flatMap` with a callback that returns its parameter. Use `Effect.flatten`.
+  - `manual-metric-tap-to-track` reports an `Effect.tap`, `Effect.tapError`, or `Effect.tapDefect` that only updates a metric. Use `Effect.trackSuccesses`, `Effect.trackErrors`, or `Effect.trackDefects`.
+  - `map-const-to-as` reports an `Effect.map` callback that ignores its input and returns a constant. Use `Effect.as`.
+  - `map-map-error-to-map-both` reports `Effect.map` and `Effect.mapError` as adjacent steps of one pipe. Use `Effect.mapBoth`.
+  - `map-some-catch-no-such-element` reports `Effect.map(Option.some)` followed by a `catchTag` of `NoSuchElementError` that succeeds with `Option.none()`. Use `Effect.catchNoSuchElement`.
+  - `match-boolean-to-is-success` reports `Effect.match` that folds to `true` and `false`. Use `Effect.isSuccess` or `Effect.isFailure`.
+  - `match-to-result-or-option` reports `Effect.match` handlers, or a map step followed by a catch step, that only turn the outcome into a value. Use `Effect.result` or `Effect.option`.
+  - `provide-merge-all-to-array` reports `Effect.provide(Layer.mergeAll(a, b))`. Use `Effect.provide([a, b])`.
+  - `result-match-to-from-result` reports a `Result.match` that only turns a success into `Effect.succeed` and a failure into `Effect.fail`. Use `Effect.fromResult`.
+  - `suspend-fail-to-fail-sync` reports `Effect.suspend` around a single `Effect.fail` or `Effect.die`. Use `Effect.failSync` or `Effect.dieSync`.
+
+  The preset does not enable `global-json`, which reports `JSON` calls outside Effect code, or the style preferences `type-union-to-schema-union` and `yield-in-call-argument`.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update` to install the new version.
+  - Expect `adamantite check` to report the code that these rules describe.
+  - `@effect/tsgo` 0.67.1 has Effect builds for Oxlint 1.88.0, 1.89.0, 1.90.0, and 1.91.0, and for oxlint-tsgolint 7.0.2004 and 7.0.2005.
+  - If you run `effect-tsgo patch --typescript` yourself, 0.67.1 patches TypeScript 7.0.2, 7.1.0-beta, and `7.1.0-dev.20261103.1`.
+
+- [#619](https://github.com/adelrodriguez/adamantite/pull/619) [`33f2dc3`](https://github.com/adelrodriguez/adamantite/commit/33f2dc3f8a2a6cf82f04d7b003a2885c40cb20f2) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update the managed tooling versions: Oxlint 1.91.0, oxlint-tsgolint 7.0.2005, and oxfmt 0.76.0. Also update the runtime dependency `@oxlint/plugins` to 1.91.0.
+
+  Oxlint 1.90.0 and later need oxlint-tsgolint 7.0.2005 or later, so the two versions move together.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update` to install the new versions.
+  - Expect `adamantite check` to report more code. Oxlint 1.89.0 fixed many rules so that they report cases they missed before. For example, `eslint/sort-keys` now checks computed keys, and `unicorn/prefer-string-replace-all` now resolves a regular expression in a variable.
+  - Expect `adamantite fix` to format HTML files differently. oxfmt 0.76.0 formats them with its own HTML formatter (oxc-project/oxc#28273).
+
+### Patch Changes
+
+- [#555](https://github.com/adelrodriguez/adamantite/pull/555) [`8f8b157`](https://github.com/adelrodriguez/adamantite/commit/8f8b15700e636d51f2444b4d76114339d97f5f4f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite analyze` no longer reports custom rule files as unused files. The `adamantite/analyze` preset adds the rule files in `.adamantite/rules/` and in its `tests/` folder as Knip entry files, in the root and in each workspace package, and keeps Knip's default entry files. Knip still reports a helper file that starts with `_` when no file imports it.
+
+- [#597](https://github.com/adelrodriguez/adamantite/pull/597) [`0c0962e`](https://github.com/adelrodriguez/adamantite/commit/0c0962e9be22c0ba279b744f52dfe7e16683754d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Doctor reports a project that has managed scripts and no `AGENTS.md` at its root. `AGENTS.md` is
+  where coding agents start, and it points to the other documentation of the project. In a monorepo, Doctor checks only the root. The finding gives the
+  `adamantite init --agents` command as one way to create the file.
+
+- [#572](https://github.com/adelrodriguez/adamantite/pull/572) [`7b3fd8d`](https://github.com/adelrodriguez/adamantite/commit/7b3fd8d19d43eaf52fd74a0da7d6ded8beffb951) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Doctor checks the rules folders of a `custom()` call whose `name` is not a string literal. Before,
+  such a call turned off the check for rules folders that no `custom()` call loads, and its warning
+  said that Doctor did not check the folder. Now only a `dir` that is not a string literal turns off
+  that check, and a `name` that is not a string literal gets its own warning.
+
+- [#556](https://github.com/adelrodriguez/adamantite/pull/556) [`fff64fd`](https://github.com/adelrodriguez/adamantite/commit/fff64fdab2b02bab17f642ed54dd03dbd20e8766) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Doctor and `adamantite harden` resolve Oxlint config imports with `oxc-resolver`, as Node.js loads
+  the config, and now also follow `#` imports. A workspace package resolves after an install: before
+  it, Doctor warns that it cannot resolve the import and says to install the dependencies.
+
+- [#626](https://github.com/adelrodriguez/adamantite/pull/626) [`99533e0`](https://github.com/adelrodriguez/adamantite/commit/99533e0165f8cee62d95723ddcd9a34cd406991b) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Doctor reports when the installed packages cannot run Oxlint
+
+  Doctor resolves the Oxlint runtime as `adamantite check` and the editors do, without starting tools or loading native code. It reports missing declared packages, missing stock native files, and unsupported `@effect/tsgo` builds for the installed Oxlint, tsrs, or platform. Local bindings and `TSRS_BINARY` overrides remain supported. A project whose dependencies are not fully installed now gets these findings, so run Doctor after the install.
+
+- [#601](https://github.com/adelrodriguez/adamantite/pull/601) [`8462266`](https://github.com/adelrodriguez/adamantite/commit/8462266fcc4e1088a1dd3ecd657a17f24ca82b4e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite harden` lists the Markdown files that no chain of links or code-span paths from an `AGENTS.md` reaches, and each link to a missing file, and the agent reports them as discovery gaps. The examples in code blocks do not count. After a handoff, `harden` fails when the session added a link to a missing file.
+
+- [#600](https://github.com/adelrodriguez/adamantite/pull/600) [`4314358`](https://github.com/adelrodriguez/adamantite/commit/4314358931faa16e20bf9163c5624e3f200dc864) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite harden` asks the agent to read the fix commits of the last 200 commits, or of the number that `--commits` gives. A mistake that two fixes have, or that the code still repeats, becomes a candidate, and the code before and after a fix become the cases of its rule.
+
+- [#591](https://github.com/adelrodriguez/adamantite/pull/591) [`ccac98c`](https://github.com/adelrodriguez/adamantite/commit/ccac98c7eded35935315e6398293f15e2653ef2d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite harden` now stops before it prints the prompt when the project does not install the Adamantite version that runs the command. It finds the install as Oxlint loads the preset, so a package that the package manager hoists to a parent `node_modules` counts. The message tells you to run the project's own Adamantite or to install the dependencies again. The prompt offers the presets and rules of the version that runs, so a stale install made the agent propose rules that the project cannot load. `harden` also runs in an Adamantite checkout of the same version, which does not depend on itself.
+
+- [#598](https://github.com/adelrodriguez/adamantite/pull/598) [`0e58eb5`](https://github.com/adelrodriguez/adamantite/commit/0e58eb5971c9158e88df8e606a2cf7bd6867cec4) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite harden` lists each Markdown file of the project that git tracks or does not ignore, except the changesets and the changelogs, and the agent marks each one before it lists the standards. The instructions now start from `AGENTS.md` only: a file that states a standard and that no chain of links from `AGENTS.md` reaches is a discovery gap.
+
+- [#590](https://github.com/adelrodriguez/adamantite/pull/590) [`024fa14`](https://github.com/adelrodriguez/adamantite/commit/024fa1440df70606daa71a1f65b31e2829a17311) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite harden` asks the agent to explore the project's documentation before it lists the standards, and to report the files that no instruction points to. Each written standard goes on to the enforcement check, also when the code breaks it. Each candidate comes with its scope, a case that the rule must report, and a case that it must accept. The agent scores the candidates, shows only the strong ones, and lists the decisions for the maintainer apart from the candidates.
+
+- [#596](https://github.com/adelrodriguez/adamantite/pull/596) [`5bc2097`](https://github.com/adelrodriguez/adamantite/commit/5bc20979b7c887d679bc7165551d77d1e38655d6) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - The `adamantite harden` prompt now tells the agent to try a rule in a trial copy of the project, with a case that the rule must report and a case that it must accept, so a rule with options or from a JS plugin gives real evidence. A candidate that needs a choice from the maintainer goes to the Decisions list instead. Each rule says what it guarantees and what it does not, and a construct that the code never uses needs a written source before it becomes a standard.
+
+- [#599](https://github.com/adelrodriguez/adamantite/pull/599) [`f53238c`](https://github.com/adelrodriguez/adamantite/commit/f53238c0de93eff059088b2a630e63c72e29a7aa) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite harden` audits the rules that the project already has. The agent lists the forms of a mistake that a rule or its test misses, the files that an override glob misses, the files that an override no longer needs, and the rules with many suppressions. To fix a gap, the agent adds the missed case to the rule test first and sees it fail.
+
+- [#574](https://github.com/adelrodriguez/adamantite/pull/574) [`463c1d9`](https://github.com/adelrodriguez/adamantite/commit/463c1d90e344b48fd70bdb734e16d5d262102e69) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop asking about a GitHub Actions workflow in an interactive `init` when Adamantite cannot
+  generate one for the detected package manager. Before, `init` asked the question and then skipped
+  the workflow with a warning when the answer was yes. Now it says that the package manager is not
+  supported and does not ask.
+
+- [#592](https://github.com/adelrodriguez/adamantite/pull/592) [`21a4461`](https://github.com/adelrodriguez/adamantite/commit/21a4461b5ecdeb5fadf15e9647cd8f8cdb91e9fd) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Doctor now parses the Adamantite GitHub Actions workflow as YAML. It reads the `run` of each job
+  step, the `command` of each matrix `include` entry, and the `node-version` input of each step, so
+  it also finds a step in flow style, such as `- { name: Check, run: pnpm run check }`, and it
+  ignores text in comments. Doctor treats a workflow that does not parse as a workflow that runs no
+  commands. Adamantite also parses `pnpm-workspace.yaml` as YAML to find the workspace packages.
+  Adamantite now depends on `effect` 4.1.2, whose YAML parser keeps tabs in block scalars and reads
+  flow lists over several lines.
+
+- [#541](https://github.com/adelrodriguez/adamantite/pull/541) [`70611d9`](https://github.com/adelrodriguez/adamantite/commit/70611d965feaa6b68b3a6bcf0cd315b141a937a9) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - `adamantite rule add` no longer writes an `AGENTS.md` to the rules folder. The authoring guidance lives only in the "Custom rules" section of the Adamantite skill, and `rule add` and the `AGENTS.md` section that `init` writes point to it. An existing `.adamantite/rules/AGENTS.md` stays in place, and you can delete it.
+
+- [#578](https://github.com/adelrodriguez/adamantite/pull/578) [`1560b92`](https://github.com/adelrodriguez/adamantite/commit/1560b92747a267ae602e4372ed07dd53475c93de) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop exporting the internal helpers `getRuleName`, `isRuleFile`, `listRuleFiles`, and
+  `DEFAULT_PLUGIN_NAME` from `adamantite/lint/custom`. They were never documented. The module still
+  exports `custom()` and `CustomRulesOptions`.
+
+- [#573](https://github.com/adelrodriguez/adamantite/pull/573) [`319e19e`](https://github.com/adelrodriguez/adamantite/commit/319e19e2bcbf64ff001b15e68a48bd744245e286) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Find the workspace packages that `package.json` declares when `pnpm-workspace.yaml` holds only
+  settings, such as `allowBuilds`. Before, Adamantite treated such a project as a monorepo but found
+  no workspace packages in it, so Doctor, `harden`, and `rule test` skipped the configs and rules
+  folders of the packages.
+
 ## 0.45.0
 
 ### Minor Changes

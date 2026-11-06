@@ -5,7 +5,6 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import * as Result from "effect/Result"
 import type { NativeOverride } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import {
   EffectBuildMissing,
@@ -92,24 +91,21 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
     { concurrency: "unbounded" }
   )
   const tsrsFile = process.platform === "win32" ? "tsrs.exe" : "tsrs"
-  // `Result.all` takes the first failure in input order, so a project that has no build of either
-  // version always gets the backend error.
-  const artifacts = yield* Effect.all(
-    [
-      findArtifact(
-        platformDirectory.value,
-        effectVersion,
-        "tsrs",
-        tsrsVersion,
-        (file) => file === tsrsFile
-      ),
-      findArtifact(platformDirectory.value, effectVersion, "oxlint", oxlintVersion, (file) =>
-        file.endsWith(".node")
-      ),
-    ],
-    { concurrency: "unbounded", mode: "result" }
+  // Resolve the backend first so a project missing both builds always gets the backend error.
+  const backend = yield* findArtifact(
+    platformDirectory.value,
+    effectVersion,
+    "tsrs",
+    tsrsVersion,
+    (file) => file === tsrsFile
   )
-  const [backend, binding] = yield* Effect.fromResult(Result.all(artifacts))
+  const binding = yield* findArtifact(
+    platformDirectory.value,
+    effectVersion,
+    "oxlint",
+    oxlintVersion,
+    (file) => file.endsWith(".node")
+  )
 
   // With the mode `tsrs`, the Effect binding starts the backend as `<path> --lint headless`.
   return [

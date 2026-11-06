@@ -6,7 +6,7 @@ const PREPARE_COMMAND = "adamantite prepare"
 
 /**
  * A finding when the `prepare` script still runs `adamantite prepare`. The command patched Oxlint
- * for the effect preset. The toolchain proxy replaced the patch, so the command does nothing, and a
+ * for the effect preset. The Oxlint proxy replaced the patch, so the command does nothing, and a
  * later release removes it.
  */
 export function assessPrepareScript(packageJson: PackageJson, integration: string): Finding[] {

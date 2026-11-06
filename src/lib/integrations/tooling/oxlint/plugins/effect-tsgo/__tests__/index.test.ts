@@ -3,11 +3,13 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
+
+const effectTsgo = managedPlugin("@effect/tsgo")
 
 const ROOT = "/project"
 const PREPARE = "adamantite prepare"

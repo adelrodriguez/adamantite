@@ -9,11 +9,13 @@ import {
   getPackageActions,
   getPackageFindings,
 } from "#lib/integrations/tooling/base.ts"
+import * as commands from "#lib/integrations/tooling/oxlint/command.ts"
 import {
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
   type LintPreset,
 } from "#lib/integrations/tooling/oxlint/config.ts"
+import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
@@ -33,8 +35,9 @@ const VERSION = getDependencyVersion("oxlint")
 const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 
 export default defineIntegration({
-  assess: ({ cwd, lintConfig, packageJson }: Project) =>
+  assess: (project: Project) =>
     Effect.gen(function* () {
+      const { cwd, lintConfig, packageJson } = project
       const managedScripts = getManagedScripts(packageJson)
 
       if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
@@ -44,6 +47,7 @@ export default defineIntegration({
       }
 
       const state = yield* detect(cwd)
+      const runtimeFindings = yield* assessOxlintRuntime(project)
       const packageActions = getPackageActions(
         packageJson,
         { name: "oxlint", version: VERSION },
@@ -64,6 +68,7 @@ export default defineIntegration({
         applicable: true,
         findings: [
           ...getPackageFindings(packageActions, "oxlint"),
+          ...runtimeFindings,
           ...getConfigFindings(state, {
             configContent,
             configFile: CONFIG_FILE,
@@ -77,6 +82,7 @@ export default defineIntegration({
         warnings: state.warnings,
       } satisfies IntegrationAssessment
     }),
+  check: commands.check,
   config: CONFIG_FILE,
   create: (cwd: string, presets: readonly LintPreset[] = []) =>
     Effect.gen(function* () {
@@ -87,6 +93,7 @@ export default defineIntegration({
     }),
   detect,
   files,
+  fix: commands.fix,
   kind: "tooling",
   name: "oxlint",
   version: VERSION,

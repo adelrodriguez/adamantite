@@ -7,7 +7,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import checkCommand from "#commands/check.ts"
-import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
@@ -47,6 +47,7 @@ describe("check", () => {
           {
             args: ["--check", "--no-error-on-unmatched-pattern"],
             command: "oxfmt",
+            cwd: process.cwd(),
             title: "✨ Checking formatting",
           },
         ])
@@ -155,6 +156,7 @@ describe("check", () => {
           {
             args: ["--check", join(files.root, "index.ts")],
             command: "oxfmt",
+            cwd: process.cwd(),
             title: "✨ Checking formatting",
           },
           {

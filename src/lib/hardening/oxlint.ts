@@ -9,7 +9,7 @@ import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { CliNotFound, TrialLintFailed } from "#lib/shared/errors.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -45,7 +45,7 @@ const OxlintConfig = Schema.Struct({ rules: Schema.Record(Schema.String, Schema.
 const decodeOxlintConfig = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintConfig))
 
 /**
- * The command that runs Oxlint for a project. It starts the toolchain entry that the build writes
+ * The command that runs Oxlint for a project. It starts the Oxlint entry that the build writes
  * beside the CLI, so a test that runs from source gives the entry in `src/oxlint.ts`.
  */
 export const OxlintCommand = Context.Reference<typeof getOxlintCommand>(
@@ -97,8 +97,8 @@ function quietNodeOptions() {
 }
 
 /**
- * Runs Oxlint in `cwd`, with the toolchain of `project`. `output` has stdout and stderr together,
- * because Oxlint prints a config error to either stream.
+ * Runs Oxlint in `cwd`, with the Oxlint runtime of `project`. `output` has stdout and stderr
+ * together, because Oxlint prints a config error to either stream.
  */
 const runOxlint = Effect.fn("runOxlint")(
   function* (cwd: string, args: readonly string[], project: string = cwd) {
@@ -169,9 +169,9 @@ export const listLintedFiles = Effect.fn("listLintedFiles")(function* (
 })
 
 /**
- * The rule as Oxlint reports it, with the toolchain of `project`. Oxlint prints the config of an
- * empty folder that turns on the rule and each built-in plugin, and names the rule as it resolves
- * it. A rule that this config cannot load is a rule of a JS plugin.
+ * The rule as Oxlint reports it, with the Oxlint runtime of `project`. Oxlint prints the config of
+ * an empty folder that turns on the rule and each built-in plugin, and names the rule as it
+ * resolves it. A rule that this config cannot load is a rule of a JS plugin.
  */
 export const resolveRule = Effect.fn("resolveRule")(function* (rule: string, project: string) {
   const fs = yield* FileSystem.FileSystem

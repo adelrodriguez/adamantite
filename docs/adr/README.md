@@ -21,3 +21,4 @@
 - [ADR 0019: Oxlint runs through a toolchain proxy](0019-oxlint-runs-through-a-toolchain-proxy.md)
 - [ADR 0020: Harden computes facts, and the prompt keeps judgment](0020-harden-computes-facts.md)
 - [ADR 0021: The type-aware rules run on tsrs](0021-type-aware-rules-run-on-tsrs.md)
+- [ADR 0022: Toolchain coordinates tools and shares runtime resolution with Doctor](0022-toolchain-owns-tooling-workflows.md)

@@ -5,11 +5,11 @@ import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
 import * as NodePath from "@effect/platform-node/NodePath"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
-import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/execution/oxlint-entry.ts"
-import { resolveToolchain } from "#lib/integrations/tooling/oxlint/toolchain.ts"
+import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { resolveOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 
-// Run Oxlint with the toolchain of the project, and pass every argument through. Editors and
+// Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
 // `adamantite check` start this file in place of `oxlint`.
 
 const project = getProjectDirectory(
@@ -18,7 +18,7 @@ const project = getProjectDirectory(
   process.env[PROJECT_VARIABLE]
 )
 const result = await Effect.runPromise(
-  resolveToolchain(project).pipe(
+  resolveOxlintRuntime(project).pipe(
     Effect.result,
     Effect.provide([NodeFileSystem.layer, NodePath.layer, ModuleResolver.layer])
   )

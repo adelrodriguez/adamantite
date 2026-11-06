@@ -15,7 +15,11 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    makeModuleResolverLayer(ROOT, { "oxlint/package.json": "node_modules/oxlint/package.json" }),
+  ])
 }
 
 function runAssess(files: FileSystemTestContext) {

@@ -3,10 +3,12 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
-import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import { readProject } from "#lib/workspace/project.ts"
+
+const shadcnLint = managedPlugin("@shadcn/lint")
 
 const ROOT = "/project"
 

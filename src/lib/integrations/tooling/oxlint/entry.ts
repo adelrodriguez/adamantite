@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url"
 
 /**
- * The entry that runs Oxlint with the project's toolchain. The build writes it beside the CLI
+ * The entry that runs Oxlint with the project's Oxlint runtime. The build writes it beside the CLI
  * bundle, as `dist/oxlint.js`, so the CLI runs the entry of its own version.
  */
 const OXLINT_ENTRY = fileURLToPath(new URL("oxlint.js", import.meta.url))
@@ -20,6 +20,7 @@ export function getOxlintCommand(project: string) {
   return {
     args: [OXLINT_ENTRY],
     command: "node",
+    cwd: project,
     env: { [PROJECT_VARIABLE]: project },
     name: "oxlint",
   } as const

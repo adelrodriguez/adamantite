@@ -3,13 +3,12 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import updateCommand from "#commands/update.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
-import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
-import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
+import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts"
 import {
@@ -18,6 +17,9 @@ import {
   createRunnerTestContext,
   runCommand,
 } from "./command-test-helpers.ts"
+
+const effectTsgo = managedPlugin("@effect/tsgo")
+const shadcnLint = managedPlugin("@shadcn/lint")
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)

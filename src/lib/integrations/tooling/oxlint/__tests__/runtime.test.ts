@@ -1,10 +1,19 @@
 import process from "node:process"
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import { resolveToolchain } from "#lib/integrations/tooling/oxlint/toolchain.ts"
+import {
+  defineOxlintPlugin,
+  type NativeOverride,
+  type OxlintPlugin,
+} from "#lib/integrations/tooling/oxlint/plugins/base.ts"
+import {
+  resolveOxlintRuntime,
+  type OxlintRuntime,
+  type RuntimePart,
+} from "#lib/integrations/tooling/oxlint/runtime.ts"
 
 const ROOT = "/project"
 const PLATFORM = `${process.platform}-${process.arch}`
@@ -55,7 +64,7 @@ function runResolve(
   packages: Readonly<Record<string, string>>,
   project = ROOT
 ) {
-  return resolveToolchain(project).pipe(
+  return resolveOxlintRuntime(project).pipe(
     Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages)])
   )
 }
@@ -90,12 +99,12 @@ function makeWindowsFiles(launcher: string) {
   })
 }
 
-describe("toolchain", () => {
+describe("Oxlint runtime", () => {
   it.effect("start the installed tsrs when the project does not install @effect/tsgo", () =>
     Effect.gen(function* () {
-      const toolchain = yield* runResolve(makeFiles(), STOCK_PACKAGES)
+      const runtime = yield* runResolve(makeFiles(), STOCK_PACKAGES)
 
-      expect(toolchain).toStrictEqual({
+      expect(runtime).toStrictEqual({
         backend: {
           OXLINT_TSGOLINT_PATH:
             process.platform === "win32"
@@ -112,11 +121,11 @@ describe("toolchain", () => {
     "start the tsrs-lint launcher of the root installation for a workspace package on Windows",
     () =>
       Effect.gen(function* () {
-        const toolchain = yield* onWindows(
+        const runtime = yield* onWindows(
           runResolve(makeWindowsFiles("tsrs-lint.cmd"), STOCK_PACKAGES, `${ROOT}/packages/app`)
         )
 
-        expect(toolchain.backend).toStrictEqual({
+        expect(runtime.backend).toStrictEqual({
           OXLINT_TSGOLINT_PATH: `${ROOT}/node_modules/.bin/tsrs-lint.cmd`,
         })
       })
@@ -124,11 +133,11 @@ describe("toolchain", () => {
 
   it.effect("start the .exe launcher that Bun writes for tsrs-lint on Windows", () =>
     Effect.gen(function* () {
-      const toolchain = yield* onWindows(
+      const runtime = yield* onWindows(
         runResolve(makeWindowsFiles("tsrs-lint.exe"), STOCK_PACKAGES)
       )
 
-      expect(toolchain.backend).toStrictEqual({
+      expect(runtime.backend).toStrictEqual({
         OXLINT_TSGOLINT_PATH: `${ROOT}/node_modules/.bin/tsrs-lint.exe`,
       })
     })
@@ -136,11 +145,11 @@ describe("toolchain", () => {
 
   it.effect("run Oxlint as it is installed when the project does not install tsrs", () =>
     Effect.gen(function* () {
-      const toolchain = yield* runResolve(makeFiles(), {
+      const runtime = yield* runResolve(makeFiles(), {
         "oxlint/package.json": "node_modules/oxlint/package.json",
       })
 
-      expect(toolchain).toStrictEqual({
+      expect(runtime).toStrictEqual({
         backend: {},
         binding: { _tag: "Stock" },
         oxlint: `${ROOT}/node_modules/oxlint`,
@@ -152,9 +161,9 @@ describe("toolchain", () => {
     "replace the binding and the backend with the Effect builds of the installed versions",
     () =>
       Effect.gen(function* () {
-        const toolchain = yield* runResolve(makeFiles(), EFFECT_PACKAGES)
+        const runtime = yield* runResolve(makeFiles(), EFFECT_PACKAGES)
 
-        expect(toolchain).toStrictEqual({
+        expect(runtime).toStrictEqual({
           backend: {
             EFFECT_TSGO_TSGOLINT_MODE: "tsrs",
             EFFECT_TSGO_TSGOLINT_PATH: `${ROOT}/${ARTIFACTS}/tsrs/${TSRS_VERSION}/${TSRS}`,
@@ -266,4 +275,99 @@ describe("toolchain", () => {
       })
     })
   )
+})
+
+describe("native runtime overrides", () => {
+  it.effect.each(["Binding", "Backend"] as const)(
+    "reject two extensions that replace the %s",
+    (part) =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+        const override: NativeOverride =
+          part === "Binding"
+            ? { _tag: "Binding", path: "/native.node" }
+            : { _tag: "Backend", env: { NATIVE_BACKEND: "/backend" } }
+        const error = yield* resolveOxlintRuntime(ROOT, [
+          {
+            name: "first",
+            preset: "effect",
+            runtime: {
+              _tag: "Native",
+              resolve: () => Effect.succeed([override]),
+            },
+          },
+          {
+            name: "second",
+            preset: "effect",
+            runtime: {
+              _tag: "Native",
+              resolve: () => Effect.succeed([override]),
+            },
+          },
+        ]).pipe(
+          Effect.flip,
+          Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
+        )
+
+        expect(error).toMatchObject({
+          _tag: "NativeRuntimeConflict",
+          part,
+          plugins: ["first", "second"],
+        })
+      })
+  )
+
+  it.effect("combine distinct native parts and replace the whole stock backend", () =>
+    Effect.gen(function* () {
+      const files = makeFiles()
+      const runtime = yield* resolveOxlintRuntime(ROOT, [
+        {
+          name: "binding",
+          preset: "effect",
+          runtime: {
+            _tag: "Native",
+            resolve: () => Effect.succeed([{ _tag: "Binding", path: "/binding.node" }]),
+          },
+        },
+        {
+          name: "backend",
+          preset: "effect",
+          runtime: {
+            _tag: "Native",
+            resolve: () =>
+              Effect.succeed([{ _tag: "Backend", env: { NATIVE_BACKEND: "/backend" } }]),
+          },
+        },
+        { name: "javascript", preset: "shadcn", runtime: { _tag: "JavaScript" } },
+      ]).pipe(
+        Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
+      )
+
+      expect(runtime).toStrictEqual({
+        backend: { NATIVE_BACKEND: "/backend" },
+        binding: { _tag: "Replaced", path: "/binding.node" },
+        oxlint: "/project/node_modules/oxlint",
+      })
+    })
+  )
+})
+
+describe("runtime types", () => {
+  it("keep plugin capabilities and resolved runtime parts distinct in types", () => {
+    const javascript = defineOxlintPlugin({
+      name: "example",
+      preset: "shadcn",
+      runtime: { _tag: "JavaScript" },
+    })
+
+    expectTypeOf(javascript.name).toEqualTypeOf<"example">()
+    expectTypeOf<Extract<OxlintPlugin["runtime"], { _tag: "JavaScript" }>>().toEqualTypeOf<{
+      readonly _tag: "JavaScript"
+    }>()
+    expectTypeOf<Extract<NativeOverride, { _tag: "Backend" }>>().toEqualTypeOf<{
+      readonly _tag: "Backend"
+      readonly env: Readonly<Record<string, string>>
+    }>()
+    expectTypeOf<OxlintRuntime["binding"]>().toEqualTypeOf<RuntimePart>()
+  })
 })

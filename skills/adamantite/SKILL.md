@@ -221,6 +221,9 @@ Run the read-only assessment:
 adamantite doctor
 ```
 
+Doctor also reports when the installed packages cannot run Oxlint, such as a declared package
+that is not installed, or no `@effect/tsgo` build for the installed Oxlint or tsrs.
+
 Follow each finding. Doctor supplies the current state, the goal criteria, reference
 content when needed, and the verification command. In an interactive terminal, Doctor
 offers to hand off to an installed coding agent CLI, or to copy the combined Markdown prompt. In a

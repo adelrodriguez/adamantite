@@ -1,47 +1,10 @@
+import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import { type CommandRunOptions, CommandRunner } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
-import { CliNotFound, InvalidAnalyzeOptions } from "#lib/shared/errors.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
-
-type StageName = "monorepo" | "unused"
-
-interface Stage {
-  readonly command: string
-  readonly fixArguments: readonly string[]
-  readonly name: StageName
-  readonly stdin: NonNullable<CommandRunOptions["stdin"]>
-  readonly strictArguments: readonly string[]
-  readonly title: string
-}
-
-/**
- * The stages of `analyze`, in run order. The monorepo stage runs only in a detected monorepo.
- */
-const STAGES: readonly Stage[] = [
-  {
-    command: sherif.name,
-    fixArguments: ["--fix"],
-    name: "monorepo",
-    // Sherif prompts for a version when a fix has more than one candidate.
-    stdin: "inherit",
-    strictArguments: [],
-    title: "📦 Analyzing the monorepo",
-  },
-  {
-    command: knip.name,
-    fixArguments: ["--fix", "--allow-remove-files"],
-    name: "unused",
-    stdin: "ignore",
-    strictArguments: ["--production", "--strict"],
-    title: "🧹 Analyzing unused code",
-  },
-]
+import * as Toolchain from "#lib/toolchain/index.ts"
 
 const fix = Flag.Boolean("fix").pipe(
   Flag.withDefault(false),
@@ -76,60 +39,13 @@ export default Command.make("analyze", { fix, only, strict }).pipe(
   ]),
   Command.withHandler(({ fix, only, strict }) =>
     Effect.gen(function* () {
-      const forwardedArguments = yield* ForwardedArguments
-      const runner = yield* CommandRunner
-      const selected = Option.getOrUndefined(only)
-
-      // Without a usable manifest there is no monorepo to analyze; Knip reports the manifest.
-      const isMonorepo = yield* checkIsMonorepo().pipe(
-        Effect.catchTags({
-          FailedToParseFile: () => Effect.succeed(false),
-          FailedToReadFile: () => Effect.succeed(false),
-        })
-      )
-
-      if (selected === "monorepo") {
-        if (strict) {
-          return yield* new InvalidAnalyzeOptions({
-            reason: "`--strict` applies to the unused stage. Remove it or `--only monorepo`.",
-          })
-        }
-
-        if (!isMonorepo) {
-          return yield* new InvalidAnalyzeOptions({
-            reason: "`--only monorepo` needs a monorepo, and no monorepo was detected.",
-          })
-        }
-      }
-
-      const stages = STAGES.filter((stage) =>
-        selected === undefined ? stage.name === "unused" || isMonorepo : stage.name === selected
-      )
-      const forwardedStage = selected ?? "unused"
-
-      const steps = stages.map((stage) => ({
-        args: [
-          ...(fix ? stage.fixArguments : []),
-          ...(strict ? stage.strictArguments : []),
-          ...(stage.name === forwardedStage ? forwardedArguments : []),
-        ],
-        command: stage.command,
-        stdin: stage.stdin,
-        title: stage.title,
-      }))
-
-      // A failed Sherif fix means no install happened, and Knip would then delete from a stale
-      // dependency graph.
-      yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
-        Effect.mapError((error) =>
-          error._tag === "CliNotFound" && error.command === sherif.name
-            ? new CliNotFound({
-                command: error.command,
-                hint: "Run `adamantite update` to install it.",
-              })
-            : error
-        )
-      )
+      yield* Toolchain.analyze({
+        cwd: process.cwd(),
+        fix,
+        forwardedArguments: yield* ForwardedArguments,
+        only: Option.getOrUndefined(only),
+        strict,
+      })
     })
   )
 )

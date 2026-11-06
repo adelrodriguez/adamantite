@@ -5,6 +5,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import initCommand from "#commands/init/index.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -12,9 +13,6 @@ import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.t
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
-import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
-import shadcnLint from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
@@ -29,6 +27,10 @@ import {
   nonProbeInvocations,
   runCommand,
 } from "./command-test-helpers.ts"
+
+const effectTsgo = managedPlugin("@effect/tsgo")
+const shadcnLint = managedPlugin("@shadcn/lint")
+const reactDoctor = managedPlugin("oxlint-plugin-react-doctor")
 
 const basePackageJson = JSON.stringify(
   {

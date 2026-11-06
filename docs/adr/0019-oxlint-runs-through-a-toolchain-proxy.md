@@ -1,5 +1,8 @@
 # Oxlint runs through a toolchain proxy
 
+ADR 0022 renames the narrow toolchain to Oxlint runtime and changes the module ownership.
+The names and paths below describe this decision when it was made.
+
 The `effect` preset needs the Effect builds of the Oxlint native binding and oxlint-tsgolint,
 which `@effect/tsgo` ships. ADR 0007 put those builds in `node_modules` with
 `effect-tsgo patch`. Each install restored the stock files, so the target project needed

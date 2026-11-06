@@ -223,7 +223,7 @@ describe("zed", () => {
       })
     )
 
-    it.effect("replace the Oxlint binary of the existing config with the toolchain entry", () =>
+    it.effect("replace the Oxlint binary of the existing config with the Oxlint entry", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           [SETTINGS_PATH]: yield* stringifyJson({

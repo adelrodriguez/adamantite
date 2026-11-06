@@ -10,16 +10,16 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import type { Workspace } from "#lib/workspace/monorepo.ts"
-import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import { readOverrides } from "#lib/hardening/overrides.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
 import { type TrialCase, type TrialSetting, tryRule } from "#lib/hardening/trial.ts"
+import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/lint/custom.ts")
 const RULES_MODULE = join(REPO_ROOT, "presets/rules/index.ts")
 
-// The build writes the toolchain entry beside the CLI, so a run from source starts its source.
+// The build writes the Oxlint entry beside the CLI, so a run from source starts its source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
   Layer.succeed(OxlintCommand)((project) => ({
@@ -240,9 +240,9 @@ describe("rule trials in a real project", () => {
     })
   )
 
-  it.live("run a rule of the effect preset with the Effect toolchain of the project", () =>
+  it.live("run a rule of the effect preset with the Effect runtime of the project", () =>
     Effect.gen(function* () {
-      // A plain `oxlint` fails to load a config with the `effecttsgo` plugin. The Effect toolchain
+      // A plain `oxlint` fails to load a config with the `effecttsgo` plugin. The Effect runtime
       // takes the Effect build of the tsrs version that the project installs.
       for (const name of ["@effect", "effect", "tsrs"]) {
         symlinkSync(join(REPO_ROOT, "node_modules", name), join(project, "node_modules", name))

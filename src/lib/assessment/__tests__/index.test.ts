@@ -159,6 +159,87 @@ describe("renderAssessmentMarkdown", () => {
 })
 
 describe("assessProject", () => {
+  it.effect.each([
+    { editor: "vscode", settings: "{}", finding: "vscode-oxlint-entry" },
+    {
+      editor: "vscode",
+      settings: '{ "oxc.path.oxlint": "node_modules/oxlint/bin/oxlint" }',
+      finding: "vscode-oxlint-entry",
+    },
+    {
+      editor: "vscode",
+      settings:
+        '{ "oxc.path.oxlint": "${workspaceFolder}/node_modules/adamantite/dist/oxlint.js" }',
+      finding: "vscode-oxlint-entry",
+    },
+    { editor: "vscode", settings: '{ "oxc.path.oxlint": false }', finding: "vscode-oxlint-entry" },
+    {
+      editor: "vscode",
+      settings:
+        '{ /* Project settings */ "oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js", }',
+      finding: undefined,
+    },
+    { editor: "vscode", settings: undefined, finding: undefined },
+    { editor: "zed", settings: "{}", finding: "zed-oxlint-entry" },
+    {
+      editor: "zed",
+      settings: '{ "lsp": { "oxlint": { "binary": { "path": "oxlint" } } } }',
+      finding: "zed-oxlint-entry",
+    },
+    {
+      editor: "zed",
+      settings:
+        '{ "lsp": { "oxlint": { "binary": { "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js"] } } } }',
+      finding: "zed-oxlint-entry",
+    },
+    {
+      editor: "zed",
+      settings:
+        '{ "lsp": { "oxlint": { "binary": { "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp", "--fix"] } } } }',
+      finding: "zed-oxlint-entry",
+    },
+    { editor: "zed", settings: '{ "lsp": false }', finding: "zed-oxlint-entry" },
+    {
+      editor: "zed",
+      settings:
+        '{ "lsp": { "oxlint": { "binary": { "path": "node", "arguments": ["node_modules/adamantite/dist/oxlint.js", "--lsp"] } } } }',
+      finding: undefined,
+    },
+    { editor: "zed", settings: undefined, finding: undefined },
+  ])("assess $editor settings $settings without changing files", ({ editor, settings, finding }) =>
+    Effect.gen(function* () {
+      const settingsPath = `.${editor}/settings.json`
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": "{}",
+          ...(settings === undefined ? {} : { [settingsPath]: settings }),
+        },
+        root: ROOT,
+      })
+      const before = files.list().map((file) => [file, files.read(file)])
+      files.makeReadOnly(ROOT)
+
+      const assessment = yield* readProject(ROOT).pipe(
+        Effect.flatMap((project) => assessProject(project)),
+        Effect.provide([
+          files.layer,
+          Path.layer,
+          makeModuleResolverLayer(ROOT),
+          Layer.succeed(DependencyInstaller)({
+            addDevDependencies: () => Effect.void,
+            detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+          }),
+        ])
+      )
+
+      expect(
+        assessment.findings.filter((entry) => entry.integration === editor).map(({ id }) => id)
+      ).toStrictEqual(finding === undefined ? [] : [finding])
+      expect(assessment.applicableIntegrations.includes(editor)).toBe(settings !== undefined)
+      expect(files.list().map((file) => [file, files.read(file)])).toStrictEqual(before)
+    })
+  )
+
   it.effect("read the shared project facts one time for every integration", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

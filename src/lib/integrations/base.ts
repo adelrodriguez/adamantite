@@ -1,6 +1,3 @@
-import type * as Effect from "effect/Effect"
-import type { Project } from "#lib/workspace/project.ts"
-
 export type IntegrationKind = "tooling" | "workspace" | "editor" | "ci"
 
 export type IntegrationFileType = "config" | "legacy_config" | "ci"
@@ -61,16 +58,6 @@ export interface IntegrationBase<Kind extends IntegrationKind> {
   readonly files?: readonly IntegrationFile[]
   readonly kind: Kind
   readonly name: string
-}
-
-export interface AssessableIntegration<Error = unknown, Requirements = unknown> {
-  /**
-   * Classifies package drift and managed state against the latest supported state. It must not
-   * change files. The caller reads the project one time and shares it with every assessment, so
-   * read the workspace, the root `oxlint.config.ts`, and the custom rules from `project`, not from
-   * the filesystem.
-   */
-  readonly assess: (project: Project) => Effect.Effect<IntegrationAssessment, Error, Requirements>
 }
 
 export function defineIntegration<const T extends IntegrationBase<IntegrationKind>>(

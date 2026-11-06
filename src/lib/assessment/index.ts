@@ -1,16 +1,6 @@
-import type * as FileSystem from "effect/FileSystem"
-import type * as Path from "effect/Path"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as Option from "effect/Option"
-import type {
-  AssessableIntegration,
-  Finding,
-  IntegrationAssessment,
-  IntegrationBase,
-  IntegrationKind,
-  PackageAction,
-} from "#lib/integrations/base.ts"
+import type { Finding, PackageAction } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
@@ -48,52 +38,6 @@ const managedIntegrations = [
   zed,
 ] as const
 
-type ApplicableAssessment = Extract<IntegrationAssessment, { readonly applicable: true }>
-
-type AnyAssessableIntegration = IntegrationBase<IntegrationKind> & AssessableIntegration
-
-interface NamedAssessment {
-  readonly assessment: ApplicableAssessment
-  readonly name: string
-}
-
-const collect = Effect.fn("collectApplicableAssessments")(function* (
-  integrations: readonly AnyAssessableIntegration[],
-  project: Project
-) {
-  return yield* Effect.forEach(
-    integrations,
-    (integration) =>
-      // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- `collectApplicable` restores the precise channels.
-      integration
-        .assess(project)
-        .pipe(
-          Effect.map((assessment) =>
-            assessment.applicable
-              ? Option.some({ assessment, name: integration.name })
-              : Option.none<NamedAssessment>()
-          )
-        ),
-    // Assessments are read-only and independent, and `forEach` keeps results in input order.
-    { concurrency: "unbounded" }
-  ).pipe(Effect.map((optionalAssessments) => Array.getSomes(optionalAssessments)))
-})
-
-// The overload recovers each integration's precise error and requirement types, which
-// direct `Effect.forEach` inference loses over the heterogeneous registry tuple.
-function collectApplicable<const I extends AnyAssessableIntegration>(
-  integrations: readonly I[],
-  project: Project
-): Effect.Effect<
-  NamedAssessment[],
-  Effect.Error<ReturnType<I["assess"]>>,
-  Effect.Services<ReturnType<I["assess"]>> | FileSystem.FileSystem | Path.Path
->
-function collectApplicable(integrations: readonly AnyAssessableIntegration[], project: Project) {
-  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- The overload above declares the precise channels.
-  return collect(integrations, project)
-}
-
 export interface ProjectAssessment {
   /**
    * Names of the integrations that apply to this project. Empty means nothing is managed.
@@ -112,7 +56,17 @@ export interface ProjectAssessment {
  * session or a dependency update reads the project again, so it sees the changes.
  */
 export const assessProject = Effect.fn("assessProject")(function* (project: Project) {
-  const applicable = yield* collectApplicable(managedIntegrations, project)
+  const assessments = yield* Effect.forEach(
+    managedIntegrations,
+    (integration) =>
+      Effect.gen(function* () {
+        const assessment = yield* integration.assess(project)
+        return assessment.applicable ? [{ assessment, name: integration.name }] : []
+      }),
+    // Assessments are read-only and independent, and `forEach` keeps results in input order.
+    { concurrency: "unbounded" }
+  )
+  const applicable = Array.flatten(assessments)
 
   return {
     applicableIntegrations: applicable.map(({ name }) => name),

@@ -1,4 +1,3 @@
-import * as Array from "effect/Array"
 import type { CommandRunOptions } from "#lib/execution/command-runner.ts"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 
@@ -20,7 +19,6 @@ export function check(options: Options & { readonly allowWarnings: boolean }): C
   return {
     ...entry,
     args: [...entry.args, ...options.files, ...denyWarnings, ...options.forwardedArguments],
-    cwd: options.cwd,
     title: "🔍 Linting",
   }
 }
@@ -37,15 +35,12 @@ export function fix(
     ...entry,
     args: [
       ...entry.args,
-      ...Array.dedupe([
-        "--fix",
-        ...(options.suggested ? ["--fix-suggestions"] : []),
-        ...(options.dangerous ? ["--fix-dangerously"] : []),
-        ...options.files,
-      ]),
+      "--fix",
+      ...(options.suggested ? ["--fix-suggestions"] : []),
+      ...(options.dangerous ? ["--fix-dangerously"] : []),
+      ...options.files,
       ...options.forwardedArguments,
     ],
-    cwd: options.cwd,
     title: "🔧 Fixing lint issues",
   }
 }

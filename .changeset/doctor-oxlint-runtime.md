@@ -4,4 +4,4 @@
 
 Doctor reports when the installed packages cannot run Oxlint
 
-Doctor resolves the Oxlint runtime as `adamantite check` and the editors do, and starts no tool to do it. It reports a declared package that is not installed, such as `oxlint` or `tsrs`, and an `@effect/tsgo` that has no build for the installed Oxlint, tsrs, or platform. A project that declares its packages but has not installed them now gets these findings, so run Doctor after the install.
+Doctor resolves the Oxlint runtime as `adamantite check` and the editors do, without starting tools or loading native code. It reports missing declared packages, missing stock native files, and unsupported `@effect/tsgo` builds for the installed Oxlint, tsrs, or platform. Local bindings and `TSRS_BINARY` overrides remain supported. A project whose dependencies are not fully installed now gets these findings, so run Doctor after the install.

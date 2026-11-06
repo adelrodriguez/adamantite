@@ -125,6 +125,16 @@
       },
       "tracking": "dependency",
       "version": "1.91.0"
+    },
+    {
+      "name": "tsrs",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/tsrs/-/tsrs-0.21.0-ts7.1.0-beta.tgz"
+      },
+      "tracking": "dependency",
+      "version": "0.21.0-ts7.1.0-beta"
     }
   ]
 }

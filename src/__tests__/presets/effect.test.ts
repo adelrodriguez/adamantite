@@ -80,9 +80,9 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the files with the effect preset in one real Oxlint run, through the toolchain entry.
- * Oxlint, `@effect/tsgo`, and `effect` resolve from the repository's `node_modules`, which nothing
- * patches. `jsPlugins` adds plugins next to the preset.
+ * Lint the files with the effect preset in one real Oxlint run, through the Oxlint entry. Oxlint,
+ * `@effect/tsgo`, and `effect` resolve from the repository's `node_modules`, which nothing patches.
+ * `jsPlugins` adds plugins next to the preset.
  */
 function lint(files: Record<string, string>, jsPlugins: readonly string[] = []) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-effect-"))
@@ -157,7 +157,7 @@ describe("effect preset", () => {
     expect(presetRules.filter((rule) => EXCLUDED_RULES.has(rule))).toStrictEqual([])
   })
 
-  // The toolchain loads the Effect builds from `artifacts/<tool>/<version>` of the platform package.
+  // The runtime loads the Effect builds from `artifacts/<tool>/<version>` of the platform package.
   it("ship Effect builds for the pinned Oxlint and tsrs", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
@@ -174,7 +174,7 @@ describe("effect preset", () => {
     expect(missing).toStrictEqual([])
   })
 
-  it("report Effect misuse through the toolchain entry", () => {
+  it("report Effect misuse through the Oxlint entry", () => {
     const diagnostics = lint({
       "bad.ts": [
         'import * as Effect from "effect/Effect"',

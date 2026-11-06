@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { getOxlintCommand, getProjectDirectory } from "#lib/execution/oxlint-entry.ts"
+import { getOxlintCommand, getProjectDirectory } from "#lib/integrations/tooling/oxlint/entry.ts"
 
 const CWD = "/somewhere/else"
 
@@ -52,6 +52,7 @@ describe("oxlint-entry", () => {
       expect(getOxlintCommand("/project")).toStrictEqual({
         args: [expect.stringMatching(/[/\\]oxlint\.js$/u)],
         command: "node",
+        cwd: "/project",
         env: { ADAMANTITE_PROJECT: "/project" },
         name: "oxlint",
       })

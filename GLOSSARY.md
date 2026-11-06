@@ -71,10 +71,15 @@ Sherif, or tsrs.
 _Avoid_: Dependency adapter
 
 **Toolchain**:
+The code-quality tools and their plugins that Adamantite configures and runs for a target
+project.
+_Avoid_: Proxy
+
+**Oxlint runtime**:
 The Oxlint package, native binding, and type-aware backend that Adamantite runs Oxlint with for
-one target project. Each part is the installed one, or a replacement, such as the Effect build
-from `@effect/tsgo`.
-_Avoid_: Patch, setup
+one target project. Each native part is the installed one, or a replacement that a managed
+plugin ships, such as the Effect build from `@effect/tsgo`.
+_Avoid_: Toolchain, patch, setup
 
 **Managed script**:
 A `package.json` script whose command is owned by Adamantite.

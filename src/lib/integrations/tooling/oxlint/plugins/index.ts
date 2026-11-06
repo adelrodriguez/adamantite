@@ -3,7 +3,8 @@ import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.t
 import shadcn from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
 
 /**
- * Every managed plugin. Init installs the ones whose preset is selected. Doctor and update keep a
- * plugin on its pinned version only while `oxlint.config.ts` imports its preset.
+ * Every Oxlint plugin definition. Both runtime resolution and management use this registry. The
+ * Oxlint entry loads it from source, so no definition imports a macro module. `plugins/managed.ts`
+ * adds the versions.
  */
-export const managedPlugins = [shadcn, reactDoctor, effectTsgo] as const
+export const oxlintPlugins = [shadcn, reactDoctor, effectTsgo] as const

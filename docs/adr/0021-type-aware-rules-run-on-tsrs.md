@@ -1,5 +1,8 @@
 # The type-aware rules run on tsrs
 
+ADR 0022 renames the narrow toolchain to Oxlint runtime and changes the module ownership.
+The names and paths below describe this decision when it was made.
+
 Oxlint runs its type-aware rules in a separate backend process. Until now, that backend was
 oxlint-tsgolint, which is built on typescript-go. [tsrs](https://github.com/oxc-project/tsrs), a
 Rust port of the TypeScript 7 compiler, ships `tsrs --lint` since 0.21.0. It implements the

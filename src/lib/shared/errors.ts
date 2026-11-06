@@ -357,6 +357,20 @@ export class OperationCancelled extends Data.TaggedError("OperationCancelled")<{
 }
 
 /**
+ * Two Oxlint plugins replace the same native part of the Oxlint runtime.
+ */
+export class NativeRuntimeConflict extends Data.TaggedError("NativeRuntimeConflict")<{
+  part: "Binding" | "Backend"
+  plugins: readonly string[]
+}> {
+  override get message() {
+    const part = this.part === "Binding" ? "native binding" : "type-aware backend"
+
+    return `${this.plugins.join(" and ")} both replace the Oxlint ${part}. Remove one of them.`
+  }
+}
+
+/**
  * A package that Oxlint needs does not resolve from the project.
  */
 export class PackageNotInstalled extends Data.TaggedError("PackageNotInstalled")<{

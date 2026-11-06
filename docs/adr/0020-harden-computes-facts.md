@@ -1,5 +1,8 @@
 # Harden computes facts, and the prompt keeps judgment
 
+ADR 0022 renames the narrow toolchain to Oxlint runtime and changes the module ownership.
+The names and paths below describe this decision when it was made.
+
 `adamantite harden` teaches the enforcement ladder: a type or a tool first, an instruction last.
 Its own prompt grew one paragraph each time an agent missed a step (#597 to #601). Some of these
 paragraphs taught mechanical work: how to copy the project for a trial, how to change the

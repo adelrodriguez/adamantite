@@ -18,7 +18,7 @@ services so command behavior can be tested without changing a real project.
 Tsdown bundles the CLI, the Oxlint entry, and the presets into `dist`. Unplugin macros expands
 compile-time package metadata and terminal-title values during builds and Vitest source
 transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint.ts` builds to
-`dist/oxlint.js`, beside the CLI bundle, and runs Oxlint with the project's toolchain. The
+`dist/oxlint.js`, beside the CLI bundle, and runs Oxlint with the project's Oxlint runtime. The
 entry imports no macro module, so this repository runs it from source with
 `node src/oxlint.ts`. See ADR 0019. Repository tests run with Vitest
 under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
@@ -27,7 +27,8 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 | Module         | Responsibility                                                                                                                                    |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `commands`     | Define one CLI workflow and render its user-facing result.                                                                                        |
+| `commands`     | Define Effect CLI input, command composition, and user-facing output.                                                                             |
+| `toolchain`    | Coordinate check, fix, and analyze stages, argument routing, and failure policy.                                                                  |
 | `execution`    | Run child commands, hand off to coding agents, install the Adamantite skill, and carry forwarded arguments.                                       |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
 | `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
@@ -52,11 +53,21 @@ layer is its sibling, so `workspace` and `execution` do not import each other, a
 target-project files and package state, but not integration types such as `Finding`. An import
 that breaks a map, or a folder that is not in its map, fails `pnpm run check`. See ADR 0013.
 
+`toolchain`, `assessment`, and `hardening` are siblings above `integrations`. The `check`,
+`fix`, and `analyze` commands call `toolchain/index.ts`, and `harden` calls its `check`
+operation after a handoff. Doctor calls `assessment`. The Oxlint integration and the Oxlint
+entry use one Oxlint runtime resolver. `hardening` starts the Oxlint entry through
+`tooling/oxlint/entry.ts` to capture the lint output. An `adamantite/import-owners` entry lets
+only `src/lib`, `init`, `update`, the tests, and the Oxlint entry import the tooling
+integrations, so the other commands go through Toolchain.
+
 Inside `integrations`, `base.ts` defines the integration and finding types.
 `tooling/base.ts` and `tooling/preset-config.ts` hold the logic that several tools share.
 Each tool has a folder: `index.ts` exports only the integration as a default export, and
 helper modules beside it, such as `knip/config.ts`, hold the logic that only that tool
-uses. The `assessment` layer is the only module that imports every integration.
+uses. The `assessment` layer registers every managed integration. The tooling integrations
+that Toolchain runs also have command builders, which return `CommandRunOptions` and start no
+process. Oxlint and Oxfmt keep them in `command.ts`, and Knip and Sherif in `index.ts`.
 
 ## Integration lifecycle
 
@@ -104,6 +115,10 @@ The agent's exit code is ignored: only the reassessment decides success. Non-int
 print the Markdown prompt directly when findings remain. If an assessment reports only
 warnings, a non-interactive run prints a Markdown warning report and exits 0.
 
+Runtime findings check the installed packages. Package findings check the declarations and
+the managed versions. A project that declares tsrs, but cannot resolve its backend, gets a
+runtime finding, although the entry still runs stock Oxlint without tsrs, as ADR 0021 says.
+
 Package drift also stays structured so that `update` can install current managed package
 versions. Doctor renders package drift as findings that tell the user to run `update`.
 
@@ -112,14 +127,19 @@ warns the user and points to `adamantite doctor`.
 
 ## Command boundaries
 
-- `check` and `fix` run Oxfmt and Oxlint. They start Oxlint through the entry `dist/oxlint.js`
-  with `node`, so Oxlint runs with the project's toolchain. `check` fails on Oxlint warnings
-  unless `--allow-warnings` is set. See ADR 0018 and ADR 0019.
-- `analyze` runs Sherif in a detected monorepo, then Knip. `--only` selects one stage.
+- `check` and `fix` call Toolchain to run Oxfmt and Oxlint. Toolchain starts Oxlint through
+  the entry `dist/oxlint.js` with `node`, so Oxlint runs with the project's Oxlint runtime.
+  `check` fails on Oxlint warnings unless `--allow-warnings` is set. See ADR 0018, ADR 0019,
+  and ADR 0022.
+- `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
+  one stage.
 - `init` creates selected integrations and managed scripts. It installs the Adamantite skill
   for the selected coding agents with the `skills` CLI, from `node_modules/adamantite`, so
   the copy matches the installed version.
-- `doctor` assesses managed integrations and emits repair findings.
+- `doctor` assesses managed integrations and emits repair findings. The Oxlint assessment
+  resolves the same runtime as the entry and reports missing installed packages, unsupported
+  native builds or platforms, and conflicting overrides. Resolution neither launches a tool
+  nor changes files or process variables. Unexpected read and parse failures still propagate.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
   into custom rules and instructions, and offers it through the resolution menu. After a
   handoff, it runs Oxfmt and Oxlint as `check` does, then the custom rule tests as `rule test`
@@ -136,7 +156,7 @@ warns the user and points to `adamantite doctor`.
   `init` installed is stale, then
   emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
   not need it.
-- `prepare` does nothing. It patched Oxlint for the effect preset before the toolchain proxy,
+- `prepare` does nothing. It patched Oxlint for the effect preset before the Oxlint proxy,
   and existing `prepare` scripts still run it. #444 removes it.
 - `rule add` writes a custom rule stub and its test. `rule ast` prints the AST that Oxlint
   rules visit. `rule test` runs the custom rule tests with `node --test`. `check` does not run
@@ -172,12 +192,13 @@ src/
     execution/      child command runs, coding-agent detection and handoff, the Adamantite skill, forwarded arguments
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
-    assessment/     integration registry, project assessment, agent prompt (top layer)
+    assessment/     integration registry, project assessment, agent prompt
+    toolchain/      check, fix, and analyze operations
     hardening/      harden context, harden prompt, rule facts, and rule trials
   terminal/         user prompting, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
-  oxlint.ts         entry that runs Oxlint with the project's toolchain
+  oxlint.ts         entry that runs Oxlint with the project's Oxlint runtime
 ```
 
 ## Dependency version invariant
@@ -189,33 +210,33 @@ in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit u
 
 ## Managed plugins
 
-A preset can need a third-party Oxlint plugin that is published on npm, such as
-`@shadcn/lint` for the `shadcn` preset and `oxlint-plugin-react-doctor` for the
-`react-doctor` preset. The plugin stays an npm package in the target
-project. Its tooling integration lives in `src/lib/integrations/tooling/oxlint/plugins/`
-and is made with `defineManagedPlugin` from `plugins/define.ts`, so the package is required only while
-`oxlint.config.ts` imports the preset. Register a new plugin in the `managedPlugins` list in
-that folder's `index.ts`; init and doctor read the list. The preset names the plugin by its bare package name
-in `jsPlugins`, and Oxlint resolves it from the target project. The pin is the devDependency
-version in `package.json`. See ADR 0003.
+A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`
+for `shadcn` and `oxlint-plugin-react-doctor` for `react-doctor`. Each definition under
+`tooling/oxlint/plugins/` uses `defineOxlintPlugin` and declares its package, preset, and
+JavaScript or native runtime capability. `plugins/index.ts` is the one registry of definitions.
+It imports no version macro, so the Oxlint entry can load it from source. JavaScript plugins
+still load through the preset's `jsPlugins` entries, which resolve from the target project.
 
-`@effect/tsgo` for the `effect` preset is a managed plugin too, but it is not a `jsPlugins`
-package. Its `effecttsgo` rules exist only in the Effect builds of the Oxlint binding and
-tsrs that the package ships. The toolchain in `tooling/oxlint/toolchain.ts` loads those builds
-when the project installs `@effect/tsgo`, and the entry `src/oxlint.ts` runs Oxlint with them.
-Every other project runs the type-aware rules on the installed `tsrs`, which the `tsrs`
-integration in `tooling/oxlint/tsrs.ts` pins. See ADR 0019 and ADR 0021. The `@effect/tsgo` integration also manages the
-`@effect/language-service` entry in `tsconfig.json`, and reports a `prepare` script that still
-runs `adamantite prepare`. It lives in `plugins/effect-tsgo/`: `index.ts` is one
-`defineManagedPlugin` call, and `prepare-script.ts`, `tsconfig.ts`, and `toolchain.ts` hold one
-concern each. `defineManagedPlugin` takes an optional `assess` for findings beyond the package,
-which runs only while the plugin applies, and keeps other options, such as `update`, as methods
-of the integration. The helpers do not import `index.ts` or each other. `tooling/oxlint/toolchain.ts`
-imports `toolchain.ts` and not `index.ts`, because `index.ts` imports a macro module and the
-entry runs from source in this repository. The Knip integration requires
-`ignoreDependencies.effect` while `oxlint.config.ts` imports the preset. A test asserts that
-`@effect/tsgo` ships Effect builds for the pinned Oxlint and tsrs versions. See ADR
-0007 for the curation.
+`plugins/managed.ts` derives the managed integrations from those definitions with
+`defineManagedPlugin`. Its version table holds the build-time version of each registered
+package, and its type fails when a package has no version. Init installs the packages of the
+selected presets. Doctor and update maintain a package while the root config imports its
+preset. See ADR 0003.
+
+The Effect definition also assesses the language service entry in `tsconfig.json` and the
+legacy `prepare` script, and its `update` method writes the language service entry for init.
+Its runtime resolver, in `plugins/effect-tsgo/runtime.ts`, returns binding and backend
+overrides when the target project installs `@effect/tsgo`. The installed package turns the
+Effect builds on, so nested configs and relative preset imports get them too. The managed
+package requirement depends on the root config import instead.
+
+`tooling/oxlint/runtime.ts` resolves the installed Oxlint package and applies the native
+overrides. Two overrides for the same part fail with `NativeRuntimeConflict`. A backend
+override replaces all default backend variables. Without a backend override, Oxlint starts the
+installed tsrs through its `tsrs-lint` launcher. A project without tsrs runs stock Oxlint, as
+ADR 0021 says. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
+CLI. It clears the temporary binding variable before JavaScript plugins load. See ADR 0019,
+ADR 0021, and ADR 0022.
 
 ## Vendored bundles
 

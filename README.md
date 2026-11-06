@@ -199,7 +199,9 @@ adamantite analyze --only monorepo --fix -- --select highest
 ### `adamantite doctor`
 
 Assess every Adamantite-managed integration. Doctor is read-only. Each finding describes
-the current state, the goal state, and how to verify the repair.
+the current state, the goal state, and how to verify the repair. Doctor also checks that the
+installed packages can run Oxlint: each declared package is installed, and `@effect/tsgo` has
+a build for the installed Oxlint, tsrs, and platform. It starts no tool for this check.
 
 ```sh
 adamantite doctor

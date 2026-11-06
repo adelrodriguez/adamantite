@@ -10,7 +10,6 @@ import * as Schema from "effect/Schema"
 import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { getOxlintCommand } from "#lib/execution/oxlint-entry.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
   readHardenContext,
@@ -19,7 +18,6 @@ import {
 } from "#lib/hardening/index.ts"
 import { readOverrides } from "#lib/hardening/overrides.ts"
 import { readSuppressions } from "#lib/hardening/suppressions.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import {
   AdamantiteNotInNodeModules,
   AdamantiteNotInstalled,
@@ -28,6 +26,7 @@ import {
   ScopeOutsideProject,
 } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import * as Toolchain from "#lib/toolchain/index.ts"
 import { readCustomRuleTestCommand } from "#lib/workspace/custom-rules/index.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readWorkspace } from "#lib/workspace/monorepo.ts"
@@ -188,9 +187,10 @@ export default Command.make("harden", { commits, scope }).pipe(
 
       const { agent } = resolution
       const runner = yield* CommandRunner
-      const oxlintCommand = getOxlintCommand(cwd)
       // A step that fails or cannot start fails the verification, and the later steps still run.
-      const passes = (step: ReturnType<typeof runner.run>) =>
+      const passes = <R>(
+        step: Effect.Effect<void, Effect.Error<ReturnType<typeof runner.run>>, R>
+      ) =>
         step.pipe(
           Effect.as(true),
           Effect.catchTags({
@@ -200,16 +200,7 @@ export default Command.make("harden", { commits, scope }).pipe(
         )
       // The agent's exit code says nothing about the project, so `check`, the rule tests, and the
       // assessment decide.
-      const checkPassed = yield* passes(
-        runner.runAll([
-          { args: ["--check"], command: oxfmt.name, title: "✨ Checking formatting" },
-          {
-            ...oxlintCommand,
-            args: [...oxlintCommand.args, "--deny-warnings"],
-            title: "🔍 Linting",
-          },
-        ])
-      )
+      const checkPassed = yield* passes(Toolchain.check({ cwd }))
       // The session can change the project, so the checks after it read the project again. The
       // agent reach, the rule tests, and the assessment share that one read, and they change no
       // file, so they run together. The Doctor warnings below already name the rules folders that

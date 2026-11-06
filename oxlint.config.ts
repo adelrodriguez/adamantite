@@ -62,6 +62,19 @@ export default defineConfig({
         import: "oxc-resolver",
         owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/rules/layers.ts"],
       },
+      // Commands run tools through Toolchain. Only the lifecycle commands `init` and `update` use
+      // the tooling integrations directly.
+      {
+        import: "#lib/integrations/tooling",
+        owners: [
+          "src/lib",
+          "src/commands/init",
+          "src/commands/update.ts",
+          "src/commands/__tests__",
+          "src/__tests__",
+          "src/oxlint.ts",
+        ],
+      },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
       // integration takes them from the `Project`. Harden discovers the custom rules of its own
       // scope.
@@ -110,10 +123,11 @@ export default defineConfig({
           workspace: ["shared"],
 
           // Harden is not an assessment, so `assessment` does not import `hardening`.
-          hardening: ["workspace", "execution"],
+          hardening: ["integrations"],
           integrations: ["workspace", "execution"],
 
           assessment: ["integrations"],
+          toolchain: ["integrations"],
         },
         root: "src/lib",
       },

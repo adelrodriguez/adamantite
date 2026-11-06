@@ -6,6 +6,7 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
+import type { NativeOverride } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import {
   EffectBuildMissing,
   EffectPlatformUnsupported,
@@ -16,17 +17,6 @@ import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const NAME = "@effect/tsgo"
-
-/**
- * The Effect builds that replace the Oxlint native binding and the type-aware backend.
- */
-export interface EffectToolchain {
-  /**
-   * The variables that make the Effect binding start the Effect build of tsrs.
-   */
-  readonly backend: Readonly<Record<string, string>>
-  readonly binding: string
-}
 
 const readVersion = Effect.fn("readVersion")(function* (directory: string) {
   const { version } = yield* readPackageJson(directory)
@@ -71,17 +61,17 @@ const findArtifact = Effect.fn("findArtifact")(function* (
 
 /**
  * The Effect builds of the Oxlint binding and tsrs for the installed Oxlint and tsrs versions. They
- * come from the `@effect/tsgo` platform package, so the project needs no patch. None when the
- * project does not install `@effect/tsgo`.
+ * come from the `@effect/tsgo` platform package, so the project needs no patch. No overrides when
+ * the project does not install `@effect/tsgo`.
  */
-export const resolveEffectToolchain = Effect.fn("resolveEffectToolchain")(function* (
+export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* (
   project: string,
   oxlint: string
 ) {
   const tsgo = yield* resolvePackageDirectory(project, NAME)
 
   if (Option.isNone(tsgo)) {
-    return Option.none<EffectToolchain>()
+    return [] satisfies readonly NativeOverride[]
   }
 
   const platform = `${process.platform}-${process.arch}`
@@ -122,8 +112,11 @@ export const resolveEffectToolchain = Effect.fn("resolveEffectToolchain")(functi
   const [backend, binding] = yield* Effect.fromResult(Result.all(artifacts))
 
   // With the mode `tsrs`, the Effect binding starts the backend as `<path> --lint headless`.
-  return Option.some<EffectToolchain>({
-    backend: { EFFECT_TSGO_TSGOLINT_MODE: "tsrs", EFFECT_TSGO_TSGOLINT_PATH: backend },
-    binding,
-  })
+  return [
+    { _tag: "Binding", path: binding },
+    {
+      _tag: "Backend",
+      env: { EFFECT_TSGO_TSGOLINT_MODE: "tsrs", EFFECT_TSGO_TSGOLINT_PATH: backend },
+    },
+  ] satisfies readonly NativeOverride[]
 })

@@ -135,7 +135,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "antislop",
         },
         {
-          hint: "Tailwind v4 design system: no restyled components, raw colors, arbitrary values, or unknown classes",
+          hint: "Tailwind v4 design system: no restyled components, raw colors, arbitrary values, or unknown classes. Installs @shadcn/lint",
           label: "tailwind",
           value: "tailwind",
         },

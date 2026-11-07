@@ -10,8 +10,8 @@
     "plugins": [
       {
         "name": "@effect/language-service",
-        // Oxlint reports the Effect diagnostics through the effect preset.
-        "diagnostics": false,
+        // The Effect server supplies editor quick fixes; editor settings hide duplicate Oxlint reports.
+        "diagnostics": true,
         "allowedUnstableApis": [
           "@effect/platform-node",
           "@effect/vitest",

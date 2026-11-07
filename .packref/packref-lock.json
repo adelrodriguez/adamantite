@@ -135,6 +135,18 @@
       },
       "tracking": "dependency",
       "version": "0.21.0-ts7.1.0-beta"
+    },
+    {
+      "name": "@effect/tsgo",
+      "registry": "npm",
+      "source": {
+        "directory": "_packages/tsgo",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/tsgo"
+      },
+      "tracking": "dependency",
+      "version": "0.67.3"
     }
   ]
 }

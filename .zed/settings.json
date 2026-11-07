@@ -73,7 +73,8 @@
       ],
       "prettier": {
         "allowed": false
-      }
+      },
+      "language_servers": ["typescript-ls", "!vtsls", "!typescript-language-server", "..."]
     },
     "MDX": {
       "format_on_save": "on",
@@ -115,7 +116,8 @@
       ],
       "prettier": {
         "allowed": false
-      }
+      },
+      "language_servers": ["typescript-ls", "!vtsls", "!typescript-language-server", "..."]
     },
     "TypeScript": {
       "format_on_save": "on",
@@ -131,7 +133,8 @@
       ],
       "prettier": {
         "allowed": false
-      }
+      },
+      "language_servers": ["typescript-ls", "!vtsls", "!typescript-language-server", "..."]
     },
     "YAML": {
       "format_on_save": "on",
@@ -145,6 +148,9 @@
       "prettier": {
         "allowed": false
       }
+    },
+    "JSX": {
+      "language_servers": ["typescript-ls", "!vtsls", "!typescript-language-server", "..."]
     }
   },
   "lsp": {
@@ -167,8 +173,457 @@
           "fixKind": "safe_fix",
           "run": "onType",
           "typeAware": true,
-          "unusedDisableDirectives": "deny"
+          "unusedDisableDirectives": "deny",
+          "rulesCustomization": {
+            "effecttsgo/abort-controller-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/acquire-release-disposable": {
+              "severity": "off"
+            },
+            "effecttsgo/all-of-map-to-for-each": {
+              "severity": "off"
+            },
+            "effecttsgo/any-unknown-in-error-context": {
+              "severity": "off"
+            },
+            "effecttsgo/api-stability-leak": {
+              "severity": "off"
+            },
+            "effecttsgo/async-function": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-all-tag-dispatch-to-catch-tag": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-all-to-map-error": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-chain-to-first-success-of": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-conditional-refail-to-catch-if": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-die-to-or-die": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-if-tag-to-catch-tag": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-refail-to-tap-error": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-tag-to-catch-reason": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-to-ignore": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-to-or-else-succeed": {
+              "severity": "off"
+            },
+            "effecttsgo/catch-unfailable-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/class-self-mismatch": {
+              "severity": "off"
+            },
+            "effecttsgo/crypto-random-uuid": {
+              "severity": "off"
+            },
+            "effecttsgo/crypto-random-uuid-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/deterministic-keys": {
+              "severity": "off"
+            },
+            "effecttsgo/duplicate-package": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-do-notation": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-fn-iife": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-fn-implicit-any": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-fn-opportunity": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-gen-uses-adapter": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-in-failure": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-in-void-success": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-map-flatten": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-map-void": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-sleep-zero-to-yield-now": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-succeed-with-undefined": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-succeed-with-void": {
+              "severity": "off"
+            },
+            "effecttsgo/effect-try-without-catch": {
+              "severity": "off"
+            },
+            "effecttsgo/error-payload-shadows-name": {
+              "severity": "off"
+            },
+            "effecttsgo/experimental-api-usage": {
+              "severity": "off"
+            },
+            "effecttsgo/extends-native-error": {
+              "severity": "off"
+            },
+            "effecttsgo/fail-cause-to-constructor": {
+              "severity": "off"
+            },
+            "effecttsgo/flat-map-conditional-to-filter-or-fail": {
+              "severity": "off"
+            },
+            "effecttsgo/flat-map-identity-to-flatten": {
+              "severity": "off"
+            },
+            "effecttsgo/flat-map-ignored-param-to-and-then": {
+              "severity": "off"
+            },
+            "effecttsgo/flat-map-to-map": {
+              "severity": "off"
+            },
+            "effecttsgo/flat-map-to-tap": {
+              "severity": "off"
+            },
+            "effecttsgo/floating-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/floating-effect-in-vitest": {
+              "severity": "off"
+            },
+            "effecttsgo/generic-effect-services": {
+              "severity": "off"
+            },
+            "effecttsgo/global-console": {
+              "severity": "off"
+            },
+            "effecttsgo/global-console-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/global-date": {
+              "severity": "off"
+            },
+            "effecttsgo/global-date-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/global-error-in-effect-catch": {
+              "severity": "off"
+            },
+            "effecttsgo/global-error-in-effect-failure": {
+              "severity": "off"
+            },
+            "effecttsgo/global-fetch": {
+              "severity": "off"
+            },
+            "effecttsgo/global-fetch-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/global-json": {
+              "severity": "off"
+            },
+            "effecttsgo/global-json-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/global-random": {
+              "severity": "off"
+            },
+            "effecttsgo/global-random-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/global-timers": {
+              "severity": "off"
+            },
+            "effecttsgo/global-timers-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/instance-of-schema": {
+              "severity": "off"
+            },
+            "effecttsgo/layer-merge-all-with-dependencies": {
+              "severity": "off"
+            },
+            "effecttsgo/lazy-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/lazy-promise-in-effect-sync": {
+              "severity": "off"
+            },
+            "effecttsgo/leaking-requirements": {
+              "severity": "off"
+            },
+            "effecttsgo/manual-metric-tap-to-track": {
+              "severity": "off"
+            },
+            "effecttsgo/map-const-to-as": {
+              "severity": "off"
+            },
+            "effecttsgo/map-map-error-to-map-both": {
+              "severity": "off"
+            },
+            "effecttsgo/map-some-catch-no-such-element": {
+              "severity": "off"
+            },
+            "effecttsgo/map-some-to-as-some": {
+              "severity": "off"
+            },
+            "effecttsgo/match-boolean-to-is-success": {
+              "severity": "off"
+            },
+            "effecttsgo/match-effect-to-map-both": {
+              "severity": "off"
+            },
+            "effecttsgo/match-effect-to-match": {
+              "severity": "off"
+            },
+            "effecttsgo/match-to-result-or-option": {
+              "severity": "off"
+            },
+            "effecttsgo/missed-pipeable-opportunity": {
+              "severity": "off"
+            },
+            "effecttsgo/missing-effect-context": {
+              "severity": "off"
+            },
+            "effecttsgo/missing-effect-error": {
+              "severity": "off"
+            },
+            "effecttsgo/missing-effect-service-dependency": {
+              "severity": "off"
+            },
+            "effecttsgo/missing-layer-context": {
+              "severity": "off"
+            },
+            "effecttsgo/missing-pipeable-signature": {
+              "severity": "off"
+            },
+            "effecttsgo/missing-return-yield-star": {
+              "severity": "off"
+            },
+            "effecttsgo/missing-star-in-yield-effect-gen": {
+              "severity": "off"
+            },
+            "effecttsgo/multiple-catch-tag": {
+              "severity": "off"
+            },
+            "effecttsgo/multiple-effect-provide": {
+              "severity": "off"
+            },
+            "effecttsgo/nested-effect-gen-yield": {
+              "severity": "off"
+            },
+            "effecttsgo/new-promise": {
+              "severity": "off"
+            },
+            "effecttsgo/new-schema-class": {
+              "severity": "off"
+            },
+            "effecttsgo/node-builtin-import": {
+              "severity": "off"
+            },
+            "effecttsgo/non-object-effect-service-type": {
+              "severity": "off"
+            },
+            "effecttsgo/obsolete-match-import": {
+              "severity": "off"
+            },
+            "effecttsgo/obsolete-schema-import": {
+              "severity": "off"
+            },
+            "effecttsgo/option-match-to-from-option": {
+              "severity": "off"
+            },
+            "effecttsgo/outdated-api": {
+              "severity": "off"
+            },
+            "effecttsgo/overridden-schema-constructor": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-barrel-import": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-effect-array": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-effect-record": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-effect-string": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-namespace-import": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-schema-over-json": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-schema-tagged-error": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-schema-type-property": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-succeed-some-or-none": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-typed-schema-decoder": {
+              "severity": "off"
+            },
+            "effecttsgo/prefer-unsafe-constructor": {
+              "severity": "off"
+            },
+            "effecttsgo/process-env": {
+              "severity": "off"
+            },
+            "effecttsgo/process-env-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/promise-in-effect-success": {
+              "severity": "off"
+            },
+            "effecttsgo/provide-layer-succeed-to-provide-service": {
+              "severity": "off"
+            },
+            "effecttsgo/provide-merge-all-to-array": {
+              "severity": "off"
+            },
+            "effecttsgo/race-first-with-sleep-to-timeout": {
+              "severity": "off"
+            },
+            "effecttsgo/redundant-map-error": {
+              "severity": "off"
+            },
+            "effecttsgo/redundant-or-die": {
+              "severity": "off"
+            },
+            "effecttsgo/redundant-schema-tag-identifier": {
+              "severity": "off"
+            },
+            "effecttsgo/result-match-to-from-result": {
+              "severity": "off"
+            },
+            "effecttsgo/return-effect-in-gen": {
+              "severity": "off"
+            },
+            "effecttsgo/run-effect-inside-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/run-of-exit-to-run-exit": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-class-missing-brand": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-class-object-literal": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-literal-non-finite": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-number": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-opaque-instance-member": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-struct-with-tag": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-sync": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-sync-in-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/schema-union-of-literals": {
+              "severity": "off"
+            },
+            "effecttsgo/scope-in-layer-effect": {
+              "severity": "off"
+            },
+            "effecttsgo/service-not-as-class": {
+              "severity": "off"
+            },
+            "effecttsgo/strict-boolean-expressions": {
+              "severity": "off"
+            },
+            "effecttsgo/strict-effect-provide": {
+              "severity": "off"
+            },
+            "effecttsgo/suspend-fail-to-fail-sync": {
+              "severity": "off"
+            },
+            "effecttsgo/sync-to-succeed": {
+              "severity": "off"
+            },
+            "effecttsgo/timeout-catch-tag-to-timeout-or-else": {
+              "severity": "off"
+            },
+            "effecttsgo/try-catch-in-effect-gen": {
+              "severity": "off"
+            },
+            "effecttsgo/type-union-to-schema-union": {
+              "severity": "off"
+            },
+            "effecttsgo/unknown-in-effect-catch": {
+              "severity": "off"
+            },
+            "effecttsgo/unnecessary-arrow-block": {
+              "severity": "off"
+            },
+            "effecttsgo/unnecessary-effect-gen": {
+              "severity": "off"
+            },
+            "effecttsgo/unnecessary-fail-yieldable-error": {
+              "severity": "off"
+            },
+            "effecttsgo/unnecessary-pipe": {
+              "severity": "off"
+            },
+            "effecttsgo/unnecessary-pipe-chain": {
+              "severity": "off"
+            },
+            "effecttsgo/unnecessary-typeof-type": {
+              "severity": "off"
+            },
+            "effecttsgo/unsafe-effect-type-assertion": {
+              "severity": "off"
+            },
+            "effecttsgo/unstable-api-usage": {
+              "severity": "off"
+            },
+            "effecttsgo/yield-in-call-argument": {
+              "severity": "off"
+            }
+          }
         }
+      }
+    },
+    "typescript-ls": {
+      "binary": {
+        "arguments": ["node_modules/@effect/tsgo/dist/effect-tsgo.cjs", "tsc", "--lsp", "--stdio"],
+        "path": "node"
       }
     }
   }

@@ -184,7 +184,7 @@ export default Command.make("init", initCommandOptions).pipe(
       yield* setupEditors(cwd, selectedEditors)
 
       if (installExtensions) {
-        yield* installEditorExtensions(selectedEditors, selectedScripts)
+        yield* installEditorExtensions(selectedEditors, selectedScripts, presets)
       }
 
       if (gitHubActionsPackageManager !== undefined) {

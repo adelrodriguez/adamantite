@@ -165,6 +165,14 @@ export class EffectPlatformUnsupported extends Data.TaggedError("EffectPlatformU
   }
 }
 
+export class EffectEditorUnavailable extends Data.TaggedError("EffectEditorUnavailable")<{
+  reason: string
+}> {
+  override get message() {
+    return this.reason
+  }
+}
+
 export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDirectory")<{
   path?: string
   cause?: unknown

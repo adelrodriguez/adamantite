@@ -134,7 +134,32 @@ export function createFileSystemTestContext(options?: {
     access: makeUnimplemented("access"),
     chmod: makeUnimplemented("chmod"),
     chown: makeUnimplemented("chown"),
-    copy: makeUnimplemented("copy"),
+    copy: (fromPath, toPath, copyOptions) =>
+      Effect.suspend(() => {
+        const source = normalize(fromPath)
+        const target = normalize(toPath)
+        if (checkIsReadOnly(target)) {
+          return Effect.fail(makeSystemError("PermissionDenied", "copy", toPath))
+        }
+        if (!files.has(source) && !directories.has(source)) {
+          return Effect.fail(makeSystemError("NotFound", "copy", fromPath))
+        }
+        const entries = [...files].filter(
+          ([file]) => file === source || file.startsWith(`${source}/`)
+        )
+        for (const [file, content] of entries) {
+          const destination = `${target}${file.slice(source.length)}`
+          if (copyOptions?.overwrite === false && files.has(destination)) {
+            continue
+          }
+          addDirectoryRecursive(dirname(destination))
+          files.set(destination, content)
+        }
+        if (directories.has(source)) {
+          addDirectoryRecursive(target)
+        }
+        return Effect.void
+      }),
     copyFile: makeUnimplemented("copyFile"),
     exists: (path) => {
       const target = normalize(path)

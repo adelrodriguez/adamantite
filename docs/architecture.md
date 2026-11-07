@@ -125,6 +125,14 @@ versions. Doctor renders package drift as findings that tell the user to run `up
 `init` creates selected setup for a target project. If it preserves existing setup, it
 warns the user and points to `adamantite doctor`.
 
+The editor integrations select the installed Effect language server when `@effect/tsgo` is
+present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect-sdk/`, prepared by
+`init`. The editor helper matches the installed TypeScript `gitHead` to the Effect build and copies
+its compiler and standard libraries. Zed starts the upstream CLI through Node.js. Both editor
+integrations hide duplicate Oxlint Effect reports, so the Effect server can supply diagnostics
+and semantic quick fixes. Doctor reports missing settings and a stale or incomplete SDK without
+writing files. See ADR 0023.
+
 ## Command boundaries
 
 - `check` and `fix` call Toolchain to run Oxfmt and Oxlint. Toolchain starts Oxlint through

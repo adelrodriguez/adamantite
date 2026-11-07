@@ -16,9 +16,9 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 const TSCONFIG_FILE = "tsconfig.json"
 const LANGUAGE_SERVICE = "@effect/language-service"
-// Oxlint reports the Effect diagnostics, so the language service turns its own off and `tsc` and
-// the editor do not report each one a second time.
-const LANGUAGE_SERVICE_PLUGIN = { diagnostics: false, name: LANGUAGE_SERVICE }
+// Semantic quick fixes need the language service diagnostics. Editor integrations hide the
+// corresponding Oxlint reports; CLI Oxlint still uses the Effect preset.
+const LANGUAGE_SERVICE_PLUGIN = { diagnostics: true, name: LANGUAGE_SERVICE }
 const TSCONFIG_REFERENCE = `${JSON.stringify(
   { compilerOptions: { plugins: [LANGUAGE_SERVICE_PLUGIN] } },
   null,
@@ -35,8 +35,8 @@ function findLanguageServicePlugin(plugins: JsonValue | undefined) {
 }
 
 /**
- * A finding when the root `tsconfig.json` lacks the language service entry, or the entry reports
- * its own diagnostics. A monorepo gets guidance instead, as the tsconfig integration does.
+ * A finding when the root `tsconfig.json` lacks the language service entry, or the entry reports no
+ * diagnostics. A monorepo gets guidance instead, as the tsconfig integration does.
  */
 export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* (
   { cwd, workspace }: Project,
@@ -65,7 +65,7 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
           )
         )
 
-  if (plugin?.["diagnostics"] === false) {
+  if (plugin !== undefined && plugin["diagnostics"] !== false) {
     return { findings: [], warnings: [] }
   }
 
@@ -73,14 +73,15 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
     currentState:
       plugin === undefined
         ? `\`${TSCONFIG_FILE}\` does not configure the \`${LANGUAGE_SERVICE}\` plugin.`
-        : `The \`${LANGUAGE_SERVICE}\` plugin in \`${TSCONFIG_FILE}\` reports its own diagnostics, so \`tsc\` and the editor repeat every Oxlint report.`,
+        : `The \`${LANGUAGE_SERVICE}\` plugin in \`${TSCONFIG_FILE}\` disables its diagnostics, so semantic quick fixes do not work.`,
     goal: [
-      `Add \`${yield* stringifyJson(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\` in \`${TSCONFIG_FILE}\`, or set \`diagnostics\` to \`false\` in the existing entry. Keep every other plugin and option.`,
+      `Add \`${yield* stringifyJson(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\` in \`${TSCONFIG_FILE}\`, or set \`diagnostics\` to \`true\` in the existing entry. Keep every other plugin and option.`,
     ],
     id: "missing-effect-language-service-plugin",
     integration,
     notes: [
       "The `effecttsgo` rules read their options, such as `allowedUnstableApis`, from this entry.",
+      "The managed editor settings hide duplicate Effect reports from the Oxlint editor service. CLI Oxlint keeps its Effect rules.",
     ],
     reference: { content: TSCONFIG_REFERENCE, language: "json" },
     title: "Effect language service is not configured",
@@ -90,7 +91,7 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
 })
 
 /**
- * Add the language service entry to the root `tsconfig.json`, or set `diagnostics` to `false` in an
+ * Add the language service entry to the root `tsconfig.json`, or set `diagnostics` to `true` in an
  * existing entry. A monorepo has no root config to change.
  */
 export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* (cwd: string) {
@@ -126,7 +127,7 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
 
   const existing = findLanguageServicePlugin(plugins)
   const nextPlugins = existing
-    ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: false } : entry))
+    ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: true } : entry))
     : [...plugins, LANGUAGE_SERVICE_PLUGIN]
 
   yield* writeFile(

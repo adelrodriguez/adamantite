@@ -507,7 +507,7 @@ TypeScript-Go, and need Oxlint's type-aware mode.
 The rules are not a JavaScript plugin. They exist only in the Effect builds of the Oxlint
 binding and tsrs, which `@effect/tsgo` ships. When the project installs
 `@effect/tsgo`, Adamantite runs Oxlint with those builds. Nothing changes in
-`node_modules`, so an install needs no extra step. These run Oxlint with the builds:
+installed package files, so linting needs no install script. These run Oxlint with the builds:
 
 - `adamantite check`, `adamantite fix`, and `adamantite harden`.
 - VS Code and Zed, through the settings that `adamantite init` writes. They start
@@ -520,9 +520,11 @@ file arguments.
 When you select the preset, `adamantite init` does these steps:
 
 - Installs the pinned `@effect/tsgo`.
-- Adds `{ "name": "@effect/language-service", "diagnostics": false }` to
+- Adds `{ "name": "@effect/language-service", "diagnostics": true }` to
   `compilerOptions.plugins` in `tsconfig.json`. The rules read their options from this entry.
-  Oxlint reports the diagnostics, so the language service does not report them a second time.
+  The Effect language server needs diagnostics enabled to offer semantic quick fixes.
+- Configures the selected editors to use the installed Effect language server. Their Oxlint
+  settings hide duplicate Effect rule reports. CLI Oxlint keeps the effect preset.
 - Sets `ignoreDependencies.effect` in `knip.config.ts`, because no package has the name
   `@effect/language-service`.
 
@@ -533,9 +535,26 @@ Oxlint or tsrs version that the pinned `@effect/tsgo` has no build of, Oxlint
 does not start, and the message names the versions that it supports. `@effect/tsgo` has no
 builds for Linux with musl.
 
-Adamantite no longer patches TypeScript, so editors do not get the Effect quick fixes,
-refactors, and hovers of the patched `tsc`. To get them, run
-`npx effect-tsgo patch --typescript` yourself after each install.
+VS Code uses a copy of the Effect compiler and its standard libraries in
+`node_modules/.cache/adamantite/effect-sdk/`. Init creates this cache without changing installed
+package files. Zed starts the project's installed `effect-tsgo` CLI with `tsc --lsp --stdio`.
+Both use a native TypeScript version that the installed `@effect/tsgo` supports.
+
+To upgrade an existing editor setup, run:
+
+```sh
+adamantite update
+adamantite init --non-interactive --script check --preset effect --editor vscode --editor zed --install-extensions
+```
+
+Init installs the TypeScript 7 extension for VS Code when `--install-extensions` is set.
+Select the workspace TypeScript SDK when VS Code asks. Install Zed's TypeScript language server
+extension (`zed://extension/tsgo`); the managed server ID is `typescript-ls`.
+
+After a fresh dependency install or an update, run
+`adamantite init --non-interactive --script check --editor vscode` to prepare or refresh the SDK cache.
+Doctor reports missing editor settings and a missing, incomplete, or stale SDK. It does not
+write files. Install scripts can stay disabled.
 
 The rules read their options from the tsconfig entry. For example, `unstable-api-usage`
 reports each use of an API marked `@stability unstable`. To allow a module on purpose, list
@@ -547,7 +566,7 @@ it in `allowedUnstableApis`:
     "plugins": [
       {
         "name": "@effect/language-service",
-        "diagnostics": false,
+        "diagnostics": true,
         "allowedUnstableApis": ["effect/cli"],
       },
     ],

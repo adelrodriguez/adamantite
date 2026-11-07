@@ -14,7 +14,7 @@ const effectTsgo = managedPlugin("@effect/tsgo")
 const ROOT = "/project"
 const PREPARE = "adamantite prepare"
 const CONFIGURED_TSCONFIG = JSON.stringify({
-  compilerOptions: { plugins: [{ diagnostics: false, name: "@effect/language-service" }] },
+  compilerOptions: { plugins: [{ diagnostics: true, name: "@effect/language-service" }] },
 })
 
 function makeFiles(files?: Record<string, string>) {
@@ -120,11 +120,13 @@ describe("effect-tsgo", () => {
       })
     )
 
-    it.effect("report a language service entry that reports its own diagnostics", () =>
+    it.effect("report a language service entry that disables semantic quick fixes", () =>
       Effect.gen(function* () {
         const files = makeConfiguredFiles({
           "tsconfig.json": yield* stringifyJson({
-            compilerOptions: { plugins: [{ name: "@effect/language-service" }] },
+            compilerOptions: {
+              plugins: [{ diagnostics: false, name: "@effect/language-service" }],
+            },
           }),
         })
 
@@ -133,7 +135,7 @@ describe("effect-tsgo", () => {
         expect(result).toMatchObject({
           findings: [
             {
-              currentState: expect.stringContaining("reports its own diagnostics"),
+              currentState: expect.stringContaining("disables its diagnostics"),
               id: "missing-effect-language-service-plugin",
             },
           ],

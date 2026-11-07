@@ -35,7 +35,7 @@ describe("tsconfig", () => {
         expect(result).toBe("updated")
         expect(yield* parseJson(files.read("tsconfig.json"))).toStrictEqual({
           compilerOptions: {
-            plugins: [{ name: "other" }, { diagnostics: false, name: "@effect/language-service" }],
+            plugins: [{ name: "other" }, { diagnostics: true, name: "@effect/language-service" }],
             strict: true,
           },
           extends: "adamantite/typescript",
@@ -43,12 +43,18 @@ describe("tsconfig", () => {
       })
     )
 
-    it.effect("turn off diagnostics in an existing entry and keep its options", () =>
+    it.effect("turn on diagnostics in an existing entry and keep its options", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           "tsconfig.json": yield* stringifyJson({
             compilerOptions: {
-              plugins: [{ allowedUnstableApis: ["effect/cli"], name: "@effect/language-service" }],
+              plugins: [
+                {
+                  allowedUnstableApis: ["effect/cli"],
+                  diagnostics: false,
+                  name: "@effect/language-service",
+                },
+              ],
             },
           }),
         })
@@ -60,7 +66,7 @@ describe("tsconfig", () => {
             plugins: [
               {
                 allowedUnstableApis: ["effect/cli"],
-                diagnostics: false,
+                diagnostics: true,
                 name: "@effect/language-service",
               },
             ],
@@ -90,7 +96,7 @@ describe("tsconfig", () => {
     "strict": true, // keep strict
     "plugins": [
       {
-        "diagnostics": false,
+        "diagnostics": true,
         "name": "@effect/language-service"
       }
     ]

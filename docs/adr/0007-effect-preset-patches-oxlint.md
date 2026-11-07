@@ -1,5 +1,8 @@
 # The effect preset patches Oxlint, and its rules are curated
 
+ADR 0023 replaces this record's editor diagnostic policy. The Effect language server now reports
+editor diagnostics for semantic quick fixes, and the editor settings hide duplicate Oxlint reports.
+
 ADR 0019 replaces the patch lane below: Adamantite now runs Oxlint through a toolchain proxy, and
 nothing patches `node_modules`. The curation still applies.
 

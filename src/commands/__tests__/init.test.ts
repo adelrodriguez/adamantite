@@ -341,7 +341,7 @@ describe("init", () => {
         expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["effect"])
         expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
-            plugins: [{ diagnostics: false, name: "@effect/language-service" }],
+            plugins: [{ diagnostics: true, name: "@effect/language-service" }],
           },
           extends: "adamantite/typescript",
         })

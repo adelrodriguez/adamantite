@@ -22,3 +22,4 @@
 - [ADR 0020: Harden computes facts, and the prompt keeps judgment](0020-harden-computes-facts.md)
 - [ADR 0021: The type-aware rules run on tsrs](0021-type-aware-rules-run-on-tsrs.md)
 - [ADR 0022: Toolchain coordinates tools and shares runtime resolution with Doctor](0022-toolchain-owns-tooling-workflows.md)
+- [ADR 0023: Effect editors use unpatched compilers](0023-effect-editors-use-unpatched-compilers.md)

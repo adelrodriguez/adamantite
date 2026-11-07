@@ -178,10 +178,10 @@ describe("assessProject", () => {
           Path.layer,
           makeModuleResolverLayer(ROOT),
         ])
-        const assess = readProject(ROOT).pipe(
-          Effect.flatMap((project) => editor.assess(project)),
-          provideFiles
-        )
+        const assess = Effect.gen(function* () {
+          const project = yield* readProject(ROOT)
+          return yield* editor.assess(project)
+        }).pipe(provideFiles)
 
         expect(yield* assess).toMatchObject({
           applicable: true,
@@ -216,8 +216,10 @@ describe("assessProject", () => {
           files: { "package.json": "{}", [`.${editor.name}/settings.json`]: content },
           root: ROOT,
         })
-        const result = yield* readProject(ROOT).pipe(
-          Effect.flatMap((project) => editor.assess(project)),
+        const result = yield* Effect.gen(function* () {
+          const project = yield* readProject(ROOT)
+          return yield* editor.assess(project)
+        }).pipe(
           Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)]),
           Effect.flip
         )

@@ -3,10 +3,10 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import { formatJson, parseJson, stringifyJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
+import { effectEditorFiles, effectEditorResolver } from "./effect-fixture.ts"
 
 const ROOT = "/project"
 
@@ -21,7 +21,11 @@ function makeFiles(files?: Record<string, string>) {
 }
 
 function provideFiles(files: FileSystemTestContext) {
-  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
+  return Effect.provide([
+    files.layer,
+    Path.layer,
+    effectEditorResolver(ROOT, files.exists("node_modules/@effect/tsgo/package.json")),
+  ])
 }
 
 describe("zed", () => {
@@ -82,6 +86,82 @@ describe("zed", () => {
   })
 
   describe("create", () => {
+    it.effect("reach an ancestor Effect install and report a stale local command", () =>
+      Effect.gen(function* () {
+        const cwd = `${ROOT}/packages/app`
+        const settingsPath = `packages/app/${SETTINGS_PATH}`
+        const files = makeFiles({ ...effectEditorFiles(), "packages/app/package.json": "{}" })
+        yield* zed.create(ROOT).pipe(provideFiles(files))
+        files.write(settingsPath, files.read(SETTINGS_PATH))
+
+        const stale = yield* readProject(cwd).pipe(
+          Effect.flatMap((project) => zed.assess(project)),
+          provideFiles(files)
+        )
+        expect(stale).toMatchObject({ findings: [{ id: "zed-effect-server" }] })
+
+        yield* zed.update(cwd).pipe(provideFiles(files))
+        const updated = files.read(settingsPath)
+        const config = yield* parseJson(updated)
+        expect(config).toHaveProperty(["lsp", "typescript-ls", "binary"], {
+          arguments: [
+            "../../node_modules/@effect/tsgo/dist/effect-tsgo.cjs",
+            "tsc",
+            "--lsp",
+            "--stdio",
+          ],
+          path: "node",
+        })
+        const healthy = yield* readProject(cwd).pipe(
+          Effect.flatMap((project) => zed.assess(project)),
+          provideFiles(files)
+        )
+        expect(healthy).toMatchObject({ findings: [] })
+
+        yield* zed.create(cwd).pipe(provideFiles(files))
+        expect(yield* parseJson(files.read(settingsPath))).toStrictEqual(config)
+      })
+    )
+
+    it.effect(
+      "select the installed Effect server for all JavaScript and TypeScript languages",
+      () =>
+        Effect.gen(function* () {
+          const files = makeFiles(effectEditorFiles())
+
+          yield* zed.create(ROOT).pipe(provideFiles(files))
+
+          const config = yield* parseJson(files.read(SETTINGS_PATH))
+          expect(config).toHaveProperty(["lsp", "typescript-ls", "binary"], {
+            arguments: [
+              "node_modules/@effect/tsgo/dist/effect-tsgo.cjs",
+              "tsc",
+              "--lsp",
+              "--stdio",
+            ],
+            path: "node",
+          })
+          for (const language of ["JavaScript", "JSX", "TypeScript", "TSX"]) {
+            expect(config).toHaveProperty(
+              ["languages", language, "language_servers"],
+              ["typescript-ls", "!vtsls", "!typescript-language-server", "..."]
+            )
+          }
+          expect(config).toHaveProperty(
+            [
+              "lsp",
+              "oxlint",
+              "initialization_options",
+              "settings",
+              "rulesCustomization",
+              "effecttsgo/floating-effect",
+              "severity",
+            ],
+            "off"
+          )
+        })
+    )
+
     it.effect("create .zed/settings.json with type-aware Oxlint on type", () =>
       Effect.gen(function* () {
         const files = makeFiles()
@@ -102,6 +182,66 @@ describe("zed", () => {
   })
 
   describe("update", () => {
+    it.effect("migrate the old tsgo server and preserve other servers and settings", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          ...effectEditorFiles(),
+          [SETTINGS_PATH]: yield* stringifyJson({
+            languages: {
+              TypeScript: { language_servers: ["tsgo", "tailwindcss-language-server", "..."] },
+            },
+            lsp: {
+              oxlint: {
+                initialization_options: {
+                  settings: { rulesCustomization: { eqeqeq: { severity: "hint" } } },
+                },
+              },
+              tsgo: {
+                binary: { arguments: ["--lsp", "--stdio"], path: "old-tsgo" },
+                settings: { typescript: { inlayHints: { parameterTypes: { enabled: true } } } },
+              },
+              "typescript-ls": { initialization_options: { teamSetting: true } },
+            },
+          }),
+        })
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+        const first = files.read(SETTINGS_PATH)
+        const config = yield* parseJson(first)
+        expect(config).not.toHaveProperty(["lsp", "tsgo"])
+        expect(config).toMatchObject({
+          lsp: {
+            oxlint: {
+              initialization_options: {
+                settings: { rulesCustomization: { eqeqeq: { severity: "hint" } } },
+              },
+            },
+            "typescript-ls": {
+              initialization_options: { teamSetting: true },
+              settings: { typescript: { inlayHints: { parameterTypes: { enabled: true } } } },
+            },
+          },
+        })
+        expect(config).toHaveProperty(
+          ["languages", "TypeScript", "language_servers"],
+          [
+            "typescript-ls",
+            "!vtsls",
+            "!typescript-language-server",
+            "tailwindcss-language-server",
+            "...",
+          ]
+        )
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+        expect(files.read(SETTINGS_PATH)).toBe(first)
+        expect(
+          yield* readProject(ROOT).pipe(
+            Effect.flatMap((project) => zed.assess(project)),
+            provideFiles(files)
+          )
+        ).toMatchObject({ findings: [] })
+      })
+    )
+
     it.effect("deduplicate formatter entries for managed languages", () =>
       Effect.gen(function* () {
         const files = makeFiles({

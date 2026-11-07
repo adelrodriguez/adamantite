@@ -254,7 +254,11 @@ export const setupEditors = (cwd: string, editors: string[]) =>
     }
   })
 
-export const installEditorExtensions = (editors: string[], scripts: Script[]) =>
+export const installEditorExtensions = (
+  editors: string[],
+  scripts: Script[],
+  presets: readonly string[] = []
+) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const hasZed = editors.includes("zed")
@@ -266,7 +270,7 @@ export const installEditorExtensions = (editors: string[], scripts: Script[]) =>
           Effect.gen(function* () {
             if (hasVscode) {
               yield* spinner.message("Installing VS Code extension...")
-              yield* vscode.extension(scripts)
+              yield* vscode.extension(scripts, presets)
             }
 
             return true as const
@@ -303,6 +307,11 @@ export const installEditorExtensions = (editors: string[], scripts: Script[]) =>
 
     if (hasZed) {
       yield* prompter.log.info("Install the Zed `oxc` extension: zed://extension/oxc")
+      if (presets.includes("effect")) {
+        yield* prompter.log.info(
+          "Install the Zed TypeScript language server extension: zed://extension/tsgo"
+        )
+      }
     }
   })
 

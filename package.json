@@ -99,7 +99,7 @@
   "devDependencies": {
     "@changesets/changelog-github": "1.0.1",
     "@changesets/cli": "3.0.3",
-    "@effect/tsgo": "0.67.1",
+    "@effect/tsgo": "0.67.3",
     "@effect/vitest": "4.1.2",
     "@shadcn/lint": "0.2.1",
     "@tanstack/intent": "0.5.5",

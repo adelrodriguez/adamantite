@@ -1,11 +1,17 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { Script } from "#lib/workspace/package-json.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type Finding,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
+import { EFFECT_SDK_PATH, readEffectEditor } from "#lib/integrations/editors/effect.ts"
 import {
   FailedToInstallExtension,
   InvalidConfigFormat,
@@ -86,27 +92,72 @@ export default defineIntegration({
 
       const current = config["oxc.path.oxlint"]
       const expected = CONFIG["oxc.path.oxlint"]
+      const findings: Finding[] =
+        current === expected
+          ? []
+          : [
+              {
+                currentState: `\`${files[0].path}\` sets \`oxc.path.oxlint\` to ${current === undefined ? "no value" : `\`${yield* stringifyJson(current)}\``}. VS Code does not start Oxlint through Adamantite's Oxlint entry.`,
+                goal: [
+                  `Set \`oxc.path.oxlint\` to \`${expected}\` in \`${files[0].path}\`. Preserve every other setting.`,
+                ],
+                id: "vscode-oxlint-entry",
+                integration: "vscode",
+                reference: {
+                  content: `${yield* formatJson({ "oxc.path.oxlint": expected })}\n`,
+                  language: "json",
+                },
+                title: "VS Code does not use the Oxlint entry",
+              },
+            ]
+      const effect = yield* readEffectEditor(cwd)
+      if (Option.isSome(effect)) {
+        const customizations = config["oxc.lint.customization"]
+        const hidesDuplicates =
+          checkIsJsonObject(customizations)
+          && Object.keys(effect.value.rulesCustomization).every((rule) => {
+            const customization = customizations[rule]
+            return checkIsJsonObject(customization) && customization["severity"] === "off"
+          })
+        if (config["js/ts.tsdk.path"] !== EFFECT_SDK_PATH || !hidesDuplicates) {
+          findings.push({
+            currentState: `\`${files[0].path}\` does not select the Effect editor SDK with duplicate Oxlint Effect reports hidden.`,
+            goal: [
+              `Set \`js/ts.tsdk.path\` to \`${EFFECT_SDK_PATH}\` and merge the reference \`oxc.lint.customization\` entries. Preserve other settings and rule customizations.`,
+            ],
+            id: "vscode-effect-server",
+            integration: "vscode",
+            reference: {
+              content: `${yield* formatJson({ "js/ts.tsdk.path": EFFECT_SDK_PATH, "oxc.lint.customization": effect.value.rulesCustomization })}\n`,
+              language: "json",
+            },
+            title: "VS Code does not use the Effect language server",
+          })
+        }
+        const sdkState = yield* effect.value.sdkIsCurrent.pipe(
+          Effect.map((current) =>
+            current
+              ? undefined
+              : `\`${EFFECT_SDK_PATH}\` is missing or does not match the installed Effect compiler.`
+          ),
+          Effect.catchTag("EffectEditorUnavailable", (error) => Effect.succeed(error.message))
+        )
+        if (sdkState !== undefined) {
+          findings.push({
+            currentState: sdkState,
+            goal: [
+              "Install a supported native TypeScript version and the Effect optional dependencies. Run `adamantite init --non-interactive --script check --editor vscode` to prepare the SDK cache, then restart the TypeScript server.",
+            ],
+            id: "vscode-effect-sdk",
+            integration: "vscode",
+            title: "The Effect editor SDK needs preparation",
+          })
+        }
+      }
 
       return {
         applicable: true,
-        findings:
-          current === expected
-            ? []
-            : [
-                {
-                  currentState: `\`${files[0].path}\` sets \`oxc.path.oxlint\` to ${current === undefined ? "no value" : `\`${yield* stringifyJson(current)}\``}. VS Code does not start Oxlint through Adamantite's Oxlint entry.`,
-                  goal: [
-                    `Set \`oxc.path.oxlint\` to \`${expected}\` in \`${files[0].path}\`. Preserve every other setting.`,
-                  ],
-                  id: "vscode-oxlint-entry",
-                  integration: "vscode",
-                  reference: {
-                    content: `${yield* formatJson({ "oxc.path.oxlint": expected })}\n`,
-                    language: "json",
-                  },
-                  title: "VS Code does not use the Oxlint entry",
-                },
-              ],
+        findings,
         packageActions: [],
         warnings: [],
       } satisfies IntegrationAssessment
@@ -116,9 +167,20 @@ export default defineIntegration({
     Effect.gen(function* () {
       const path = yield* Path.Path
       const settingsPath = path.join(cwd, files[0].path)
+      const effect = yield* readEffectEditor(cwd)
+      const config = Option.isSome(effect)
+        ? {
+            ...CONFIG,
+            "js/ts.tsdk.path": EFFECT_SDK_PATH,
+            "oxc.lint.customization": effect.value.rulesCustomization,
+          }
+        : CONFIG
+      if (Option.isSome(effect)) {
+        yield* effect.value.prepareSdk
+      }
 
       yield* ensureDirectory(path.dirname(settingsPath))
-      yield* writeJsonFile(settingsPath, CONFIG)
+      yield* writeJsonFile(settingsPath, config)
     }),
   detect: (cwd: string) =>
     Effect.gen(function* () {
@@ -126,7 +188,7 @@ export default defineIntegration({
       const path = yield* Path.Path
       return yield* fs.exists(path.join(cwd, files[0].path))
     }),
-  extension: (scripts: Script[] = []) =>
+  extension: (scripts: Script[] = [], presets: readonly string[] = []) =>
     Effect.gen(function* () {
       const extensions: string[] = []
 
@@ -136,6 +198,9 @@ export default defineIntegration({
 
       if (scripts.includes("analyze")) {
         extensions.push("webpro.vscode-knip")
+      }
+      if (presets.includes("effect")) {
+        extensions.push("TypeScriptTeam.native-preview")
       }
 
       for (const extension of extensions) {
@@ -172,7 +237,18 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      const newConfig = yield* mergeConfig(CONFIG, existingConfig)
+      const effect = yield* readEffectEditor(cwd)
+      const base = Option.isSome(effect)
+        ? {
+            ...CONFIG,
+            "js/ts.tsdk.path": EFFECT_SDK_PATH,
+            "oxc.lint.customization": effect.value.rulesCustomization,
+          }
+        : CONFIG
+      if (Option.isSome(effect)) {
+        yield* effect.value.prepareSdk
+      }
+      const newConfig = yield* mergeConfig(base, existingConfig)
 
       yield* writeFile(settingsPath, updateJsonText(vscodeFile, newConfig))
     }),

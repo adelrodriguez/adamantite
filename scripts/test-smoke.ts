@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { delimiter, join } from "node:path"
@@ -145,6 +146,7 @@ const npmVersion = run("npm", ["--version"], { cwd: repoRoot }).trim()
 const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
 const monorepoFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-monorepo-"))
+const effectFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-effect-"))
 
 try {
   writeFileSync(
@@ -176,6 +178,157 @@ try {
   }
 
   run("npm", ["install", "--save-dev", join(packDirectory, tarball)], { cwd: fixture })
+
+  console.info("Checking Effect editor setup after an install with scripts disabled...")
+  writeFileSync(
+    join(effectFixture, "package.json"),
+    JSON.stringify({
+      name: "adamantite-effect-editor-smoke",
+      packageManager: `npm@${npmVersion}`,
+      private: true,
+      type: "module",
+      version: "0.0.0",
+    })
+  )
+  const effectEnv = { ...process.env, npm_config_ignore_scripts: "true" }
+  run(
+    "npm",
+    [
+      "install",
+      "--ignore-scripts",
+      "--save-dev",
+      join(packDirectory, tarball),
+      "typescript@7.0.2",
+      "effect@4.1.2",
+    ],
+    { cwd: effectFixture, env: effectEnv }
+  )
+  const typescriptResolver = join(
+    effectFixture,
+    "node_modules",
+    "typescript",
+    "lib",
+    "getExePath.js"
+  )
+  const originalResolver = readFileSync(typescriptResolver, "utf8")
+  const originalCompiler = run(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      "import getExePath from './node_modules/typescript/lib/getExePath.js'; process.stdout.write(getExePath())",
+    ],
+    { cwd: effectFixture, env: effectEnv }
+  ).trim()
+  const originalCompilerHash = createHash("sha256")
+    .update(readFileSync(originalCompiler))
+    .digest("hex")
+  run(
+    process.execPath,
+    [
+      cliPath,
+      "init",
+      "--non-interactive",
+      "--script",
+      "check",
+      "--preset",
+      "effect",
+      "--typescript",
+      "--agents",
+      "--editor",
+      "vscode",
+      "--editor",
+      "zed",
+    ],
+    { cwd: effectFixture, env: effectEnv }
+  )
+  writeFileSync(
+    join(effectFixture, "index.ts"),
+    'import * as Effect from "effect/Effect"\n\nexport const value = Effect.succeed(1)\n'
+  )
+  const sdkDirectory = join(effectFixture, "node_modules", ".cache", "adamantite", "effect")
+  const sdkCompiler = join(sdkDirectory, process.platform === "win32" ? "tsc.exe" : "tsc")
+  assertIncludes(
+    run(sdkCompiler, ["--version"], { cwd: effectFixture, env: effectEnv }),
+    "effect-tsgo"
+  )
+  run(sdkCompiler, ["--noEmit", "--project", "tsconfig.json"], {
+    cwd: effectFixture,
+    env: effectEnv,
+  })
+  assertFileContains(
+    join(effectFixture, ".vscode", "settings.json"),
+    '"js/ts.tsdk.path": "node_modules/.cache/adamantite/effect"'
+  )
+  assertFileContains(
+    join(effectFixture, ".vscode", "settings.json"),
+    '"effecttsgo/global-json-in-effect"'
+  )
+  assertFileContains(join(effectFixture, ".zed", "settings.json"), '"typescript-ls"')
+  assertFileContains(join(effectFixture, "tsconfig.json"), '"diagnostics": true')
+  const serverFiles = run(
+    process.execPath,
+    [
+      join(effectFixture, "node_modules", "@effect", "tsgo", "dist", "effect-tsgo.cjs"),
+      "tsc",
+      "--listFilesOnly",
+      "--project",
+      "tsconfig.json",
+    ],
+    { cwd: effectFixture, env: effectEnv }
+  )
+  assertIncludes(serverFiles, join(effectFixture, "index.ts"))
+  run(process.execPath, [cliPath, "doctor"], { cwd: effectFixture, env: effectEnv })
+
+  const effectWorkspacePackage = join(effectFixture, "packages", "app")
+  mkdirSync(effectWorkspacePackage, { recursive: true })
+  writeFileSync(
+    join(effectWorkspacePackage, "package.json"),
+    JSON.stringify({ name: "effect-workspace-package", private: true, type: "module" })
+  )
+  run(
+    process.execPath,
+    [cliPath, "init", "--non-interactive", "--script", "check", "--editor", "zed"],
+    { cwd: effectWorkspacePackage, env: effectEnv }
+  )
+  const ancestorEffectCli = "../../node_modules/@effect/tsgo/dist/effect-tsgo.cjs"
+  assertFileContains(
+    join(effectWorkspacePackage, ".zed", "settings.json"),
+    JSON.stringify(ancestorEffectCli)
+  )
+  assertIncludes(
+    run(
+      process.execPath,
+      [ancestorEffectCli, "tsc", "--listFilesOnly", "--project", "../../tsconfig.json"],
+      { cwd: effectWorkspacePackage, env: effectEnv }
+    ),
+    join(effectFixture, "index.ts")
+  )
+
+  rmSync(sdkDirectory, { force: true, recursive: true })
+  assertIncludes(
+    runExpectingFailure(process.execPath, [cliPath, "doctor"], {
+      cwd: effectFixture,
+      env: effectEnv,
+    }).output,
+    "The Effect editor SDK needs preparation"
+  )
+  run(
+    process.execPath,
+    [cliPath, "init", "--non-interactive", "--script", "check", "--editor", "vscode"],
+    {
+      cwd: effectFixture,
+      env: effectEnv,
+    }
+  )
+  run(process.execPath, [cliPath, "doctor"], { cwd: effectFixture, env: effectEnv })
+  if (
+    readFileSync(typescriptResolver, "utf8") !== originalResolver
+    || createHash("sha256").update(readFileSync(originalCompiler)).digest("hex")
+      !== originalCompilerHash
+  ) {
+    throw new Error("Effect editor setup changed the installed TypeScript package")
+  }
 
   console.info("Running `adamantite init` against the fixture project...")
   run(
@@ -378,7 +531,9 @@ try {
 
   console.info("Smoke test passed: init output is accepted by the pinned tool versions.")
 } catch (error) {
-  console.info(`Fixtures kept for debugging at: ${fixture} and ${monorepoFixture}`)
+  console.info(
+    `Fixtures kept for debugging at: ${fixture}, ${monorepoFixture}, and ${effectFixture}`
+  )
   throw error
 } finally {
   rmSync(packDirectory, { force: true, recursive: true })
@@ -386,3 +541,4 @@ try {
 
 rmSync(fixture, { force: true, recursive: true })
 rmSync(monorepoFixture, { force: true, recursive: true })
+rmSync(effectFixture, { force: true, recursive: true })

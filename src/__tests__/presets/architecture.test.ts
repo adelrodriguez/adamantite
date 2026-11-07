@@ -13,13 +13,14 @@ const decodeOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOu
 
 describe("architecture preset", () => {
   it.each([
-    { codes: [], name: "alone", presets: ["architecture"] },
+    { codes: [], name: "alone", presets: ["architecture"], status: 0 },
     {
       codes: ["eslint(no-console)"],
       name: "with strict",
       presets: ["architecture", "strict"],
+      status: 1,
     },
-  ])("load $name without enabling architecture rules", ({ codes, presets }) => {
+  ])("load $name without enabling architecture rules", ({ codes, presets, status }) => {
     const directory = mkdtempSync(join(tmpdir(), "adamantite-architecture-"))
 
     try {
@@ -42,15 +43,12 @@ describe("architecture preset", () => {
         { cwd: directory, encoding: "utf8" }
       )
 
-      if (result.error) {
-        throw result.error
-      }
-
+      expect(result.error).toBeUndefined()
       expect(result.stderr).toBe("")
-      expect(decodeOutput(result.stdout).diagnostics.map((diagnostic) => diagnostic.code)).toStrictEqual(
-        codes
-      )
-      expect(result.status).toBe(codes.length === 0 ? 0 : 1)
+      expect(
+        decodeOutput(result.stdout).diagnostics.map((diagnostic) => diagnostic.code)
+      ).toStrictEqual(codes)
+      expect(result.status).toBe(status)
     } finally {
       rmSync(directory, { force: true, recursive: true })
     }

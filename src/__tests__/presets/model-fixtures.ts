@@ -45,8 +45,8 @@ function listSourceFiles(dir: string): string[] {
 }
 
 /**
- * Lint one model in a real Oxlint run through the architecture preset, and return the files that the rule
- * reported.
+ * Lint one model in a real Oxlint run through the architecture preset, and return the files that
+ * the rule reported.
  */
 function lintModel(options: ModelFixtureOptions, tempDir: string, model: string): Set<string> {
   const projectDir = join(tempDir, model)

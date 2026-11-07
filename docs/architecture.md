@@ -294,8 +294,12 @@ locations, and options, and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<rule>/` that the preset test lints in one real
 Oxlint run.
 
-`adamantite/layers` needs a layer map from the target project, so no preset turns it on, and
-`strict` only loads the plugin for it. It is the one rule that resolves imports: it resolves each
+The `architecture` preset loads the first-party plugin without enabling rules. Init offers it
+for projects that configure layer maps and import owners without the other rules of `strict`.
+The `strict` preset continues to load the same plugin.
+
+`adamantite/layers` needs a layer map from the target project, so no preset turns it on.
+It is the one rule that resolves imports: it resolves each
 import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `createLayersRule`
 takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/layers/`, one for each layer model, and

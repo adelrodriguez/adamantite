@@ -164,7 +164,8 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
   run(process.execPath, [cliPath, "rule", "add", "test", "no-smoke"], { cwd, env })
   try {
     assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
-    run(process.execPath, [cliPath, "check"], { cwd, env })
+    // Load the plugin without linting the monorepo's unrelated dependency-version fixtures.
+    run(process.execPath, [cliPath, "check", "oxlint.config.ts", "--only", "lint"], { cwd, env })
   } finally {
     rmSync(testPath)
   }

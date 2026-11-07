@@ -4,6 +4,7 @@ import rule from {{ruleImport}}
 const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
 
 // Replace these cases with valid and invalid code for this rule.
+// oxlint-disable-next-line vitest/require-hook, jest/require-hook -- RuleTester registers its node:test suites here.
 tester.run("{{name}}", rule, {
   invalid: [{ code: "debugger", errors: [{ messageId: "unexpected" }] }],
   valid: ["const value: number = 1"],

@@ -125,6 +125,9 @@ const addTest = Command.make("test", {
       yield* prompter.log.info(
         `Adapt the valid and invalid cases to the rule, then run \`adamantite rule test\`${Option.isSome(target) ? " with `--path` and the test file path." : "."}`
       )
+      yield* prompter.log.info(
+        "RuleTester uses node:test. If you keep this file, exclude it from Vitest/Jest discovery. See the Adamantite README, Custom rules."
+      )
     })
   )
 )

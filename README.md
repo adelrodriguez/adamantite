@@ -729,6 +729,34 @@ it to every generated config. It takes these options:
 `@oxlint/plugins` dependency. Use `definePlugin` from that module if you write a plugin
 that you register in `jsPlugins` yourself. You do not need to add `@oxlint/plugins` to your project.
 
+Optional saved RuleTester tests use `node:test`. Exclude them from Vitest or Jest discovery
+so those runners do not also try to run them. Keep the runner's default and existing
+exclusions. For Vitest:
+
+```ts
+// vitest.config.ts
+import { configDefaults, defineConfig } from "vitest/config"
+
+export default defineConfig({
+  test: {
+    exclude: [...configDefaults.exclude, ".adamantite/lint/**/*.test.*"],
+  },
+})
+```
+
+For Jest:
+
+```js
+// jest.config.mjs
+export default {
+  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/.adamantite/lint/"],
+}
+```
+
+For another rules folder or a custom test `--path`, use its path in the exclusion. To
+type-check tests that import `.ts` rule files, enable `compilerOptions.allowImportingTsExtensions`
+in `tsconfig.json`. To check the hidden rules folder too, add `.adamantite/lint` to `include`.
+
 To keep an existing `.adamantite/rules` folder, set `custom({ dir: ".adamantite/rules" })`
 and use `rule add --dir .adamantite/rules`. You can instead move the folder to
 `.adamantite/lint`. The previous `adamantite/lint/custom` import and named authoring imports

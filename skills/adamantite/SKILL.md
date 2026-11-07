@@ -332,7 +332,8 @@ saves.
 - Oxlint caches the rules for each run. Restart the editor language server after you change a
   rule.
 - TypeScript does not check `.adamantite/lint/` by default, because its name starts with a dot. Add
-  `".adamantite/lint"` to `include` in `tsconfig.json` to check it.
+  `".adamantite/lint"` to `include` in `tsconfig.json` to check it. Enable
+  `compilerOptions.allowImportingTsExtensions` when checking tests that import `.ts` rule files.
 - In a monorepo, give each rules folder its own plugin name, such as `custom({ name: "web" })`:
   Oxlint rejects two plugins with the same name in one run. A relative `dir` resolves from the
   file that calls `custom()`, so a shared tooling package can own the rules with
@@ -371,6 +372,9 @@ for a test saved elsewhere. Use `.test.ts` for tests in the rules folder so the 
 load them as rules. Init, CI generation, and harden do not run saved tests by default.
 For another rules folder, keep its rule and test patterns in the Knip `oxlint.entry` setting.
 For a test outside the rules folder, add that file to the Knip entry settings if needed.
+Saved tests use `node:test`. Exclude them from Vitest `test.exclude` or Jest
+`testPathIgnorePatterns`, and keep the runner's default and existing exclusions. The README
+Custom rules section has config examples. For a custom `--path`, exclude that path instead.
 
 ## Decision guide
 

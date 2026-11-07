@@ -5,9 +5,12 @@ import { dirname, join } from "node:path"
 import process from "node:process"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
+import * as Effect from "effect/Effect"
 import * as Order from "effect/Order"
+import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
+import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { addCustomRuleTest, toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")
@@ -160,6 +163,35 @@ describe("custom preset", () => {
 
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
   })
+
+  it.each(["core", "vitest", "jest"])(
+    "lint an optional generated test with the %s preset",
+    async (preset) => {
+      expect.hasAssertions()
+      const rulePath = ".adamantite/lint/no-debugger-here.ts"
+      const files = createFileSystemTestContext({
+        files: { [rulePath]: makeStub() },
+        root: project,
+      })
+      const testPath = await Effect.runPromise(
+        addCustomRuleTest(project, "no-debugger-here").pipe(
+          Effect.provide([files.layer, Path.layer])
+        )
+      )
+      write(rulePath, makeStub())
+      write(".adamantite/lint/no-debugger-here.test.ts", files.read(testPath))
+      write(
+        "oxlint.config.ts",
+        [
+          `import core from ${JSON.stringify(join(REPO_ROOT, "presets/lint/core.ts"))}`,
+          `import testPreset from ${JSON.stringify(join(REPO_ROOT, `presets/lint/${preset}.ts`))}`,
+          "export default { extends: [core, testPreset] }",
+        ].join("\n")
+      )
+
+      expect(lint(".adamantite/lint/no-debugger-here.test.ts")).toStrictEqual([])
+    }
+  )
 
   describe("temporary rule verification", () => {
     const rulePath = ".adamantite/lint/no-debugger-here.ts"

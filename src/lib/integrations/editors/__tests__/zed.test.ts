@@ -86,6 +86,43 @@ describe("zed", () => {
   })
 
   describe("create", () => {
+    it.effect("reach an ancestor Effect install and report a stale local command", () =>
+      Effect.gen(function* () {
+        const cwd = `${ROOT}/packages/app`
+        const settingsPath = `packages/app/${SETTINGS_PATH}`
+        const files = makeFiles({ ...effectEditorFiles(), "packages/app/package.json": "{}" })
+        yield* zed.create(ROOT).pipe(provideFiles(files))
+        files.write(settingsPath, files.read(SETTINGS_PATH))
+
+        const stale = yield* readProject(cwd).pipe(
+          Effect.flatMap((project) => zed.assess(project)),
+          provideFiles(files)
+        )
+        expect(stale).toMatchObject({ findings: [{ id: "zed-effect-server" }] })
+
+        yield* zed.update(cwd).pipe(provideFiles(files))
+        const updated = files.read(settingsPath)
+        const config = yield* parseJson(updated)
+        expect(config).toHaveProperty(["lsp", "typescript-ls", "binary"], {
+          arguments: [
+            "../../node_modules/@effect/tsgo/dist/effect-tsgo.cjs",
+            "tsc",
+            "--lsp",
+            "--stdio",
+          ],
+          path: "node",
+        })
+        const healthy = yield* readProject(cwd).pipe(
+          Effect.flatMap((project) => zed.assess(project)),
+          provideFiles(files)
+        )
+        expect(healthy).toMatchObject({ findings: [] })
+
+        yield* zed.create(cwd).pipe(provideFiles(files))
+        expect(yield* parseJson(files.read(settingsPath))).toStrictEqual(config)
+      })
+    )
+
     it.effect(
       "select the installed Effect server for all JavaScript and TypeScript languages",
       () =>

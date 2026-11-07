@@ -13,7 +13,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { readEffectEditor } from "#lib/integrations/editors/effect.ts"
-import { InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { EffectEditorUnavailable, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
   readFile,
@@ -125,16 +125,41 @@ const STALE_OXFMT_SETTINGS = {
   unusedDisableDirectives: false,
 } as const satisfies Record<string, Schema.Json>
 
-const EFFECT_BINARY = {
-  arguments: ["node_modules/@effect/tsgo/dist/effect-tsgo.cjs", "tsc", "--lsp", "--stdio"],
-  path: "node",
-} as const
 const TYPESCRIPT_SERVERS = new Set(["typescript-ls", "tsgo", "vtsls", "typescript-language-server"])
 
+// Keep the logical node_modules path. The resolver's real path can point into a machine's pnpm
+// store, which must not go into shared editor settings.
+const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  let directory = path.resolve(cwd)
+  for (;;) {
+    const candidate = path.join(directory, "node_modules", "@effect", "tsgo")
+    if (yield* fs.exists(path.join(candidate, "package.json"))) {
+      return path
+        .relative(cwd, path.join(candidate, "dist", "effect-tsgo.cjs"))
+        .replaceAll("\\", "/")
+    }
+    const parent = path.dirname(directory)
+    if (parent === directory) {
+      return yield* new EffectEditorUnavailable({
+        reason:
+          "Zed cannot find the installed Effect CLI in node_modules. Install @effect/tsgo, then run `adamantite init --non-interactive --script check --editor zed`.",
+      })
+    }
+    directory = parent
+  }
+})
+
 const setEffectSettings = Effect.fn("setEffectSettings")(function* (
+  cwd: string,
   config: Schema.JsonObject,
   rulesCustomization: Schema.JsonObject
 ) {
+  const binary = {
+    arguments: [yield* resolveEffectCli(cwd), "tsc", "--lsp", "--stdio"],
+    path: "node",
+  }
   const languages = checkIsJsonObject(config.languages) ? config.languages : {}
   const managedLanguages: Record<string, Schema.Json> = {}
   for (const language of ["JavaScript", "JSX", "TypeScript", "TSX"]) {
@@ -175,10 +200,7 @@ const setEffectSettings = Effect.fn("setEffectSettings")(function* (
       "lsp",
       Object.fromEntries([
         ...Object.entries(lsp).filter(([name]) => name !== "tsgo"),
-        [
-          "typescript-ls",
-          Object.fromEntries([...Object.entries(server), ["binary", EFFECT_BINARY]]),
-        ],
+        ["typescript-ls", Object.fromEntries([...Object.entries(server), ["binary", binary]])],
         [
           "oxlint",
           Object.fromEntries([
@@ -324,7 +346,11 @@ export default defineIntegration({
       const effect = yield* readEffectEditor(cwd)
       const effectFindings: Finding[] = []
       if (Option.isSome(effect)) {
-        const expectedConfig = yield* setEffectSettings(config, effect.value.rulesCustomization)
+        const expectedConfig = yield* setEffectSettings(
+          cwd,
+          config,
+          effect.value.rulesCustomization
+        )
         if (!Equal.equals(config, expectedConfig)) {
           effectFindings.push({
             currentState: `\`${files[0].path}\` does not select the installed Effect language server with duplicate Oxlint Effect reports hidden.`,
@@ -334,7 +360,7 @@ export default defineIntegration({
             id: "zed-effect-server",
             integration: "zed",
             reference: {
-              content: `${yield* formatJson(yield* setEffectSettings({}, effect.value.rulesCustomization))}\n`,
+              content: `${yield* formatJson(yield* setEffectSettings(cwd, {}, effect.value.rulesCustomization))}\n`,
               language: "json",
             },
             title: "Zed does not use the Effect language server",
@@ -389,7 +415,7 @@ export default defineIntegration({
       const settingsPath = path.join(cwd, files[0].path)
       const effect = yield* readEffectEditor(cwd)
       const config = Option.isSome(effect)
-        ? yield* setEffectSettings(CONFIG, effect.value.rulesCustomization)
+        ? yield* setEffectSettings(cwd, CONFIG, effect.value.rulesCustomization)
         : CONFIG
 
       yield* ensureDirectory(path.dirname(settingsPath))
@@ -420,7 +446,7 @@ export default defineIntegration({
       const effect = yield* readEffectEditor(cwd)
       const base = setOxlintBinary(deduplicateManagedFormatters(mergedConfig))
       const newConfig = Option.isSome(effect)
-        ? yield* setEffectSettings(base, effect.value.rulesCustomization)
+        ? yield* setEffectSettings(cwd, base, effect.value.rulesCustomization)
         : base
 
       yield* writeFile(settingsPath, updateJsonText(zedFile, newConfig))

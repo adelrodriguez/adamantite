@@ -279,6 +279,32 @@ try {
   )
   assertIncludes(serverFiles, join(effectFixture, "index.ts"))
   run(process.execPath, [cliPath, "doctor"], { cwd: effectFixture, env: effectEnv })
+
+  const effectWorkspacePackage = join(effectFixture, "packages", "app")
+  mkdirSync(effectWorkspacePackage, { recursive: true })
+  writeFileSync(
+    join(effectWorkspacePackage, "package.json"),
+    JSON.stringify({ name: "effect-workspace-package", private: true, type: "module" })
+  )
+  run(
+    process.execPath,
+    [cliPath, "init", "--non-interactive", "--script", "check", "--editor", "zed"],
+    { cwd: effectWorkspacePackage, env: effectEnv }
+  )
+  const ancestorEffectCli = "../../node_modules/@effect/tsgo/dist/effect-tsgo.cjs"
+  assertFileContains(
+    join(effectWorkspacePackage, ".zed", "settings.json"),
+    JSON.stringify(ancestorEffectCli)
+  )
+  assertIncludes(
+    run(
+      process.execPath,
+      [ancestorEffectCli, "tsc", "--listFilesOnly", "--project", "../../tsconfig.json"],
+      { cwd: effectWorkspacePackage, env: effectEnv }
+    ),
+    join(effectFixture, "index.ts")
+  )
+
   rmSync(sdkDirectory, { force: true, recursive: true })
   assertIncludes(
     runExpectingFailure(process.execPath, [cliPath, "doctor"], {

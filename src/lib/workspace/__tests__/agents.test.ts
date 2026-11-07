@@ -47,7 +47,7 @@ describe("writeAgentsGuidance", () => {
       expect(
         Array.from(agents.matchAll(/^- Run `bun run (\w+)`/gm), ([, script]) => script)
       ).toStrictEqual(["check", "fix", "analyze"])
-      expect(agents).toContain(".adamantite/rules")
+      expect(agents).toContain(".adamantite/lint")
     })
   )
 
@@ -100,7 +100,7 @@ describe("writeAgentsGuidance", () => {
 
       const agents = files.read("AGENTS.md")
       expect(agents).not.toContain("Prefer the package scripts")
-      expect(agents).not.toContain(".adamantite/rules")
+      expect(agents).not.toContain(".adamantite/lint")
       expect(agents).toContain(
         `dependency-analysis setup.\n\n- Run \`adamantite doctor\` and follow its findings to repair managed setup.\n\n${ADAMANTITE_AGENTS_END_MARKER}`
       )
@@ -119,7 +119,7 @@ describe("writeAgentsGuidance", () => {
 
       expect(files.read("AGENTS.md")).not.toContain("monorepo")
       // Custom rules run through Oxlint, so the guidance needs a lint script.
-      expect(files.read("AGENTS.md")).not.toContain(".adamantite/rules")
+      expect(files.read("AGENTS.md")).not.toContain(".adamantite/lint")
 
       yield* runWriteAgentsGuidance(files, {
         isMonorepo: true,

@@ -6,9 +6,15 @@ import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import type { CustomRuleDiscovery } from "#lib/workspace/custom-rules/discover.ts"
 import type { Project } from "#lib/workspace/project.ts"
-import { CustomRuleExists, FailedToReadFile, InvalidRuleName } from "#lib/shared/errors.ts"
+import {
+  CustomRuleExists,
+  CustomRuleNotFound,
+  FailedToReadFile,
+  InvalidRuleName,
+} from "#lib/shared/errors.ts"
 import { ensureDirectory, readDirectoryIfExists, writeFile } from "#lib/shared/filesystem.ts"
-import { isRuleFile } from "#lib/workspace/custom-rules/inspect.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
+import { isRuleFile, isRuleTestFile } from "#lib/workspace/custom-rules/inspect.ts"
 import {
   getStubTemplate,
   getTestStubTemplate,
@@ -21,14 +27,7 @@ const testStubTemplate = getTestStubTemplate()
  * The rules folder that `custom()` loads when no `dir` is given, relative to the file that calls
  * it.
  */
-export const CUSTOM_RULES_DIRECTORY = ".adamantite/rules"
-
-/**
- * The folder in a rules folder that holds the rule tests. `custom()` does not read subfolders, and
- * the default Vitest and Jest patterns do not match `tests/<name>.ts`, so only `adamantite rule
- * test` runs these files.
- */
-export const CUSTOM_RULE_TESTS_DIRECTORY = "tests"
+export const CUSTOM_RULES_DIRECTORY = ".adamantite/lint"
 
 const RULE_NAME_PATTERN = /^[a-z][\da-z]*(?:-[\da-z]+)*$/
 
@@ -40,15 +39,8 @@ export function toCustomRuleStub(name: string): string {
 }
 
 /**
- * The test that `rule add` writes beside the stub: one valid case and one invalid case.
- */
-export function toCustomRuleTestStub(name: string): string {
-  return testStubTemplate.replaceAll("{{name}}", name)
-}
-
-/**
- * Write a rule stub to the rules folder, and its test to `tests/` in that folder. A relative `dir`
- * resolves from `cwd`. When the rule or the test exists, write nothing.
+ * Write only a rule stub. Agents verify it with temporary RuleTester cases. A relative dir resolves
+ * from cwd. An existing rule stays unchanged.
  */
 export const addCustomRule = Effect.fn("addCustomRule")(function* (
   cwd: string,
@@ -63,42 +55,112 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
   const path = yield* Path.Path
   const directory = path.resolve(cwd, dir)
   const rulePath = path.join(directory, `${name}.ts`)
-  const testPath = path.join(directory, CUSTOM_RULE_TESTS_DIRECTORY, `${name}.ts`)
-  const existing = yield* Effect.filter([rulePath, testPath], (file) =>
-    fs.exists(file).pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: file })))
-  )
+  const exists = yield* fs
+    .exists(rulePath)
+    .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: rulePath })))
 
-  if (existing.length > 0) {
-    return yield* new CustomRuleExists({ paths: existing })
+  if (exists) {
+    return yield* new CustomRuleExists({ paths: [rulePath] })
   }
 
-  yield* ensureDirectory(path.dirname(testPath))
+  yield* ensureDirectory(directory)
   yield* writeFile(rulePath, toCustomRuleStub(name))
-  yield* writeFile(testPath, toCustomRuleTestStub(name))
 
-  return { rulePath, testPath }
+  return rulePath
 })
 
 /**
- * The rule tests of each rules folder that a `custom()` call loads, in sorted order. A test is a
- * file in `tests/` that would be a rule in the rules folder, so a `_` file is a helper. Discovery
- * cannot follow a `custom()` call whose `dir` is not a string literal, or an import that it cannot
- * resolve, so the tests of those rules folders are not in the result.
+ * List the rules that can receive an optional test, in file-name order.
+ */
+export const listCustomRules = Effect.fn("listCustomRules")(function* (
+  cwd: string,
+  dir: string = CUSTOM_RULES_DIRECTORY
+) {
+  const path = yield* Path.Path
+  const fs = yield* FileSystem.FileSystem
+  const directory = path.resolve(cwd, dir)
+  const entries = yield* readDirectoryIfExists(directory)
+  const files = yield* Effect.filter(
+    Option.getOrElse(entries, () => []).filter((entry) => isRuleFile(entry)),
+    (entry) =>
+      fs.stat(path.join(directory, entry)).pipe(
+        Effect.mapBoth({
+          onFailure: (cause) => new FailedToReadFile({ cause, path: path.join(directory, entry) }),
+          onSuccess: (info) => info.type === "File",
+        })
+      )
+  )
+
+  return Array.sort(files, Order.String)
+})
+
+/**
+ * Write an optional test for an existing rule. The test defaults to a sibling `.test.ts` file; an
+ * explicit target resolves from cwd. Existing tests stay unchanged.
+ */
+export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
+  cwd: string,
+  name: string,
+  dir: string = CUSTOM_RULES_DIRECTORY,
+  target?: string
+) {
+  if (!RULE_NAME_PATTERN.test(name)) {
+    return yield* new InvalidRuleName({ rule: name })
+  }
+
+  const path = yield* Path.Path
+  const fs = yield* FileSystem.FileSystem
+  const directory = path.resolve(cwd, dir)
+  const rules = yield* listCustomRules(cwd, dir)
+  const rule = rules.find((file) => file.slice(0, -path.extname(file).length) === name)
+
+  if (rule === undefined) {
+    return yield* new CustomRuleNotFound({ directory, rule: name })
+  }
+
+  const testPath =
+    target === undefined ? path.join(directory, `${name}.test.ts`) : path.resolve(cwd, target)
+  const exists = yield* fs
+    .exists(testPath)
+    .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: testPath })))
+
+  if (exists) {
+    return yield* new CustomRuleExists({ paths: [testPath] })
+  }
+
+  const relative = path
+    .relative(path.dirname(testPath), path.join(directory, rule))
+    .split(path.sep)
+    .join("/")
+  const ruleImport = relative.startsWith("../") ? relative : `./${relative}`
+  const importLiteral = yield* stringifyJson(ruleImport)
+  yield* ensureDirectory(path.dirname(testPath))
+  yield* writeFile(
+    testPath,
+    testStubTemplate.replaceAll("{{name}}", name).replace("{{ruleImport}}", importLiteral)
+  )
+
+  return testPath
+})
+
+/**
+ * The optional rule tests of each rules folder that a `custom()` call loads, in sorted order. A
+ * test is a `.test.*` file beside the rules, so a `_` file is a helper. Discovery cannot follow a
+ * `custom()` call whose `dir` is not a string literal, or an import that it cannot resolve, so the
+ * tests of those rules folders are not in the result.
  */
 export const findCustomRuleTests = Effect.fn("findCustomRuleTests")(function* (
   customRules: CustomRuleDiscovery
 ) {
   const path = yield* Path.Path
-  const testDirectories = Array.dedupe(
-    customRules.calls.map((call) => path.join(call.dir, CUSTOM_RULE_TESTS_DIRECTORY))
-  )
+  const testDirectories = Array.dedupe(customRules.calls.map((call) => call.dir))
   const tests = yield* Effect.forEach(
     testDirectories,
     (directory) =>
       readDirectoryIfExists(directory).pipe(
         Effect.map((names) =>
           Option.getOrElse(names, () => [])
-            .filter((name) => isRuleFile(name))
+            .filter((name) => isRuleTestFile(name))
             .map((name) => path.join(directory, name))
         )
       ),

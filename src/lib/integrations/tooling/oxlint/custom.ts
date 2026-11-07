@@ -10,7 +10,11 @@ import {
 } from "#lib/integrations/base.ts"
 import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
-import { inspectRuleFile, isRuleFile } from "#lib/workspace/custom-rules/inspect.ts"
+import {
+  hasLegacyRuleImports,
+  inspectRuleFile,
+  isRuleFile,
+} from "#lib/workspace/custom-rules/inspect.ts"
 
 const NAME = "oxlint-custom"
 
@@ -21,7 +25,7 @@ interface RulesFolder {
 
 const CONFIG_REFERENCE = `import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
-import custom from "adamantite/lint/custom"
+import custom from "adamantite/rules"
 
 export default defineConfig({
   extends: [core, custom()],
@@ -45,24 +49,35 @@ export default defineIntegration({
       const path = yield* Path.Path
       const relative = (target: string) => path.relative(cwd, target) || "."
       const packageDirectories = [cwd, ...workspace.packageDirectories]
-      const { calls, unresolvedCalls, unresolvedImports } = customRules
+      const { calls, legacyImports, unresolvedCalls, unresolvedImports } = customRules
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )
       const loadedFolders = Array.dedupe(calls.map((call) => call.dir))
+      const oldDefaultFolders = packageDirectories.map((directory) =>
+        path.join(directory, ".adamantite/rules")
+      )
       const folders = Array.getSomes(
         yield* Effect.forEach(
-          Array.dedupe([...defaultFolders, ...loadedFolders]),
+          Array.dedupe([...defaultFolders, ...oldDefaultFolders, ...loadedFolders]),
           (dir) => readRulesFolder(dir),
           { concurrency: "unbounded" }
         )
       ).filter((folder) => folder.ruleFiles.length > 0)
+      const legacyFolders = folders.filter(
+        (folder) =>
+          unresolvedCalls.length === 0
+          && unresolvedImports.length === 0
+          && oldDefaultFolders.includes(folder.dir)
+          && !loadedFolders.includes(folder.dir)
+      )
 
       if (
         calls.length === 0
         && unresolvedCalls.length === 0
         && folders.length === 0
         && unresolvedImports.length === 0
+        && legacyImports.length === 0
       ) {
         return { applicable: false } satisfies IntegrationAssessment
       }
@@ -88,14 +103,14 @@ export default defineIntegration({
       // folder is reported only when every `dir` and import is resolved.
       if (unresolvedCalls.length === 0 && unresolvedImports.length === 0) {
         for (const folder of folders) {
-          if (loadedFolders.includes(folder.dir)) {
+          if (loadedFolders.includes(folder.dir) || legacyFolders.includes(folder)) {
             continue
           }
 
           findings.push({
             currentState: `\`${relative(folder.dir)}\` has ${folder.ruleFiles.length} rule file(s), but no \`custom()\` call loads it, so Oxlint does not run them.`,
             goal: [
-              `Load \`${relative(folder.dir)}\` with \`custom()\` from \`adamantite/lint/custom\` in the Oxlint config of \`${relative(path.dirname(path.dirname(folder.dir)))}\`. A relative \`dir\` resolves from the file that calls \`custom()\`.`,
+              `Load \`${relative(folder.dir)}\` with \`custom()\` from \`adamantite/rules\` in the Oxlint config of \`${relative(path.dirname(path.dirname(folder.dir)))}\`. A relative \`dir\` resolves from the file that calls \`custom()\`.`,
               "Give each rules folder its own plugin name with the `name` option, because Oxlint rejects two plugins with the same name in one run.",
               "Preserve every other setting in the Oxlint config.",
             ],
@@ -111,10 +126,47 @@ export default defineIntegration({
         folders.flatMap((folder) => folder.ruleFiles.map((file) => path.join(folder.dir, file))),
         (rulePath) =>
           readFile(rulePath).pipe(
-            Effect.map((content) => ({ problems: inspectRuleFile(rulePath, content), rulePath }))
+            Effect.map((content) => ({
+              legacyImports: hasLegacyRuleImports(rulePath, content),
+              problems: inspectRuleFile(rulePath, content),
+              rulePath,
+            }))
           ),
         { concurrency: "unbounded" }
       )
+
+      const migrationSources = Array.dedupe([
+        ...legacyImports,
+        ...rules.filter((rule) => rule.legacyImports).map((rule) => rule.rulePath),
+      ])
+
+      if (migrationSources.length > 0 || legacyFolders.length > 0) {
+        findings.push({
+          currentState: [
+            ...migrationSources.map(
+              (source) => `\`${relative(source)}\` imports the old custom-rules API.`
+            ),
+            ...legacyFolders.map(
+              (folder) =>
+                `\`${relative(folder.dir)}\` is the previous default rules folder, and no current \`custom()\` call loads it.`
+            ),
+          ].join("\n"),
+          goal: [
+            'Import the rules-folder preset as `import custom from "adamantite/rules"`. Replace `adamantite/lint/custom` imports and keep `custom()` in the Oxlint config extends.',
+            "Import `definePlugin`, `defineRule`, `eslintCompatPlugin`, and the Oxlint authoring types from `adamantite/rules/plugin`. Keep `RuleTester` at `adamantite/rules/testing`.",
+            'Move `.adamantite/rules` to `.adamantite/lint`, or keep its path with `custom({ dir: ".adamantite/rules" })` and `rule add --dir .adamantite/rules`. A relative `dir` resolves from the file that calls `custom()`.',
+            "If you keep `.adamantite/rules` or another explicit rules folder, add its rule and optional test patterns to Knip oxlint.entry. The preset defaults cover only `.adamantite/lint`.",
+            "Update relative imports, tsconfig include paths, and Knip oxlint.entry patterns when a folder moves. Keep explicit rules folders and their options.",
+            "Keep optional saved tests beside their rules as `<name>.test.ts`, and update their relative imports. For tests saved elsewhere, use `adamantite rule test --path <file>` and keep their Knip entry settings. Add a test only on request with `adamantite rule add test [name]`.",
+            "Agents verify rules with RuleTester from `adamantite/rules/testing`, using stdin or a temporary file, and remove their temporary cases and fixtures. Preserve user-owned optional tests and CI steps. `adamantite rule test` runs saved tests only when explicitly invoked.",
+            "Preserve rule behavior, plugin names, rule severity, rule options, and all other config settings. Run `adamantite check`, then run Doctor again.",
+          ],
+          id: "custom-rules-api-migration",
+          integration: NAME,
+          reference: { content: CONFIG_REFERENCE, language: "ts" },
+          title: "Custom rules need migration to the current agent workflow",
+        })
+      }
 
       for (const { problems, rulePath } of rules) {
         if (problems.length === 0) {

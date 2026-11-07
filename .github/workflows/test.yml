@@ -83,10 +83,10 @@ jobs:
             exit 1
           fi
           grep "adamantite(query-from-loader)" oxlint-output.txt
-          # Custom rules load from .adamantite/rules through custom() and adamantite/rules.
-          mkdir -p .adamantite/rules
-          printf '%s\n' 'import { defineRule } from "adamantite/rules"' '' 'export default defineRule({' '  meta: { messages: { unexpected: "No debugger here." }, type: "problem" },' '  createOnce(context) {' '    return { DebuggerStatement(node) { context.report({ messageId: "unexpected", node }) } }' '  },' '})' > .adamantite/rules/no-debugger-here.ts
-          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import custom from "adamantite/lint/custom"' '' 'export default defineConfig({ extends: [custom()] })' > oxlint.config.ts
+          # Custom rules load from .adamantite/lint through custom() and adamantite/rules/plugin.
+          mkdir -p .adamantite/lint
+          printf '%s\n' 'import { defineRule } from "adamantite/rules/plugin"' '' 'export default defineRule({' '  meta: { messages: { unexpected: "No debugger here." }, type: "problem" },' '  createOnce(context) {' '    return { DebuggerStatement(node) { context.report({ messageId: "unexpected", node }) } }' '  },' '})' > .adamantite/lint/no-debugger-here.ts
+          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import custom from "adamantite/rules"' '' 'export default defineConfig({ extends: [custom()] })' > oxlint.config.ts
           printf '%s\n' 'export function stop() {' '  debugger' '}' > bad.ts
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.ts > oxlint-output.txt 2>&1; then
             echo "Expected diagnostics from the packaged custom() preset and a custom rule to fail the lint run"
@@ -145,7 +145,7 @@ jobs:
           bun node_modules/adamantite/bin/adamantite --help
           bun node_modules/adamantite/dist/presets/lint/core.js
           # Bun prints stack frames as plain paths; custom() must still find the calling file.
-          printf '%s\n' 'import custom from "adamantite/lint/custom"' '' 'const config = custom()' 'if (config.rules?.["project/no-debugger-here"] !== "error") {' '  console.error(JSON.stringify(config))' '  process.exit(1)' '}' > custom-check.mjs
+          printf '%s\n' 'import custom from "adamantite/rules"' '' 'const config = custom()' 'if (config.rules?.["project/no-debugger-here"] !== "error") {' '  console.error(JSON.stringify(config))' '  process.exit(1)' '}' > custom-check.mjs
           bun "${compatibility_dir}/custom-check.mjs"
 
   verify:

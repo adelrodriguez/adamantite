@@ -312,12 +312,12 @@ describe("assessProject", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/no-foo.ts": "export default {}\n",
+          ".adamantite/lint/no-foo.ts": "export default {}\n",
           ".github/workflows/adamantite.yml":
             "jobs:\n  check:\n    steps:\n      - run: pnpm run check\n",
           "oxlint.config.ts": [
             'import core from "adamantite/lint"',
-            'import custom from "adamantite/lint/custom"',
+            'import custom from "adamantite/rules"',
             'import effect from "adamantite/lint/effect"',
             'import shadcn from "adamantite/lint/shadcn"',
             "export default { extends: [core, effect, shadcn, custom()] }",

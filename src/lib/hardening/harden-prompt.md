@@ -97,9 +97,9 @@ This step is done when each written standard and each candidate is marked as enf
 
 Step 5 starts from the standards. This step starts from the rules that the project already has: each custom rule, each `adamantite/layers` map, each `adamantite/import-owners` option, and each `no-restricted-imports` setting and its overrides.
 
-- **Forms that a rule misses:** list the forms of the same mistake that the rule does not report. For an import rule, check `require()`, `import()`, `export … from`, `import type`, and the path aliases of `tsconfig.json`. For a custom rule, read its logic and check the other syntax of the same mistake, such as a call through a variable, optional chaining, a computed member, or a re-export. Search the code for each form, and lint a file that has it. When the code does not have the form yet, run `adamantite rule try <rule> --current --report <control> --report <missed form>`, with a form that the rule reports as the control. The gap is confirmed when it reports the control and does not report the missed form. When no trial can show it, mark the gap as not confirmed: the failing test case of step 9 confirms it.
+- **Forms that a rule misses:** list the forms of the same mistake that the rule does not report. For an import rule, check `require()`, `import()`, `export … from`, `import type`, and the path aliases of `tsconfig.json`. For a custom rule, read its logic and check the other syntax of the same mistake, such as a call through a variable, optional chaining, a computed member, or a re-export. Search the code for each form, and lint a file that has it. When the code does not have the form yet, run `adamantite rule try <rule> --current --report <control> --report <missed form>`, with a form that the rule reports as the control. The gap is confirmed when it reports the control and does not report the missed form. When no trial can show it, mark the gap as not confirmed: the temporary regression case of step 9 confirms it.
 - **Files that a rule misses:** for each `files` glob of an override, list the files that the standard applies to and that the glob does not match, such as a new folder or another file extension.
-- **Cases that a test misses:** for each custom rule, list the forms from the first item that its test does not have.
+- **Verification cases:** for each custom rule, prepare temporary valid and invalid cases for the forms above. Use `adamantite rule add test <name>` to create a temporary test beside a new rule, adapt its cases, and run `adamantite rule test --path <test-file>`. Remove the temporary test after verification. If a user-owned test already exists, preserve it and use RuleTester from stdin for additional cases.
 - **Overrides that can shrink:** each file that the overrides above mark "no longer breaks the rule" or "does not exist" is a candidate: remove it from the override. A file that Oxlint did not lint, because the config ignores it or it does not parse, is not evidence. Check it yourself.
 - **Suppressions:** read the counts in the suppressions above. Many suppressions of one rule are a **decision**: the rule is too wide, or the standard has exceptions that the rule must know.
 
@@ -157,11 +157,11 @@ When no human can approve, for example in CI or in an unattended session, the ca
 Write only the approved candidates:
 
 - **Type, structure, preset rule, import rule, or project check:** change the types, the Oxlint config, `tsconfig.json`, or the check.
-- **Custom rule:** run `adamantite rule add <name>`, and follow the "Custom rules" section of the Adamantite skill. When the rules folder above is not `.adamantite/rules`, pass it with `--dir`, such as `adamantite rule add <name> --dir tooling/rules`.
+- **Custom rule:** run `adamantite rule add <name>`, and follow the "Custom rules" section of the Adamantite skill. When the rules folder above is not `.adamantite/lint`, pass it with `--dir`, such as `adamantite rule add <name> --dir tooling/rules`.
   - The rule message says what to do instead.
   - A comment at the top of the rule file states the standard and why it exists.
-  - The test has the case that the rule must report and the case that it must accept.
-- **Gap in a custom rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail. Then change the rule until the test passes.
+  - Verify the rule with temporary RuleTester cases that it must report and that it must accept. Keep the rule and its runtime helpers, discard your temporary cases, and preserve user-owned optional tests.
+- **Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail. Then change the rule until all valid and invalid cases pass. Discard the verification cases and fixtures after the check.
 - **Gap in the config of a rule,** such as a layer map, an import-owners option, a `no-restricted-imports` path, or an override glob: change the Oxlint config. Then lint a file that has the missed form, and read the report. When no file has the form, tell the user that the change is not verified. Do not change a rule that a preset or plugin ships.
 - **Override that can shrink:** remove only the files that no longer break the rule.
 - **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
@@ -171,7 +171,10 @@ Write only the approved candidates:
 
 ## Verify
 
-When you wrote files, run `adamantite check`, `adamantite rule test`, and `adamantite doctor` in this order — through your package runner, such as `npx` or `pnpm exec`, if they are not on PATH.
-All three must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 9 says, not a disable comment. When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong, and tell the user which case you changed and why.
+Verify each custom rule that you added or changed with RuleTester from `adamantite/rules/testing`. Use stdin or a temporary file outside the project, as the Adamantite skill shows. Valid and invalid cases must pass, and the verification command must exit 0. When verification fails, fix the rule. Change a case only when the case itself is wrong, and tell the user which case you changed and why.
+
+Remove your temporary verification cases, fixtures, and verification-only helpers before you finish. Do not add saved rule tests or CI steps unless the user requests them. Preserve existing user-owned optional tests and CI steps. Users can run saved tests explicitly with `adamantite rule test`. Report the cases and their results briefly.
+
+When you wrote files, run `adamantite check` and `adamantite doctor` in this order, through your package runner if they are not on PATH. Both must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 9 says, not a disable comment.
 
 When you changed the documentation, run `adamantite harden` again without a terminal, and read its agent reach. Each discovery gap that you closed must be gone, and no link that you added may go to a file that does not exist.

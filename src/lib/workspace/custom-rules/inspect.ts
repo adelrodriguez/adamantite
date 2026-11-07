@@ -11,10 +11,10 @@ import {
   Visitor,
 } from "oxc-parser"
 
-export const CUSTOM_RULES_MODULE = "adamantite/lint/custom"
+export const CUSTOM_RULES_MODULE = "adamantite/rules"
 
 const DEFAULT_PLUGIN_NAME = "project"
-const DEFAULT_DIRECTORY = ".adamantite/rules"
+const DEFAULT_DIRECTORY = ".adamantite/lint"
 
 const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts", ".ts"])
 
@@ -25,7 +25,18 @@ const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts"
 export function isRuleFile(name: string): boolean {
   const extension = /\.[^.]+$/.exec(name)?.[0] ?? ""
 
-  return RULE_FILE_EXTENSIONS.has(extension) && !name.startsWith("_") && !/\.d\.m?ts$/.test(name)
+  return (
+    RULE_FILE_EXTENSIONS.has(extension)
+    && !name.startsWith("_")
+    && !/\.(?:d\.m?ts|test\.[^.]+)$/.test(name)
+  )
+}
+
+/**
+ * An optional test beside a rule. Helpers that start with `_` are not test entries.
+ */
+export function isRuleTestFile(name: string): boolean {
+  return !name.startsWith("_") && /\.test\.(?:js|mjs|mts|ts)$/.test(name)
 }
 
 /**
@@ -41,14 +52,61 @@ function parse(file: string, content: string) {
   return parseSync(file, content, { preserveParens: false, sourceType: "module" })
 }
 
-function getDefaultImportName(program: Program, moduleName: string) {
+function getCustomImportNames(program: Program) {
   return program.body
     .flatMap((statement) =>
-      statement.type === "ImportDeclaration" && statement.source.value === moduleName
+      statement.type === "ImportDeclaration" && statement.source.value === CUSTOM_RULES_MODULE
         ? statement.specifiers
         : []
     )
-    .find((specifier) => specifier.type === "ImportDefaultSpecifier")?.local.name
+    .filter((specifier) => specifier.type === "ImportDefaultSpecifier")
+    .map((specifier) => specifier.local.name)
+}
+
+/**
+ * Whether a module imports or re-exports the custom-rules API that Doctor must ask the project to
+ * migrate. This does not load the old API or treat its custom() calls as current calls.
+ */
+export function hasLegacyRuleImports(file: string, content: string): boolean {
+  const parsed = parse(file, content)
+
+  if (parsed.errors.length > 0) {
+    return false
+  }
+
+  return parsed.program.body.some((statement) => {
+    if (statement.type === "ImportDeclaration") {
+      return (
+        statement.source.value === "adamantite/lint/custom"
+        || (statement.source.value === CUSTOM_RULES_MODULE
+          && statement.specifiers.some(
+            (specifier) =>
+              specifier.type === "ImportSpecifier"
+              && (specifier.imported.type === "Identifier"
+                ? specifier.imported.name
+                : specifier.imported.value) !== "CustomRulesOptions"
+          ))
+      )
+    }
+
+    if (statement.type === "ExportNamedDeclaration" && statement.source !== null) {
+      return (
+        statement.source.value === "adamantite/lint/custom"
+        || (statement.source.value === CUSTOM_RULES_MODULE
+          && statement.specifiers.some((specifier) => {
+            const name =
+              specifier.local.type === "Identifier" ? specifier.local.name : specifier.local.value
+
+            return name !== "default" && name !== "CustomRulesOptions"
+          }))
+      )
+    }
+
+    return (
+      statement.type === "ExportAllDeclaration"
+      && statement.source.value === "adamantite/lint/custom"
+    )
+  })
 }
 
 function getStaticString(expression: Expression) {
@@ -90,21 +148,21 @@ function readCallOptions(options: ObjectExpression): CustomRulesCall {
 }
 
 /**
- * The `custom()` calls in a module that imports `custom` from `adamantite/lint/custom`. A module
- * that does not parse has none.
+ * The `custom()` calls in a module that imports `custom` from `adamantite/rules`. A module that
+ * does not parse has none.
  */
 export function findCustomRulesCalls(file: string, content: string): CustomRulesCall[] {
   const parsed = parse(file, content)
-  const localName = getDefaultImportName(parsed.program, CUSTOM_RULES_MODULE)
+  const localNames = getCustomImportNames(parsed.program)
 
-  if (parsed.errors.length > 0 || localName === undefined) {
+  if (parsed.errors.length > 0 || localNames.length === 0) {
     return []
   }
 
   const calls: CustomRulesCall[] = []
   const visitor = new Visitor({
     CallExpression(node) {
-      if (node.callee.type !== "Identifier" || node.callee.name !== localName) {
+      if (node.callee.type !== "Identifier" || !localNames.includes(node.callee.name)) {
         return
       }
 

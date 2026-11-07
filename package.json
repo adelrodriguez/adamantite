@@ -58,6 +58,10 @@
       "types": "./dist/presets/rules/index.d.ts",
       "default": "./dist/presets/rules/index.js"
     },
+    "./rules/plugin": {
+      "types": "./dist/presets/rules/plugin.d.ts",
+      "default": "./dist/presets/rules/plugin.js"
+    },
     "./rules/testing": {
       "types": "./dist/presets/rules/testing.d.ts",
       "default": "./dist/presets/rules/testing.js"

@@ -150,8 +150,9 @@ writing files. See ADR 0023.
   nor changes files or process variables. Unexpected read and parse failures still propagate.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
   into custom rules and instructions, and offers it through the resolution menu. After a
-  handoff, it runs Oxfmt and Oxlint as `check` does, then the custom rule tests as `rule test`
-  does, then assesses the project as Doctor does. It never produces findings, so it never changes Doctor's
+  handoff, it runs Oxfmt and Oxlint as `check` does, then assesses the project as Doctor does.
+  The agent verifies new and changed custom rules with temporary RuleTester cases during the
+  session and removes the cases before handback. Harden never produces findings, so it never changes Doctor's
   result. The prompt lists each Markdown file that `git ls-files` gives, except the changesets
   and the changelogs, so the agent reads all the documentation. `hardening/agent-reach.ts`
   finds the files that no chain of links from an `AGENTS.md` reaches, and the links to missing
@@ -166,9 +167,12 @@ writing files. See ADR 0023.
   not need it.
 - `prepare` does nothing. It patched Oxlint for the effect preset before the Oxlint proxy,
   and existing `prepare` scripts still run it. #444 removes it.
-- `rule add` writes a custom rule stub and its test. `rule ast` prints the AST that Oxlint
-  rules visit. `rule test` runs the custom rule tests with `node --test`. `check` does not run
-  them. The managed GitHub workflow runs `rule test` when the project has rule tests. See ADR 0009.
+- `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit.
+  Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
+  Temporary verification cases do not stay in the target project. Users can opt in to saved
+  `.test.*` files beside their rules, add them with `rule add test [name]`, and run them explicitly
+  with `rule test`. `--path` selects another test location. Init, CI,
+  and harden do not run them by default. See ADR 0009.
 - `rule try` runs a trial: `hardening/trial.ts` copies the files that git lists to a temporary
   folder, puts a trial config in place of the config that lints the cases, and lints the cases
   with Oxlint from the root of the copy. The copy gets a real `node_modules` folder with a link
@@ -184,10 +188,10 @@ commands do not forward arguments because they coordinate multiple operations.
 
 ```text
 presets/
-  lint/             published Oxlint presets, and custom() for custom rules
+  lint/             published Oxlint presets
     plugin/         first-party Oxlint plugin and its rules
     vendor/         vendored plugin bundles
-  rules/            published authoring and testing modules for custom rules
+  rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
   tsconfig.json     published TypeScript preset
@@ -196,7 +200,7 @@ src/
   lib/
     shared/         errors, filesystem, and JSON helpers (bottom layer)
     workspace/      target-project state and file operations
-      custom-rules/ rules folders, custom() discovery, rule file checks, and rule tests
+      custom-rules/ rules folders, custom() discovery, rule file checks, and rule scaffolding
     execution/      child command runs, coding-agent detection and handoff, the Adamantite skill, forwarded arguments
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
       tooling/      shared tooling infrastructure and one folder for each tool
@@ -306,24 +310,28 @@ the fixture projects of both rules. See ADR 0016.
 
 ## Custom rules
 
-Custom rules are Oxlint rules that the target project writes in a rules folder. See
-ADR 0009. Five modules carry them:
+Custom rules are Oxlint rules that the target project writes in a rules folder, by default
+`.adamantite/lint`. See ADR 0009. These modules carry them:
 
-- `presets/lint/custom.ts` exports `custom()`, which runs while Oxlint loads the config. It
+- `presets/rules/custom.ts` implements `custom()`, which runs while Oxlint loads the config. It
   finds the calling file in the call stack, resolves the rules folder from it, lists the
   rule files, and enables each one. It writes one entry module for each rules folder to
   `node_modules/.cache/adamantite/`, or to the OS temporary directory, and returns a
   `jsPlugins` entry that points to it. Without a rules folder it returns an empty config.
-- `presets/rules/index.ts` is published as `adamantite/rules`. It re-exports `defineRule`
-  and the rule types from `@oxlint/plugins`, and exports `loadRules`, which the entry
-  module calls to import every rule file. `presets/rules/folder.ts` says what a rules folder
+- `presets/rules/index.ts` is published as `adamantite/rules`. Its default export is `custom()`
+  from `presets/rules/custom.ts`. `presets/rules/load.ts` holds the internal `loadRules`, which
+  the entry module calls to import every rule file and assemble them with `definePlugin`.
+  `presets/rules/plugin.ts`, published as
+  `adamantite/rules/plugin`, re-exports `definePlugin`, `defineRule`, `eslintCompatPlugin`, and
+  all authoring types from `@oxlint/plugins`. `presets/rules/folder.ts` says what a rules folder
   holds: the default folder and plugin name, and which files are rules. Both `custom()` and
   `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
-  `adamantite/rules/testing`. It re-exports `RuleTester` from `oxlint/plugins-dev`, connected
-  to `node:test`.
+  `adamantite/rules/testing`. It re-exports `RuleTester` and the test types from
+  `oxlint/plugins-dev`, connected to `node:test`.
 - `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
   `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
-  finds the Oxlint configs and follows their imports to the `custom()` calls. The
+  finds the Oxlint configs and follows their imports to the `custom()` calls. It also records
+  old API imports for Doctor's migration finding. Old calls do not load rules. The
   `ModuleResolver` service in `src/lib/workspace/module-resolver.ts` resolves each import
   with `oxc-resolver`, as Node.js loads a config, so a workspace package resolves only after an
   install. Tests pass a fake from `src/__tests__/module-resolver.ts`, and the smoke test
@@ -331,20 +339,21 @@ ADR 0009. Five modules carry them:
   it too, to list the configs and rules folders in its prompt. `inspect.ts` keeps its own
   copy of the rule file test and the defaults, and a unit test keeps them equal to
   `presets/rules/folder.ts`.
-  `index.ts` writes the rule stub and its test in `tests/` for `adamantite rule add`, from
-  the templates beside it, and builds the `node --test` command for the tests of the loaded
-  rules folders, which `adamantite rule test` and `adamantite harden` run.
+  `index.ts` writes only the rule stub for `adamantite rule add`, from the template beside it.
+  It also lists existing rules for `rule add test`, writes an optional sibling `<name>.test.ts`
+  or the file that `--path` names, and finds `.test.*` files in each loaded rules folder for
+  `adamantite rule test`. The command accepts `--path` to run a test saved elsewhere.
+  The shipped skill tells the agent how to run temporary
+  RuleTester cases, remove its temporary files, and preserve user-owned tests.
 - The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
   that module to report rules folders that no `custom()` call loads, rule files that cannot
-  load, and rules folders that share a plugin name.
-- The `github` integration in `src/lib/integrations/ci/github.ts` uses the same list of rule
-  tests as `rule test`. When the list is not empty, `init` adds a `rule test` entry to the
-  workflow matrix, and Doctor reports a workflow that does not run `adamantite rule test`. No
-  managed script runs the tests, so the entry runs the installed CLI with the package
-  manager, such as `pnpm exec adamantite rule test`. A Deno workflow with rule tests also
-  gets the Node.js setup step, because `rule test` runs `node --test`.
+  load, and rules folders that share a plugin name. It also reports old imports, old default
+  folders with migration instructions. Optional saved tests do not produce a finding.
+- The `github` integration in `src/lib/integrations/ci/github.ts` writes only the selected
+  managed check and analyze scripts into the workflow. It does not add or require a rule-test
+  step. Users can add one themselves, and Doctor preserves it.
 
-Both preset modules run under the runtime that executes Oxlint, so they use only Node.js
+The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`
 extend the root config, so type-aware lint sees the Node.js types and the `.ts` import
 extensions. `src/__tests__/presets/custom.test.ts` lints temporary projects in real Oxlint

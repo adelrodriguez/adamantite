@@ -147,6 +147,28 @@
       },
       "tracking": "dependency",
       "version": "0.67.3"
+    },
+    {
+      "name": "vite-plus",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/cli",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/voidzero-dev/vite-plus"
+      },
+      "tracking": "manual",
+      "version": "1.5.0"
+    },
+    {
+      "name": "@oxlint/plugins",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/@oxlint/plugins/-/plugins-1.91.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "1.91.0"
     }
   ]
 }

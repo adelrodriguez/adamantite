@@ -16,8 +16,8 @@ import { type TrialCase, type TrialSetting, tryRule } from "#lib/hardening/trial
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
-const CUSTOM_PRESET = join(REPO_ROOT, "presets/lint/custom.ts")
-const RULES_MODULE = join(REPO_ROOT, "presets/rules/index.ts")
+const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")
+const RULES_MODULE = join(REPO_ROOT, "presets/rules/plugin.ts")
 
 // The build writes the Oxlint entry beside the CLI, so a run from source starts its source.
 const TEST_LAYER = Layer.mergeAll(
@@ -61,7 +61,7 @@ const WORKSPACE_FILES = {
   "oxlint.config.ts":
     'import { defineConfig } from "oxlint"\nimport tooling from "tooling"\n\nexport default defineConfig({ extends: [tooling] })\n',
   "package.json": JSON.stringify({ name: "app", type: "module", workspaces: ["packages/*"] }),
-  "packages/tooling/.adamantite/rules/no-debugger-here.ts": NO_DEBUGGER_RULE,
+  "packages/tooling/.adamantite/lint/no-debugger-here.ts": NO_DEBUGGER_RULE,
   "packages/tooling/index.ts": `import custom from ${JSON.stringify(CUSTOM_PRESET)}\n\nexport default custom()\n`,
   "packages/tooling/package.json": JSON.stringify({
     exports: "./index.ts",
@@ -74,7 +74,7 @@ const WORKSPACE_FILES = {
 const BUILT_WORKSPACE_FILES = {
   ...WORKSPACE_FILES,
   ".gitignore": "node_modules\ndist\n",
-  "packages/tooling/dist/index.js": `import custom from ${JSON.stringify(CUSTOM_PRESET)}\n\nexport default custom({ dir: "../.adamantite/rules" })\n`,
+  "packages/tooling/dist/index.js": `import custom from ${JSON.stringify(CUSTOM_PRESET)}\n\nexport default custom({ dir: "../.adamantite/lint" })\n`,
   "packages/tooling/index.ts": null,
   "packages/tooling/package.json": JSON.stringify({
     exports: "./dist/index.js",
@@ -165,7 +165,7 @@ describe("rule trials in a real project", () => {
     symlinkSync(join(REPO_ROOT, "node_modules/oxlint"), join(project, "node_modules/oxlint"))
     write(".gitignore", "node_modules\n")
     write("package.json", JSON.stringify({ name: "app", type: "module" }))
-    write(".adamantite/rules/no-debugger-here.ts", NO_DEBUGGER_RULE)
+    write(".adamantite/lint/no-debugger-here.ts", NO_DEBUGGER_RULE)
     write(
       "oxlint.config.ts",
       makeConfig(
@@ -336,7 +336,7 @@ describe("rule trials in a real project", () => {
 
   it.live("count only the reports of the plugin of the rule", () =>
     Effect.gen(function* () {
-      write(".adamantite/rules/no-console.ts", SILENT_RULE)
+      write(".adamantite/lint/no-console.ts", SILENT_RULE)
       write(
         "oxlint.config.ts",
         makeConfig('{ extends: [custom()], rules: { "no-console": "error" } }')

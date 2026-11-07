@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import process from "node:process"
@@ -7,11 +7,11 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
-import { toCustomRuleStub, toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
+import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
-const CUSTOM_PRESET = join(REPO_ROOT, "presets/lint/custom.ts")
-const RULES_MODULE = join(REPO_ROOT, "presets/rules/index.ts")
+const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")
+const RULES_MODULE = join(REPO_ROOT, "presets/rules/plugin.ts")
 const TESTING_MODULE = join(REPO_ROOT, "presets/rules/testing.ts")
 
 const OxlintJsonOutput = Schema.Struct({
@@ -57,7 +57,7 @@ function makeRule(message: string) {
  */
 function makeStub() {
   return toCustomRuleStub("no-debugger-here").replace(
-    '"adamantite/rules"',
+    '"adamantite/rules/plugin"',
     JSON.stringify(RULES_MODULE)
   )
 }
@@ -110,21 +110,49 @@ describe("custom preset", () => {
     rmSync(project, { force: true, recursive: true })
   })
 
-  it("enable each rule file in .adamantite/rules and skip helper files", () => {
-    write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
+  it("enable each rule file in .adamantite/lint and skip helper files", () => {
+    write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
     // A helper without a default export fails the run if it loads as a rule.
-    write(".adamantite/rules/_helpers.ts", "export const helper = 1\n")
-    write(".adamantite/rules/AGENTS.md", "# Custom rules\n")
+    write(".adamantite/lint/_helpers.ts", "export const helper = 1\n")
+    // Optional tests must not run or become rules when the plugin loads.
+    write(".adamantite/lint/no-debugger-here.test.ts", 'throw new Error("Test was loaded")\n')
+    write(".adamantite/lint/AGENTS.md", "# Custom rules\n")
     write("oxlint.config.ts", makeConfig("custom()"))
+
+    expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
+  })
+
+  it("load a plugin defined with the public helpers through jsPlugins", () => {
+    write("no-debugger-here.ts", makeRule("No debugger here."))
+    write(
+      "lint-plugin.ts",
+      [
+        `import { definePlugin } from ${JSON.stringify(RULES_MODULE)}`,
+        'import rule from "./no-debugger-here.ts"',
+        'export default definePlugin({ meta: { name: "local" }, rules: { "no-debugger-here": rule } })',
+        "",
+      ].join("\n")
+    )
+    write(
+      "oxlint.config.ts",
+      'export default { jsPlugins: ["./lint-plugin.ts"], rules: { "no-debugger": "off", "local/no-debugger-here": "error" } }\n'
+    )
+
+    expect(lint("src")).toStrictEqual(["local(no-debugger-here):error"])
+  })
+
+  it("keep loading a previous rules folder when dir names it", () => {
+    write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
+    write("oxlint.config.ts", makeConfig('custom({ dir: ".adamantite/rules" })'))
 
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
   })
 
   it("load and run the stub that rule add writes", () => {
     write(
-      ".adamantite/rules/no-debugger-here.ts",
+      ".adamantite/lint/no-debugger-here.ts",
       toCustomRuleStub("no-debugger-here").replace(
-        '"adamantite/rules"',
+        '"adamantite/rules/plugin"',
         JSON.stringify(RULES_MODULE)
       )
     )
@@ -133,40 +161,47 @@ describe("custom preset", () => {
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):error"])
   })
 
-  describe("the test that rule add writes", () => {
-    const testPath = ".adamantite/rules/tests/no-debugger-here.ts"
+  describe("temporary rule verification", () => {
+    const rulePath = ".adamantite/lint/no-debugger-here.ts"
 
-    function writeRuleAndTest(rule: string) {
-      write(".adamantite/rules/no-debugger-here.ts", rule)
-      write(
-        testPath,
-        toCustomRuleTestStub("no-debugger-here").replace(
-          '"adamantite/rules/testing"',
-          JSON.stringify(TESTING_MODULE)
-        )
-      )
+    function writeRuleAndVerify(rule: string) {
+      write(rulePath, rule)
+      const input = [
+        `import { RuleTester } from ${JSON.stringify(TESTING_MODULE)}`,
+        `import rule from ${JSON.stringify(join(project, rulePath))}`,
+        'new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } }).run("no-debugger-here", rule, {',
+        '  invalid: [{ code: "debugger", errors: [{ messageId: "unexpected" }] }],',
+        '  valid: ["const value: number = 1"],',
+        "})",
+      ].join("\n")
 
-      return spawnSync(process.execPath, ["--test", testPath], { cwd: project, encoding: "utf8" })
+      return spawnSync(process.execPath, ["--input-type=module"], {
+        cwd: project,
+        encoding: "utf8",
+        input,
+      })
     }
 
-    it("pass under node --test, and report each case by name", () => {
-      const result = writeRuleAndTest(makeStub())
+    it("pass from stdin and leave only the rule file", () => {
+      const result = writeRuleAndVerify(makeStub())
 
       expect(result.status, `${result.stdout}${result.stderr}`).toBe(0)
       expect(result.stdout).toContain("✔ const value: number = 1")
       expect(result.stdout).toContain("✔ debugger")
+      expect(readdirSync(join(project, ".adamantite/lint"))).toStrictEqual(["no-debugger-here.ts"])
     })
 
     it("fail and name the case when the rule does not report the invalid code", () => {
-      const result = writeRuleAndTest(makeStub().replace("DebuggerStatement", "WithStatement"))
+      const result = writeRuleAndVerify(makeStub().replace("DebuggerStatement", "WithStatement"))
 
       expect(result.status).toBe(1)
       expect(result.stdout).toContain("✖ debugger")
+      expect(readdirSync(join(project, ".adamantite/lint"))).toStrictEqual(["no-debugger-here.ts"])
     })
   })
 
   it("apply severity overrides from the rules option", () => {
-    write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
+    write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
     write("oxlint.config.ts", makeConfig('custom({ rules: { "no-debugger-here": "warn" } })'))
 
     expect(lint("src")).toStrictEqual(["project(no-debugger-here):warning"])
@@ -204,8 +239,8 @@ describe("custom preset", () => {
   })
 
   it("load one rules folder per workspace package under distinct names", () => {
-    write(".adamantite/rules/no-debugger-here.ts", makeRule("No debugger here."))
-    write("packages/web/.adamantite/rules/no-debugger-in-web.ts", makeRule("No debugger in web."))
+    write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
+    write("packages/web/.adamantite/lint/no-debugger-in-web.ts", makeRule("No debugger in web."))
     write("oxlint.config.ts", makeConfig("custom()"))
     // A nested config replaces the root config, so the package extends the root rules too.
     write(

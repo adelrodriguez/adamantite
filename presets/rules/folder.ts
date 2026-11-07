@@ -10,7 +10,7 @@ import { extname } from "node:path"
  * The rules folder that `custom()` loads when no `dir` is given, relative to the file that calls
  * it.
  */
-export const DEFAULT_DIRECTORY = ".adamantite/rules"
+export const DEFAULT_DIRECTORY = ".adamantite/lint"
 
 /**
  * The plugin name that prefixes every rule when `custom()` is given no `name`.
@@ -25,11 +25,13 @@ export function getRuleName(file: string): string {
 
 /**
  * Whether a file in a rules folder is a rule: it has a JavaScript or TypeScript extension, is not a
- * declaration file, and does not start with `_`.
+ * declaration or test file, and does not start with `_`.
  */
 export function isRuleFile(name: string): boolean {
   return (
-    RULE_FILE_EXTENSIONS.has(extname(name)) && !name.startsWith("_") && !/\.d\.m?ts$/.test(name)
+    RULE_FILE_EXTENSIONS.has(extname(name))
+    && !name.startsWith("_")
+    && !/\.(?:d\.m?ts|test\.[^.]+)$/.test(name)
   )
 }
 

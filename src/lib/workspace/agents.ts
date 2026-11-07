@@ -51,7 +51,7 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
   return fillTemplate(agentsSectionTemplate, {
     customRules:
       scripts.includes("check") || scripts.includes("fix")
-        ? '- Write project-specific lint rules in `.adamantite/rules/`, one rule for each file. Run `adamantite rule add <name>` to start a rule, and follow the "Custom rules" section of the Adamantite skill.\n'
+        ? '- Write project-specific lint rules in `.adamantite/lint/`, one rule for each file. Run `adamantite rule add <name>` to start a rule, and follow the "Custom rules" section of the Adamantite skill.\n'
         : "",
     end: ADAMANTITE_AGENTS_END_MARKER,
     scripts:

@@ -2,8 +2,20 @@
 "adamantite": minor
 ---
 
-`adamantite rule add <name>` now also writes `tests/<name>.ts` in the rules folder: a `RuleTester` test with one valid case and one invalid case. A new command, `adamantite rule test`, runs the tests of every rules folder that a `custom()` call loads with `node --test`, and exits with its exit code. It warns about a `custom()` call whose `dir` is not a string literal, and an import that it cannot follow, because it cannot run the tests behind them. The tests run under Node.js in every project, Bun projects too, and the project's own Vitest or Jest run does not find them. `adamantite check` does not run them.
+Add `adamantite/rules/testing` for temporary agent verification
 
-Add `adamantite/rules/testing`, which exports `RuleTester` connected to `node:test`, so a rule test has one import and each case reports by name. `oxlint` is now an optional peer dependency.
+Agents use `RuleTester` with valid and invalid cases from stdin or a temporary file while they
+write or harden custom rules. They remove the verification cases and fixtures before handback.
+By default, the target project keeps only the rules, their runtime helpers, and the required config.
+`RuleTester` connects to `node:test`, so a failed case makes the verification command fail,
+also in a Bun project that runs the command with Node.js. `oxlint` is an optional peer dependency.
 
-When the rule or its test exists, `rule add` writes nothing, and the error names each file that exists. The rule stub sorts its keys, so `adamantite check` accepts it without `fix`. The "Custom rules" section of the Adamantite skill now teaches `rule test`, how to put the logic of a large rule in a `_<name>.ts` helper, how to write a message that says what to do instead, and when a rule earns its place.
+`rule add` writes only a rule stub. Users can opt in with `adamantite rule add test [name]`.
+Without a name, it lists existing rules for selection. A named rule must already exist.
+The command writes `<name>.test.ts` beside the rule; `--path <file>` chooses another test path.
+Run saved tests explicitly with `adamantite rule test`, or give it `--path` for a test saved
+elsewhere. The plugin loader and Doctor do not treat `.test.*` files as rules.
+
+Automatic test scaffolding, CI test steps, and post-handoff test runs are removed.
+Doctor preserves user-owned tests and optional CI steps. Init keeps an existing workflow
+that explicitly runs `rule test`, including its setup and other settings.

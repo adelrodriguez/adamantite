@@ -12,7 +12,6 @@ sources:
   - "adelrodriguez/adamantite:src/lib/workspace/agents-section.md"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/index.ts"
   - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/stub.ts.template"
-  - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/stub.test.ts.template"
 ---
 
 # Adamantite
@@ -247,7 +246,7 @@ no human can approve, stop after you show the candidates. In an interactive term
 offers a handoff to an installed coding agent CLI, a copy of the prompt, or nothing. In a
 monorepo, `--path` limits the session to one workspace package or folder. `--commits` sets how many
 recent commits the agent reads for fixed mistakes, and the default is 200. After a
-handoff, it runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of
+handoff, it runs `check`, then the Doctor assessment, and exits 1 when either of
 them fails, or when the session added a link to a Markdown file that does not exist. `harden` never
 produces Doctor findings. The prompt lists the disable comments of each rule, and marks each file
 of an override that turns a rule off. Use `adamantite rule try` for each trial that the prompt
@@ -268,19 +267,30 @@ from the skill in the installed package. It then reports any remaining doctor fi
 
 ## Custom rules
 
-Each file in the rules folder, `.adamantite/rules/` by default, is an Oxlint rule that this
-project owns. `custom()` from `adamantite/lint/custom` loads the folder and enables each
+Each rule file in the rules folder, `.adamantite/lint/` by default, is an Oxlint rule that this
+project owns. `custom()` from `adamantite/rules` loads the folder and enables each
 rule as `error` under the `project` plugin: `no-process-env.ts` becomes
 `project/no-process-env`. Add a file to add a rule. Delete the file to remove the rule.
-`adamantite rule add <name>` writes a correct stub, and a test for it in `tests/<name>.ts` in the
-rules folder. `adamantite rule test` runs the tests.
+`adamantite rule add <name>` writes only a rule stub. Keep the rule and the helpers that it uses
+in the project. RuleTester and its cases are internal agent verification: use them while you work,
+and remove your temporary cases, fixtures, and verification-only helpers before handback.
+Preserve user-owned saved rule tests. Keep new saved tests only when the user asks for them.
+During harden, use `adamantite rule add test <name>` to prepare temporary cases beside a new
+rule, adapt the cases, run `adamantite rule test --path <test-file>`, and remove the test after
+verification. The command fails if a test already exists; preserve that test and use temporary
+cases from stdin for additional verification.
+
+When Doctor reports the previous custom-rules API, replace `adamantite/lint/custom` with
+the default import from `adamantite/rules`. Move authoring imports from `adamantite/rules`
+to `adamantite/rules/plugin`. Move the old default folder to `.adamantite/lint`, or set its
+path explicitly with `dir`. Preserve rule behavior, plugin names, severity, and options.
 
 Write a rule only for a pattern that recurs. A rule that guards one file costs more than it
 saves.
 
-- A file that starts with `_`, such as `_helpers.ts`, is a helper, not a rule. Subfolders are
-  not read.
-- Export the rule as default with `defineRule` from `adamantite/rules`. The same module exports
+- A file that starts with `_`, such as `_helpers.ts`, is a helper, not a rule. Declaration files
+  and `.test.*` files are not rules. Subfolders are not read.
+- Export the rule as default with `defineRule` from `adamantite/rules/plugin`. The same module exports
   the `Context`, `Rule`, `Visitor`, and `ESTree` node types.
 - Use `createOnce`. It runs one time for each lint run, not one time for each file. Reset
   per-file state in `before`, and report collected results in `after`. `context.filename`,
@@ -305,35 +315,62 @@ saves.
 - When a rule has much logic, keep the rule file thin. Put the logic in plain functions in a
   `_<name>.ts` helper, such as a function that gets an import path and returns its layer. The
   rule file only connects the functions to the visitors. Test the rule through `RuleTester` as
-  usual. Test the helper functions directly only when the cases are too many for `RuleTester`.
-  Those tests import `node:test`, so type-aware lint needs `@types/node`.
+  usual, with temporary cases. Verify a helper directly only when its cases are too many for
+  `RuleTester`, and discard those verification cases too.
 - The message tells the author what to do instead, and links the standard or the doc that
   states it, such as `CODING_STANDARDS.md` or `docs/architecture.md`.
-- The test that `rule add` writes runs the rule through `RuleTester` from
-  `adamantite/rules/testing`. Put the code that the rule reports in `invalid`, and similar code
-  that it accepts in `valid`. A file in `tests/` that starts with `_` is a helper, not a test.
-- Run `adamantite rule test` after you change a rule. It runs the tests of every rules folder
-  that a `custom()` call loads with `node --test`, also in a Bun project, and fails with the
-  name of each case that fails. `adamantite check` does not run rule tests. When a `dir` is not a
-  string literal, `rule test` cannot find that rules folder: it warns, and does not run its tests.
-- The Adamantite GitHub Actions workflow runs `adamantite rule test` when the project has
-  rule tests. After the first `rule add`, `adamantite doctor` reports a workflow that does not
-  run it. Follow that finding.
-- The project's Vitest or Jest run does not find the rule tests, because `tests/<name>.ts` has
-  no `.test` suffix and is not in `__tests__/`. Do not rename them.
+- Before you finish a new rule or a change to a rule, use `RuleTester` from
+  `adamantite/rules/testing`. Put code that must report in `invalid`, and similar code that
+  must pass in `valid`. Cover the syntax forms and file paths that the standard applies to.
+- For a bug fix, run a temporary regression case first and confirm that it fails. Then fix
+  the rule and confirm that all valid and invalid cases pass. Change a case only when it is
+  wrong, and explain that change.
+- Run verification from stdin, as below, or from a temporary test file beside the rule.
+  Use Node.js even in a Bun project. Do not add saved tests or a CI step by default.
+- Remove your temporary cases and fixtures before handback. Preserve existing user-owned tests
+  and CI steps, and keep the rule, its runtime helpers, and the required config. Report the cases and the verification result briefly.
 - Oxlint caches the rules for each run. Restart the editor language server after you change a
   rule.
-- TypeScript does not check `.adamantite/rules/` by default, because its name starts with a dot. Add
-  `".adamantite/rules"` to `include` in `tsconfig.json` to check it.
+- TypeScript does not check `.adamantite/lint/` by default, because its name starts with a dot. Add
+  `".adamantite/lint"` to `include` in `tsconfig.json` to check it.
 - In a monorepo, give each rules folder its own plugin name, such as `custom({ name: "web" })`:
   Oxlint rejects two plugins with the same name in one run. A relative `dir` resolves from the
   file that calls `custom()`, so a shared tooling package can own the rules with
   `custom({ dir: "rules", name: "acme" })`. A nested Oxlint config replaces the root config, so
   a package that needs the root rules extends the root config.
-- `adamantite analyze` treats the rule files in `.adamantite/rules/` and in its `tests/` folder as
+- `adamantite analyze` treats the rule files and optional `.test.*` files in `.adamantite/lint/` as
   Knip entry files, in the root and in each workspace package. Knip still reports a helper that no
   file imports. For a rules folder at another path, set `oxlint.entry` in `knip.config.ts` to the
   patterns of the preset and of that folder.
+
+For the stub from `adamantite rule add no-debugger`, run this from the project root.
+Adapt the cases after you write the rule:
+
+```sh
+node --input-type=module <<'JS'
+import { RuleTester } from "adamantite/rules/testing"
+import rule from "./.adamantite/lint/no-debugger.ts"
+
+new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } }).run("no-debugger", rule, {
+  invalid: [{ code: "debugger", errors: [{ messageId: "unexpected" }] }],
+  valid: ["const value: number = 1"],
+})
+JS
+```
+
+Verification is complete when every case passes, the command exits 0, and the project has
+no temporary verification cases or fixtures left from your work. Then run `adamantite check` and `adamantite doctor`.
+
+Users can opt in to saved tests with `adamantite rule add test`. It lists existing rules for
+selection. `adamantite rule add test no-debugger` skips the list and fails if the rule does not
+exist. The command writes `no-debugger.test.ts` beside `no-debugger.ts`; `--dir` selects another
+rules folder. Adapt the generated valid and invalid cases to the rule. `--path <file>` writes
+the test elsewhere, with a relative import of the rule. Existing files stay unchanged.
+Run saved tests explicitly with `adamantite rule test`, or `adamantite rule test --path <file>`
+for a test saved elsewhere. Use `.test.ts` for tests in the rules folder so the plugin does not
+load them as rules. Init, CI generation, and harden do not run saved tests by default.
+For another rules folder, keep its rule and test patterns in the Knip `oxlint.entry` setting.
+For a test outside the rules folder, add that file to the Knip entry settings if needed.
 
 ## Decision guide
 

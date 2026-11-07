@@ -1,4 +1,4 @@
-import { defineRule } from "adamantite/rules"
+import { defineRule } from "adamantite/rules/plugin"
 
 export default defineRule({
   createOnce(context) {

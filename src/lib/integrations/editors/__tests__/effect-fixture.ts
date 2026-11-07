@@ -4,7 +4,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 const PLATFORM = `${process.platform}-${process.arch}`
 const PLATFORM_DIRECTORY = `node_modules/@effect/tsgo-${PLATFORM}`
 export const EFFECT_COMPILER = `${PLATFORM_DIRECTORY}/lib/${process.platform === "win32" ? "tsc.exe" : "tsc"}`
-export const EFFECT_SDK = "node_modules/.cache/adamantite/effect-sdk"
+export const EFFECT_SDK = "node_modules/.cache/adamantite/effect"
 
 export function effectEditorFiles() {
   return {

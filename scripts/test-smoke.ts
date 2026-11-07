@@ -246,7 +246,7 @@ try {
     join(effectFixture, "index.ts"),
     'import * as Effect from "effect/Effect"\n\nexport const value = Effect.succeed(1)\n'
   )
-  const sdkDirectory = join(effectFixture, "node_modules", ".cache", "adamantite", "effect-sdk")
+  const sdkDirectory = join(effectFixture, "node_modules", ".cache", "adamantite", "effect")
   const sdkCompiler = join(sdkDirectory, process.platform === "win32" ? "tsc.exe" : "tsc")
   assertIncludes(
     run(sdkCompiler, ["--version"], { cwd: effectFixture, env: effectEnv }),
@@ -258,7 +258,7 @@ try {
   })
   assertFileContains(
     join(effectFixture, ".vscode", "settings.json"),
-    '"js/ts.tsdk.path": "node_modules/.cache/adamantite/effect-sdk"'
+    '"js/ts.tsdk.path": "node_modules/.cache/adamantite/effect"'
   )
   assertFileContains(
     join(effectFixture, ".vscode", "settings.json"),

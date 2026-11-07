@@ -9,7 +9,7 @@ the Effect compiler's diagnostics; that option is not part of the effect preset.
 
 VS Code needs an SDK folder with a native executable. Init copies the compiler that matches the
 installed TypeScript `gitHead`, with its standard libraries, into
-`node_modules/.cache/adamantite/effect-sdk/`. The user selected a cache inside `node_modules` rather
+`node_modules/.cache/adamantite/effect/`. The user selected a cache inside `node_modules` rather
 than a folder in the project root. The shared setting has no host-specific path. A copy works on
 Windows without symbolic-link permissions and leaves installed package files unchanged. We
 accept preparing the cache after a fresh install or dependency update in exchange for keeping

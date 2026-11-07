@@ -10,7 +10,7 @@ import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
 import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
-export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect-sdk"
+export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect"
 const SDK_METADATA = "adamantite-sdk.json"
 const NATIVE_TYPESCRIPT = Schema.Struct({
   gitHead: Schema.NonEmptyString,

@@ -536,7 +536,7 @@ does not start, and the message names the versions that it supports. `@effect/ts
 builds for Linux with musl.
 
 VS Code uses a copy of the Effect compiler and its standard libraries in
-`node_modules/.cache/adamantite/effect-sdk/`. Init creates this cache without changing installed
+`node_modules/.cache/adamantite/effect/`. Init creates this cache without changing installed
 package files. Zed starts the project's installed `effect-tsgo` CLI with `tsc --lsp --stdio`.
 Both use a native TypeScript version that the installed `@effect/tsgo` supports.
 

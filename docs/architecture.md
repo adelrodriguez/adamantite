@@ -126,7 +126,7 @@ versions. Doctor renders package drift as findings that tell the user to run `up
 warns the user and points to `adamantite doctor`.
 
 The editor integrations select the installed Effect language server when `@effect/tsgo` is
-present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect-sdk/`, prepared by
+present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, prepared by
 `init`. The editor helper matches the installed TypeScript `gitHead` to the Effect build and copies
 its compiler and standard libraries. Zed starts the upstream CLI through Node.js. Both editor
 integrations hide duplicate Oxlint Effect reports, so the Effect server can supply diagnostics

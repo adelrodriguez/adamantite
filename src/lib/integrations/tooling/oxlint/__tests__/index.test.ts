@@ -119,6 +119,47 @@ describe("oxlint", () => {
       })
     )
 
+    it.effect("give read-only migration instructions for old maps in a shared config", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxlint.config.ts": 'export { default } from "./tooling/lint.ts"\n',
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+          "tooling/lint.ts": `export default {
+  rules: {
+    "adamantite/layers": ["error", {
+      root: "src/lib",
+      layers: { shared: [], workspace: ["shared"] },
+      ignore: ["**/__tests__/**"],
+    }],
+  },
+}\n`,
+        })
+        const before = files.list().map((file) => [file, files.read(file)])
+        const result = yield* runAssess(files)
+
+        expect(result.applicable).toBe(true)
+
+        if (result.applicable) {
+          const finding = result.findings.find((item) => item.id === "layers-map-migration")
+
+          expect(finding).toMatchObject({
+            currentState: expect.stringContaining("tooling/lint.ts"),
+            goal: expect.arrayContaining([
+              expect.stringContaining("imports"),
+              expect.stringContaining("Preserve"),
+              expect.stringContaining("adamantite check"),
+            ]),
+            integration: "oxlint",
+          })
+        }
+
+        expect(files.list().map((file) => [file, files.read(file)])).toStrictEqual(before)
+      })
+    )
+
     it.effect("report not applicable when no managed lint script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({

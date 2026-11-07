@@ -548,8 +548,9 @@ adamantite init --non-interactive --script check --preset effect --editor vscode
 ```
 
 Init installs the TypeScript 7 extension for VS Code when `--install-extensions` is set.
-Select the workspace TypeScript SDK when VS Code asks. Install Zed's TypeScript language server
-extension (`zed://extension/tsgo`); the managed server ID is `typescript-ls`.
+In VS Code, run **TypeScript: Select TypeScript Version...**, then select **Use Workspace Version**
+to use the Effect SDK. Install Zed's TypeScript language server extension (`zed://extension/tsgo`);
+the managed server ID is `typescript-ls`.
 
 After a fresh dependency install or an update, run
 `adamantite init --non-interactive --script check --editor vscode` to prepare or refresh the SDK cache.

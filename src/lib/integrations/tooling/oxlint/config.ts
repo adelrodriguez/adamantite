@@ -44,6 +44,7 @@ export const LINT_PRESETS = [
   "jest",
   "vitest",
   "node",
+  "architecture",
   "strict",
   "antislop",
   "shadcn",

@@ -45,8 +45,8 @@ function listSourceFiles(dir: string): string[] {
 }
 
 /**
- * Lint one model in a real Oxlint run through the strict preset, and return the files that the rule
- * reported.
+ * Lint one model in a real Oxlint run through the architecture preset, and return the files that
+ * the rule reported.
  */
 function lintModel(options: ModelFixtureOptions, tempDir: string, model: string): Set<string> {
   const projectDir = join(tempDir, model)
@@ -57,10 +57,10 @@ function lintModel(options: ModelFixtureOptions, tempDir: string, model: string)
     join(projectDir, "oxlint.config.ts"),
     [
       'import { defineConfig } from "oxlint"',
-      `import strict from ${JSON.stringify(join(REPO_ROOT, "presets/lint/strict.ts"))}`,
+      `import architecture from ${JSON.stringify(join(REPO_ROOT, "presets/lint/architecture.ts"))}`,
       `import fragment from ${JSON.stringify(`./${options.configFile}`)} with { type: "json" }`,
       "",
-      "export default defineConfig({ extends: [strict], ...fragment })",
+      "export default defineConfig({ extends: [architecture], ...fragment })",
       "",
     ].join("\n")
   )

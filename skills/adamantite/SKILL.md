@@ -34,7 +34,7 @@ values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`, `jest`,
-  `vitest`, `node`, `strict`, `antislop`, `shadcn`;
+  `vitest`, `node`, `architecture`, `strict`, `antislop`, `shadcn`;
   editors: `vscode`, `zed`
 - Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, `opencode`. Init
   installs this skill for each one with the `skills` CLI.
@@ -67,7 +67,8 @@ The `strict` preset's `no-warning-comments` rule reports a comment that starts w
 `FIXME`, `XXX`, or `HACK`. Fix the code now, or track the work in the project's issue tracker.
 Do not rename the marker or rephrase the comment only to silence the report.
 
-The `strict` preset also loads `adamantite/layers`, which enforces one-way imports between the
+The `architecture` preset loads the first-party plugin without enabling rules. The `strict`
+preset also loads it. Configure `adamantite/layers` to enforce one-way imports between the
 folders of a root, such as `src/lib`. The project turns it on with its layer map: each layer by
 folder name, with the layers directly below it. Imports are transitive.
 
@@ -95,7 +96,7 @@ inside `lib`. A file below two roots must pass both maps. Follow the repair
 in each message. Do not add a layer to another layer's list, or add an `ignore` glob, only to
 silence a report.
 
-The `strict` preset also loads `adamantite/import-owners`, which restricts an import to the files
+The plugin also provides `adamantite/import-owners`, which restricts an import to the files
 and folders that own it, such as a wrapper module. The project turns it on: each option after the
 severity is one import and its owners, by path relative to the workspace root, or to the
 `package.json` folder outside a workspace. An owner folder covers every file below it, and a

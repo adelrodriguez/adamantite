@@ -11,7 +11,7 @@ import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
+import { getImportedLintPresets, LINT_PRESETS } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
@@ -187,6 +187,16 @@ describe("init", () => {
     )
   })
 
+  it.effect("offer every selectable lint preset in interactive init", () =>
+    Effect.gen(function* () {
+      const { prompter } = yield* runFreshSetup()
+
+      expect(prompter.multiselectCalls[1]).toMatchObject({
+        options: LINT_PRESETS.map((value) => ({ value })),
+      })
+    })
+  )
+
   describe("legacy config handling", () => {
     it.effect.each([
       {
@@ -251,6 +261,8 @@ describe("init", () => {
           "--preset",
           "react-strict",
           "--preset",
+          "architecture",
+          "--preset",
           "strict",
           "--preset",
           "tanstack",
@@ -262,11 +274,12 @@ describe("init", () => {
       expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
         "react",
         "react-strict",
+        "architecture",
         "strict",
         "tanstack",
       ])
       expect(installer.calls[0]?.packages).toStrictEqual(
-        expect.not.arrayContaining([expect.stringMatching(/strict|tanstack/)])
+        expect.not.arrayContaining([expect.stringMatching(/architecture|strict|tanstack/)])
       )
     })
   )

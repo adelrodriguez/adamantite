@@ -224,6 +224,19 @@ try {
 
   run("npm", ["install", "--save-dev", join(packDirectory, tarball)], { cwd: fixture })
 
+  run(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      [
+        'import architecture from "adamantite/lint/architecture"',
+        'if (Object.keys(architecture.rules ?? {}).length > 0) throw new Error("The architecture preset must enable no rules")',
+      ].join("\n"),
+    ],
+    { cwd: fixture }
+  )
+
   console.info("Checking Effect editor setup after an install with scripts disabled...")
   writeFileSync(
     join(effectFixture, "package.json"),
@@ -386,6 +399,8 @@ try {
       "check",
       "--script",
       "analyze",
+      "--preset",
+      "architecture",
       "--typescript",
       "--agents",
       "--github-actions",
@@ -398,6 +413,7 @@ try {
   assertFileContains(join(fixture, "package.json"), '"adamantite": "file:')
 
   assertFileContains(join(fixture, "oxlint.config.ts"), "adamantite/lint")
+  assertFileContains(join(fixture, "oxlint.config.ts"), "adamantite/lint/architecture")
   assertFileContains(join(fixture, "oxfmt.config.ts"), "adamantite/format")
   assertFileContains(join(fixture, "knip.config.ts"), "adamantite/analyze")
   assertFileContains(join(fixture, "tsconfig.json"), "adamantite/typescript")

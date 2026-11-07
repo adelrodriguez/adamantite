@@ -95,7 +95,7 @@ Available setup values:
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`,
-  `jest`, `vitest`, `node`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
+  `jest`, `vitest`, `node`, `architecture`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
 - Editors: `vscode` and `zed`.
 - Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, and `opencode`.
 
@@ -348,6 +348,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/jest`         | Jest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                            |
 | `adamantite/lint/vitest`       | Vitest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                          |
+| `adamantite/lint/architecture` | Load first-party rules for project-defined layer maps and import owners. No rules are enabled by default.                                                                                                                                                                              |
 | `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, no type assertions outside tests, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                                                                        |
 | `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
 | `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
@@ -602,6 +603,42 @@ The preset enables only rules that report Effect code. It does not ban platform 
 as `Date.now()` or `process.env`, in code that is not Effect code. Inside Effect code, it
 reports them, because `Clock`, `Random`, and `Config` let tests control them. See
 [ADR 0007](docs/adr/0007-effect-preset-patches-oxlint.md) for the criteria.
+
+### The architecture preset
+
+`adamantite/lint/architecture` loads the first-party plugin without enabling any rules.
+Use it to configure `adamantite/layers` and `adamantite/import-owners` without the other
+rules of `strict`. It needs no extra package. The `strict` preset still loads the same plugin.
+
+```ts
+import core from "adamantite/lint"
+import architecture from "adamantite/lint/architecture"
+import { defineConfig } from "oxlint"
+
+export default defineConfig({
+  extends: [core, architecture],
+  ignorePatterns: core.ignorePatterns,
+  rules: {
+    "adamantite/layers": [
+      "error",
+      {
+        root: "src/lib",
+        layers: { shared: [], services: ["shared"] },
+      },
+    ],
+    "adamantite/import-owners": [
+      "error",
+      { import: "giget", owners: ["src/lib/services/download.ts"] },
+    ],
+  },
+})
+```
+
+Each option after the severity is one layer map or one import and its owners. Set these
+options for your project. The preset enables neither rule by default.
+
+You can also select it during setup with
+`adamantite init --non-interactive --script check --preset architecture`.
 
 ### The strict preset
 

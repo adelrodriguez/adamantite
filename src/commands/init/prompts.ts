@@ -120,6 +120,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "node",
         },
         {
+          hint: "Load layer and import-owner rules, then configure them in your project",
+          label: "architecture",
+          value: "architecture",
+        },
+        {
           hint: "Framework-neutral strictness: no deep or wide destructuring, no type assertions outside tests",
           label: "strict",
           value: "strict",

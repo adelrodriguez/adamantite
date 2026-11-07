@@ -4,32 +4,27 @@ import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { DummyRule, OxlintConfig } from "oxlint"
-import {
-  DEFAULT_DIRECTORY,
-  DEFAULT_PLUGIN_NAME,
-  getRuleName,
-  listRuleFiles,
-} from "../rules/folder.ts"
+import { DEFAULT_DIRECTORY, DEFAULT_PLUGIN_NAME, getRuleName, listRuleFiles } from "./folder.ts"
 
 // Custom rules are Oxlint rules that the target project writes in its own rules folder. `custom()`
 // runs while Oxlint loads the config. It lists the rule files, enables each one, and points Oxlint
-// at a small entry module that loads the folder through `loadRules` from `adamantite/rules`.
+// at a small entry module that loads the folder through the internal `loadRules` module.
 //
 // Oxlint caches a plugin module by its path and drops query strings, so each rules folder gets its
 // own entry module file. The entry module imports `loadRules` by file URL, so it works from the
-// temporary directory too. The source tree holds `rules/index.ts` and the dist tree holds
-// `rules/index.js`, so the extension follows the extension of this module. This module runs under
+// temporary directory too. The source tree holds `rules/load.ts` and the dist tree holds
+// `rules/load.js`, so the extension follows the extension of this module. This module runs under
 // whatever runtime executes oxlint in the target project, so it uses only APIs that Node.js and Bun
 // both provide.
 const MODULE_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
-const RULES_MODULE_URL = new URL(`../rules/index.${MODULE_EXTENSION}`, import.meta.url).href
+const RULES_MODULE_URL = new URL(`load.${MODULE_EXTENSION}`, import.meta.url).href
 
 const CACHE_DIRECTORY = join("node_modules", ".cache", "adamantite")
 
 export interface CustomRulesOptions {
   /**
    * The rules folder. A relative path resolves from the file that calls `custom()`, not from the
-   * working directory. Default: `.adamantite/rules`.
+   * working directory. Default: `.adamantite/lint`.
    */
   readonly dir?: string
   /**
@@ -172,7 +167,7 @@ function writeEntryModule(dir: string, name: string) {
  * ```ts
  * import { defineConfig } from "oxlint"
  * import core from "adamantite/lint"
- * import custom from "adamantite/lint/custom"
+ * import custom from "adamantite/rules"
  *
  * export default defineConfig({ extends: [core, custom()] })
  * ```

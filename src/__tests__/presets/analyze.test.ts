@@ -62,27 +62,27 @@ describe("analyze preset", () => {
     rmSync(project, { force: true, recursive: true })
   })
 
-  it("keep rule files, rule tests, and their helpers in the rules folder", () => {
-    write(".adamantite/rules/_shared.ts", "export const message = 'No foo.'\n")
+  it("keep rule files, optional rule tests, and their helpers in the rules folder", () => {
+    write(".adamantite/lint/_shared.ts", "export const message = 'No foo.'\n")
     write(
-      ".adamantite/rules/no-foo.ts",
+      ".adamantite/lint/no-foo.ts",
       `import { message } from "./_shared.ts"\n\nexport default { create: () => ({}), message }\n`
     )
-    write(".adamantite/rules/no-bar.mjs", RULE)
-    write(".adamantite/rules/tests/no-foo.ts", 'import rule from "../no-foo.ts"\n\nvoid rule\n')
+    write(".adamantite/lint/no-bar.mjs", RULE)
+    write(".adamantite/lint/no-foo.test.ts", 'import rule from "./no-foo.ts"\n\nvoid rule\n')
     write("src/unused.ts", "export const unused = 1\n")
 
     expect(findUnusedFiles()).toStrictEqual(["src/unused.ts"])
   })
 
   it("report a helper in the rules folder that no file imports", () => {
-    write(".adamantite/rules/no-foo.ts", RULE)
-    write(".adamantite/rules/_unused.ts", "export const unused = 1\n")
-    write(".adamantite/rules/tests/_unused.ts", "export const unused = 1\n")
+    write(".adamantite/lint/no-foo.ts", RULE)
+    write(".adamantite/lint/_unused.ts", "export const unused = 1\n")
+    write(".adamantite/lint/_unused.test.ts", "export const unused = 1\n")
 
     expect(findUnusedFiles()).toStrictEqual([
-      ".adamantite/rules/_unused.ts",
-      ".adamantite/rules/tests/_unused.ts",
+      ".adamantite/lint/_unused.test.ts",
+      ".adamantite/lint/_unused.ts",
     ])
   })
 
@@ -91,10 +91,10 @@ describe("analyze preset", () => {
       "package.json",
       JSON.stringify({ name: "fixture", private: true, type: "module", workspaces: ["packages/*"] })
     )
-    write(".adamantite/rules/no-foo.ts", RULE)
+    write(".adamantite/lint/no-foo.ts", RULE)
     write("packages/web/package.json", JSON.stringify({ name: "web", type: "module" }))
     write("packages/web/src/index.ts", "export const value = 1\n")
-    write("packages/web/.adamantite/rules/no-bar.ts", RULE)
+    write("packages/web/.adamantite/lint/no-bar.ts", RULE)
 
     expect(findUnusedFiles()).toStrictEqual([])
   })

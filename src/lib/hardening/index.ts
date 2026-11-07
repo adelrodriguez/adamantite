@@ -243,7 +243,7 @@ function renderAgentReach(reach: AgentReach) {
 
 function renderRulesFolders(context: HardenContext) {
   if (context.rulesFolders.length === 0 && context.unresolvedCalls.length === 0) {
-    return `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/lint/custom\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`
+    return `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/rules\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`
   }
 
   return [

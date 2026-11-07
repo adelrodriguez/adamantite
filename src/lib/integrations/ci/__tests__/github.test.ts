@@ -25,9 +25,9 @@ const WORKFLOW_PATH = ".github/workflows/adamantite.yml"
 
 // A rules folder that `custom()` loads, with one rule and no test.
 const RULE_FILES = {
-  ".adamantite/rules/no-a.ts": "export default {}\n",
+  ".adamantite/lint/no-a.ts": "export default {}\n",
   "oxlint.config.ts": [
-    'import custom from "adamantite/lint/custom"',
+    'import custom from "adamantite/rules"',
     'import { defineConfig } from "oxlint"',
     "",
     "export default defineConfig({ extends: [custom()] })",
@@ -35,7 +35,7 @@ const RULE_FILES = {
   ].join("\n"),
 }
 
-const RULE_TEST_FILES = { ...RULE_FILES, ".adamantite/rules/tests/no-a.ts": "// test\n" }
+const RULE_TEST_FILES = { ...RULE_FILES, ".adamantite/lint/no-a.test.ts": "// test\n" }
 
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({
@@ -488,57 +488,19 @@ describe("github", () => {
       })
     )
 
-    it.effect("report a missing rule test command when the project has rule tests", () =>
+    it.effect("not require a rule test command even when saved tests remain", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           ...RULE_TEST_FILES,
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check"),
         })
-        const result = yield* readProject(ROOT, packageJson).pipe(
-          Effect.flatMap((project) => github.assess(project)),
-          provideAssessment(files)
-        )
 
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState:
-                "The workflow does not run `adamantite rule test`, and the project has custom rule tests.",
-              goal: expect.arrayContaining([
-                "Make the workflow run `adamantite rule test`, so that CI runs the custom rule tests.",
-              ]),
-              id: "outdated-adamantite-workflow",
-              notes: expect.arrayContaining([
-                "With `pnpm`, run the custom rule tests with `pnpm exec adamantite rule test`.",
-              ]),
-            },
-          ],
-        })
-      })
-    )
-
-    it.effect("tell a Deno project that the rule test job needs a Node.js setup step", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          ...RULE_TEST_FILES,
-          [WORKFLOW_PATH]: makeWorkflow("- run: deno task check"),
-        })
-        const result = yield* readProject(ROOT, packageJson).pipe(
-          Effect.flatMap((project) => github.assess(project)),
-          provideAssessment(files, "deno")
-        )
-
-        expect(result).toMatchObject({
-          findings: [
-            {
-              id: "outdated-adamantite-workflow",
-              notes: expect.arrayContaining([
-                "`adamantite rule test` runs the tests with Node.js 22.18 or later, so the Deno workflow also needs an `actions/setup-node` step before the tests run.",
-              ]),
-            },
-          ],
-        })
+        expect(
+          yield* readProject(ROOT, packageJson).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files)
+          )
+        ).toMatchObject({ findings: [] })
       })
     )
 
@@ -558,7 +520,7 @@ describe("github", () => {
           { command: '"pnpm exec adamantite rule test"', name: "rule test" }
         ),
       },
-    ])("accept a rule test command in $name", ({ workflow }) =>
+    ])("accept an optional rule test command in $name", ({ workflow }) =>
       Effect.gen(function* () {
         const files = makeFiles({ ...RULE_TEST_FILES, [WORKFLOW_PATH]: workflow })
 
@@ -573,36 +535,23 @@ describe("github", () => {
       })
     )
 
-    it.effect("report a missing rule test command when no managed script runs in CI", () =>
+    it.effect("accept an optional rule test command without managed scripts", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          ...RULE_TEST_FILES,
-          [WORKFLOW_PATH]: makeWorkflow("- run: pnpm install"),
+          [WORKFLOW_PATH]: makeWorkflow("- run: pnpm exec adamantite rule test"),
         })
+        const before = files.read(WORKFLOW_PATH)
         const result = yield* readProject(ROOT, { name: "app", version: "1.0.0" }).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
         )
 
-        expect(result).toMatchObject({
-          findings: [
-            {
-              currentState:
-                "The workflow does not run `adamantite rule test`, and the project has custom rule tests.",
-              // The project has no managed `check` script, so the finding does not ask for it.
-              goal: [
-                "Make the workflow run `adamantite rule test`, so that CI runs the custom rule tests.",
-                "Use the project's Node.js version declaration instead of a hard-coded version.",
-              ],
-              id: "outdated-adamantite-workflow",
-            },
-          ],
-          warnings: [],
-        })
+        expect(result).toMatchObject({ findings: [], warnings: [] })
+        expect(files.read(WORKFLOW_PATH)).toBe(before)
       })
     )
 
-    it.effect("accept a rule test command in a run block scalar", () =>
+    it.effect("accept an optional rule test command in a run block scalar", () =>
       Effect.gen(function* () {
         const files = makeFiles({
           ...RULE_TEST_FILES,
@@ -898,15 +847,9 @@ describe("github", () => {
       })
     )
 
-    it.effect.each([
-      { command: "bunx adamantite rule test", packageManager: "bun" },
-      { command: "deno run -A npm:adamantite rule test", packageManager: "deno" },
-      { command: "npx adamantite rule test", packageManager: "npm" },
-      { command: "pnpm exec adamantite rule test", packageManager: "pnpm" },
-      { command: "yarn adamantite rule test", packageManager: "yarn" },
-    ] as const)(
-      "run the custom rule tests with $packageManager when the project has rule tests",
-      ({ command, packageManager }) =>
+    it.effect.each(["bun", "deno", "npm", "pnpm", "yarn"] as const)(
+      "omit saved rule tests from the workflow for %s",
+      (packageManager) =>
         Effect.gen(function* () {
           const files = makeFiles(RULE_TEST_FILES)
 
@@ -914,7 +857,13 @@ describe("github", () => {
             .create(ROOT, { packageManager, scripts: ["check", "analyze"] })
             .pipe(provideFallback(files))
 
-          expect(getMatrixJobs(files).slice(2)).toStrictEqual([{ command, name: "rule test" }])
+          expect(getMatrixJobs(files).map((entry) => entry.name)).toStrictEqual([
+            "check",
+            "analyze",
+          ])
+          if (packageManager === "deno") {
+            expect(getSetupNodeInputs(files)).toBeUndefined()
+          }
         })
     )
 
@@ -957,25 +906,6 @@ describe("github", () => {
         })
     )
 
-    it.effect("set up Node.js for deno when the project has rule tests", () =>
-      Effect.gen(function* () {
-        const files = makeFiles(RULE_TEST_FILES)
-
-        yield* github
-          .create(ROOT, { packageManager: "deno", scripts: ["check"] })
-          .pipe(provideFileResolver(files))
-
-        expect(readGeneratedWorkflow(files).steps.map((step) => step.name)).toStrictEqual([
-          "Checkout",
-          "Setup Node.js",
-          "Setup Deno",
-          "Install dependencies",
-          `Run \${{ matrix.name }}`,
-        ])
-        expect(getSetupNodeInputs(files)).toStrictEqual({ "node-version-file": ".node-version" })
-      })
-    )
-
     it.effect("not render a Node setup step for deno when the project has no rule tests", () =>
       Effect.gen(function* () {
         const files = makeFiles()
@@ -993,6 +923,38 @@ describe("github", () => {
   })
 
   describe("update", () => {
+    it.effect.each([
+      {
+        name: "an explicit test step and its Node setup",
+        packageManager: "deno",
+        workflow: makeWorkflow(
+          "- uses: actions/setup-node@v7",
+          "  with:",
+          '    node-version-file: ".node-version"',
+          "- run: deno task check",
+          "- run: deno run -A npm:adamantite rule test"
+        ),
+      },
+      {
+        name: "an explicit test matrix entry",
+        packageManager: "pnpm",
+        workflow: makeMatrixWorkflow(
+          { command: "pnpm run check", name: "check" },
+          { command: "pnpm exec adamantite rule test", name: "rule test" }
+        ),
+      },
+    ] as const)("preserve $name", ({ packageManager, workflow }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ ...RULE_TEST_FILES, [WORKFLOW_PATH]: workflow })
+
+        yield* github
+          .update(ROOT, { packageManager, scripts: ["check", "analyze"] })
+          .pipe(provideFallback(files))
+
+        expect(files.read(WORKFLOW_PATH)).toBe(workflow)
+      })
+    )
+
     it.effect("update an existing workflow", () =>
       Effect.gen(function* () {
         const files = makeFiles({ [WORKFLOW_PATH]: "name: Old Workflow" })

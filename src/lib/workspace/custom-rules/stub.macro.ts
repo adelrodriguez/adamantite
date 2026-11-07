@@ -9,7 +9,7 @@ export function getStubTemplate(): string {
 }
 
 /**
- * Build-time macro that inlines `stub.test.ts.template`, the rule test that `rule add` writes.
+ * Inline the optional test template. Only `rule add test` writes it.
  */
 export function getTestStubTemplate(): string {
   return readFileSync(new URL("stub.test.ts.template", import.meta.url), "utf8")

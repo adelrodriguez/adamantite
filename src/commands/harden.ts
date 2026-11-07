@@ -1,7 +1,6 @@
 import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
-import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
@@ -9,7 +8,6 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
 import { assessProject } from "#lib/assessment/index.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
   readHardenContext,
@@ -27,7 +25,6 @@ import {
 } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Toolchain from "#lib/toolchain/index.ts"
-import { readCustomRuleTestCommand } from "#lib/workspace/custom-rules/index.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readWorkspace } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -186,44 +183,21 @@ export default Command.make("harden", { commits, scope }).pipe(
       }
 
       const { agent } = resolution
-      const runner = yield* CommandRunner
-      // A step that fails or cannot start fails the verification, and the later steps still run.
-      const passes = <R>(
-        step: Effect.Effect<void, Effect.Error<ReturnType<typeof runner.run>>, R>
-      ) =>
-        step.pipe(
-          Effect.as(true),
-          Effect.catchTags({
-            CliNotFound: (error) => prompter.log.error(error.message).pipe(Effect.as(false)),
-            CommandFailed: () => Effect.succeed(false),
-          })
-        )
-      // The agent's exit code says nothing about the project, so `check`, the rule tests, and the
-      // assessment decide.
-      const checkPassed = yield* passes(Toolchain.check({ cwd }))
-      // The session can change the project, so the checks after it read the project again. The
-      // agent reach, the rule tests, and the assessment share that one read, and they change no
-      // file, so they run together. The Doctor warnings below already name the rules folders that
-      // discovery cannot follow.
+      // The agent verifies custom rules during the session with temporary cases. The resulting
+      // project must still pass check and Doctor after the session ends.
+      const checkPassed = yield* Toolchain.check({ cwd }).pipe(
+        Effect.as(true),
+        Effect.catchTags({
+          CliNotFound: (error) => prompter.log.error(error.message).pipe(Effect.as(false)),
+          CommandFailed: () => Effect.succeed(false),
+        })
+      )
+      // The session can change the project, so agent reach and assessment share a fresh read.
       const project = yield* readProject(cwd)
-      const [reachAfter, { command: ruleTestCommand }, assessment] = yield* Effect.all(
-        [
-          readHardenReach(cwd, project.workspace, scopeDirectory),
-          readCustomRuleTestCommand(project),
-          assessProject(project),
-        ],
+      const [reachAfter, assessment] = yield* Effect.all(
+        [readHardenReach(cwd, project.workspace, scopeDirectory), assessProject(project)],
         { concurrency: "unbounded" }
       )
-      // `rule test` passes when the project has no rule tests.
-      const ruleTestPassed = Option.isNone(ruleTestCommand)
-        ? true
-        : yield* passes(
-            Console.log("").pipe(
-              Effect.andThen(
-                runner.run({ ...ruleTestCommand.value, title: "🧪 Testing custom rules" })
-              )
-            )
-          )
       // A link that was broken before the session is a gap that the user may not have approved, so
       // only a link that the session added fails the verification.
       const brokenBefore = new Set(
@@ -245,12 +219,6 @@ export default Command.make("harden", { commits, scope }).pipe(
         yield* prompter.log.error(`\`adamantite check\` failed after the ${agent.name} session.`)
       }
 
-      if (!ruleTestPassed) {
-        yield* prompter.log.error(
-          `\`adamantite rule test\` failed after the ${agent.name} session.`
-        )
-      }
-
       if (assessment.findings.length > 0) {
         yield* prompter.log.warning(`Doctor found issues after the ${agent.name} session.`)
         yield* printFindings(assessment.findings)
@@ -262,12 +230,7 @@ export default Command.make("harden", { commits, scope }).pipe(
         )
       }
 
-      if (
-        !checkPassed
-        || !ruleTestPassed
-        || assessment.findings.length > 0
-        || addedBrokenLinks.length > 0
-      ) {
+      if (!checkPassed || assessment.findings.length > 0 || addedBrokenLinks.length > 0) {
         yield* prompter.outro("⚠️ Harden verification failed.")
         return yield* new CommandFailed({
           command: "harden",
@@ -276,7 +239,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       }
 
       yield* prompter.log.success(
-        `\`adamantite check\`, \`adamantite rule test\`, and Doctor pass after the ${agent.name} session.`
+        `\`adamantite check\` and Doctor pass after the ${agent.name} session.`
       )
       yield* prompter.outro("✅ Harden completed successfully!")
     }).pipe(

@@ -122,7 +122,7 @@ export class CommandFailed extends Data.TaggedError("CommandFailed")<{
 
 export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
   /**
-   * The rule file, the test file, or both.
+   * The existing rule or test file.
    */
   paths: readonly string[]
 }> {
@@ -132,6 +132,15 @@ export class CustomRuleExists extends Data.TaggedError("CustomRuleExists")<{
     return this.paths.length === 1
       ? `${files} already exists. Choose another name, or edit the file.`
       : `${files} already exist. Choose another name, or edit the files.`
+  }
+}
+
+export class CustomRuleNotFound extends Data.TaggedError("CustomRuleNotFound")<{
+  directory: string
+  rule: string
+}> {
+  override get message() {
+    return `Rule \`${this.rule}\` does not exist in \`${this.directory}\`. Create the rule before adding its test.`
   }
 }
 

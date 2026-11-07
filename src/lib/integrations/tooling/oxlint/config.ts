@@ -57,7 +57,7 @@ function getImportName(preset: LintPreset | "core") {
 
 /**
  * The `oxlint.config.ts` that `init` writes. It always extends `custom()`, which is an empty config
- * until the project adds a rule to `.adamantite/rules`.
+ * until the project adds a rule to `.adamantite/lint`.
  */
 export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
   const presetNames = ["core", ...presets] as const
@@ -67,7 +67,7 @@ export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
       (preset) =>
         `import ${getImportName(preset)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
     ),
-    'import custom from "adamantite/lint/custom"',
+    'import custom from "adamantite/rules"',
     "",
     "export default defineConfig({",
     `  extends: [${[...presetNames.map((preset) => getImportName(preset)), "custom()"].join(", ")}],`,
@@ -99,7 +99,7 @@ function parse(content: string) {
 const LINT_PRESET_PREFIX = "adamantite/lint/"
 
 /**
- * The module that exports `custom()`. It loads the project's custom rules and is not a preset.
+ * The removed custom-rules module. Doctor handles its migration separately from lint presets.
  */
 const CUSTOM_RULES_MODULE = `${LINT_PRESET_PREFIX}custom`
 

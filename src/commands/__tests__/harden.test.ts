@@ -103,7 +103,7 @@ const REQUIRED_PHRASES = {
     "run `adamantite rule try <rule> --current --report <control> --report <missed form>`",
     "The gap is confirmed when it reports the control and does not report the missed form.",
     "the files that the standard applies to and that the glob does not match",
-    "list the forms from the first item that its test does not have",
+    "prepare temporary valid and invalid cases",
     'each file that the overrides above mark "no longer breaks the rule" or "does not exist" is a candidate',
     "Many suppressions of one rule are a **decision**",
     "A gap that is not confirmed is a candidate too",
@@ -132,7 +132,7 @@ const REQUIRED_PHRASES = {
     "Stop after this step.",
   ],
   "## 9. Write the approved standards": [
-    "**Gap in a custom rule:** add the case that the rule misses to its test first, and run `adamantite rule test` to see the test fail",
+    "**Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail",
     "When no file has the form, tell the user that the change is not verified.",
     "Do not change a rule that a preset or plugin ships.",
     "remove only the files that no longer break the rule",
@@ -150,12 +150,14 @@ const REQUIRED_PHRASES = {
     "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
   ],
   "## Verify": [
+    "Remove your temporary verification cases, fixtures, and verification-only helpers",
+    "Do not add saved rule tests or CI steps unless the user requests them",
     "run `adamantite harden` again without a terminal, and read its agent reach",
-    "`adamantite check`, `adamantite rule test`, and `adamantite doctor`",
-    "All three must exit 0.",
+    "`adamantite check` and `adamantite doctor`",
+    "Both must exit 0.",
     "When you changed a project check, also run that check with the project's own command",
     "add the file to the override as step 9 says, not a disable comment",
-    "When `rule test` fails, fix the rule. Change a test case only when the case itself is wrong",
+    "When verification fails, fix the rule. Change a case only when the case itself is wrong",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
 
@@ -179,7 +181,7 @@ const INSTALLED = {
 
 const CUSTOM_RULES_CONFIG = `import { defineConfig } from "oxlint"
 import core from "adamantite/lint"
-import custom from "adamantite/lint/custom"
+import custom from "adamantite/rules"
 
 export default defineConfig({
   extends: [core, custom({ dir: "tooling/rules", name: "acme" })],
@@ -311,10 +313,9 @@ const claudeAgent = agentByCommand("claude")
 // the assessment after a session passes.
 const HEALTHY_FILES = INSTALLED
 
-// A config that loads `.adamantite/rules`, with one rule test, so `rule test` has a test to run.
-const RULE_TEST_FILES = {
-  ".adamantite/rules/no-foo.ts": "export default {}\n",
-  ".adamantite/rules/tests/no-foo.ts": "// test\n",
+// A project with a loaded custom rule. Verification cases do not stay in the project.
+const CUSTOM_RULE_FILES = {
+  ".adamantite/lint/no-foo.ts": "export default {}\n",
   "oxlint.config.ts": CUSTOM_RULES_CONFIG.replace(
     'dir: "tooling/rules", name: "acme"',
     'name: "acme"'
@@ -324,8 +325,7 @@ const RULE_TEST_FILES = {
 
 const SUCCESS_LOG = {
   level: "success",
-  message:
-    "`adamantite check`, `adamantite rule test`, and Doctor pass after the Claude Code session.",
+  message: "`adamantite check` and Doctor pass after the Claude Code session.",
 }
 
 interface InteractiveHardenOptions {
@@ -461,7 +461,7 @@ export default defineConfig({ extends: [tooling] })
 `,
   "packages/web/package.json": JSON.stringify({ name: "web" }),
   "packages/web/src/index.ts": "export {}\n",
-  "tooling/lint/index.ts": `import custom from "adamantite/lint/custom"
+  "tooling/lint/index.ts": `import custom from "adamantite/rules"
 
 export default custom({ dir: "rules", name: "acme" })
 `,
@@ -778,8 +778,8 @@ describe("harden", () => {
       })
       const rulesFolders = getSection(prompt, "### Rules folders")
 
-      expect(rulesFolders).toContain("adamantite/lint/custom")
-      expect(rulesFolders).toContain(".adamantite/rules")
+      expect(rulesFolders).toContain("adamantite/rules")
+      expect(rulesFolders).toContain(".adamantite/lint")
       expect(getSection(prompt, "### Instructions")).toContain("No `AGENTS.md` was found.")
     })
   )
@@ -1091,7 +1091,7 @@ describe("harden", () => {
   it.effect("offer a handoff to each installed agent, the copy, and nothing", () =>
     Effect.gen(function* () {
       const { exit, prompter, runner } = yield* runInteractiveHarden({
-        files: RULE_TEST_FILES,
+        files: CUSTOM_RULE_FILES,
         prompter: { selectResponses: ["done"] },
       })
 
@@ -1119,49 +1119,58 @@ describe("harden", () => {
     })
   )
 
-  it.effect(
-    "hand off to an agent seeded with the prompt, then verify with check, rule test, and Doctor",
-    () =>
-      Effect.gen(function* () {
-        // The agent's exit code does not decide the result, and a session may change no files.
-        const { exit, prompter, runner } = yield* runInteractiveHarden({
-          files: RULE_TEST_FILES,
-          prompter: { selectResponses: [claudeAgent] },
-          runner: { agentExit: 1 },
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(nonProbeInvocations(runner)).toStrictEqual([
-          expect.objectContaining({
-            args: [expect.stringMatching(/^# Adamantite harden\n[\s\S]*## Verify/)],
-            command: "claude",
-            detached: false,
-            stderr: "inherit",
-            stdin: "inherit",
-            stdout: "inherit",
-          }),
-          expect.objectContaining({ args: ["--check"], command: "oxfmt" }),
-          expect.objectContaining({
-            ...OXLINT,
-            args: [...OXLINT.args, "--deny-warnings"],
-          }),
-          {
-            args: ["--test", ".adamantite/rules/tests/no-foo.ts"],
-            command: "node",
-            title: "🧪 Testing custom rules",
-          },
-        ])
-        expect(prompter).toMatchObject({
-          logs: [
-            {
-              level: "info",
-              message: "Handing the terminal to Claude Code. Exit the agent to return to Harden.",
-            },
-            SUCCESS_LOG,
-          ],
-          outros: ["✅ Harden completed successfully!"],
-        })
+  it.effect("hand off to an agent seeded with the prompt, then verify with check and Doctor", () =>
+    Effect.gen(function* () {
+      // The agent's exit code does not decide the result, and a session may change no files.
+      const { exit, prompter, runner } = yield* runInteractiveHarden({
+        files: CUSTOM_RULE_FILES,
+        prompter: { selectResponses: [claudeAgent] },
+        runner: { agentExit: 1 },
       })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(nonProbeInvocations(runner)).toStrictEqual([
+        expect.objectContaining({
+          args: [expect.stringMatching(/^# Adamantite harden\n[\s\S]*## Verify/)],
+          command: "claude",
+          detached: false,
+          stderr: "inherit",
+          stdin: "inherit",
+          stdout: "inherit",
+        }),
+        expect.objectContaining({ args: ["--check"], command: "oxfmt" }),
+        expect.objectContaining({
+          ...OXLINT,
+          args: [...OXLINT.args, "--deny-warnings"],
+        }),
+      ])
+      expect(prompter).toMatchObject({
+        logs: [
+          {
+            level: "info",
+            message: "Handing the terminal to Claude Code. Exit the agent to return to Harden.",
+          },
+          SUCCESS_LOG,
+        ],
+        outros: ["✅ Harden completed successfully!"],
+      })
+    })
+  )
+
+  it.effect("preserve user-owned optional rule tests without running them", () =>
+    Effect.gen(function* () {
+      const { exit, prompter, runner } = yield* runInteractiveHarden({
+        files: { ...CUSTOM_RULE_FILES, ".adamantite/lint/no-foo.test.ts": "// user-owned test\n" },
+        prompter: { selectResponses: [claudeAgent] },
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(
+        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
+      ).toStrictEqual(["claude", "oxfmt", "oxlint"])
+      expect(prompter.logs).toContainEqual(SUCCESS_LOG)
+      expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
+    })
   )
 
   it.effect(
@@ -1174,7 +1183,7 @@ describe("harden", () => {
 
         yield* runInteractiveHarden({
           files: {
-            ...RULE_TEST_FILES,
+            ...CUSTOM_RULE_FILES,
             "packages/web/package.json": yield* stringifyJson({ name: "web" }),
             "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
           },
@@ -1199,7 +1208,7 @@ describe("harden", () => {
       })
   )
 
-  it.effect("run no rule test and still pass when the project has no rule tests", () =>
+  it.effect("verify a project that has no custom rules", () =>
     Effect.gen(function* () {
       const { exit, prompter, runner } = yield* runInteractiveHarden({
         prompter: { selectResponses: [claudeAgent] },
@@ -1212,68 +1221,6 @@ describe("harden", () => {
       expect(prompter.logs).toContainEqual(SUCCESS_LOG)
       expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
     })
-  )
-
-  it.effect("fail and say so when a rule test fails after the session", () =>
-    Effect.gen(function* () {
-      const { exit, prompter } = yield* runInteractiveHarden({
-        files: RULE_TEST_FILES,
-        prompter: { selectResponses: [claudeAgent] },
-        runner: { commandExits: { node: 1 } },
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.logs.filter((log) => log.level !== "info")).toStrictEqual([
-        {
-          level: "error",
-          message: "`adamantite rule test` failed after the Claude Code session.",
-        },
-      ])
-      expect(prompter.outros).toStrictEqual(["⚠️ Harden verification failed."])
-    })
-  )
-
-  it.effect("run the rule tests and name both steps when check also fails", () =>
-    Effect.gen(function* () {
-      const { exit, prompter, runner } = yield* runInteractiveHarden({
-        files: RULE_TEST_FILES,
-        prompter: { selectResponses: [claudeAgent] },
-        runner: { commandExits: { node: 1, oxlint: 1 } },
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(
-        nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
-      ).toStrictEqual(["claude", "oxfmt", "oxlint", "node"])
-      expect(prompter.logs.filter((log) => log.level === "error")).toStrictEqual([
-        { level: "error", message: "`adamantite check` failed after the Claude Code session." },
-        {
-          level: "error",
-          message: "`adamantite rule test` failed after the Claude Code session.",
-        },
-      ])
-    })
-  )
-
-  it.effect(
-    "fail and name the missing tool when the rule tests cannot start after the session",
-    () =>
-      Effect.gen(function* () {
-        const { exit, prompter } = yield* runInteractiveHarden({
-          files: RULE_TEST_FILES,
-          prompter: { selectResponses: [claudeAgent] },
-          runner: { commandExits: { node: "not-found" } },
-        })
-
-        expect(Exit.isFailure(exit)).toBe(true)
-        expect(prompter.logs.filter((log) => log.level === "error")).toStrictEqual([
-          { level: "error", message: "Command `node` not found. Please install it and try again." },
-          {
-            level: "error",
-            message: "`adamantite rule test` failed after the Claude Code session.",
-          },
-        ])
-      })
   )
 
   it.effect("fail and say so when check fails after the session", () =>
@@ -1387,7 +1334,7 @@ describe("harden", () => {
   it.effect("print the prompt and copy it when the user chooses to copy", () =>
     Effect.gen(function* () {
       const { copied, exit, prompter, runner } = yield* runInteractiveHarden({
-        files: RULE_TEST_FILES,
+        files: CUSTOM_RULE_FILES,
         prompter: { selectResponses: ["copy"] },
       })
 
@@ -1430,7 +1377,7 @@ describe("harden", () => {
   it.effect("offer the copy when the agent fails to start", () =>
     Effect.gen(function* () {
       const { copied, exit, prompter, runner } = yield* runInteractiveHarden({
-        files: RULE_TEST_FILES,
+        files: CUSTOM_RULE_FILES,
         prompter: { confirmResponses: [true], selectResponses: [claudeAgent] },
         runner: { agentExit: "not-found" },
       })

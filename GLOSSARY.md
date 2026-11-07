@@ -45,15 +45,17 @@ some exports of it. Every other file uses what the owner exports.
 _Avoid_: Allowed importer, import boundary
 
 **Custom rule**:
-An Oxlint rule that the target project writes in a rules folder. The target project owns
-its correctness and the cases of its test. Adamantite owns the wiring, the authoring guidance,
-and the test scaffold, and runs the tests with `adamantite rule test`. Use "plugin" only for
-the Oxlint `jsPlugins` entry that loads the rules.
+An Oxlint rule that the target project keeps in a rules folder to enforce a coding standard.
+Agents verify it with temporary valid and invalid cases, then discard those cases. Users can
+choose to keep saved tests and run them explicitly with `adamantite rule test`. Adamantite
+owns the wiring and the authoring guidance. Use "plugin" only for the Oxlint `jsPlugins` entry
+that loads the rules.
 _Avoid_: Custom plugin, project plugin, first-party rule
 
 **Rules folder**:
-The folder that `custom()` loads custom rules from, `.adamantite/rules` by default. Each
-file in it is one custom rule, except files that start with `_`.
+The folder that `custom()` loads custom rules from, `.adamantite/lint` by default. Each
+file in it is one custom rule, except files that start with `_`, declaration files, and
+optional `.test.*` files. An optional test sits beside its rule unless the user gives another path.
 _Avoid_: Plugin folder
 
 **Target project**:

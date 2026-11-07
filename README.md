@@ -34,7 +34,7 @@ and Sherif so humans and coding agents can use the same project workflow.
   through an interactive or non-interactive initializer.
 - **Setup maintenance**: Assess managed integrations with `doctor`, update managed
   dependencies, and give humans or agents repair instructions.
-- **Custom rules**: Write project-specific Oxlint rules in `.adamantite/rules/`, one rule
+- **Custom rules**: Write project-specific Oxlint rules in `.adamantite/lint/`, one rule
   for each file, and enable all of them with one line.
 - **Hardening**: Have a coding agent turn the coding standards that your code already
   follows into custom rules, and into instructions for the ones that no rule can check.
@@ -103,8 +103,10 @@ Presets and TypeScript require the `check` or `fix` script. Editor extension ins
 requires an editor. GitHub Actions requires a compatible script and a supported package
 manager. Omitted boolean flags are disabled.
 
-The GitHub Actions workflow runs the `check` and `analyze` scripts that you select. When the
-project has [custom rule](#custom-rules) tests, it also runs `adamantite rule test`.
+The GitHub Actions workflow runs the `check` and `analyze` scripts that you select.
+Agents verify custom rules with temporary cases while they work. CI runs the rules through
+`check` by default. Users can add an explicit `adamantite rule test` step for optional saved tests.
+Init preserves a workflow with an explicit rule-test command, including its setup and other settings.
 
 Existing package scripts whose commands differ from Adamantite's are kept and reported
 instead of being replaced. The interactive initializer asks before overwriting them; in
@@ -251,9 +253,10 @@ approve, the agent stops at the candidates.
 
 In an interactive terminal, `harden` offers the same menu as Doctor: hand off to an installed
 coding agent seeded with the prompt, copy the prompt, or do nothing. After a handoff, `harden`
-runs `check`, then `rule test`, then the Doctor assessment, and exits 1 when one of them fails.
-It also exits 1 when the session added a link to a Markdown file that does not exist. A project with
-no rule tests passes the `rule test` step. A copy or "do nothing"
+runs `check`, then the Doctor assessment, and exits 1 when either fails.
+During the session, the agent verifies each new or changed custom rule with temporary
+RuleTester cases and removes the cases before handback.
+Harden also exits 1 when the session added a link to a Markdown file that does not exist. A copy or "do nothing"
 exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings. See
 [ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).
 
@@ -285,13 +288,26 @@ Write and inspect [custom rules](#custom-rules):
 ```sh
 adamantite rule add no-process-env
 adamantite rule add no-window --dir tooling/lint/rules
-adamantite rule ast src/index.ts
+adamantite rule add test
+adamantite rule add test no-process-env
+adamantite rule add test no-process-env --path tests/no-process-env.test.ts
 adamantite rule test
+adamantite rule test --path tests/no-process-env.test.ts
+adamantite rule ast src/index.ts
 ```
 
-`rule add` writes a rule stub to `.adamantite/rules/`, or to the folder that `--dir` names, and
-a `RuleTester` test for it in `tests/` in that folder. `rule test` runs the tests of every rules
-folder that a `custom()` call loads with `node --test`, and exits with its exit code.
+`rule add` writes only a rule stub to `.adamantite/lint/`, or to the folder that `--dir` names.
+Agents verify it with temporary `RuleTester` cases by default. `rule add test` lists existing
+rules for selection. Pass a rule name to skip the list; the command fails if the rule does not
+exist. It writes an optional `<name>.test.ts` beside the rule, or at the file path that `--path`
+names. `--dir` selects another rules folder. It preserves existing files. Adapt the generated
+valid and invalid cases to the rule before running them.
+
+`rule test` runs saved `.test.*` files beside the rules that `custom()` loads. Use
+`rule test --path <file>` for a test saved elsewhere. CI and harden do not run saved tests
+automatically. Agents remove their temporary verification cases before they finish.
+During harden, agents can use `rule add test` to prepare those temporary cases and
+`rule test --path <file>` to run them. They preserve user-owned saved tests.
 `rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
 real code.
 
@@ -335,8 +351,9 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, no type assertions outside tests, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                                                                        |
 | `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
 | `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
-| `adamantite/lint/custom`       | A function, `custom()`, that loads the project's own rules from `.adamantite/rules/`. See [custom rules](#custom-rules).                                                                                                                                                               |
-| `adamantite/rules`             | `defineRule` and the rule and AST types for custom rules.                                                                                                                                                                                                                              |
+| `adamantite/rules`             | A function, `custom()`, that loads the project's own rules from `.adamantite/lint/`. See [custom rules](#custom-rules).                                                                                                                                                                |
+| `adamantite/rules/plugin`      | `definePlugin`, `defineRule`, `eslintCompatPlugin`, and all Oxlint authoring types.                                                                                                                                                                                                    |
+| `adamantite/rules/testing`     | `RuleTester` and its types for temporary agent verification and optional saved tests.                                                                                                                                                                                                  |
 | `adamantite/format`            | Oxfmt configuration.                                                                                                                                                                                                                                                                   |
 | `adamantite/analyze`           | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo and `ignoreDependencies.effect` with the effect preset.                                                                               |
 | `adamantite/typescript`        | Strict TypeScript configuration for TS 7+. Allows only erasable syntax, so `enum`, a `namespace` with values, and parameter properties fail type checking.                                                                                                                             |
@@ -652,21 +669,23 @@ contracts, and custom messages.
 
 ## Custom rules
 
-Custom rules are Oxlint rules that your project writes and owns. Each file in
-`.adamantite/rules/` is one rule. `custom()` from `adamantite/lint/custom` loads the folder
+Custom rules are Oxlint rules that your project writes and owns. Each rule file in
+`.adamantite/lint/` is one rule. `custom()` from `adamantite/rules` loads the folder
 and enables each rule as `error` under the `project` plugin, so `no-process-env.ts` becomes
 `project/no-process-env`. Add a file to add a rule, and delete the file to remove it. A file
-that starts with `_`, such as `_helpers.ts`, is a helper, not a rule.
+that starts with `_`, such as `_helpers.ts`, is a helper. Declaration files and optional
+`.test.*` files are also excluded from plugin loading.
 
 ```text
-.adamantite/rules/
+.adamantite/lint/
   no-process-env.ts      # enabled as project/no-process-env
+  no-process-env.test.ts # optional test, skipped by the plugin
   _helpers.ts            # skipped
 ```
 
 ```ts
-// .adamantite/rules/no-process-env.ts
-import { defineRule } from "adamantite/rules"
+// .adamantite/lint/no-process-env.ts
+import { defineRule } from "adamantite/rules/plugin"
 
 export default defineRule({
   meta: {
@@ -688,7 +707,7 @@ export default defineRule({
 ```ts
 // oxlint.config.ts
 import core from "adamantite/lint"
-import custom from "adamantite/lint/custom"
+import custom from "adamantite/rules"
 import { defineConfig } from "oxlint"
 
 export default defineConfig({
@@ -701,25 +720,64 @@ export default defineConfig({
 it to every generated config. It takes these options:
 
 - `dir`: the rules folder. A relative path resolves from the file that calls `custom()`, not
-  from the working directory. Default: `.adamantite/rules`.
+  from the working directory. Default: `.adamantite/lint`.
 - `name`: the plugin name that prefixes each rule. Default: `project`.
 - `rules`: severity or options for a rule, by rule name without the prefix, such as
   `{ "no-process-env": "warn" }`.
 
+`adamantite/rules/plugin` re-exports the helpers and types from Adamantite's pinned
+`@oxlint/plugins` dependency. Use `definePlugin` from that module if you write a plugin
+that you register in `jsPlugins` yourself. You do not need to add `@oxlint/plugins` to your project.
+
+Optional saved RuleTester tests use `node:test`. Exclude them from Vitest or Jest discovery
+so those runners do not also try to run them. Keep the runner's default and existing
+exclusions. For Vitest:
+
+```ts
+// vitest.config.ts
+import { configDefaults, defineConfig } from "vitest/config"
+
+export default defineConfig({
+  test: {
+    exclude: [...configDefaults.exclude, ".adamantite/lint/**/*.test.*"],
+  },
+})
+```
+
+For Jest:
+
+```js
+// jest.config.mjs
+export default {
+  testPathIgnorePatterns: ["/node_modules/", "<rootDir>/.adamantite/lint/"],
+}
+```
+
+For another rules folder or a custom test `--path`, use its path in the exclusion. To
+type-check tests that import `.ts` rule files, enable `compilerOptions.allowImportingTsExtensions`
+in `tsconfig.json`. To check the hidden rules folder too, add `.adamantite/lint` to `include`.
+
+To keep an existing `.adamantite/rules` folder, set `custom({ dir: ".adamantite/rules" })`
+and use `rule add --dir .adamantite/rules`. You can instead move the folder to
+`.adamantite/lint`. The previous `adamantite/lint/custom` import and named authoring imports
+from `adamantite/rules` are removed. Import `custom` from `adamantite/rules` and the
+authoring helpers and types from `adamantite/rules/plugin`. Run `adamantite doctor` for
+migration instructions. Doctor reports the old imports and default folder without changing files.
+
 Rule files run with Node.js type stripping, so use erasable TypeScript only: no `enum`,
 `namespace` with values, or parameter properties. Rules get no type information. A rule
 that throws prints an error for each file, and the lint run still exits 0. Adamantite owns
-the wiring, the authoring guidance, and the test scaffold; your project owns the correctness
-of its rules and the cases of their tests. `adamantite rule add` writes a test with each rule, with `RuleTester` from
-`adamantite/rules/testing`, and `adamantite rule test` runs the tests with `node --test`, also
-in Bun projects. `adamantite check` does not run them. The GitHub Actions workflow that
-`adamantite init` writes runs them when the project has rule tests. The "Custom rules" section
-of the [Adamantite skill](#agent-skill) has the full authoring guidance.
+the wiring and the authoring guidance; your project owns the correctness of its rules.
+Agents use `RuleTester` from `adamantite/rules/testing` to verify new and changed rules.
+They run valid and invalid cases from stdin or a temporary file with Node.js, also in Bun
+projects, and remove their temporary verification cases and fixtures before handback. The rules and their
+runtime helpers stay in the target project. The "Custom rules" section of the
+[Adamantite skill](#agent-skill) has the command and the full authoring guidance.
 
 `adamantite doctor` reports a rule file that cannot load, with the reason, a rules folder
 that no `custom()` call loads, and two rules folders that use the same plugin name. It also
-reports an Adamantite workflow that does not run `adamantite rule test` when the project has
-rule tests.
+provides migration guidance for old API imports and the previous default rules folder.
+User-owned saved tests and optional CI steps remain supported.
 
 ### Custom rules in a monorepo
 
@@ -729,7 +787,7 @@ root rules extends the root config:
 
 ```ts
 // packages/web/oxlint.config.ts
-import custom from "adamantite/lint/custom"
+import custom from "adamantite/rules"
 import { defineConfig } from "oxlint"
 import root from "../../oxlint.config.ts"
 
@@ -742,7 +800,7 @@ extends it loads the same rules:
 
 ```ts
 // tooling/lint/index.ts
-import custom from "adamantite/lint/custom"
+import custom from "adamantite/rules"
 
 export default custom({ dir: "rules", name: "acme" })
 ```

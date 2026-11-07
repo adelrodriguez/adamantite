@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import {
   findCustomRulesCalls,
+  hasLegacyRuleImports,
   inspectRuleFile,
   isRuleFile,
 } from "#lib/workspace/custom-rules/inspect.ts"
@@ -10,7 +11,7 @@ import {
   isRuleFile as isLoadedRuleFile,
 } from "#presets/rules/folder.ts"
 
-const IMPORT = 'import custom from "adamantite/lint/custom"\n'
+const IMPORT = 'import custom from "adamantite/rules"\n'
 
 describe("isRuleFile", () => {
   it.each([
@@ -18,6 +19,10 @@ describe("isRuleFile", () => {
     ["no-process-env.mts", true],
     ["no-process-env.js", true],
     ["no-process-env.mjs", true],
+    ["no-process-env.test.ts", false],
+    ["no-process-env.test.mts", false],
+    ["no-process-env.test.js", false],
+    ["no-process-env.test.mjs", false],
     ["_helpers.ts", false],
     ["types.d.ts", false],
     ["types.d.mts", false],
@@ -31,6 +36,18 @@ describe("isRuleFile", () => {
 })
 
 describe("findCustomRulesCalls", () => {
+  it("ignore the retired rules-folder import", () => {
+    const content = [
+      'import custom from "adamantite/rules"',
+      'import legacy from "adamantite/lint/custom"',
+      'export default { extends: [custom(), legacy({ dir: ".adamantite/rules", name: "old" })] }',
+    ].join("\n")
+
+    expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
+      { dir: ".adamantite/lint", name: "project" },
+    ])
+  })
+
   it("use the default folder and name for a call without options, as custom() does", () => {
     expect(
       findCustomRulesCalls("oxlint.config.ts", `${IMPORT}export default { extends: [custom()] }`)
@@ -39,13 +56,13 @@ describe("findCustomRulesCalls", () => {
 
   it("read string literal options under the local import name", () => {
     const content = [
-      'import rules from "adamantite/lint/custom"',
+      'import rules from "adamantite/rules"',
       'export default { extends: [rules({ dir: "tooling/rules", name: "acme" }), rules({ "name": `web` })] }',
     ].join("\n")
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
       { dir: "tooling/rules", name: "acme" },
-      { dir: ".adamantite/rules", name: "web" },
+      { dir: ".adamantite/lint", name: "web" },
     ])
   })
 
@@ -67,9 +84,32 @@ describe("findCustomRulesCalls", () => {
   })
 })
 
+describe("hasLegacyRuleImports", () => {
+  it.each([
+    'import custom from "adamantite/lint/custom"',
+    'import { defineRule as rule } from "adamantite/rules"',
+    'import type { Rule } from "adamantite/rules"',
+    'export { defineRule } from "adamantite/rules"',
+    'export { default } from "adamantite/lint/custom"',
+    'export * from "adamantite/lint/custom"',
+  ])("report the old import in %s", (content) => {
+    expect(hasLegacyRuleImports("rule.ts", content)).toBe(true)
+  })
+
+  it.each([
+    'import custom, { type CustomRulesOptions } from "adamantite/rules"',
+    'import { defineRule } from "adamantite/rules/plugin"',
+    'export { default, type CustomRulesOptions } from "adamantite/rules"',
+    '// import { defineRule } from "adamantite/rules"',
+    'const text = "adamantite/lint/custom"',
+  ])("accept the current API and ignore text in %s", (content) => {
+    expect(hasLegacyRuleImports("rule.ts", content)).toBe(false)
+  })
+})
+
 describe("inspectRuleFile", () => {
   const RULE =
-    'import { defineRule } from "adamantite/rules"\n\nexport default defineRule({ create: () => ({}) })\n'
+    'import { defineRule } from "adamantite/rules/plugin"\n\nexport default defineRule({ create: () => ({}) })\n'
 
   it("accept a rule with erasable TypeScript", () => {
     const content = [

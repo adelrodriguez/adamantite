@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
-import { findCallerFile } from "#presets/lint/custom.ts"
+import { findCallerFile } from "#presets/rules/custom.ts"
 
-const OWN_FILE = "/project/node_modules/adamantite/dist/presets/lint/custom.js"
+const OWN_FILE = "/project/node_modules/adamantite/dist/presets/rules/custom.js"
 
 function callFromOwnFile() {
   return new Error("custom()").stack ?? ""
@@ -11,8 +11,8 @@ describe("findCallerFile", () => {
   it("find the config file in a Node.js stack, without Oxlint's cache query", () => {
     const stack = [
       "Error: custom()",
-      "    at resolveRulesDirectory (file:///project/node_modules/adamantite/dist/presets/lint/custom.js:90:20)",
-      "    at custom (file:///project/node_modules/adamantite/dist/presets/lint/custom.js:160:15)",
+      "    at resolveRulesDirectory (file:///project/node_modules/adamantite/dist/presets/rules/custom.js:90:20)",
+      "    at custom (file:///project/node_modules/adamantite/dist/presets/rules/custom.js:160:15)",
       "    at file:///project/oxlint.config.ts?cache=1:2:19",
       "    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)",
       "    at async node:internal/modules/esm/loader:650:26",
@@ -24,8 +24,8 @@ describe("findCallerFile", () => {
   it("find the config file in a Bun stack", () => {
     const stack = [
       "Error: custom()",
-      "    at resolveRulesDirectory (/project/node_modules/adamantite/dist/presets/lint/custom.js:90:20)",
-      "    at custom (/project/node_modules/adamantite/dist/presets/lint/custom.js:160:15)",
+      "    at resolveRulesDirectory (/project/node_modules/adamantite/dist/presets/rules/custom.js:90:20)",
+      "    at custom (/project/node_modules/adamantite/dist/presets/rules/custom.js:160:15)",
       "    at /project/oxlint.config.ts:2:19",
       "    at moduleEvaluation (native:1:11)",
     ].join("\n")
@@ -36,7 +36,7 @@ describe("findCallerFile", () => {
   it("find a named caller frame, such as a shared tooling config", () => {
     const stack = [
       "Error: custom()",
-      "    at custom (/project/node_modules/adamantite/dist/presets/lint/custom.js:160:15)",
+      "    at custom (/project/node_modules/adamantite/dist/presets/rules/custom.js:160:15)",
       "    at makeLintConfig (file:///project/tooling/lint/index.ts:4:10)",
     ].join("\n")
 
@@ -51,7 +51,7 @@ describe("findCallerFile", () => {
   it("return undefined when no frame names another file", () => {
     const stack = [
       "Error: custom()",
-      "    at custom (/project/node_modules/adamantite/dist/presets/lint/custom.js:160:15)",
+      "    at custom (/project/node_modules/adamantite/dist/presets/rules/custom.js:160:15)",
       "    at moduleEvaluation (native:1:11)",
     ].join("\n")
 

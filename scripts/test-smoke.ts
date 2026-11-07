@@ -11,6 +11,7 @@ const cliPath = join(repoRoot, "bin", "adamantite")
 interface RunOptions {
   readonly cwd: string
   readonly env?: NodeJS.ProcessEnv
+  readonly input?: string
 }
 
 function spawn(command: string, args: string[], options: RunOptions) {
@@ -18,10 +19,11 @@ function spawn(command: string, args: string[], options: RunOptions) {
     cwd: options.cwd,
     encoding: "utf8",
     env: options.env ?? process.env,
+    input: options.input,
     // A dependency install can exceed Node's 1 MiB default and would surface as a
     // misleading generic failure; a stuck install should fail here, not eat the CI job.
     maxBuffer: 64 * 1024 * 1024,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: [options.input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
     timeout: 5 * 60 * 1000,
   })
 
@@ -118,26 +120,69 @@ function assertFileContains(path: string, expected: string) {
 }
 
 /**
- * Write a custom rule and its test with `adamantite rule add`, and run the test with `adamantite
- * rule test`. Then break the rule, and expect `rule test` to fail and name the case that broke.
+ * Verify the scaffolded rule from stdin, then break it and confirm that verification fails. The
+ * target project keeps only the rule, with no verification cases or fixtures.
  */
-function addRuleAndRunTest(cwd: string, env: NodeJS.ProcessEnv) {
-  const rulePath = join(cwd, ".adamantite", "rules", "no-smoke.ts")
+function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
+  const rulePath = join(cwd, ".adamantite", "lint", "no-smoke.ts")
 
   assertIncludes(
     run(process.execPath, [cliPath, "rule", "add", "no-smoke"], { cwd, env }),
-    "Run the test with `adamantite rule test`."
+    "Wrote .adamantite/lint/no-smoke.ts."
   )
-  assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
+  const input = [
+    'import { RuleTester } from "adamantite/rules/testing"',
+    'import rule from "./.adamantite/lint/no-smoke.ts"',
+    'new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } }).run("no-smoke", rule, {',
+    '  invalid: [{ code: "debugger", errors: [{ messageId: "unexpected" }] }],',
+    '  valid: ["const value: number = 1"],',
+    "})",
+  ].join("\n")
+  const options = { cwd, env, input }
+  const args = ["--input-type=module"]
 
+  assertIncludes(run(process.execPath, args, options), "✔ debugger")
   const rule = readFileSync(rulePath, "utf8")
 
   writeFileSync(rulePath, rule.replace("DebuggerStatement", "WithStatement"))
-  assertIncludes(
-    runExpectingFailure(process.execPath, [cliPath, "rule", "test"], { cwd, env }).output,
-    "✖ debugger"
-  )
+  assertIncludes(runExpectingFailure(process.execPath, args, options).output, "✖ debugger")
   writeFileSync(rulePath, rule)
+
+  const files = readdirSync(join(cwd, ".adamantite", "lint"))
+
+  if (files.length !== 1 || files[0] !== "no-smoke.ts") {
+    throw new Error(`Expected only the custom rule to remain, received: ${files.join(", ")}`)
+  }
+
+  // Add a saved test only on request. It must stay out of the runtime plugin.
+  assertIncludes(
+    runExpectingFailure(process.execPath, [cliPath, "rule", "add", "test", "missing"], { cwd, env })
+      .output,
+    "does not exist"
+  )
+  const testPath = join(cwd, ".adamantite", "lint", "no-smoke.test.ts")
+  run(process.execPath, [cliPath, "rule", "add", "test", "no-smoke"], { cwd, env })
+  try {
+    assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
+    // Load the plugin without linting the monorepo's unrelated dependency-version fixtures.
+    run(process.execPath, [cliPath, "check", "oxlint.config.ts", "--only", "lint"], { cwd, env })
+  } finally {
+    rmSync(testPath)
+  }
+
+  const customTest = join(cwd, "tests", "no-smoke.test.ts")
+  run(process.execPath, [cliPath, "rule", "add", "test", "no-smoke", "--path", customTest], {
+    cwd,
+    env,
+  })
+  try {
+    assertIncludes(
+      run(process.execPath, [cliPath, "rule", "test", "--path", customTest], { cwd, env }),
+      "✔ debugger"
+    )
+  } finally {
+    rmSync(customTest)
+  }
 }
 
 // The fixture uses npm and the monorepo fixture uses pnpm, so the smoke test covers both
@@ -367,15 +412,10 @@ try {
     PATH: `${join(fixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
   }
 
-  console.info("Running `adamantite rule add` and `adamantite rule test`...")
-  addRuleAndRunTest(fixture, fixtureEnv)
+  console.info("Running `adamantite rule add` and temporary RuleTester verification...")
+  addRuleAndVerify(fixture, fixtureEnv)
 
-  if (readFileSync(join(fixture, "package.json"), "utf8").includes('"@types/node"')) {
-    throw new Error("Expected the fixture to have no @types/node, so check proves the rule test.")
-  }
-
-  // The fixture has no `@types/node`, so `check` also proves that the rule test passes type-aware
-  // lint without it, and `analyze` proves that Knip does not report the rule and its test.
+  // Check the generated config and custom rule, and keep the rule as a Knip entry file.
   for (const command of ["fix", "check", "analyze"]) {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
@@ -471,8 +511,10 @@ try {
 
   assertFileContains(join(monorepoFixture, "packages", "second", "package.json"), '"7.0.0"')
 
-  console.info("Running `adamantite rule add` and `adamantite rule test` in the monorepo...")
-  addRuleAndRunTest(monorepoFixture, monorepoEnv)
+  console.info(
+    "Running `adamantite rule add` and temporary RuleTester verification in the monorepo..."
+  )
+  addRuleAndVerify(monorepoFixture, monorepoEnv)
 
   // Doctor resolves config imports with the real resolver. The root config loads a shared tooling
   // package through an `exports` subpath, so Doctor reaches its rules folder only by following the
@@ -499,15 +541,15 @@ try {
   writeFileSync(join(lintPackage, "config.ts"), 'export { default } from "./rules.js"\n')
   writeFileSync(
     join(lintPackage, "rules.js"),
-    'import custom from "adamantite/lint/custom"\n\nexport default custom({ dir: "rules", name: "smoke" })\n'
+    'import custom from "adamantite/rules"\n\nexport default custom({ dir: "rules", name: "smoke" })\n'
   )
   writeFileSync(
     join(lintPackage, "rules.ts"),
-    'import custom from "adamantite/lint/custom"\n\nexport default custom({ dir: "source-rules", name: "smoke" })\n'
+    'import custom from "adamantite/rules"\n\nexport default custom({ dir: "source-rules", name: "smoke" })\n'
   )
   writeFileSync(
     join(lintPackage, "rules", "no-enum.ts"),
-    'import { defineRule } from "adamantite/rules"\n\nenum Kind { A }\n\nexport default defineRule({ create: () => ({}), meta: { kind: Kind.A } })\n'
+    'import { defineRule } from "adamantite/rules/plugin"\n\nenum Kind { A }\n\nexport default defineRule({ create: () => ({}), meta: { kind: Kind.A } })\n'
   )
   run("pnpm", ["add", "--save-dev", "--workspace-root", "@adamantite-smoke/lint@workspace:*"], {
     cwd: monorepoFixture,

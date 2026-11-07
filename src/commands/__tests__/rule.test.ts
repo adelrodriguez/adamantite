@@ -5,15 +5,16 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand, { renderTrial } from "#commands/rule.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { toCustomRuleStub, toCustomRuleTestStub } from "#lib/workspace/custom-rules/index.ts"
+import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 import {
   createPrompterTestContext,
   createRunnerTestContext,
+  interactiveTerminalLayer,
   runCommand,
 } from "./command-test-helpers.ts"
 
 describe("rule add", () => {
-  it.effect("write the stub to .adamantite/rules and its test to tests/", () =>
+  it.effect("write only the rule stub to .adamantite/lint", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext()
       const prompter = createPrompterTestContext()
@@ -24,24 +25,19 @@ describe("rule add", () => {
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(files.read(".adamantite/rules/no-process-env.ts")).toBe(
+      expect(files.read(".adamantite/lint/no-process-env.ts")).toBe(
         toCustomRuleStub("no-process-env")
       )
-      expect(files.read(".adamantite/rules/tests/no-process-env.ts")).toBe(
-        toCustomRuleTestStub("no-process-env")
-      )
-      expect(files.exists(".adamantite/rules/AGENTS.md")).toBe(false)
+      expect(files.list()).toStrictEqual([".adamantite/lint/no-process-env.ts"])
       expect(prompter.logs).toStrictEqual([
         {
           level: "success",
-          message:
-            "Wrote .adamantite/rules/no-process-env.ts and .adamantite/rules/tests/no-process-env.ts.",
+          message: "Wrote .adamantite/lint/no-process-env.ts.",
         },
-        { level: "info", message: "Run the test with `adamantite rule test`." },
         {
           level: "info",
           message:
-            '`custom()` from `adamantite/lint/custom` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells you how to write the rule and its test.',
+            '`custom()` from `adamantite/rules` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells agents how to verify the rule with temporary cases.',
         },
       ])
     })
@@ -59,33 +55,34 @@ describe("rule add", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(files.read("tooling/lint/rules/no-window.ts")).toBe(toCustomRuleStub("no-window"))
-      expect(files.read("tooling/lint/rules/tests/no-window.ts")).toBe(
-        toCustomRuleTestStub("no-window")
-      )
+      expect(files.list()).toStrictEqual(["tooling/lint/rules/no-window.ts"])
       expect(files.exists(".adamantite")).toBe(false)
     })
   )
 
-  it.effect.each([
-    {
-      existing: [".adamantite/rules/no-process-env.ts"],
-      name: "keep an existing rule, and write no test",
-    },
-    {
-      existing: [".adamantite/rules/tests/no-process-env.ts"],
-      name: "keep an existing test, and write no rule",
-    },
-    {
-      existing: [
-        ".adamantite/rules/no-process-env.ts",
-        ".adamantite/rules/tests/no-process-env.ts",
-      ],
-      name: "keep an existing rule and test",
-    },
-  ])("$name", ({ existing }) =>
+  it.effect("preserve an optional test while adding only the rule", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
-        files: Object.fromEntries(existing.map((file) => [file, "// mine\n"])),
+        files: { ".adamantite/lint/no-process-env.test.ts": "// user-owned test\n" },
+      })
+
+      const exit = yield* runCommand(ruleCommand, ["add", "no-process-env"], {
+        files,
+        layers: [createPrompterTestContext().layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read(".adamantite/lint/no-process-env.test.ts")).toBe("// user-owned test\n")
+      expect(files.read(".adamantite/lint/no-process-env.ts")).toBe(
+        toCustomRuleStub("no-process-env")
+      )
+    })
+  )
+
+  it.effect("keep an existing rule unchanged", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ".adamantite/lint/no-process-env.ts": "// mine\n" },
       })
 
       const exit = yield* runCommand(ruleCommand, ["add", "no-process-env"], {
@@ -95,12 +92,10 @@ describe("rule add", () => {
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
         _tag: "CustomRuleExists",
-        paths: existing.map((file) => `${files.root}/${file}`),
+        paths: [`${files.root}/.adamantite/lint/no-process-env.ts`],
       })
-      expect(files.list()).toStrictEqual(existing)
-      expect(existing.map((file) => files.read(file))).toStrictEqual(
-        existing.map(() => "// mine\n")
-      )
+      expect(files.read(".adamantite/lint/no-process-env.ts")).toBe("// mine\n")
+      expect(files.list()).toStrictEqual([".adamantite/lint/no-process-env.ts"])
     })
   )
 
@@ -125,9 +120,161 @@ describe("rule add", () => {
 
 const PACKAGE_JSON = JSON.stringify({ name: "app" })
 
+describe("rule add test", () => {
+  it.effect("list existing rules for selection when no name is given", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/lint/_helpers.ts": "// helper\n",
+          ".adamantite/lint/no-debugger.ts": "// rule\n",
+          ".adamantite/lint/no-window.test.ts": "// existing test\n",
+          ".adamantite/lint/no-window.ts": "// another rule\n",
+        },
+      })
+      const prompter = createPrompterTestContext({ selectResponses: ["no-debugger"] })
+      const exit = yield* runCommand(ruleCommand, ["add", "test"], {
+        files,
+        layers: [prompter.layer, interactiveTerminalLayer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.selectCalls).toStrictEqual([
+        {
+          message: "Which rule needs a test?",
+          options: [
+            { label: "no-debugger", value: "no-debugger" },
+            { label: "no-window", value: "no-window" },
+          ],
+        },
+      ])
+      expect(files.read(".adamantite/lint/no-debugger.test.ts")).toContain(
+        'import rule from "./no-debugger.ts"'
+      )
+      expect(files.read(".adamantite/lint/no-window.test.ts")).toBe("// existing test\n")
+    })
+  )
+
+  it.effect("list rules without writing a file when the terminal is not interactive", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
+      })
+      const prompter = createPrompterTestContext()
+      const exit = yield* runCommand(ruleCommand, ["add", "test"], {
+        files,
+        layers: [prompter.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual(["no-debugger"])
+      expect(prompter.selectCalls).toStrictEqual([])
+      expect(files.list()).toStrictEqual([".adamantite/lint/no-debugger.ts"])
+    })
+  )
+
+  it.effect("write to --path with an import relative to that test file", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
+      })
+      const exit = yield* runCommand(
+        ruleCommand,
+        ["add", "test", "no-debugger", "--path", "tests/lint/no-debugger.test.ts"],
+        { files, layers: [createPrompterTestContext().layer] }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read("tests/lint/no-debugger.test.ts")).toContain(
+        'import rule from "../../.adamantite/lint/no-debugger.ts"'
+      )
+      expect(files.exists(".adamantite/lint/no-debugger.test.ts")).toBe(false)
+    })
+  )
+
+  it.effect("add an optional test beside an existing rule without changing the rule", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ".adamantite/lint/no-debugger.ts": "// user-owned rule\n" },
+      })
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext()
+      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
+        files,
+        layers: [prompter.layer, runner.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read(".adamantite/lint/no-debugger.ts")).toBe("// user-owned rule\n")
+      const test = files.read(".adamantite/lint/no-debugger.test.ts")
+      expect(test).toContain('import rule from "./no-debugger.ts"')
+      expect(runner.invocations).toStrictEqual([])
+      expect(files.list()).toStrictEqual([
+        ".adamantite/lint/no-debugger.test.ts",
+        ".adamantite/lint/no-debugger.ts",
+      ])
+    })
+  )
+
+  it.effect("require an existing rule before creating a test", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext()
+      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
+        files,
+        layers: [createPrompterTestContext().layer],
+      })
+
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
+        _tag: "CustomRuleNotFound",
+        rule: "no-debugger",
+      })
+      expect(files.list()).toStrictEqual([])
+    })
+  )
+
+  it.effect("preserve an existing optional test", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/lint/no-debugger.test.ts": "// user-owned test\n",
+          ".adamantite/lint/no-debugger.ts": "// rule\n",
+        },
+      })
+      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
+        files,
+        layers: [createPrompterTestContext().layer],
+      })
+
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
+        _tag: "CustomRuleExists",
+        paths: [`${files.root}/.adamantite/lint/no-debugger.test.ts`],
+      })
+      expect(files.read(".adamantite/lint/no-debugger.test.ts")).toBe("// user-owned test\n")
+    })
+  )
+
+  it.effect("use the rule extension in a custom rules folder", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "tooling/lint/no-window.mjs": "export default {}\n" },
+      })
+      const exit = yield* runCommand(
+        ruleCommand,
+        ["add", "test", "no-window", "--dir", "tooling/lint"],
+        { files, layers: [createPrompterTestContext().layer] }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read("tooling/lint/no-window.test.ts")).toContain(
+        'import rule from "./no-window.mjs"'
+      )
+      expect(files.exists(".adamantite")).toBe(false)
+    })
+  )
+})
+
 function makeConfig(...customCalls: string[]) {
   return [
-    'import custom from "adamantite/lint/custom"',
+    'import custom from "adamantite/rules"',
     'import { defineConfig } from "oxlint"',
     "",
     `export default defineConfig({ extends: [${customCalls.join(", ")}] })`,
@@ -136,20 +283,46 @@ function makeConfig(...customCalls: string[]) {
 }
 
 describe("rule test", () => {
+  it.effect("run an explicit --path without needing a custom() config", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "tests/lint/no-debugger.test.ts": "// test\n" },
+      })
+      const runner = createRunnerTestContext()
+      const exit = yield* runCommand(
+        ruleCommand,
+        ["test", "--path", "tests/lint/no-debugger.test.ts"],
+        {
+          files,
+          layers: [createPrompterTestContext().layer, runner.layer],
+        }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(runner.invocations).toStrictEqual([
+        {
+          args: ["--test", `${files.root}/tests/lint/no-debugger.test.ts`],
+          command: "node",
+          title: "🧪 Testing custom rules",
+        },
+      ])
+    })
+  )
+
   it.effect("run node --test on the tests of each rules folder that custom() loads", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/no-a.ts": "export default {}\n",
-          ".adamantite/rules/tests/_cases.ts": "export const cases = []\n",
-          ".adamantite/rules/tests/no-a.ts": "// test\n",
-          ".adamantite/rules/tests/notes.md": "# Notes\n",
+          ".adamantite/lint/_cases.test.ts": "export const cases = []\n",
+          ".adamantite/lint/no-a.test.ts": "// test\n",
+          ".adamantite/lint/no-a.ts": "export default {}\n",
+          ".adamantite/lint/notes.md": "# Notes\n",
           "oxlint.config.ts": makeConfig(
             "custom()",
             'custom({ dir: "tooling/rules", name: "acme" })'
           ),
           "package.json": PACKAGE_JSON,
-          "tooling/rules/tests/no-b.ts": "// test\n",
+          "tooling/rules/no-b.test.ts": "// test\n",
         },
       })
       const runner = createRunnerTestContext()
@@ -162,7 +335,7 @@ describe("rule test", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toStrictEqual([
         {
-          args: ["--test", ".adamantite/rules/tests/no-a.ts", "tooling/rules/tests/no-b.ts"],
+          args: ["--test", ".adamantite/lint/no-a.test.ts", "tooling/rules/no-b.test.ts"],
           command: "node",
           title: "🧪 Testing custom rules",
         },
@@ -175,7 +348,7 @@ describe("rule test", () => {
       const files = createFileSystemTestContext({
         files: {
           "package.json": yield* stringifyJson({ name: "root", workspaces: ["packages/*"] }),
-          "packages/web/.adamantite/rules/tests/no-window.ts": "// test\n",
+          "packages/web/.adamantite/lint/no-window.test.ts": "// test\n",
           "packages/web/oxlint.config.ts": makeConfig('custom({ name: "web" })'),
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
@@ -189,7 +362,7 @@ describe("rule test", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations.map((invocation) => invocation.args)).toStrictEqual([
-        ["--test", "packages/web/.adamantite/rules/tests/no-window.ts"],
+        ["--test", "packages/web/.adamantite/lint/no-window.test.ts"],
       ])
     })
   )
@@ -198,7 +371,7 @@ describe("rule test", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/tests/no-a.ts": "// test\n",
+          ".adamantite/lint/no-a.test.ts": "// test\n",
           "oxlint.config.ts": makeConfig("custom()"),
           "package.json": PACKAGE_JSON,
         },
@@ -221,13 +394,13 @@ describe("rule test", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/tests/no-a.ts": "// test\n",
+          ".adamantite/lint/no-a.test.ts": "// test\n",
           "oxlint.config.ts": `const RULES_DIR = "tooling/rules"\n${makeConfig(
             "custom()",
             'custom({ dir: RULES_DIR, name: "acme" })'
           )}`,
           "package.json": PACKAGE_JSON,
-          "tooling/rules/tests/no-b.ts": "// test\n",
+          "tooling/rules/no-b.test.ts": "// test\n",
         },
       })
       const prompter = createPrompterTestContext()
@@ -247,7 +420,7 @@ describe("rule test", () => {
         },
       ])
       expect(runner.invocations.map((invocation) => invocation.args)).toStrictEqual([
-        ["--test", ".adamantite/rules/tests/no-a.ts"],
+        ["--test", ".adamantite/lint/no-a.test.ts"],
       ])
     })
   )
@@ -279,7 +452,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No custom rule tests found. `adamantite rule add <name>` writes a rule and its test.",
+            "No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule.",
         },
       ])
     })
@@ -292,7 +465,7 @@ describe("rule test", () => {
     },
     {
       // Oxlint does not load a rules folder that no `custom()` call names, so its tests do not run.
-      files: { ".adamantite/rules/tests/no-a.ts": "// test\n", "package.json": PACKAGE_JSON },
+      files: { ".adamantite/lint/no-a.test.ts": "// test\n", "package.json": PACKAGE_JSON },
       name: "tests in a folder that no custom() call loads",
     },
   ])("say that there are no tests, and pass, with $name", ({ files: fixture }) =>
@@ -312,7 +485,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No custom rule tests found. `adamantite rule add <name>` writes a rule and its test.",
+            "No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule.",
         },
       ])
     })

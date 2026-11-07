@@ -39,6 +39,26 @@ repeat them against the pinned Oxlint:
   `custom()` calls, and reports a rules folder that no call loads and two folders that
   share a plugin name. A call in a module that no config imports does not count.
 
+## API update (2026-11-07, issue #635)
+
+The default rules folder is now `.adamantite/lint`. Import `custom()` as the default from
+`adamantite/rules`. The authoring API is `adamantite/rules/plugin`, which re-exports
+`definePlugin`, `defineRule`, `eslintCompatPlugin`, and all authoring types from the pinned
+`@oxlint/plugins` package. This follows the Vite+ re-export pattern and keeps the helpers on
+the version that Adamantite uses. `adamantite/rules/testing` keeps the test API separate.
+
+The old named authoring imports from `adamantite/rules` and the default import from
+`adamantite/lint/custom` are removed. Doctor reports a migration finding for old imports and
+old default folders. It does not run the old API or change files. A project can keep its old
+rules folder by setting `dir: ".adamantite/rules"`, or move the folder to `.adamantite/lint`.
+
+Verification is internal agent work. Agents use `RuleTester` from stdin or a temporary file
+while they write or harden rules, then discard the cases and fixtures. The target project
+keeps the rules and their runtime helpers. This replaces the saved-test workflow from
+issues #525 and #558. `rule add` writes only a rule, `rule test` remains optional, and
+CI generation adds no custom-rule test step. Users can keep saved tests and run
+`adamantite rule test` explicitly. Doctor preserves those tests and optional CI steps.
+
 ## Consequences
 
 - A rule file with an `enum` or another non-erasable construct stops the whole lint run.
@@ -51,21 +71,19 @@ repeat them against the pinned Oxlint:
 - Doctor cannot follow a `dir` or `name` that is not a string literal. It reports a warning.
   For a `dir`, it does not check that folder. For a `name`, it still checks the folder, but
   not that the plugin name is unique.
-- Adamantite scaffolds rule tests and runs them with `adamantite rule test`, not with `check`,
-  which stays Oxfmt plus Oxlint (2026-10-28, issue #525). A broken rule otherwise fails
-  silently: Oxlint loads it, it reports nothing, and `check` passes. `rule add` writes
-  `tests/<name>.ts` in the rules folder. `custom()` does not read subfolders, and the default
-  Vitest and Jest patterns do not match the file, so neither loads it.
-- `rule test` runs the tests with `node --test`, not with the project's test runner. Spikes
-  against Oxlint 1.88 showed that `RuleTester` refuses Bun and that Jest in CommonJS mode
-  cannot load `oxlint/plugins-dev`. The CLI runs on Node.js, so `node --test` works in every
-  project that runs Adamantite.
-- The managed GitHub workflow runs `rule test` when the project has rule tests (issue #558),
-  so CI catches a rule that stops reporting. `check` still does not run them. A Deno workflow
-  with rule tests also sets up Node.js, because `node --test` needs it.
+- A broken rule can report nothing while `check` passes. Agents must verify valid and invalid
+  cases before they finish each new or changed rule. A bug fix starts with a temporary case
+  that fails before the fix and passes after it.
+- RuleTester verification runs with Node.js, also in a Bun project. The cases run from stdin
+  or a temporary file by default. Users can add a saved `.test.ts` beside an existing rule
+  with `adamantite rule add test [name]`. Without a name, it lists existing rules for selection.
+  `--path` selects another test file path. Run saved tests explicitly with
+  `adamantite rule test`, or give it `--path` for a file outside the rules folder.
+- After a harden handoff, Adamantite runs `check` and the Doctor assessment. The agent does
+  the temporary verification during the session.
 - `adamantite/rules/testing` re-exports `RuleTester` from `oxlint/plugins-dev` and connects it
   to `node:test`, so a test needs one import and each case reports by name. Its declarations
-  export only `RuleTester`, so a type-aware lint run needs no `@types/node`. It imports
+  export `RuleTester` and the upstream test types, so a type-aware lint run needs no `@types/node`. It imports
   `oxlint` at run time, so `oxlint` is an optional peer dependency.
 - Read-only installs, such as some CI sandboxes and Yarn Plug'n'Play, use the temporary
   directory. That path is not tested.

@@ -15,7 +15,7 @@ import { readProject } from "#lib/workspace/project.ts"
 const ROOT = "/project"
 
 const RULE =
-  'import { defineRule } from "adamantite/rules"\n\nexport default defineRule({ create: () => ({}) })\n'
+  'import { defineRule } from "adamantite/rules/plugin"\n\nexport default defineRule({ create: () => ({}) })\n'
 
 const PACKAGE_JSON = JSON.stringify({
   name: "test-project",
@@ -32,7 +32,7 @@ function makeConfig(extendsList: string, imports: readonly string[] = []) {
   return [
     'import { defineConfig } from "oxlint"',
     'import core from "adamantite/lint"',
-    'import custom from "adamantite/lint/custom"',
+    'import custom from "adamantite/rules"',
     ...imports,
     "",
     `export default defineConfig({ extends: [${extendsList}] })`,
@@ -57,13 +57,154 @@ function getFindings(assessment: IntegrationAssessment) {
 }
 
 const CUSTOM_ACME = [
-  'import custom from "adamantite/lint/custom"',
+  'import custom from "adamantite/rules"',
   "",
   'export default custom({ dir: "rules", name: "acme" })',
   "",
 ].join("\n")
 
 describe("oxlint-custom", () => {
+  it.effect.each([".adamantite/lint", "tooling/lint/rules"])(
+    "accept optional saved rule tests in %s without editing files",
+    (dir) =>
+      Effect.gen(function* () {
+        const files = createFileSystemTestContext({
+          files: {
+            [`${dir}/no-process-env.ts`]: RULE,
+            [`${dir}/no-process-env.test.ts`]: "// saved verification case\n",
+            "oxlint.config.ts": makeConfig(`core, custom({ dir: "${dir}" })`),
+            "package.json": PACKAGE_JSON,
+          },
+          root: ROOT,
+        })
+        const before = files.list().map((file) => [file, files.read(file)])
+
+        expect(getFindings(yield* runAssess(files))).toStrictEqual([])
+        expect(files.list().map((file) => [file, files.read(file)])).toStrictEqual(before)
+      })
+  )
+
+  it.effect("report the retired loader before a project writes its first custom rule", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts":
+            'import custom from "adamantite/lint/custom"\nexport default custom()\n',
+          "package.json": PACKAGE_JSON,
+        },
+        root: ROOT,
+      })
+
+      expect(getFindings(yield* runAssess(files))).toMatchObject([
+        {
+          currentState: "`oxlint.config.ts` imports the old custom-rules API.",
+          id: "custom-rules-api-migration",
+        },
+      ])
+    })
+  )
+
+  it.effect("report migration steps for old imports and the old default folder without edits", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/no-process-env.ts": RULE.replace(
+            "adamantite/rules/plugin",
+            "adamantite/rules"
+          ),
+          "oxlint.config.ts": 'export { default } from "./tooling/lint.ts"\n',
+          "package.json": PACKAGE_JSON,
+          "tooling/lint.ts":
+            'import custom from "adamantite/lint/custom"\nexport default custom()\n',
+        },
+        root: ROOT,
+      })
+      const before = files.list().map((file) => [file, files.read(file)])
+
+      const findings = getFindings(yield* runAssess(files))
+
+      expect(findings).toMatchObject([
+        {
+          currentState: expect.stringContaining(
+            "`.adamantite/rules` is the previous default rules folder"
+          ),
+          goal: expect.arrayContaining([
+            expect.stringContaining('import custom from "adamantite/rules"'),
+            expect.stringContaining("`adamantite/rules/plugin`"),
+            expect.stringContaining('custom({ dir: ".adamantite/rules" })'),
+          ]),
+          id: "custom-rules-api-migration",
+        },
+      ])
+      expect(findings[0]?.currentState).toContain(
+        "`tooling/lint.ts` imports the old custom-rules API."
+      )
+      expect(findings[0]?.currentState).toContain(
+        "`.adamantite/rules/no-process-env.ts` imports the old custom-rules API."
+      )
+      expect(files.list().map((file) => [file, files.read(file)])).toStrictEqual(before)
+    })
+  )
+
+  it.effect("report a retired authoring import in the current default folder", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/lint/no-process-env.ts": RULE.replace(
+            "adamantite/rules/plugin",
+            "adamantite/rules"
+          ),
+          "oxlint.config.ts": toOxlintTsConfigContent(),
+          "package.json": PACKAGE_JSON,
+        },
+        root: ROOT,
+      })
+
+      expect(getFindings(yield* runAssess(files))).toMatchObject([
+        {
+          currentState: "`.adamantite/lint/no-process-env.ts` imports the old custom-rules API.",
+          id: "custom-rules-api-migration",
+        },
+      ])
+    })
+  )
+
+  it.effect("accept the previous folder path when the current API loads it explicitly", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ".adamantite/rules/no-process-env.ts": RULE,
+          "oxlint.config.ts": makeConfig('core, custom({ dir: ".adamantite/rules" })'),
+          "package.json": PACKAGE_JSON,
+        },
+        root: ROOT,
+      })
+
+      expect(getFindings(yield* runAssess(files))).toStrictEqual([])
+    })
+  )
+
+  it.effect("report a workspace package that still has the old default folder", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": toOxlintTsConfigContent(),
+          "package.json": MONOREPO_PACKAGE_JSON,
+          "packages/web/.adamantite/rules/no-process-env.ts": RULE,
+          "packages/web/package.json": yield* stringifyJson({ name: "web" }),
+        },
+        root: ROOT,
+      })
+
+      expect(getFindings(yield* runAssess(files))).toMatchObject([
+        {
+          currentState: expect.stringContaining("`packages/web/.adamantite/rules`"),
+          id: "custom-rules-api-migration",
+        },
+      ])
+    })
+  )
+
   it.effect("report not applicable without a rules folder or a custom() call", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -79,9 +220,9 @@ describe("oxlint-custom", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/_helpers.ts": "export const helper = 1\n",
-          ".adamantite/rules/AGENTS.md": "# Custom rules\n",
-          ".adamantite/rules/no-process-env.ts": RULE,
+          ".adamantite/lint/_helpers.ts": "export const helper = 1\n",
+          ".adamantite/lint/AGENTS.md": "# Custom rules\n",
+          ".adamantite/lint/no-process-env.ts": RULE,
           "oxlint.config.ts": toOxlintTsConfigContent(["react"]),
           "package.json": PACKAGE_JSON,
         },
@@ -101,7 +242,7 @@ describe("oxlint-custom", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/no-process-env.ts": RULE,
+          ".adamantite/lint/no-process-env.ts": RULE,
           "oxlint.config.ts": makeConfig("core"),
           "package.json": PACKAGE_JSON,
         },
@@ -113,8 +254,8 @@ describe("oxlint-custom", () => {
       expect(findings).toStrictEqual([
         expect.objectContaining({
           currentState:
-            "`.adamantite/rules` has 1 rule file(s), but no `custom()` call loads it, so Oxlint does not run them.",
-          id: "custom-rules-not-loaded:.adamantite/rules",
+            "`.adamantite/lint` has 1 rule file(s), but no `custom()` call loads it, so Oxlint does not run them.",
+          id: "custom-rules-not-loaded:.adamantite/lint",
           integration: "oxlint-custom",
         }),
       ])
@@ -125,10 +266,10 @@ describe("oxlint-custom", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/no-process-env.ts": RULE,
+          ".adamantite/lint/no-process-env.ts": RULE,
           "oxlint.config.ts": makeConfig("core"),
           "package.json": PACKAGE_JSON,
-          "scratch.ts": 'import custom from "adamantite/lint/custom"\n\nexport default custom()\n',
+          "scratch.ts": 'import custom from "adamantite/rules"\n\nexport default custom()\n',
         },
         root: ROOT,
       })
@@ -136,7 +277,7 @@ describe("oxlint-custom", () => {
       const findings = getFindings(yield* runAssess(files))
 
       expect(findings.map((finding) => finding.id)).toStrictEqual([
-        "custom-rules-not-loaded:.adamantite/rules",
+        "custom-rules-not-loaded:.adamantite/lint",
       ])
     })
   )
@@ -145,11 +286,11 @@ describe("oxlint-custom", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/no-process-env.ts": RULE,
+          ".adamantite/lint/no-process-env.ts": RULE,
           "lint/rules.ts": [
-            'import custom from "adamantite/lint/custom"',
+            'import custom from "adamantite/rules"',
             "",
-            'export default custom({ dir: "../.adamantite/rules" })',
+            'export default custom({ dir: "../.adamantite/lint" })',
             "",
           ].join("\n"),
           "oxlint.config.ts": makeConfig("core, rules", ['import rules from "./lint/rules.js"']),
@@ -169,9 +310,9 @@ describe("oxlint-custom", () => {
       const files = createFileSystemTestContext({
         files: {
           // A helper is not a rule, so the enum that would stop a rule from loading is not reported.
-          ".adamantite/rules/_helpers.ts": "enum Kind { A }\nexport const helper = Kind.A\n",
-          ".adamantite/rules/no-enum.ts": `enum Kind { A }\n${RULE}`,
-          ".adamantite/rules/no-process-env.ts": RULE,
+          ".adamantite/lint/_helpers.ts": "enum Kind { A }\nexport const helper = Kind.A\n",
+          ".adamantite/lint/no-enum.ts": `enum Kind { A }\n${RULE}`,
+          ".adamantite/lint/no-process-env.ts": RULE,
           "oxlint.config.ts": toOxlintTsConfigContent(),
           "package.json": PACKAGE_JSON,
         },
@@ -185,7 +326,7 @@ describe("oxlint-custom", () => {
           currentState: expect.stringContaining(
             "Line 1: `enum` needs a TypeScript transform, which type stripping does not do."
           ),
-          id: "custom-rule-cannot-load:.adamantite/rules/no-enum.ts",
+          id: "custom-rule-cannot-load:.adamantite/lint/no-enum.ts",
         },
       ])
     })
@@ -199,7 +340,7 @@ describe("oxlint-custom", () => {
           "package.json": MONOREPO_PACKAGE_JSON,
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
           "tooling/lint/index.ts": [
-            'import custom from "adamantite/lint/custom"',
+            'import custom from "adamantite/rules"',
             "",
             'export default custom({ dir: "rules", name: "acme" })',
             "",
@@ -278,7 +419,7 @@ describe("oxlint-custom", () => {
       Effect.gen(function* () {
         const files = createFileSystemTestContext({
           files: {
-            ".adamantite/rules/no-process-env.ts": RULE,
+            ".adamantite/lint/no-process-env.ts": RULE,
             "oxlint.config.ts": makeConfig("core, tooling", [
               'import tooling from "@acme/lint/missing"',
             ]),
@@ -309,7 +450,7 @@ describe("oxlint-custom", () => {
         files: {
           "oxlint.config.ts": toOxlintTsConfigContent(),
           "package.json": MONOREPO_PACKAGE_JSON,
-          "packages/web/.adamantite/rules/no-window.ts": RULE,
+          "packages/web/.adamantite/lint/no-window.ts": RULE,
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
         root: ROOT,
@@ -318,7 +459,7 @@ describe("oxlint-custom", () => {
       const findings = getFindings(yield* runAssess(files))
 
       expect(findings.map((finding) => finding.id)).toStrictEqual([
-        "custom-rules-not-loaded:packages/web/.adamantite/rules",
+        "custom-rules-not-loaded:packages/web/.adamantite/lint",
       ])
       expect(findings[0]?.goal[0]).toContain("in the Oxlint config of `packages/web`")
     })
@@ -328,10 +469,10 @@ describe("oxlint-custom", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/no-process-env.ts": RULE,
+          ".adamantite/lint/no-process-env.ts": RULE,
           "oxlint.config.ts": toOxlintTsConfigContent(),
           "package.json": MONOREPO_PACKAGE_JSON,
-          "packages/web/.adamantite/rules/no-window.ts": RULE,
+          "packages/web/.adamantite/lint/no-window.ts": RULE,
           "packages/web/oxlint.config.ts": makeConfig("root, custom()", [
             'import root from "../../oxlint.config.ts"',
           ]),
@@ -345,7 +486,7 @@ describe("oxlint-custom", () => {
       expect(findings).toStrictEqual([
         expect.objectContaining({
           currentState:
-            "2 rules folders use the plugin name `project`: `.adamantite/rules`, `packages/web/.adamantite/rules`. Oxlint rejects two plugins with the same name in one run.",
+            "2 rules folders use the plugin name `project`: `.adamantite/lint`, `packages/web/.adamantite/lint`. Oxlint rejects two plugins with the same name in one run.",
           id: "custom-rules-duplicate-name:project",
         }),
       ])
@@ -356,10 +497,10 @@ describe("oxlint-custom", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          ".adamantite/rules/no-process-env.ts": RULE,
+          ".adamantite/lint/no-process-env.ts": RULE,
           "oxlint.config.ts": toOxlintTsConfigContent(),
           "package.json": MONOREPO_PACKAGE_JSON,
-          "packages/web/.adamantite/rules/no-window.ts": RULE,
+          "packages/web/.adamantite/lint/no-window.ts": RULE,
           "packages/web/oxlint.config.ts": makeConfig('root, custom({ name: "web" })', [
             'import root from "../../oxlint.config.ts"',
           ]),
@@ -372,15 +513,15 @@ describe("oxlint-custom", () => {
     })
   )
 
-  it.effect(
-    "warn about a custom() call that doctor cannot resolve, and skip the folder check",
-    () =>
+  it.effect.each([".adamantite/lint", ".adamantite/rules"])(
+    "warn about an unresolved dir and skip the folder check for %s",
+    (folder) =>
       Effect.gen(function* () {
         const files = createFileSystemTestContext({
           files: {
-            ".adamantite/rules/no-process-env.ts": RULE,
+            [`${folder}/no-process-env.ts`]: RULE,
             "oxlint.config.ts": makeConfig("core, custom({ dir: RULES_DIR })", [
-              'const RULES_DIR = ".adamantite/rules"',
+              `const RULES_DIR = "${folder}"`,
             ]),
             "package.json": PACKAGE_JSON,
           },
@@ -402,7 +543,7 @@ describe("oxlint-custom", () => {
       Effect.gen(function* () {
         const files = createFileSystemTestContext({
           files: {
-            ".adamantite/rules/no-process-env.ts": RULE,
+            ".adamantite/lint/no-process-env.ts": RULE,
             "oxlint.config.ts": makeConfig('core, custom({ dir: "rules", name: NAME })', [
               'const NAME = "acme"',
             ]),
@@ -415,7 +556,7 @@ describe("oxlint-custom", () => {
         const assessment = yield* runAssess(files)
 
         expect(getFindings(assessment).map((finding) => finding.id)).toStrictEqual([
-          "custom-rules-not-loaded:.adamantite/rules",
+          "custom-rules-not-loaded:.adamantite/lint",
           "custom-rule-cannot-load:rules/no-window.ts",
         ])
         expect(assessment.warnings).toStrictEqual([

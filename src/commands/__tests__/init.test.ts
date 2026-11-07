@@ -305,7 +305,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("install oxlint-plugin-react-doctor when the react-doctor preset is selected", () =>
+    it.effect("install oxlint-plugin-react-doctor when the react-strict preset is selected", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({ "package.json": basePackageJson })
         const prompter = createPrompterTestContext()
@@ -320,7 +320,7 @@ describe("init", () => {
             "--preset",
             "react",
             "--preset",
-            "react-doctor",
+            "react-strict",
           ],
           { files, layers: [prompter.layer, installer.layer] }
         )
@@ -330,7 +330,7 @@ describe("init", () => {
           `oxlint-plugin-react-doctor@${reactDoctor.version}`
         )
         expect(files.read("oxlint.config.ts")).toContain(
-          'import reactDoctor from "adamantite/lint/react-doctor"'
+          'import reactStrict from "adamantite/lint/react-strict"'
         )
       })
     )

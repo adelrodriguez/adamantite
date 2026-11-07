@@ -119,6 +119,54 @@ describe("oxlint", () => {
       })
     )
 
+    it.effect.each([false, true])("report the retired React Doctor preset with react-strict already present: %s", (hasStrict) =>
+      Effect.gen(function* () {
+        const config = toOxlintTsConfigContent(hasStrict ? ["react", "react-strict"] : ["react"])
+          .replace('import custom from', 'import oldDoctor from "adamantite/lint/react-doctor"\nimport custom from')
+          .replace("custom()],", "oldDoctor, custom()],")
+        const files = makeFiles({
+          "oxlint.config.ts": config,
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+        files.makeReadOnly("oxlint.config.ts")
+
+        const result = yield* runAssess(files)
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: expect.arrayContaining([
+            expect.objectContaining({ id: "react-doctor-preset-migration", integration: "oxlint" }),
+          ]),
+        })
+        if (!result.applicable) return
+        const finding = result.findings.find((entry) => entry.id === "react-doctor-preset-migration")
+        expect(finding?.goal.join("\n")).toContain("react-strict")
+        expect(finding?.goal.join("\n")).toContain("Preserve")
+        expect(files.read("oxlint.config.ts")).toBe(config)
+      })
+    )
+
+    it.effect("clear the React Doctor migration finding after the config is repaired", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxlint.config.ts": toOxlintTsConfigContent(["react", "react-strict"]),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.applicable && result.findings).not.toContainEqual(
+          expect.objectContaining({ id: "react-doctor-preset-migration" })
+        )
+      })
+    )
+
     it.effect("report not applicable when no managed lint script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({

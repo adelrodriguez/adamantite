@@ -338,7 +338,7 @@ describe("native runtime overrides", () => {
               Effect.succeed([{ _tag: "Backend", env: { NATIVE_BACKEND: "/backend" } }]),
           },
         },
-        { name: "javascript", preset: "shadcn", runtime: { _tag: "JavaScript" } },
+        { name: "javascript", preset: "tailwind", runtime: { _tag: "JavaScript" } },
       ]).pipe(
         Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
       )
@@ -356,7 +356,7 @@ describe("runtime types", () => {
   it("keep plugin capabilities and resolved runtime parts distinct in types", () => {
     const javascript = defineOxlintPlugin({
       name: "example",
-      preset: "shadcn",
+      preset: "tailwind",
       runtime: { _tag: "JavaScript" },
     })
 

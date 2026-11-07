@@ -99,7 +99,7 @@ jobs:
           # A target project lists TypeScript itself. Without that entry, npm cannot add the plugin
           # in a separate step: see ADR 0003.
           npm install "typescript@${typescript_version}" "@shadcn/lint@${shadcn_lint_version}"
-          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import shadcn from "adamantite/lint/shadcn"' '' 'export default defineConfig({ extends: [shadcn] })' > oxlint.config.ts
+          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import tailwind from "adamantite/lint/tailwind"' '' 'export default defineConfig({ extends: [tailwind] })' > oxlint.config.ts
           printf '%s\n' 'export const Panel = () => <div style={{ padding: 16 }}>Panel</div>' > bad.tsx
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.tsx > oxlint-output.txt 2>&1; then
             echo "Expected shadcn diagnostics from the packaged preset and the managed plugin to fail the lint run"

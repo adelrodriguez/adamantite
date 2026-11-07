@@ -1,6 +1,6 @@
 import type { OxlintConfig } from "oxlint"
 
-// The shadcn plugin (https://github.com/shadcn-ui/lint) checks a Tailwind v4
+// The Tailwind preset (https://github.com/shadcn-ui/lint) checks a Tailwind v4
 // design system: components keep their own appearance, colors and sizes come
 // from the theme, and every class is one Tailwind can generate. shadcn/ui is
 // not required.

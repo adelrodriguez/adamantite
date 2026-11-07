@@ -223,7 +223,7 @@ in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit u
 ## Managed plugins
 
 A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`
-for `shadcn` and `oxlint-plugin-react-doctor` for `react-doctor`. Each definition under
+for `tailwind` and `oxlint-plugin-react-doctor` for `react-doctor`. Each definition under
 `tooling/oxlint/plugins/` uses `defineOxlintPlugin` and declares its package, preset, and
 JavaScript or native runtime capability. `plugins/index.ts` is the one registry of definitions.
 It imports no version macro, so the Oxlint entry can load it from source. JavaScript plugins

@@ -95,7 +95,7 @@ Available setup values:
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`,
-  `jest`, `vitest`, `node`, `architecture`, `strict`, `antislop`, and `shadcn`. `react-doctor` requires `react`.
+  `jest`, `vitest`, `node`, `architecture`, `strict`, `antislop`, and `tailwind`. `react-doctor` requires `react`.
 - Editors: `vscode` and `zed`.
 - Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, and `opencode`.
 
@@ -351,7 +351,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/architecture` | Load first-party rules for project-defined layer maps and import owners. No rules are enabled by default.                                                                                                                                                                              |
 | `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, no type assertions outside tests, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                                                                        |
 | `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                |
-| `adamantite/lint/shadcn`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the shadcn preset](#the-shadcn-preset). |
+| `adamantite/lint/tailwind`       | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the tailwind preset](#the-tailwind-preset). |
 | `adamantite/rules`             | A function, `custom()`, that loads the project's own rules from `.adamantite/lint/`. See [custom rules](#custom-rules).                                                                                                                                                                |
 | `adamantite/rules/plugin`      | `definePlugin`, `defineRule`, `eslintCompatPlugin`, and all Oxlint authoring types.                                                                                                                                                                                                    |
 | `adamantite/rules/testing`     | `RuleTester` and its types for temporary agent verification and optional saved tests.                                                                                                                                                                                                  |
@@ -675,9 +675,11 @@ export default defineConfig({
 })
 ```
 
-### The shadcn preset
+### The Tailwind preset
 
-`adamantite/lint/shadcn` needs Tailwind v4 and the `@shadcn/lint` package. `adamantite init`
+The preset uses upstream `shadcn/*` rule names and `settings.shadcn` keys.
+
+`adamantite/lint/tailwind` needs Tailwind v4 and the `@shadcn/lint` package. `adamantite init`
 installs the pinned version when you select the preset, and `adamantite doctor` and
 `adamantite update` keep it on that version. If you add the preset by hand, install
 `@shadcn/lint` as a devDependency too. The plugin finds your components and theme
@@ -687,11 +689,11 @@ components live elsewhere, set `settings.shadcn.ui`:
 
 ```ts
 import core from "adamantite/lint"
-import shadcn from "adamantite/lint/shadcn"
+import tailwind from "adamantite/lint/tailwind"
 import { defineConfig } from "oxlint"
 
 export default defineConfig({
-  extends: [core, shadcn],
+  extends: [core, tailwind],
   ignorePatterns: core.ignorePatterns,
   settings: { shadcn: { ui: "@/ds" } },
 })

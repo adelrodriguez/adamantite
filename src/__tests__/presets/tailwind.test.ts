@@ -5,13 +5,13 @@ import { join } from "node:path"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import { plugin as shadcnPlugin } from "@shadcn/lint"
 import * as Schema from "effect/Schema"
-import shadcn from "#presets/lint/shadcn.ts"
+import tailwind from "#presets/lint/tailwind.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/shadcn-overlap")
 const NAMESPACE = "shadcn"
 
-const presetRules = Object.keys(shadcn.rules ?? {})
+const presetRules = Object.keys(tailwind.rules ?? {})
   .filter((name) => name.startsWith(`${NAMESPACE}/`))
   .map((name) => name.slice(NAMESPACE.length + 1))
 
@@ -28,7 +28,7 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the overlap fixtures with the react and shadcn presets in one real Oxlint run. The plugin
+ * Lint the overlap fixtures with the react and tailwind presets in one real Oxlint run. The plugin
  * resolves from the repository's `node_modules`, as it does from a target project's.
  */
 function lintOverlapFixtures() {
@@ -42,9 +42,9 @@ function lintOverlapFixtures() {
       [
         'import { defineConfig } from "oxlint"',
         `import react from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react.ts"))}`,
-        `import shadcn from ${JSON.stringify(join(REPO_ROOT, "presets/lint/shadcn.ts"))}`,
+        `import tailwind from ${JSON.stringify(join(REPO_ROOT, "presets/lint/tailwind.ts"))}`,
         "",
-        "export default defineConfig({ extends: [react, shadcn] })",
+        "export default defineConfig({ extends: [react, tailwind] })",
         "",
       ].join("\n")
     )
@@ -71,13 +71,13 @@ function lintOverlapFixtures() {
   }
 }
 
-describe("shadcn preset", () => {
+describe("tailwind preset", () => {
   it("enable exactly the rules the managed plugin defines", () => {
     expect(new Set(presetRules)).toStrictEqual(new Set(Object.keys(shadcnPlugin.rules)))
   })
 })
 
-describe("shadcn and react preset overlap", () => {
+describe("tailwind and react preset overlap", () => {
   let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"]
 
   beforeAll(() => {
@@ -91,7 +91,7 @@ describe("shadcn and react preset overlap", () => {
     expect(codes).toContain("shadcn(no-raw-colors)")
   })
 
-  it("leave shadcn findings to the shadcn rules", () => {
+  it("leave design-system findings to the shadcn rules", () => {
     const reactCodes = new Set<string | undefined>([
       "react(no-unknown-property)",
       "react(style-prop-object)",

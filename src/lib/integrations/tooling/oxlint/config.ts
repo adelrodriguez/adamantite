@@ -47,7 +47,7 @@ export const LINT_PRESETS = [
   "architecture",
   "strict",
   "antislop",
-  "shadcn",
+  "tailwind",
 ] as const
 
 export type LintPreset = (typeof LINT_PRESETS)[number]

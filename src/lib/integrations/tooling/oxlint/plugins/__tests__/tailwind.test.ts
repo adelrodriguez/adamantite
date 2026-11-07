@@ -48,7 +48,7 @@ describe("shadcn-lint", () => {
     it.effect("report not applicable without a managed lint script", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "oxlint.config.ts": toOxlintTsConfigContent(["shadcn"]),
+          "oxlint.config.ts": toOxlintTsConfigContent(["tailwind"]),
           "package.json": makePackageJson({ scripts: { check: "oxlint" } }),
         })
 
@@ -58,10 +58,10 @@ describe("shadcn-lint", () => {
       })
     )
 
-    it.effect("report a missing package when the config imports the shadcn preset", () =>
+    it.effect("report a missing package when the config imports the tailwind preset", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "oxlint.config.ts": toOxlintTsConfigContent(["shadcn"]),
+          "oxlint.config.ts": toOxlintTsConfigContent(["tailwind"]),
           "package.json": makePackageJson({ scripts: { check: "adamantite check" } }),
         })
 
@@ -77,7 +77,7 @@ describe("shadcn-lint", () => {
     it.effect("report no package action when the pinned version is installed", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          "oxlint.config.ts": toOxlintTsConfigContent(["shadcn"]),
+          "oxlint.config.ts": toOxlintTsConfigContent(["tailwind"]),
           "package.json": makePackageJson({
             devDependencies: { "@shadcn/lint": shadcnLint.version },
             scripts: { fix: "adamantite fix" },

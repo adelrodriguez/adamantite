@@ -112,7 +112,7 @@ its host tool.
 import shadcnLint from "#lib/integrations/tooling/shadcn-lint.ts"
 
 // Prefer: the plugin registry keeps the definition under its host tool.
-import shadcn from "#lib/integrations/tooling/oxlint/plugins/shadcn.ts"
+import tailwind from "#lib/integrations/tooling/oxlint/plugins/tailwind.ts"
 ```
 
 [PR #472](https://github.com/adelrodriguez/adamantite/pull/472) moved managed plugins under Oxlint.

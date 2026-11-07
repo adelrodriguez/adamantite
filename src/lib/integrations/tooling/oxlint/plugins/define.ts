@@ -18,7 +18,7 @@ interface ManagedPluginOptions<AssessError, AssessRequirements> {
   >
   readonly name: string
   /**
-   * The lint preset that loads the plugin, such as `shadcn` for `adamantite/lint/shadcn`.
+   * The lint preset that loads the plugin, such as `tailwind` for `adamantite/lint/tailwind`.
    */
   readonly preset: LintPreset
   readonly version: string

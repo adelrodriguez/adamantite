@@ -34,7 +34,7 @@ values are:
 
 - Scripts: `check`, `fix`, `analyze`. In a detected monorepo, `analyze` also installs Sherif.
 - Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`, `jest`,
-  `vitest`, `node`, `architecture`, `strict`, `antislop`, `shadcn`;
+  `vitest`, `node`, `architecture`, `strict`, `antislop`, `tailwind`;
   editors: `vscode`, `zed`
 - Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, `opencode`. Init
   installs this skill for each one with the `skills` CLI.
@@ -158,7 +158,7 @@ on purpose, add it to `allowedUnstableApis` in that tsconfig entry. Do not turn 
 `effect/FileSystem` and `effect/Path`), `@effect/platform-node`, and `@effect/vitest` are
 unstable. An entry can be a module or a full package.
 
-The `shadcn` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
+The `tailwind` preset needs Tailwind v4 and the `@shadcn/lint` package, which `init` installs
 at a pinned version and doctor and `update` keep in sync. The plugin finds components and
 the theme through `components.json`. Without that file it looks in `components/ui` or
 `src/components/ui` and discovers the stylesheet that imports Tailwind; when components

@@ -251,6 +251,8 @@ describe("init", () => {
           "--preset",
           "react-strict",
           "--preset",
+          "architecture",
+          "--preset",
           "strict",
           "--preset",
           "tanstack",
@@ -262,11 +264,12 @@ describe("init", () => {
       expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
         "react",
         "react-strict",
+        "architecture",
         "strict",
         "tanstack",
       ])
       expect(installer.calls[0]?.packages).toStrictEqual(
-        expect.not.arrayContaining([expect.stringMatching(/strict|tanstack/)])
+        expect.not.arrayContaining([expect.stringMatching(/architecture|strict|tanstack/)])
       )
     })
   )

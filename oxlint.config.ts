@@ -132,5 +132,16 @@ export default defineConfig({
         root: "src/lib",
       },
     ],
+    // Repository suppressions use `@ts-expect-error - reason`, so the format belongs in the check.
+    "typescript/ban-ts-comment": [
+      "error",
+      {
+        minimumDescriptionLength: 3,
+        "ts-check": false,
+        "ts-expect-error": { descriptionFormat: "^ - \\S" },
+        "ts-ignore": true,
+        "ts-nocheck": "allow-with-description",
+      },
+    ],
   },
 })

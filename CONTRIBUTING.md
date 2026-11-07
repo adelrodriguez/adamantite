@@ -21,6 +21,8 @@ Thank you for contributing to Adamantite.
 
 Read [GLOSSARY.md](GLOSSARY.md) before you change domain behavior. Use
 [docs/architecture.md](docs/architecture.md) to find the relevant module boundary.
+Read [CODING_STANDARDS.md](CODING_STANDARDS.md) for coding choices that require review, and
+[DESIGN.md](DESIGN.md) before changing terminal output or interaction.
 
 ## Development commands
 
@@ -55,16 +57,6 @@ pnpm run test:build
 
 ## Make a change
 
-- Keep command modules thin and put reusable behavior in `src/lib`.
-- Keep `src/lib` layers in one dependency direction: `shared`, then `workspace` and
-  `execution`, then `integrations`, then `assessment`. Oxlint rejects an import from a
-  higher layer.
-- Keep integration modules limited to their default integration export. Put logic that one
-  tool owns in that tool's folder, and logic that several tools share in
-  `src/lib/integrations/tooling/base.ts`.
-- Keep `assess` and `doctor` read-only. Findings define the goal state that an agent or a
-  human must reach.
-- Keep `update` limited to managed dependency updates and follow-up findings.
 - Add or update tests for behavior changes. Tests are colocated in `__tests__` directories.
 - Update user documentation when CLI behavior, presets, exports, or requirements change.
 

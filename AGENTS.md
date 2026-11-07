@@ -2,8 +2,12 @@
 
 Use ASD-STE100 Simplified Technical English for all communication.
 
-Before you explore or change code, read `GLOSSARY.md` and the relevant parts of
-`docs/architecture.md`. Use the project's domain language.
+Before you explore or change code, read [GLOSSARY.md](GLOSSARY.md) and the relevant parts of
+[docs/architecture.md](docs/architecture.md). Use the project's domain language.
+
+Read [CODING_STANDARDS.md](CODING_STANDARDS.md) before you write or review code.
+
+For terminal output and interaction, read [DESIGN.md](DESIGN.md).
 
 ## Agent skills
 
@@ -16,98 +20,29 @@ with `pnpm dlx packref add <package>` and read its version-locked source under
 ### Issue tracker
 
 Issues and PRDs are GitHub issues at `adelrodriguez/adamantite`. See
-`docs/agents/issue-tracker.md`.
+[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
 ### Triage labels
 
-Use the default five-role triage vocabulary. See `docs/agents/triage-labels.md`.
+Use the default five-role triage vocabulary. See
+[docs/agents/triage-labels.md](docs/agents/triage-labels.md).
 
 ### Domain docs
 
-Use the single-context domain-doc layout. See `docs/agents/domain.md`.
+Use the single-context domain-doc layout. See [docs/agents/domain.md](docs/agents/domain.md).
 
 ### Changesets
 
 Use Changesets for versioning and changelog management. See
-`docs/agents/changesets.md`.
+[docs/agents/changesets.md](docs/agents/changesets.md).
 
 ### Implementation plans
 
 Write an implementation plan into the GitHub issue that it serves. Update the issue body
 when the plan changes, so the issue stays the single record of the work. Do not add plan
-files to the repository. See `docs/agents/issue-tracker.md`.
+files to the repository. See [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
 
-## Repository rules
+## Development workflow
 
-- Use pnpm for package management and scripts.
-- Run `pnpm run test`, `pnpm run check`, `pnpm run fix`, and `pnpm run format` after
-  edits.
-- Run `pnpm run analyze` after dependency, import, or export changes.
-- Effect tests use a paused `TestClock`. Use `TestClock.adjust` to advance test time, or
-  use `it.live` when the test must use real time.
-- Unit tests must not touch the host filesystem. Use `createFileSystemTestContext` from
-  `src/__tests__/filesystem.ts` (with `Path.layer`) for filesystem access, fixtures, and
-  failure injection. Only integration tests that spawn real processes, such as the antislop
-  Oxlint run, may use `node:fs`.
-- Preset declarations build with oxc isolated declarations: every export in
-  `presets/**/*.ts` must carry an explicit type annotation, or the build fails.
-- Prefer function declarations for standalone functions. Keep arrow functions for
-  callbacks, object methods, and functions that directly return an Effect chain.
-- Format suppressions as `@ts-expect-error - reason`. Prefer this form to casts that hide
-  known third-party type mismatches.
-- Keep `src/lib` layers in one dependency direction: `shared`, then `workspace` and
-  `execution`, then `integrations`, then `assessment`, `toolchain`, and `hardening`, which do
-  not import each other. A layer imports only from the layers below it. Oxlint enforces these
-  rules.
-- Keep tool modules limited to their default integration export, and plugin modules to their
-  default plugin definition. Shared infrastructure (`integrations/base.ts`,
-  `integrations/tooling/base.ts`, `integrations/tooling/preset-config.ts`), helper modules in
-  a tool's folder, the plugin types in `integrations/tooling/oxlint/plugins/base.ts`, the
-  `oxlintPlugins` registry in `plugins/index.ts`, and the derived `managedPlugins` in
-  `plugins/managed.ts` are the exceptions.
-- Keep packages that belong to a host tool under that tool's folder: companion packages
-  beside it (`tooling/oxlint/tsrs.ts`) and managed plugins in `plugins/`. Add a managed
-  plugin with `defineOxlintPlugin`, register it in `oxlintPlugins`, and add its version pin to
-  `plugins/managed.ts`. Keep version macros out of plugin definitions, because the Oxlint
-  entry loads them from source.
-- Put behavior that one tool owns in that tool's folder, for example
-  `integrations/tooling/knip/config.ts`. Put behavior that several tools share in
-  `integrations/tooling/base.ts`. Put target-project state that does not use integration
-  types in `src/lib/workspace`, and cross-cutting helpers in `src/lib/shared`.
-- Keep command parsing and Effect CLI composition in `commands` and `cli.ts`. The `check`,
-  `fix`, and `analyze` commands, and the check after a `harden` handoff, call
-  `toolchain/index.ts`. Each tooling integration builds the arguments of its tool. The
-  lifecycle commands `init` and `update` use integrations directly.
-- Keep Oxlint runtime resolution read-only. Only `src/oxlint.ts` sets process variables and
-  loads Oxlint.
-- Keep `init` deterministic and independent from doctor assessment.
-- Keep `assess` and `doctor` read-only. Doctor reports current state, goal criteria, and
-  verification instructions. Agents or humans perform repairs.
-- Keep `update` limited to managed dependency updates and the refresh of the Adamantite
-  skill that `init` installed. It can report doctor findings, but findings do not make a
-  successful update fail.
-- Keep tooling integration versions aligned with the corresponding versions in
-  `package.json`.
-
-<!-- PACKREF:START -->
-
-## Packref
-
-Packref provides local copies of dependency source code so you can inspect the exact implementation used by this project.
-
-- Source references are stored in `.packref/packages/<registry>/<package>/<version>/` for unscoped packages and `.packref/packages/<registry>/<scope>/<package>/<version>/` for scoped packages — browse these directories to read dependency internals
-- `.packref/packref-lock.json` is shared and should be committed; `.packref/packages/` is developer-local and git-ignored
-- Run `packref install` after cloning when locked references are missing; install restores locked references exactly and does not install runtime dependencies
-- Available commands:
-  - `packref add [package]` — select manifest dependencies or fetch a named package (e.g. `packref add react`, `packref add hono@4.2.0`, `packref add @effect/cli`)
-  - `packref remove [package]` — select or name package references to remove
-  - `packref install` — materialize every reference already recorded in the committed lockfile
-  - `packref sync` — update dependency-tracked lock entries to match current `package.json` dependency versions
-  - `packref list` — show all referenced packages
-  - `packref prune` — remove unused entries from the global store
-  - `packref clean` — remove all project-local references
-  - `packref clean --global` — wipe all global store entries
-- Use Packref when you need to understand how a dependency works internally — read the source in `.packref/` instead of guessing or searching the web
-- Multiple versions of the same package can coexist; check `.packref/packref-lock.json` for the full list
-
-<!-- PACKREF:END -->
+Use pnpm for package management and scripts. Read
+[CONTRIBUTING.md](CONTRIBUTING.md#validate-a-change) for setup, validation, and pull requests.

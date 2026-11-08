@@ -7,6 +7,7 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import initCommand from "#commands/init/index.ts"
+import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
@@ -17,14 +18,12 @@ import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
-import { getDependencyVersion } from "#lib/shared/version.macro.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/workspace/agents.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
   createPrompterTestContext,
   makeHandoffRunner,
-  nonProbeInvocations,
   runCommand,
 } from "./command-test-helpers.ts"
 
@@ -54,20 +53,7 @@ const monorepoPackageJson = JSON.stringify(
 // Interactive init probes the coding agent CLIs for the skill prompt. None of them is installed.
 const noCodingAgents = makeHandoffRunner({ installedCommands: [] }).layer
 
-function getSkillsAddArgs(...agents: string[]) {
-  return [
-    "--yes",
-    `skills@${getDependencyVersion("skills")}`,
-    "add",
-    "./node_modules/adamantite",
-    "--skill",
-    "adamantite",
-    ...agents.flatMap((agent) => ["--agent", agent]),
-    "--yes",
-    // Only JSON mode exits nonzero when a skill copy fails.
-    "--json",
-  ]
-}
+const shippedSkill = getShippedSkillFiles()
 
 function createInitTestContext(files?: Record<string, string>) {
   return createFileSystemTestContext({
@@ -99,7 +85,7 @@ function runFreshSetup() {
   return Effect.gen(function* () {
     const files = createInitTestContext()
     const prompter = createPrompterTestContext({
-      confirmResponses: [true, false, false, false],
+      confirmResponses: [true, false, false],
       multiselectResponses: [["check", "analyze"], ["react"], ["vscode"], []],
     })
     const installer = createDependencyInstallerTestContext()
@@ -432,7 +418,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
+          confirmResponses: [false, false],
           multiselectResponses: [["check"], ["react-strict"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -577,7 +563,7 @@ describe("init", () => {
         })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false, false],
+          confirmResponses: [true, false, false],
           multiselectResponses: [["check"], [], ["vscode"], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -607,7 +593,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false, false],
+          confirmResponses: [false, false, false],
           multiselectResponses: [["check"], [], ["zed"], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -935,7 +921,7 @@ describe("init", () => {
         })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false, false],
+          confirmResponses: [true, false, false],
           multiselectResponses: [["check"], [], [], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -969,7 +955,7 @@ describe("init", () => {
         })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false, false],
+          confirmResponses: [false, false, false],
           multiselectResponses: [["check"], [], [], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -1005,7 +991,7 @@ describe("init", () => {
           // Only the typescript, CI, and agents confirms should fire; an overwrite
           // confirm would fail the run with a missing confirm response.
           const prompter = createPrompterTestContext({
-            confirmResponses: [false, false, false],
+            confirmResponses: [false, false],
             multiselectResponses: [["check"], [], [], []],
           })
           const installer = createDependencyInstallerTestContext()
@@ -1055,8 +1041,8 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, true],
-          multiselectResponses: [["check"], [], [], []],
+          confirmResponses: [false, false],
+          multiselectResponses: [["check"], [], [], ["agents-md"]],
         })
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: { name: "npm" },
@@ -1082,8 +1068,8 @@ describe("init", () => {
           const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
           const prompter = createPrompterTestContext({
-            confirmResponses: [false, false, true],
-            multiselectResponses: [["check"], [], [], []],
+            confirmResponses: [false, false],
+            multiselectResponses: [["check"], [], [], ["agents-md"]],
           })
           const installer = createDependencyInstallerTestContext()
 
@@ -1108,7 +1094,7 @@ describe("init", () => {
         const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
+          confirmResponses: [false, false],
           multiselectResponses: [["check"], [], [], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -1130,8 +1116,8 @@ describe("init", () => {
         const files = createInitTestContext({ "AGENTS.md/placeholder": "" })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, true],
-          multiselectResponses: [["check"], [], [], []],
+          confirmResponses: [false, false],
+          multiselectResponses: [["check"], [], [], ["agents-md"]],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -1153,11 +1139,9 @@ describe("init", () => {
   })
 
   describe("Adamantite skill", () => {
-    const shippedSkill = { "node_modules/adamantite/skills/adamantite/SKILL.md": "# Adamantite\n" }
-
-    it.effect("install the shipped skill for each selected agent with the skills CLI", () =>
+    it.effect("write the shipped skill to each folder of the selected agents", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext(shippedSkill)
+        const files = createInitTestContext()
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
@@ -1171,29 +1155,37 @@ describe("init", () => {
             "--skill-agent",
             "codex",
             "--skill-agent",
+            "opencode",
+            "--skill-agent",
             "claude-code",
           ],
           { files, layers: [prompter.layer, installer.layer, runner.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        // The agents keep registry order, whatever the flag order.
-        expect(runner.invocations).toStrictEqual([
-          expect.objectContaining({
-            args: getSkillsAddArgs("claude-code", "codex"),
-            command: "npx",
-            cwd: files.root,
-          }),
-        ])
+        expect(runner.invocations).toStrictEqual([])
+        expect(files.list().filter((file) => file.includes("/skills/"))).toStrictEqual(
+          [".agents/skills", ".claude/skills"].flatMap((folder) =>
+            Object.keys(shippedSkill).map((file) => `${folder}/adamantite/${file}`)
+          )
+        )
+
+        for (const [file, content] of Object.entries(shippedSkill)) {
+          expect(files.read(`.agents/skills/adamantite/${file}`)).toBe(content)
+        }
+        expect(prompter.spinnerEntries).toContainEqual({
+          message: "Adamantite skill added to `.agents/skills` and `.claude/skills`.",
+          type: "stop",
+        })
       })
     )
 
-    it.effect("preselect the installed agents in the interactive prompt", () =>
+    it.effect("ask one question for the AGENTS.md section and the skill folders", () =>
       Effect.gen(function* () {
-        const files = createInitTestContext(shippedSkill)
+        const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], [], [], ["claude-code"]],
+          confirmResponses: [false, false],
+          multiselectResponses: [["check"], [], [], ["agents-md", ".claude/skills"]],
         })
         const installer = createDependencyInstallerTestContext()
         const runner = makeHandoffRunner({ installedCommands: ["claude", "opencode"] })
@@ -1204,59 +1196,84 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.multiselectCalls.at(-1)).toMatchObject({
-          initialValues: ["claude-code", "opencode"],
+        expect(prompter.multiselectCalls.at(-1)).toStrictEqual({
+          // `.agents/skills` is the default. Claude Code is installed, so its folder starts selected.
+          initialValues: ["agents-md", ".agents/skills", ".claude/skills"],
+          message: "What should init add for coding agents?",
+          options: [
+            {
+              hint: "Tell agents which scripts to run and when to run Doctor.",
+              label: "AGENTS.md section",
+              value: "agents-md",
+            },
+            {
+              hint: "Codex, Cursor, Gemini CLI, and OpenCode read this folder.",
+              label: "Skill in .agents/skills",
+              value: ".agents/skills",
+            },
+            {
+              hint: "Claude Code reads this folder.",
+              label: "Skill in .claude/skills",
+              value: ".claude/skills",
+            },
+            {
+              hint: "Grok Build reads this folder.",
+              label: "Skill in .grok/skills",
+              value: ".grok/skills",
+            },
+          ],
+          required: false,
         })
-        expect(nonProbeInvocations(runner)).toStrictEqual([
-          expect.objectContaining({ args: getSkillsAddArgs("claude-code"), command: "npx" }),
-        ])
+        expect(files.read("AGENTS.md")).toContain(ADAMANTITE_AGENTS_START_MARKER)
+        expect(files.exists(".claude/skills/adamantite/SKILL.md")).toBe(true)
+        expect(files.exists(".agents/skills/adamantite")).toBe(false)
       })
     )
 
-    it.effect("warn and continue when node_modules has no skill to install", () =>
+    it.effect("leave a skill copy alone when it matches the shipped skill", () =>
       Effect.gen(function* () {
+        const copy = Object.fromEntries(
+          Object.entries(shippedSkill).map(([file, content]) => [
+            `.agents/skills/adamantite/${file}`,
+            content,
+          ])
+        )
+        const files = createInitTestContext(copy)
+        files.makeReadOnly(".agents/skills/adamantite/SKILL.md")
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "fix", "--skill-agent", "codex"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        // A write to the read-only file would fail, so no warning means init wrote nothing.
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.logs.filter((log) => log.level === "warning")).toStrictEqual([])
+      })
+    )
+
+    it.effect("warn and continue when the skill cannot be written", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        files.makeReadOnly(".claude/skills/adamantite/SKILL.md")
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "fix", "--skill-agent", "claude-code"],
-          {
-            files: createInitTestContext(),
-            layers: [prompter.layer, installer.layer, runner.layer],
-          }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual([])
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "`node_modules` has no Adamantite skill to install. Run `npx skills add adelrodriguez/adamantite --skill adamantite` to install the skill from GitHub.",
-        })
-      })
-    )
-
-    it.effect("warn with the install command and continue when the skills CLI fails", () =>
-      Effect.gen(function* () {
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext([1])
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "fix", "--skill-agent", "claude-code"],
-          {
-            files: createInitTestContext(shippedSkill),
-            layers: [prompter.layer, installer.layer, runner.layer],
-          }
+          { files, layers: [prompter.layer, installer.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toContainEqual({
           level: "warning",
-          message: `Run \`npx skills@${getDependencyVersion("skills")} add ./node_modules/adamantite --skill adamantite --agent claude-code --yes\` to see why the skill install failed.`,
+          message: expect.stringMatching(
+            /^Could not add the Adamantite skill\. Could not write `.*\/\.claude\/skills\/adamantite\/SKILL\.md`\..* Adamantite will continue initialization\.$/
+          ),
         })
         expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
       })
@@ -1273,7 +1290,7 @@ describe("init", () => {
         })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
+          confirmResponses: [false],
           multiselectResponses: [["analyze"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -1318,7 +1335,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [true, true, true, false],
+          confirmResponses: [true, true, true],
           multiselectResponses: [["check"], ["react"], ["zed"], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -1338,7 +1355,7 @@ describe("init", () => {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
           // TypeScript and the AGENTS.md guidance.
-          confirmResponses: [false, false],
+          confirmResponses: [false],
           multiselectResponses: [["check"], [], [], []],
         })
         const installer = createDependencyInstallerTestContext({
@@ -1370,7 +1387,7 @@ describe("init", () => {
         files.makeReadOnly(workflowPath)
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, true, false],
+          confirmResponses: [false, true],
           multiselectResponses: [["check"], [], [], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -1423,7 +1440,7 @@ describe("init", () => {
     it.effect("continue successfully and show the exit code when the extension install fails", () =>
       Effect.gen(function* () {
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, true, false, false],
+          confirmResponses: [false, true, false],
           multiselectResponses: [["check"], [], ["vscode"], []],
         })
         const installer = createDependencyInstallerTestContext()
@@ -1454,7 +1471,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, true, false, false],
+          confirmResponses: [false, true, false],
           multiselectResponses: [["check"], [], ["vscode"], []],
         })
         const installer = createDependencyInstallerTestContext()

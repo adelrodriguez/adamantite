@@ -20,7 +20,8 @@ export interface CodingAgent {
    */
   readonly seedArguments: (prompt: string) => string[]
   /**
-   * The agent's name for the `--agent` option of the `skills` CLI.
+   * The value of the `--skill-agent` option of `init`. The values are the agent names of the
+   * `skills` CLI, which earlier versions of `init` ran, so existing commands keep working.
    */
   readonly skillsAgent: string
   /**
@@ -36,7 +37,7 @@ export interface CodingAgent {
 // - grok: `[PROMPT]` interactive seed and the `version` subcommand confirmed against
 //   the shipped binary, grok 1.0.5 (5115b46bc9).
 // - cursor-agent, gemini, opencode: forms from first-party docs; smoke test pending.
-// The skills agent names and folders come from the agent table of the `skills` CLI, version 1.7.4.
+// The skill folders come from the agent table of the `skills` CLI, version 1.7.4.
 export const codingAgents = [
   {
     command: "claude",

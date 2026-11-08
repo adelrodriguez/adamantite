@@ -3,7 +3,7 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
-import { findStaleSkillAgents, getSkillInstallCommand, installSkill } from "#lib/execution/skill.ts"
+import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
 import { getPackageActions } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
@@ -76,9 +76,9 @@ export default Command.make("update").pipe(
         )
       }
 
-      // The skill that init installed is a copy, so it stays at the Adamantite version that made it.
-      const skillAgents = yield* findStaleSkillAgents(cwd).pipe(
-        Effect.catchTag(["FailedToParseFile", "FailedToReadFile"], (error) =>
+      // The skill that init wrote is a copy, so it stays at the Adamantite version that wrote it.
+      const staleSkillFolders = yield* findStaleSkillFolders(cwd).pipe(
+        Effect.catchTag("FailedToReadFile", (error) =>
           Effect.as(
             prompter.log.warning(`Could not check the Adamantite skill. ${error.message}`),
             []
@@ -86,23 +86,37 @@ export default Command.make("update").pipe(
         )
       )
 
-      if (skillAgents.length > 0) {
+      if (staleSkillFolders.length > 0) {
         yield* prompter
-          .withSpinner(() => installSkill(cwd, skillAgents), {
+          .withSpinner(() => writeSkill(cwd, staleSkillFolders), {
             failure: "Failed to refresh the Adamantite skill.",
             start: "Refreshing the Adamantite skill...",
             success: "Adamantite skill refreshed.",
           })
           .pipe(
             Effect.catchTag(
-              ["CommandFailed", "CliNotFound", "FailedToReadFile", "PlatformError"],
-              () =>
-                prompter.log.warning(
-                  `Run \`${getSkillInstallCommand(skillAgents)}\` to see why the skill refresh failed.`
-                )
+              ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
+              (error) =>
+                prompter.log.warning(`Could not refresh the Adamantite skill. ${error.message}`)
             )
           )
       }
+
+      // `npx skills add` records the skill in `skills-lock.json`, and `skills update` would then
+      // write the same folders. Adamantite owns the copy, so the lock entry goes away.
+      const removedLockEntry = yield* removeSkillsLockEntry(cwd).pipe(
+        Effect.tap((removed) =>
+          removed
+            ? prompter.log.info("Removed the `adamantite` entry from `skills-lock.json`.")
+            : Effect.void
+        ),
+        Effect.catchTag(["FailedToParseFile", "FailedToReadFile", "FailedToWriteFile"], (error) =>
+          Effect.as(
+            prompter.log.warning(`Could not update \`skills-lock.json\`. ${error.message}`),
+            false
+          )
+        )
+      )
 
       const finalAssessment =
         updates.length === 0 ? assessment : yield* assessProject(yield* readProject(cwd))
@@ -120,7 +134,12 @@ export default Command.make("update").pipe(
         )
       }
 
-      if (updates.length === 0 && skillAgents.length === 0 && findings.length === 0) {
+      if (
+        updates.length === 0
+        && staleSkillFolders.length === 0
+        && !removedLockEntry
+        && findings.length === 0
+      ) {
         return "no-changes" as const
       }
 

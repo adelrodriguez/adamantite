@@ -3,6 +3,7 @@ import * as Array from "effect/Array"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import { type SkillsAgent, codingAgents } from "#lib/execution/coding-agents.ts"
+import { type SkillFolder, skillFolders } from "#lib/execution/skill.ts"
 import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
@@ -29,7 +30,7 @@ export interface InitOptions {
   readonly overwriteScripts: boolean
   readonly presets: LintPreset[]
   readonly scripts: Script[]
-  readonly skillAgents: SkillsAgent[]
+  readonly skillFolders: SkillFolder[]
   readonly typescript: boolean
 }
 
@@ -41,9 +42,18 @@ export interface InitOptionsInput {
   readonly overwriteScripts: boolean
   readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
-  readonly skillAgents: readonly SkillsAgent[]
+  readonly skillFolders: readonly SkillFolder[]
   readonly typescript: boolean
 }
+
+/**
+ * The skill folders that the agents of `--skill-agent` read. Agents that share a folder select it
+ * once.
+ */
+export const getSkillFolders = (agents: readonly SkillsAgent[]): SkillFolder[] =>
+  codingAgents
+    .filter((agent) => agents.includes(agent.skillsAgent))
+    .map((agent) => agent.skillsFolder)
 
 export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   input: InitOptionsInput,
@@ -57,7 +67,8 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     overwriteScripts: input.overwriteScripts,
     presets: Array.dedupe(input.presets),
     scripts: Array.dedupe(input.scripts),
-    skillAgents: Array.dedupe(input.skillAgents),
+    // Menu order, whatever the selection order.
+    skillFolders: skillFolders.filter((folder) => input.skillFolders.includes(folder)),
     typescript: input.typescript,
   }
 

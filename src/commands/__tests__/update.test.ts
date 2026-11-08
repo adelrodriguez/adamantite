@@ -5,12 +5,13 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import updateCommand from "#commands/update.ts"
+import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
-import { getDependencyVersion } from "#lib/shared/version.macro.ts"
+import { parseJson } from "#lib/shared/json.ts"
 import {
   createDependencyInstallerTestContext,
   createPrompterTestContext,
@@ -40,14 +41,29 @@ function makeEffectFiles(oxlintConfig: string) {
   })
 }
 
-function makeSkillsLock(source: string): string {
-  return JSON.stringify({ skills: { adamantite: { source, sourceType: "local" } }, version: 1 })
+const shippedSkill = getShippedSkillFiles()
+
+/**
+ * The shipped skill as test fixture files in the skill folder.
+ */
+function makeSkillCopy(folder: string, skill: Record<string, string> = shippedSkill) {
+  return Object.fromEntries(
+    Object.entries(skill).map(([file, content]) => [`${folder}/adamantite/${file}`, content])
+  )
+}
+
+function makeSkillsLock(skills: Record<string, string>): string {
+  return JSON.stringify({
+    skills: Object.fromEntries(
+      Object.entries(skills).map(([name, source]) => [name, { source, sourceType: "local" }])
+    ),
+    version: 1,
+  })
 }
 
 function makeSkillFiles(files: Record<string, string>) {
   return createFileSystemTestContext({
     files: {
-      "node_modules/adamantite/skills/adamantite/SKILL.md": "# Adamantite 2\n",
       "package.json": manifest({ devDependencies: { knip: knip.version } }),
       ...files,
     },
@@ -252,7 +268,101 @@ describe("update", () => {
   )
 
   describe("Adamantite skill", () => {
-    it.effect("report no applied updates when the skill lock cannot be parsed", () =>
+    it.effect("refresh a copy when only a reference guide differs from the shipped skill", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          ...makeSkillCopy(".claude/skills", {
+            ...shippedSkill,
+            "references/removed.md": "# A guide that the shipped skill no longer has\n",
+            "references/setup.md": "# An older setup guide\n",
+          }),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.list().filter((file) => file.startsWith(".claude/"))).toStrictEqual(
+          Object.keys(makeSkillCopy(".claude/skills"))
+        )
+        expect(files.read(".claude/skills/adamantite/references/setup.md")).toBe(
+          shippedSkill["references/setup.md"]
+        )
+        // A folder without the skill stays without it.
+        expect(files.exists(".agents/skills/adamantite")).toBe(false)
+        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+      })
+    )
+
+    it.effect("leave a copy alone when it matches the shipped skill", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles(makeSkillCopy(".agents/skills"))
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
+      })
+    )
+
+    it.effect("delete the skills lock when the adamantite entry was its only entry", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          ...makeSkillCopy(".agents/skills"),
+          "skills-lock.json": makeSkillsLock({ adamantite: "./node_modules/adamantite" }),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.exists("skills-lock.json")).toBe(false)
+        expect(prompter.logs).toContainEqual({
+          level: "info",
+          message: "Removed the `adamantite` entry from `skills-lock.json`.",
+        })
+        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+      })
+    )
+
+    it.effect("keep the other entries of the skills lock", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          "skills-lock.json": makeSkillsLock({
+            adamantite: "./node_modules/adamantite",
+            other: "someone/other",
+          }),
+        })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(yield* parseJson(files.read("skills-lock.json"))).toStrictEqual({
+          skills: { other: { source: "someone/other", sourceType: "local" } },
+          version: 1,
+        })
+      })
+    )
+
+    it.effect("warn and report no applied updates when the skills lock cannot be parsed", () =>
       Effect.gen(function* () {
         const files = makeSkillFiles({ "skills-lock.json": "{ invalid" })
         const prompter = createPrompterTestContext()
@@ -268,114 +378,35 @@ describe("update", () => {
         expect(prompter.logs).toContainEqual(
           expect.objectContaining({
             level: "warning",
-            message: expect.stringContaining("Could not check the Adamantite skill."),
+            message: expect.stringContaining("Could not update `skills-lock.json`."),
           })
         )
-        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
-      })
-    )
-
-    it.effect("refresh a copy that init installed when it differs from the shipped skill", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({
-          ".agents/skills/adamantite/SKILL.md": "# Adamantite 1\n",
-          ".claude/skills/adamantite/SKILL.md": "# Adamantite 1\n",
-          "skills-lock.json": makeSkillsLock("./node_modules/adamantite"),
-        })
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer, runner.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual([
-          expect.objectContaining({
-            args: [
-              "--yes",
-              `skills@${getDependencyVersion("skills")}`,
-              "add",
-              "./node_modules/adamantite",
-              "--skill",
-              "adamantite",
-              // Every agent that reads `.agents/skills` has the copy there.
-              ...["claude-code", "codex", "cursor", "gemini-cli", "opencode"].flatMap((agent) => [
-                "--agent",
-                agent,
-              ]),
-              "--yes",
-              "--json",
-            ],
-            command: "npx",
-          }),
-        ])
-        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
-      })
-    )
-
-    it.effect("leave a copy alone when it matches the shipped skill", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({
-          ".claude/skills/adamantite/SKILL.md": "# Adamantite 2\n",
-          "skills-lock.json": makeSkillsLock("./node_modules/adamantite"),
-        })
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
-      })
-    )
-
-    it.effect("leave a skill alone when the user installed it from another source", () =>
-      Effect.gen(function* () {
-        const files = makeSkillFiles({
-          ".claude/skills/adamantite/SKILL.md": "# Adamantite 1\n",
-          "skills-lock.json": makeSkillsLock("adelrodriguez/adamantite"),
-        })
-        const prompter = createPrompterTestContext()
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(updateCommand, [], {
-          files,
-          layers: [prompter.layer, installer.layer],
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
       })
     )
 
     it.effect("warn and finish the update when the refresh fails", () =>
       Effect.gen(function* () {
-        const files = makeSkillFiles({
-          ".claude/skills/adamantite/SKILL.md": "# Adamantite 1\n",
-          "skills-lock.json": makeSkillsLock("./node_modules/adamantite"),
-        })
+        const files = makeSkillFiles(
+          makeSkillCopy(".claude/skills", { ...shippedSkill, "SKILL.md": "# Adamantite 1\n" })
+        )
+        files.makeReadOnly(".claude/skills/adamantite/SKILL.md")
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext([1])
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer, runner.layer],
+          layers: [prompter.layer, installer.layer],
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toContainEqual(
           expect.objectContaining({
             level: "warning",
-            message: expect.stringContaining("to see why the skill refresh failed."),
+            message: expect.stringContaining("Could not refresh the Adamantite skill."),
           })
         )
+        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
       })
     )
   })

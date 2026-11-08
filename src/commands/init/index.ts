@@ -15,7 +15,7 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
-import { initCommandOptions, validateInitOptions } from "./options.ts"
+import { getSkillFolders, initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
 import {
   addScripts,
@@ -103,7 +103,7 @@ export default Command.make("init", initCommandOptions).pipe(
       }
 
       const input = options.nonInteractive
-        ? options
+        ? { ...options, skillFolders: getSkillFolders(options.skillAgents) }
         : yield* collectInteractiveInitOptions(cwd, isMonorepo, packageManager.name)
       const initOptions = yield* validateInitOptions(input, packageManager.name)
       const selectedScripts = initOptions.scripts
@@ -113,7 +113,7 @@ export default Command.make("init", initCommandOptions).pipe(
       const installExtensions = initOptions.installExtensions
       const gitHubActionsPackageManager = initOptions.githubActions
       const shouldAddAgentsGuidance = initOptions.agents
-      const skillAgents = initOptions.skillAgents
+      const skillFolders = initOptions.skillFolders
 
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
       const hasKnip = selectedScripts.includes("analyze")
@@ -167,9 +167,8 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts, isMonorepo)
       }
 
-      // After the install, so `node_modules` has the skill that the installed Adamantite ships.
-      if (skillAgents.length > 0) {
-        yield* setupSkill(cwd, skillAgents)
+      if (skillFolders.length > 0) {
+        yield* setupSkill(cwd, skillFolders)
       }
 
       if (shouldSetupTypescript) {

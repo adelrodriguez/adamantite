@@ -1,6 +1,7 @@
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
+import { type SkillFolder, skillFolders } from "#lib/execution/skill.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,
@@ -11,6 +12,23 @@ import {
 } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import type { InitOptions, InitOptionsInput } from "./options.ts"
+
+const AGENTS_MD = "agents-md"
+
+// Most agents read `.agents/skills`, so the skill goes there unless the user deselects it.
+const DEFAULT_SKILL_FOLDER: SkillFolder = ".agents/skills"
+
+type AgentSetupChoice = typeof AGENTS_MD | SkillFolder
+
+const agentNames = new Intl.ListFormat("en", { type: "conjunction" })
+
+const describeSkillFolder = (folder: SkillFolder) => {
+  const names = codingAgents
+    .filter((agent) => agent.skillsFolder === folder)
+    .map((agent) => agent.name)
+
+  return `${agentNames.format(names)} ${names.length === 1 ? "reads" : "read"} this folder.`
+}
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
   `\`${conflict.script}\` runs \`${conflict.command}\`. Init would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
@@ -185,34 +203,41 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         })
       : false
 
-  const shouldAddAgentsGuidance = yield* prompter.confirm({
-    initialValue: true,
-    message: "Tell coding agents in AGENTS.md how to run these scripts?",
-  })
-
   const installedAgents = yield* (yield* CodingAgents).detectInstalled(cwd)
-  const selectedSkillAgents = yield* prompter.multiselect({
-    initialValues: codingAgents
-      .filter((agent) => installedAgents.some((installed) => installed.command === agent.command))
-      .map((agent) => agent.skillsAgent),
-    message: "Which coding agents should get the Adamantite skill?",
-    options: codingAgents.map((agent) => ({
-      hint: agent.skillsFolder,
-      label: agent.name,
-      value: agent.skillsAgent,
-    })),
+  const agentSetup = yield* prompter.multiselect<AgentSetupChoice>({
+    initialValues: [
+      AGENTS_MD,
+      ...skillFolders.filter(
+        (folder) =>
+          folder === DEFAULT_SKILL_FOLDER
+          || installedAgents.some((agent) => agent.skillsFolder === folder)
+      ),
+    ],
+    message: "What should init add for coding agents?",
+    options: [
+      {
+        hint: "Tell agents which scripts to run and when to run Doctor.",
+        label: "AGENTS.md section",
+        value: AGENTS_MD,
+      },
+      ...skillFolders.map((folder) => ({
+        hint: describeSkillFolder(folder),
+        label: `Skill in ${folder}`,
+        value: folder,
+      })),
+    ],
     required: false,
   })
 
   return {
-    agents: shouldAddAgentsGuidance,
+    agents: agentSetup.includes(AGENTS_MD),
     editors: selectedEditors,
     githubActions: shouldEnableGitHubActions,
     installExtensions: shouldInstallExtensions,
     overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,
-    skillAgents: selectedSkillAgents,
+    skillFolders: agentSetup.filter((choice) => choice !== AGENTS_MD),
     typescript: shouldSetupTypescript,
   } satisfies InitOptionsInput
 })

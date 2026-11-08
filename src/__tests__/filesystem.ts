@@ -200,10 +200,6 @@ export function createFileSystemTestContext(options?: {
       Effect.suspend(() => {
         const target = normalize(path)
 
-        if (readOptions?.recursive) {
-          return Effect.die(makeUnimplementedError("readDirectory with recursive"))
-        }
-
         if (!directories.has(target)) {
           // The Node backend maps ENOTDIR to BadResource.
           return files.has(target)
@@ -211,9 +207,14 @@ export function createFileSystemTestContext(options?: {
             : Effect.fail(makeSystemError("NotFound", "readDirectory", path))
         }
 
+        // A recursive listing gives paths relative to the directory, as the Node backend does.
         const children = [...files.keys(), ...directories]
-          .filter((entry) => entry !== target && dirname(entry) === target)
-          .map((entry) => basename(entry))
+          .filter((entry) =>
+            readOptions?.recursive
+              ? entry.startsWith(`${target}/`)
+              : entry !== target && dirname(entry) === target
+          )
+          .map((entry) => (readOptions?.recursive ? relative(target, entry) : basename(entry)))
 
         return Effect.succeed(EffectArray.sort(new Set(children), Order.String))
       }),

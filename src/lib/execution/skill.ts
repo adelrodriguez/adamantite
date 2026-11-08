@@ -1,116 +1,174 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import { pipe } from "effect/Function"
+import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
+import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import * as Schema from "effect/Schema"
-import { type CodingAgent, codingAgents } from "#lib/execution/coding-agents.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
-import { parseJson } from "#lib/shared/json.ts"
-import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import * as Predicate from "effect/Predicate"
+import { codingAgents } from "#lib/execution/coding-agents.ts"
+import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts" with { type: "macro" }
+import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
+import {
+  ensureDirectory,
+  readDirectoryIfExists,
+  readFile,
+  readFileIfExists,
+  writeFile,
+  writeJsonFile,
+} from "#lib/shared/filesystem.ts"
+import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
 
 const SKILL_NAME = "adamantite"
 
 /**
- * The installed Adamantite package. The `skills` CLI copies the skill from it, so the copy matches
- * the installed Adamantite version. The CLI records this path in `skills-lock.json`.
+ * The skill that this Adamantite build ships, keyed by POSIX paths relative to the skill folder.
  */
-const SKILL_SOURCE = "./node_modules/adamantite"
-
-const SKILLS_CLI = `skills@${getDependencyVersion("skills")}`
-
-const SkillsLock = Schema.Struct({
-  skills: Schema.Struct({
-    [SKILL_NAME]: Schema.Struct({ source: Schema.Literal(SKILL_SOURCE) }),
-  }),
-})
-
-function getSkillsAddArguments(agents: readonly CodingAgent[]) {
-  return [
-    "add",
-    SKILL_SOURCE,
-    "--skill",
-    SKILL_NAME,
-    ...agents.flatMap((agent) => ["--agent", agent.skillsAgent]),
-    "--yes",
-  ]
-}
+const shippedSkill = getShippedSkillFiles()
 
 /**
- * The command that installs the skill by hand, for a warning after a failed install.
+ * A project folder that coding agents load skills from, such as `.agents/skills`.
  */
-export function getSkillInstallCommand(agents: readonly CodingAgent[]): string {
-  return ["npx", SKILLS_CLI, ...getSkillsAddArguments(agents)].join(" ")
-}
+export type SkillFolder = (typeof codingAgents)[number]["skillsFolder"]
 
-const readShippedSkill = Effect.fn("readShippedSkill")(function* (cwd: string) {
+/**
+ * Each skill folder once, in alphabetical order, which puts the shared `.agents/skills` first.
+ */
+export const skillFolders: readonly SkillFolder[] = Array.sort(
+  Array.dedupe(codingAgents.map((agent) => agent.skillsFolder)),
+  Order.String
+)
+
+const readSkillCopy = Effect.fn("readSkillCopy")(function* (directory: string) {
+  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  return yield* readFileIfExists(path.join(cwd, SKILL_SOURCE, "skills", SKILL_NAME, "SKILL.md"))
-})
+  const entries = yield* readDirectoryIfExists(directory, { recursive: true })
 
-/**
- * Install the skill that the installed Adamantite package ships for each agent, with the `skills`
- * CLI. Returns `"missing"` when `node_modules` has no skill to copy, such as with Yarn
- * Plug'n'Play.
- */
-export const installSkill = Effect.fn("installSkill")(function* (
-  cwd: string,
-  agents: readonly CodingAgent[]
-) {
-  if (Option.isNone(yield* readShippedSkill(cwd))) {
-    return "missing" as const
+  if (Option.isNone(entries)) {
+    return Option.none()
   }
 
-  const runner = yield* CommandRunner
-  yield* runner.run({
-    // In its default output mode, the CLI prints a failed skill copy but exits 0. JSON mode exits 1.
-    args: ["--yes", SKILLS_CLI, ...getSkillsAddArguments(agents), "--json"],
-    command: "npx",
-    cwd,
-    stderr: "ignore",
-    stdout: "ignore",
-  })
+  const files = yield* Effect.forEach(
+    entries.value,
+    (entry) =>
+      Effect.gen(function* () {
+        const target = path.join(directory, entry)
+        const info = yield* fs
+          .stat(target)
+          .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: target })))
 
-  return "installed" as const
-})
-
-/**
- * The agents whose copy of the skill differs from the skill that the installed Adamantite package
- * ships. Only a skill that `skills-lock.json` records from the installed package counts, so a skill
- * that the user installed from another source stays as it is.
- */
-export const findStaleSkillAgents = Effect.fn("findStaleSkillAgents")(function* (cwd: string) {
-  const path = yield* Path.Path
-  const [lock, shipped] = yield* Effect.all(
-    [readFileIfExists(path.join(cwd, "skills-lock.json")), readShippedSkill(cwd)],
+        return info.type === "File"
+          ? Option.some([entry.split(path.sep).join("/"), yield* readFile(target)] as const)
+          : Option.none()
+      }),
     { concurrency: "unbounded" }
   )
 
-  if (Option.isNone(lock) || Option.isNone(shipped)) {
-    return []
-  }
+  return Option.some(Object.fromEntries(Array.getSomes(files)))
+})
 
-  if (!Schema.is(SkillsLock)(yield* parseJson(lock.value))) {
-    return []
-  }
+function matchesShippedSkill(copy: Readonly<Record<string, string>>) {
+  const shipped = Object.entries(shippedSkill)
 
+  return (
+    Object.keys(copy).length === shipped.length
+    && shipped.every(([file, content]) => copy[file] === content)
+  )
+}
+
+const getSkillDirectory = Effect.fn("getSkillDirectory")(function* (
+  cwd: string,
+  folder: SkillFolder
+) {
+  const path = yield* Path.Path
+  return path.join(cwd, folder, SKILL_NAME)
+})
+
+/**
+ * The folders whose `adamantite` skill differs from the skill that this build ships, in any file. A
+ * folder without the skill is not stale.
+ */
+export const findStaleSkillFolders = Effect.fn("findStaleSkillFolders")(function* (cwd: string) {
   const copies = yield* Effect.forEach(
-    codingAgents,
-    (agent) =>
-      readFileIfExists(path.join(cwd, agent.skillsFolder, SKILL_NAME, "SKILL.md")).pipe(
-        Effect.map((copy: Option.Option<string>) =>
-          pipe(
-            copy,
-            Option.map((content) => ({ agent, content }))
-          )
-        )
+    skillFolders,
+    (folder) =>
+      getSkillDirectory(cwd, folder).pipe(
+        Effect.flatMap((directory) => readSkillCopy(directory)),
+        Effect.map((copy) => ({ copy, folder }))
       ),
     { concurrency: "unbounded" }
   )
-  const installed = Array.getSomes(copies)
 
-  return installed.some(({ content }) => content !== shipped.value)
-    ? installed.map(({ agent }) => agent)
-    : []
+  return copies
+    .filter(({ copy }) => Option.isSome(copy) && !matchesShippedSkill(copy.value))
+    .map(({ folder }) => folder)
+})
+
+/**
+ * Writes the skill that this build ships to each folder. A folder that already has the shipped
+ * skill stays as it is. Any other copy is replaced, so files that the shipped skill no longer has
+ * go away.
+ */
+export const writeSkill = Effect.fn("writeSkill")(function* (
+  cwd: string,
+  folders: readonly SkillFolder[]
+) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+
+  for (const folder of folders) {
+    const directory = yield* getSkillDirectory(cwd, folder)
+    const copy = yield* readSkillCopy(directory)
+
+    if (Option.isSome(copy) && matchesShippedSkill(copy.value)) {
+      continue
+    }
+
+    yield* fs
+      .remove(directory, { force: true, recursive: true })
+      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: directory })))
+
+    for (const [file, content] of Object.entries(shippedSkill)) {
+      const target = path.join(directory, ...file.split("/"))
+      yield* ensureDirectory(path.dirname(target))
+      yield* writeFile(target, content)
+    }
+  }
+})
+
+/**
+ * Removes the `adamantite` entry that `npx skills add` records in the project's `skills-lock.json`,
+ * so the `skills` CLI no longer writes the folders that Adamantite owns. Deletes the lock when that
+ * entry was its only one. Returns whether the lock changed.
+ */
+export const removeSkillsLockEntry = Effect.fn("removeSkillsLockEntry")(function* (cwd: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const lockPath = path.join(cwd, "skills-lock.json")
+  const content = yield* readFileIfExists(lockPath)
+
+  if (Option.isNone(content)) {
+    return false
+  }
+
+  const lock = yield* parseJson(content.value, lockPath)
+
+  if (!checkIsJsonObject(lock) || !checkIsJsonObject(lock.skills)) {
+    return false
+  }
+
+  const { [SKILL_NAME]: entry, ...skills } = lock.skills
+
+  if (Predicate.isUndefined(entry)) {
+    return false
+  }
+
+  if (Object.keys(skills).length === 0) {
+    yield* fs
+      .remove(lockPath)
+      .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: lockPath })))
+    return true
+  }
+
+  yield* writeJsonFile(lockPath, { ...lock, skills })
+  return true
 })

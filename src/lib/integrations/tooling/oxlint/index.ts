@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import {
@@ -14,7 +15,6 @@ import {
   checkImportsLintPreset,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
-  type LintPreset,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 import { assessLayerMaps } from "#lib/integrations/tooling/oxlint/layers.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"

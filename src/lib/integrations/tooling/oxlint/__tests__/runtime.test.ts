@@ -290,7 +290,6 @@ describe("native runtime overrides", () => {
         const error = yield* resolveOxlintRuntime(ROOT, [
           {
             name: "first",
-            preset: "effect",
             runtime: {
               _tag: "Native",
               resolve: () => Effect.succeed([override]),
@@ -298,7 +297,6 @@ describe("native runtime overrides", () => {
           },
           {
             name: "second",
-            preset: "effect",
             runtime: {
               _tag: "Native",
               resolve: () => Effect.succeed([override]),
@@ -323,7 +321,6 @@ describe("native runtime overrides", () => {
       const runtime = yield* resolveOxlintRuntime(ROOT, [
         {
           name: "binding",
-          preset: "effect",
           runtime: {
             _tag: "Native",
             resolve: () => Effect.succeed([{ _tag: "Binding", path: "/binding.node" }]),
@@ -331,14 +328,13 @@ describe("native runtime overrides", () => {
         },
         {
           name: "backend",
-          preset: "effect",
           runtime: {
             _tag: "Native",
             resolve: () =>
               Effect.succeed([{ _tag: "Backend", env: { NATIVE_BACKEND: "/backend" } }]),
           },
         },
-        { name: "javascript", preset: "tailwind", runtime: { _tag: "JavaScript" } },
+        { name: "javascript", runtime: { _tag: "JavaScript" } },
       ]).pipe(
         Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
       )
@@ -356,7 +352,6 @@ describe("runtime types", () => {
   it("keep plugin capabilities and resolved runtime parts distinct in types", () => {
     const javascript = defineOxlintPlugin({
       name: "example",
-      preset: "tailwind",
       runtime: { _tag: "JavaScript" },
     })
 

@@ -2,10 +2,9 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import {
   getImportedLintPresets,
   inspectRequiredOxlintConfig,
-  LINT_PRESETS,
-  type LintPreset,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
+import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 
 const unsupportedConfigReason =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."

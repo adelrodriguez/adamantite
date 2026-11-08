@@ -1,10 +1,10 @@
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
-import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
-import tailwind from "#lib/integrations/tooling/oxlint/plugins/tailwind.ts"
+import { lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
 
 /**
- * Every Oxlint plugin definition. Both runtime resolution and management use this registry. The
- * Oxlint entry loads it from source, so no definition imports a macro module. `plugins/managed.ts`
- * adds the versions.
+ * Every Oxlint plugin definition, from the presets that load them. Both runtime resolution and
+ * management use this registry. The Oxlint entry loads it from source, so no definition imports a
+ * macro module. `plugins/managed.ts` adds the versions.
  */
-export const oxlintPlugins = [tailwind, reactDoctor, effectTsgo] as const
+export const oxlintPlugins = lintPresets.flatMap((preset) =>
+  "plugin" in preset ? [preset.plugin] : []
+)

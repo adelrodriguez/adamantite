@@ -223,7 +223,7 @@ in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit u
 ## Managed plugins
 
 A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`
-for `tailwind` and `oxlint-plugin-react-doctor` for `react-doctor`. Each definition under
+for `tailwind` and `oxlint-plugin-react-doctor` for `react-strict`. Each definition under
 `tooling/oxlint/plugins/` uses `defineOxlintPlugin` and declares its package, preset, and
 JavaScript or native runtime capability. `plugins/index.ts` is the one registry of definitions.
 It imports no version macro, so the Oxlint entry can load it from source. JavaScript plugins
@@ -234,6 +234,11 @@ still load through the preset's `jsPlugins` entries, which resolve from the targ
 package, and its type fails when a package has no version. Init installs the packages of the
 selected presets. Doctor and update maintain a package while the root config imports its
 preset. See ADR 0003.
+
+Doctor reports imports of the retired `adamantite/lint/react-doctor` preset. Its repair
+prompt moves the config to `react-strict`, keeps one extends entry when both presets were
+present, and preserves project settings and `react-doctor/*` overrides. Assessment does not
+write the config.
 
 The Effect definition also assesses the language service entry in `tsconfig.json` and the
 legacy `prepare` script, and its `update` method writes the language service entry for init.

@@ -95,6 +95,24 @@ export default defineIntegration({
               "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting.",
             toolName: "oxlint",
           }),
+          ...(checkImportsLintPreset(lintConfig, "react-doctor")
+            ? [
+                {
+                  currentState:
+                    "`oxlint.config.ts` imports the retired `adamantite/lint/react-doctor` preset.",
+                  goal: [
+                    "Replace `adamantite/lint/react-doctor` with `adamantite/lint/react-strict`. If react-strict is already imported, use its existing binding and remove the old import.",
+                    "Keep the `react` preset and exactly one `react-strict` entry in extends. Keep `oxlint-plugin-react-doctor` as a devDependency. Run `adamantite update` if the package is missing or off its managed version.",
+                    "Preserve project settings, custom rules, rule severity, and rule options, including `react-doctor/*` overrides. The upstream rule namespace stays the same.",
+                    "The react-strict preset also reports state, effect, and memoization hooks outside hook modules. Follow those reports when updating feature code.",
+                    "Run `adamantite check`, then run Doctor again.",
+                  ],
+                  id: "react-doctor-preset-migration",
+                  integration: "oxlint",
+                  title: "React Doctor rules now belong to react-strict",
+                },
+              ]
+            : []),
         ],
         packageActions,
         warnings: state.warnings,

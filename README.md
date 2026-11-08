@@ -94,8 +94,8 @@ Available setup values:
 
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
-- Presets: `react`, `react-strict`, `react-doctor`, `tanstack`, `nextjs`, `vue`, `effect`,
-  `jest`, `vitest`, `node`, `architecture`, `strict`, `antislop`, and `tailwind`. `react-doctor` requires `react`.
+- Presets: `react`, `react-strict`, `tanstack`, `nextjs`, `vue`, `effect`,
+  `jest`, `vitest`, `node`, `architecture`, `strict`, `antislop`, and `tailwind`. `react-strict` requires `react`.
 - Editors: `vscode` and `zed`.
 - Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, and `opencode`.
 
@@ -339,8 +339,7 @@ Adamantite publishes configuration that can also be consumed directly:
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `adamantite/lint`              | Core Oxlint rules.                                                                                                                                                                                                                                                                         |
 | `adamantite/lint/react`        | React, JSX accessibility, and performance.                                                                                                                                                                                                                                                 |
-| `adamantite/lint/react-strict` | Opinions for React feature code: no state, effect, or memoization hooks outside hook modules. See [the react-strict preset](#the-react-strict-preset).                                                                                                                                     |
-| `adamantite/lint/react-doctor` | Curated [React Doctor](https://github.com/millionco/react-doctor) rules for React state and effect misuse. See [the react-doctor preset](#the-react-doctor-preset).                                                                                                                        |
+| `adamantite/lint/react-strict` | React feature-code restrictions and curated [React Doctor](https://github.com/millionco/react-doctor) checks for state, effects, cleanup, and render lifetimes. See [the react-strict preset](#the-react-strict-preset).                                                                   |
 | `adamantite/lint/tanstack`     | Opinions for [TanStack Query](https://tanstack.com/query) with route loaders: queries defined once with `queryOptions()`, and no query data copied into state. See [the tanstack preset](#the-tanstack-preset).                                                                            |
 | `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                                 |
@@ -424,8 +423,9 @@ ignores the `vitest/*` rules of an override that does not enable the `vitest` pl
 ### The react-strict preset
 
 `adamantite/lint/react-strict` keeps state and side effects out of React feature code. Use
-it together with `adamantite/lint/react`. It needs no extra package: the rules come from
-Adamantite's own Oxlint plugin, which ships inside the package.
+it together with `adamantite/lint/react`. It loads Adamantite's first-party plugin and the
+managed `oxlint-plugin-react-doctor` package. Init installs the pinned package when you
+select `react-strict`. Doctor and update maintain its version.
 
 `adamantite/no-react-state-hooks` reports calls to `useState`, `useReducer`, `useEffect`,
 `useLayoutEffect`, `useSyncExternalStore`, `useMemo`, and `useCallback` imported from
@@ -459,23 +459,17 @@ export default defineConfig({
 
 Each option replaces its default list.
 
-### The react-doctor preset
-
-`adamantite/lint/react-doctor` reports specific misuse of React state and effects. Use it
-together with `adamantite/lint/react`. It needs the `oxlint-plugin-react-doctor` package.
-`adamantite init` installs the pinned version when you select the preset, and
-`adamantite doctor` and `adamantite update` keep it on that version. If you add the preset
-by hand, install `oxlint-plugin-react-doctor` as a devDependency too.
-
-The plugin exports more than 900 rules. The preset enables only rules that run on one file
+The React Doctor package exports more than 900 rules. The preset enables only rules that run on one file
 and that the native `react`, `react-hooks`, `jsx-a11y`, and `unicorn` rules do not already
 report. Examples are an effect that does the work of an event handler (`no-effect-event-handler`), data fetched in an effect
-(`no-fetch-in-effect`), and state changed in place (`no-direct-state-mutation`). The
+(`no-fetch-in-effect`), and state changed in place (`no-direct-state-mutation`). It also
+checks cleanup, stale timer references, discarded effect cleanup callbacks, loading flags
+that stay set after a failed request, and contexts or object URLs created during render. The
 TanStack Query and TanStack Start rules are not in this preset. See
 [ADR 0005](docs/adr/0005-curate-react-doctor-rules.md) for the criteria.
 
-The preset works together with `adamantite/lint/react-strict`. React Doctor rules report
-specific misuse, and `react-strict` bans the hooks in feature code. Some React Doctor rules
+React Doctor checks also run in hook modules where state and effect hooks are allowed.
+Some React Doctor rules
 skip test files and fixtures by path, such as `__tests__/` and `*.test.tsx`.
 
 `oxlint-plugin-react-doctor` has a modified MIT license. It needs written permission from
@@ -484,11 +478,15 @@ as a hosted product. Read the
 [license](https://www.npmjs.com/package/oxlint-plugin-react-doctor?activeTab=code) before
 you select the preset.
 
+If you add `react-strict` by hand, install `oxlint-plugin-react-doctor` as a devDependency.
+Run `adamantite doctor` for an existing `react-doctor` configuration. Its repair prompt
+moves the preset to `react-strict` and preserves project settings and rule overrides.
+
 ### The tanstack preset
 
 `adamantite/lint/tanstack` holds opinions for TanStack Query (`@tanstack/react-query`) in
 apps that preload queries in route loaders, such as TanStack Router and TanStack Start apps.
-Like `react-strict`, it needs no extra package.
+It needs no extra package.
 
 - `adamantite/query-from-loader` reports `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`,
   and `useSuspenseInfiniteQuery` calls in route files that take a plain options object or a `queryOptions()`
@@ -509,9 +507,8 @@ A route file is a file that calls a route factory from `@tanstack/react-router`,
 the query, so components outside route files can define their queries inline.
 `query-from-loader` checks one file at a time. It cannot prove that a loader preloads the
 options, so it moves queries toward shared definitions but does not guarantee the preload.
-The `react-doctor` preset reports other query misuse, such as refetches from effects and
-mutations that do not invalidate queries. See
-[ADR 0008](docs/adr/0008-tanstack-query-options-from-loaders.md).
+Query refetches from effects and mutation invalidation are not checked by these presets.
+See [ADR 0008](docs/adr/0008-tanstack-query-options-from-loaders.md).
 
 ### The effect preset
 
@@ -642,8 +639,8 @@ You can also select it during setup with
 
 ### The strict preset
 
-`adamantite/lint/strict` holds framework-neutral opinions. Use it with any other preset. Like
-`react-strict`, it needs no extra package.
+`adamantite/lint/strict` holds framework-neutral opinions. Use it with any other preset.
+It needs no extra package.
 
 - `adamantite/no-overzealous-destructuring` reports destructuring patterns nested more than
   `maxDepth` levels deep (default 2), such as `const { data: { user: { name } } } = query`,

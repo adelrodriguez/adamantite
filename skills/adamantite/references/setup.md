@@ -14,7 +14,7 @@ Adapt the selected options to the request. Omitted boolean flags are disabled.
 Use `--skill-agent` to install this skill for a coding agent. `--agents` adds instructions
 to `AGENTS.md` and does not install the skill.
 
-Before selecting `react-doctor`, tell the user about its modified MIT license.
+Before selecting `react-strict`, tell the user about its modified MIT license.
 The installed `oxlint-plugin-react-doctor` license requires written permission for use as
 machine learning training or evaluation data, and for certain paid or hosted services.
 Read that license for the exact restrictions.
@@ -36,6 +36,9 @@ Continue when the selected dependencies are installed and the generated files ma
 
 If the selected presets include a managed plugin, check its setup:
 
+- For `react-strict`, include the `react` preset and keep `oxlint-plugin-react-doctor`
+  installed. Init installs the pinned package, and Doctor and update maintain it.
+  Its React Doctor checks also apply in hook modules.
 - For `effect`, run Oxlint through Adamantite. A plain `oxlint` call cannot load the
   `effecttsgo` rules and stops with `Unknown plugin: 'effecttsgo'`. Replace that call with
   `adamantite check --only lint` instead of removing the preset.

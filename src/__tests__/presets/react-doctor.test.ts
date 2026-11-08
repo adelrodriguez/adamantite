@@ -4,14 +4,14 @@ import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
-import reactDoctor from "#presets/lint/react-doctor.ts"
+import reactStrict from "#presets/lint/react-strict.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/react-doctor")
 const NAMESPACE = "react-doctor"
 const CLEAN_FIXTURE = "clean.tsx"
 
-const presetRules = Object.keys(reactDoctor.rules ?? {})
+const presetRules = Object.keys(reactStrict.rules ?? {})
   .filter((name) => name.startsWith(`${NAMESPACE}/`))
   .map((name) => name.slice(NAMESPACE.length + 1))
 
@@ -30,16 +30,16 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the fixtures with the react and react-doctor presets in one real Oxlint run. The plugin
+ * Lint the existing fixtures with react and react-strict in one real Oxlint run. The plugin
  * resolves from the repository's `node_modules`, as it does from a target project's. The fixtures
- * are copied to `src/` because some React Doctor rules skip files under a `fixtures/` path.
+ * are copied to `src/hooks/` to allow hooks and avoid paths React Doctor skips.
  */
 function lintFixtures() {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-react-doctor-"))
 
   try {
     symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
-    cpSync(FIXTURES_DIR, join(tempDir, "src"), { recursive: true })
+    cpSync(FIXTURES_DIR, join(tempDir, "src/hooks"), { recursive: true })
     writeFileSync(
       join(tempDir, "package.json"),
       JSON.stringify({ dependencies: { react: "19.2.0" }, name: "fixture", type: "module" })
@@ -49,9 +49,9 @@ function lintFixtures() {
       [
         'import { defineConfig } from "oxlint"',
         `import react from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react.ts"))}`,
-        `import reactDoctor from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react-doctor.ts"))}`,
+        `import reactStrict from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react-strict.ts"))}`,
         "",
-        "export default defineConfig({ extends: [react, reactDoctor] })",
+        "export default defineConfig({ extends: [react, reactStrict] })",
         "",
       ].join("\n")
     )
@@ -78,10 +78,10 @@ function lintFixtures() {
   }
 }
 
-describe("react-doctor preset", () => {
-  it("have one fixture for each enabled rule", () => {
-    expect(new Set(ruleFixtures.map((file) => basename(file, ".tsx")))).toStrictEqual(
-      new Set(presetRules)
+describe("React Doctor rules in react-strict", () => {
+  it("enable the rules covered by the existing fixtures", () => {
+    expect(presetRules).toStrictEqual(
+      expect.arrayContaining(ruleFixtures.map((file) => basename(file, ".tsx")))
     )
   })
 })

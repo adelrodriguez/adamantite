@@ -18,9 +18,9 @@ the better shape:
 - Its `allow` option marks hook modules with globs, without an override block for each
   directory. Later first-party rules can use the same feature-code convention.
 
-The `react-doctor` preset (#470) does not replace this rule. React Doctor rules report
-specific misuse, such as state derived from props or data fetching in an effect. They do
-not ban a hook, and they do not report manual memoization.
+The React Doctor checks introduced in #470 do not replace this rule. They report specific
+misuse, such as data fetching in an effect. They do not ban a hook or report manual
+memoization. Issue #647 combines both sets of checks in `react-strict`.
 
 ## Consequences
 

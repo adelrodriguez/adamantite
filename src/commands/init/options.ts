@@ -75,9 +75,9 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  if (options.presets.includes("react-doctor") && !options.presets.includes("react")) {
+  if (options.presets.includes("react-strict") && !options.presets.includes("react")) {
     return yield* new InvalidInitOptions({
-      reason: "`--preset react-doctor` requires `--preset react`.",
+      reason: "`--preset react-strict` requires `--preset react`.",
     })
   }
 

@@ -364,5 +364,5 @@ extensions. `src/__tests__/presets/custom.test.ts` lints temporary projects in r
 runs, including a monorepo with a shared tooling package, and runs `custom()` under Bun
 when Bun is installed.
 
-The authoring guidance lives only in the "Custom rules" section of
-`skills/adamantite/SKILL.md`.
+The "Custom rules" section of `skills/adamantite/SKILL.md` links to the authoring guidance in
+`skills/adamantite/references/custom-rules.md`.

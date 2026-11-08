@@ -2,13 +2,13 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
+import type { Script } from "#lib/workspace/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
   writeAgentsGuidance,
 } from "#lib/workspace/agents.ts"
-import { MANAGED_SCRIPT_COMMANDS, type Script } from "#lib/workspace/package-json.ts"
 
 const ROOT = "/project"
 
@@ -47,7 +47,7 @@ describe("writeAgentsGuidance", () => {
       expect(
         Array.from(agents.matchAll(/^- Run `bun run (\w+)`/gm), ([, script]) => script)
       ).toStrictEqual(["check", "fix", "analyze"])
-      expect(agents).toContain(".adamantite/lint")
+      expect(agents).toContain("For custom rules, follow the")
     })
   )
 
@@ -102,7 +102,7 @@ describe("writeAgentsGuidance", () => {
       expect(agents).not.toContain("Prefer the package scripts")
       expect(agents).not.toContain(".adamantite/lint")
       expect(agents).toContain(
-        `dependency-analysis setup.\n\n- Run \`adamantite doctor\` and follow its findings to repair managed setup.\n\n${ADAMANTITE_AGENTS_END_MARKER}`
+        "in the installed `adamantite` package.\n\n- Run `adamantite doctor` for managed setup findings."
       )
     })
   )
@@ -129,7 +129,9 @@ describe("writeAgentsGuidance", () => {
 
       const agents = files.read("AGENTS.md")
       expect(agents).toContain("It also checks monorepo package consistency.")
-      expect(agents).toContain("Direct command: `adamantite analyze`")
+      expect(agents).toContain(
+        "Run `bun run analyze` after changing dependencies, imports, or exports."
+      )
     })
   )
 
@@ -155,21 +157,28 @@ describe("writeAgentsGuidance", () => {
 
         const result = yield* runWriteAgentsGuidance(files, { isMonorepo, packageManager, scripts })
 
-        expect(result).toBe("updated")
-
         const agents = files.read("AGENTS.md")
-        expect(agents.startsWith(existing)).toBe(true)
-        expect(countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER)).toBe(1)
-        expect(countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER)).toBe(1)
-        expect(agents.endsWith("\n")).toBe(true)
+        expect({
+          endMarkers: countOccurrences(agents, ADAMANTITE_AGENTS_END_MARKER),
+          endsWithNewline: agents.endsWith("\n"),
+          result,
+          startMarkers: countOccurrences(agents, ADAMANTITE_AGENTS_START_MARKER),
+          startsWithExisting: agents.startsWith(existing),
+        }).toStrictEqual({
+          endMarkers: 1,
+          endsWithNewline: true,
+          result: "updated",
+          startMarkers: 1,
+          startsWithExisting: true,
+        })
 
         // The block body lists guidance for exactly the selected scripts, with commands that
         // invoke the selected package manager.
-        for (const script of ALL_SCRIPTS) {
-          expect(agents.includes(`Direct command: \`${MANAGED_SCRIPT_COMMANDS[script]}\`.`)).toBe(
-            scripts.includes(script)
-          )
-        }
+        const writtenScripts = Array.from(
+          agents.matchAll(/^- Run `[^`\n]+ (check|fix|analyze)`/gm),
+          ([, script]) => script
+        )
+        expect(new Set(writtenScripts)).toStrictEqual(new Set(scripts))
         if (scripts.length > 0) {
           expect(agents).toContain(`${packageManager} `)
         }

@@ -196,7 +196,12 @@ describe("doctor", () => {
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.messages.map(getHeadings)).toStrictEqual([
-        ["# Adamantite doctor findings", "## 1. Missing knip configuration", "## Verify"],
+        [
+          "# Adamantite doctor findings",
+          "## 1. Missing knip configuration",
+          "## Verify",
+          "## Check the repair",
+        ],
       ])
       expect(prompter).toMatchObject({ intros: [], notes: [], outros: [] })
     })
@@ -214,7 +219,12 @@ describe("doctor", () => {
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.messages.map(getHeadings)).toStrictEqual([
-        ["# Adamantite doctor findings", "## 1. Missing AGENTS.md", "## Verify"],
+        [
+          "# Adamantite doctor findings",
+          "## 1. Missing AGENTS.md",
+          "## Verify",
+          "## Check the repair",
+        ],
       ])
     })
   )
@@ -313,6 +323,7 @@ describe("doctor", () => {
           "## 1. Legacy format script",
           "## 2. Legacy format workflow step",
           "## Verify",
+          "## Check the repair",
         ],
       ])
     })

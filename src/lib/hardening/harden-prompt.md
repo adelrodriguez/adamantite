@@ -1,9 +1,8 @@
 # Adamantite harden
 
-This project uses Adamantite {{version}} to manage linting, formatting, and type tooling.
-`adamantite harden` asks you to find the coding standards that this project already follows, and to put each one on the highest step of the enforcement ladder that works.
+Find the coding standards that this target project already follows. Propose the highest step of the enforcement ladder that can enforce each standard. The project uses Adamantite {{version}}.
 
-Steps 1 to 8 are read-only. You change files only in step 9, and only for the candidates that the user approves.
+Steps 1 to 8 are read-only for the target project. Keep trial case files outside the project and use stdin for RuleTester cases. Change project files only in step 9, for the candidates that the user approves.
 
 ## Context
 
@@ -41,7 +40,7 @@ These are the Markdown files of the project, without the changesets and the chan
 
 ## 1. Explore the documentation
 
-Start with each `AGENTS.md` above. Coding agents start from `AGENTS.md`, so it is the only instruction file that they surely read. It must point to the other documentation of the project. Then read each file in the documentation list above. Also read the files that the instructions link to or tell agents to read, also when the list does not have them, and the comments in the Oxlint config. A linked file outside the scope of `--path` counts: read it, but do not survey the code beside it.
+Start with each `AGENTS.md` above, then read each file in the documentation list. Follow the files that the instructions link to or tell agents to read, including files absent from the list. Read the comments in the Oxlint config. Read a linked file outside `--path`, but keep the code survey inside the selected scope. Read each file once.
 
 Mark each file as "has standards" or "no standards". A file that states a standard, and that the agent reach above lists as not reached, is a **discovery gap**: an agent that starts from `AGENTS.md` never finds its standards. Record the file, its standards, and the `AGENTS.md` that should point to it. Each link to a Markdown file that does not exist is a discovery gap too. Record the file that the link must go to.
 
@@ -51,13 +50,15 @@ This step is done when each file in the documentation list, and each file that t
 
 List each standard that a file marked "has standards" states, with its file and line. Each written standard is a candidate, and goes on to step 5, also when the code breaks it in many places.
 
+Continue when every written standard has a source location and a candidate entry.
+
 ## 3. Survey the code
 
 Survey these areas: file names and placement, import direction, naming, API use, error handling, and test layout. In each area, find the patterns that the code follows and that no instruction states.
 
 - A pattern is a candidate when the code follows it in several places and has few counterexamples. List each counterexample with its file and line.
 - Give the scope of each count as globs, and the command that gives the count, such as an `rg` command. Count source, tests, and generated code apart.
-- If the GitHub CLI `gh` is available and authenticated, read the review comments of recent merged pull requests. A correction that reviewers repeat is a strong sign of a standard.
+- If the GitHub CLI `gh` is available and authenticated, read the review comments of recent merged pull requests. A correction that reviewers repeat is evidence of a standard. If reviews are unavailable, record that limit and use the documentation, code, and local history.
 - A construct that the code never uses is not a standard by itself. It needs an instruction, a review comment, or a commit that states it.
 - Read the git history of the Oxlint config, for example with `git log -p -- oxlint.config.ts`. A rule that a commit removed is a **decision** that the maintainer already made, not a candidate.
 
@@ -75,7 +76,9 @@ A mistake that a commit fixed, and that other code repeats, is a standard that a
 - A mistake is a candidate when two or more fixes have it, or when one fix has it and the code still has the same form in other places. List each fix with its commit, and each other place with its file and line.
 - The code before the fix is the case that the rule must report, and the code after the fix is the case that it must accept. Read the code before the fix with `git show <commit>^:<file>`.
 
-This step is done when each fix has its mark: "candidate", "one-off", or "not a code mistake".
+If Git or the required history is unavailable, record the missing source and continue with the documentation and code candidates. Do not infer commit evidence.
+
+This step is done when each fix has its mark: "candidate", "one-off", or "not a code mistake", or the missing history is recorded.
 
 ## 5. Drop what a tool already enforces
 
@@ -122,7 +125,11 @@ For each rule, give one case that the rule must report and one similar case that
 
 A candidate that needs a choice from the maintainer before a rule is useful is a decision, not a candidate. Examples are two documents that state a policy differently, and a migration that changes how the code behaves. Put it in the Decisions list of step 8, and propose no rule for it.
 
+Continue when every remaining candidate has a proposed step, evidence, limits, and cases, or is recorded as a decision.
+
 ## 8. Show the candidates and wait for approval
+
+If a tool or source was unavailable, name it on the first line of the report and state the fallback you used. Mark unverified evidence before scoring candidates.
 
 Score each candidate from 1 to 5:
 
@@ -148,20 +155,17 @@ Then show three short lists:
 - **Discovery gaps:** the gaps from step 1. Propose a pointer only for the standards that stay instructions, because a rule replaces the instruction that a pointer would lead to. For a broken link, propose the correct target.
 - **Also considered:** the candidates with a score of 3 or lower, one line for each, with the reason.
 
-Ask the user which candidates to write. This step is done when the user names the candidates to write, or approves none.
+When no human can approve, for example in CI or in an unattended session, report the candidates and stop after this step.
 
-When no human can approve, for example in CI or in an unattended session, the candidates are the result of the run. Stop after this step.
+Otherwise, put the approval question last in the report, with no text after it. Ask the user which named candidates to write. Wait until the user names the candidates to write or approves none. If the user approves none, stop without changing project files.
 
 ## 9. Write the approved standards
 
 Write only the approved candidates:
 
 - **Type, structure, preset rule, import rule, or project check:** change the types, the Oxlint config, `tsconfig.json`, or the check.
-- **Custom rule:** run `adamantite rule add <name>`, and follow the "Custom rules" section of the Adamantite skill. When the rules folder above is not `.adamantite/lint`, pass it with `--dir`, such as `adamantite rule add <name> --dir tooling/rules`.
-  - The rule message says what to do instead.
-  - A comment at the top of the rule file states the standard and why it exists.
-  - Use `adamantite rule add test <name>` to prepare temporary cases beside the new rule. Adapt the cases, then run `adamantite rule test --path <test-file>`. Keep the rule and its runtime helpers, discard your temporary cases, and preserve user-owned optional tests. Use RuleTester from stdin when a user-owned test already exists.
-- **Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail. Then change the rule until all valid and invalid cases pass. Discard the verification cases and fixtures after the check.
+- **Custom rule:** read `skills/adamantite/SKILL.md` in the installed `adamantite` package. Follow its "Custom rules" section and linked guide to write, verify, and clean up the approved rule. Run `adamantite rule add <name>`. When the rules folder above is not `.adamantite/lint`, pass it with `--dir`. A comment at the top of the rule file states the standard and why it exists.
+- **Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail. Follow the custom-rule guide above until all valid and invalid cases pass and cleanup is complete.
 - **Gap in the config of a rule,** such as a layer map, an import-owners option, a `no-restricted-imports` path, or an override glob: change the Oxlint config. Then lint a file that has the missed form, and read the report. When no file has the form, tell the user that the change is not verified. Do not change a rule that a preset or plugin ships.
 - **Override that can shrink:** remove only the files that no longer break the rule.
 - **Instruction that became a rule:** delete the instruction of each standard that a rule now checks. The rule is the only source of the standard. When the rule checks only part of the standard, keep the other part as the instruction.
@@ -169,12 +173,28 @@ Write only the approved candidates:
 - **Instruction:** write each approved standard that no tool can check to `CODING_STANDARDS.md`, one line for each standard. When no `AGENTS.md` points to `CODING_STANDARDS.md`, add the pointer to the root `AGENTS.md`.
 - **Discovery gap:** add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link. Fix each approved broken link.
 
+Continue when every approved candidate is implemented and each changed custom rule has passed the guide's verification and cleanup checks.
+
 ## Verify
 
-Verify each custom rule that you added or changed with RuleTester from `adamantite/rules/testing`. Use stdin or a temporary test beside the rule, as the Adamantite skill shows. Valid and invalid cases must pass, and the verification command must exit 0. When verification fails, fix the rule. Change a case only when the case itself is wrong, and tell the user which case you changed and why.
+Run `adamantite check` and `adamantite doctor` in this order, through the project's package runner. Both must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it. Read the output of every check.
 
-Remove your temporary verification cases, fixtures, and verification-only helpers before you finish. Do not add saved rule tests or CI steps unless the user requests them. Preserve existing user-owned optional tests and CI steps. Users can run saved tests explicitly with `adamantite rule test`. Report the cases and their results briefly.
+When a new rule makes `check` fail, fix the rule or add the file to the override as step 9 says, not a disable comment. Do not add saved rule tests or CI steps unless the user requests them. Preserve user-owned tests and CI steps.
 
-When you wrote files, run `adamantite check` and `adamantite doctor` in this order, through your package runner if they are not on PATH. Both must exit 0. When you changed a project check, also run that check with the project's own command, from the folder where CI runs it, and it must exit 0 too. When a new rule makes `check` fail, fix the rule or add the file to the override as step 9 says, not a disable comment.
+When you changed the documentation, run `adamantite harden` again without a terminal and read its agent reach. Do not restart this procedure. Each discovery gap that you closed must be gone, and no link that you added may go to a file that does not exist.
 
-When you changed the documentation, run `adamantite harden` again without a terminal, and read its agent reach. Each discovery gap that you closed must be gone, and no link that you added may go to a file that does not exist.
+Continue when the required checks pass, the approved discovery gaps are closed, and no temporary verification cases, fixtures, or verification-only helpers remain. If a check is blocked, record its command and reason instead of claiming completion.
+
+## Report the result
+
+Use the missing-source report format from step 8. Report the approved candidates implemented, changed files, verification cases and results, commands run, and remaining violations or decisions. State whether temporary verification files were removed. Keep unverified results separate from successful checks.
+
+The report is complete when each approved candidate has a verified result or an explicit blocker. Use this report only after approval and implementation. Before approval, use the proposal and closing question in step 8.
+
+## Check the result
+
+- Every project change implements an approved candidate and stays inside the selected scope.
+- Each new or changed custom rule passed valid and invalid cases, including a regression case for a bug fix.
+- Temporary verification files are removed, and user-owned tests and CI steps remain.
+- Project checks and Doctor pass, or the report names each blocked check and remaining finding.
+- Approved discovery gaps are closed, and added documentation links resolve.

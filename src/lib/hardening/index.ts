@@ -363,7 +363,7 @@ export function renderHardenPrompt(
   return fillTemplate(hardenPromptTemplate, {
     agentReach: Option.match(context.agentReach, {
       onNone: () =>
-        "Adamantite could not find which files each `AGENTS.md` reaches, because git could not list the files. Follow the links from each `AGENTS.md` yourself.",
+        "Git could not list the files, so agent reach is unavailable. Follow the links from each `AGENTS.md` and record the files you checked. Report this fallback with the missing sources.",
       onSome: (reach) => renderAgentReach(reach),
     }),
     configs: renderList(
@@ -372,7 +372,7 @@ export function renderHardenPrompt(
     ),
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>
-        "Git could not list the files of this project. Find the Markdown files with a file search, and leave out the dependencies, the build output, the changesets, and the changelogs.",
+        "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, and changelogs. Record the search scope and report this fallback with the missing sources.",
       onSome: (files) => renderList(files, "The project has no Markdown file."),
     }),
     fixHistoryCommand: `\`git log -n ${commits} --no-merges --format="%h %s" -- ${fixHistoryPath}\``,

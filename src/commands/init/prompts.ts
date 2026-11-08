@@ -75,7 +75,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react",
         },
         {
-          hint: "Keep hooks in hook modules. Installs React Doctor.",
+          hint: "Keep state, effect, and memo hooks in hook files. Installs oxlint-plugin-react-doctor and selects the react preset.",
           label: "react-strict",
           value: "react-strict",
         },
@@ -120,12 +120,12 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "architecture",
         },
         {
-          hint: "Ban type assertions, deep destructuring, and TODOs.",
+          hint: "Limit type assertions, deep destructuring, and TODOs.",
           label: "strict",
           value: "strict",
         },
         {
-          hint: "Ban unknown types, module mocks, and Reflect calls.",
+          hint: "Ban module mocks, Reflect.get, and unknown parameters.",
           label: "antislop",
           value: "antislop",
         },

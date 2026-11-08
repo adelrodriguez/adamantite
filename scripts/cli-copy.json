@@ -257,12 +257,12 @@
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Framework-neutral strictness: no deep or wide destructuring, no type assertions outside tests\"",
-    "after": "\"Ban type assertions, deep destructuring, and TODOs.\""
+    "after": "\"Limit type assertions, deep destructuring, and TODOs.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Rejects low-signal escape hatches: unjustified assertions, unknown leaks, module mocks\"",
-    "after": "\"Ban unknown types, module mocks, and Reflect calls.\""
+    "after": "\"Ban module mocks, Reflect.get, and unknown parameters.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
@@ -1143,7 +1143,7 @@
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Keep state, effect, and memoization hooks in hook modules. Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset.\"",
-    "after": "\"Keep hooks in hook modules. Installs React Doctor.\""
+    "after": "\"Keep state, effect, and memo hooks in hook files. Installs oxlint-plugin-react-doctor and selects the react preset.\""
   },
   {
     "file": "src/commands/init/prompts.ts",

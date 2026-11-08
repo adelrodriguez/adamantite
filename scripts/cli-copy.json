@@ -217,22 +217,22 @@
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Which presets do you want to install? (core is always included)\"",
-    "after": "\"Which presets should init configure? The core preset is always included.\""
+    "after": "\"Which presets should init use with the core preset?\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"React correctness, JSX accessibility, and render performance rules\"",
-    "after": "\"Check React code, JSX accessibility, and rendering performance.\""
+    "after": "\"Check React code, JSX accessibility, and performance.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"TanStack Query: queries defined once with queryOptions() so route loaders can preload them, no query data copied into state\"",
-    "after": "\"Define queries once with queryOptions(), reuse them in route loaders, and avoid copying query data into state.\""
+    "after": "\"Use queryOptions() and keep query data out of state.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Next.js pitfalls around scripts, fonts, images, and document/head usage\"",
-    "after": "\"Check Next.js scripts, fonts, images, and document and head usage.\""
+    "after": "\"Check Next.js scripts, fonts, images, and head usage.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
@@ -242,12 +242,12 @@
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Jest test hygiene: focused/disabled tests, matcher and snapshot discipline\"",
-    "after": "\"Find focused or disabled Jest tests and check matchers and snapshots.\""
+    "after": "\"Find focused or skipped tests and check assertions.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Vitest test hygiene: focused/disabled tests, matcher and snapshot discipline\"",
-    "after": "\"Find focused or disabled Vitest tests and check matchers and snapshots.\""
+    "after": "\"Find focused or skipped tests and check assertions.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
@@ -257,12 +257,12 @@
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Framework-neutral strictness: no deep or wide destructuring, no type assertions outside tests\"",
-    "after": "\"Check for deep or wide destructuring and type assertions outside tests.\""
+    "after": "\"Ban type assertions, deep destructuring, and TODOs.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Rejects low-signal escape hatches: unjustified assertions, unknown leaks, module mocks\"",
-    "after": "\"Check type assertions, unknown types, and module mocks with anti-slop rules.\""
+    "after": "\"Ban unknown types, module mocks, and Reflect calls.\""
   },
   {
     "file": "src/commands/init/prompts.ts",
@@ -292,12 +292,12 @@
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Add Adamantite guidance to AGENTS.md so coding agents know how to run project checks?\"",
-    "after": "\"Add project check instructions to AGENTS.md for coding agents?\""
+    "after": "\"Tell coding agents in AGENTS.md how to run these scripts?\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"Install the Adamantite skill for which coding agents? It teaches them how to use Adamantite. (optional)\"",
-    "after": "\"Which coding agents should receive the Adamantite skill?\""
+    "after": "\"Which coding agents should get the Adamantite skill?\""
   },
   {
     "file": "src/terminal/resolution-menu.ts",
@@ -662,12 +662,12 @@
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"analyze - check monorepo consistency using Sherif and find unused dependencies, exports, and files using knip\"",
-    "after": "\"analyze - check monorepo consistency and find unused code with Sherif and Knip\""
+    "after": "\"analyze - find unused code and check monorepo consistency\""
   },
   {
     "file": "src/commands/init/prompts.ts",
     "before": "\"analyze - find unused dependencies, exports, and files using knip\"",
-    "after": "\"analyze - find unused dependencies, exports, and files with Knip\""
+    "after": "\"analyze - find unused dependencies, exports, and files\""
   },
   {
     "file": "src/commands/init/prompts.ts",
@@ -1134,5 +1134,30 @@
     "file": "src/commands/rule.ts",
     "before": "\"No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule.\"",
     "after": "\"No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test.\""
+  },
+  {
+    "file": "src/commands/init/prompts.ts",
+    "before": "\"check - check formatting, lint issues, and type errors\"",
+    "after": "\"check - find formatting, lint, and type errors\""
+  },
+  {
+    "file": "src/commands/init/prompts.ts",
+    "before": "\"Keep state, effect, and memoization hooks in hook modules. Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset.\"",
+    "after": "\"Keep hooks in hook modules. Installs React Doctor.\""
+  },
+  {
+    "file": "src/commands/init/prompts.ts",
+    "before": "\"Find unhandled errors and effects that never run. Init installs @effect/tsgo.\"",
+    "after": "\"Find effects that never run. Installs @effect/tsgo.\""
+  },
+  {
+    "file": "src/commands/init/prompts.ts",
+    "before": "\"Check layer dependencies and package imports with rules you configure for your project.\"",
+    "after": "\"Check the layer maps and import owners you define.\""
+  },
+  {
+    "file": "src/commands/init/prompts.ts",
+    "before": "\"Check Tailwind v4 classes and component styles against your design system. Init installs @shadcn/lint.\"",
+    "after": "\"Check Tailwind v4 classes. Installs @shadcn/lint.\""
   }
 ]

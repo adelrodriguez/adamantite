@@ -27,7 +27,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     options: [
       {
         hint: "recommended",
-        label: "check - check formatting, lint issues, and type errors",
+        label: "check - find formatting, lint, and type errors",
         value: "check",
       },
       {
@@ -37,8 +37,8 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
       },
       {
         label: isMonorepo
-          ? "analyze - check monorepo consistency and find unused code with Sherif and Knip"
-          : "analyze - find unused dependencies, exports, and files with Knip",
+          ? "analyze - find unused code and check monorepo consistency"
+          : "analyze - find unused dependencies, exports, and files",
         value: "analyze",
       },
     ],
@@ -67,25 +67,25 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   if (hasOxlint) {
     selectedPresets = yield* prompter.multiselect({
-      message: "Which presets should init configure? The core preset is always included.",
+      message: "Which presets should init use with the core preset?",
       options: [
         {
-          hint: "Check React code, JSX accessibility, and rendering performance.",
+          hint: "Check React code, JSX accessibility, and performance.",
           label: "react",
           value: "react",
         },
         {
-          hint: "Keep state, effect, and memoization hooks in hook modules. Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset.",
+          hint: "Keep hooks in hook modules. Installs React Doctor.",
           label: "react-strict",
           value: "react-strict",
         },
         {
-          hint: "Define queries once with queryOptions(), reuse them in route loaders, and avoid copying query data into state.",
+          hint: "Use queryOptions() and keep query data out of state.",
           label: "tanstack",
           value: "tanstack",
         },
         {
-          hint: "Check Next.js scripts, fonts, images, and document and head usage.",
+          hint: "Check Next.js scripts, fonts, images, and head usage.",
           label: "next.js",
           value: "nextjs",
         },
@@ -95,17 +95,17 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "vue",
         },
         {
-          hint: "Find unhandled errors and effects that never run. Init installs @effect/tsgo.",
+          hint: "Find effects that never run. Installs @effect/tsgo.",
           label: "effect",
           value: "effect",
         },
         {
-          hint: "Find focused or disabled Jest tests and check matchers and snapshots.",
+          hint: "Find focused or skipped tests and check assertions.",
           label: "jest",
           value: "jest",
         },
         {
-          hint: "Find focused or disabled Vitest tests and check matchers and snapshots.",
+          hint: "Find focused or skipped tests and check assertions.",
           label: "vitest",
           value: "vitest",
         },
@@ -115,22 +115,22 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "node",
         },
         {
-          hint: "Check layer dependencies and package imports with rules you configure for your project.",
+          hint: "Check the layer maps and import owners you define.",
           label: "architecture",
           value: "architecture",
         },
         {
-          hint: "Check for deep or wide destructuring and type assertions outside tests.",
+          hint: "Ban type assertions, deep destructuring, and TODOs.",
           label: "strict",
           value: "strict",
         },
         {
-          hint: "Check type assertions, unknown types, and module mocks with anti-slop rules.",
+          hint: "Ban unknown types, module mocks, and Reflect calls.",
           label: "antislop",
           value: "antislop",
         },
         {
-          hint: "Check Tailwind v4 classes and component styles against your design system. Init installs @shadcn/lint.",
+          hint: "Check Tailwind v4 classes. Installs @shadcn/lint.",
           label: "tailwind",
           value: "tailwind",
         },
@@ -187,7 +187,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   const shouldAddAgentsGuidance = yield* prompter.confirm({
     initialValue: true,
-    message: "Add project check instructions to AGENTS.md for coding agents?",
+    message: "Tell coding agents in AGENTS.md how to run these scripts?",
   })
 
   const installedAgents = yield* (yield* CodingAgents).detectInstalled(cwd)
@@ -195,7 +195,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     initialValues: codingAgents
       .filter((agent) => installedAgents.some((installed) => installed.command === agent.command))
       .map((agent) => agent.skillsAgent),
-    message: "Which coding agents should receive the Adamantite skill?",
+    message: "Which coding agents should get the Adamantite skill?",
     options: codingAgents.map((agent) => ({
       hint: agent.skillsFolder,
       label: agent.name,

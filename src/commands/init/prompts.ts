@@ -75,14 +75,9 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react",
         },
         {
-          hint: "Strict React feature code: no state, effect, or memoization hooks outside hook modules",
+          hint: "Keep state, effect, and memoization hooks in hook modules. Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset.",
           label: "react-strict",
           value: "react-strict",
-        },
-        {
-          hint: "Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset.",
-          label: "react-doctor",
-          value: "react-doctor",
         },
         {
           hint: "TanStack Query: queries defined once with queryOptions() so route loaders can preload them, no query data copied into state",
@@ -143,9 +138,9 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
       required: false,
     })
 
-    if (selectedPresets.includes("react-doctor") && !selectedPresets.includes("react")) {
+    if (selectedPresets.includes("react-strict") && !selectedPresets.includes("react")) {
       selectedPresets = ["react", ...selectedPresets]
-      yield* prompter.log.info("Added the `react` preset, which `react-doctor` requires.")
+      yield* prompter.log.info("Added the `react` preset, which `react-strict` requires.")
     }
   }
 

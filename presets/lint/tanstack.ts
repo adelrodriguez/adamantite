@@ -1,8 +1,7 @@
 import type { OxlintConfig } from "oxlint"
 
 // Opinions for TanStack Query with route loaders: each query is defined once with `queryOptions()`
-// so a loader can preload it, and query data stays in the query cache. The react-doctor preset
-// covers other query misuse, such as refetches from effects and mutations without invalidation.
+// so a loader can preload it, and query data stays in the query cache.
 //
 // The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
 // extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the

@@ -1,10 +1,14 @@
 # Curate the react-doctor rules
 
-The `react-doctor` preset loads `oxlint-plugin-react-doctor` as a managed plugin (see
-ADR 0003). Version 0.9.14 exports 906 rules. We decided (2026-09-30, issue #470) to enable
+The `react-strict` preset loads `oxlint-plugin-react-doctor` as a managed plugin (see
+ADR 0003). Version 0.9.18 exports 906 rules. We decided (2026-09-30, issue #470) to enable
 a curated list of rules, not all of them. On a small React fixture, all the rules together
 reported `preact-no-react-hooks-import` and `react-in-jsx-scope` on plain React files, and
 they duplicated native Oxlint rules such as `button-has-type`.
+
+Issue #647 moves the curated rules from the separate `react-doctor` preset into
+`react-strict`. The first-party hook restriction and React Doctor misuse checks keep their
+own rule namespaces. Doctor reports the retired preset import through its repair prompt.
 
 A rule is in the preset only when all of these conditions are true:
 
@@ -29,26 +33,35 @@ A rule is in the preset only when all of these conditions are true:
 - It does not report valid code. `no-derived-useState` reports every `useState(prop)`,
   including editable state that uses the prop only as its initial value, such as a form
   input. React allows that pattern, so the rule is not in the preset.
-- It reports its fixture. `effect-needs-cleanup`, `effect-listener-cleanup-mismatch`, and
+- It reports its fixture. `effect-listener-cleanup-mismatch` and
   `no-promise-then-side-effect-in-effect-without-catch` did not report a simple case.
 - No other enabled rule reports the same defect. The preset keeps
   `no-direct-state-mutation` and not `no-mutate-then-set-or-return-same-reference`,
   `no-impure-state-updater` and not `no-side-effect-in-state-updater-function`, and
   `no-pass-live-state-to-parent` and not `no-prop-callback-in-effect`.
 
-The `query-*` and `tanstack-start-*` rules are not in this preset. They find calls by name,
-so they report a project that does not depend on TanStack Query or TanStack Start. For
-example, `query-stable-query-client` reports `new QueryClient()` from a local module. They
-belong in the `tanstack` preset (#406).
+The 0.9.18 fixture run now confirms `effect-needs-cleanup` on missing timer and observer
+cleanup and mismatched subscription callbacks. It replaces `effect-observer-needs-disconnect`
+and covers `effect-listener-cleanup-reference-mismatch`, so neither narrower rule is enabled.
+The animation-frame loop fixture still needs `effect-raf-loop-needs-cancel`.
+
+The preset also checks stale timer references, discarded cleanup returns in effect wrappers,
+debounced work without cancellation, loading flags left set after a failed request, and
+contexts or object URLs created during render. Each addition has valid and invalid fixtures.
+
+The `query-*` and `tanstack-start-*` rules are not in this preset. Some still find calls by
+name. For example, `query-stable-query-client` reports `new QueryClient()` from a local module,
+and `query-mutation-missing-invalidation` reports unrelated local APIs. Other rules now resolve
+import bindings. Any future additions belong in `tanstack` and need checks for unrelated imports.
 
 ## Consequences
 
-- The preset test lints one fixture for each enabled rule, with the `react` preset. It
-  fails when a rule stops reporting its fixture, or when a native rule reports the same
-  fixture. The package is 0.x and renames rules, so the test also asserts that every
-  enabled rule id is in the plugin's `rules`.
+- The preset test lints the fixtures with `react` and `react-strict`. Each invalid case
+  must get exactly its own React Doctor report and no native or first-party report. Valid
+  cases must get no reports. The fixture rule names must match the enabled rule names.
 - Some React Doctor rules skip files by path, such as `__tests__/`, `test/`, `fixtures/`,
-  and `*.test.tsx`. The test copies its fixtures to `src/` before it lints them.
+  and `*.test.tsx`. The test copies its fixtures to `src/hooks/` before it lints them, where
+  the first-party rule permits hooks but React Doctor still checks their use.
 - A new rule is added only with a fixture that meets these conditions.
 - The license is MIT with two added restrictions: no use as machine learning training
   data, and no resale as a hosted product. Adamantite does not copy the source, and the

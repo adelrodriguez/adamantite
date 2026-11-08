@@ -41,7 +41,7 @@ binding, a member of either, a `??` or `||` operand, or the expression body of a
 initializer function. The copy stops updating when the query refetches or another
 component changes the cache.
 
-Neither rule overlaps the `react-doctor` preset. We ran every rule of
+Neither rule overlaps the React Doctor checks now included in `react-strict`. We ran every rule of
 `oxlint-plugin-react-doctor` 0.9.14 on this preset's fixtures. No rule reported an inline
 `useQuery` options object or a `useState` call initialized from query data.
 `react-doctor/no-derived-useState` reports state derived from props. The `query-*` and `tanstack-start-*` rules that React Doctor has

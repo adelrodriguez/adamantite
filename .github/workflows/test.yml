@@ -49,7 +49,8 @@ jobs:
           node --input-type=module --eval 'await import("adamantite/lint/antislop")'
           node --input-type=module --eval 'const fs = await import("node:fs"); const url = await import("node:url"); const path = url.fileURLToPath(import.meta.resolve("adamantite/typescript")); if (!fs.statSync(path).isFile()) process.exit(1)'
           oxlint_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.oxlint")"
-          npm install "oxlint@${oxlint_version}"
+          react_doctor_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['oxlint-plugin-react-doctor']")"
+          npm install "oxlint@${oxlint_version}" "oxlint-plugin-react-doctor@${react_doctor_version}"
           npm pkg set type=module
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import antislop from "adamantite/lint/antislop"' '' 'export default defineConfig({ extends: [antislop] })' > oxlint.config.ts
           printf '%s\n' 'export const value = JSON.parse("{}") as unknown as string' > bad.ts
@@ -107,12 +108,10 @@ jobs:
             exit 1
           fi
           grep "shadcn(no-inline-styles)" oxlint-output.txt
-          react_doctor_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['oxlint-plugin-react-doctor']")"
-          npm install "oxlint-plugin-react-doctor@${react_doctor_version}"
-          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import reactDoctor from "adamantite/lint/react-doctor"' '' 'export default defineConfig({ extends: [reactDoctor] })' > oxlint.config.ts
+          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import reactStrict from "adamantite/lint/react-strict"' '' 'export default defineConfig({ extends: [reactStrict] })' > oxlint.config.ts
           printf '%s\n' 'import { useEffect } from "react"' '' 'export function Product({ isInCart }: { isInCart: boolean }) {' '  useEffect(() => {' '    if (isInCart) {' '      alert("Added to the cart")' '    }' '  }, [isInCart])' '  return <p>Product</p>' '}' > bad.tsx
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.tsx > oxlint-output.txt 2>&1; then
-            echo "Expected react-doctor diagnostics from the packaged preset and the managed plugin to fail the lint run"
+            echo "Expected React Doctor diagnostics from react-strict and the managed plugin to fail the lint run"
             cat oxlint-output.txt
             exit 1
           fi

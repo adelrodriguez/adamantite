@@ -257,10 +257,6 @@ describe("init", () => {
           "--script",
           "check",
           "--preset",
-          "react",
-          "--preset",
-          "react-strict",
-          "--preset",
           "architecture",
           "--preset",
           "strict",
@@ -272,8 +268,6 @@ describe("init", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
-        "react",
-        "react-strict",
         "architecture",
         "strict",
         "tanstack",
@@ -434,12 +428,12 @@ describe("init", () => {
       })
     )
 
-    it.effect("add the react preset when react-doctor is selected without it", () =>
+    it.effect("add the react preset when react-strict is selected without it", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], ["react-doctor"], [], []],
+          multiselectResponses: [["check"], ["react-strict"], [], []],
         })
         const installer = createDependencyInstallerTestContext()
 
@@ -454,7 +448,7 @@ describe("init", () => {
         )
         expect(prompter.logs).toContainEqual({
           level: "info",
-          message: "Added the `react` preset, which `react-doctor` requires.",
+          message: "Added the `react` preset, which `react-strict` requires.",
         })
       })
     )
@@ -768,9 +762,9 @@ describe("init", () => {
         reason: "`--preset` requires the `check` or `fix` script.",
       },
       {
-        args: ["--non-interactive", "--script", "check", "--preset", "react-doctor"],
-        name: "react-doctor without the react preset",
-        reason: "`--preset react-doctor` requires `--preset react`.",
+        args: ["--non-interactive", "--script", "check", "--preset", "react-strict"],
+        name: "react-strict without the react preset",
+        reason: "`--preset react-strict` requires `--preset react`.",
       },
       {
         args: ["--non-interactive", "--script", "analyze", "--typescript"],

@@ -4,14 +4,14 @@ import { tmpdir } from "node:os"
 import { basename, join } from "node:path"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
-import reactDoctor from "#presets/lint/react-doctor.ts"
+import reactStrict from "#presets/lint/react-strict.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/react-doctor")
 const NAMESPACE = "react-doctor"
 const CLEAN_FIXTURE = "clean.tsx"
 
-const presetRules = Object.keys(reactDoctor.rules ?? {})
+const presetRules = Object.keys(reactStrict.rules ?? {})
   .filter((name) => name.startsWith(`${NAMESPACE}/`))
   .map((name) => name.slice(NAMESPACE.length + 1))
 
@@ -42,10 +42,10 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the fixtures with the react and react-doctor presets in one real Oxlint run. The plugin
+ * Lint the React Doctor fixtures with react and react-strict in one real Oxlint run. The plugin
  * resolves from the repository's `node_modules`, as it does from a target project's. The fixtures
- * are copied to `src/hooks/` because some React Doctor rules skip fixture paths. Hook modules
- * also exercise the rules where react-strict permits state and effect hooks.
+ * are copied to `src/hooks/` because some React Doctor rules skip fixture paths. Hook modules also
+ * exercise the rules where react-strict permits state and effect hooks.
  */
 function lintFixtures() {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-react-doctor-"))
@@ -62,9 +62,9 @@ function lintFixtures() {
       [
         'import { defineConfig } from "oxlint"',
         `import react from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react.ts"))}`,
-        `import reactDoctor from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react-doctor.ts"))}`,
+        `import reactStrict from ${JSON.stringify(join(REPO_ROOT, "presets/lint/react-strict.ts"))}`,
         "",
-        "export default defineConfig({ extends: [react, reactDoctor] })",
+        "export default defineConfig({ extends: [react, reactStrict] })",
         "",
       ].join("\n")
     )
@@ -95,15 +95,13 @@ function lintFixtures() {
   }
 }
 
-describe("react-doctor preset", () => {
+describe("React Doctor rules in react-strict", () => {
   it("have fixtures for exactly the enabled rules", () => {
-    expect(new Set(fixtures.map((fixture) => fixture.rule))).toStrictEqual(
-      new Set(presetRules)
-    )
+    expect(new Set(fixtures.map((fixture) => fixture.rule))).toStrictEqual(new Set(presetRules))
   })
 })
 
-describe("react-doctor and react preset overlap", () => {
+describe("React Doctor and native React rule overlap", () => {
   let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"]
 
   function getFixtureCodes(fixture: string) {
@@ -116,19 +114,23 @@ describe("react-doctor and react preset overlap", () => {
     diagnostics = lintFixtures()
   })
 
-  it.each(fixtures.filter((fixture) => fixture.kind === "invalid"))("report $file through its rule", ({ file, rule }) => {
-    expect(getFixtureCodes(file).filter((code) => code?.startsWith(`${NAMESPACE}(`))).toStrictEqual([
-      `${NAMESPACE}(${rule})`,
-    ])
-  })
+  it.each(fixtures.filter((fixture) => fixture.kind === "invalid"))(
+    "report $file through its rule",
+    ({ file, rule }) => {
+      expect(
+        getFixtureCodes(file).filter((code) => code?.startsWith(`${NAMESPACE}(`))
+      ).toStrictEqual([`${NAMESPACE}(${rule})`])
+    }
+  )
 
-  it.each(fixtures.filter((fixture) => fixture.kind === "invalid"))("leave $file to the react-doctor rules", ({ file }) => {
-    const nativeCodes = getFixtureCodes(file).filter(
-      (code) => !code?.startsWith(`${NAMESPACE}(`)
-    )
+  it.each(fixtures.filter((fixture) => fixture.kind === "invalid"))(
+    "leave $file to the react-doctor rules",
+    ({ file }) => {
+      const nativeCodes = getFixtureCodes(file).filter((code) => !code?.startsWith(`${NAMESPACE}(`))
 
-    expect(nativeCodes).toStrictEqual([])
-  })
+      expect(nativeCodes).toStrictEqual([])
+    }
+  )
 
   it.each(fixtures.filter((fixture) => fixture.kind === "valid"))("accept $file", ({ file }) => {
     expect(getFixtureCodes(file)).toStrictEqual([])

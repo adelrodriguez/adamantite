@@ -5,6 +5,7 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
+import { formatJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
 const reactDoctor = managedPlugin("oxlint-plugin-react-doctor")
@@ -18,7 +19,7 @@ describe("React Doctor package", () => {
         const files = createFileSystemTestContext({
           files: {
             "oxlint.config.ts": toOxlintTsConfigContent(["react", "react-strict"]),
-            "package.json": JSON.stringify({
+            "package.json": yield* formatJson({
               devDependencies: version ? { "oxlint-plugin-react-doctor": version } : {},
               scripts: { check: "adamantite check" },
             }),
@@ -36,7 +37,12 @@ describe("React Doctor package", () => {
         expect(result.packageActions).toMatchObject(
           version === reactDoctor.version
             ? []
-            : [{ package: "oxlint-plugin-react-doctor", type: version ? "update_package" : "install_package" }]
+            : [
+                {
+                  package: "oxlint-plugin-react-doctor",
+                  type: version ? "update_package" : "install_package",
+                },
+              ]
         )
       })
   )

@@ -169,6 +169,18 @@
       },
       "tracking": "dependency",
       "version": "1.91.0"
+    },
+    {
+      "name": "oxlint-plugin-react-doctor",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/oxlint-plugin-react-doctor",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/millionco/react-doctor"
+      },
+      "tracking": "dependency",
+      "version": "0.9.18"
     }
   ]
 }

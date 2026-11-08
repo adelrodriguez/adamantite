@@ -136,9 +136,7 @@ export default Command.make("update").pipe(
         Effect.gen(function* () {
           const prompter = yield* Prompter
           yield* prompter.outro(
-            value === "no-changes"
-              ? "✅ Managed packages and the Adamantite skill are up to date."
-              : "✅ Update finished."
+            value === "no-changes" ? "✅ No managed updates were applied." : "✅ Update finished."
           )
         })
       )

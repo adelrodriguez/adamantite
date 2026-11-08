@@ -70,9 +70,7 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual([
-        "✅ Managed packages and the Adamantite skill are up to date.",
-      ])
+      expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
     })
   )
 
@@ -267,10 +265,12 @@ describe("update", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(installer.calls).toStrictEqual([])
-        expect(prompter.logs).toContainEqual(expect.objectContaining({
-          level: "warning",
-          message: expect.stringContaining("Could not check the Adamantite skill."),
-        }))
+        expect(prompter.logs).toContainEqual(
+          expect.objectContaining({
+            level: "warning",
+            message: expect.stringContaining("Could not check the Adamantite skill."),
+          })
+        )
         expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
       })
     )
@@ -331,9 +331,7 @@ describe("update", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual([
-          "✅ Managed packages and the Adamantite skill are up to date.",
-        ])
+        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
       })
     )
 
@@ -352,9 +350,7 @@ describe("update", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual([
-          "✅ Managed packages and the Adamantite skill are up to date.",
-        ])
+        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
       })
     )
 

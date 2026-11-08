@@ -736,7 +736,7 @@
   {
     "file": "src/commands/update.ts",
     "before": "\"\u2705 Adamantite is already up to date.\"",
-    "after": "\"\u2705 Managed packages and the Adamantite skill are up to date.\""
+    "after": "\"\u2705 No managed updates were applied.\""
   },
   {
     "file": "src/commands/doctor.ts",
@@ -952,7 +952,7 @@
   {
     "file": "src/commands/__tests__/update.test.ts",
     "before": "\"\u2705 Adamantite is already up to date.\"",
-    "after": "\"\u2705 Managed packages and the Adamantite skill are up to date.\"",
+    "after": "\"\u2705 No managed updates were applied.\"",
     "report": false
   },
   {

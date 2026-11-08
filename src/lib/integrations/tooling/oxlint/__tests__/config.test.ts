@@ -1,8 +1,9 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import {
   getImportedLintPresets,
   inspectRequiredOxlintConfig,
   LINT_PRESETS,
+  type LintPreset,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 
@@ -70,9 +71,9 @@ describe("inspectRequiredOxlintConfig", () => {
 
 describe("getImportedLintPresets", () => {
   it("list the presets a generated config imports, without core and custom", () => {
-    expect(getImportedLintPresets(toOxlintTsConfigContent(["react", "shadcn"]))).toStrictEqual([
+    expect(getImportedLintPresets(toOxlintTsConfigContent(["react", "tailwind"]))).toStrictEqual([
       "react",
-      "shadcn",
+      "tailwind",
     ])
   })
 
@@ -94,6 +95,8 @@ describe("getImportedLintPresets", () => {
   it("accept only Adamantite preset names", () => {
     // @ts-expect-error - only LintPreset names are accepted
     expect(getImportedLintPresets(toOxlintTsConfigContent(["foo.bar"]))).toStrictEqual([])
+    expectTypeOf<Extract<LintPreset, "tailwind">>().toEqualTypeOf<"tailwind">()
+    expectTypeOf<Extract<LintPreset, "shadcn">>().toEqualTypeOf<never>()
   })
 
   it("extend core and custom() in the default config", () => {
@@ -106,7 +109,7 @@ describe("getImportedLintPresets", () => {
 
   it("list no preset for a config that does not parse", () => {
     expect(
-      getImportedLintPresets('import shadcn from "adamantite/lint/shadcn"\nexport default {')
+      getImportedLintPresets('import tailwind from "adamantite/lint/tailwind"\nexport default {')
     ).toStrictEqual([])
   })
 })

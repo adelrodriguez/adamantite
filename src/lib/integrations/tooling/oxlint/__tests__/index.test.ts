@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
@@ -66,6 +67,58 @@ describe("oxlint", () => {
   })
 
   describe("assess", () => {
+    it.effect("report the removed shadcn preset import without changing the project", () =>
+      Effect.gen(function* () {
+        const config = toOxlintTsConfigContent(["tailwind"]).replaceAll(
+          "adamantite/lint/tailwind",
+          "adamantite/lint/shadcn"
+        )
+        const manifest = makePackageJson({
+          devDependencies: { oxlint: oxlint.version },
+          scripts: { check: "adamantite check" },
+        })
+        const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("adamantite/lint/shadcn"),
+              goal: expect.arrayContaining([
+                expect.stringContaining("adamantite/lint/tailwind"),
+                expect.stringContaining("shadcn/*"),
+                expect.stringContaining("settings.shadcn"),
+              ]),
+              id: "tailwind-preset-migration",
+              integration: "oxlint",
+            },
+          ],
+        })
+        expect(files.read("oxlint.config.ts")).toBe(config)
+        expect(files.read("package.json")).toBe(manifest)
+      })
+    )
+
+    it.effect("report no migration for the tailwind preset or an old import in a comment", () =>
+      Effect.gen(function* () {
+        const config = [
+          '// Previously imported "adamantite/lint/shadcn".',
+          toOxlintTsConfigContent(["tailwind"]),
+        ].join("\n")
+        const files = makeFiles({
+          "oxlint.config.ts": config,
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        expect(yield* runAssess(files)).toMatchObject({ applicable: true, findings: [] })
+      })
+    )
+
     it.effect("report not applicable when no managed lint script exists", () =>
       Effect.gen(function* () {
         const files = makeFiles({

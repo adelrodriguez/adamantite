@@ -2,6 +2,6 @@ import { defineOxlintPlugin } from "#lib/integrations/tooling/oxlint/plugins/bas
 
 export default defineOxlintPlugin({
   name: "@shadcn/lint",
-  preset: "shadcn",
+  preset: "tailwind",
   runtime: { _tag: "JavaScript" },
 })

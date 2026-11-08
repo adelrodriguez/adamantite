@@ -319,8 +319,8 @@ describe("assessProject", () => {
             'import core from "adamantite/lint"',
             'import custom from "adamantite/rules"',
             'import effect from "adamantite/lint/effect"',
-            'import shadcn from "adamantite/lint/shadcn"',
-            "export default { extends: [core, effect, shadcn, custom()] }",
+            'import tailwind from "adamantite/lint/tailwind"',
+            "export default { extends: [core, effect, tailwind, custom()] }",
             "",
           ].join("\n"),
           "package.json": yield* stringifyJson({

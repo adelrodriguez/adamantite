@@ -285,7 +285,7 @@ describe("init", () => {
   )
 
   describe("managed lint plugins", () => {
-    it.effect("install @shadcn/lint when the shadcn preset is selected", () =>
+    it.effect("install @shadcn/lint when the tailwind preset is selected", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({ "package.json": basePackageJson })
         const prompter = createPrompterTestContext()
@@ -293,14 +293,14 @@ describe("init", () => {
 
         const exit = yield* runCommand(
           initCommand,
-          ["--non-interactive", "--script", "check", "--preset", "shadcn"],
+          ["--non-interactive", "--script", "check", "--preset", "tailwind"],
           { files, layers: [prompter.layer, installer.layer] }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(installer.calls[0]?.packages).toContain(`@shadcn/lint@${shadcnLint.version}`)
         expect(files.read("oxlint.config.ts")).toContain(
-          'import shadcn from "adamantite/lint/shadcn"'
+          'import tailwind from "adamantite/lint/tailwind"'
         )
       })
     )

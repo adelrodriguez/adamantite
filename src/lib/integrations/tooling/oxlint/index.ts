@@ -11,6 +11,7 @@ import {
 } from "#lib/integrations/tooling/base.ts"
 import * as commands from "#lib/integrations/tooling/oxlint/command.ts"
 import {
+  checkImportsLintPreset,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
   type LintPreset,
@@ -63,12 +64,29 @@ export default defineIntegration({
             )
           : undefined
       const configContent = toOxlintTsConfigContent()
+      const presetFindings = checkImportsLintPreset(lintConfig, "shadcn")
+        ? [
+            {
+              currentState:
+                "`oxlint.config.ts` imports the removed `adamantite/lint/shadcn` preset.",
+              goal: [
+                "Replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind` in `oxlint.config.ts`. Keep the local import name and its `extends` entry.",
+                "Keep the managed `@shadcn/lint` package, `shadcn/*` rule names, `settings.shadcn` keys, rule severity, rule options, and all other project settings.",
+                "Use `--preset tailwind` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
+              ],
+              id: "tailwind-preset-migration",
+              integration: "oxlint",
+              title: "The shadcn preset was renamed to tailwind",
+            },
+          ]
+        : []
 
       return {
         applicable: true,
         findings: [
           ...getPackageFindings(packageActions, "oxlint"),
           ...runtimeFindings,
+          ...presetFindings,
           ...getConfigFindings(state, {
             configContent,
             configFile: CONFIG_FILE,

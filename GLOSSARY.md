@@ -28,11 +28,14 @@ doctor and update.
 _Avoid_: Vendored bundle, dependency
 
 **Layer map**:
-One option object of the first-party rule `adamantite/layers`: a root folder, and each layer of
-that folder, by folder name, with the layers directly below it. A layer imports the layers it
-lists and every layer that those import. The rule takes one or more layer maps, and each map
-checks the files below its root on its own.
+A dependency graph for the immediate child folders of one root. Each containing layer map
+checks the files below its root independently.
 _Avoid_: Layer order, boundaries
+
+**Layer**:
+A folder in a layer map, with the sibling layers that it can import directly or transitively.
+A layer can contain its own layer map.
+_Avoid_: Level, tier
 
 **Entry**:
 A composition file below the root of a layer map, such as `router.tsx`. An entry imports any

@@ -2,9 +2,17 @@
 "adamantite": minor
 ---
 
-Add the `adamantite/layers` rule. It enforces one-way imports between the folders of a root, such
-as `src/lib`, from a layer map in the rule options. Each option is one layer map, so a project can
-check nested roots, such as `src` and `src/lib`, with one map each. It resolves each import with
-`oxc-resolver`, including `#` imports and `tsconfig.json` `paths`, reports a folder that is not in
-the map, and each message gives the repairs that the map allows and names the root of the map.
-The `strict` preset loads the rule, and the project turns it on with its maps.
+Add `adamantite/layers` with explicit `imports` lists and nested layer maps. The rule enforces
+one-way, transitive imports between the folders of a root. Each layer can contain a child map
+in `layers`, with its own settings and a root derived from its containing folder. Declaration
+order does not change permissions. Every containing map remains an independent check.
+
+The rule resolves relative imports, `#` imports, and `tsconfig.json` paths. It reports unknown
+folders and duplicate concrete scopes. Each violation names the map's concrete root and
+declaration path and gives the repairs that its graph permits. The `strict` preset loads
+the rule, and the project enables it with its maps.
+
+For the previous array-valued declarations, run `adamantite doctor` and follow its migration
+instructions. Replace each dependency array with `{ imports: [...] }`, preserve every dependency
+and setting, and nest only existing compatible child scopes. Doctor writes no files. Run
+`adamantite check`, verify allowed and forbidden imports, and run Doctor again.

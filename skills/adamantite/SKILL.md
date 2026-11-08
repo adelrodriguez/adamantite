@@ -72,6 +72,8 @@ The task is complete when the affected checks exit 0 and you have read their out
 Run `adamantite doctor`. It assesses managed integrations without changing files.
 Without a terminal, it prints a Markdown repair prompt and exits 1 when findings remain.
 Follow each finding's current state, goal, reference, and verification command.
+For old layer-map declarations, use the migration step in
+[Configure layer maps and import owners](references/lint-rules.md#configure-layer-maps-and-import-owners).
 For a finding about the previous custom-rules API, use the migration step in
 [How to write and verify custom rules](references/custom-rules.md#repair-an-existing-rules-folder).
 

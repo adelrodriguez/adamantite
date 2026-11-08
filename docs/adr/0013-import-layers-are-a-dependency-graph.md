@@ -1,5 +1,8 @@
 # Import layers are a dependency graph in a first-party rule
 
+ADR 0024 replaces the array-valued declaration shape and the rejection of nested maps.
+The dependency graph and independent map checks remain.
+
 Target projects enforced one-way import layers by hand. Adamantite had one
 `no-restricted-imports` override for each lib layer and a test to check them. packref had one
 deny-list override for each `src/lib` folder, and its prose and its overrides disagreed. v1 and

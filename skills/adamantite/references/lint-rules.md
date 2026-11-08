@@ -35,8 +35,8 @@ Continue when the reported code follows the rule's repair and the affected lint 
 If the task changes import rules, use the first-party plugin loaded by `architecture` or
 `strict`. The `architecture` preset enables no rules until the project configures them.
 
-Set `adamantite/layers` with a layer map. Each layer lists the layers directly below it.
-Imports are transitive. For example:
+Set `adamantite/layers` with a layer map. Give each layer an `imports` list of sibling
+layers. Imports are transitive. Put a child map in the containing layer's `layers` property:
 
 ```ts
 import architecture from "adamantite/lint/architecture"
@@ -47,18 +47,47 @@ export default defineConfig({
   rules: {
     "adamantite/layers": [
       "error",
-      { root: "src/lib", layers: { shared: [], services: ["shared"] } },
+      {
+        root: "src",
+        layers: {
+          lib: {
+            imports: [],
+            layers: {
+              shared: { imports: [] },
+              services: { imports: ["shared"] },
+            },
+          },
+          terminal: { imports: ["lib"] },
+          commands: { imports: ["terminal"] },
+        },
+      },
     ],
   },
 })
 ```
 
-Resolve `root` from the `package.json` folder. Add another option after the severity for
-each additional map. A file below two roots must pass both maps.
+Resolve `root` from the nearest `package.json` folder. The `lib` child map has the root
+`src/lib`, and its dependency names are local to that map. Every containing map checks a
+file independently. A child permission cannot override a parent prohibition. Declaration
+order does not change permissions.
+
 Use `entries` for composition files, `isolate` for layers whose child folders cannot import
 each other, and `ignoreTypes` when type-only imports do not count. Add import `conditions`
 explicitly when resolution needs them. The rule does not read tsconfig `customConditions`.
-An unresolved import is not checked. A folder missing from the map is reported.
+An unresolved import is not checked. A folder missing from the map is reported. Move a
+loose root file into a layer or declare it as an entry.
+
+Place child settings beside the child's `layers`. Settings do not inherit. A parent's
+`ignore`, `entries`, or `ignoreTypes` does not skip child checks. A child root uses the
+parent's actual matched folder, including when the top root is a glob. Declare each
+concrete scope once. Keep separate option objects for roots that cannot nest without a
+new intermediate map.
+
+If the config uses the previous array-valued declarations, run `adamantite doctor` and
+follow its migration instructions. Preserve every dependency and map setting. Nest only
+existing compatible child scopes. Verify allowed and forbidden imports with
+`adamantite check`, then run Doctor again. Continue when the migrated maps preserve the
+project's intended imports and Doctor reports no layer-map migration finding.
 
 For a package import that belongs to one file or folder, set `adamantite/import-owners`:
 

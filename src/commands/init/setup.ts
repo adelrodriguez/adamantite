@@ -5,7 +5,7 @@ import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import type { ToolingConfigState } from "#lib/integrations/tooling/base.ts"
-import { type SkillFolder, writeSkill } from "#lib/execution/skill.ts"
+import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
@@ -400,26 +400,27 @@ export const setupAgentsGuidance = (
 const folderList = new Intl.ListFormat("en", { type: "conjunction" })
 
 /**
- * Write the Adamantite skill to the selected skill folders. The skill is optional, so a failure
- * leaves a warning and initialization continues.
+ * Write the Adamantite skill to the skill folders of the agents that the project uses. The skill is
+ * optional, so a failure leaves a warning and initialization continues.
  */
-export const setupSkill = (cwd: string, folders: readonly SkillFolder[]) =>
+export const setupSkill = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
 
-    yield* prompter
-      .withSpinner(() => writeSkill(cwd, folders), {
-        failure: "Failed to add the Adamantite skill.",
-        start: "Adding the Adamantite skill...",
-        success: `Adamantite skill added to ${folderList.format(folders.map((folder) => `\`${folder}\``))}.`,
-      })
-      .pipe(
-        Effect.catchTag(
-          ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
-          (error) =>
-            prompter.log.warning(
-              `Could not add the Adamantite skill. ${error.message} Adamantite will continue initialization.`
-            )
-        )
+    yield* detectSkillFolders(cwd).pipe(
+      Effect.flatMap((folders) =>
+        prompter.withSpinner(() => writeSkill(cwd, folders), {
+          failure: "Failed to add the Adamantite skill.",
+          start: "Adding the Adamantite skill...",
+          success: `Adamantite skill added to ${folderList.format(folders.map((folder) => `\`${folder}\``))}.`,
+        })
+      ),
+      Effect.catchTag(
+        ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
+        (error) =>
+          prompter.log.warning(
+            `Could not add the Adamantite skill. ${error.message} Adamantite will continue initialization.`
+          )
       )
+    )
   })

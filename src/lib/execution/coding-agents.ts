@@ -20,11 +20,6 @@ export interface CodingAgent {
    */
   readonly seedArguments: (prompt: string) => string[]
   /**
-   * The value of the `--skill-agent` option of `init`. The values are the agent names of the
-   * `skills` CLI, which earlier versions of `init` ran, so existing commands keep working.
-   */
-  readonly skillsAgent: string
-  /**
    * The project folder that the agent loads skills from.
    */
   readonly skillsFolder: string
@@ -43,28 +38,24 @@ export const codingAgents = [
     command: "claude",
     name: "Claude Code",
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "claude-code",
     skillsFolder: ".claude/skills",
   },
   {
     command: "codex",
     name: "Codex",
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "codex",
     skillsFolder: ".agents/skills",
   },
   {
     command: "cursor-agent",
     name: "Cursor",
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "cursor",
     skillsFolder: ".agents/skills",
   },
   {
     command: "gemini",
     name: "Gemini CLI",
     seedArguments: (prompt) => ["-i", prompt],
-    skillsAgent: "gemini-cli",
     skillsFolder: ".agents/skills",
   },
   {
@@ -72,19 +63,15 @@ export const codingAgents = [
     name: "Grok Build",
     probeArguments: ["version"],
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "grok",
     skillsFolder: ".grok/skills",
   },
   {
     command: "opencode",
     name: "OpenCode",
     seedArguments: (prompt) => ["--prompt", prompt],
-    skillsAgent: "opencode",
     skillsFolder: ".agents/skills",
   },
 ] as const satisfies readonly CodingAgent[]
-
-export type SkillsAgent = (typeof codingAgents)[number]["skillsAgent"]
 
 export interface HandoffOptions {
   readonly agent: CodingAgent

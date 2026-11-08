@@ -15,7 +15,7 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
-import { getSkillFolders, initCommandOptions, validateInitOptions } from "./options.ts"
+import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
 import {
   addScripts,
@@ -41,7 +41,7 @@ export default Command.make("init", initCommandOptions).pipe(
     },
     {
       command:
-        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript --install-extensions --github-actions --agents --skill-agent claude-code",
+        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript --install-extensions --github-actions --agents",
       description:
         "Configure a React project with VS Code, TypeScript, CI, agent guidance, and the Adamantite skill",
     },
@@ -91,7 +91,6 @@ export default Command.make("init", initCommandOptions).pipe(
             options.installExtensions,
             options.githubActions,
             options.agents,
-            options.skillAgents.length > 0,
             options.overwriteScripts,
           ],
           Predicate.isTruthy
@@ -103,7 +102,7 @@ export default Command.make("init", initCommandOptions).pipe(
       }
 
       const input = options.nonInteractive
-        ? { ...options, skillFolders: getSkillFolders(options.skillAgents) }
+        ? options
         : yield* collectInteractiveInitOptions(cwd, isMonorepo, packageManager.name)
       const initOptions = yield* validateInitOptions(input, packageManager.name)
       const selectedScripts = initOptions.scripts
@@ -112,8 +111,7 @@ export default Command.make("init", initCommandOptions).pipe(
       const shouldSetupTypescript = initOptions.typescript
       const installExtensions = initOptions.installExtensions
       const gitHubActionsPackageManager = initOptions.githubActions
-      const shouldAddAgentsGuidance = initOptions.agents
-      const skillFolders = initOptions.skillFolders
+      const shouldSetupAgents = initOptions.agents
 
       const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
       const hasKnip = selectedScripts.includes("analyze")
@@ -163,12 +161,9 @@ export default Command.make("init", initCommandOptions).pipe(
         overwriteScripts: initOptions.overwriteScripts,
       })
 
-      if (shouldAddAgentsGuidance) {
+      if (shouldSetupAgents) {
         yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts, isMonorepo)
-      }
-
-      if (skillFolders.length > 0) {
-        yield* setupSkill(cwd, skillFolders)
+        yield* setupSkill(cwd)
       }
 
       if (shouldSetupTypescript) {

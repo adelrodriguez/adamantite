@@ -26,10 +26,11 @@ export const readFileIfExists = (path: string) =>
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readFileString(path)),
     Effect.asSome,
-    Effect.catch((error) =>
-      error.reason._tag === "NotFound"
-        ? Effect.succeedNone
-        : Effect.fail(new FailedToReadFile({ cause: error, path }))
+    Effect.catchReason(
+      "PlatformError",
+      "NotFound",
+      () => Effect.succeedNone,
+      (_reason, error) => Effect.fail(new FailedToReadFile({ cause: error, path }))
     )
   )
 
@@ -42,10 +43,13 @@ export const readDirectoryIfExists = (path: string, options?: { readonly recursi
   FileSystem.FileSystem.pipe(
     Effect.flatMap((fs) => fs.readDirectory(path, options)),
     Effect.asSome,
-    Effect.catch((error) =>
-      error.reason._tag === "NotFound" || error.reason._tag === "BadResource"
-        ? Effect.succeed(Option.none<string[]>())
-        : Effect.fail(new FailedToReadFile({ cause: error, path }))
+    Effect.catchReasons(
+      "PlatformError",
+      {
+        BadResource: () => Effect.succeed(Option.none<string[]>()),
+        NotFound: () => Effect.succeed(Option.none<string[]>()),
+      },
+      (_reason, error) => Effect.fail(new FailedToReadFile({ cause: error, path }))
     )
   )
 

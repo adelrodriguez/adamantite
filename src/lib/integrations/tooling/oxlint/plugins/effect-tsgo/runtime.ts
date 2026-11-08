@@ -5,7 +5,11 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { NativeOverride } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
+import {
+  BackendOverride,
+  BindingOverride,
+  type NativeOverride,
+} from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import {
   EffectBuildMissing,
   EffectPlatformUnsupported,
@@ -114,10 +118,9 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
 
   // With the mode `tsrs`, the Effect binding starts the backend as `<path> --lint headless`.
   return [
-    { _tag: "Binding", path: binding },
-    {
-      _tag: "Backend",
+    new BindingOverride({ path: binding }),
+    new BackendOverride({
       env: { EFFECT_TSGO_TSGOLINT_MODE: "tsrs", EFFECT_TSGO_TSGOLINT_PATH: backend },
-    },
-  ] satisfies readonly NativeOverride[]
+    }),
+  ]
 })

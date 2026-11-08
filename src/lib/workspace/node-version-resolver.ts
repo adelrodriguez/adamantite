@@ -1,5 +1,6 @@
 import type { JsonValue } from "type-fest"
 import * as Context from "effect/Context"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
@@ -13,27 +14,20 @@ import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import { parseJson } from "#lib/shared/json.ts"
 
 /**
- * A workflow-ready Node.js version input for `actions/setup-node`. `File` renders as
- * `node-version-file` so the workflow keeps tracking the target project's declaration; `Version`
- * renders as a literal `node-version` value.
+ * A file that declares the Node.js version. It renders as `node-version-file`, so the workflow
+ * keeps tracking the target project's declaration.
  */
-export type NodeVersionSource =
-  | {
-      readonly _tag: "File"
-      readonly path: string
-    }
-  | {
-      readonly _tag: "Version"
-      readonly value: string
-    }
+export class NodeVersionFile extends Data.TaggedClass("File")<{ readonly path: string }> {}
 
-function fileSource(path: string): NodeVersionSource {
-  return { _tag: "File", path }
-}
+/**
+ * A Node.js version that renders as a literal `node-version` value.
+ */
+export class NodeVersion extends Data.TaggedClass("Version")<{ readonly value: string }> {}
 
-function versionSource(value: string): NodeVersionSource {
-  return { _tag: "Version", value }
-}
+/**
+ * A workflow-ready Node.js version input for `actions/setup-node`.
+ */
+export type NodeVersionSource = NodeVersionFile | NodeVersion
 
 const VERSION_FILES = [".node-version", ".nvmrc"] as const
 
@@ -108,14 +102,14 @@ export class NodeVersionResolver extends Context.Service<
             const content = yield* readDeclarationFile(cwd, file)
 
             if (Option.exists(content, (value) => Str.isNonEmpty(value.trim()))) {
-              return fileSource(file)
+              return new NodeVersionFile({ path: file })
             }
           }
 
           const toolVersions = yield* readDeclarationFile(cwd, ".tool-versions")
 
           if (Option.exists(toolVersions, (content) => hasToolVersionsNodeEntry(content))) {
-            return fileSource(".tool-versions")
+            return new NodeVersionFile({ path: ".tool-versions" })
           }
 
           const packageJsonContent = yield* readDeclarationFile(cwd, "package.json")
@@ -127,11 +121,11 @@ export class NodeVersionResolver extends Context.Service<
             )
 
             if (hasNodeDeclaration(packageJson)) {
-              return fileSource("package.json")
+              return new NodeVersionFile({ path: "package.json" })
             }
           }
 
-          return versionSource("lts/*")
+          return new NodeVersion({ value: "lts/*" })
         }),
       }
     })

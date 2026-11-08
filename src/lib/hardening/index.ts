@@ -4,11 +4,11 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { OverridesReport } from "#lib/hardening/overrides.ts"
 import type { RuleSuppressions } from "#lib/hardening/suppressions.ts"
 import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { type AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
+import { OverridesLintFailed, type OverridesReport } from "#lib/hardening/overrides.ts"
 import { listProjectFiles } from "#lib/hardening/project-files.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
@@ -317,7 +317,7 @@ const OVERRIDE_MARKS = {
 } as const
 
 function renderOverrides(report: OverridesReport) {
-  if (report._tag === "Failed") {
+  if (report instanceof OverridesLintFailed) {
     return [
       "Adamantite could not lint the files of the overrides that turn a rule off:",
       "",

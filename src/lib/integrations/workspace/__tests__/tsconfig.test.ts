@@ -7,6 +7,7 @@ import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
+import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
@@ -194,7 +195,7 @@ describe("tsconfig", () => {
         expect(Result.isFailure(result)).toBe(true)
 
         if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
+          expect(result.failure).toBeInstanceOf(InvalidConfigFormat)
         }
       })
     )

@@ -1,20 +1,33 @@
 import process from "node:process"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { OxlintPlugin, NativeOverride } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
+import {
+  BindingOverride,
+  type NativeOverride,
+  NativeRuntime,
+  type OxlintPlugin,
+} from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import { NativeRuntimeConflict, PackageNotInstalled } from "#lib/shared/errors.ts"
 import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 
 /**
- * A file that Oxlint loads. `Stock` lets Oxlint find its own file. `Replaced` gives Oxlint the file
- * at `path` in its place.
+ * Oxlint finds its own file.
  */
-export type RuntimePart =
-  | { readonly _tag: "Stock" }
-  | { readonly _tag: "Replaced"; readonly path: string }
+export class StockPart extends Data.TaggedClass("Stock") {}
+
+/**
+ * Oxlint loads the file at `path` in place of its own file.
+ */
+export class ReplacedPart extends Data.TaggedClass("Replaced")<{ readonly path: string }> {}
+
+/**
+ * A file that Oxlint loads.
+ */
+export type RuntimePart = StockPart | ReplacedPart
 
 /**
  * What runs Oxlint for one project: the Oxlint package, its native binding, and its type-aware
@@ -102,12 +115,12 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
     return yield* new PackageNotInstalled({ packageName: "oxlint", project })
   }
 
-  let binding: RuntimePart = { _tag: "Stock" }
+  let binding: RuntimePart = new StockPart()
   let backend: Readonly<Record<string, string>> | undefined
   const owners = new Map<NativeOverride["_tag"], string>()
 
   for (const plugin of plugins) {
-    if (plugin.runtime._tag !== "Native") {
+    if (!(plugin.runtime instanceof NativeRuntime)) {
       continue
     }
 
@@ -125,8 +138,8 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
 
       owners.set(override._tag, plugin.name)
 
-      if (override._tag === "Binding") {
-        binding = { _tag: "Replaced", path: override.path }
+      if (override instanceof BindingOverride) {
+        binding = new ReplacedPart({ path: override.path })
       } else {
         // An override replaces the whole backend, so the default and the native backend variables
         // never mix.

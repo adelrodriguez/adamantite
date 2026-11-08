@@ -11,9 +11,10 @@ import { formatJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
+const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }
 
 function makeFiles(files?: Record<string, string>) {
-  const target = `${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : process.platform === "win32" ? "-msvc" : ""}`
+  const target = `${process.platform}-${process.arch}${BINDING_SUFFIXES[process.platform] ?? ""}`
 
   return createFileSystemTestContext({
     files: {

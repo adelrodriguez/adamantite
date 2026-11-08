@@ -237,12 +237,11 @@ describe("writeAgentsGuidance", () => {
     },
     ({ prefix, suffix, variant, ...guidance }) =>
       Effect.gen(function* () {
-        const existing =
-          variant === "start-only"
-            ? `${prefix}${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
-            : variant === "end-only"
-              ? `${prefix}${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
-              : `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
+        const existing = {
+          "end-before-start": `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`,
+          "end-only": `${prefix}${ADAMANTITE_AGENTS_END_MARKER}${suffix}`,
+          "start-only": `${prefix}${ADAMANTITE_AGENTS_START_MARKER}${suffix}`,
+        }[variant]
 
         const files = makeFiles({ "AGENTS.md": existing })
         const { isMonorepo, packageManager, scripts } = guidance

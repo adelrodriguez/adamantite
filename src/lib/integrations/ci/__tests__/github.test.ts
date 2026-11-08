@@ -13,8 +13,10 @@ import github from "#lib/integrations/ci/github.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
-  type NodeVersionSource,
+  NodeVersion,
+  NodeVersionFile,
   NodeVersionResolver,
+  type NodeVersionSource,
 } from "#lib/workspace/node-version-resolver.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import testWorkflow from "../../../../../.github/workflows/test.yml?raw"
@@ -55,7 +57,7 @@ function provideFallback(files: FileSystemTestContext) {
     files.layer,
     Path.layer,
     makeModuleResolverLayer(ROOT),
-    makeResolverLayer({ _tag: "Version", value: "lts/*" }),
+    makeResolverLayer(new NodeVersion({ value: "lts/*" })),
   ])
 }
 
@@ -142,7 +144,7 @@ function provideFileResolver(files: FileSystemTestContext) {
     files.layer,
     Path.layer,
     makeModuleResolverLayer(ROOT),
-    makeResolverLayer({ _tag: "File", path: ".node-version" }),
+    makeResolverLayer(new NodeVersionFile({ path: ".node-version" })),
   ])
 }
 

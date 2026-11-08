@@ -6,6 +6,7 @@ import {
   renderOverrideTrialConfig,
   renderTrialConfig,
 } from "#lib/hardening/trial.ts"
+import { InvalidTrialCase } from "#lib/shared/errors.ts"
 
 describe("parseTrialCase", () => {
   it.effect("read a project path, and a path with the file that holds its content", () =>
@@ -35,7 +36,8 @@ describe("parseTrialCase", () => {
     Effect.gen(function* () {
       const error = yield* parseTrialCase(value, "reported").pipe(Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "InvalidTrialCase", value })
+      expect(error).toBeInstanceOf(InvalidTrialCase)
+      expect(error).toMatchObject({ value })
     })
   )
 })

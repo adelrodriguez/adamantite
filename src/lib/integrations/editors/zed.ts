@@ -340,7 +340,7 @@ export default defineIntegration({
       const settingsPath = path.join(cwd, files[0].path)
       const content = yield* readFileIfExists(settingsPath)
 
-      if (content._tag === "None") {
+      if (Option.isNone(content)) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 

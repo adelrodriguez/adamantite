@@ -8,6 +8,7 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import checkCommand from "#commands/check.ts"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { CommandFailed } from "#lib/shared/errors.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
@@ -186,7 +187,8 @@ describe("check", () => {
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
+        expect(error).toBeInstanceOf(CommandFailed)
+        expect(error).toMatchObject({ command: "oxfmt", exitCode: 2 })
         expect(
           runner.invocations.map((invocation) => invocation.name ?? invocation.command)
         ).toStrictEqual(["oxfmt", "oxlint"])

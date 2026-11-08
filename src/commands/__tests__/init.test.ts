@@ -17,7 +17,7 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { LINT_PRESETS } from "#lib/integrations/tooling/oxlint/presets.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
-import { CliNotFound } from "#lib/shared/errors.ts"
+import { CliNotFound, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/workspace/agents.ts"
 import {
@@ -801,10 +801,9 @@ describe("init", () => {
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
-        expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-          _tag: "InvalidInitOptions",
-          reason,
-        })
+        expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
+          new InvalidInitOptions({ reason })
+        )
         expect(installer.calls).toStrictEqual([])
         expect(files.read("package.json")).toBe(originalPackageJson)
       })
@@ -829,11 +828,12 @@ describe("init", () => {
           )
 
           expect(Exit.isFailure(exit)).toBe(true)
-          expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-            _tag: "InvalidInitOptions",
-            reason:
-              "`--github-actions` does not support the detected package manager `aube`. Use bun, deno, npm, pnpm, or yarn.",
-          })
+          expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
+            new InvalidInitOptions({
+              reason:
+                "`--github-actions` does not support the detected package manager `aube`. Use bun, deno, npm, pnpm, or yarn.",
+            })
+          )
           expect(installer.calls).toStrictEqual([])
           expect(files.read("package.json")).toBe(originalPackageJson)
           expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
@@ -1337,7 +1337,7 @@ describe("init", () => {
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "NoPackageManager" })
+        expect(error).toBeInstanceOf(NoPackageManager)
       })
     )
 

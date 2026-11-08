@@ -4,6 +4,7 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import zed from "#lib/integrations/editors/zed.ts"
+import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { formatJson, parseJson, stringifyJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { effectEditorFiles, effectEditorResolver } from "./effect-fixture.ts"
@@ -440,7 +441,7 @@ describe("zed", () => {
         expect(Result.isFailure(result)).toBe(true)
 
         if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
+          expect(result.failure).toBeInstanceOf(InvalidConfigFormat)
         }
       })
     )

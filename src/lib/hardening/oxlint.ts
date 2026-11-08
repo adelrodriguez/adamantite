@@ -126,10 +126,11 @@ const runOxlint = Effect.fn("runOxlint")(
     return { exitCode, output: `${stdout}${stderr}`.trim(), stdout }
   },
   Effect.scoped,
-  Effect.mapError((cause) =>
-    cause.reason._tag === "NotFound"
-      ? new CliNotFound({ command: "node" })
-      : new TrialLintFailed({ output: cause.message })
+  Effect.catchReason(
+    "PlatformError",
+    "NotFound",
+    () => Effect.fail(new CliNotFound({ command: "node" })),
+    (_reason, error) => Effect.fail(new TrialLintFailed({ output: error.message }))
   )
 )
 

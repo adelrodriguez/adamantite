@@ -5,7 +5,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import analyzeCommand from "#commands/analyze.ts"
-import { CliNotFound } from "#lib/shared/errors.ts"
+import { CliNotFound, CommandFailed, InvalidAnalyzeOptions } from "#lib/shared/errors.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 function createMonorepoFiles() {
@@ -121,8 +121,8 @@ describe("analyze", () => {
           "sherif",
           "knip",
         ])
+        expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CommandFailed)
         expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-          _tag: "CommandFailed",
           command: "sherif",
           exitCode: 2,
         })
@@ -139,8 +139,8 @@ describe("analyze", () => {
         })
 
         expect(runner.invocations.map((invocation) => invocation.command)).toStrictEqual(["sherif"])
+        expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CommandFailed)
         expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-          _tag: "CommandFailed",
           command: "sherif",
         })
       })
@@ -158,7 +158,8 @@ describe("analyze", () => {
         })
 
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CliNotFound", command: "sherif" })
+        expect(error).toBeInstanceOf(CliNotFound)
+        expect(error).toMatchObject({ command: "sherif" })
         expect(error.message).toBe(
           "The command `sherif` was not found on PATH. Run `adamantite update` to install it."
         )
@@ -211,7 +212,7 @@ describe("analyze", () => {
 
         expect(runner.invocations).toStrictEqual([])
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "InvalidAnalyzeOptions" })
+        expect(error).toBeInstanceOf(InvalidAnalyzeOptions)
         expect(error.message).toContain("requires a monorepo")
       })
     )
@@ -227,7 +228,7 @@ describe("analyze", () => {
 
         expect(runner.invocations).toStrictEqual([])
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "InvalidAnalyzeOptions" })
+        expect(error).toBeInstanceOf(InvalidAnalyzeOptions)
         expect(error.message).toContain("`--strict` applies to the unused stage")
       })
     )

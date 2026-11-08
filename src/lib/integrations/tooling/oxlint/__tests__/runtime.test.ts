@@ -5,15 +5,27 @@ import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import {
+  BackendOverride,
+  BindingOverride,
   defineOxlintPlugin,
+  JavaScriptRuntime,
   type NativeOverride,
+  NativeRuntime,
   type OxlintPlugin,
 } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import {
+  ReplacedPart,
   resolveOxlintRuntime,
+  StockPart,
   type OxlintRuntime,
   type RuntimePart,
 } from "#lib/integrations/tooling/oxlint/runtime.ts"
+import {
+  EffectBuildMissing,
+  EffectPlatformUnsupported,
+  NativeRuntimeConflict,
+  PackageNotInstalled,
+} from "#lib/shared/errors.ts"
 
 const ROOT = "/project"
 const PLATFORM = `${process.platform}-${process.arch}`
@@ -111,7 +123,7 @@ describe("Oxlint runtime", () => {
               ? `${ROOT}/node_modules/.bin/tsrs-lint.cmd`
               : `${ROOT}/node_modules/tsrs/bin/tsrs-lint`,
         },
-        binding: { _tag: "Stock" },
+        binding: new StockPart(),
         oxlint: `${ROOT}/node_modules/oxlint`,
       })
     })
@@ -151,7 +163,7 @@ describe("Oxlint runtime", () => {
 
       expect(runtime).toStrictEqual({
         backend: {},
-        binding: { _tag: "Stock" },
+        binding: new StockPart(),
         oxlint: `${ROOT}/node_modules/oxlint`,
       })
     })
@@ -168,10 +180,9 @@ describe("Oxlint runtime", () => {
             EFFECT_TSGO_TSGOLINT_MODE: "tsrs",
             EFFECT_TSGO_TSGOLINT_PATH: `${ROOT}/${ARTIFACTS}/tsrs/${TSRS_VERSION}/${TSRS}`,
           },
-          binding: {
-            _tag: "Replaced",
+          binding: new ReplacedPart({
             path: `${ROOT}/${ARTIFACTS}/oxlint/1.88.0/oxlint.${PLATFORM}.node`,
-          },
+          }),
           oxlint: `${ROOT}/node_modules/oxlint`,
         })
       })
@@ -183,8 +194,8 @@ describe("Oxlint runtime", () => {
       Effect.gen(function* () {
         const error = yield* runResolve(makeFiles("1.91.0"), EFFECT_PACKAGES).pipe(Effect.flip)
 
+        expect(error).toBeInstanceOf(EffectBuildMissing)
         expect(error).toMatchObject({
-          _tag: "EffectBuildMissing",
           effectVersion: "0.67.1",
           supported: ["1.88.0", "1.89.0"],
           tool: "oxlint",
@@ -202,8 +213,8 @@ describe("Oxlint runtime", () => {
         Effect.flip
       )
 
+      expect(error).toBeInstanceOf(EffectBuildMissing)
       expect(error).toMatchObject({
-        _tag: "EffectBuildMissing",
         supported: [TSRS_VERSION],
         tool: "tsrs",
         version: "0.22.0",
@@ -248,7 +259,8 @@ describe("Oxlint runtime", () => {
 
       const error = yield* runResolve(makeFiles(), packages).pipe(Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "EffectPlatformUnsupported", platform: PLATFORM })
+      expect(error).toBeInstanceOf(EffectPlatformUnsupported)
+      expect(error).toMatchObject({ platform: PLATFORM })
     })
   )
 
@@ -260,7 +272,8 @@ describe("Oxlint runtime", () => {
 
       const error = yield* runResolve(makeFiles(), packages).pipe(Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "PackageNotInstalled", packageName: "tsrs" })
+      expect(error).toBeInstanceOf(PackageNotInstalled)
+      expect(error).toMatchObject({ packageName: "tsrs" })
     })
   )
 
@@ -268,8 +281,8 @@ describe("Oxlint runtime", () => {
     Effect.gen(function* () {
       const error = yield* runResolve(makeFiles(), {}).pipe(Effect.flip)
 
+      expect(error).toBeInstanceOf(PackageNotInstalled)
       expect(error).toMatchObject({
-        _tag: "PackageNotInstalled",
         packageName: "oxlint",
         project: ROOT,
       })
@@ -286,31 +299,25 @@ describe("native runtime overrides", () => {
 
         const override: NativeOverride =
           part === "Binding"
-            ? { _tag: "Binding", path: "/native.node" }
-            : { _tag: "Backend", env: { NATIVE_BACKEND: "/backend" } }
+            ? new BindingOverride({ path: "/native.node" })
+            : new BackendOverride({ env: { NATIVE_BACKEND: "/backend" } })
 
         const error = yield* resolveOxlintRuntime(ROOT, [
           {
             name: "first",
-            runtime: {
-              _tag: "Native",
-              resolve: () => Effect.succeed([override]),
-            },
+            runtime: new NativeRuntime({ resolve: () => Effect.succeed([override]) }),
           },
           {
             name: "second",
-            runtime: {
-              _tag: "Native",
-              resolve: () => Effect.succeed([override]),
-            },
+            runtime: new NativeRuntime({ resolve: () => Effect.succeed([override]) }),
           },
         ]).pipe(
           Effect.flip,
           Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
         )
 
+        expect(error).toBeInstanceOf(NativeRuntimeConflict)
         expect(error).toMatchObject({
-          _tag: "NativeRuntimeConflict",
           part,
           plugins: ["first", "second"],
         })
@@ -324,27 +331,25 @@ describe("native runtime overrides", () => {
       const runtime = yield* resolveOxlintRuntime(ROOT, [
         {
           name: "binding",
-          runtime: {
-            _tag: "Native",
-            resolve: () => Effect.succeed([{ _tag: "Binding", path: "/binding.node" }]),
-          },
+          runtime: new NativeRuntime({
+            resolve: () => Effect.succeed([new BindingOverride({ path: "/binding.node" })]),
+          }),
         },
         {
           name: "backend",
-          runtime: {
-            _tag: "Native",
+          runtime: new NativeRuntime({
             resolve: () =>
-              Effect.succeed([{ _tag: "Backend", env: { NATIVE_BACKEND: "/backend" } }]),
-          },
+              Effect.succeed([new BackendOverride({ env: { NATIVE_BACKEND: "/backend" } })]),
+          }),
         },
-        { name: "javascript", runtime: { _tag: "JavaScript" } },
+        { name: "javascript", runtime: new JavaScriptRuntime() },
       ]).pipe(
         Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, STOCK_PACKAGES)])
       )
 
       expect(runtime).toStrictEqual({
         backend: { NATIVE_BACKEND: "/backend" },
-        binding: { _tag: "Replaced", path: "/binding.node" },
+        binding: new ReplacedPart({ path: "/binding.node" }),
         oxlint: "/project/node_modules/oxlint",
       })
     })
@@ -355,17 +360,12 @@ describe("runtime types", () => {
   it("keep plugin capabilities and resolved runtime parts distinct in types", () => {
     const javascript = defineOxlintPlugin({
       name: "example",
-      runtime: { _tag: "JavaScript" },
+      runtime: new JavaScriptRuntime(),
     })
 
     expectTypeOf(javascript.name).toEqualTypeOf<"example">()
-    expectTypeOf<Extract<OxlintPlugin["runtime"], { _tag: "JavaScript" }>>().toEqualTypeOf<{
-      readonly _tag: "JavaScript"
-    }>()
-    expectTypeOf<Extract<NativeOverride, { _tag: "Backend" }>>().toEqualTypeOf<{
-      readonly _tag: "Backend"
-      readonly env: Readonly<Record<string, string>>
-    }>()
+    expectTypeOf<OxlintPlugin["runtime"]>().toEqualTypeOf<JavaScriptRuntime | NativeRuntime>()
+    expectTypeOf<NativeOverride>().toEqualTypeOf<BindingOverride | BackendOverride>()
     expectTypeOf<OxlintRuntime["binding"]>().toEqualTypeOf<RuntimePart>()
   })
 })

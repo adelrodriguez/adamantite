@@ -7,7 +7,12 @@ import type { Script } from "#lib/workspace/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
-import { CliNotFound } from "#lib/shared/errors.ts"
+import {
+  CliNotFound,
+  EffectEditorUnavailable,
+  InvalidConfigFormat,
+  VscodeCliNotFound,
+} from "#lib/shared/errors.ts"
 import { formatJson, parseJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import {
@@ -79,10 +84,8 @@ describe("vscode", () => {
           .extension(["check"])
           .pipe(Effect.provide(runner.layer), Effect.flip)
 
-        expect(error).toMatchObject({
-          _tag: "VscodeCliNotFound",
-          cause: { _tag: "CliNotFound", command: "code" },
-        })
+        expect(error).toBeInstanceOf(VscodeCliNotFound)
+        expect(error).toMatchObject({ cause: new CliNotFound({ command: "code" }) })
       })
     )
   })
@@ -277,7 +280,7 @@ describe("vscode", () => {
           ]),
         })
         const error = yield* vscode.update(ROOT).pipe(provideFiles(files), Effect.flip)
-        expect(error).toMatchObject({ _tag: "EffectEditorUnavailable" })
+        expect(error).toBeInstanceOf(EffectEditorUnavailable)
         expect(files.list().map((path) => [path, files.read(path)])).toStrictEqual(before)
       })
     )
@@ -345,7 +348,7 @@ describe("vscode", () => {
         expect(Result.isFailure(result)).toBe(true)
 
         if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
+          expect(result.failure).toBeInstanceOf(InvalidConfigFormat)
         }
       })
     )

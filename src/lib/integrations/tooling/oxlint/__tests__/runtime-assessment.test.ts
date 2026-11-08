@@ -8,6 +8,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
+import { FailedToParseFile } from "#lib/shared/errors.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
@@ -15,7 +16,8 @@ const PLATFORM_PACKAGE = `@effect/tsgo-${process.platform}-${process.arch}`
 const TSRS_VERSION = "0.21.0-ts7.1.0-beta"
 const TSRS = process.platform === "win32" ? "tsrs.exe" : "tsrs"
 const ARTIFACTS = `node_modules/${PLATFORM_PACKAGE}/artifacts`
-const STOCK_TARGET = `${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : process.platform === "win32" ? "-msvc" : ""}`
+const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }
+const STOCK_TARGET = `${process.platform}-${process.arch}${BINDING_SUFFIXES[process.platform] ?? ""}`
 const STOCK_BINDING = `node_modules/oxlint/dist/oxlint.${STOCK_TARGET}.node`
 const STOCK_TSRS_PACKAGE = `@tsrs/${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : ""}`
 const STOCK_BACKEND = `node_modules/${STOCK_TSRS_PACKAGE}/${TSRS}`
@@ -332,7 +334,7 @@ describe("Oxlint runtime assessment", () => {
         })
       ).pipe(Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "FailedToParseFile" })
+      expect(error).toBeInstanceOf(FailedToParseFile)
     })
   )
 })

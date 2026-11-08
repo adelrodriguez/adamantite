@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import type { Project } from "#lib/workspace/project.ts"
-import { defineOxlintPlugin } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
+import { defineOxlintPlugin, NativeRuntime } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { assessPrepareScript } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/prepare-script.ts"
 import { resolveEffectRuntime } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/runtime.ts"
 import {
@@ -21,7 +21,7 @@ export default defineOxlintPlugin({
       }
     }),
   name: NAME,
-  runtime: { _tag: "Native", resolve: resolveEffectRuntime },
+  runtime: new NativeRuntime({ resolve: resolveEffectRuntime }),
   /**
    * Write the language service entry in `tsconfig.json`.
    */

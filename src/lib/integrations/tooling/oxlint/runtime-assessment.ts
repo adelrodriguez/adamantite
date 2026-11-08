@@ -7,9 +7,12 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/workspace/project.ts"
+import { NativeRuntime } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import {
+  ReplacedPart,
   resolveOxlintRuntime,
+  StockPart,
   type OxlintRuntime,
 } from "#lib/integrations/tooling/oxlint/runtime.ts"
 import { PackageNotInstalled } from "#lib/shared/errors.ts"
@@ -59,7 +62,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
     }
 
     for (const plugin of oxlintPlugins) {
-      if (plugin.runtime._tag === "Native" && declared(plugin.name)) {
+      if (plugin.runtime instanceof NativeRuntime && declared(plugin.name)) {
         const installed = yield* resolvePackageDirectory(project.cwd, plugin.name)
 
         if (Option.isNone(installed)) {
@@ -70,7 +73,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
 
     const launcher = runtime.backend["OXLINT_TSGOLINT_PATH"]
 
-    if (runtime.binding._tag === "Replaced" && launcher === undefined) {
+    if (runtime.binding instanceof ReplacedPart && launcher === undefined) {
       return []
     }
 
@@ -111,7 +114,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
 
     const bindingTarget = platform + (suffix[process.platform] ?? "")
 
-    if (runtime.binding._tag === "Stock") {
+    if (runtime.binding instanceof StockPart) {
       const override = yield* Config.String("NAPI_RS_NATIVE_LIBRARY_PATH").pipe(
         Config.withDefault("")
       )

@@ -3,8 +3,12 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as PlatformError from "effect/PlatformError"
-import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import {
+  type FileSystemTestContext,
+  createFileSystemTestContext,
+  makeSystemError,
+} from "#__tests__/filesystem.ts"
+import { FailedToCreateDirectory, FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
   readDirectoryIfExists,
@@ -32,7 +36,8 @@ describe("filesystem", () => {
 
       const error = yield* ensureDirectory(path).pipe(provideFiles(files), Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "FailedToCreateDirectory", path })
+      expect(error).toBeInstanceOf(FailedToCreateDirectory)
+      expect(error).toMatchObject({ path })
     })
   )
 
@@ -42,7 +47,8 @@ describe("filesystem", () => {
 
       const error = yield* readFile(path).pipe(provideFiles(makeFiles()), Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "FailedToReadFile", path })
+      expect(error).toBeInstanceOf(FailedToReadFile)
+      expect(error).toMatchObject({ path })
     })
   )
 
@@ -63,7 +69,8 @@ describe("filesystem", () => {
 
       const error = yield* readFileIfExists(path).pipe(provideFiles(files), Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "FailedToReadFile", path })
+      expect(error).toBeInstanceOf(FailedToReadFile)
+      expect(error).toMatchObject({ path })
     })
   )
 
@@ -85,14 +92,7 @@ describe("filesystem", () => {
 
       const fileSystemLayer = FileSystem.layerNoop({
         readDirectory: () =>
-          Effect.fail(
-            PlatformError.systemError({
-              _tag: "PermissionDenied",
-              method: "readDirectory",
-              module: "FileSystem",
-              pathOrDescriptor: path,
-            })
-          ),
+          Effect.fail(makeSystemError("PermissionDenied", "readDirectory", path)),
       })
 
       const error = yield* readDirectoryIfExists(path).pipe(
@@ -100,7 +100,8 @@ describe("filesystem", () => {
         Effect.flip
       )
 
-      expect(error).toMatchObject({ _tag: "FailedToReadFile", path })
+      expect(error).toBeInstanceOf(FailedToReadFile)
+      expect(error).toMatchObject({ path })
     })
   )
 
@@ -112,7 +113,8 @@ describe("filesystem", () => {
 
       const error = yield* writeFile(path, "{}").pipe(provideFiles(files), Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "FailedToWriteFile", path })
+      expect(error).toBeInstanceOf(FailedToWriteFile)
+      expect(error).toMatchObject({ path })
     })
   )
 })

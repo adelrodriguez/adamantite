@@ -1,10 +1,12 @@
 import type * as Schema from "effect/Schema"
 import { posix, win32 } from "node:path"
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import type { Workspace } from "#lib/workspace/monorepo.ts"
 import {
   isReportOf,
@@ -51,12 +53,21 @@ export interface TrialCase {
 }
 
 /**
- * How a trial sets the rule: as the project config sets it now, or at `error` with the options that
- * come after the severity.
+ * The trial sets the rule as the project config sets it now.
  */
-export type TrialSetting =
-  | { readonly _tag: "Current" }
-  | { readonly _tag: "Error"; readonly options: readonly Schema.Json[] }
+export class CurrentSetting extends Data.TaggedClass("Current") {}
+
+/**
+ * The trial sets the rule at `error` with the options that come after the severity.
+ */
+export class ErrorSetting extends Data.TaggedClass("Error")<{
+  readonly options: readonly Schema.Json[]
+}> {}
+
+/**
+ * How a trial sets the rule.
+ */
+export type TrialSetting = CurrentSetting | ErrorSetting
 
 export interface TrialDiagnostic {
   readonly column: number
@@ -233,10 +244,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       (file) =>
         fs.copyFile(path.join(cwd, file), path.join(copy, file)).pipe(
           // The git index also has the files that a delete left out of the working tree.
-          Effect.catchIf(
-            (error) => error.reason._tag === "NotFound",
-            () => Effect.void
-          )
+          Effect.catchReason("PlatformError", "NotFound", () => Effect.void)
         ),
       { concurrency: 16, discard: true }
     )
@@ -425,9 +433,11 @@ export const tryRule = Effect.fn("tryRule")(
       const detail = [
         `Rule '${ruleName}' not found in plugin '${plugin}'`,
         `Plugin '${plugin}' not found`,
-      ].find((message) => error._tag === "TrialLintFailed" && error.output.includes(message))
+      ].find(
+        (message) => Predicate.isTagged(error, "TrialLintFailed") && error.output.includes(message)
+      )
 
-      return setting._tag === "Error" && detail !== undefined
+      return setting instanceof ErrorSetting && detail !== undefined
         ? new TrialRuleNotFound({ detail, rule })
         : error
     }
@@ -467,7 +477,7 @@ export const tryRule = Effect.fn("tryRule")(
       { concurrency: 1 }
     )
 
-    if (setting._tag === "Error") {
+    if (setting instanceof ErrorSetting) {
       for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
         yield* replaceConfig(config, (base) =>
           renderTrialConfig({

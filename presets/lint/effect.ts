@@ -13,9 +13,21 @@ import type { OxlintConfig } from "oxlint"
 // The rules read their options, such as `allowedUnstableApis`, from the `@effect/language-service`
 // plugin entry in `tsconfig.json`.
 //
-// The preset enables only rules that report Effect code. It does not ban platform APIs in code
-// that is not Effect code. See ADR 0007 for the criteria.
+// The preset enables only the @effect/tsgo rules that report Effect code. It does not ban platform
+// APIs in code that is not Effect code. See ADR 0007 for the criteria.
+//
+// The preset also loads the anti-slop-effect plugin (https://github.com/dmmulroy/anti-slop), which
+// reports tagged values that code handles by hand instead of with Effect's tagged constructors,
+// `Match`, and `catchTag`. Upstream is not published to npm, so Adamantite ships a bundled build in
+// vendor/antislop-effect/. scripts/vendor-plugins.ts regenerates it. The preset targets Effect
+// codebases, so it enables every rule of the bundle.
 const config: OxlintConfig = {
+  jsPlugins: [
+    {
+      name: "anti-slop-effect",
+      specifier: new URL("vendor/antislop-effect/plugin.mjs", import.meta.url).href,
+    },
+  ],
   options: {
     typeAware: true,
   },
@@ -146,6 +158,12 @@ const config: OxlintConfig = {
     "effecttsgo/unnecessary-pipe": "error",
     "effecttsgo/unnecessary-pipe-chain": "error",
     "effecttsgo/unnecessary-typeof-type": "error",
+
+    "anti-slop-effect/no-manual-effect-error-tag": "error",
+    "anti-slop-effect/no-manual-tag-comparison": "error",
+    "anti-slop-effect/no-manual-tagged-construction": "error",
+    "anti-slop-effect/no-service-constructor-imports": "error",
+    "anti-slop-effect/prefer-effect-match": "error",
   },
 }
 

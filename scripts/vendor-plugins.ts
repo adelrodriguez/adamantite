@@ -61,6 +61,14 @@ const VENDORED_PLUGINS: VendoredPlugin[] = [
     pinnedRef: "13909c9e07590f5a85d93c62712259fe14a883f7",
     repoUrl: "https://github.com/dmmulroy/anti-slop.git",
   },
+  {
+    copiedLicenses: [],
+    entry: "src/effect/index.ts",
+    name: "anti-slop-effect",
+    outDir: "presets/lint/vendor/antislop-effect",
+    pinnedRef: "13909c9e07590f5a85d93c62712259fe14a883f7",
+    repoUrl: "https://github.com/dmmulroy/anti-slop.git",
+  },
 ]
 
 async function run(command: string, args: string[], cwd: string) {

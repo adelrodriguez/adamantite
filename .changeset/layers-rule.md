@@ -9,8 +9,8 @@ order does not change permissions. Every containing map remains an independent c
 
 The rule resolves relative imports, `#` imports, and `tsconfig.json` paths. It reports unknown
 folders and duplicate concrete scopes. Each violation names the map's concrete root and
-declaration path and gives the repairs that its graph permits. The `strict` preset loads
-the rule, and the project enables it with its maps.
+declaration path and gives the repairs that its graph permits. The `architecture` and `strict`
+presets load the plugin, and the project enables the rule with its maps.
 
 For the previous array-valued declarations, run `adamantite doctor` and follow its migration
 instructions. Replace each dependency array with `{ imports: [...] }`, preserve every dependency

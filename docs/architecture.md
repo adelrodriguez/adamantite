@@ -50,8 +50,8 @@ entries. Tests share the helpers in `src/__tests__`, so this map does not check 
 That ignore does not exempt tests from the child map.
 
 The nested `lib.layers` map holds the lib layers, with its root derived as `src/lib`.
-A layer that the map does not connect to another
-layer is its sibling, so `workspace` and `execution` do not import each other, and
+A layer that the map does not connect to another layer is its sibling, so `workspace` and
+`execution` do not import each other, and
 `assessment` does not import `hardening`: harden is not an assessment. `workspace` knows
 target-project files and package state, but not integration types such as `Finding`. An import
 that breaks a map, or a folder that is not in its map, fails `pnpm run check`. See ADR 0013

@@ -26,7 +26,7 @@ export default {
               integration: "oxfmt",
               notes: [
                 "The managed `check` script verifies formatting and the managed `fix` script applies it.",
-                "Doctor does not assess `AGENTS.md`. Remove the `format` line from its Adamantite section.",
+                "Doctor checks that `AGENTS.md` exists but does not review its contents. Remove the `format` line from its Adamantite section.",
               ],
               title: "Legacy format script",
             },

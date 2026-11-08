@@ -128,7 +128,8 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
 
     if (!isMonorepo) {
       return yield* new InvalidAnalyzeOptions({
-        reason: "`--only monorepo` needs a monorepo, and no monorepo was detected.",
+        reason:
+          "`--only monorepo` requires a monorepo. Run from the monorepo root, or use `--only unused` for a single-package project.",
       })
     }
   }

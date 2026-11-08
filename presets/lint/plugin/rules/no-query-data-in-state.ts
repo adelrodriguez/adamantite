@@ -139,7 +139,7 @@ const rule: Rule = {
     },
     messages: {
       copiedData:
-        "`{{hook}}` copies query data into local state, so the copy stops updating when the query refetches or another component updates the cache. Read the value from the query result where you use it. To edit it, keep only the user's changes in state and merge them with the query data during render.",
+        "`{{hook}}` copies query data into local state. The copy can become stale when the query changes. Read values from the query result where you use them. Keep only the user's edits in local state, then merge them with the query data during render.",
     },
     schema: [],
     type: "problem",

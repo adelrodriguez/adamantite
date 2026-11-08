@@ -159,7 +159,7 @@ describe("analyze", () => {
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "CliNotFound", command: "sherif" })
         expect(error.message).toBe(
-          "Command `sherif` not found. Run `adamantite update` to install it."
+          "The command `sherif` was not found on PATH. Run `adamantite update` to install it."
         )
       })
     )
@@ -211,7 +211,7 @@ describe("analyze", () => {
         expect(runner.invocations).toStrictEqual([])
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toMatchObject({ _tag: "InvalidAnalyzeOptions" })
-        expect(error.message).toContain("no monorepo was detected")
+        expect(error.message).toContain("requires a monorepo")
       })
     )
 

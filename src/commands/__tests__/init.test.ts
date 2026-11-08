@@ -238,7 +238,7 @@ describe("init", () => {
           expect(files.exists(modernConfig)).toBe(false)
           expect(prompter.logs).toContainEqual({
             level: "info",
-            message: `Legacy \`${legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor\` and follow its findings to migrate it to the latest ${tool} config.`,
+            message: `Legacy \`${legacyConfig}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool} config.`,
           })
         })
     )
@@ -538,8 +538,7 @@ describe("init", () => {
           expect.arrayContaining([
             {
               level: "info",
-              message:
-                "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project.",
+              message: "Adamantite leaves the root `tsconfig.json` unchanged in a monorepo.",
             },
             {
               level: "info",
@@ -779,7 +778,7 @@ describe("init", () => {
       {
         args: ["--non-interactive", "--script", "fix", "--github-actions"],
         name: "GitHub Actions without a CI-compatible script",
-        reason: "`--github-actions` requires a CI-compatible script.",
+        reason: "`--github-actions` requires --script check or --script analyze.",
       },
       {
         args: ["--script", "check"],
@@ -893,7 +892,7 @@ describe("init", () => {
         expect(prompter.logs).toContainEqual({
           level: "info",
           message:
-            "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite analyze -- --directory packages/app`.",
+            "Pass custom tool arguments after `--`, such as `adamantite analyze -- --directory packages/app`.",
         })
       })
     )
@@ -949,11 +948,10 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toContainEqual({
           level: "warning",
-          message:
-            "`check` is currently `tsc && eslint .`; Adamantite would replace it with `adamantite check`.",
+          message: "`check` runs `tsc && eslint .`. Init would replace it with `adamantite check`.",
         })
         expect(prompter.confirmCalls[0]).toMatchObject({
-          message: "Overwrite this existing script with Adamantite's command?",
+          message: "Replace this script with Adamantite's command?",
         })
 
         expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "adamantite check" })
@@ -987,7 +985,7 @@ describe("init", () => {
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message:
-            "Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Re-run `adamantite init` and confirm overwriting to replace it.",
+            "Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Run `adamantite init` again and choose to replace the script.",
         })
       })
     )
@@ -1098,7 +1096,7 @@ describe("init", () => {
           expect(prompter.logs).toContainEqual({
             level: "warning",
             message:
-              "Could not update AGENTS.md because Adamantite markers are incomplete. Remove the stale ADAMANTITE marker and run adamantite init again.",
+              "AGENTS.md has an incomplete ADAMANTITE marker. Remove the incomplete marker and run `adamantite init` again.",
           })
           expect(files.read("AGENTS.md")).toBe(existingAgents)
         })
@@ -1146,14 +1144,10 @@ describe("init", () => {
         expect(prompter.logs).toContainEqual({
           level: "warning",
           message: expect.stringMatching(
-            /Could not update AGENTS\.md\. Failed to read `.*\/AGENTS\.md`\.( Cause: .*)? Adamantite will continue initialization\./
+            /Could not update AGENTS\.md\. Could not read `.*\/AGENTS\.md`\. Check that the file exists and is readable, then try again\.( Cause: .*)? Adamantite will continue initialization\./
           ),
         })
-        expect(prompter.logs).toContainEqual({
-          level: "success",
-          message: "Your project is now configured",
-        })
-        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
       })
     )
   })
@@ -1264,7 +1258,7 @@ describe("init", () => {
           level: "warning",
           message: `Run \`npx skills@${getDependencyVersion("skills")} add ./node_modules/adamantite --skill adamantite --agent claude-code --yes\` to see why the skill install failed.`,
         })
-        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
       })
     )
   })
@@ -1358,7 +1352,7 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
-          "Do you want to add a GitHub Actions workflow to run checks in CI?"
+          "Add a GitHub Actions workflow to run the selected checks?"
         )
         expect(prompter.logs).toContainEqual({
           level: "info",
@@ -1393,7 +1387,7 @@ describe("init", () => {
             {
               level: "warning",
               message: expect.stringMatching(
-                /Could not set up the GitHub Actions workflow\. Failed to write `.*adamantite\.yml`\./
+                /Could not set up the GitHub Actions workflow\. Could not write `.*adamantite\.yml`\. Check the directory permissions and available disk space, then try again\./
               ),
             },
             {
@@ -1401,10 +1395,9 @@ describe("init", () => {
               message:
                 "Fix the reported problem and run `adamantite init` again, or create the workflow manually.",
             },
-            { level: "success", message: "Your project is now configured" },
           ])
         )
-        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
       })
     )
 
@@ -1421,7 +1414,7 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.cancels).toStrictEqual(["You've cancelled the initialization process."])
+        expect(prompter.cancels).toStrictEqual(["Setup was cancelled."])
         expect(prompter.outros).toStrictEqual([])
         expect(installer.calls).toStrictEqual([])
       })
@@ -1452,11 +1445,7 @@ describe("init", () => {
         })
         expect(prompter.logs).toContainEqual({
           level: "warning",
-          message: "Please install it manually after setup completes.",
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "success",
-          message: "Your project is now configured",
+          message: "Install the extension manually after setup finishes.",
         })
       })
     )
@@ -1484,12 +1473,11 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toStrictEqual(
           expect.arrayContaining([
-            { level: "error", message: "VSCode CLI ('code' command) not found." },
-            { level: "info", message: "To install it:" },
-            { level: "success", message: "Your project is now configured" },
+            { level: "error", message: "VS Code's `code` command was not found on PATH." },
+            { level: "info", message: "Add the code command to PATH:" },
           ])
         )
-        expect(prompter.outros).toStrictEqual(["💠 Adamantite initialized successfully!"])
+        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
         expect(files.exists(".vscode/settings.json")).toBe(true)
       })
     )

@@ -16,7 +16,7 @@ const PRESET_EXTENDS = "adamantite/typescript"
 const CONFIG = { extends: PRESET_EXTENDS }
 
 export const MONOREPO_GUIDANCE = [
-  "Skipping `tsconfig.json` setup: a root config in a monorepo makes TypeScript treat all packages as one project.",
+  "Adamantite leaves the root `tsconfig.json` unchanged in a monorepo.",
   `To use the TypeScript preset, add \`"extends": "${PRESET_EXTENDS}"\` to each package's \`tsconfig.json\` or to a shared base config.`,
 ] as const
 

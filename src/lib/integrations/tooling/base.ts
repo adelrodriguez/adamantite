@@ -113,7 +113,7 @@ function getToolingConfigWarnings(
       findLegacyConfigByFormat(files, "json"),
       findLegacyConfigByFormat(files, "jsonc"),
       (jsonFile, jsoncFile) =>
-        `Found both \`${jsonFile}\` and \`${jsoncFile}\`. Multiple legacy ${toolName} configs exist; Adamantite will treat \`${jsoncFile}\` as the source of truth in its findings.`
+        `Found both \`${jsonFile}\` and \`${jsoncFile}\`. Multiple legacy ${toolName} configs exist. Doctor uses \`${jsoncFile}\` when checking the setup.`
     ),
     Option.toArray
   )
@@ -243,7 +243,7 @@ export function getConfigFindings(
       {
         currentState: `Legacy \`${state.active.file}\` is the active ${options.toolName} configuration.`,
         goal: [
-          `Port the project settings into \`${options.configFile}\` using the reference content as the base.`,
+          `Move the project settings into \`${options.configFile}\` using the reference content as the base.`,
           `Delete every legacy ${options.toolName} JSON or JSONC config after its settings are preserved.`,
         ],
         id: `legacy-${options.toolName}-config`,

@@ -120,7 +120,7 @@ function renderRepairPrompt(
       ? [
           "## Assessment warnings",
           "",
-          "Account for these warnings while fixing the findings:",
+          "Review these warnings before making repairs:",
           "",
           ...warnings.map((warning) => `- ${warning}`),
           "",
@@ -128,7 +128,7 @@ function renderRepairPrompt(
         ].join("\n")
       : ""
   return fillTemplate(repairPromptTemplate, {
-    findingCount: `${findings.length}`,
+    findingCount: findings.length.toLocaleString("en-US"),
     findings: sections.join("\n\n"),
     version: adamantiteVersion,
     warnings: warningSection,

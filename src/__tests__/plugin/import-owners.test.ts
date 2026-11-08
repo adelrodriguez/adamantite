@@ -33,7 +33,7 @@ function file(path: string) {
   return `/project/${path}`
 }
 
-const MODULE_MESSAGE = `Only \`src/lib/sources/repository/fetch.ts\` imports \`giget\`. Use what the owner exports, or move this code into the owner. ${HINT}`
+const MODULE_MESSAGE = `Only \`src/lib/sources/repository/fetch.ts\` may import \`giget\`. Use what the owner exports, or move this code into the owner. ${HINT}`
 
 tester.run("import-owners", rule, {
   invalid: [
@@ -85,7 +85,7 @@ tester.run("import-owners", rule, {
       code: 'import * as z from "zod/mini"',
       errors: [
         {
-          message: `Only \`packages/utils\` imports \`zod\`. Use what the owner exports, or move this code into the owner. ${HINT}`,
+          message: `Only \`packages/utils\` may import \`zod\`. Use what the owner exports, or move this code into the owner. ${HINT}`,
         },
       ],
       filename: file("apps/web/src/form.ts"),
@@ -104,7 +104,7 @@ tester.run("import-owners", rule, {
         {
           column: 9,
           line: 1,
-          message: `Only \`apps/mobile/src/shared/alerts.ts\` or \`apps/mobile/src/features/*/hooks.ts\` imports \`Alert\` from \`react-native\`. Use what the owner exports, or move this code into the owner. ${HINT}`,
+          message: `Only \`apps/mobile/src/shared/alerts.ts\` or \`apps/mobile/src/features/*/hooks.ts\` may import \`Alert\` from \`react-native\`. Use what the owner exports, or move this code into the owner. ${HINT}`,
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),
@@ -136,7 +136,7 @@ tester.run("import-owners", rule, {
       code: 'import * as Native from "react-native"',
       errors: [
         {
-          message: `This import reaches \`Alert\` from \`react-native\`, which only \`apps/mobile/src/shared/alerts.ts\` or \`apps/mobile/src/features/*/hooks.ts\` imports. Import only the names that this file needs. ${HINT}`,
+          message: `This import reaches \`Alert\` from \`react-native\`, which only \`apps/mobile/src/shared/alerts.ts\` or \`apps/mobile/src/features/*/hooks.ts\` may import. Import only the names that this file needs. ${HINT}`,
         },
       ],
       filename: file("apps/mobile/src/app/index.tsx"),

@@ -70,7 +70,9 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+      expect(prompter.outros).toStrictEqual([
+        "✅ Managed packages and the Adamantite skill are up to date.",
+      ])
     })
   )
 
@@ -154,7 +156,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toHaveLength(1)
       expect(installer.calls[0]?.packages).toStrictEqual([`knip@${knip.version}`])
-      expect(prompter.outros).toStrictEqual(["✅ Update completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Update finished."])
     })
   )
 
@@ -207,7 +209,7 @@ describe("update", () => {
       )
       expect(prompter.logs).toContainEqual({
         level: "info",
-        message: "Run `adamantite doctor` to get the combined Markdown repair prompt.",
+        message: "Run `adamantite doctor` for the remaining repairs and an agent prompt.",
       })
     })
   )
@@ -289,7 +291,7 @@ describe("update", () => {
             command: "npx",
           }),
         ])
-        expect(prompter.outros).toStrictEqual(["✅ Update completed successfully!"])
+        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
       })
     )
 
@@ -308,7 +310,9 @@ describe("update", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+        expect(prompter.outros).toStrictEqual([
+          "✅ Managed packages and the Adamantite skill are up to date.",
+        ])
       })
     )
 
@@ -327,7 +331,9 @@ describe("update", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+        expect(prompter.outros).toStrictEqual([
+          "✅ Managed packages and the Adamantite skill are up to date.",
+        ])
       })
     )
 

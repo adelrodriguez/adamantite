@@ -560,7 +560,7 @@ describe("rule try", () => {
         "✗ `src/cart.ts`: reported, but it must be accepted.",
         "    1:1  'node:fs' import is restricted from being used.",
         "",
-        "1 of 2 cases is not as expected.",
+        "1 of 2 cases is different from the expected result.",
       ].join("\n")
     )
   })
@@ -576,7 +576,7 @@ describe("rule try", () => {
         "",
         "✓ `src/cart.ts`: accepted, as expected.",
         "",
-        "Each case is as expected.",
+        "All cases produced the expected result.",
       ].join("\n")
     )
   })

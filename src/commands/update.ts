@@ -27,7 +27,9 @@ const knownPackages = [
 ] as const satisfies readonly ToolingPackage[]
 
 export default Command.make("update").pipe(
-  Command.withDescription("Update Adamantite-managed dependencies and report setup findings"),
+  Command.withDescription(
+    "Update managed packages and the Adamantite skill, then report setup issues"
+  ),
   Command.withHandler(() =>
     Effect.gen(function* () {
       const cwd = process.cwd()
@@ -49,7 +51,7 @@ export default Command.make("update").pipe(
       ]
 
       if (updates.length > 0) {
-        yield* prompter.log.info("The following dependencies will be updated:")
+        yield* prompter.log.info("Packages to install or update:")
 
         for (const action of updates) {
           const currentVersion =
@@ -69,10 +71,9 @@ export default Command.make("update").pipe(
           {
             failure: "Failed to update dependencies",
             start: "Updating dependencies...",
-            success: "Dependencies updated successfully",
+            success: "Dependencies updated.",
           }
         )
-        yield* prompter.log.success("Dependencies updated successfully.")
       }
 
       // The skill that init installed is a copy, so it stays at the Adamantite version that made it.
@@ -115,12 +116,11 @@ export default Command.make("update").pipe(
       if (findings.length > 0) {
         yield* printFindings(findings)
         yield* prompter.log.info(
-          "Run `adamantite doctor` to get the combined Markdown repair prompt."
+          "Run `adamantite doctor` for the remaining repairs and an agent prompt."
         )
       }
 
       if (updates.length === 0 && skillAgents.length === 0 && findings.length === 0) {
-        yield* prompter.log.success("No changes needed.")
         return "no-changes" as const
       }
 
@@ -137,8 +137,8 @@ export default Command.make("update").pipe(
           const prompter = yield* Prompter
           yield* prompter.outro(
             value === "no-changes"
-              ? "✅ Adamantite is already up to date."
-              : "✅ Update completed successfully!"
+              ? "✅ Managed packages and the Adamantite skill are up to date."
+              : "✅ Update finished."
           )
         })
       )

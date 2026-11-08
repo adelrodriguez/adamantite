@@ -100,9 +100,15 @@ describe("doctor", () => {
     {
       files: NO_INTEGRATION_FILES,
       layers: [interactiveTerminalLayer],
-      logs: [{ level: "success", message: "No applicable integrations found." }],
+      logs: [
+        {
+          level: "success",
+          message:
+            "No Adamantite-managed setup found. Run `adamantite init` to configure the project.",
+        },
+      ],
       name: "no managed integration applies in an interactive terminal",
-      outros: ["✅ Doctor completed successfully!"],
+      outros: ["✅ Doctor finished."],
     },
     {
       files: HEALTHY_FILES,
@@ -114,9 +120,9 @@ describe("doctor", () => {
     {
       files: HEALTHY_FILES,
       layers: [interactiveTerminalLayer],
-      logs: [{ level: "success", message: "No issues found." }],
+      logs: [{ level: "success", message: "No setup repairs needed." }],
       name: "managed state meets the oracle in an interactive terminal",
-      outros: ["✅ Doctor completed successfully!"],
+      outros: ["✅ Doctor finished."],
     },
   ])("report success when $name", ({ files, layers, logs, outros }) =>
     Effect.gen(function* () {
@@ -233,7 +239,7 @@ describe("doctor", () => {
         logs: [],
         messages: [
           expect.stringMatching(
-            /^# Adamantite doctor findings\n[\s\S]*Skipping `tsconfig\.json` setup/
+            /^# Adamantite doctor findings\n[\s\S]*Adamantite leaves the root `tsconfig\.json` unchanged/
           ),
         ],
         outros: [],
@@ -334,10 +340,10 @@ describe("doctor", () => {
               expect.objectContaining({ label: "Hand off to Claude Code" }),
               expect.objectContaining({ label: "Hand off to Codex" }),
               expect.objectContaining({
-                label: "Copy the Markdown prompt for a coding agent",
+                label: "Copy the agent prompt",
                 value: "copy",
               }),
-              expect.objectContaining({ label: "Do nothing", value: "done" }),
+              expect.objectContaining({ label: "Finish without an agent", value: "done" }),
             ],
           },
         ],
@@ -355,12 +361,12 @@ describe("doctor", () => {
         logs: [
           {
             level: "success",
-            message: "The Markdown prompt was printed and sent to the terminal clipboard.",
+            message: "The agent prompt is printed above and sent to the terminal clipboard.",
           },
         ],
         messages: [
           expect.stringMatching(
-            /^# Adamantite doctor findings\n[\s\S]*Do not suppress or work around checks/
+            /^# Adamantite doctor findings\n[\s\S]*Fix the cause of each finding/
           ),
         ],
         outros: ["⚠️ Doctor found issues."],
@@ -427,7 +433,7 @@ describe("doctor", () => {
           },
           { level: "success", message: "All findings were resolved by Claude Code." },
         ],
-        outros: ["✅ Doctor completed successfully!"],
+        outros: ["✅ Doctor finished."],
       })
     })
   )
@@ -449,11 +455,11 @@ describe("doctor", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs).toContainEqual({
         level: "warning",
-        message: "1 of 1 findings remain after the Claude Code session.",
+        message: "Doctor still reports 1 unresolved finding after the Claude Code session.",
       })
       expect(prompter.confirmCalls).toContainEqual({
         initialValue: true,
-        message: "Copy the Markdown prompt for a coding agent?",
+        message: "Copy the agent prompt?",
       })
       expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
@@ -481,7 +487,7 @@ describe("doctor", () => {
       })
       expect(prompter.confirmCalls).toContainEqual({
         initialValue: true,
-        message: "Copy the Markdown prompt for a coding agent?",
+        message: "Copy the agent prompt?",
       })
       expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
@@ -508,7 +514,7 @@ describe("doctor", () => {
       })
       expect(prompter.confirmCalls).toContainEqual({
         initialValue: true,
-        message: "Copy the Markdown prompt for a coding agent?",
+        message: "Copy the agent prompt?",
       })
       expect(prompter.outros).toStrictEqual(["⚠️ Doctor found issues."])
     })
@@ -555,15 +561,15 @@ describe("doctor", () => {
         expect.objectContaining({
           options: [
             expect.objectContaining({
-              label: "Copy the Markdown prompt for a coding agent",
+              label: "Copy the agent prompt",
               value: "copy",
             }),
-            expect.objectContaining({ label: "Do nothing", value: "done" }),
+            expect.objectContaining({ label: "Finish without an agent", value: "done" }),
           ],
         }),
       ])
       expect(prompter.spinnerEntries).toContainEqual({
-        message: "No supported coding agent CLI was found on PATH.",
+        message: "No supported coding agent was found on PATH.",
         type: "stop",
       })
     })

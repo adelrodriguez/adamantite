@@ -90,8 +90,7 @@ const rule: Rule = {
         "`{{hook}}` subscribes to an external store in feature code. Subscribe through a query or a store abstraction instead.",
       localState:
         "`{{hook}}` keeps local state in feature code. Derive the value from loader data or URL params instead.",
-      memoization:
-        "`{{hook}}` memoizes by hand. Remove it: the React Compiler handles memoization.",
+      memoization: "`{{hook}}` memoizes in feature code. Remove it or move it into a hook module.",
     },
     schema: [
       {

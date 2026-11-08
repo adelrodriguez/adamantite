@@ -107,7 +107,7 @@ export class CliNotFound extends Data.TaggedError("CliNotFound")<{
   hint?: string
 }> {
   override get message() {
-    return `Command \`${this.command}\` not found. ${this.hint ?? "Please install it and try again."}`
+    return `The command \`${this.command}\` was not found on PATH. ${this.hint ?? "Install it, then run the command again."}`
   }
 }
 
@@ -188,7 +188,7 @@ export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDir
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target directory"
-    return `Failed to create directory ${target}.${formatCauseDetail(this.cause)}`
+    return `Could not create ${target}. Check the parent directory permissions, then try again.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -234,7 +234,7 @@ export class FailedToParseFile extends Data.TaggedError("FailedToParseFile")<{
 
     return [
       `Failed to parse ${target}.`,
-      "Please fix the JSON/JSONC syntax and run the command again.",
+      "Fix the JSON or JSONC syntax and run the command again.",
       "",
       "Parse details:",
       formatParseErrors(this.errors),
@@ -256,9 +256,10 @@ export class FailedToParseSource extends Data.TaggedError("FailedToParseSource")
   errors: readonly string[]
 }> {
   override get message() {
-    return [`Failed to parse \`${this.path}\`.`, ...this.errors.map((error) => `- ${error}`)].join(
-      "\n"
-    )
+    return [
+      `Could not parse \`${this.path}\`. Fix the syntax and run the command again.`,
+      ...this.errors.map((error) => `- ${error}`),
+    ].join("\n")
   }
 }
 
@@ -268,7 +269,7 @@ export class FailedToReadFile extends Data.TaggedError("FailedToReadFile")<{
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target file"
-    return `Failed to read ${target}.${formatCauseDetail(this.cause)}`
+    return `Could not read ${target}. Check that the file exists and is readable, then try again.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -278,7 +279,7 @@ export class FailedToWriteFile extends Data.TaggedError("FailedToWriteFile")<{
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target file"
-    return `Failed to write ${target}.${formatCauseDetail(this.cause)}`
+    return `Could not write ${target}. Check the directory permissions and available disk space, then try again.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -288,7 +289,7 @@ export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target config file"
 
-    return `Invalid config format in ${target}. The config must be a JSON object (for example: {}).`
+    return `The config in ${target} must be a JSON object, such as {}.`
   }
 }
 
@@ -345,7 +346,7 @@ export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
   cause?: unknown
 }> {
   override get message() {
-    return `No package manager detected. Please run this command from a project with a lockfile.${formatCauseDetail(this.cause)}`
+    return `No package manager was found. Run this command from a project with a lockfile.${formatCauseDetail(this.cause)}`
   }
 }
 
@@ -403,7 +404,7 @@ export class PassthroughNotSupported extends Data.TaggedError("PassthroughNotSup
   command: string
 }> {
   override get message() {
-    return `Command \`adamantite ${this.command}\` does not invoke a single underlying CLI and cannot accept passthrough arguments.`
+    return `\`adamantite ${this.command}\` does not accept arguments after \`--\`. Use the command options instead.`
   }
 }
 
@@ -414,7 +415,7 @@ export class TrialCaseIgnored extends Data.TaggedError("TrialCaseIgnored")<{
   path: string
 }> {
   override get message() {
-    return `The trial is not evidence: the Oxlint config ignores \`${this.path}\`. Put the case at a path that the config lints.`
+    return `The trial could not check this case because the Oxlint config ignores \`${this.path}\`. Put the case at a path that the config lints.`
   }
 }
 
@@ -424,7 +425,7 @@ export class TrialCaseUnparsable extends Data.TaggedError("TrialCaseUnparsable")
 }> {
   override get message() {
     return [
-      `The trial is not evidence: Oxlint cannot parse \`${this.path}\`.`,
+      `Oxlint could not parse the trial case \`${this.path}\`. Fix the syntax and run the trial again.`,
       ...this.errors.map((error) => `- ${error}`),
     ].join("\n")
   }
@@ -434,7 +435,7 @@ export class TrialConfigNotFound extends Data.TaggedError("TrialConfigNotFound")
   path: string
 }> {
   override get message() {
-    return `The trial is not evidence: no Oxlint config lints \`${this.path}\`. Run \`adamantite init\` first.`
+    return `No Oxlint config applies to \`${this.path}\`. Configure linting with \`adamantite init\`, then run the trial again.`
   }
 }
 
@@ -445,7 +446,7 @@ export class TrialLintFailed extends Data.TaggedError("TrialLintFailed")<{
   output: string
 }> {
   override get message() {
-    return `The trial is not evidence: Oxlint failed.\n${this.output}`
+    return `Oxlint could not run the trial. Fix the errors below and run it again.\n${this.output}`
   }
 }
 
@@ -456,7 +457,7 @@ export class TrialProjectUnlisted extends Data.TaggedError("TrialProjectUnlisted
   cwd: string
 }> {
   override get message() {
-    return `The trial needs git to list the files of \`${this.cwd}\`. Run it in a git repository.`
+    return `The trial needs Git to list the files of \`${this.cwd}\`. Run it in a Git repository.`
   }
 }
 
@@ -465,7 +466,7 @@ export class TrialRuleNotFound extends Data.TaggedError("TrialRuleNotFound")<{
   rule: string
 }> {
   override get message() {
-    return `The trial is not evidence: the rule \`${this.rule}\` does not exist. Oxlint says: ${this.detail}`
+    return `The rule \`${this.rule}\` is not available. Check that the Oxlint config loads it. Oxlint reports: ${this.detail}`
   }
 }
 
@@ -473,6 +474,6 @@ export class VscodeCliNotFound extends Data.TaggedError("VscodeCliNotFound")<{
   cause?: unknown
 }> {
   override get message() {
-    return `VS Code CLI (\`code\`) not found. Please install it to manage extensions.${formatCauseDetail(this.cause)}`
+    return `VS Code's \`code\` command was not found on PATH. Add it to PATH to manage extensions.${formatCauseDetail(this.cause)}`
   }
 }

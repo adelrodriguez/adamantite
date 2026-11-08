@@ -39,14 +39,16 @@ const copyPrompt = Effect.fn("copyPrompt")(function* (prompt: string) {
 
   yield* prompter.message(prompt)
   yield* terminal.copyToClipboard(prompt)
-  yield* prompter.log.success("The Markdown prompt was printed and sent to the terminal clipboard.")
+  yield* prompter.log.success(
+    "The agent prompt is printed above and sent to the terminal clipboard."
+  )
 })
 
 export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: string) {
   const prompter = yield* Prompter
   const shouldCopyPrompt = yield* prompter.confirm({
     initialValue: true,
-    message: "Copy the Markdown prompt for a coding agent?",
+    message: "Copy the agent prompt?",
   })
 
   if (shouldCopyPrompt) {
@@ -68,7 +70,7 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
     start: "Checking for installed coding agents...",
     success: (detected) =>
       detected.length === 0
-        ? "No supported coding agent CLI was found on PATH."
+        ? "No supported coding agent was found on PATH."
         : `Found ${detected.map((agent) => agent.name).join(", ")}.`,
   })
 
@@ -87,8 +89,8 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
         label: `Hand off to ${agent.name}`,
         value: agent,
       })),
-      { label: "Copy the Markdown prompt for a coding agent", value: "copy" as const },
-      { label: "Do nothing", value: "done" as const },
+      { label: "Copy the agent prompt", value: "copy" as const },
+      { label: "Finish without an agent", value: "done" as const },
     ],
   })
 

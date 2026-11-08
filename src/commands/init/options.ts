@@ -95,7 +95,7 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
 
   if (options.githubActions && !hasCICompatibleScripts(options.scripts)) {
     return yield* new InvalidInitOptions({
-      reason: "`--github-actions` requires a CI-compatible script.",
+      reason: "`--github-actions` requires --script check or --script analyze.",
     })
   }
 
@@ -115,40 +115,42 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
 
 const nonInteractive = Flag.Boolean("non-interactive").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Configure without prompts; requires at least one --script")
+  Flag.withDescription("Configure without prompts. Select at least one --script")
 )
 
 const scripts = Flag.Literals("script", INIT_SCRIPTS).pipe(
   Flag.atMost(INIT_SCRIPTS.length),
   Flag.withDescription(
-    "Package script to configure; repeatable and required in non-interactive mode"
+    "Add a package script. Repeat --script to add more. Required with --non-interactive"
   )
 )
 
 const presets = Flag.Literals("preset", LINT_PRESETS).pipe(
   Flag.atMost(LINT_PRESETS.length),
-  Flag.withDescription("Oxlint preset to configure; repeatable and requires --script check or fix")
+  Flag.withDescription(
+    "Select an Oxlint preset. Repeat --preset to add more. Requires --script check or --script fix"
+  )
 )
 
 const editors = Flag.Literals("editor", INIT_EDITORS).pipe(
   Flag.atMost(INIT_EDITORS.length),
-  Flag.withDescription("Editor to configure; may be specified multiple times")
+  Flag.withDescription("Configure an editor. Repeat --editor to add more")
 )
 
 const typescript = Flag.Boolean("typescript").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Configure the TypeScript preset; requires --script check or fix")
+  Flag.withDescription("Use the TypeScript preset. Requires --script check or --script fix")
 )
 
 const installExtensions = Flag.Boolean("install-extensions").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Install recommended extensions; requires at least one --editor")
+  Flag.withDescription("Install recommended editor extensions. Select at least one --editor")
 )
 
 const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
-    "Configure CI; requires a compatible script and bun, deno, npm, pnpm, or yarn"
+    "Add a GitHub Actions workflow. Requires --script check or --script analyze and bun, deno, npm, pnpm, or yarn"
   )
 )
 
@@ -163,7 +165,7 @@ const skillAgents = Flag.Literals(
 ).pipe(
   Flag.atMost(codingAgents.length),
   Flag.withDescription(
-    "Coding agent to install the Adamantite skill for with the skills CLI; repeatable"
+    "Install the Adamantite skill for a coding agent. Repeat --skill-agent to select more"
   )
 )
 

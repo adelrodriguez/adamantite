@@ -1100,7 +1100,7 @@ describe("harden", () => {
       expect(prompter).toMatchObject({
         intros: ["💠 adamantite harden"],
         messages: [],
-        outros: ["✅ Harden completed."],
+        outros: ["Harden ended without an agent session."],
         selectCalls: [
           {
             message: "How do you want to harden this project?",
@@ -1108,10 +1108,10 @@ describe("harden", () => {
               expect.objectContaining({ label: "Hand off to Claude Code" }),
               expect.objectContaining({ label: "Hand off to Codex" }),
               expect.objectContaining({
-                label: "Copy the Markdown prompt for a coding agent",
+                label: "Copy the agent prompt",
                 value: "copy",
               }),
-              expect.objectContaining({ label: "Do nothing", value: "done" }),
+              expect.objectContaining({ label: "Finish without an agent", value: "done" }),
             ],
           },
         ],
@@ -1152,7 +1152,7 @@ describe("harden", () => {
           },
           SUCCESS_LOG,
         ],
-        outros: ["✅ Harden completed successfully!"],
+        outros: ["✅ Harden checks passed."],
       })
     })
   )
@@ -1169,7 +1169,7 @@ describe("harden", () => {
         nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
       ).toStrictEqual(["claude", "oxfmt", "oxlint"])
       expect(prompter.logs).toContainEqual(SUCCESS_LOG)
-      expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Harden checks passed."])
     })
   )
 
@@ -1219,7 +1219,7 @@ describe("harden", () => {
         nonProbeInvocations(runner).map((invocation) => invocation.name ?? invocation.command)
       ).toStrictEqual(["claude", "oxfmt", "oxlint"])
       expect(prompter.logs).toContainEqual(SUCCESS_LOG)
-      expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Harden checks passed."])
     })
   )
 
@@ -1249,7 +1249,11 @@ describe("harden", () => {
 
       expect(Exit.isFailure(exit)).toBe(true)
       expect(prompter.logs.filter((log) => log.level === "error")).toStrictEqual([
-        { level: "error", message: "Command `oxfmt` not found. Please install it and try again." },
+        {
+          level: "error",
+          message:
+            "The command `oxfmt` was not found on PATH. Install it, then run the command again.",
+        },
         { level: "error", message: "`adamantite check` failed after the Claude Code session." },
       ])
       expect(prompter.outros).toStrictEqual(["⚠️ Harden verification failed."])
@@ -1304,7 +1308,7 @@ describe("harden", () => {
         },
         SUCCESS_LOG,
       ])
-      expect(prompter.outros).toStrictEqual(["✅ Harden completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Harden checks passed."])
     })
   )
 
@@ -1345,7 +1349,7 @@ describe("harden", () => {
       expect(prompter.logs).toStrictEqual([
         {
           level: "success",
-          message: "The Markdown prompt was printed and sent to the terminal clipboard.",
+          message: "The agent prompt is printed above and sent to the terminal clipboard.",
         },
       ])
     })
@@ -1388,7 +1392,7 @@ describe("harden", () => {
         message: "`claude` was not found on PATH. Install Claude Code or copy the prompt instead.",
       })
       expect(prompter.confirmCalls).toStrictEqual([
-        { initialValue: true, message: "Copy the Markdown prompt for a coding agent?" },
+        { initialValue: true, message: "Copy the agent prompt?" },
       ])
       expect(copied).toStrictEqual([expect.stringMatching(/^# Adamantite harden\n/)])
       expect(
@@ -1404,7 +1408,7 @@ describe("harden", () => {
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.cancels).toStrictEqual(["Harden was cancelled. Nothing was changed."])
+      expect(prompter.cancels).toStrictEqual(["Harden was cancelled."])
       expect(nonProbeInvocations(runner)).toStrictEqual([])
       expect(copied).toStrictEqual([])
       expect(prompter.outros).toStrictEqual([])

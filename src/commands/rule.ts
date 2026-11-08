@@ -36,7 +36,7 @@ const astFile = Argument.File("file", { mustExist: true }).pipe(
 
 const ast = Command.make("ast", { file: astFile }).pipe(
   Command.withDescription(
-    "Print the ESTree-shaped AST that Oxlint rules visit, to find node names for a custom rule"
+    "Print the syntax tree Oxlint rules use, with node names for custom rules"
   ),
   Command.withHandler(({ file }) =>
     Effect.gen(function* () {
@@ -79,9 +79,7 @@ const addTest = Command.make("test", {
   name: ruleName.pipe(Argument.optional),
   path: testPath,
 }).pipe(
-  Command.withDescription(
-    "Add an optional test for an existing rule. Omit the name to select a rule"
-  ),
+  Command.withDescription("Create a test for an existing rule. Omit the name to choose a rule"),
   Command.withHandler(({ name, path: target }) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
@@ -98,7 +96,7 @@ const addTest = Command.make("test", {
 
         if (names.length === 0) {
           return yield* prompter.log.info(
-            `No custom rules found in ${directory}. Run \`adamantite rule add <name>\` first.`
+            `No custom rules were found in \`${directory}\`. Run \`adamantite rule add <name>\` first.`
           )
         }
 
@@ -126,7 +124,7 @@ const addTest = Command.make("test", {
         `Adapt the valid and invalid cases to the rule, then run \`adamantite rule test\`${Option.isSome(target) ? " with `--path` and the test file path." : "."}`
       )
       yield* prompter.log.info(
-        "RuleTester uses node:test. If you keep this file, exclude it from Vitest/Jest discovery. See the Adamantite README, Custom rules."
+        "RuleTester uses node:test. Exclude this test from Vitest and Jest discovery. See Custom rules in the Adamantite README."
       )
     })
   )
@@ -134,7 +132,7 @@ const addTest = Command.make("test", {
 
 const add = addCommand.pipe(
   Command.withDescription(
-    "Write a custom rule stub. The Adamantite skill has the authoring guidance"
+    "Create a custom rule file. See the Adamantite skill for authoring instructions"
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
@@ -154,7 +152,7 @@ const add = addCommand.pipe(
 
 const test = Command.make("test", { path: testPath }).pipe(
   Command.withDescription(
-    "Run optional custom rule tests with `node --test`. Use --path for a test outside the rules folder"
+    "Run custom rule tests with node --test. Use --path for a test outside the rules folder"
   ),
   Command.withHandler(({ path: target }) =>
     Effect.gen(function* () {
@@ -206,15 +204,13 @@ const trialRule = Argument.String("rule").pipe(
 const report = Flag.String("report").pipe(
   Flag.atLeast(1),
   Flag.withDescription(
-    "A case that has the mistake, so the rule must report it: a project path, or <path>=<file> to lint the content of <file> at <path>. Repeat the flag for more cases"
+    "Add a case the rule must report. Use a project path, or <path>=<file> to lint file contents at another path. Repeat --report for more cases"
   )
 )
 
 const accept = Flag.String("accept").pipe(
   Flag.atLeast(0),
-  Flag.withDescription(
-    "A case that is correct code, so the rule must not report it, in the same form as --report"
-  )
+  Flag.withDescription("Add a case the rule must accept, using the same path format as --report")
 )
 
 const trialOptions = Flag.String("options").pipe(
@@ -227,7 +223,7 @@ const trialOptions = Flag.String("options").pipe(
 
 const current = Flag.Boolean("current").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Keep the rule setting of the project config, to see what it reports now")
+  Flag.withDescription("Use the project's current rule setting to see what it reports")
 )
 
 function describeSetting(rule: string, setting: TrialSetting) {
@@ -269,10 +265,10 @@ export function renderTrial(
   const failures = results.filter((result) => !isAsExpected(result)).length
   const summary =
     failures === 0
-      ? "Each case is as expected."
+      ? "All cases produced the expected result."
       : results.length === 1
-        ? "The case is not as expected."
-        : `${failures} of ${results.length} cases ${failures === 1 ? "is" : "are"} not as expected.`
+        ? "The case did not produce the expected result."
+        : `${failures.toLocaleString("en-US")} of ${results.length.toLocaleString("en-US")} cases ${failures === 1 ? "is" : "are"} different from the expected result.`
 
   return [
     `Trial of ${describeSetting(rule, setting)}, in ${configs}.`,
@@ -291,7 +287,7 @@ const trial = Command.make("try", {
   rule: trialRule,
 }).pipe(
   Command.withDescription(
-    "Lint cases in a copy of the project with one rule setting, and show whether the rule reports each case. The project stays unchanged. Exit code 0: each case is as expected. 1: a case is not. 2: the trial is not evidence"
+    "Test a rule against cases in a project copy. Exit codes: 0 for expected results, 1 for a mismatch, and 2 if a case could not be checked. Project files stay unchanged"
   ),
   Command.withHandler(({ accept, current, options, report, rule }) =>
     Effect.gen(function* () {
@@ -355,7 +351,7 @@ const trial = Command.make("try", {
 
 export default Command.make("rule").pipe(
   Command.withDescription(
-    "Write and inspect custom Oxlint rules, run trials, or run optional tests"
+    "Create and inspect custom Oxlint rules, try them against cases, and run saved tests"
   ),
   Command.withSubcommands([add, ast, test, trial])
 )

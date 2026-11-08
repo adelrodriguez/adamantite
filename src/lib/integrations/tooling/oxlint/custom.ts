@@ -108,7 +108,7 @@ export default defineIntegration({
           }
 
           findings.push({
-            currentState: `\`${relative(folder.dir)}\` has ${folder.ruleFiles.length} rule file(s), but no \`custom()\` call loads it, so Oxlint does not run them.`,
+            currentState: `No \`custom()\` call loads the rules in \`${relative(folder.dir)}\`, so Oxlint does not run them.`,
             goal: [
               `Load \`${relative(folder.dir)}\` with \`custom()\` from \`adamantite/rules\` in the Oxlint config of \`${relative(path.dirname(path.dirname(folder.dir)))}\`. A relative \`dir\` resolves from the file that calls \`custom()\`.`,
               "Give each rules folder its own plugin name with the `name` option, because Oxlint rejects two plugins with the same name in one run.",
@@ -203,7 +203,7 @@ export default defineIntegration({
         }
 
         findings.push({
-          currentState: `${dirs.length} rules folders use the plugin name \`${name}\`: ${dirs.map((dir) => `\`${relative(dir)}\``).join(", ")}. Oxlint rejects two plugins with the same name in one run.`,
+          currentState: `${dirs.length.toLocaleString("en-US")} rules folders use the plugin name \`${name}\`: ${dirs.map((dir) => `\`${relative(dir)}\``).join(", ")}. Oxlint rejects two plugins with the same name in one run.`,
           goal: [
             `Each \`custom()\` call that loads one of these folders passes a \`name\` that no other rules folder uses, such as \`custom({ name: "web" })\`. The calls are in ${Array.dedupe(group.map((call) => `\`${relative(call.source)}\``)).join(", ")}.`,
             "Rule names in `oxlint-disable` comments and `rules` settings use the new plugin name.",

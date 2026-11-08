@@ -11,6 +11,7 @@ import {
   type PropertyKey,
 } from "oxc-parser"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
+import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",
@@ -28,28 +29,6 @@ type NamedObjectPropertyResult =
   | { readonly status: "found"; readonly property: ObjectProperty }
   | { readonly status: "invalid" }
   | { readonly status: "missing" }
-
-/**
- * Every lint preset a target project can select besides core. Each one is published as
- * `adamantite/lint/<preset>`.
- */
-export const LINT_PRESETS = [
-  "react",
-  "react-strict",
-  "tanstack",
-  "nextjs",
-  "vue",
-  "effect",
-  "jest",
-  "vitest",
-  "node",
-  "architecture",
-  "strict",
-  "antislop",
-  "tailwind",
-] as const
-
-export type LintPreset = (typeof LINT_PRESETS)[number]
 
 function getImportName(preset: LintPreset | "core") {
   return preset.replaceAll(/-([a-z])/g, (_, letter: string) => letter.toUpperCase())

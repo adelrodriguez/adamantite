@@ -21,7 +21,6 @@ export default defineOxlintPlugin({
       }
     }),
   name: NAME,
-  preset: "effect",
   runtime: { _tag: "Native", resolve: resolveEffectRuntime },
   /**
    * Write the language service entry in `tsconfig.json`.

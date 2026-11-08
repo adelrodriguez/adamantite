@@ -1,7 +1,6 @@
 import type * as Effect from "effect/Effect"
 import type * as FileSystem from "effect/FileSystem"
 import type * as Path from "effect/Path"
-import type { LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 import type {
   EffectBuildMissing,
   EffectPlatformUnsupported,
@@ -17,7 +16,6 @@ export type NativeOverride =
 
 export interface OxlintPlugin {
   readonly name: string
-  readonly preset: LintPreset
   readonly runtime:
     | { readonly _tag: "JavaScript" }
     | {

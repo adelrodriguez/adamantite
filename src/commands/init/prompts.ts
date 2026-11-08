@@ -1,5 +1,10 @@
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
+import {
+  describeLintPreset,
+  findMissingRequiredPresets,
+  lintPresets,
+} from "#lib/integrations/tooling/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,
@@ -67,79 +72,21 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   if (hasOxlint) {
     selectedPresets = yield* prompter.multiselect({
       message: "Which presets should Adamantite use with the core preset?",
-      options: [
-        {
-          hint: "Check React code, JSX accessibility, and performance.",
-          label: "react",
-          value: "react",
-        },
-        {
-          hint: "Keep state, effect, and memo hooks in hook files. Installs oxlint-plugin-react-doctor and selects the react preset.",
-          label: "react-strict",
-          value: "react-strict",
-        },
-        {
-          hint: "Use queryOptions() and keep query data out of state.",
-          label: "tanstack",
-          value: "tanstack",
-        },
-        {
-          hint: "Check Next.js scripts, fonts, images, and head usage.",
-          label: "next.js",
-          value: "nextjs",
-        },
-        {
-          hint: "Check Vue 3 code for errors and deprecated APIs.",
-          label: "vue",
-          value: "vue",
-        },
-        {
-          hint: "Find effects that never run. Installs @effect/tsgo.",
-          label: "effect",
-          value: "effect",
-        },
-        {
-          hint: "Find focused or skipped tests and check assertions.",
-          label: "jest",
-          value: "jest",
-        },
-        {
-          hint: "Find focused or skipped tests and check assertions.",
-          label: "vitest",
-          value: "vitest",
-        },
-        {
-          hint: "Check Node.js callbacks and CommonJS modules.",
-          label: "node",
-          value: "node",
-        },
-        {
-          hint: "Check the layer maps and import owners you define.",
-          label: "architecture",
-          value: "architecture",
-        },
-        {
-          hint: "Limit type assertions, deep destructuring, and TODOs.",
-          label: "strict",
-          value: "strict",
-        },
-        {
-          hint: "Ban module mocks, Reflect.get, and unknown parameters.",
-          label: "antislop",
-          value: "antislop",
-        },
-        {
-          hint: "Check Tailwind v4 classes. Installs @shadcn/lint.",
-          label: "tailwind",
-          value: "tailwind",
-        },
-      ],
+      options: lintPresets.map((preset) => ({
+        hint: describeLintPreset(preset),
+        label: preset.label,
+        value: preset.name,
+      })),
       required: false,
     })
 
-    if (selectedPresets.includes("react-strict") && !selectedPresets.includes("react")) {
-      selectedPresets = ["react", ...selectedPresets]
-      yield* prompter.log.info("Added the `react` preset, which `react-strict` requires.")
+    const missingPresets = findMissingRequiredPresets(selectedPresets)
+    selectedPresets = [...missingPresets.map(({ required }) => required), ...selectedPresets]
+
+    for (const { required, requiredBy } of missingPresets) {
+      yield* prompter.log.info(
+        `Added the \`${required}\` preset, which \`${requiredBy}\` requires.`
+      )
     }
   }
 

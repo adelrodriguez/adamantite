@@ -225,22 +225,33 @@ When the corresponding dependency version in `package.json` increases, update th
 in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit under
 `tooling/oxlint/`: tsrs beside the integration, managed plugins in `plugins/`.
 
+## Lint presets
+
+`tooling/oxlint/presets.ts` holds `lintPresets`, the one list of the presets that a target
+project can select besides core. Each entry has the preset name, the init label, a hint that
+describes the rules, the presets it requires, and its managed plugin. Init builds its choices,
+its required-preset additions, and its `--preset` check from the list. `describeLintPreset`
+appends the plugin package and the required presets to the hint, so a written hint holds no
+setup text. A test fails when the list and the preset files in `presets/lint/` disagree.
+
 ## Managed plugins
 
 A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`
 for `tailwind` and `oxlint-plugin-react-doctor` for `react-strict`. Each definition under
-`tooling/oxlint/plugins/` uses `defineOxlintPlugin` and declares its package, preset, and
-JavaScript or native runtime capability. `plugins/index.ts` is the one registry of definitions.
-It imports no version macro, so the Oxlint entry can load it from source. JavaScript plugins
+`tooling/oxlint/plugins/` uses `defineOxlintPlugin` and declares its package and JavaScript or
+native runtime capability. The preset catalog links each plugin to its preset, and
+`plugins/index.ts` derives the one registry of definitions from the catalog. Neither imports a
+version macro, so the Oxlint entry can load them from source. JavaScript plugins
 still load through the preset's `jsPlugins` entries, which resolve from the target project.
 
-`plugins/managed.ts` derives the managed integrations from those definitions with
-`defineManagedPlugin`. Its version table holds the build-time version of each registered
+`plugins/managed.ts` derives the managed integrations from the catalog entries that have a
+plugin, with `defineManagedPlugin`. Its version table holds the build-time version of each registered
 package, and its type fails when a package has no version. Init installs the packages of the
 selected presets. Doctor and update maintain a package while the root config imports its
 preset. See ADR 0003.
 
-Doctor reports imports of the retired `adamantite/lint/react-doctor` preset. Its repair
+Doctor reports imports of retired presets from the `retiredLintPresets` table in
+`tooling/oxlint/index.ts`: `shadcn`, renamed to `tailwind`, and `react-doctor`. The `react-doctor` repair
 prompt moves the config to `react-strict`, keeps one extends entry when both presets were
 present, and preserves project settings and `react-doctor/*` overrides. Assessment does not
 write the config.

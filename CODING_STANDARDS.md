@@ -215,27 +215,3 @@ const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
 The [Zed resolver](src/lib/integrations/editors/zed.ts) walks ancestor folders without saving a
 real package-store path. [PR #633's review](https://github.com/adelrodriguez/adamantite/pull/633#discussion_r4503357503)
 found the broken nested-workspace command and the assessment that accepted it.
-
-## Terminal prompts
-
-### Describe preset rules and their setup
-
-Name each managed plugin package in the `hint` of its preset choice in `init`. Describe the
-rules first, then the installation or project configuration that the choice needs. The user
-must know what a choice adds before selecting it.
-
-Spot it: The hint describes checks but omits the package name, or claims an installation step
-that `init` no longer performs.
-
-```ts
-// Avoid: the React Doctor choice did not name the managed plugin.
-hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects; requires react"
-
-// Prefer: the choice names the package before the user selects it.
-hint: "Keep state, effect, and memoization hooks in hook modules. Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset."
-```
-
-The [init choices](src/commands/init/prompts.ts) name the installed packages for each managed
-plugin and state that the architecture rules need project configuration.
-[The choices before this change](https://github.com/adelrodriguez/adamantite/blob/0a0ebeb25e708128523db649d58737dd5f2d7a60/src/commands/init/prompts.ts#L81-L140)
-omitted managed package names and described the removed Effect patch step.

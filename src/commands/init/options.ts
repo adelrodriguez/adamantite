@@ -2,7 +2,12 @@ import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
-import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
+import * as Option from "effect/Option"
+import {
+  findMissingRequiredPresets,
+  LINT_PRESETS,
+  type LintPreset,
+} from "#lib/integrations/tooling/oxlint/presets.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
@@ -74,9 +79,12 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  if (options.presets.includes("react-strict") && !options.presets.includes("react")) {
+  const missingPreset = Array.head(findMissingRequiredPresets(options.presets))
+
+  if (Option.isSome(missingPreset)) {
+    const { required, requiredBy } = missingPreset.value
     return yield* new InvalidInitOptions({
-      reason: "`--preset react-strict` requires `--preset react`.",
+      reason: `\`--preset ${requiredBy}\` requires \`--preset ${required}\`.`,
     })
   }
 

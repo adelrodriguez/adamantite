@@ -80,7 +80,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react-strict",
         },
         {
-          hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects; requires react",
+          hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects. Requires react. Installs oxlint-plugin-react-doctor",
           label: "react-doctor",
           value: "react-doctor",
         },
@@ -100,7 +100,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "vue",
         },
         {
-          hint: "Effect misuse, such as effects that never run and unhandled errors; installs @effect/tsgo and patches Oxlint and TypeScript",
+          hint: "Effect misuse, such as effects that never run and unhandled errors. Installs @effect/tsgo",
           label: "effect",
           value: "effect",
         },
@@ -120,7 +120,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "node",
         },
         {
-          hint: "Load layer and import-owner rules, then configure them in your project",
+          hint: "Layer dependencies and import ownership. Configure the rules in your project",
           label: "architecture",
           value: "architecture",
         },

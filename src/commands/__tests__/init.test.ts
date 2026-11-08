@@ -1183,7 +1183,7 @@ describe("init", () => {
         expect(prompter.confirmCalls.at(-1)).toStrictEqual({
           initialValue: true,
           message:
-            "Set up coding agents? Init adds Adamantite guidance to AGENTS.md and the Adamantite skill, which teaches agents how to use Adamantite.",
+            "Teach coding agents to use Adamantite? This adds an AGENTS.md section and the Adamantite skill.",
         })
         expect(files.read("AGENTS.md")).toContain(ADAMANTITE_AGENTS_START_MARKER)
         expect(files.read(".agents/skills/adamantite/SKILL.md")).toBe(shippedSkill["SKILL.md"])

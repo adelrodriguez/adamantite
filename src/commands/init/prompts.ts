@@ -187,7 +187,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const shouldSetupAgents = yield* prompter.confirm({
     initialValue: true,
     message:
-      "Set up coding agents? Init adds Adamantite guidance to AGENTS.md and the Adamantite skill, which teaches agents how to use Adamantite.",
+      "Teach coding agents to use Adamantite? This adds an AGENTS.md section and the Adamantite skill.",
   })
 
   return {

@@ -145,9 +145,10 @@ writing files. See ADR 0023.
   and ADR 0022.
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
-- `init` creates selected integrations and managed scripts. It installs the Adamantite skill
-  for the selected coding agents with the `skills` CLI, from `node_modules/adamantite`, so
-  the copy matches the installed version.
+- `init` creates selected integrations and managed scripts. When the user sets up coding agents, it
+  writes the Adamantite skill to `.agents/skills` and to each other skill folder whose agent
+  folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/` into the CLI, so the
+  copy matches the running Adamantite version without `node_modules` or the network.
 - `doctor` assesses managed integrations and emits repair findings. The Oxlint assessment
   resolves the same runtime as the entry and reports missing installed packages, unsupported
   native builds or platforms, and conflicting overrides. Resolution neither launches a tool
@@ -165,9 +166,9 @@ writing files. See ADR 0023.
   files that Oxlint lints, and `hardening/overrides.ts` marks each file of an override that turns
   a rule off, after a trial that turns the rule on again. The prompt shows both as data. See ADR
   0012 and ADR 0020.
-- `update` updates managed dependencies, copies the Adamantite skill again when the copy that
-  `init` installed is stale, then
-  emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
+- `update` updates managed dependencies, writes the Adamantite skill again to each skill folder
+  whose copy differs from the bundled skill in any file, removes the `adamantite` entry from
+  `skills-lock.json`, then emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
   not need it.
 - `prepare` does nothing. It patched Oxlint for the effect preset before the Oxlint proxy,
   and existing `prepare` scripts still run it. #444 removes it.

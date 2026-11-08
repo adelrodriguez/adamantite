@@ -1,6 +1,5 @@
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
-import { CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,
@@ -13,7 +12,7 @@ import { Prompter } from "#terminal/prompter.ts"
 import type { InitOptions, InitOptionsInput } from "./options.ts"
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
-  `\`${conflict.script}\` runs \`${conflict.command}\`. Init would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
+  `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
   cwd: string,
@@ -23,7 +22,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const prompter = yield* Prompter
 
   const selectedScripts = yield* prompter.multiselect({
-    message: "Which scripts should init add to `package.json`?",
+    message: "Which scripts should Adamantite add to `package.json`?",
     options: [
       {
         hint: "recommended",
@@ -67,7 +66,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   if (hasOxlint) {
     selectedPresets = yield* prompter.multiselect({
-      message: "Which presets should init use with the core preset?",
+      message: "Which presets should Adamantite use with the core preset?",
       options: [
         {
           hint: "Check React code, JSX accessibility, and performance.",
@@ -154,7 +153,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     : false
 
   const selectedEditors = yield* prompter.multiselect({
-    message: "Which editors should init configure?",
+    message: "Which editors should Adamantite configure?",
     options: [
       { label: "VS Code / Cursor / Windsurf", value: "vscode" },
       { label: "Zed", value: "zed" },
@@ -185,34 +184,20 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         })
       : false
 
-  const shouldAddAgentsGuidance = yield* prompter.confirm({
+  const shouldSetupAgents = yield* prompter.confirm({
     initialValue: true,
-    message: "Tell coding agents in AGENTS.md how to run these scripts?",
-  })
-
-  const installedAgents = yield* (yield* CodingAgents).detectInstalled(cwd)
-  const selectedSkillAgents = yield* prompter.multiselect({
-    initialValues: codingAgents
-      .filter((agent) => installedAgents.some((installed) => installed.command === agent.command))
-      .map((agent) => agent.skillsAgent),
-    message: "Which coding agents should get the Adamantite skill?",
-    options: codingAgents.map((agent) => ({
-      hint: agent.skillsFolder,
-      label: agent.name,
-      value: agent.skillsAgent,
-    })),
-    required: false,
+    message:
+      "Teach coding agents to use Adamantite? This adds an AGENTS.md section and the Adamantite skill.",
   })
 
   return {
-    agents: shouldAddAgentsGuidance,
+    agents: shouldSetupAgents,
     editors: selectedEditors,
     githubActions: shouldEnableGitHubActions,
     installExtensions: shouldInstallExtensions,
     overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,
-    skillAgents: selectedSkillAgents,
     typescript: shouldSetupTypescript,
   } satisfies InitOptionsInput
 })

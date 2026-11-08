@@ -34,12 +34,13 @@ export const readFileIfExists = (path: string) =>
   )
 
 /**
- * Lists the entry names of a directory that may not exist. A missing path, or a path that is not a
+ * Lists the entry names of a directory that may not exist. With `recursive`, the names are paths
+ * relative to the directory and include nested directories. A missing path, or a path that is not a
  * directory, is `Option.none`; every other failure is a `FailedToReadFile`.
  */
-export const readDirectoryIfExists = (path: string) =>
+export const readDirectoryIfExists = (path: string, options?: { readonly recursive?: boolean }) =>
   FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => fs.readDirectory(path)),
+    Effect.flatMap((fs) => fs.readDirectory(path, options)),
     Effect.asSome,
     Effect.catch((error) =>
       error.reason._tag === "NotFound" || error.reason._tag === "BadResource"

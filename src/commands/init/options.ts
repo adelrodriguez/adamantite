@@ -2,7 +2,6 @@ import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
-import { type SkillsAgent, codingAgents } from "#lib/execution/coding-agents.ts"
 import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
@@ -19,6 +18,9 @@ const INIT_EDITORS = ["vscode", "zed"] as const
 type InitEditor = (typeof INIT_EDITORS)[number]
 
 export interface InitOptions {
+  /**
+   * Add the Adamantite section to `AGENTS.md` and the Adamantite skill.
+   */
   readonly agents: boolean
   readonly editors: InitEditor[]
   /**
@@ -29,7 +31,6 @@ export interface InitOptions {
   readonly overwriteScripts: boolean
   readonly presets: LintPreset[]
   readonly scripts: Script[]
-  readonly skillAgents: SkillsAgent[]
   readonly typescript: boolean
 }
 
@@ -41,7 +42,6 @@ export interface InitOptionsInput {
   readonly overwriteScripts: boolean
   readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
-  readonly skillAgents: readonly SkillsAgent[]
   readonly typescript: boolean
 }
 
@@ -57,7 +57,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     overwriteScripts: input.overwriteScripts,
     presets: Array.dedupe(input.presets),
     scripts: Array.dedupe(input.scripts),
-    skillAgents: Array.dedupe(input.skillAgents),
     typescript: input.typescript,
   }
 
@@ -156,16 +155,8 @@ const githubActions = Flag.Boolean("github-actions").pipe(
 
 const agents = Flag.Boolean("agents").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Add Adamantite guidance to AGENTS.md")
-)
-
-const skillAgents = Flag.Literals(
-  "skill-agent",
-  codingAgents.map((agent) => agent.skillsAgent)
-).pipe(
-  Flag.atMost(codingAgents.length),
   Flag.withDescription(
-    "Install the Adamantite skill for a coding agent. Repeat --skill-agent to select more"
+    "Add Adamantite guidance to AGENTS.md and the Adamantite skill to the skill folders of your coding agents"
   )
 )
 
@@ -185,6 +176,5 @@ export const initCommandOptions = {
   overwriteScripts,
   presets,
   scripts,
-  skillAgents,
   typescript,
 }

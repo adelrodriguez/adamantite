@@ -5,8 +5,7 @@ import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import type { ToolingConfigState } from "#lib/integrations/tooling/base.ts"
-import { type SkillsAgent, codingAgents } from "#lib/execution/coding-agents.ts"
-import { getSkillInstallCommand, installSkill } from "#lib/execution/skill.ts"
+import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
@@ -398,37 +397,30 @@ export const setupAgentsGuidance = (
     }
   })
 
+const folderList = new Intl.ListFormat("en", { type: "conjunction" })
+
 /**
- * Install the Adamantite skill for the selected agents. The skill is optional, so a failure leaves
- * a warning and initialization continues.
+ * Write the Adamantite skill to the skill folders of the agents that the project uses. The skill is
+ * optional, so a failure leaves a warning and initialization continues.
  */
-export const setupSkill = (cwd: string, skillAgents: readonly SkillsAgent[]) =>
+export const setupSkill = (cwd: string) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const agents = codingAgents.filter((agent) => skillAgents.includes(agent.skillsAgent))
 
-    const result = yield* prompter
-      .withSpinner(() => installSkill(cwd, agents), {
-        failure: "Failed to install the Adamantite skill.",
-        start: "Installing the Adamantite skill...",
-        success: (outcome) =>
-          outcome === "installed" ? "Adamantite skill installed." : "Adamantite skill not found.",
-      })
-      .pipe(
-        Effect.catchTag(["CommandFailed", "CliNotFound", "FailedToReadFile", "PlatformError"], () =>
-          Effect.succeed("failed" as const)
-        )
+    yield* detectSkillFolders(cwd).pipe(
+      Effect.flatMap((folders) =>
+        prompter.withSpinner(() => writeSkill(cwd, folders), {
+          failure: "Failed to add the Adamantite skill.",
+          start: "Adding the Adamantite skill...",
+          success: `Adamantite skill added to ${folderList.format(folders.map((folder) => `\`${folder}\``))}.`,
+        })
+      ),
+      Effect.catchTag(
+        ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
+        (error) =>
+          prompter.log.warning(
+            `Could not add the Adamantite skill. ${error.message} Adamantite will continue initialization.`
+          )
       )
-
-    if (result === "failed") {
-      yield* prompter.log.warning(
-        `Run \`${getSkillInstallCommand(agents)}\` to see why the skill install failed.`
-      )
-    }
-
-    if (result === "missing") {
-      yield* prompter.log.warning(
-        "`node_modules` has no Adamantite skill to install. Run `npx skills add adelrodriguez/adamantite --skill adamantite` to install the skill from GitHub."
-      )
-    }
+    )
   })

@@ -2,7 +2,7 @@
 
 ## Select the setup
 
-Read `adamantite init --help` for the available scripts, presets, editors, and skill agents.
+Read `adamantite init --help` for the available scripts, presets, and editors.
 Use explicit `--non-interactive` setup as an agent. Include at least one `--script`.
 For example, to configure checks, fixes, TypeScript, and agent instructions, run:
 
@@ -11,8 +11,8 @@ npx adamantite init --non-interactive --script check --script fix --typescript -
 ```
 
 Adapt the selected options to the request. Omitted boolean flags are disabled.
-Use `--skill-agent` to install this skill for a coding agent. `--agents` adds instructions
-to `AGENTS.md` and does not install the skill.
+`--agents` adds instructions to `AGENTS.md` and writes this skill to `.agents/skills`, and
+to `.claude/skills` or `.grok/skills` when the project has `.claude/` or `.grok/`.
 
 Before selecting `react-strict`, tell the user about its modified MIT license.
 The installed `oxlint-plugin-react-doctor` license requires written permission for use as

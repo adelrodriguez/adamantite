@@ -20,10 +20,6 @@ export interface CodingAgent {
    */
   readonly seedArguments: (prompt: string) => string[]
   /**
-   * The agent's name for the `--agent` option of the `skills` CLI.
-   */
-  readonly skillsAgent: string
-  /**
    * The project folder that the agent loads skills from.
    */
   readonly skillsFolder: string
@@ -36,34 +32,30 @@ export interface CodingAgent {
 // - grok: `[PROMPT]` interactive seed and the `version` subcommand confirmed against
 //   the shipped binary, grok 1.0.5 (5115b46bc9).
 // - cursor-agent, gemini, opencode: forms from first-party docs; smoke test pending.
-// The skills agent names and folders come from the agent table of the `skills` CLI, version 1.7.4.
+// The skill folders come from the agent table of the `skills` CLI, version 1.7.4.
 export const codingAgents = [
   {
     command: "claude",
     name: "Claude Code",
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "claude-code",
     skillsFolder: ".claude/skills",
   },
   {
     command: "codex",
     name: "Codex",
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "codex",
     skillsFolder: ".agents/skills",
   },
   {
     command: "cursor-agent",
     name: "Cursor",
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "cursor",
     skillsFolder: ".agents/skills",
   },
   {
     command: "gemini",
     name: "Gemini CLI",
     seedArguments: (prompt) => ["-i", prompt],
-    skillsAgent: "gemini-cli",
     skillsFolder: ".agents/skills",
   },
   {
@@ -71,19 +63,15 @@ export const codingAgents = [
     name: "Grok Build",
     probeArguments: ["version"],
     seedArguments: (prompt) => [prompt],
-    skillsAgent: "grok",
     skillsFolder: ".grok/skills",
   },
   {
     command: "opencode",
     name: "OpenCode",
     seedArguments: (prompt) => ["--prompt", prompt],
-    skillsAgent: "opencode",
     skillsFolder: ".agents/skills",
   },
 ] as const satisfies readonly CodingAgent[]
-
-export type SkillsAgent = (typeof codingAgents)[number]["skillsAgent"]
 
 export interface HandoffOptions {
   readonly agent: CodingAgent

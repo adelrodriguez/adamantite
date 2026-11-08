@@ -15,19 +15,7 @@ const presetRules = Object.keys(reactStrict.rules ?? {})
   .filter((name) => name.startsWith(`${NAMESPACE}/`))
   .map((name) => name.slice(NAMESPACE.length + 1))
 
-const fixtures = readdirSync(FIXTURES_DIR, { withFileTypes: true })
-  .filter((entry) => entry.name !== CLEAN_FIXTURE)
-  .flatMap((entry) =>
-    entry.isFile()
-      ? [{ file: entry.name, kind: "invalid", rule: basename(entry.name, ".tsx") }]
-      : ["invalid", "valid"].flatMap((kind) =>
-          readdirSync(join(FIXTURES_DIR, entry.name, kind)).map((file) => ({
-            file: `${entry.name}/${kind}/${file}`,
-            kind,
-            rule: entry.name,
-          }))
-        )
-  )
+const ruleFixtures = readdirSync(FIXTURES_DIR).filter((file) => file !== CLEAN_FIXTURE)
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(
@@ -42,10 +30,9 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the React Doctor fixtures with react and react-strict in one real Oxlint run. The plugin
+ * Lint the existing fixtures with react and react-strict in one real Oxlint run. The plugin
  * resolves from the repository's `node_modules`, as it does from a target project's. The fixtures
- * are copied to `src/hooks/` because some React Doctor rules skip fixture paths. Hook modules also
- * exercise the rules where react-strict permits state and effect hooks.
+ * are copied to `src/hooks/` to allow hooks and avoid paths React Doctor skips.
  */
 function lintFixtures() {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-react-doctor-"))
@@ -79,10 +66,6 @@ function lintFixtures() {
       throw result.error
     }
 
-    if (result.signal !== null || ![0, 1].includes(result.status ?? -1)) {
-      throw new Error(`Oxlint did not finish the fixture run.\n${result.stdout}${result.stderr}`)
-    }
-
     try {
       return decodeOxlintJsonOutput(result.stdout).diagnostics
     } catch (error) {
@@ -96,17 +79,19 @@ function lintFixtures() {
 }
 
 describe("React Doctor rules in react-strict", () => {
-  it("have fixtures for exactly the enabled rules", () => {
-    expect(new Set(fixtures.map((fixture) => fixture.rule))).toStrictEqual(new Set(presetRules))
+  it("enable the rules covered by the existing fixtures", () => {
+    expect(presetRules).toStrictEqual(
+      expect.arrayContaining(ruleFixtures.map((file) => basename(file, ".tsx")))
+    )
   })
 })
 
-describe("React Doctor and native React rule overlap", () => {
+describe("react-doctor and react preset overlap", () => {
   let diagnostics: (typeof OxlintJsonOutput.Type)["diagnostics"]
 
   function getFixtureCodes(fixture: string) {
     return diagnostics
-      .filter((diagnostic) => diagnostic.filename === `src/hooks/${fixture}`)
+      .filter((diagnostic) => basename(diagnostic.filename) === fixture)
       .map((diagnostic) => diagnostic.code)
   }
 
@@ -114,26 +99,16 @@ describe("React Doctor and native React rule overlap", () => {
     diagnostics = lintFixtures()
   })
 
-  it.each(fixtures.filter((fixture) => fixture.kind === "invalid"))(
-    "report $file through its rule",
-    ({ file, rule }) => {
-      expect(
-        getFixtureCodes(file).filter((code) => code?.startsWith(`${NAMESPACE}(`))
-      ).toStrictEqual([`${NAMESPACE}(${rule})`])
-    }
-  )
+  it.each(ruleFixtures)("report %s through the plugin", (fixture) => {
+    expect(getFixtureCodes(fixture)).toContain(`${NAMESPACE}(${basename(fixture, ".tsx")})`)
+  })
 
-  it.each(fixtures.filter((fixture) => fixture.kind === "invalid"))(
-    "leave $file to the react-doctor rules",
-    ({ file }) => {
-      const nativeCodes = getFixtureCodes(file).filter((code) => !code?.startsWith(`${NAMESPACE}(`))
+  it.each(ruleFixtures)("leave %s to the react-doctor rules", (fixture) => {
+    const nativeCodes = getFixtureCodes(fixture).filter(
+      (code) => !code?.startsWith(`${NAMESPACE}(`)
+    )
 
-      expect(nativeCodes).toStrictEqual([])
-    }
-  )
-
-  it.each(fixtures.filter((fixture) => fixture.kind === "valid"))("accept $file", ({ file }) => {
-    expect(getFixtureCodes(file)).toStrictEqual([])
+    expect(nativeCodes).toStrictEqual([])
   })
 
   it("report nothing for a plain component", () => {

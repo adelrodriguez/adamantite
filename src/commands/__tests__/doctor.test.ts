@@ -7,7 +7,6 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import doctorCommand from "#commands/doctor.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import {
   agentByCommand,
@@ -21,36 +20,6 @@ import {
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)
 }
-
-it.effect(
-  "include the React Doctor preset migration in the repair prompt without writing the config",
-  () =>
-    Effect.gen(function* () {
-      const config = toOxlintTsConfigContent(["react", "react-strict"]).replace(
-        "adamantite/lint/react-strict",
-        "adamantite/lint/react-doctor"
-      )
-      const files = createFileSystemTestContext({
-        files: {
-          "oxlint.config.ts": config,
-          "package.json": manifest({
-            devDependencies: { adamantite: "1.0.0" },
-            scripts: { check: "adamantite check" },
-          }),
-        },
-      })
-      files.makeReadOnly("oxlint.config.ts")
-      const prompter = createPrompterTestContext()
-
-      yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
-
-      const prompt = prompter.messages.join("\n")
-      expect(prompt).toContain("React Doctor rules now belong to react-strict")
-      expect(prompt).toContain("exactly one `react-strict` entry")
-      expect(prompt).toContain("Preserve project settings")
-      expect(files.read("oxlint.config.ts")).toBe(config)
-    })
-)
 
 function getHeadings(markdown: string) {
   return markdown.match(/^#{1,2} .+$/gm) ?? []

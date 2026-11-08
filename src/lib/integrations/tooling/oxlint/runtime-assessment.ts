@@ -84,6 +84,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
     if (process.platform === "linux") {
       const ldd = yield* readFileIfExists("/usr/bin/ldd")
       const report = Option.isNone(ldd) ? decodeReport(process.report.getReport()) : Option.none()
+
       const musl = Option.isSome(ldd)
         ? ldd.value.includes("musl")
         : Option.isSome(report)
@@ -91,6 +92,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
           && report.value.sharedObjects.some(
             (file) => file.includes("libc.musl-") || file.includes("ld-musl-")
           )
+
       libc = musl ? "musl" : "gnu"
     }
 
@@ -106,24 +108,30 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
           ? "-gnu"
           : "-msvc",
     }
+
     const bindingTarget = platform + (suffix[process.platform] ?? "")
 
     if (runtime.binding._tag === "Stock") {
       const override = yield* Config.String("NAPI_RS_NATIVE_LIBRARY_PATH").pipe(
         Config.withDefault("")
       )
+
       const targets =
         process.platform === "darwin" ? ["darwin-universal", bindingTarget] : [bindingTarget]
+
       const nativeCandidates = override
         ? [override]
         : targets.flatMap((target) => [`./oxlint.${target}.node`, `@oxlint/binding-${target}`])
+
       const candidates = [...nativeCandidates, "./oxlint.wasi.cjs", "@oxlint/binding-wasm32-wasi"]
+
       const binding = yield* Effect.findFirst(candidates, (specifier) =>
         Effect.gen(function* () {
           const resolved = yield* resolver.resolve(
             path.join(runtime.oxlint, "dist", "bindings.js"),
             specifier
           )
+
           if (Option.isNone(resolved) || !(yield* fs.exists(resolved.value))) {
             return false
           }
@@ -149,10 +157,12 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
       const tsrs = yield* resolvePackageDirectory(project.cwd, "tsrs")
       const override = yield* Config.String("TSRS_BINARY").pipe(Config.withDefault(""))
       const target = `${platform}${process.platform === "linux" ? `-${libc}` : ""}`
+
       const installed =
         Option.isSome(tsrs) && !override
           ? yield* resolvePackageDirectory(tsrs.value, `@tsrs/${target}`)
           : Option.none<string>()
+
       const binary =
         override === ""
           ? Option.isSome(installed)

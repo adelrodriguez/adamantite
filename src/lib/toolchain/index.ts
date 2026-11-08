@@ -28,6 +28,7 @@ export const check = Effect.fn("Toolchain.check")(function* ({
 }) {
   const runner = yield* CommandRunner
   const forwardedStage = only ?? "lint"
+
   const stages = {
     format: oxfmt.check({
       cwd,
@@ -74,6 +75,7 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
   const runner = yield* CommandRunner
   const targets = Array.dedupe(files)
   const forwardedStage = only ?? "lint"
+
   const stages = {
     format: oxfmt.fix({
       cwd,
@@ -111,6 +113,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   readonly strict?: boolean
 }) {
   const runner = yield* CommandRunner
+
   // Without a usable manifest there is no monorepo to analyze. Knip reports the manifest.
   const isMonorepo = yield* checkIsMonorepo(cwd).pipe(
     Effect.catchTags({
@@ -135,6 +138,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   }
 
   const forwardedStage = only ?? "unused"
+
   const stages = {
     monorepo: sherif.analyze({
       cwd,
@@ -148,6 +152,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
       strict,
     }),
   }
+
   const steps =
     only === undefined ? [...(isMonorepo ? [stages.monorepo] : []), stages.unused] : [stages[only]]
 

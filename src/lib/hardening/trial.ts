@@ -245,6 +245,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
     // A file of the project outside each `node_modules` folder, such as a workspace package, has a
     // copy. A real path can differ from `cwd` in a folder link, such as `/var` on macOS.
     const root = yield* fs.realPath(cwd)
+
     const toProjectFolder = (file: string) => {
       const relative = path.relative(root, file)
 
@@ -258,10 +259,12 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
           && !relative.split(path.sep).includes("node_modules")
       )
     }
+
     // The packages of a `node_modules` folder, with the packages of each scope folder, such as
     // `@acme/ui`, in place of the folder.
     const listPackages = Effect.fnUntraced(function* (modules: string) {
       const entries = yield* readDirectoryIfExists(modules)
+
       const packages = yield* Effect.forEach(
         Option.getOrElse(entries, () => []).filter((entry) => entry !== ".cache"),
         Effect.fnUntraced(function* (entry) {
@@ -271,6 +274,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
               Effect.as(true),
               Effect.orElseSucceed(() => false)
             ))
+
           const scoped = isScope
             ? yield* readDirectoryIfExists(path.join(modules, entry))
             : Option.none()
@@ -301,6 +305,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
           Option.getOrElse(entries, () => []),
           Effect.fnUntraced(function* (entry) {
             const source = path.join(modules, entry)
+
             // A broken link has no real path, so the copy links to the same missing file.
             const folder = (yield* fs.realPath(source).pipe(Effect.option)).pipe(
               Option.flatMap((file) => toProjectFolder(file))
@@ -322,6 +327,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       }),
       { concurrency: 1 }
     )
+
     // A linked package can load files that git ignores, such as the build output that its
     // `exports` name, so the copy of the package has them too.
     const ignored = yield* Effect.forEach(
@@ -412,6 +418,7 @@ export const tryRule = Effect.fn("tryRule")(
     const resolved = yield* resolveRule(rule, cwd)
     const copy = yield* makeProjectCopy(cwd, workspace)
     const toProjectPath = (file: string) => path.relative(copy, file).split(path.sep).join("/")
+
     // Oxlint fails to load a config with a rule or a plugin that does not exist. Only a trial
     // config can add a rule that the project config does not have.
     const toRuleNotFound = (error: CliNotFound | TrialLintFailed) => {
@@ -491,6 +498,7 @@ export const tryRule = Effect.fn("tryRule")(
           ],
         })
       )
+
       const originals = yield* Effect.forEach(
         placed,
         ({ target }) => fs.readFileString(target).pipe(Effect.option),
@@ -506,6 +514,7 @@ export const tryRule = Effect.fn("tryRule")(
       // that only a root config can set, such as `typeAware`, and the nearest config gives the
       // rules of each case.
       const files = round.map((entry) => entry.case.path)
+
       const report = yield* lintFiles(copy, files).pipe(
         Effect.mapError((error) => toRuleNotFound(error))
       )
@@ -532,6 +541,7 @@ export const tryRule = Effect.fn("tryRule")(
         const reports = report.diagnostics.filter(
           (diagnostic) => diagnostic.filename === entry.case.path
         )
+
         const parseErrors = reports.filter((diagnostic) => diagnostic.code === undefined)
 
         if (parseErrors.length > 0) {

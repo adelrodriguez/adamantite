@@ -101,11 +101,13 @@ const sigintShield = Effect.acquireRelease(
     process.removeAllListeners("SIGINT")
     // With no listener at all, Node's default SIGINT behavior kills the process.
     process.on("SIGINT", ignoreSigint)
+
     return previous
   }),
   (previous) =>
     Effect.sync(() => {
       process.removeAllListeners("SIGINT")
+
       for (const listener of previous) {
         process.on("SIGINT", listener)
       }

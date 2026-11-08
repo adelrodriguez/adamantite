@@ -33,6 +33,7 @@ const PRESET_LIST_REGEX: Record<IgnoreList, RegExp> = {
   monorepo:
     /ignoreDependencies\s*:\s*(?:ignoreDependencies\.monorepo|\[[^\]]*?ignoreDependencies\.monorepo)/u,
 }
+
 const PRESET_LIST_IMPORT_REGEX =
   /import\s[^;]*?\{[^}]*\bignoreDependencies\b[^}]*\}\s*from\s*["']adamantite\/analyze["']/u
 

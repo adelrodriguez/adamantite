@@ -283,10 +283,12 @@ describe("native runtime overrides", () => {
     (part) =>
       Effect.gen(function* () {
         const files = makeFiles()
+
         const override: NativeOverride =
           part === "Binding"
             ? { _tag: "Binding", path: "/native.node" }
             : { _tag: "Backend", env: { NATIVE_BACKEND: "/backend" } }
+
         const error = yield* resolveOxlintRuntime(ROOT, [
           {
             name: "first",
@@ -318,6 +320,7 @@ describe("native runtime overrides", () => {
   it.effect("combine distinct native parts and replace the whole stock backend", () =>
     Effect.gen(function* () {
       const files = makeFiles()
+
       const runtime = yield* resolveOxlintRuntime(ROOT, [
         {
           name: "binding",

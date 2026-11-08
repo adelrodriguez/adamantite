@@ -16,9 +16,11 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 const TSCONFIG_FILE = "tsconfig.json"
 const LANGUAGE_SERVICE = "@effect/language-service"
+
 // Semantic quick fixes need the language service diagnostics. Editor integrations hide the
 // corresponding Oxlint reports; CLI Oxlint still uses the Effect preset.
 const LANGUAGE_SERVICE_PLUGIN = { diagnostics: true, name: LANGUAGE_SERVICE }
+
 const TSCONFIG_REFERENCE = `${JSON.stringify(
   { compilerOptions: { plugins: [LANGUAGE_SERVICE_PLUGIN] } },
   null,
@@ -54,6 +56,7 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
   const path = yield* Path.Path
   const configPath = path.join(cwd, TSCONFIG_FILE)
   const content = yield* readFileIfExists(configPath)
+
   const plugin =
     content._tag === "None"
       ? undefined
@@ -126,6 +129,7 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
   }
 
   const existing = findLanguageServicePlugin(plugins)
+
   const nextPlugins = existing
     ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: true } : entry))
     : [...plugins, LANGUAGE_SERVICE_PLUGIN]

@@ -63,11 +63,13 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
     (integration) =>
       Effect.gen(function* () {
         const assessment = yield* integration.assess(project)
+
         return assessment.applicable ? [{ assessment, name: integration.name }] : []
       }),
     // Assessments are read-only and independent, and `forEach` keeps results in input order.
     { concurrency: "unbounded" }
   )
+
   const applicable = Array.flatten(assessments)
 
   return {
@@ -105,9 +107,11 @@ function renderRepairPrompt(
 ): string {
   const sections = findings.map((finding, index) => {
     const goal = finding.goal.map((item) => `  - ${item}`).join("\n")
+
     const reference = finding.reference
       ? `\n- **Reference:**\n\n\`\`\`${finding.reference.language}\n${finding.reference.content.trimEnd()}\n\`\`\``
       : ""
+
     const notes =
       finding.notes && finding.notes.length > 0
         ? `\n- **Notes:**\n${finding.notes.map((note) => `  - ${note}`).join("\n")}`
@@ -115,6 +119,7 @@ function renderRepairPrompt(
 
     return `## ${index + 1}. ${finding.title}\n\n- **Current state:** ${finding.currentState}\n- **Goal:**\n${goal}${reference}${notes}`
   })
+
   const warningSection =
     warnings.length > 0
       ? [
@@ -127,6 +132,7 @@ function renderRepairPrompt(
           "",
         ].join("\n")
       : ""
+
   return fillTemplate(repairPromptTemplate, {
     findingCount: findings.length.toLocaleString("en-US"),
     findings: sections.join("\n\n"),

@@ -41,6 +41,7 @@ export default Command.make("update").pipe(
       const assessment = yield* assessProject(yield* readProject(cwd, packageJson))
       const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
+
       const updates = [
         ...packageActions,
         // A known package that the project does not install stays uninstalled.

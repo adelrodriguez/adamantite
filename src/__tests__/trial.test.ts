@@ -186,6 +186,7 @@ describe("rule trials in a real project", () => {
   it.live("report the case with the mistake and accept the correct code at the same path", () =>
     Effect.gen(function* () {
       const before = listProject()
+
       const results = yield* runTrial(
         "no-restricted-imports",
         { _tag: "Error", options: [{ paths: ["node:fs"] }] },
@@ -229,6 +230,7 @@ describe("rule trials in a real project", () => {
     Effect.gen(function* () {
       const before = listProject()
       const debuggerCase = writeCase("debugger.ts", "export function stop() {\n  debugger\n}\n")
+
       const results = yield* runTrial("project/no-debugger-here", { _tag: "Current" }, [
         makeCase("src/new.ts", "reported", debuggerCase),
         makeCase("src/legacy.ts", "accepted"),
@@ -289,6 +291,7 @@ describe("rule trials in a real project", () => {
       symlinkSync("../packages/tooling", join(project, "node_modules/tooling"))
 
       const before = listProject()
+
       const results = yield* runTrial(
         "project/no-debugger-here",
         { _tag: "Current" },
@@ -442,6 +445,7 @@ describe("rule trials in a real project", () => {
   it.live("mark each file of an override that turns a rule off", () =>
     Effect.gen(function* () {
       const before = listProject()
+
       const report = yield* readOverrides(project, NO_WORKSPACE, ["oxlint.config.ts"], null).pipe(
         Effect.provide(TEST_LAYER)
       )

@@ -11,6 +11,7 @@ const check = process.argv.includes("--check")
 const requested = process.argv.slice(2).filter((argument) => argument !== "--check")
 const repo = resolve(import.meta.dirname, "..")
 const fixtures = join(repo, "src/__tests__/presets/fixtures/layers")
+
 const files =
   requested.length > 0
     ? requested.map((file) => resolve(file))
@@ -59,6 +60,7 @@ function convertTypeScript(file: string, content: string): string {
 
   const edits: Array<{ readonly start: number; readonly end: number; readonly content: string }> =
     []
+
   const visitor = new Visitor({
     Property(property) {
       const key = property.key.type === "Identifier" ? property.key.name : undefined
@@ -106,6 +108,7 @@ function convertTypeScript(file: string, content: string): string {
 
 for (const file of files) {
   const before = readFileSync(file, "utf8")
+
   const after = file.endsWith(".json")
     ? `${JSON.stringify(convertJson(parseJson(before)), null, 2)}\n`
     : convertTypeScript(file, before)

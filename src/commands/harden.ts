@@ -149,6 +149,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       // Each step before the session takes this read of the workspace.
       const workspace = yield* readWorkspace(cwd)
       const context = yield* readHardenContext(cwd, workspace, scopeDirectory)
+
       // These reads change no file in the project, so they run together.
       const [overrides, suppressions] = yield* Effect.all(
         [
@@ -157,6 +158,7 @@ export default Command.make("harden", { commits, scope }).pipe(
         ],
         { concurrency: "unbounded" }
       )
+
       const prompt = renderHardenPrompt(context, {
         adamantiteVersion: version,
         commits,
@@ -166,6 +168,7 @@ export default Command.make("harden", { commits, scope }).pipe(
 
       if (!isInteractive) {
         yield* prompter.message(prompt)
+
         return
       }
 
@@ -179,10 +182,12 @@ export default Command.make("harden", { commits, scope }).pipe(
 
       if (resolution._tag !== "Ended") {
         yield* prompter.outro("Harden ended without an agent session.")
+
         return
       }
 
       const { agent } = resolution
+
       // The agent verifies custom rules during the session with temporary cases. The resulting
       // project must still pass check and Doctor after the session ends.
       const checkPassed = yield* Toolchain.check({ cwd }).pipe(
@@ -192,12 +197,15 @@ export default Command.make("harden", { commits, scope }).pipe(
           CommandFailed: () => Effect.succeed(false),
         })
       )
+
       // The session can change the project, so agent reach and assessment share a fresh read.
       const project = yield* readProject(cwd)
+
       const [reachAfter, assessment] = yield* Effect.all(
         [readHardenReach(cwd, project.workspace, scopeDirectory), assessProject(project)],
         { concurrency: "unbounded" }
       )
+
       // A link that was broken before the session is a gap that the user may not have approved, so
       // only a link that the session added fails the verification.
       const brokenBefore = new Set(
@@ -206,6 +214,7 @@ export default Command.make("harden", { commits, scope }).pipe(
           onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
         })
       )
+
       const addedBrokenLinks = Option.match(reachAfter, {
         onNone: () => [],
         onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
@@ -232,6 +241,7 @@ export default Command.make("harden", { commits, scope }).pipe(
 
       if (!checkPassed || assessment.findings.length > 0 || addedBrokenLinks.length > 0) {
         yield* prompter.outro("⚠️ Harden verification failed.")
+
         return yield* new CommandFailed({
           command: "harden",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -272,6 +282,7 @@ export default Command.make("harden", { commits, scope }).pipe(
         Effect.gen(function* () {
           const prompter = yield* Prompter
           yield* prompter.cancel("Harden was cancelled.")
+
           return yield* new CommandFailed({
             command: "harden",
             exitCode: ChildProcessSpawner.ExitCode(1),

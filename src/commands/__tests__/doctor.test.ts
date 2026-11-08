@@ -60,6 +60,7 @@ function runCopyResolution() {
     const copied: string[] = []
     const prompter = createPrompterTestContext({ selectResponses: ["copy"] })
     const runner = makeHandoffRunner()
+
     const interactive = Layer.succeed(TerminalCapabilities)({
       copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
       isInteractive: Effect.succeed(true),
@@ -190,6 +191,7 @@ describe("doctor", () => {
           }),
         },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
@@ -240,6 +242,7 @@ describe("doctor", () => {
           }),
         },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
@@ -275,6 +278,7 @@ describe("doctor", () => {
           "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
         },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
@@ -312,6 +316,7 @@ describe("doctor", () => {
           }),
         },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
@@ -407,6 +412,7 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const prompter = createPrompterTestContext({ selectResponses: [claudeAgent] })
+
       // A nonzero agent exit must not matter: reassessment is the oracle.
       const runner = makeHandoffRunner({
         agentExit: 1,
@@ -452,10 +458,12 @@ describe("doctor", () => {
   it.effect("report surviving findings and fail when the agent repairs nothing", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
+
       const prompter = createPrompterTestContext({
         confirmResponses: [false],
         selectResponses: [claudeAgent],
       })
+
       const runner = makeHandoffRunner()
 
       const exit = yield* runCommand(doctorCommand, [], {
@@ -479,10 +487,12 @@ describe("doctor", () => {
   it.effect("fall back to the prompt copy offer when the agent CLI is missing", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
+
       const prompter = createPrompterTestContext({
         confirmResponses: [false],
         selectResponses: [claudeAgent],
       })
+
       // Installed at menu time, gone at spawn time: the race the fallback covers.
       const runner = makeHandoffRunner({ agentExit: "not-found" })
 
@@ -507,10 +517,12 @@ describe("doctor", () => {
   it.effect("surface the spawn failure detail and fall back to the copy offer", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
+
       const prompter = createPrompterTestContext({
         confirmResponses: [false],
         selectResponses: [codexAgent],
       })
+
       const runner = makeHandoffRunner({ agentExit: "spawn-error" })
 
       const exit = yield* runCommand(doctorCommand, [], {
@@ -552,10 +564,12 @@ describe("doctor", () => {
   it.effect("offer only the copy actions when no agent CLI is installed", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()
+
       const prompter = createPrompterTestContext({
         confirmResponses: [false],
         selectResponses: ["copy"],
       })
+
       const runner = makeHandoffRunner({ installedCommands: [] })
 
       const exit = yield* runCommand(doctorCommand, [], {
@@ -590,6 +604,7 @@ describe("doctor", () => {
     Effect.gen(function* () {
       const files = makeFindingsFixture()
       const prompter = createPrompterTestContext({ selectResponses: [geminiAgent] })
+
       const runner = makeHandoffRunner({
         installedCommands: ["gemini"],
         onAgentRun: () => {

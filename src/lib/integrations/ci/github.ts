@@ -25,10 +25,13 @@ import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspac
 
 const CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
+
 const FORMAT_CHECK_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+format|deno(?:\s+(?!task\b)\S+)*\s+task\s+format)(?:\s+--)?\s+--check\b/
+
 const MONOREPO_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+(?:check|fix):monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+(?:check|fix):monorepo|adamantite\s+monorepo)(?=\s|$)/
+
 const RULE_TEST_COMMAND_REGEX = /\badamantite\s+rule\s+test(?=\s|$)/
 
 const workflowTemplate = getWorkflowTemplate()
@@ -79,6 +82,7 @@ const readWorkflow = (content: string, path: string) =>
     Effect.map(({ jobs }) => {
       const jobList = Object.values(jobs)
       const steps = jobList.flatMap((job) => job.steps ?? [])
+
       const matrixCommands = jobList.flatMap((job) =>
         Option.match(Schema.decodeUnknownOption(Matrix)(job.strategy?.matrix), {
           onNone: () => [],
@@ -225,12 +229,16 @@ export default defineIntegration({
 
       const managedScripts = getManagedScripts(packageJson)
       const workflow = yield* readWorkflow(content.value, workflowPath)
+
       const runs = (commandRegex: RegExp) =>
         workflow.commands.some((command) => commandRegex.test(command))
+
       const hasHardcodedNodeVersion = workflow.nodeVersions.some((version) =>
         /^\d/.test(String(version))
       )
+
       const isMissingCheckCommand = managedScripts.includes("check") && !runs(CHECK_COMMAND_REGEX)
+
       const legacyFindings = [
         ...(runs(FORMAT_CHECK_COMMAND_REGEX) ? [legacyFormatStepFinding] : []),
         ...(runs(MONOREPO_COMMAND_REGEX) ? [legacyMonorepoStepFinding] : []),
@@ -323,6 +331,7 @@ export default defineIntegration({
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
+
       return yield* fs.exists(path.join(cwd, files[0].path))
     }),
   files,

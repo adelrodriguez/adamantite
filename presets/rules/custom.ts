@@ -130,17 +130,21 @@ function writeIfChanged(path: string, content: string) {
 function writeEntryModule(dir: string, name: string) {
   const hash = createHash("sha256").update(`${dir}\0${name}`).digest("hex").slice(0, 16)
   const fileName = `rules-${hash}.mjs`
+
   const content = [
     `import { loadRules } from ${JSON.stringify(RULES_MODULE_URL)}`,
     "",
     `export default await loadRules(${JSON.stringify(dir)}, ${JSON.stringify(name)})`,
     "",
   ].join("\n")
+
   const root = findNodeModules(dir)
+
   const candidates = [
     ...(root === undefined ? [] : [join(root, CACHE_DIRECTORY, fileName)]),
     join(tmpdir(), "adamantite", fileName),
   ]
+
   const failures: unknown[] = []
 
   for (const path of candidates) {
@@ -174,6 +178,7 @@ function writeEntryModule(dir: string, name: string) {
  */
 export default function custom(options: CustomRulesOptions = {}): OxlintConfig {
   const name = options.name ?? DEFAULT_PLUGIN_NAME
+
   const dir = resolveRulesDirectory(
     options.dir ?? DEFAULT_DIRECTORY,
     new Error("custom()").stack ?? ""

@@ -100,6 +100,7 @@ export default defineIntegration({
 
       const state = yield* detect(cwd)
       const runtimeFindings = yield* assessOxlintRuntime(project)
+
       const packageActions = getPackageActions(
         packageJson,
         { name: "oxlint", version: VERSION },
@@ -114,10 +115,12 @@ export default defineIntegration({
               Option.getOrUndefined
             )
           : undefined
+
       const configContent = toOxlintTsConfigContent()
-      const retiredPresetFindings = retiredLintPresets
-        .filter((retired) => checkImportsLintPreset(lintConfig, retired.name))
-        .map(({ finding }) => finding)
+
+      const retiredPresetFindings = retiredLintPresets.flatMap((retired) =>
+        checkImportsLintPreset(lintConfig, retired.name) ? [retired.finding] : []
+      )
 
       return {
         applicable: true,

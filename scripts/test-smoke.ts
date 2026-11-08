@@ -130,6 +130,7 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
     run(process.execPath, [cliPath, "rule", "add", "no-smoke"], { cwd, env }),
     "Wrote .adamantite/lint/no-smoke.ts."
   )
+
   const input = [
     'import { RuleTester } from "adamantite/rules/testing"',
     'import rule from "./.adamantite/lint/no-smoke.ts"',
@@ -138,6 +139,7 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
     '  valid: ["const value: number = 1"],',
     "})",
   ].join("\n")
+
   const options = { cwd, env, input }
   const args = ["--input-type=module"]
 
@@ -162,6 +164,7 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
   )
   const testPath = join(cwd, ".adamantite", "lint", "no-smoke.test.ts")
   run(process.execPath, [cliPath, "rule", "add", "test", "no-smoke"], { cwd, env })
+
   try {
     assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
     // Load the plugin without linting the monorepo's unrelated dependency-version fixtures.
@@ -175,6 +178,7 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
     cwd,
     env,
   })
+
   try {
     assertIncludes(
       run(process.execPath, [cliPath, "rule", "test", "--path", customTest], { cwd, env }),
@@ -261,6 +265,7 @@ try {
     ],
     { cwd: effectFixture, env: effectEnv }
   )
+
   const typescriptResolver = join(
     effectFixture,
     "node_modules",
@@ -268,7 +273,9 @@ try {
     "lib",
     "getExePath.js"
   )
+
   const originalResolver = readFileSync(typescriptResolver, "utf8")
+
   const originalCompiler = run(
     process.execPath,
     [
@@ -278,9 +285,11 @@ try {
     ],
     { cwd: effectFixture, env: effectEnv }
   ).trim()
+
   const originalCompilerHash = createHash("sha256")
     .update(readFileSync(originalCompiler))
     .digest("hex")
+
   run(
     process.execPath,
     [
@@ -324,6 +333,7 @@ try {
   )
   assertFileContains(join(effectFixture, ".zed", "settings.json"), '"typescript-ls"')
   assertFileContains(join(effectFixture, "tsconfig.json"), '"diagnostics": true')
+
   const serverFiles = run(
     process.execPath,
     [
@@ -335,6 +345,7 @@ try {
     ],
     { cwd: effectFixture, env: effectEnv }
   )
+
   assertIncludes(serverFiles, join(effectFixture, "index.ts"))
   run(process.execPath, [cliPath, "doctor"], { cwd: effectFixture, env: effectEnv })
 
@@ -380,6 +391,7 @@ try {
     }
   )
   run(process.execPath, [cliPath, "doctor"], { cwd: effectFixture, env: effectEnv })
+
   if (
     readFileSync(typescriptResolver, "utf8") !== originalResolver
     || createHash("sha256").update(readFileSync(originalCompiler)).digest("hex")
@@ -481,6 +493,7 @@ try {
   // devDependency, although no script or import references them. `tsrs` is an optional peer of
   // Adamantite, which Knip counts as a use.
   console.info("Running `adamantite analyze --only unused` in the monorepo fixture...")
+
   const unusedOutput = run(process.execPath, [cliPath, "analyze", "--only", "unused"], {
     cwd: monorepoFixture,
     env: monorepoEnv,
@@ -491,6 +504,7 @@ try {
   }
 
   console.info("Running `adamantite analyze` against the version mismatch...")
+
   const analysis = runExpectingFailure(process.execPath, [cliPath, "analyze"], {
     cwd: monorepoFixture,
     env: monorepoEnv,
@@ -505,6 +519,7 @@ try {
   assertIncludes(analysis.output, "(knip)")
 
   console.info("Running `adamantite analyze --only monorepo --fix`...")
+
   const fixOutput = run(
     process.execPath,
     [
@@ -576,6 +591,7 @@ try {
   )
 
   console.info("Running `adamantite doctor` against a config that imports a workspace package...")
+
   const doctorOutput = spawn(process.execPath, [cliPath, "doctor"], {
     cwd: monorepoFixture,
     env: monorepoEnv,
@@ -598,5 +614,7 @@ try {
 }
 
 rmSync(fixture, { force: true, recursive: true })
+
 rmSync(monorepoFixture, { force: true, recursive: true })
+
 rmSync(effectFixture, { force: true, recursive: true })

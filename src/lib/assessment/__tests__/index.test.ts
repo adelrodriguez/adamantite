@@ -195,6 +195,7 @@ describe("assessProject", () => {
     (editor) =>
       Effect.gen(function* () {
         const settingsPath = `.${editor.name}/settings.json`
+
         const files = createFileSystemTestContext({
           files: {
             "package.json": "{}",
@@ -202,13 +203,16 @@ describe("assessProject", () => {
           },
           root: ROOT,
         })
+
         const provideFiles = Effect.provide([
           files.layer,
           Path.layer,
           makeModuleResolverLayer(ROOT),
         ])
+
         const assess = Effect.gen(function* () {
           const project = yield* readProject(ROOT)
+
           return yield* editor.assess(project)
         }).pipe(provideFiles)
 
@@ -245,13 +249,16 @@ describe("assessProject", () => {
           files: { "package.json": "{}", [`.${editor.name}/settings.json`]: content },
           root: ROOT,
         })
+
         const result = yield* Effect.gen(function* () {
           const project = yield* readProject(ROOT)
+
           return yield* editor.assess(project)
         }).pipe(
           Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)]),
           Effect.flip
         )
+
         expect(result).toMatchObject({ _tag: error })
       }
     })
@@ -306,13 +313,16 @@ describe("assessProject", () => {
   ])("assess $editor settings $settings without changing files", ({ editor, settings, finding }) =>
     Effect.gen(function* () {
       const settingsPath = `.${editor}/settings.json`
+
       const files = createFileSystemTestContext({
         files: { "package.json": "{}" },
         root: ROOT,
       })
+
       if (settings !== undefined) {
         files.write(settingsPath, settings)
       }
+
       const before = files.list().map((file) => [file, files.read(file)])
       files.makeReadOnly(ROOT)
 
@@ -365,8 +375,10 @@ describe("assessProject", () => {
         },
         root: ROOT,
       })
+
       const reads: string[] = []
       const discoveries: string[] = []
+
       const fileSystem = Layer.effect(FileSystem.FileSystem)(
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem
@@ -375,6 +387,7 @@ describe("assessProject", () => {
             ...fs,
             readFileString: (path: string, encoding?: string) => {
               reads.push(path)
+
               return fs.readFileString(path, encoding)
             },
           }

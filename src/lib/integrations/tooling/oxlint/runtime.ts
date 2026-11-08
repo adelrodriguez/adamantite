@@ -71,6 +71,7 @@ const findWindowsLauncher = Effect.fn("findWindowsLauncher")(function* (project:
 const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (project: string) {
   const path = yield* Path.Path
   const tsrs = yield* resolvePackageDirectory(project, "tsrs")
+
   // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` bin adds the `--lint` flag
   // of tsrs.
   const launcher = Option.isNone(tsrs)

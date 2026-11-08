@@ -23,6 +23,7 @@ function makeTestLayer(fileSystemLayer: Layer.Layer<FileSystem.FileSystem>) {
 function resolve(cwd: string) {
   return Effect.gen(function* () {
     const resolver = yield* NodeVersionResolver
+
     return yield* resolver.resolve(cwd)
   })
 }
@@ -52,6 +53,7 @@ describe("NodeVersionResolver", () => {
         module: "FileSystem",
         pathOrDescriptor: `${ROOT}/.node-version`,
       })
+
       const fileSystemLayer = FileSystem.layerNoop({
         readFileString: () => Effect.fail(cause),
       })
@@ -72,6 +74,7 @@ describe("NodeVersionResolver", () => {
       const result = yield* Effect.result(runResolve(files))
 
       expect(Result.isFailure(result)).toBe(true)
+
       if (Result.isFailure(result)) {
         expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
       }
@@ -85,6 +88,7 @@ describe("NodeVersionResolver", () => {
     Schema.Literals(["22.19.0", "22", "lts/iron"]),
     Schema.Literals(["", "  ", " # pinned"]),
   ])
+
   // Lines the parser must ignore: comments, other tools, node-prefixed tool names, and bare
   // `node` entries without a version. The `node # pinned` shapes stay inert only when comments
   // are stripped before matching, so they keep the comment handling load-bearing.
@@ -113,9 +117,11 @@ describe("NodeVersionResolver", () => {
     ({ hasNode, lines, node, position }) =>
       Effect.gen(function* () {
         const allLines: string[] = [...lines]
+
         if (hasNode) {
           allLines.splice(Math.min(position, allLines.length), 0, node)
         }
+
         const files = makeFiles({ ".tool-versions": allLines.join("\n") })
 
         const source = yield* runResolve(files)
@@ -133,12 +139,14 @@ describe("NodeVersionResolver", () => {
     Schema.Struct({ content: Schema.Literal(""), valid: Schema.Literal(false) }),
     Schema.Struct({ content: Schema.Literal("   \n"), valid: Schema.Literal(false) }),
   ])
+
   const toolVersionsContent = Schema.Union([
     Schema.Struct({ content: Schema.Literal("nodejs 22.19.0\n"), valid: Schema.Literal(true) }),
     Schema.Struct({ content: Schema.Literal("node 22\n"), valid: Schema.Literal(true) }),
     Schema.Struct({ content: Schema.Literal("python 3.12.0\n"), valid: Schema.Literal(false) }),
     Schema.Struct({ content: Schema.Literal("# only comments\n"), valid: Schema.Literal(false) }),
   ])
+
   const packageJsonContent = Schema.Union([
     Schema.Struct({
       content: Schema.Literal(JSON.stringify({ engines: { node: ">=22" }, name: "pkg" })),
@@ -174,18 +182,23 @@ describe("NodeVersionResolver", () => {
     ({ nodeVersion, nvmrc, packageJson, toolVersions }) =>
       Effect.gen(function* () {
         const fixtures: Record<string, string> = {}
+
         if (nodeVersion) {
           fixtures[".node-version"] = nodeVersion.content
         }
+
         if (nvmrc) {
           fixtures[".nvmrc"] = nvmrc.content
         }
+
         if (toolVersions) {
           fixtures[".tool-versions"] = toolVersions.content
         }
+
         if (packageJson) {
           fixtures["package.json"] = packageJson.content
         }
+
         const files = makeFiles(fixtures)
 
         const source = yield* runResolve(files)
@@ -199,12 +212,14 @@ describe("NodeVersionResolver", () => {
               : packageJson?.valid
                 ? { _tag: "File", path: "package.json" }
                 : { _tag: "Version", value: "lts/*" }
+
         expect(source).toStrictEqual(expected)
       }),
     { arbitrary: { runs: 200 } }
   )
 
   const nonEmptyVersion = Schema.Literals(["22.19.0", ">=22", "lts/*"])
+
   const declaringManifest = Schema.Union([
     Schema.Struct({ volta: Schema.Struct({ node: nonEmptyVersion }) }),
     Schema.Struct({ engines: Schema.Struct({ node: nonEmptyVersion }) }),
@@ -225,6 +240,7 @@ describe("NodeVersionResolver", () => {
       }),
     }),
   ])
+
   const nonDeclaringManifest = Schema.Union([
     Schema.Struct({}),
     Schema.Struct({ engines: Schema.Struct({}) }),

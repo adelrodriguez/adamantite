@@ -80,6 +80,7 @@ const readSkillCopy = Effect.fn("readSkillCopy")(function* (directory: string) {
     (entry) =>
       Effect.gen(function* () {
         const target = path.join(directory, entry)
+
         const info = yield* fs
           .stat(target)
           .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: target })))
@@ -108,6 +109,7 @@ const getSkillDirectory = Effect.fn("getSkillDirectory")(function* (
   folder: SkillFolder
 ) {
   const path = yield* Path.Path
+
   return path.join(cwd, folder, SKILL_NAME)
 })
 
@@ -194,9 +196,11 @@ export const removeSkillsLockEntry = Effect.fn("removeSkillsLockEntry")(function
     yield* fs
       .remove(lockPath)
       .pipe(Effect.mapError((cause) => new FailedToWriteFile({ cause, path: lockPath })))
+
     return true
   }
 
   yield* writeJsonFile(lockPath, { ...lock, skills })
+
   return true
 })

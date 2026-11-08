@@ -96,6 +96,7 @@ describe("tailwind and react preset overlap", () => {
       "react(no-unknown-property)",
       "react(style-prop-object)",
     ])
+
     const overlapping = diagnostics
       .map((diagnostic) => diagnostic.code)
       .filter((code) => reactCodes.has(code))

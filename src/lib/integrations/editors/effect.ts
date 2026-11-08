@@ -12,6 +12,7 @@ import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect"
 const SDK_METADATA = "adamantite-sdk.json"
+
 const NATIVE_TYPESCRIPT = Schema.Struct({
   gitHead: Schema.NonEmptyString,
   version: Schema.NonEmptyString,
@@ -31,16 +32,21 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
 
   for (const name of ["typescript", "@typescript/native"]) {
     const directory = yield* resolvePackageDirectory(cwd, name)
+
     if (Option.isNone(directory)) {
       continue
     }
+
     const installed = yield* readPackageJson(directory.value)
+
     if (Number(installed.version?.split(".")[0]) >= 7) {
       const native = Schema.decodeUnknownOption(NATIVE_TYPESCRIPT)(installed)
+
       if (Option.isSome(native)) {
         gitHead = native.value.gitHead
         typescriptVersion = native.value.version
       }
+
       break
     }
   }
@@ -53,10 +59,12 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   }
 
   const platform = `${process.platform}-${process.arch}`
+
   const platformDirectory = yield* resolvePackageDirectory(
     effectDirectory,
     `@effect/tsgo-${platform}`
   )
+
   if (Option.isNone(platformDirectory)) {
     return yield* new EffectEditorUnavailable({
       reason: `The Effect editor SDK cannot find \`@effect/tsgo-${platform}\`. Install the optional dependencies on a supported platform.`,
@@ -69,6 +77,7 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   const builds = checkIsJsonObject(components) && components.typescript
   const tags = checkIsJsonObject(metadata) && metadata.tags
   const typescriptTags = checkIsJsonObject(tags) && tags.typescript
+
   if (
     !checkIsJsonObject(metadata)
     || metadata.schemaVersion !== 5
@@ -79,14 +88,17 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   }
 
   const executable = process.platform === "win32" ? "tsc.exe" : "tsc"
+
   for (const [version, build] of Object.entries(builds)) {
     if (!checkIsJsonObject(build) || build.gitHead !== gitHead) {
       continue
     }
+
     const directory =
       version === typescriptTags.latest
         ? path.join(platformDirectory.value, "lib")
         : path.join(platformDirectory.value, "artifacts", "typescript", version)
+
     if (
       (yield* fs.exists(path.join(directory, executable)))
       && (yield* fs.exists(path.join(directory, "lib.d.ts")))
@@ -109,23 +121,29 @@ const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
   const sdk = path.join(cwd, EFFECT_SDK_PATH)
   const metadataPath = path.join(sdk, SDK_METADATA)
   const content = yield* readFileIfExists(metadataPath)
+
   if (Option.isNone(content)) {
     return false
   }
+
   const metadata = yield* parseJson(content.value, metadataPath).pipe(
     Effect.catchTag("FailedToParseFile", () => Effect.succeed(null))
   )
+
   if (
     !checkIsJsonObject(metadata)
     || !Object.entries(source).every(([key, value]) => metadata[key] === value)
   ) {
     return false
   }
+
   const entries = yield* fs.readDirectory(source.source)
+
   const copied = yield* Effect.forEach(
     entries.filter((name) => name === source.executable || name.endsWith(".d.ts")),
     (name) => fs.exists(path.join(sdk, name))
   )
+
   return copied.every(Boolean)
 })
 
@@ -135,9 +153,11 @@ const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
  */
 export const readEffectEditor = Effect.fn("readEffectEditor")(function* (cwd: string) {
   const directory = yield* resolvePackageDirectory(cwd, "@effect/tsgo")
+
   if (Option.isNone(directory)) {
     return Option.none()
   }
+
   const path = yield* Path.Path
   const manifest = yield* readPackageJson(directory.value)
   const presetPath = path.join(directory.value, "oxlint-schema.json")
@@ -145,23 +165,28 @@ export const readEffectEditor = Effect.fn("readEffectEditor")(function* (cwd: st
   const definitions = checkIsJsonObject(preset) && preset.definitions
   const rules = checkIsJsonObject(definitions) && definitions["DummyRuleMap"]
   const properties = checkIsJsonObject(rules) && rules["properties"]
+
   if (!checkIsJsonObject(properties)) {
     return yield* new InvalidConfigFormat({ path: presetPath })
   }
+
   // The schema lists every Effect rule, including rules excluded from upstream presets.
   const rulesCustomization = Object.fromEntries(
     Object.keys(properties)
       .filter((rule) => rule.startsWith("effecttsgo/"))
       .map((rule) => [rule, { severity: "off" }])
   ) satisfies Schema.JsonObject
+
   const source = resolveSdkSource(cwd, directory.value, manifest.version ?? "unknown")
 
   return Option.some({
     prepareSdk: Effect.gen(function* () {
       const resolved = yield* source
+
       if (yield* sdkIsCurrent(cwd, resolved)) {
         return
       }
+
       const fs = yield* FileSystem.FileSystem
       const sdk = path.join(cwd, EFFECT_SDK_PATH)
       yield* fs.remove(sdk, { force: true, recursive: true })

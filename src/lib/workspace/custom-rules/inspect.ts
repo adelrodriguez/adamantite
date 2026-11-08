@@ -160,6 +160,7 @@ export function findCustomRulesCalls(file: string, content: string): CustomRules
   }
 
   const calls: CustomRulesCall[] = []
+
   const visitor = new Visitor({
     CallExpression(node) {
       if (node.callee.type !== "Identifier" || !localNames.includes(node.callee.name)) {
@@ -287,11 +288,13 @@ export function inspectRuleFile(file: string, content: string): string[] {
   }
 
   const problems: string[] = []
+
   const report = (offset: number, construct: string) => {
     problems.push(
       `Line ${getLine(content, offset)}: ${construct} needs a TypeScript transform, which type stripping does not do.`
     )
   }
+
   const visitor = new Visitor({
     TSEnumDeclaration(node) {
       if (!node.declare) {

@@ -24,6 +24,7 @@ export interface BrokenLink {
 }
 
 const MARKDOWN_EXTENSION = /\.(?:md|mdx|mdc)$/u
+
 // A fence opens with three or more backticks or tildes. A fence of the same character that is at
 // least as long, with only spaces or tabs after it, closes it, as CommonMark says. The end of the
 // file also closes it.
@@ -62,6 +63,7 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const listed = new Set(files)
+
   const prose = new Map(
     yield* Effect.forEach(
       files,
@@ -73,10 +75,16 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       { concurrency: "unbounded" }
     )
   )
+
   const resolve = (candidates: readonly string[]) => {
-    const normalized = candidates
-      .map((candidate) => posix.normalize(candidate))
-      .filter((candidate) => candidate !== "." && !candidate.startsWith(".."))
+    const normalized = candidates.flatMap((candidate) => {
+      const normalizedCandidate = posix.normalize(candidate)
+
+      return normalizedCandidate !== "." && !normalizedCandidate.startsWith("..")
+        ? [normalizedCandidate]
+        : []
+    })
+
     const file = normalized.find((candidate) => listed.has(candidate))
 
     if (file !== undefined) {
@@ -93,19 +101,29 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       ? []
       : files.filter((listedFile) => posix.dirname(listedFile) === folder)
   }
+
   const getLinkTargets = (file: string) => {
     const text = (prose.get(file) ?? "").replaceAll(CODE_SPAN, "")
 
-    return [...matchAll(text, INLINE_LINK), ...matchAll(text, LINK_DEFINITION)]
-      .filter((target) => !URL_SCHEME.test(target) && !target.startsWith("#"))
-      .map((target) => cleanTarget(target))
-      .filter((target) => target.length > 0)
-      .map((target) =>
+    return [...matchAll(text, INLINE_LINK), ...matchAll(text, LINK_DEFINITION)].flatMap((link) => {
+      if (URL_SCHEME.test(link) || link.startsWith("#")) {
+        return []
+      }
+
+      const target = cleanTarget(link)
+
+      if (target.length === 0) {
+        return []
+      }
+
+      return [
         posix.normalize(
           target.startsWith("/") ? target.slice(1) : posix.join(posix.dirname(file), target)
-        )
-      )
+        ),
+      ]
+    })
   }
+
   const getReferences = (file: string) => [
     ...getLinkTargets(file).flatMap((target) => resolve([target])),
     ...matchAll(prose.get(file) ?? "", CODE_SPAN).flatMap((span) =>
@@ -130,6 +148,7 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
       .filter((target) => MARKDOWN_EXTENSION.test(target) && !listed.has(target))
       .map((target) => ({ file, target }))
   )
+
   // A Markdown file that git ignores still exists.
   const brokenLinks = yield* Effect.filter(
     linksToMarkdown,

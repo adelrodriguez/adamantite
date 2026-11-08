@@ -64,6 +64,7 @@ describe("zed", () => {
             { id: "zed-oxlint-entry" },
           ],
         })
+
         if (result.applicable) {
           expect(result.findings[0]?.currentState).not.toContain("typeAware")
         }
@@ -98,6 +99,7 @@ describe("zed", () => {
           Effect.flatMap((project) => zed.assess(project)),
           provideFiles(files)
         )
+
         expect(stale).toMatchObject({ findings: [{ id: "zed-effect-server" }] })
 
         yield* zed.update(cwd).pipe(provideFiles(files))
@@ -112,10 +114,12 @@ describe("zed", () => {
           ],
           path: "node",
         })
+
         const healthy = yield* readProject(cwd).pipe(
           Effect.flatMap((project) => zed.assess(project)),
           provideFiles(files)
         )
+
         expect(healthy).toMatchObject({ findings: [] })
 
         yield* zed.create(cwd).pipe(provideFiles(files))
@@ -141,12 +145,14 @@ describe("zed", () => {
             ],
             path: "node",
           })
+
           for (const language of ["JavaScript", "JSX", "TypeScript", "TSX"]) {
             expect(config).toHaveProperty(
               ["languages", language, "language_servers"],
               ["typescript-ls", "!vtsls", "!typescript-language-server", "..."]
             )
           }
+
           expect(config).toHaveProperty(
             [
               "lsp",
@@ -204,6 +210,7 @@ describe("zed", () => {
             },
           }),
         })
+
         yield* zed.update(ROOT).pipe(provideFiles(files))
         const first = files.read(SETTINGS_PATH)
         const config = yield* parseJson(first)
@@ -305,6 +312,7 @@ describe("zed", () => {
     it.effect("preserve formatter entries for unmanaged languages", () =>
       Effect.gen(function* () {
         const formatter = [{ external: "custom" }, { external: "custom" }]
+
         const files = makeFiles({
           [SETTINGS_PATH]: yield* stringifyJson({ languages: { Svelte: { formatter } } }),
         })
@@ -347,6 +355,7 @@ describe("zed", () => {
             name: "custom",
           },
         }
+
         const files = makeFiles({
           [SETTINGS_PATH]: yield* stringifyJson({
             languages: { JavaScript: { formatter: [formatter, formatter] } },
@@ -429,6 +438,7 @@ describe("zed", () => {
         const result = yield* Effect.result(zed.update(ROOT).pipe(provideFiles(files)))
 
         expect(Result.isFailure(result)).toBe(true)
+
         if (Result.isFailure(result)) {
           expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
         }

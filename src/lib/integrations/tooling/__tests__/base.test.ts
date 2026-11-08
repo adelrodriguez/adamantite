@@ -112,15 +112,19 @@ describe("detectToolingConfig", () => {
     ({ hasJson, hasJsonc, hasTs, legacyOrder }) =>
       Effect.gen(function* () {
         const fixtures: Record<string, string> = {}
+
         if (hasTs) {
           fixtures["tool.config.ts"] = "export default {}\n"
         }
+
         if (hasJsonc) {
           fixtures["tool.jsonc"] = "{}\n"
         }
+
         if (hasJson) {
           fixtures["tool.json"] = "{}\n"
         }
+
         const files = makeFiles(fixtures)
 
         const state = yield* detect(files, { config: "tool.config.ts", legacyConfigs: legacyOrder })
@@ -132,11 +136,13 @@ describe("detectToolingConfig", () => {
             : hasJson
               ? "tool.json"
               : null
+
         expect(state.active?.file ?? null).toBe(expectedActive)
 
         const expectedLegacy = [hasJson ? "tool.json" : null, hasJsonc ? "tool.jsonc" : null]
           .filter((file) => file !== null)
           .filter((file) => file !== expectedActive)
+
         expect(
           EffectArray.sort(
             state.legacy.map((entry) => entry.file),
@@ -166,6 +172,7 @@ describe("getPackageActions", () => {
     Arbitrary.map((parts) => {
       if (parts === null) return null
       const [workspacePrefix, rangePrefix, version] = parts
+
       return { version, written: `${workspacePrefix}${rangePrefix}${version}` }
     })
   )

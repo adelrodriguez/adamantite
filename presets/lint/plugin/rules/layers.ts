@@ -347,6 +347,7 @@ function keepLowest(layers: LayerMap, names: readonly string[]) {
 export function findLowerRepairs(layers: LayerMap, from: string, to: string): string[] {
   const fromImportable = listImportable(layers, from)
   const toImportable = listImportable(layers, to)
+
   const common = Object.keys(layers).filter(
     (name) => fromImportable.has(name) && toImportable.has(name) && (from !== to || name !== from)
   )
@@ -608,6 +609,7 @@ function checkImport(
 
   // An import that does not resolve is outside the map. TypeScript reports it.
   const target = file.modules.resolve(file.importer, source.value, options.conditions)
+
   const relative =
     target === undefined
       ? undefined
@@ -632,11 +634,13 @@ function checkImport(
       messageId: "entry",
       node: source,
     })
+
     return
   }
 
   if (to.kind !== "layer") {
     reportUnmapped(context, source, to, root, options.configPath)
+
     return
   }
 
@@ -677,6 +681,7 @@ export function createLayersRule(modules: Modules): Rule {
       const relative = posix.relative(packageDir, importer)
       const reported: ReportedFile[] = []
       const linted: LintedFile[] = []
+
       const active: Array<{
         readonly options: LayersOptions
         readonly root: string

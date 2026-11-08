@@ -50,13 +50,17 @@ export default defineIntegration({
       const relative = (target: string) => path.relative(cwd, target) || "."
       const packageDirectories = [cwd, ...workspace.packageDirectories]
       const { calls, legacyImports, unresolvedCalls, unresolvedImports } = customRules
+
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )
+
       const loadedFolders = Array.dedupe(calls.map((call) => call.dir))
+
       const oldDefaultFolders = packageDirectories.map((directory) =>
         path.join(directory, ".adamantite/rules")
       )
+
       const folders = Array.getSomes(
         yield* Effect.forEach(
           Array.dedupe([...defaultFolders, ...oldDefaultFolders, ...loadedFolders]),
@@ -64,6 +68,7 @@ export default defineIntegration({
           { concurrency: "unbounded" }
         )
       ).filter((folder) => folder.ruleFiles.length > 0)
+
       const legacyFolders = folders.filter(
         (folder) =>
           unresolvedCalls.length === 0
@@ -83,6 +88,7 @@ export default defineIntegration({
       }
 
       const unknownNameCalls = calls.filter((call) => call.name === null)
+
       const warnings = [
         ...unresolvedImports.map(
           ({ from, specifier }) =>
@@ -97,6 +103,7 @@ export default defineIntegration({
             `Doctor cannot read the \`name\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that its plugin name differs from the other rules folders.`
         ),
       ]
+
       const findings: Finding[] = []
 
       // A call with an unknown `dir`, or an unresolved import, can load any folder, so an unloaded

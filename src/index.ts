@@ -32,6 +32,7 @@ NodeRuntime.runMain(program, {
   teardown: (exit, onExit) => {
     if (Exit.isSuccess(exit)) {
       onExit(Number(exit.value))
+
       return
     }
 

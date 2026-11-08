@@ -56,9 +56,11 @@ const tsgoPackageJson = require.resolve("@effect/tsgo/package.json")
 
 const CategoryPreset = Schema.Struct({ rules: Schema.Record(Schema.String, Schema.String) })
 const decodeCategoryPreset = Schema.decodeUnknownSync(Schema.fromJsonString(CategoryPreset))
+
 const RootPackageJson = Schema.Struct({
   devDependencies: Schema.Record(Schema.String, Schema.String),
 })
+
 const decodeRootPackageJson = Schema.decodeUnknownSync(Schema.fromJsonString(RootPackageJson))
 
 const upstreamRules = CATEGORY_PRESETS.flatMap((category) =>
@@ -162,14 +164,18 @@ describe("effect preset", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
     )
+
     const platformDirectory = dirname(
       createRequire(tsgoPackageJson).resolve(
         `@effect/tsgo-${process.platform}-${process.arch}/package.json`
       )
     )
-    const missing = ["oxlint", "tsrs"]
-      .map((tool) => `${tool}/${devDependencies[tool]}`)
-      .filter((artifact) => !existsSync(join(platformDirectory, "artifacts", artifact)))
+
+    const artifacts = ["oxlint", "tsrs"].map((tool) => `${tool}/${devDependencies[tool]}`)
+
+    const missing = artifacts.filter(
+      (artifact) => !existsSync(join(platformDirectory, "artifacts", artifact))
+    )
 
     expect(missing).toStrictEqual([])
   })

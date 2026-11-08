@@ -88,6 +88,7 @@ export function getLegacyMonorepoScriptFindings(packageJson: PackageJson): Findi
   }
 
   const hasAnalyze = getManagedScripts(packageJson).includes("analyze")
+
   const scriptList = legacyScripts
     .map(({ command, name }) => `\`${name}\` (\`${command}\`)`)
     .join(", ")

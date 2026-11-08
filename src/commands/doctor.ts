@@ -30,6 +30,7 @@ export default Command.make("doctor").pipe(
       // Only reachable on the interactive path: the non-interactive branch fails earlier.
       const failWithFindings = Effect.gen(function* () {
         yield* prompter.outro("⚠️ Doctor found issues.")
+
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -44,12 +45,14 @@ export default Command.make("doctor").pipe(
       ) {
         const message =
           "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
+
         if (isInteractive) {
           yield* prompter.log.warning(message)
           yield* prompter.outro("⚠️ Doctor found issues.")
         } else {
           yield* prompter.message(message)
         }
+
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -71,6 +74,7 @@ export default Command.make("doctor").pipe(
           )
           yield* prompter.outro("✅ Doctor finished.")
         }
+
         return
       }
 
@@ -81,11 +85,13 @@ export default Command.make("doctor").pipe(
         } else if (assessment.warnings.length > 0) {
           yield* prompter.message(renderAssessmentMarkdown(assessment, version))
         }
+
         return
       }
 
       if (!isInteractive) {
         yield* prompter.message(renderAssessmentMarkdown(assessment, version))
+
         return yield* new CommandFailed({
           command: "doctor",
           exitCode: ChildProcessSpawner.ExitCode(1),
@@ -112,6 +118,7 @@ export default Command.make("doctor").pipe(
       if (after.findings.length === 0) {
         yield* prompter.log.success(`All findings were resolved by ${agent.name}.`)
         yield* prompter.outro("✅ Doctor finished.")
+
         return
       }
 
@@ -120,12 +127,14 @@ export default Command.make("doctor").pipe(
       )
       yield* printFindings(after.findings)
       yield* offerPromptCopy(renderAssessmentMarkdown(after, version))
+
       return yield* failWithFindings
     }).pipe(
       Effect.catchTag("OperationCancelled", () =>
         Effect.gen(function* () {
           const prompter = yield* Prompter
           yield* prompter.cancel("Doctor was cancelled. The findings remain.")
+
           return yield* new CommandFailed({
             command: "doctor",
             exitCode: ChildProcessSpawner.ExitCode(1),

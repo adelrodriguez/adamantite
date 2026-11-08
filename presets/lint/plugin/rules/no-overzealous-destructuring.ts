@@ -60,6 +60,7 @@ function getDepth(pattern: Pattern) {
 const rule: Rule = {
   create(context): Visitor {
     const maxDepth = readPositiveIntegerOption(context.options, "maxDepth") ?? DEFAULT_MAX_DEPTH
+
     const maxProperties =
       readPositiveIntegerOption(context.options, "maxProperties") ?? DEFAULT_MAX_PROPERTIES
 

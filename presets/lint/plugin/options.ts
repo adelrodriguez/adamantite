@@ -1,6 +1,7 @@
 import type { Options } from "@oxlint/plugins"
 
 type OptionValue = Options[number]
+
 type OptionObject = Exclude<OptionValue, OptionValue[] | boolean | number | string | null>
 
 function isOptionObject(value: OptionValue | undefined): value is OptionObject {

@@ -252,11 +252,13 @@ function makeProcessLayer(
       files.list().filter((file) => !file.startsWith("../")),
       Order.String
     )
+
   const getGitOutput = (args: ChildProcess.StandardCommand["args"]) =>
     Array.sort([...listFiles(), ...indexOnlyFiles], Order.String)
       .filter((file) => !args.includes("*.md") || MARKDOWN_FILE.test(file))
       .map((file) => `${file}\0`)
       .join("")
+
   const getOxlintOutput = () =>
     listFiles()
       .filter((file) => !lintIgnoredFiles.includes(file))
@@ -295,6 +297,7 @@ function runHarden(
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
     const context = createFileSystemTestContext({ files })
+
     const exit = yield* runCommand(hardenCommand, args, {
       files: context,
       // The monorepo configs import the shared tooling package.
@@ -356,14 +359,17 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
     const copied: string[] = []
     const prompter = createPrompterTestContext(options.prompter)
     const files = createFileSystemTestContext({ files: options.files ?? HEALTHY_FILES })
+
     const runner = makeHandoffRunner({
       ...options.runner,
       onAgentRun: () => options.onSession?.(files),
     })
+
     const terminal = Layer.succeed(TerminalCapabilities)({
       copyToClipboard: (content) => Effect.sync(() => copied.push(content)),
       isInteractive: Effect.succeed(true),
     })
+
     const fileSystem = Layer.effect(FileSystem.FileSystem)(
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem
@@ -372,11 +378,13 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
           ...fs,
           readFileString: (path: string, encoding?: string) => {
             options.onReadFile?.(path)
+
             return fs.readFileString(path, encoding)
           },
         }
       })
     ).pipe(Layer.provide(files.layer))
+
     const exit = yield* runCommand(hardenCommand, [], {
       files,
       layers: [
@@ -402,6 +410,7 @@ function runInteractiveHarden(options: InteractiveHardenOptions) {
 function runHardenHoisted() {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
+
     const files = {
       "../node_modules/adamantite/dist/presets/lint/core.js": "export default {}\n",
       "../node_modules/adamantite/package.json": yield* stringifyJson({
@@ -410,7 +419,9 @@ function runHardenHoisted() {
       }),
       "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
     }
+
     const context = createFileSystemTestContext({ files })
+
     const exit = yield* runCommand(hardenCommand, [], {
       files: context,
       layers: [
@@ -783,6 +794,7 @@ describe("harden", () => {
         "oxlint.config.ts": CORE_CONFIG,
         ...INSTALLED,
       })
+
       const rulesFolders = getSection(prompt, "### Rules folders")
 
       expect(rulesFolders).toContain("adamantite/rules")
@@ -835,6 +847,7 @@ describe("harden", () => {
           "oxlint.config.ts": CORE_CONFIG,
           ...INSTALLED,
         })
+
         const missing = Object.entries(REQUIRED_PHRASES).flatMap(([heading, phrases]) =>
           getMissingPhrases(getSection(prompt, heading), phrases).map(
             (phrase) => `${heading}: ${phrase}`
@@ -1003,6 +1016,7 @@ describe("harden", () => {
           "docs/shared.md": "# Shared\n",
           "packages/api/AGENTS.md": "Read [the shared guide](../../docs/shared.md).\n",
         }
+
         const scoped = yield* runHardenPrompt(files, ["--path", "packages/web"])
         const whole = yield* runHardenPrompt(files)
 
@@ -1425,6 +1439,7 @@ describe("harden", () => {
   it.effect("fail when Adamantite is not installed in an interactive terminal", () =>
     Effect.gen(function* () {
       const prompter = createPrompterTestContext()
+
       const exit = yield* runCommand(hardenCommand, [], {
         files: createFileSystemTestContext({ files: { "package.json": manifest({}) } }),
         layers: [prompter.layer, interactiveTerminalLayer],

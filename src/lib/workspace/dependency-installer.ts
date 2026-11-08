@@ -66,6 +66,7 @@ function needsWorkspaceRootFlag(
 export const addRootDevDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
     const dependencyInstaller = yield* DependencyInstaller
+
     const [isMonorepo, packageManager] = yield* Effect.all(
       [checkIsMonorepo(cwd), dependencyInstaller.detectPackageManager(cwd)],
       { concurrency: "unbounded" }

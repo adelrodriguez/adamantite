@@ -102,6 +102,7 @@ export class Prompter extends Context.Service<Prompter, PrompterService>()("Prom
           Effect.sync(() => {
             const spinner = spinnerFactory()
             spinner.start(options.start)
+
             return spinner
           }),
           (spinner) =>

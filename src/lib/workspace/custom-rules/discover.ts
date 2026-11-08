@@ -91,11 +91,13 @@ const resolveImport = Effect.fn("resolveImport")(function* (
 ) {
   const path = yield* Path.Path
   const resolver = yield* ModuleResolver
+
   const local =
     specifier.startsWith(".")
     || specifier.startsWith("#")
     || path.isAbsolute(specifier)
     || [...packageNames].some((name) => specifier === name || specifier.startsWith(`${name}/`))
+
   const file = yield* resolver.resolve(from, specifier)
 
   if (Option.isNone(file)) {
@@ -132,6 +134,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
 
   // Doctor and harden traverse again after a coding agent changes the project.
   yield* (yield* ModuleResolver).clearCache
+
   const [names, configsByPackage] = yield* Effect.all(
     [
       Effect.forEach(packageDirectories, (directory) => readPackageName(directory), {
@@ -145,8 +148,10 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     ],
     { concurrency: "unbounded" }
   )
+
   const packageNames = new Set(Array.getSomes(names))
   const packageConfigs = Array.getSomes(configsByPackage)
+
   const nearestConfigs = new Set(
     lintedDirectories.flatMap((directory) =>
       Array.sort(
@@ -162,14 +167,17 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
       ).slice(0, 1)
     )
   )
+
   const configs = packageConfigs.filter((config) => nearestConfigs.has(config))
   const visited = new Set<string>()
   const sources = new Map<string, SourceModule>()
+
   const resolvedImports: Array<{
     readonly from: string
     readonly specifier: string
     readonly file: string
   }> = []
+
   const calls: ResolvedCall[] = []
   const legacyImports: string[] = []
   // The module of each call whose `dir` is not a string literal, once for each call.
@@ -209,6 +217,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
         specifier,
       }))
     )
+
     const resolved = yield* Effect.forEach(
       imports,
       ({ from, specifier }) => resolveImport(from, specifier, packageNames),

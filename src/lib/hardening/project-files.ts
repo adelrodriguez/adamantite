@@ -14,6 +14,7 @@ import * as String from "effect/String"
 const listGitFiles = Effect.fn("listGitFiles")(
   function* (cwd: string, args: readonly string[]) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+
     const handle = yield* spawner.spawn(
       ChildProcess.make("git", ["ls-files", "-z", ...args], {
         cwd,
@@ -21,6 +22,7 @@ const listGitFiles = Effect.fn("listGitFiles")(
         stdin: "ignore",
       })
     )
+
     const [output, exitCode] = yield* Effect.all(
       [Stream.mkString(Stream.decodeText(handle.stdout)), handle.exitCode],
       { concurrency: "unbounded" }

@@ -25,15 +25,18 @@ describe("CodingAgents.handoff", () => {
       process.on("SIGINT", sentinel)
 
       let listenersDuringRun: unknown[] = []
+
       const runner = Layer.succeed(
         CommandRunner,
         CommandRunner.make(() =>
           Effect.sync(() => {
             listenersDuringRun = process.listeners("SIGINT")
+
             return ChildProcessSpawner.ExitCode(0)
           })
         )
       )
+
       yield* Effect.gen(function* () {
         const agents = yield* CodingAgents
         yield* agents.handoff({ agent: claudeAgent, cwd: "/project", prompt: "prompt" })
@@ -64,6 +67,7 @@ describe("CodingAgents.detectInstalled", () => {
 
       const fiber = yield* Effect.gen(function* () {
         const agents = yield* CodingAgents
+
         return yield* agents.detectInstalled("/project")
       }).pipe(Effect.provide(CodingAgents.layer.pipe(Layer.provide(runner))), Effect.forkChild)
 

@@ -82,6 +82,7 @@ describe("filesystem", () => {
   it.effect("return FailedToReadFile when readDirectoryIfExists fails for another reason", () =>
     Effect.gen(function* () {
       const path = `${ROOT}/locked`
+
       const fileSystemLayer = FileSystem.layerNoop({
         readDirectory: () =>
           Effect.fail(

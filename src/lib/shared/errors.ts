@@ -28,6 +28,7 @@ function formatCauseDetail(cause: unknown) {
     Array.head,
     Option.map((line) => {
       const detail = String.trim(line)
+
       return /[.!?]$/.test(detail) ? ` Cause: ${detail}` : ` Cause: ${detail}.`
     }),
     Option.getOrElse(() => "")
@@ -188,6 +189,7 @@ export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDir
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target directory"
+
     return `Could not create ${target}. Check the parent directory permissions, then try again.${formatCauseDetail(this.cause)}`
   }
 }
@@ -198,6 +200,7 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
 }> {
   override get message() {
     const target = this.packages?.length ? `: ${this.packages.join(", ")}` : ""
+
     return `Failed to install dependencies${target}.${formatCauseOutput(this.cause)}`
   }
 }
@@ -269,6 +272,7 @@ export class FailedToReadFile extends Data.TaggedError("FailedToReadFile")<{
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target file"
+
     return `Could not read ${target}. Check that the file exists and is readable, then try again.${formatCauseDetail(this.cause)}`
   }
 }
@@ -279,6 +283,7 @@ export class FailedToWriteFile extends Data.TaggedError("FailedToWriteFile")<{
 }> {
   override get message() {
     const target = this.path ? `\`${this.path}\`` : "the target file"
+
     return `Could not write ${target}. Check the directory permissions and available disk space, then try again.${formatCauseDetail(this.cause)}`
   }
 }
@@ -370,6 +375,7 @@ export class OperationCancelled extends Data.TaggedError("OperationCancelled")<{
 }> {
   override get message() {
     const detail = this.reason ? ` Reason: ${this.reason}` : ""
+
     return `Operation cancelled.${detail}`
   }
 }

@@ -39,6 +39,7 @@ function checkRangeUsesIdentifier(
   range: { readonly end: number; readonly start: number }
 ): boolean {
   let found = false
+
   const visitor = new Visitor({
     Identifier: (node) => {
       if (node.start >= range.start && node.end <= range.end && node.name === identifier) {
@@ -48,6 +49,7 @@ function checkRangeUsesIdentifier(
   })
 
   visitor.visit(program)
+
   return found
 }
 
@@ -73,6 +75,7 @@ function checkExportUsesPreset(program: Program, presetIdentifier: string): bool
   }
 
   const initializer = getVariableInitializer(program, declaration.name)
+
   return initializer !== null && checkRangeUsesIdentifier(program, presetIdentifier, initializer)
 }
 

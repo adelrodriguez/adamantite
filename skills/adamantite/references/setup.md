@@ -48,8 +48,8 @@ If the selected presets include a managed plugin, check its setup:
   or refresh the VS Code SDK cache. Keep the project's other setup options when needed.
   Select the workspace TypeScript version in VS Code. Zed uses the installed Effect CLI.
 - For `tailwind`, check that the project uses Tailwind v4. Init installs `@shadcn/lint`.
-  If components are outside the
-  directories that `components.json` identifies, set `settings.shadcn.ui` in `oxlint.config.ts`.
+  If components are outside the directories that `components.json` identifies, set
+  `settings.shadcn.ui` in `oxlint.config.ts`.
   Without `components.json`, the plugin looks in `components/ui` or `src/components/ui`.
   For another component directory, copy the preset's component-owned rule override to that directory.
 

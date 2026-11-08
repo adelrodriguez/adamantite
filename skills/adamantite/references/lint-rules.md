@@ -15,9 +15,11 @@ Read the rule message and apply the section below that matches it.
   `// oxlint-disable-next-line no-console -- the CLI writes its report to stdout`.
 - For `no-warning-comments`, fix the code or track the work in the project's issue tracker.
   Renaming `TODO` to another marker only to pass the check leaves the work untracked.
-- For `adamantite/query-from-loader`, define shared options with `queryOptions()` at module
-  scope or in an exported factory. Preload them with `ensureQueryData()` in the loader and pass the same
-  options to the hook. For infinite queries, use `infiniteQueryOptions()` with
+- For `adamantite/query-from-loader` reports on `useQuery` or `useSuspenseQuery`, replace a
+  plain options object or a local `queryOptions()` call with shared options. Define them with
+  `queryOptions()` at module scope or in an exported factory. Preload them with
+  `ensureQueryData()` in the loader and pass the same options to the hook. For reports on
+  `useInfiniteQuery` or `useSuspenseInfiniteQuery`, use `infiniteQueryOptions()` with
   `ensureInfiniteQueryData()`. Wrapping options in a spread or moving the hook out of the route
   only to silence the report leaves the preload problem unresolved.
 - For `adamantite/no-query-data-in-state`, read query data from the query result and keep

@@ -254,6 +254,27 @@ describe("update", () => {
   )
 
   describe("Adamantite skill", () => {
+    it.effect("report no applied updates when the skill lock cannot be parsed", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({ "skills-lock.json": "{ invalid" })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls).toStrictEqual([])
+        expect(prompter.logs).toContainEqual(expect.objectContaining({
+          level: "warning",
+          message: expect.stringContaining("Could not check the Adamantite skill."),
+        }))
+        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
+      })
+    )
+
     it.effect("refresh a copy that init installed when it differs from the shipped skill", () =>
       Effect.gen(function* () {
         const files = makeSkillFiles({

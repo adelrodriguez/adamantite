@@ -28,6 +28,12 @@ describe("lintPresets", () => {
     expect(Array.sort(LINT_PRESETS, Order.String)).toStrictEqual(Array.sort(files, Order.String))
   })
 
+  it("keep setup out of the written hints, so describeLintPreset adds it once", () => {
+    expect(lintPresets.filter((preset) => /\b(?:install|select)/i.test(preset.hint))).toStrictEqual(
+      []
+    )
+  })
+
   it.each(presetsWithPlugins)("name $plugin.name in the hint of the $name preset", (preset) => {
     expect(describeLintPreset(preset)).toContain(`Installs ${preset.plugin.name}`)
   })

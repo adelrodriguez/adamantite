@@ -281,9 +281,12 @@ To update one, bump its pinned ref in the script's plugin list, re-run the scrip
 the upstream diff, and adjust the owning preset's rules if rules were added, removed, or
 renamed; each preset's drift test catches a mismatch.
 
-When upstream copies third-party code into its source, the script adds that code's license to
-`license.md`. The build copies each bundle into `dist/presets/lint/vendor/`, and
-`scripts/test-build.ts` fails when a built preset loads a file that the build did not copy.
+One upstream can supply more than one bundle. The anti-slop repository has two entry points.
+The `anti-slop` bundle ships in the `antislop` preset, and the `anti-slop-effect` bundle ships in
+the `effect` preset. The script lists each entry point with the same pinned ref. When upstream
+copies third-party code into its source, the script adds that code's license to `license.md`.
+The build copies each bundle into `dist/presets/lint/vendor/`, and `scripts/test-build.ts` fails
+when a built preset loads a file that the build did not copy.
 
 Each enabled rule of a bundle has `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<rule>/`, one case per file. The harness in

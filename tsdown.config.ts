@@ -27,6 +27,14 @@ export default defineConfig([
         ],
         to: "dist/presets/lint/vendor/antislop",
       },
+      {
+        from: [
+          "presets/lint/vendor/antislop-effect/plugin.mjs",
+          "presets/lint/vendor/antislop-effect/plugin.d.mts",
+          "presets/lint/vendor/antislop-effect/license.md",
+        ],
+        to: "dist/presets/lint/vendor/antislop-effect",
+      },
     ],
     // The first-party plugin imports only types from @oxlint/plugins. Keeping the package external
     // leaves a type reference in its declarations instead of inlining Oxlint's AST types. The

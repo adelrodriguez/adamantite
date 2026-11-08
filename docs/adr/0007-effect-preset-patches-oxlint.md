@@ -104,6 +104,15 @@ rules are in the preset, including `any-unknown-in-error-context`,
 `unsafe-effect-type-assertion`, and `map-map-error-to-map-both`, which upstream turns off by
 default. Every enabled rule is `"error"`, as in the other presets.
 
+## The anti-slop-effect bundle
+
+We decided (2026-11-08) that the effect preset also ships the vendored `anti-slop-effect`
+bundle. The curation in this record covers the `@effect/tsgo` rules only. The preset is for
+Effect codebases, so it enables every rule of the bundle, including `prefer-effect-match`,
+which also reports chained ternaries outside Effect code. A drift test asserts that the preset
+enables exactly the rules of the bundle, and each rule has fixtures, as for the other vendored
+bundles.
+
 ## Consequences
 
 - A target project that adds the preset by hand must install `@effect/tsgo`, add

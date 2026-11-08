@@ -70,7 +70,7 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+      expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
     })
   )
 
@@ -154,7 +154,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toHaveLength(1)
       expect(installer.calls[0]?.packages).toStrictEqual([`knip@${knip.version}`])
-      expect(prompter.outros).toStrictEqual(["✅ Update completed successfully!"])
+      expect(prompter.outros).toStrictEqual(["✅ Update finished."])
     })
   )
 
@@ -207,7 +207,7 @@ describe("update", () => {
       )
       expect(prompter.logs).toContainEqual({
         level: "info",
-        message: "Run `adamantite doctor` to get the combined Markdown repair prompt.",
+        message: "Run `adamantite doctor` for the remaining repairs and an agent prompt.",
       })
     })
   )
@@ -252,6 +252,29 @@ describe("update", () => {
   )
 
   describe("Adamantite skill", () => {
+    it.effect("report no applied updates when the skill lock cannot be parsed", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({ "skills-lock.json": "{ invalid" })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls).toStrictEqual([])
+        expect(prompter.logs).toContainEqual(
+          expect.objectContaining({
+            level: "warning",
+            message: expect.stringContaining("Could not check the Adamantite skill."),
+          })
+        )
+        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
+      })
+    )
+
     it.effect("refresh a copy that init installed when it differs from the shipped skill", () =>
       Effect.gen(function* () {
         const files = makeSkillFiles({
@@ -289,7 +312,7 @@ describe("update", () => {
             command: "npx",
           }),
         ])
-        expect(prompter.outros).toStrictEqual(["✅ Update completed successfully!"])
+        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
       })
     )
 
@@ -308,7 +331,7 @@ describe("update", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
       })
     )
 
@@ -327,7 +350,7 @@ describe("update", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual(["✅ Adamantite is already up to date."])
+        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
       })
     )
 

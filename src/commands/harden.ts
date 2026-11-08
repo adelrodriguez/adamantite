@@ -72,7 +72,7 @@ const readInstalledVersion = Effect.fn("readInstalledVersion")(function* (cwd: s
 const scope = Flag.Directory("path", { mustExist: true }).pipe(
   Flag.optional,
   Flag.withDescription(
-    "Limit the session to one workspace package or folder of the project, relative to the current directory"
+    "Limit the session to a project folder or workspace package. The path is relative to the current directory"
   )
 )
 
@@ -83,12 +83,12 @@ const commits = Flag.Int("commits").pipe(
     )
   ),
   Flag.withDefault(DEFAULT_FIX_HISTORY_COMMITS),
-  Flag.withDescription("Set how many recent commits the agent reads for fixed mistakes")
+  Flag.withDescription("Set how many recent commits the agent reads to find past fixes")
 )
 
 export default Command.make("harden", { commits, scope }).pipe(
   Command.withDescription(
-    "Ask a coding agent to turn the project's coding standards into custom rules and instructions"
+    "Ask a coding agent to turn project standards into custom rules and instructions"
   ),
   Command.withHandler(({ commits, scope }) =>
     Effect.gen(function* () {
@@ -178,7 +178,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       })
 
       if (resolution._tag !== "Ended") {
-        yield* prompter.outro("✅ Harden completed.")
+        yield* prompter.outro("Harden ended without an agent session.")
         return
       }
 
@@ -241,7 +241,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       yield* prompter.log.success(
         `\`adamantite check\` and Doctor pass after the ${agent.name} session.`
       )
-      yield* prompter.outro("✅ Harden completed successfully!")
+      yield* prompter.outro("✅ Harden checks passed.")
     }).pipe(
       Effect.catchTag(
         [
@@ -271,7 +271,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       Effect.catchTag("OperationCancelled", () =>
         Effect.gen(function* () {
           const prompter = yield* Prompter
-          yield* prompter.cancel("Harden was cancelled. Nothing was changed.")
+          yield* prompter.cancel("Harden was cancelled.")
           return yield* new CommandFailed({
             command: "harden",
             exitCode: ChildProcessSpawner.ExitCode(1),

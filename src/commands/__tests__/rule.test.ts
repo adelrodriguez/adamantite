@@ -452,7 +452,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule.",
+            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test.",
         },
       ])
     })
@@ -485,7 +485,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule.",
+            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test.",
         },
       ])
     })
@@ -560,7 +560,7 @@ describe("rule try", () => {
         "✗ `src/cart.ts`: reported, but it must be accepted.",
         "    1:1  'node:fs' import is restricted from being used.",
         "",
-        "1 of 2 cases is not as expected.",
+        "1 of 2 cases is different from the expected result.",
       ].join("\n")
     )
   })
@@ -576,7 +576,7 @@ describe("rule try", () => {
         "",
         "✓ `src/cart.ts`: accepted, as expected.",
         "",
-        "Each case is as expected.",
+        "All cases produced the expected result.",
       ].join("\n")
     )
   })

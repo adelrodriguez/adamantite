@@ -169,9 +169,9 @@ const rule: Rule = {
     },
     messages: {
       localOptions:
-        "`{{hook}}` takes query options created inside a function, so the route loader cannot preload the same query. Move the `{{factory}}()` call to module scope, or into an exported factory such as `userQuery(id)`, preload it in this route's loader with `queryClient.{{preload}}()`, and pass the same options here.",
+        "`{{hook}}` takes query options created inside a function. The route loader cannot preload them. Define `{{factory}}()` at module scope or in an exported factory such as `userQuery(id)`. Preload those options in the route loader with `queryClient.{{preload}}()`, and pass them to this hook.",
       plainObject:
-        "`{{hook}}` takes a plain options object instead of options defined with `{{factory}}()`. Define the options once with `{{factory}}()` at module scope or in a shared module, preload them in this route's loader with `queryClient.{{preload}}()`, and pass the same options here.",
+        "`{{hook}}` takes a plain options object. Define the options once with `{{factory}}()` at module scope or in a shared module. Preload them in the route loader with `queryClient.{{preload}}()`, and pass the same options to this hook.",
     },
     schema: [],
     type: "suggestion",

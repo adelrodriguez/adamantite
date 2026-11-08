@@ -8,33 +8,29 @@ import * as Toolchain from "#lib/toolchain/index.ts"
 
 const fix = Flag.Boolean("fix").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Automatically fix issues in every stage that runs")
+  Flag.withDescription("Apply fixes in each selected stage")
 )
 
 const strict = Flag.Boolean("strict").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Enable strict mode for the unused stage (knip)")
+  Flag.withDescription("Enable Knip's strict mode when checking unused code")
 )
 
 const only = Flag.Literals("only", ["monorepo", "unused"]).pipe(
   Flag.optional,
-  Flag.withDescription(
-    "Run one stage: `monorepo` (sherif, monorepos only) or `unused` (knip). Arguments after `--` go to that stage"
-  )
+  Flag.withDescription("Run only monorepo (Sherif) or unused (Knip). Pass tool arguments after --")
 )
 
 export default Command.make("analyze", { fix, only, strict }).pipe(
-  Command.withDescription(
-    "Find monorepo issues using sherif, then unused dependencies, exports, and files using knip"
-  ),
+  Command.withDescription("Check monorepo consistency with Sherif and find unused code with Knip"),
   Command.withExamples([
     {
       command: "adamantite analyze -- --directory packages/app",
-      description: "Run knip from a specific directory",
+      description: "Run Knip from a specific directory",
     },
     {
       command: "adamantite analyze --only monorepo --fix -- --select highest",
-      description: "Fix only the monorepo issues and use the highest version on a mismatch",
+      description: "Fix monorepo issues and use the highest version when versions differ",
     },
   ]),
   Command.withHandler(({ fix, only, strict }) =>

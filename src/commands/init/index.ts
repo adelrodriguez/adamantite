@@ -32,7 +32,7 @@ import {
 
 export default Command.make("init", initCommandOptions).pipe(
   Command.withDescription(
-    "Initialize Adamantite in the current directory. Setup flags require --non-interactive; omitted boolean setup flags are disabled"
+    "Configure Adamantite in the current directory. Use --non-interactive with setup flags and select each optional feature explicitly"
   ),
   Command.withExamples([
     {
@@ -47,7 +47,7 @@ export default Command.make("init", initCommandOptions).pipe(
     },
     {
       command: "adamantite init --non-interactive --script analyze",
-      description: "Configure analysis; in a detected monorepo it includes Sherif",
+      description: "Configure analysis, including Sherif checks for a monorepo",
     },
   ]),
   Command.withHandler((options) =>
@@ -77,7 +77,7 @@ export default Command.make("init", initCommandOptions).pipe(
       const isMonorepo = yield* checkIsMonorepo(cwd)
 
       if (isMonorepo) {
-        yield* prompter.log.info("We've detected a monorepo setup in your project.")
+        yield* prompter.log.info("This project is a monorepo.")
       }
 
       if (
@@ -191,15 +191,13 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupGitHubActions(cwd, gitHubActionsPackageManager, selectedScripts)
       }
 
-      yield* prompter.log.success("Your project is now configured")
-
-      yield* prompter.outro("💠 Adamantite initialized successfully!")
+      yield* prompter.outro("💠 Setup finished.")
     }).pipe(
       Effect.catchTags({
         OperationCancelled: () =>
           Effect.gen(function* () {
             const prompter = yield* Prompter
-            yield* prompter.cancel("You've cancelled the initialization process.")
+            yield* prompter.cancel("Setup was cancelled.")
           }),
       })
     )

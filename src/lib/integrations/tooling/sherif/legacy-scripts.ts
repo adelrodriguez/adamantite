@@ -110,7 +110,7 @@ export function getLegacyMonorepoScriptFindings(packageJson: PackageJson): Findi
       notes: [
         "`adamantite analyze` replaces `check:monorepo`, and `adamantite analyze --only monorepo --fix` replaces `fix:monorepo`. `adamantite analyze --fix` without `--only` also lets Knip remove unused files and dependencies.",
         "`adamantite analyze` runs Sherif without flags. Sherif reads project exceptions from the `sherif` field of the root `package.json`, with the CLI options in camelCase: `ignoreDependency`, `ignoreRule`, `ignorePackage`, `select`, `noInstall`, and `failOnWarnings`.",
-        "Doctor does not assess `AGENTS.md`. Remove the lines that mention the monorepo scripts from its Adamantite section.",
+        "Doctor checks that `AGENTS.md` exists but does not review its contents. Remove the old monorepo script lines from its Adamantite section.",
       ],
       title: "Legacy monorepo scripts",
     },

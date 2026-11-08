@@ -42,7 +42,7 @@ const passthroughCommandNames: ReadonlySet<string> = new Set(
 )
 
 const main = Command.make("adamantite").pipe(
-  Command.withDescription("Opinionated preset package for modern TypeScript applications"),
+  Command.withDescription("Configure code checks for TypeScript projects"),
   Command.withSubcommands(commands)
 )
 

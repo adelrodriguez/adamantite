@@ -15,7 +15,7 @@ import { chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
 const version = getPackageVersion()
 
 export default Command.make("doctor").pipe(
-  Command.withDescription("Assess Adamantite-managed integrations in the current project"),
+  Command.withDescription("Check Adamantite setup and report what needs repair"),
   Command.withHandler(() =>
     Effect.gen(function* () {
       const cwd = process.cwd()
@@ -66,16 +66,18 @@ export default Command.make("doctor").pipe(
 
       if (assessment.applicableIntegrations.length === 0) {
         if (isInteractive) {
-          yield* prompter.log.success("No applicable integrations found.")
-          yield* prompter.outro("✅ Doctor completed successfully!")
+          yield* prompter.log.success(
+            "No Adamantite-managed setup found. Run `adamantite init` to configure the project."
+          )
+          yield* prompter.outro("✅ Doctor finished.")
         }
         return
       }
 
       if (assessment.findings.length === 0) {
         if (isInteractive) {
-          yield* prompter.log.success("No issues found.")
-          yield* prompter.outro("✅ Doctor completed successfully!")
+          yield* prompter.log.success("No setup repairs needed.")
+          yield* prompter.outro("✅ Doctor finished.")
         } else if (assessment.warnings.length > 0) {
           yield* prompter.message(renderAssessmentMarkdown(assessment, version))
         }
@@ -109,12 +111,12 @@ export default Command.make("doctor").pipe(
 
       if (after.findings.length === 0) {
         yield* prompter.log.success(`All findings were resolved by ${agent.name}.`)
-        yield* prompter.outro("✅ Doctor completed successfully!")
+        yield* prompter.outro("✅ Doctor finished.")
         return
       }
 
       yield* prompter.log.warning(
-        `${after.findings.length} of ${assessment.findings.length} findings remain after the ${agent.name} session.`
+        `Doctor still reports ${after.findings.length.toLocaleString("en-US")} unresolved ${after.findings.length === 1 ? "finding" : "findings"} after the ${agent.name} session.`
       )
       yield* printFindings(after.findings)
       yield* offerPromptCopy(renderAssessmentMarkdown(after, version))

@@ -93,7 +93,7 @@ describe("detectToolingConfig", () => {
       const state = yield* detect(files)
 
       expect(state.warnings).toStrictEqual([
-        "Found both `tool.json` and `tool.jsonc`. Multiple legacy tool configs exist; Adamantite will treat `tool.jsonc` as the source of truth in its findings.",
+        "Found both `tool.json` and `tool.jsonc`. Multiple legacy tool configs exist. Doctor uses `tool.jsonc` when checking the setup.",
       ])
     })
   )

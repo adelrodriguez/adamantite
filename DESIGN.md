@@ -18,8 +18,8 @@ components:
     reference: Reference
     notes: Notes
   resolutionMenu:
-    copy: Copy the Markdown prompt for a coding agent
-    done: Do nothing
+    copy: Copy the agent prompt
+    done: Finish without an agent
 ---
 
 # Terminal design
@@ -74,7 +74,7 @@ non-interactive option.
 | Progress        | A spinner has a start message, optional progress messages, and a success or failure message. It stops when the operation ends. | [Prompter](src/terminal/prompter.ts)                  |
 | Choice          | Clack select, multiselect, or confirm controls.                                                                                | [Prompter](src/terminal/prompter.ts)                  |
 | Finding         | A numbered note with the current state, goals, and optional repair reference and notes.                                        | [Findings](src/terminal/findings.ts)                  |
-| Resolution menu | Installed agent handoffs, then prompt copy, then `Do nothing`.                                                                 | [Resolution menu](src/terminal/resolution-menu.ts)    |
+| Resolution menu | Installed agent handoffs, then prompt copy, then `Finish without an agent`.                                                    | [Resolution menu](src/terminal/resolution-menu.ts)    |
 | Prompt copy     | Print the Markdown prompt and send it to the terminal clipboard with OSC 52.                                                   | [Terminal capabilities](src/terminal/capabilities.ts) |
 
 Doctor prints findings as Markdown when it cannot offer an interactive resolution menu. Its

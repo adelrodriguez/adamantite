@@ -337,9 +337,9 @@ export function createImportOwnersRule(project: Project): Rule {
           "Restrict an import to the files and folders that own it, from the owners in the rule options.",
       },
       messages: {
-        module: `Only {{owners}} imports \`{{import}}\`. Use what the owner exports, or move this code into the owner. ${OWNERS_HINT}`,
-        name: `Only {{owners}} imports \`{{name}}\` from \`{{import}}\`. Use what the owner exports, or move this code into the owner. ${OWNERS_HINT}`,
-        namespace: `This import reaches {{names}} from \`{{import}}\`, which only {{owners}} imports. Import only the names that this file needs. ${OWNERS_HINT}`,
+        module: `Only {{owners}} may import \`{{import}}\`. Use what the owner exports, or move this code into the owner. ${OWNERS_HINT}`,
+        name: `Only {{owners}} may import \`{{name}}\` from \`{{import}}\`. Use what the owner exports, or move this code into the owner. ${OWNERS_HINT}`,
+        namespace: `This import reaches {{names}} from \`{{import}}\`, which only {{owners}} may import. Import only the names that this file needs. ${OWNERS_HINT}`,
       },
       // Each option object is one import and its owners.
       schema: {

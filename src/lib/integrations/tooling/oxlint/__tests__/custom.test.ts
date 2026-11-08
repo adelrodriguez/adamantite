@@ -254,7 +254,7 @@ describe("oxlint-custom", () => {
       expect(findings).toStrictEqual([
         expect.objectContaining({
           currentState:
-            "`.adamantite/lint` has 1 rule file(s), but no `custom()` call loads it, so Oxlint does not run them.",
+            "No `custom()` call loads the rules in `.adamantite/lint`, so Oxlint does not run them.",
           id: "custom-rules-not-loaded:.adamantite/lint",
           integration: "oxlint-custom",
         }),

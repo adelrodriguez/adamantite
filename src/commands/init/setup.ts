@@ -67,26 +67,24 @@ export function setupToolConfig<E, R>(
           }
 
           if (state.active.format === "ts") {
-            yield* spinner.message(`Found \`${tool.config}\`, keeping existing config.`)
+            yield* spinner.message(`Found \`${tool.config}\`, keeping it.`)
             return { created: false, legacyConfig: null }
           }
 
-          yield* spinner.message(`Found \`${state.active.file}\`, keeping existing config.`)
+          yield* spinner.message(`Found \`${state.active.file}\`, keeping it.`)
           return { created: false, legacyConfig: state.active.file }
         }),
       {
         failure: `Failed to set up ${tool.name} config.`,
         start: `Setting up ${tool.name} config...`,
         success: (result) =>
-          result.created
-            ? `${tool.name} config created successfully.`
-            : `${tool.name} config is ready.`,
+          result.created ? `${tool.name} config created.` : `Existing ${tool.name} config kept.`,
       }
     )
 
     if (outcome.legacyConfig) {
       yield* prompter.log.info(
-        `Legacy \`${outcome.legacyConfig}\` was preserved during \`adamantite init\`. Run \`adamantite doctor\` and follow its findings to migrate it to the latest ${tool.name} config.`
+        `Legacy \`${outcome.legacyConfig}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool.name} config.`
       )
     }
   })
@@ -124,16 +122,16 @@ export const addScripts = (
         start: "Adding scripts to your `package.json`...",
         success:
           conflicts.length === 0
-            ? "Scripts added to your `package.json`"
+            ? "Scripts added to `package.json`."
             : writtenScripts.length === 0
-              ? "Kept your existing `package.json` scripts."
-              : "Scripts added to your `package.json`; conflicting scripts were kept.",
+              ? "Existing `package.json` scripts kept."
+              : "Scripts added to `package.json`. Existing conflicting scripts were kept.",
       }
     )
 
     const replaceHint = options.nonInteractive
       ? "Use `--overwrite-scripts` to replace it."
-      : "Re-run `adamantite init` and confirm overwriting to replace it."
+      : "Run `adamantite init` again and choose to replace the script."
 
     for (const conflict of conflicts) {
       yield* prompter.log.warning(
@@ -143,7 +141,7 @@ export const addScripts = (
 
     if (conflicts.length > 0) {
       yield* prompter.log.info(
-        "Adamantite commands forward extra arguments after `--`, so custom flags can be kept, e.g. `adamantite analyze -- --directory packages/app`."
+        "Pass custom tool arguments after `--`, such as `adamantite analyze -- --directory packages/app`."
       )
     }
 
@@ -181,9 +179,7 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
         failure: "Failed to set up TypeScript config.",
         start: "Setting up TypeScript config...",
         success: (created) =>
-          created
-            ? `\`${tsconfig.config}\` created successfully`
-            : `\`${tsconfig.config}\` updated successfully`,
+          created ? `\`${tsconfig.config}\` created.` : `\`${tsconfig.config}\` updated.`,
       }
     )
   })
@@ -279,8 +275,8 @@ export const installEditorExtensions = (
           start: "Installing editor extensions...",
           success:
             hasZed && !hasVscode
-              ? "Zed extensions require manual install."
-              : "Editor extensions installed successfully.",
+              ? "Install the Zed extensions using the links below."
+              : "Editor extensions installed.",
         }
       )
       .pipe(
@@ -288,13 +284,13 @@ export const installEditorExtensions = (
           FailedToInstallExtension: (error) =>
             Effect.gen(function* () {
               yield* prompter.log.warning(`⚠️ ${error.message}`)
-              yield* prompter.log.warning("Please install it manually after setup completes.")
+              yield* prompter.log.warning("Install the extension manually after setup finishes.")
               return false as const
             }),
           VscodeCliNotFound: () =>
             Effect.gen(function* () {
-              yield* prompter.log.error("VSCode CLI ('code' command) not found.")
-              yield* prompter.log.info("To install it:")
+              yield* prompter.log.error("VS Code's `code` command was not found on PATH.")
+              yield* prompter.log.info("Add the code command to PATH:")
               yield* prompter.log.info("  1. Open VS Code")
               yield* prompter.log.info(
                 "  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)"
@@ -338,8 +334,7 @@ export const setupGitHubActions = (
       {
         failure: "Failed to set up GitHub Actions workflow.",
         start: "Setting up GitHub Actions workflow...",
-        success: (created) =>
-          `GitHub Actions workflow ${created ? "created" : "updated"} successfully.`,
+        success: (created) => `GitHub Actions workflow ${created ? "created" : "updated"}.`,
       }
     )
   }).pipe(
@@ -398,7 +393,7 @@ export const setupAgentsGuidance = (
 
     if (result === "malformed") {
       yield* prompter.log.warning(
-        "Could not update AGENTS.md because Adamantite markers are incomplete. Remove the stale ADAMANTITE marker and run adamantite init again."
+        "AGENTS.md has an incomplete ADAMANTITE marker. Remove the incomplete marker and run `adamantite init` again."
       )
     }
   })

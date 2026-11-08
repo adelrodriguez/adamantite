@@ -115,7 +115,7 @@ describe("errors", () => {
       const error = new FailedToWriteFile({ cause, path: "/repo/oxlint.json" })
 
       expect(error.message).toBe(
-        "Failed to write `/repo/oxlint.json`. Cause: PermissionDenied: FileSystem.writeFile (/repo/oxlint.json)."
+        "Could not write `/repo/oxlint.json`. Check the directory permissions and available disk space, then try again. Cause: PermissionDenied: FileSystem.writeFile (/repo/oxlint.json)."
       )
     })
 
@@ -124,7 +124,7 @@ describe("errors", () => {
       const error = new FailedToWriteFile({ cause, path: "/repo/oxlint.json" })
 
       expect(error.message).toBe(
-        "Failed to write `/repo/oxlint.json`. Cause: Something went wrong."
+        "Could not write `/repo/oxlint.json`. Check the directory permissions and available disk space, then try again. Cause: Something went wrong."
       )
     })
 
@@ -141,7 +141,9 @@ describe("errors", () => {
     it("fall back to a plain message when the cause is missing", () => {
       const error = new FailedToReadFile({ path: "/repo/tsconfig.json" })
 
-      expect(error.message).toBe("Failed to read `/repo/tsconfig.json`.")
+      expect(error.message).toBe(
+        "Could not read `/repo/tsconfig.json`. Check that the file exists and is readable, then try again."
+      )
     })
   })
 

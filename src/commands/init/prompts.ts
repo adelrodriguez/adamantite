@@ -13,7 +13,7 @@ import { Prompter } from "#terminal/prompter.ts"
 import type { InitOptions, InitOptionsInput } from "./options.ts"
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
-  `\`${conflict.script}\` is currently \`${conflict.command}\`; Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
+  `\`${conflict.script}\` runs \`${conflict.command}\`. Init would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
   cwd: string,
@@ -23,11 +23,11 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const prompter = yield* Prompter
 
   const selectedScripts = yield* prompter.multiselect({
-    message: "Which scripts do you want to add to your `package.json`?",
+    message: "Which scripts should init add to `package.json`?",
     options: [
       {
         hint: "recommended",
-        label: "check - check formatting, lint issues, and type errors",
+        label: "check - find formatting, lint, and type errors",
         value: "check",
       },
       {
@@ -37,8 +37,8 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
       },
       {
         label: isMonorepo
-          ? "analyze - check monorepo consistency using Sherif and find unused dependencies, exports, and files using knip"
-          : "analyze - find unused dependencies, exports, and files using knip",
+          ? "analyze - find unused code and check monorepo consistency"
+          : "analyze - find unused dependencies, exports, and files",
         value: "analyze",
       },
     ],
@@ -57,8 +57,8 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
       initialValue: false,
       message:
         conflicts.length === 1
-          ? "Overwrite this existing script with Adamantite's command?"
-          : "Overwrite these existing scripts with Adamantite's commands?",
+          ? "Replace this script with Adamantite's command?"
+          : "Replace these scripts with Adamantite's commands?",
     })
   }
 
@@ -67,70 +67,70 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   if (hasOxlint) {
     selectedPresets = yield* prompter.multiselect({
-      message: "Which presets do you want to install? (core is always included)",
+      message: "Which presets should init use with the core preset?",
       options: [
         {
-          hint: "React correctness, JSX accessibility, and render performance rules",
+          hint: "Check React code, JSX accessibility, and performance.",
           label: "react",
           value: "react",
         },
         {
-          hint: "Keep state, effect, and memoization hooks in hook modules. Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset.",
+          hint: "Keep state, effect, and memo hooks in hook files. Installs oxlint-plugin-react-doctor and selects the react preset.",
           label: "react-strict",
           value: "react-strict",
         },
         {
-          hint: "TanStack Query: queries defined once with queryOptions() so route loaders can preload them, no query data copied into state",
+          hint: "Use queryOptions() and keep query data out of state.",
           label: "tanstack",
           value: "tanstack",
         },
         {
-          hint: "Next.js pitfalls around scripts, fonts, images, and document/head usage",
+          hint: "Check Next.js scripts, fonts, images, and head usage.",
           label: "next.js",
           value: "nextjs",
         },
         {
-          hint: "Vue 3 correctness rules and deprecated API detection",
+          hint: "Check Vue 3 code for errors and deprecated APIs.",
           label: "vue",
           value: "vue",
         },
         {
-          hint: "Find unhandled errors and effects that never run. Init installs @effect/tsgo.",
+          hint: "Find effects that never run. Installs @effect/tsgo.",
           label: "effect",
           value: "effect",
         },
         {
-          hint: "Jest test hygiene: focused/disabled tests, matcher and snapshot discipline",
+          hint: "Find focused or skipped tests and check assertions.",
           label: "jest",
           value: "jest",
         },
         {
-          hint: "Vitest test hygiene: focused/disabled tests, matcher and snapshot discipline",
+          hint: "Find focused or skipped tests and check assertions.",
           label: "vitest",
           value: "vitest",
         },
         {
-          hint: "Node.js callback and CommonJS pitfalls",
+          hint: "Check Node.js callbacks and CommonJS modules.",
           label: "node",
           value: "node",
         },
         {
-          hint: "Check layer dependencies and package imports with rules you configure for your project.",
+          hint: "Check the layer maps and import owners you define.",
           label: "architecture",
           value: "architecture",
         },
         {
-          hint: "Framework-neutral strictness: no deep or wide destructuring, no type assertions outside tests",
+          hint: "Limit type assertions, deep destructuring, and TODOs.",
           label: "strict",
           value: "strict",
         },
         {
-          hint: "Rejects low-signal escape hatches: unjustified assertions, unknown leaks, module mocks",
+          hint: "Ban module mocks, Reflect.get, and unknown parameters.",
           label: "antislop",
           value: "antislop",
         },
         {
-          hint: "Check Tailwind v4 classes and component styles against your design system. Init installs @shadcn/lint.",
+          hint: "Check Tailwind v4 classes. Installs @shadcn/lint.",
           label: "tailwind",
           value: "tailwind",
         },
@@ -148,15 +148,15 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     ? yield* prompter.confirm({
         initialValue: true,
         message: isMonorepo
-          ? "Adamantite provides a TypeScript preset to enforce strict type-safety. In a monorepo, each package's `tsconfig.json` must extend it. Would you like instructions on how to set it up?"
-          : "Adamantite provides a TypeScript preset to enforce strict type-safety. Would you like to use it?",
+          ? "Show how to use the TypeScript preset in each workspace package?"
+          : "Use the Adamantite TypeScript preset?",
       })
     : false
 
   const selectedEditors = yield* prompter.multiselect({
-    message: "Which editors do you want to configure? (optional)",
+    message: "Which editors should init configure?",
     options: [
-      { label: "VSCode / Cursor / Windsurf", value: "vscode" },
+      { label: "VS Code / Cursor / Windsurf", value: "vscode" },
       { label: "Zed", value: "zed" },
     ],
     required: false,
@@ -166,7 +166,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     selectedEditors.length > 0
       ? yield* prompter.confirm({
           initialValue: true,
-          message: "Do you want to install the recommended editor extensions?",
+          message: "Install the recommended editor extensions?",
         })
       : false
 
@@ -181,14 +181,13 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const shouldEnableGitHubActions =
     hasCICompatibleScripts(selectedScripts) && canEnableGitHubActions
       ? yield* prompter.confirm({
-          message: "Do you want to add a GitHub Actions workflow to run checks in CI?",
+          message: "Add a GitHub Actions workflow to run the selected checks?",
         })
       : false
 
   const shouldAddAgentsGuidance = yield* prompter.confirm({
     initialValue: true,
-    message:
-      "Add Adamantite guidance to AGENTS.md so coding agents know how to run project checks?",
+    message: "Tell coding agents in AGENTS.md how to run these scripts?",
   })
 
   const installedAgents = yield* (yield* CodingAgents).detectInstalled(cwd)
@@ -196,8 +195,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     initialValues: codingAgents
       .filter((agent) => installedAgents.some((installed) => installed.command === agent.command))
       .map((agent) => agent.skillsAgent),
-    message:
-      "Install the Adamantite skill for which coding agents? It teaches them how to use Adamantite. (optional)",
+    message: "Which coding agents should get the Adamantite skill?",
     options: codingAgents.map((agent) => ({
       hint: agent.skillsFolder,
       label: agent.name,

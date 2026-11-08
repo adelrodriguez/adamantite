@@ -40,7 +40,7 @@ and Sherif so humans and coding agents can use the same project workflow.
   follows into custom rules, and into instructions for the ones that no rule can check.
 - **Workspace checks**: Find unused code with Knip and dependency inconsistencies with
   Sherif.
-- **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`, and install the
+- **Agent guidance**: Add a managed Adamantite section to `AGENTS.md`, and add the
   Adamantite skill for your coding agents.
 
 ## Quick start
@@ -52,7 +52,7 @@ npx adamantite init
 ```
 
 The interactive setup lets you choose package scripts, presets, TypeScript, editors, CI,
-agent guidance, and the skill folders that get the [Adamantite skill](#agent-skill). After setup, use the scripts written to `package.json`:
+and coding agent setup with the [Adamantite skill](#agent-skill). After setup, use the scripts written to `package.json`:
 
 ```sh
 bun run check
@@ -72,8 +72,7 @@ adamantite analyze
 ## Non-interactive setup
 
 Use `--non-interactive` to configure a project entirely from flags. Specify at least one
-`--script`. Repeat `--script`, `--preset`, `--editor`, and `--skill-agent` to select multiple
-values.
+`--script`. Repeat `--script`, `--preset`, and `--editor` to select multiple values.
 
 ```sh
 npx adamantite init \
@@ -86,8 +85,7 @@ npx adamantite init \
   --typescript \
   --install-extensions \
   --github-actions \
-  --agents \
-  --skill-agent claude-code
+  --agents
 ```
 
 Available setup values:
@@ -97,7 +95,6 @@ Available setup values:
 - Presets: `react`, `react-strict`, `tanstack`, `nextjs`, `vue`, `effect`,
   `jest`, `vitest`, `node`, `architecture`, `strict`, `antislop`, and `tailwind`. `react-strict` requires `react`.
 - Editors: `vscode` and `zed`.
-- Skill agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `grok`, and `opencode`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
 requires an editor. GitHub Actions requires a compatible script and a supported package
@@ -875,18 +872,15 @@ resolves them as Node.js does, so run it after you install the dependencies. It 
 The Adamantite skill teaches coding agents how to initialize, assess, repair, and update a
 project, and how to write [custom rules](#custom-rules). The Adamantite package ships it.
 
-`adamantite init` asks one question about coding agents. You choose the `AGENTS.md` section
-and the skill folders that get the skill:
+`adamantite init` asks whether to set up coding agents. When you answer yes, or pass
+`--agents` in non-interactive mode, init adds the Adamantite section to `AGENTS.md` and writes
+the skill to these folders:
 
-| Skill folder     | Agents                                  |
-| ---------------- | --------------------------------------- |
-| `.agents/skills` | Codex, Cursor, Gemini CLI, and OpenCode |
-| `.claude/skills` | Claude Code                             |
-| `.grok/skills`   | Grok Build                              |
-
-`.agents/skills` is selected by default. Init also selects the folder of each agent whose CLI
-is installed. In non-interactive mode, repeat `--skill-agent` for each agent, and init writes
-the folder of each agent once.
+| Skill folder     | Agents                                  | When                        |
+| ---------------- | --------------------------------------- | --------------------------- |
+| `.agents/skills` | Codex, Cursor, Gemini CLI, and OpenCode | Always                      |
+| `.claude/skills` | Claude Code                             | The project has `.claude/`. |
+| `.grok/skills`   | Grok Build                              | The project has `.grok/`.   |
 
 The Adamantite CLI bundles the skill, so the copy matches the Adamantite version that wrote
 it. After you update Adamantite, `adamantite update` writes the skill again to each folder

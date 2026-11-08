@@ -145,8 +145,9 @@ writing files. See ADR 0023.
   and ADR 0022.
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
-- `init` creates selected integrations and managed scripts. It writes the Adamantite skill to
-  the selected skill folders. A build macro bundles `skills/adamantite/` into the CLI, so the
+- `init` creates selected integrations and managed scripts. When the user sets up coding agents, it
+  writes the Adamantite skill to `.agents/skills` and to each other skill folder whose agent
+  folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/` into the CLI, so the
   copy matches the running Adamantite version without `node_modules` or the network.
 - `doctor` assesses managed integrations and emits repair findings. The Oxlint assessment
   resolves the same runtime as the entry and reports missing installed packages, unsupported

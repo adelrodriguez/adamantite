@@ -17,11 +17,13 @@ const config: OxlintConfig = {
     },
   ],
   rules: {
+    "anti-slop/no-array-filter-map": "error",
     "anti-slop/no-chained-type-assertions": "error",
     "anti-slop/no-conditional-empty-object-spread": "error",
     "anti-slop/no-known-value-widening": "error",
     "anti-slop/no-module-mocking": "error",
     "anti-slop/no-object-parameters": "error",
+    "anti-slop/no-reduce-accumulator-copy": "error",
     "anti-slop/no-reflect-apply": "error",
     "anti-slop/no-reflect-get": "error",
     // Type predicates (`(x): x is T`) are the boundary that the rule recommends, and they cannot
@@ -33,6 +35,7 @@ const config: OxlintConfig = {
     "anti-slop/no-unknown-type-aliases": "error",
     "anti-slop/no-unsafe-dictionary-type": "error",
     "anti-slop/no-widen-then-assert": "error",
+    "anti-slop/require-readable-spacing": "error",
     "anti-slop/require-safety-comment-for-type-assertion": "error",
     // These core rules conflict with anti-slop. The consistent-indexed-object-style autofix makes
     // `Record` aliases that no-known-value-widening reports again, and no-immediate-mutation bans

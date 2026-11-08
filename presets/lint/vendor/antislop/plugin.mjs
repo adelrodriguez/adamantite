@@ -1,5 +1,5 @@
 // Vendored build of the anti-slop oxlint plugin.
-// Source: https://github.com/dmmulroy/anti-slop (MIT) at commit e8c4880471b23ab7f216fba7b27d173a6ef07d4c.
+// Source: https://github.com/dmmulroy/anti-slop (MIT) at commit 13909c9e07590f5a85d93c62712259fe14a883f7.
 // Its dependencies (MIT) are inlined so this file is self-contained.
 // See license.md for the full license text.
 //
@@ -346,6 +346,187 @@ function createContextAndVisitor(rule, afterHooksState) {
 		setupAfterHook
 	};
 }
+//#endregion
+//#region src/shared/array-method.ts
+/** Unwrap syntax-only wrappers when inspecting array methods and accumulator references. */
+function unwrapArrayExpression(node) {
+	while (node.type === "ParenthesizedExpression" || node.type === "ChainExpression" || node.type === "TSAsExpression" || node.type === "TSTypeAssertion" || node.type === "TSNonNullExpression" || node.type === "TSSatisfiesExpression") node = node.expression;
+	return node;
+}
+/** Resolve a local binding by scope, not by identifier spelling. */
+function resolveArrayBinding(sourceCode, node) {
+	node = unwrapArrayExpression(node);
+	if (node.type !== "Identifier") return null;
+	let scope = sourceCode.getScope(node);
+	while (scope !== null) {
+		const variable = scope.set.get(node.name);
+		if (variable !== void 0) return variable;
+		scope = scope.upper;
+	}
+	return null;
+}
+/** Read static method names, including computed string literals, without evaluating expressions. */
+function arrayMethodTarget(node) {
+	node = unwrapArrayExpression(node);
+	if (node.type !== "MemberExpression") return null;
+	const property = node.property;
+	if (!node.computed && property.type === "Identifier") return {
+		name: property.name,
+		object: node.object
+	};
+	if (node.computed && property.type === "Literal" && typeof property.value === "string") return {
+		name: property.value,
+		object: node.object
+	};
+	return null;
+}
+function isArrayAnnotation(type) {
+	if (type.type === "TSArrayType" || type.type === "TSTupleType") return true;
+	if (type.type === "TSParenthesizedType") return isArrayAnnotation(type.typeAnnotation);
+	if (type.type === "TSTypeOperator" && type.operator === "readonly") return isArrayAnnotation(type.typeAnnotation);
+	return type.type === "TSTypeReference" && type.typeName.type === "Identifier" && (type.typeName.name === "Array" || type.typeName.name === "ReadonlyArray");
+}
+/** Recognize local array evidence; unknown receivers and iterator pipelines are deliberately excluded. */
+function isKnownArrayExpression(sourceCode, node, visited = /* @__PURE__ */ new Set()) {
+	node = unwrapArrayExpression(node);
+	if (node.type === "ArrayExpression") return true;
+	if (node.type === "CallExpression") {
+		const method = arrayMethodTarget(node.callee);
+		return method !== null && [
+			"map",
+			"filter",
+			"flatMap",
+			"slice",
+			"concat",
+			"toSorted",
+			"toReversed",
+			"toSpliced"
+		].includes(method.name) && isKnownArrayExpression(sourceCode, method.object, visited);
+	}
+	if (node.type !== "Identifier") return false;
+	const variable = resolveArrayBinding(sourceCode, node);
+	if (variable === null || visited.has(variable)) return false;
+	visited.add(variable);
+	if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return false;
+	for (const identifier of variable.identifiers) {
+		const annotation = identifier.typeAnnotation?.typeAnnotation;
+		if (annotation !== void 0) return isArrayAnnotation(annotation);
+	}
+	for (const definition of variable.defs) if (definition.type === "Variable" && definition.node.type === "VariableDeclarator" && definition.node.id.type === "Identifier" && definition.node.init !== null && definition.node.parent.type === "VariableDeclaration" && definition.node.parent.kind === "const") return isKnownArrayExpression(sourceCode, definition.node.init, visited);
+	return false;
+}
+//#endregion
+//#region src/rules/no-array-filter-map.ts
+/** Reject eager array filter/map pipelines; lazy iterator helpers remain allowed. */
+const noArrayFilterMapRule = defineRule({
+	meta: {
+		type: "suggestion",
+		docs: { description: "Disallow adjacent array filter/map passes in favor of lazy iterator helpers or a single transformation." },
+		messages: { arrayFilterMap: "Avoid consecutive array `{{first}}` and `{{second}}` passes. Prefer `.values().{{first}}(...).{{second}}(...).toArray()` where iterator helpers are supported, or a single `flatMap`/mutating reducer. Preserve callback ordering, indexes, and filtering semantics." }
+	},
+	createOnce(context) {
+		return { CallExpression(node) {
+			const outer = arrayMethodTarget(node.callee);
+			if (outer === null || outer.name !== "map" && outer.name !== "filter") return;
+			const innerCall = unwrapArrayExpression(outer.object);
+			if (innerCall.type !== "CallExpression") return;
+			const inner = arrayMethodTarget(innerCall.callee);
+			if (inner === null || inner.name !== (outer.name === "map" ? "filter" : "map")) return;
+			if (!isKnownArrayExpression(context.sourceCode, inner.object)) return;
+			context.report({
+				node,
+				messageId: "arrayFilterMap",
+				data: {
+					first: inner.name,
+					second: outer.name
+				}
+			});
+		} };
+	}
+});
+//#endregion
+//#region src/rules/no-reduce-accumulator-copy.ts
+function enclosingReducer(node) {
+	let parent = node.parent;
+	while (parent !== null) {
+		if (parent.type === "FunctionDeclaration") return null;
+		if (parent.type === "ArrowFunctionExpression" || parent.type === "FunctionExpression") {
+			const callback = parent;
+			let owner = callback.parent;
+			while (owner !== null && unwrapArrayExpression(owner) === callback) owner = owner.parent;
+			if (owner?.type !== "CallExpression") return null;
+			const method = arrayMethodTarget(owner.callee);
+			const firstArgument = owner.arguments[0];
+			if (method === null || method.name !== "reduce" && method.name !== "reduceRight" || owner.arguments.length > 2 || firstArgument === void 0 || unwrapArrayExpression(firstArgument) !== callback) return null;
+			const firstParameter = callback.params[0];
+			const accumulator = firstParameter?.type === "AssignmentPattern" ? firstParameter.left : firstParameter;
+			if (accumulator?.type !== "Identifier") return null;
+			return {
+				callback,
+				accumulator,
+				initialValue: owner.arguments[1]
+			};
+		}
+		parent = parent.parent;
+	}
+	return null;
+}
+function referencesAccumulator(sourceCode, node, accumulator, visited = /* @__PURE__ */ new Set()) {
+	const variable = resolveArrayBinding(sourceCode, node);
+	if (variable === null || visited.has(variable)) return false;
+	if (variable === accumulator) return true;
+	visited.add(variable);
+	if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return false;
+	for (const definition of variable.defs) if (definition.type === "Variable" && definition.node.type === "VariableDeclarator" && definition.node.id.type === "Identifier" && definition.node.init !== null && definition.node.parent.type === "VariableDeclaration" && definition.node.parent.kind === "const") return referencesAccumulator(sourceCode, definition.node.init, accumulator, visited);
+	return false;
+}
+function isGlobalCopyOwner(sourceCode, node, name) {
+	node = unwrapArrayExpression(node);
+	if (node.type !== "Identifier" || node.name !== name) return false;
+	const variable = resolveArrayBinding(sourceCode, node);
+	return variable === null || variable.defs.length === 0;
+}
+/** Reject non-spread copies of reducer accumulators; pair with oxc/no-accumulating-spread. */
+const noReduceAccumulatorCopyRule = defineRule({
+	meta: {
+		type: "problem",
+		docs: { description: "Disallow copying growing reducer accumulators with Object.assign, Array.from, or array copy methods." },
+		messages: { accumulatorCopy: "Do not copy the reducer accumulator on every iteration; growing copies can cause quadratic work. Mutate a fresh, locally owned accumulator and return it, or use an iterator pipeline/flatMap." }
+	},
+	createOnce(context) {
+		return { CallExpression(node) {
+			const method = arrayMethodTarget(node.callee);
+			if (method === null) return;
+			const reducer = enclosingReducer(node);
+			if (reducer === null) return;
+			const accumulator = context.sourceCode.getDeclaredVariables(reducer.callback).find((variable) => variable.identifiers.some((identifier) => identifier.start === reducer.accumulator.start));
+			if (accumulator === void 0) return;
+			const isAccumulator = (expression) => referencesAccumulator(context.sourceCode, expression, accumulator);
+			let copiesAccumulator = false;
+			if (method.name === "assign" && isGlobalCopyOwner(context.sourceCode, method.object, "Object")) {
+				const target = node.arguments[0];
+				copiesAccumulator = target !== void 0 && unwrapArrayExpression(target).type === "ObjectExpression" && node.arguments.slice(1).some(isAccumulator);
+			} else if (method.name === "from" && isGlobalCopyOwner(context.sourceCode, method.object, "Array")) {
+				const source = node.arguments[0];
+				copiesAccumulator = source !== void 0 && isAccumulator(source);
+			} else if ([
+				"concat",
+				"slice",
+				"toSpliced",
+				"toSorted",
+				"toReversed",
+				"with"
+			].includes(method.name)) {
+				const initialValue = reducer.initialValue;
+				copiesAccumulator = initialValue !== void 0 && isKnownArrayExpression(context.sourceCode, initialValue) && isAccumulator(method.object);
+			}
+			if (copiesAccumulator) context.report({
+				node,
+				messageId: "accumulatorCopy"
+			});
+		} };
+	}
+});
 //#endregion
 //#region src/rules/no-chained-type-assertions.ts
 function isTypeAssertionExpression(node) {
@@ -880,13 +1061,9 @@ function functionParameterBindingName(parameter, sourceCode) {
 	return annotationStart === void 0 ? sourceText : sourceText.slice(0, annotationStart - parameter.start).trimEnd();
 }
 //#endregion
-//#region src/rules/no-known-value-widening.ts
-function unwrapExpression(expression) {
-	let current = expression;
-	while (current.type === "ParenthesizedExpression" || current.type === "TSAsExpression" || current.type === "TSSatisfiesExpression" || current.type === "TSTypeAssertion" || current.type === "TSNonNullExpression") current = current.expression;
-	return current;
-}
-function resolveVariable$2(sourceCode, identifier) {
+//#region src/shared/scope.ts
+/** Resolve an identifier to its binding by walking lexical scopes upward. */
+function resolveVariable(sourceCode, identifier) {
 	let scope = sourceCode.getScope(identifier);
 	while (scope !== null) {
 		const variable = scope.set.get(identifier.name);
@@ -894,6 +1071,13 @@ function resolveVariable$2(sourceCode, identifier) {
 		scope = scope.upper;
 	}
 	return null;
+}
+//#endregion
+//#region src/rules/no-known-value-widening.ts
+function unwrapExpression(expression) {
+	let current = expression;
+	while (current.type === "ParenthesizedExpression" || current.type === "TSAsExpression" || current.type === "TSSatisfiesExpression" || current.type === "TSTypeAssertion" || current.type === "TSNonNullExpression") current = current.expression;
+	return current;
 }
 function variableDeclarator$1(variable) {
 	if (variable.defs.length !== 1) return null;
@@ -907,7 +1091,7 @@ function hasKnownEvidence(sourceCode, expression, visitedVariables = /* @__PURE_
 	if (isKnownEvidenceExpression(expression)) return true;
 	const unwrapped = unwrapExpression(expression);
 	if (unwrapped.type !== "Identifier") return false;
-	const variable = resolveVariable$2(sourceCode, unwrapped);
+	const variable = resolveVariable(sourceCode, unwrapped);
 	if (variable === null || visitedVariables.has(variable)) return false;
 	const declarator = variableDeclarator$1(variable);
 	if (declarator === null || declarator.init === null || !isStableConstVariable(variable, declarator)) return false;
@@ -921,7 +1105,7 @@ function localFunctionForCall(sourceCode, callee) {
 	const unwrapped = unwrapExpression(callee);
 	if (isFunctionExpression(unwrapped)) return unwrapped;
 	if (unwrapped.type !== "Identifier") return null;
-	const variable = resolveVariable$2(sourceCode, unwrapped);
+	const variable = resolveVariable(sourceCode, unwrapped);
 	if (variable === null || variable.defs.length !== 1) return null;
 	const [definition] = variable.defs;
 	if (definition === void 0) return null;
@@ -953,7 +1137,7 @@ function hasKnownCallArgumentEvidence(sourceCode, expression, environment, visit
 		return returnType !== void 0 && hasInformativeType(returnType, environment);
 	}
 	if (expression.type !== "Identifier") return isKnownEvidenceExpression(expression);
-	const variable = resolveVariable$2(sourceCode, expression);
+	const variable = resolveVariable(sourceCode, expression);
 	if (variable === null || visitedVariables.has(variable)) return false;
 	const annotation = variableTypeAnnotation(sourceCode, variable);
 	if (annotation !== null) return hasInformativeType(annotation.typeAnnotation, environment);
@@ -1044,7 +1228,7 @@ const noKnownValueWideningRule = defineRule({
 			},
 			AssignmentExpression(node) {
 				if (node.operator !== "=" || node.left.type !== "Identifier") return;
-				const variable = resolveVariable$2(context.sourceCode, node.left);
+				const variable = resolveVariable(context.sourceCode, node.left);
 				if (variable === null) return;
 				const declarator = variableDeclarator$1(variable);
 				if (declarator === null || declarator.id.type !== "Identifier") return;
@@ -1098,15 +1282,6 @@ const moduleMockMethods = /* @__PURE__ */ new Set([
 	"mock",
 	"unstable_mockModule"
 ]);
-function resolveVariable$1(sourceCode, identifier) {
-	let scope = sourceCode.getScope(identifier);
-	while (scope !== null) {
-		const variable = scope.set.get(identifier.name);
-		if (variable !== void 0) return variable;
-		scope = scope.upper;
-	}
-	return null;
-}
 function importedName(node) {
 	if (node.type !== "ImportSpecifier") return null;
 	return node.imported.type === "Identifier" ? node.imported.name : node.imported.value;
@@ -1114,7 +1289,7 @@ function importedName(node) {
 function isTestFrameworkObject(sourceCode, expression) {
 	if (expression.type !== "Identifier") return false;
 	if ((expression.name === "vi" || expression.name === "jest") && sourceCode.isGlobalReference(expression)) return true;
-	const variable = resolveVariable$1(sourceCode, expression);
+	const variable = resolveVariable(sourceCode, expression);
 	if (variable === null || variable.defs.length === 0) return expression.name === "vi" || expression.name === "jest";
 	return variable.defs.some((definition) => {
 		if (definition.type !== "ImportBinding" || definition.parent?.type !== "ImportDeclaration") return false;
@@ -1194,15 +1369,6 @@ const noObjectParametersRule = defineRule({
 });
 //#endregion
 //#region src/shared/reflect-method.ts
-function resolveVariable(sourceCode, identifier) {
-	let scope = sourceCode.getScope(identifier);
-	while (scope !== null) {
-		const variable = scope.set.get(identifier.name);
-		if (variable !== void 0) return variable;
-		scope = scope.upper;
-	}
-	return null;
-}
 function isGlobalReflect(sourceCode, expression) {
 	if (expression.type !== "Identifier" || expression.name !== "Reflect") return false;
 	if (sourceCode.isGlobalReference(expression)) return true;
@@ -1765,6 +1931,746 @@ const noWidenThenAssertRule = defineRule({
 	}
 });
 //#endregion
+//#region src/vendor/eslint-stylistic/padding-line-ast.ts
+/** Line terminators recognized by the upstream padding matcher. */
+const LINEBREAKS = /* @__PURE__ */ new Set([
+	"\r\n",
+	"\r",
+	"\n",
+	"\u2028",
+	"\u2029"
+]);
+/** Test a closing brace without treating comment text as punctuation. */
+const isClosingBraceToken = (token) => token.type === "Punctuator" && token.value === "}";
+/** Test a semicolon without treating comment text as punctuation. */
+const isSemicolonToken = (token) => token.type === "Punctuator" && token.value === ";";
+/** Filter the optional final semicolon when identifying block-like statements. */
+const isNotSemicolonToken = (token) => !isSemicolonToken(token);
+/** Compare token/node boundaries, including attached comments. */
+const isTokenOnSameLine = (left, right) => left.loc.end.line === right.loc.start.line;
+/** Recognize declarations and expressions used by the upstream IIFE matcher. */
+const isFunction = (node) => node.type === "FunctionDeclaration" || node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression";
+/** Preserve the upstream multiline statement heuristic. */
+const isSingleLine = (node) => node.loc.start.line === node.loc.end.line;
+/** Unwrap optional chaining before checking IIFE syntax. */
+const skipChainExpression = (node) => node.type === "ChainExpression" ? node.expression : node;
+/** Only a program or function-body expression can begin a directive prologue. */
+const isTopLevelExpressionStatement = (node) => node.type === "ExpressionStatement" && (node.parent.type === "Program" || node.parent.type === "BlockStatement" && isFunction(node.parent.parent));
+/** A single wrapping pair suffices to exclude a string from directive syntax. */
+function isParenthesized(node, sourceCode) {
+	const before = sourceCode.getTokenBefore(node);
+	const after = sourceCode.getTokenAfter(node);
+	return before?.value === "(" && after?.value === ")";
+}
+//#endregion
+//#region src/vendor/eslint-stylistic/padding-line-between-statements.ts
+const CJS_EXPORT = /^(?:module\s*\.\s*)?exports(?:\s*\.|\s*\[|$)/u;
+const CJS_IMPORT = /^require\(/u;
+const LT = `[${Array.from(LINEBREAKS).join("")}]`;
+const PADDING_LINE_SEQUENCE = new RegExp(String.raw`^(\s*?${LT})\s*${LT}(\s*;?)$`, "u");
+function isSelectorOption(option) {
+	return typeof option === "object" && !Array.isArray(option);
+}
+/**
+* Creates tester which check if a node starts with specific keyword with the
+* appropriate AST_NODE_TYPES.
+* @param keyword The keyword to test.
+* @returns the created tester.
+* @private
+*/
+function newKeywordTester(type, keyword) {
+	return { test(node, sourceCode) {
+		const isSameKeyword = sourceCode.getFirstToken(node)?.value === keyword;
+		const isSameType = Array.isArray(type) ? type.includes(node.type) : type === node.type;
+		return isSameKeyword && isSameType;
+	} };
+}
+/**
+* Creates tester which check if a node is specific type.
+* @param type The node type to test.
+* @returns the created tester.
+* @private
+*/
+function newNodeTypeTester(type) {
+	return { test: (node) => node.type === type };
+}
+/**
+* Checks the given node is an expression statement of IIFE.
+* @param node The node to check.
+* @returns `true` if the node is an expression statement of IIFE.
+* @private
+*/
+function isIIFEStatement(node) {
+	if (node.type === "ExpressionStatement") {
+		let expression = skipChainExpression(node.expression);
+		if (expression.type === "UnaryExpression") expression = skipChainExpression(expression.argument);
+		if (expression.type === "CallExpression") {
+			let node = expression.callee;
+			while (node.type === "SequenceExpression") {
+				const lastExpression = node.expressions.at(-1);
+				if (lastExpression === void 0) throw new Error("Padding rule invariant: sequence expression is empty");
+				node = lastExpression;
+			}
+			return isFunction(node);
+		}
+	}
+	return false;
+}
+/**
+* Checks the given node is a CommonJS require statement
+* @param node The node to check.
+* @returns `true` if the node is a CommonJS require statement.
+* @private
+*/
+function isCJSRequire(node) {
+	if (node.type === "VariableDeclaration") {
+		const declaration = node.declarations[0];
+		if (declaration?.init) {
+			let call = declaration?.init;
+			while (call.type === "MemberExpression") call = call.object;
+			if (call.type === "CallExpression" && call.callee.type === "Identifier") return call.callee.name === "require";
+		}
+	}
+	return false;
+}
+/**
+* Checks whether the given node is a block-like statement.
+* This checks the last token of the node is the closing brace of a block.
+* @param sourceCode The source code to get tokens.
+* @param node The node to check.
+* @returns `true` if the node is a block-like statement.
+* @private
+*/
+function isBlockLikeStatement(node, sourceCode) {
+	if (node.type === "DoWhileStatement" && node.body.type === "BlockStatement") return true;
+	/**
+	* IIFE is a block-like statement specially from
+	* JSCS#disallowPaddingNewLinesAfterBlocks.
+	*/
+	if (isIIFEStatement(node)) return true;
+	const lastToken = sourceCode.getLastToken(node, isNotSemicolonToken);
+	const belongingNode = lastToken && isClosingBraceToken(lastToken) ? sourceCode.getNodeByRangeIndex(lastToken.range[0]) : null;
+	return !!belongingNode && (belongingNode.type === "BlockStatement" || belongingNode.type === "SwitchStatement");
+}
+/**
+* Check whether the given node is a directive or not.
+* @param node The node to check.
+* @param sourceCode The source code object to get tokens.
+* @returns `true` if the node is a directive.
+*/
+function isDirective(node, sourceCode) {
+	return isTopLevelExpressionStatement(node) && node.expression.type === "Literal" && typeof node.expression.value === "string" && !isParenthesized(node.expression, sourceCode);
+}
+/**
+* Check whether the given node is a part of directive prologue or not.
+* @param node The node to check.
+* @param sourceCode The source code object to get tokens.
+* @returns `true` if the node is a part of directive prologue.
+*/
+function isDirectivePrologue(node, sourceCode) {
+	if (isDirective(node, sourceCode) && node.parent && "body" in node.parent && Array.isArray(node.parent.body)) {
+		for (const sibling of node.parent.body) {
+			if (sibling === node) break;
+			if (!isDirective(sibling, sourceCode)) return false;
+		}
+		return true;
+	}
+	return false;
+}
+/**
+* Checks the given node is a CommonJS export statement
+* @param node The node to check.
+* @returns `true` if the node is a CommonJS export statement.
+* @private
+*/
+function isCJSExport(node) {
+	if (node.type === "ExpressionStatement") {
+		const expression = node.expression;
+		if (expression.type === "AssignmentExpression") {
+			let left = expression.left;
+			if (left.type === "MemberExpression") {
+				while (left.object.type === "MemberExpression") left = left.object;
+				return left.object.type === "Identifier" && (left.object.name === "exports" || left.object.name === "module" && left.property.type === "Identifier" && left.property.name === "exports");
+			}
+		}
+	}
+	return false;
+}
+/**
+* Check whether the given node is an expression
+* @param node The node to check.
+* @param sourceCode The source code object to get tokens.
+* @returns `true` if the node is an expression
+*/
+function isExpression(node, sourceCode) {
+	return node.type === "ExpressionStatement" && !isDirectivePrologue(node, sourceCode);
+}
+/**
+* Gets the actual last token.
+*
+* If a semicolon is semicolon-less style's semicolon, this ignores it.
+* For example:
+*
+*     foo()
+*     ;[1, 2, 3].forEach(bar)
+* @param sourceCode The source code to get tokens.
+* @param node The node to get.
+* @returns The actual last token.
+* @private
+*/
+function getActualLastToken(node, sourceCode) {
+	const semiToken = sourceCode.getLastToken(node);
+	const prevToken = sourceCode.getTokenBefore(semiToken);
+	const nextToken = sourceCode.getTokenAfter(semiToken);
+	return prevToken && nextToken && prevToken.range[0] >= node.range[0] && isSemicolonToken(semiToken) && !isTokenOnSameLine(prevToken, semiToken) && isTokenOnSameLine(semiToken, nextToken) ? prevToken : semiToken;
+}
+/**
+* This returns the concatenation of the first 2 captured strings.
+* @param _ Unused. Whole matched string.
+* @param trailingSpaces The trailing spaces of the first line.
+* @param indentSpaces The indentation spaces of the last line.
+* @returns The concatenation of trailingSpaces and indentSpaces.
+* @private
+*/
+function replacerToRemovePaddingLines(_, trailingSpaces, indentSpaces) {
+	return trailingSpaces + indentSpaces;
+}
+function getReportLoc(node, sourceCode) {
+	if (isSingleLine(node)) return node.loc;
+	const line = node.loc.start.line;
+	const sourceLine = sourceCode.lines[line - 1];
+	if (sourceLine === void 0) throw new Error("Padding rule invariant: statement source line is missing");
+	return {
+		start: node.loc.start,
+		end: {
+			line,
+			column: sourceLine.length
+		}
+	};
+}
+/**
+* Check and report statements for `any` configuration.
+* It does nothing.
+*
+* @private
+*/
+function verifyForAny() {}
+/**
+* Check and report statements for `never` configuration.
+* This autofix removes blank lines between the given 2 statements.
+* However, if comments exist between 2 blank lines, it does not remove those
+* blank lines automatically.
+* @param context The rule context to report.
+* @param _ Unused. The previous node to check.
+* @param nextNode The next node to check.
+* @param paddingLines The array of token pairs that blank
+* lines exist between the pair.
+*
+* @private
+*/
+function verifyForNever(context, _, nextNode, paddingLines) {
+	if (paddingLines.length === 0) return;
+	context.report({
+		node: nextNode,
+		messageId: "unexpectedBlankLine",
+		loc: getReportLoc(nextNode, context.sourceCode),
+		fix(fixer) {
+			if (paddingLines.length >= 2) return null;
+			const paddingPair = paddingLines[0];
+			if (paddingPair === void 0) throw new Error("Padding rule invariant: reported padding pair is missing");
+			const [prevToken, nextToken] = paddingPair;
+			const start = prevToken.range[1];
+			const end = nextToken.range[0];
+			const text = context.sourceCode.text.slice(start, end).replace(PADDING_LINE_SEQUENCE, replacerToRemovePaddingLines);
+			return fixer.replaceTextRange([start, end], text);
+		}
+	});
+}
+/**
+* Check and report statements for `always` configuration.
+* This autofix inserts a blank line between the given 2 statements.
+* If the `prevNode` has trailing comments, it inserts a blank line after the
+* trailing comments.
+* @param context The rule context to report.
+* @param prevNode The previous node to check.
+* @param nextNode The next node to check.
+* @param paddingLines The array of token pairs that blank
+* lines exist between the pair.
+*
+* @private
+*/
+function verifyForAlways(context, prevNode, nextNode, paddingLines) {
+	if (paddingLines.length > 0) return;
+	context.report({
+		node: nextNode,
+		messageId: "expectedBlankLine",
+		loc: getReportLoc(nextNode, context.sourceCode),
+		fix(fixer) {
+			const sourceCode = context.sourceCode;
+			let prevToken = getActualLastToken(prevNode, sourceCode);
+			const nextToken = sourceCode.getFirstTokenBetween(prevToken, nextNode, {
+				includeComments: true,
+				/**
+				* Skip the trailing comments of the previous node.
+				* This inserts a blank line after the last trailing comment.
+				*
+				* For example:
+				*
+				*     foo(); // trailing comment.
+				*     // comment.
+				*     bar();
+				*
+				* Get fixed to:
+				*
+				*     foo(); // trailing comment.
+				*
+				*     // comment.
+				*     bar();
+				* @param token The token to check.
+				* @returns `true` if the token is not a trailing comment.
+				* @private
+				*/
+				filter(token) {
+					if (isTokenOnSameLine(prevToken, token)) {
+						prevToken = token;
+						return false;
+					}
+					return true;
+				}
+			}) || nextNode;
+			const insertText = isTokenOnSameLine(prevToken, nextToken) ? "\n\n" : "\n";
+			return fixer.insertTextAfter(prevToken, insertText);
+		}
+	});
+}
+/**
+* Types of blank lines.
+* `any`, `never`, and `always` are defined.
+* Those have `verify` method to check and report statements.
+* @private
+*/
+const PaddingTypes = {
+	any: { verify: verifyForAny },
+	never: { verify: verifyForNever },
+	always: { verify: verifyForAlways }
+};
+const MaybeMultilineStatementType = {
+	"block-like": { test: isBlockLikeStatement },
+	"expression": { test: isExpression },
+	"return": newKeywordTester("ReturnStatement", "return"),
+	"export": newKeywordTester([
+		"ExportAllDeclaration",
+		"ExportDefaultDeclaration",
+		"ExportNamedDeclaration"
+	], "export"),
+	"var": newKeywordTester("VariableDeclaration", "var"),
+	"let": newKeywordTester("VariableDeclaration", "let"),
+	"const": newKeywordTester("VariableDeclaration", "const"),
+	"using": { test: (node) => node.type === "VariableDeclaration" && (node.kind === "using" || node.kind === "await using") },
+	"type": newKeywordTester("TSTypeAliasDeclaration", "type")
+};
+/**
+* Types of statements.
+* Those have `test` method to check it matches to the given statement.
+* @private
+*/
+const StatementTypes = {
+	"*": { test: () => true },
+	"exports": { test: isCJSExport },
+	"require": { test: isCJSRequire },
+	"directive": { test: isDirectivePrologue },
+	"iife": { test: isIIFEStatement },
+	"block": newNodeTypeTester("BlockStatement"),
+	"empty": newNodeTypeTester("EmptyStatement"),
+	"function": newNodeTypeTester("FunctionDeclaration"),
+	"ts-method": newNodeTypeTester("TSMethodSignature"),
+	"break": newKeywordTester("BreakStatement", "break"),
+	"case": newKeywordTester("SwitchCase", "case"),
+	"class": newKeywordTester("ClassDeclaration", "class"),
+	"continue": newKeywordTester("ContinueStatement", "continue"),
+	"debugger": newKeywordTester("DebuggerStatement", "debugger"),
+	"default": newKeywordTester(["SwitchCase", "ExportDefaultDeclaration"], "default"),
+	"do": newKeywordTester("DoWhileStatement", "do"),
+	"for": newKeywordTester([
+		"ForStatement",
+		"ForInStatement",
+		"ForOfStatement"
+	], "for"),
+	"if": newKeywordTester("IfStatement", "if"),
+	"import": newKeywordTester("ImportDeclaration", "import"),
+	"switch": newKeywordTester("SwitchStatement", "switch"),
+	"throw": newKeywordTester("ThrowStatement", "throw"),
+	"try": newKeywordTester("TryStatement", "try"),
+	"while": newKeywordTester(["WhileStatement", "DoWhileStatement"], "while"),
+	"with": newKeywordTester("WithStatement", "with"),
+	"cjs-export": { test: (node, sourceCode) => node.type === "ExpressionStatement" && node.expression.type === "AssignmentExpression" && CJS_EXPORT.test(sourceCode.getText(node.expression.left)) },
+	"cjs-import": { test: (node, sourceCode) => node.type === "VariableDeclaration" && node.declarations.length > 0 && node.declarations[0]?.init != null && CJS_IMPORT.test(sourceCode.getText(node.declarations[0].init)) },
+	"enum": newKeywordTester("TSEnumDeclaration", "enum"),
+	"interface": newKeywordTester("TSInterfaceDeclaration", "interface"),
+	"function-overload": newNodeTypeTester("TSDeclareFunction"),
+	...Object.fromEntries(Object.entries(MaybeMultilineStatementType).flatMap(([key, value]) => [
+		[key, value],
+		[`singleline-${key}`, {
+			...value,
+			test: (node, sourceCode) => value.test(node, sourceCode) && isSingleLine(node)
+		}],
+		[`multiline-${key}`, {
+			...value,
+			test: (node, sourceCode) => value.test(node, sourceCode) && !isSingleLine(node)
+		}]
+	]))
+};
+/**
+* Build the vendored padding rule with caller-owned, typed policy options.
+* `statementTypes` registers caller-defined statement types, looked up before
+* the upstream table, for syntax the upstream matchers do not distinguish.
+*/
+function createPaddingLineRule(options, statementTypes) {
+	const customStatementTypes = statementTypes ?? {};
+	return {
+		meta: {
+			type: "layout",
+			docs: { description: "Require or disallow padding lines between statements" },
+			fixable: "whitespace",
+			hasSuggestions: false,
+			schema: {
+				$defs: {
+					paddingType: {
+						type: "string",
+						enum: Object.keys(PaddingTypes)
+					},
+					statementType: {
+						type: "string",
+						enum: Object.keys(StatementTypes)
+					},
+					selectorOption: {
+						type: "object",
+						properties: {
+							selector: { type: "string" },
+							lineMode: {
+								type: "string",
+								enum: [
+									"any",
+									"singleline",
+									"multiline"
+								]
+							}
+						},
+						required: ["selector"],
+						additionalProperties: false
+					},
+					statementMatcher: { anyOf: [{ $ref: "#/$defs/statementType" }, { $ref: "#/$defs/selectorOption" }] },
+					statementOption: { anyOf: [{ $ref: "#/$defs/statementMatcher" }, {
+						type: "array",
+						items: { $ref: "#/$defs/statementMatcher" },
+						minItems: 1,
+						uniqueItems: true,
+						additionalItems: false
+					}] }
+				},
+				type: "array",
+				additionalItems: false,
+				items: {
+					type: "object",
+					properties: {
+						blankLine: { $ref: "#/$defs/paddingType" },
+						prev: { $ref: "#/$defs/statementOption" },
+						next: { $ref: "#/$defs/statementOption" }
+					},
+					additionalProperties: false,
+					required: [
+						"blankLine",
+						"prev",
+						"next"
+					]
+				}
+			},
+			messages: {
+				unexpectedBlankLine: "Unexpected blank line before this statement.",
+				expectedBlankLine: "Expected blank line before this statement."
+			}
+		},
+		create(context) {
+			const sourceCode = context.sourceCode;
+			const selectorMatchedNodes = /* @__PURE__ */ new Map();
+			const pendingPairs = [];
+			function collectSelectorOption(option) {
+				if (Array.isArray(option)) {
+					for (const item of option) collectSelectorOption(item);
+					return;
+				}
+				if (!isSelectorOption(option)) return;
+				selectorMatchedNodes.set(option.selector, /* @__PURE__ */ new Set());
+			}
+			for (const configure of options) {
+				collectSelectorOption(configure.prev);
+				collectSelectorOption(configure.next);
+			}
+			let scopeInfo = null;
+			/**
+			* Processes to enter to new scope.
+			* This manages the current previous statement.
+			*
+			* @private
+			*/
+			function enterScope() {
+				scopeInfo = {
+					upper: scopeInfo,
+					prevNode: null
+				};
+			}
+			/**
+			* Processes to exit from the current scope.
+			*
+			* @private
+			*/
+			function exitScope() {
+				if (scopeInfo) scopeInfo = scopeInfo.upper;
+			}
+			/**
+			* Checks whether the given node matches the given type.
+			* @param node The statement node to check.
+			* @param type The statement type to check.
+			* @returns `true` if the statement node matched the type.
+			* @private
+			*/
+			function match(node, type) {
+				let innerStatementNode = node;
+				while (innerStatementNode.type === "LabeledStatement") innerStatementNode = innerStatementNode.body;
+				if (Array.isArray(type)) return type.some(match.bind(null, innerStatementNode));
+				if (isSelectorOption(type)) {
+					if (!selectorMatchedNodes.get(type.selector)?.has(innerStatementNode)) return false;
+					const lineMode = type.lineMode;
+					if (lineMode === "singleline") return isSingleLine(innerStatementNode);
+					else if (lineMode === "multiline") return !isSingleLine(innerStatementNode);
+					return true;
+				} else {
+					const statementType = customStatementTypes[type] ?? StatementTypes[type];
+					if (statementType === void 0) throw new Error(`Padding rule invariant: unsupported statement type ${type}`);
+					return statementType.test(innerStatementNode, sourceCode);
+				}
+			}
+			/**
+			* Finds the last matched configure from options.
+			* @param prevNode The previous statement to match.
+			* @param nextNode The current statement to match.
+			* @returns The tester of the last matched configure.
+			* @private
+			*/
+			function getPaddingType(prevNode, nextNode) {
+				for (let i = options.length - 1; i >= 0; --i) {
+					const configure = options[i];
+					if (configure === void 0) throw new Error("Padding rule invariant: configuration entry is missing");
+					if (match(prevNode, configure.prev) && match(nextNode, configure.next)) return PaddingTypes[configure.blankLine];
+				}
+				return PaddingTypes.any;
+			}
+			/**
+			* Gets padding line sequences between the given 2 statements.
+			* Comments are separators of the padding line sequences.
+			* @param prevNode The previous statement to count.
+			* @param nextNode The current statement to count.
+			* @returns The array of token pairs.
+			* @private
+			*/
+			function getPaddingLineSequences(prevNode, nextNode) {
+				const pairs = [];
+				let prevToken = getActualLastToken(prevNode, sourceCode);
+				if (nextNode.loc.start.line - prevToken.loc.end.line >= 2) do {
+					const token = sourceCode.getTokenAfter(prevToken, { includeComments: true });
+					if (token.loc.start.line - prevToken.loc.end.line >= 2) pairs.push([prevToken, token]);
+					prevToken = token;
+				} while (prevToken.range[0] < nextNode.range[0]);
+				return pairs;
+			}
+			/**
+			* Verify padding lines between the given node and the previous node.
+			* @param node The node to verify.
+			*
+			* @private
+			*/
+			function verify(node) {
+				if (!node.parent || ![
+					"BlockStatement",
+					"Program",
+					"StaticBlock",
+					"SwitchCase",
+					"SwitchStatement",
+					"TSInterfaceBody",
+					"TSModuleBlock",
+					"TSTypeLiteral"
+				].includes(node.parent.type)) return;
+				const prevNode = scopeInfo.prevNode;
+				if (prevNode) pendingPairs.push({
+					prevNode,
+					nextNode: node
+				});
+				scopeInfo.prevNode = node;
+			}
+			function verifyPendingPairs() {
+				for (const { prevNode, nextNode } of pendingPairs) {
+					const type = getPaddingType(prevNode, nextNode);
+					const paddingLines = getPaddingLineSequences(prevNode, nextNode);
+					type.verify(context, prevNode, nextNode, paddingLines);
+				}
+			}
+			/**
+			* Verify padding lines between the given node and the previous node.
+			* Then process to enter to new scope.
+			* @param node The node to verify.
+			*
+			* @private
+			*/
+			function verifyThenEnterScope(node) {
+				verify(node);
+				enterScope();
+			}
+			return {
+				"Program": enterScope,
+				"Program:exit": () => {
+					verifyPendingPairs();
+					exitScope();
+				},
+				"BlockStatement": enterScope,
+				"BlockStatement:exit": exitScope,
+				"SwitchStatement": enterScope,
+				"SwitchStatement:exit": exitScope,
+				"SwitchCase": verifyThenEnterScope,
+				"SwitchCase:exit": exitScope,
+				"StaticBlock": enterScope,
+				"StaticBlock:exit": exitScope,
+				"TSInterfaceBody": enterScope,
+				"TSInterfaceBody:exit": exitScope,
+				"TSModuleBlock": enterScope,
+				"TSModuleBlock:exit": exitScope,
+				"TSTypeLiteral": enterScope,
+				"TSTypeLiteral:exit": exitScope,
+				"TSDeclareFunction": verifyThenEnterScope,
+				"TSDeclareFunction:exit": exitScope,
+				"TSMethodSignature": verifyThenEnterScope,
+				"TSMethodSignature:exit": exitScope,
+				":statement": verify,
+				...Object.fromEntries(Array.from(selectorMatchedNodes.keys(), (selector) => [selector, (node) => {
+					selectorMatchedNodes.get(selector)?.add(node);
+				}]))
+			};
+		}
+	};
+}
+//#endregion
+//#region src/rules/require-readable-spacing.ts
+/** A `const`/`let`/`var`/`using` declaration, optionally exported, written on one line. */
+function isSinglelineBinding(node) {
+	return (node.type === "ExportNamedDeclaration" ? node.declaration : node)?.type === "VariableDeclaration" && node.loc.start.line === node.loc.end.line;
+}
+/** Comments above a statement belong to it; a comment trailing the previous line does not. */
+function hasLeadingComment(node, sourceCode) {
+	const previousLine = sourceCode.getTokenBefore(node)?.loc.end.line;
+	return sourceCode.getCommentsBefore(node).some((comment) => comment.loc.start.line !== previousLine);
+}
+const paddingRule = createPaddingLineRule([
+	{
+		blankLine: "always",
+		prev: "import",
+		next: "*"
+	},
+	{
+		blankLine: "always",
+		prev: "*",
+		next: { selector: "Program > :not(ImportDeclaration)" }
+	},
+	{
+		blankLine: "always",
+		prev: { selector: "Program > :not(ImportDeclaration)" },
+		next: "*"
+	},
+	{
+		blankLine: "always",
+		prev: "*",
+		next: [
+			"function",
+			"class",
+			"interface",
+			"type"
+		]
+	},
+	{
+		blankLine: "always",
+		prev: [
+			"function",
+			"class",
+			"interface",
+			"type"
+		],
+		next: "*"
+	},
+	{
+		blankLine: "always",
+		prev: "*",
+		next: [
+			"multiline-const",
+			"multiline-let",
+			"multiline-var",
+			"multiline-using"
+		]
+	},
+	{
+		blankLine: "always",
+		prev: [
+			"multiline-const",
+			"multiline-let",
+			"multiline-var",
+			"multiline-using"
+		],
+		next: "*"
+	},
+	{
+		blankLine: "always",
+		prev: "*",
+		next: [
+			"return",
+			"if",
+			"switch",
+			"try",
+			"for",
+			"while",
+			"do"
+		]
+	},
+	{
+		blankLine: "always",
+		prev: "block-like",
+		next: "*"
+	},
+	{
+		blankLine: "any",
+		prev: "import",
+		next: "import"
+	},
+	{
+		blankLine: "any",
+		prev: "singleline-binding",
+		next: "undocumented-singleline-binding"
+	},
+	{
+		blankLine: "any",
+		prev: { selector: ":matches(TSDeclareFunction, ExportNamedDeclaration[declaration.type=\"TSDeclareFunction\"])" },
+		next: { selector: ":matches(TSDeclareFunction, FunctionDeclaration, ExportNamedDeclaration[declaration.type=\"TSDeclareFunction\"], ExportNamedDeclaration[declaration.type=\"FunctionDeclaration\"])" }
+	}
+], {
+	"singleline-binding": { test: (node) => isSinglelineBinding(node) },
+	"undocumented-singleline-binding": { test: (node, sourceCode) => isSinglelineBinding(node) && !hasLeadingComment(node, sourceCode) }
+});
+/** Restore structural blank lines with whitespace-only fixes; keep single-line binding groups and overloads grouped. */
+const requireReadableSpacingRule = {
+	...paddingRule,
+	meta: {
+		...paddingRule.meta,
+		docs: { description: "Require readable spacing between declarations and logical statement groups." },
+		schema: []
+	}
+};
+//#endregion
 //#region src/rules/require-safety-comment-for-type-assertion.ts
 const DEFAULT_SAFETY_MARKERS = ["SAFETY"];
 const commentOwnerKinds = /* @__PURE__ */ new Set([
@@ -1809,6 +2715,8 @@ function hasSafetyComment(sourceCode, node, pattern) {
 const antiSlopPlugin = eslintCompatPlugin({
 	meta: { name: "anti-slop" },
 	rules: {
+		"no-array-filter-map": noArrayFilterMapRule,
+		"no-reduce-accumulator-copy": noReduceAccumulatorCopyRule,
 		"no-chained-type-assertions": noChainedTypeAssertionsRule,
 		"no-conditional-empty-object-spread": noConditionalEmptyObjectSpreadRule,
 		"no-known-value-widening": noKnownValueWideningRule,
@@ -1823,6 +2731,7 @@ const antiSlopPlugin = eslintCompatPlugin({
 		"no-unknown-returns": noUnknownReturnsRule,
 		"no-unknown-type-aliases": noUnknownTypeAliasesRule,
 		"no-widen-then-assert": noWidenThenAssertRule,
+		"require-readable-spacing": requireReadableSpacingRule,
 		"require-safety-comment-for-type-assertion": defineRule({
 			meta: {
 				type: "problem",

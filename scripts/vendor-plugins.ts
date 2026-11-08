@@ -54,11 +54,11 @@ interface VendoredPlugin {
 
 const VENDORED_PLUGINS: VendoredPlugin[] = [
   {
-    copiedLicenses: [],
+    copiedLicenses: ["src/vendor/eslint-stylistic/LICENSE"],
     entry: "src/index.ts",
     name: "anti-slop",
     outDir: "presets/lint/vendor/antislop",
-    pinnedRef: "e8c4880471b23ab7f216fba7b27d173a6ef07d4c",
+    pinnedRef: "13909c9e07590f5a85d93c62712259fe14a883f7",
     repoUrl: "https://github.com/dmmulroy/anti-slop.git",
   },
 ]

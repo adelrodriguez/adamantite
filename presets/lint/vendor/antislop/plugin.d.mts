@@ -6,11 +6,13 @@ interface VendoredPluginRule {
 declare const vendoredPlugin: {
   readonly meta: { readonly name: string }
   readonly rules: {
+    readonly "no-array-filter-map": VendoredPluginRule
     readonly "no-chained-type-assertions": VendoredPluginRule
     readonly "no-conditional-empty-object-spread": VendoredPluginRule
     readonly "no-known-value-widening": VendoredPluginRule
     readonly "no-module-mocking": VendoredPluginRule
     readonly "no-object-parameters": VendoredPluginRule
+    readonly "no-reduce-accumulator-copy": VendoredPluginRule
     readonly "no-reflect-apply": VendoredPluginRule
     readonly "no-reflect-get": VendoredPluginRule
     readonly "no-runtime-typeof": VendoredPluginRule
@@ -20,6 +22,7 @@ declare const vendoredPlugin: {
     readonly "no-unknown-type-aliases": VendoredPluginRule
     readonly "no-unsafe-dictionary-type": VendoredPluginRule
     readonly "no-widen-then-assert": VendoredPluginRule
+    readonly "require-readable-spacing": VendoredPluginRule
     readonly "require-safety-comment-for-type-assertion": VendoredPluginRule
   }
 }

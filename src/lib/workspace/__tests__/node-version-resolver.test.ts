@@ -3,12 +3,20 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as PlatformError from "effect/PlatformError"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
-import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import {
+  type FileSystemTestContext,
+  createFileSystemTestContext,
+  makeSystemError,
+} from "#__tests__/filesystem.ts"
+import { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import {
+  NodeVersion,
+  NodeVersionFile,
+  NodeVersionResolver,
+} from "#lib/workspace/node-version-resolver.ts"
 
 const ROOT = "/project"
 
@@ -39,7 +47,7 @@ describe("NodeVersionResolver", () => {
 
       const source = yield* runResolve(files)
 
-      expect(source).toStrictEqual({ _tag: "Version", value: "lts/*" })
+      expect(source).toStrictEqual(new NodeVersion({ value: "lts/*" }))
     })
   )
 
@@ -47,12 +55,7 @@ describe("NodeVersionResolver", () => {
     Effect.gen(function* () {
       // The in-memory filesystem cannot make reads fail with permissions, so a noop layer
       // fails every read with PermissionDenied, as for a file with mode 0o000.
-      const cause = PlatformError.systemError({
-        _tag: "PermissionDenied",
-        method: "readFileString",
-        module: "FileSystem",
-        pathOrDescriptor: `${ROOT}/.node-version`,
-      })
+      const cause = makeSystemError("PermissionDenied", "readFileString", `${ROOT}/.node-version`)
 
       const fileSystemLayer = FileSystem.layerNoop({
         readFileString: () => Effect.fail(cause),
@@ -63,7 +66,8 @@ describe("NodeVersionResolver", () => {
         Effect.flip
       )
 
-      expect(error).toMatchObject({ _tag: "FailedToReadFile", path: `${ROOT}/.node-version` })
+      expect(error).toBeInstanceOf(FailedToReadFile)
+      expect(error).toMatchObject({ path: `${ROOT}/.node-version` })
     })
   )
 
@@ -76,7 +80,7 @@ describe("NodeVersionResolver", () => {
       expect(Result.isFailure(result)).toBe(true)
 
       if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
+        expect(result.failure).toBeInstanceOf(FailedToParseFile)
       }
     })
   )
@@ -127,7 +131,9 @@ describe("NodeVersionResolver", () => {
         const source = yield* runResolve(files)
 
         expect(source).toStrictEqual(
-          hasNode ? { _tag: "File", path: ".tool-versions" } : { _tag: "Version", value: "lts/*" }
+          hasNode
+            ? new NodeVersionFile({ path: ".tool-versions" })
+            : new NodeVersion({ value: "lts/*" })
         )
       }),
     { arbitrary: { runs: 200 } }
@@ -204,14 +210,14 @@ describe("NodeVersionResolver", () => {
         const source = yield* runResolve(files)
 
         const expected = nodeVersion?.valid
-          ? { _tag: "File", path: ".node-version" }
+          ? new NodeVersionFile({ path: ".node-version" })
           : nvmrc?.valid
-            ? { _tag: "File", path: ".nvmrc" }
+            ? new NodeVersionFile({ path: ".nvmrc" })
             : toolVersions?.valid
-              ? { _tag: "File", path: ".tool-versions" }
+              ? new NodeVersionFile({ path: ".tool-versions" })
               : packageJson?.valid
-                ? { _tag: "File", path: "package.json" }
-                : { _tag: "Version", value: "lts/*" }
+                ? new NodeVersionFile({ path: "package.json" })
+                : new NodeVersion({ value: "lts/*" })
 
         expect(source).toStrictEqual(expected)
       }),
@@ -278,7 +284,7 @@ describe("NodeVersionResolver", () => {
 
         const source = yield* runResolve(files)
 
-        expect(source).toStrictEqual({ _tag: "File", path: "package.json" })
+        expect(source).toStrictEqual(new NodeVersionFile({ path: "package.json" }))
       }),
     { arbitrary: { runs: 200 } }
   )
@@ -294,7 +300,7 @@ describe("NodeVersionResolver", () => {
 
         const source = yield* runResolve(files)
 
-        expect(source).toStrictEqual({ _tag: "Version", value: "lts/*" })
+        expect(source).toStrictEqual(new NodeVersion({ value: "lts/*" }))
       }),
     { arbitrary: { runs: 100 } }
   )

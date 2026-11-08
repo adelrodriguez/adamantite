@@ -1,5 +1,6 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Predicate from "effect/Predicate"
 import type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -161,7 +162,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   // dependency graph.
   yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
     Effect.mapError((error) =>
-      error._tag === "CliNotFound" && error.command === sherif.name
+      Predicate.isTagged(error, "CliNotFound") && error.command === sherif.name
         ? new CliNotFound({
             command: error.command,
             hint: "Run `adamantite update` to install it.",

@@ -4,13 +4,16 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as PlatformError from "effect/PlatformError"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stdio from "effect/Stdio"
 import * as Terminal from "effect/Terminal"
 import { TestConsole } from "effect/testing"
-import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import {
+  type FileSystemTestContext,
+  createFileSystemTestContext,
+  makeSystemError,
+} from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import {
@@ -173,14 +176,7 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
         }
 
         if (options.agentExit === "spawn-error") {
-          return Effect.fail(
-            PlatformError.systemError({
-              _tag: "PermissionDenied",
-              method: "spawn",
-              module: "FileSystem",
-              pathOrDescriptor: invocation.command,
-            })
-          )
+          return Effect.fail(makeSystemError("PermissionDenied", "spawn", invocation.command))
         }
 
         options.onAgentRun?.()

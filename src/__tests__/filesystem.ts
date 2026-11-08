@@ -38,7 +38,10 @@ export interface FileSystemTestContext {
   readonly makeReadOnly: (path: string) => void
 }
 
-function makeSystemError(tag: PlatformError.SystemErrorTag, method: string, path: string) {
+/**
+ * Make the system error that the Node.js FileSystem backend fails with.
+ */
+export function makeSystemError(tag: PlatformError.SystemErrorTag, method: string, path: string) {
   return PlatformError.systemError({
     _tag: tag,
     method,

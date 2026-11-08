@@ -34,7 +34,7 @@ import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
-import { chooseResolution } from "#terminal/resolution-menu.ts"
+import { AgentSessionEnded, chooseResolution } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
 
@@ -197,7 +197,7 @@ export default Command.make("harden", { commits, scope }).pipe(
         subject: "the prompt",
       })
 
-      if (resolution._tag !== "Ended") {
+      if (!(resolution instanceof AgentSessionEnded)) {
         yield* prompter.outro("Harden ended without an agent session.")
 
         return

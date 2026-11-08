@@ -1,4 +1,5 @@
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
@@ -56,11 +57,18 @@ export interface OverriddenRule {
 }
 
 /**
- * The overrides that turn a rule off, or the reason why Adamantite could not lint their files.
+ * The overrides that turn a rule off, with a mark for each file that they name.
  */
-export type OverridesReport =
-  | { readonly _tag: "Failed"; readonly reason: string }
-  | { readonly _tag: "Linted"; readonly rules: readonly OverriddenRule[] }
+export class LintedOverrides extends Data.TaggedClass("Linted")<{
+  readonly rules: readonly OverriddenRule[]
+}> {}
+
+/**
+ * The reason why Adamantite could not lint the files of the overrides.
+ */
+export class OverridesLintFailed extends Data.TaggedClass("Failed")<{ readonly reason: string }> {}
+
+export type OverridesReport = LintedOverrides | OverridesLintFailed
 
 const GLOB_CHARACTERS = /[!*?[\]{}]/u
 
@@ -351,8 +359,7 @@ export const readOverrides = Effect.fn("readOverrides")(
       }
     }
 
-    return {
-      _tag: "Linted",
+    return new LintedOverrides({
       rules: entries
         .filter((entry) => entry.literals.length > 0 || entry.globs.length > 0)
         .map((entry): OverriddenRule => ({
@@ -364,10 +371,8 @@ export const readOverrides = Effect.fn("readOverrides")(
           globs: entry.globs,
           rule: entry.rule,
         })),
-    } satisfies OverridesReport
+    })
   },
   Effect.scoped,
-  Effect.catch((error) =>
-    Effect.succeed({ _tag: "Failed", reason: error.message } satisfies OverridesReport)
-  )
+  Effect.catch((error) => Effect.succeed(new OverridesLintFailed({ reason: error.message })))
 )

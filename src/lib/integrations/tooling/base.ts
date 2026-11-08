@@ -1,5 +1,6 @@
 import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
@@ -36,13 +37,28 @@ export interface ToolingConfigFileState {
 }
 
 /**
- * The config that the tool uses: none, the latest supported TypeScript config, or a legacy JSON or
- * JSONC config.
+ * The tool has no config.
  */
-export type ActiveToolingConfig =
-  | { readonly _tag: "Missing" }
-  | { readonly _tag: "Current"; readonly file: ToolingConfigFileState }
-  | { readonly _tag: "Legacy"; readonly file: ToolingConfigFileState }
+export class MissingToolingConfig extends Data.TaggedClass("Missing") {}
+
+/**
+ * The tool uses the latest supported TypeScript config.
+ */
+export class CurrentToolingConfig extends Data.TaggedClass("Current")<{
+  readonly file: ToolingConfigFileState
+}> {}
+
+/**
+ * The tool uses a legacy JSON or JSONC config.
+ */
+export class LegacyToolingConfig extends Data.TaggedClass("Legacy")<{
+  readonly file: ToolingConfigFileState
+}> {}
+
+/**
+ * The config that the tool uses.
+ */
+export type ActiveToolingConfig = MissingToolingConfig | CurrentToolingConfig | LegacyToolingConfig
 
 export interface ToolingConfigState {
   readonly active: ActiveToolingConfig
@@ -109,11 +125,11 @@ function getToolingConfigWarnings(
   active: ActiveToolingConfig,
   legacy: readonly ToolingConfigFileState[]
 ) {
-  if (active._tag === "Missing" || legacy.length === 0) {
+  if (active instanceof MissingToolingConfig || legacy.length === 0) {
     return []
   }
 
-  if (active._tag === "Current") {
+  if (active instanceof CurrentToolingConfig) {
     return [
       `Found both \`${files.config}\` and \`${getLegacyConfigDisplayName(files)}\`. Adamantite will use \`${files.config}\`.`,
     ]
@@ -166,11 +182,11 @@ export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
   )
 
   const active = Option.match(activeCandidate, {
-    onNone: (): ActiveToolingConfig => ({ _tag: "Missing" }),
-    onSome: (candidate): ActiveToolingConfig => ({
-      _tag: candidate.format === "ts" ? "Current" : "Legacy",
-      file: toFile(candidate),
-    }),
+    onNone: (): ActiveToolingConfig => new MissingToolingConfig(),
+    onSome: (candidate): ActiveToolingConfig =>
+      candidate.format === "ts"
+        ? new CurrentToolingConfig({ file: toFile(candidate) })
+        : new LegacyToolingConfig({ file: toFile(candidate) }),
   })
 
   const legacy = present.flatMap((candidate) =>
@@ -256,7 +272,7 @@ export function getConfigFindings(
     readonly toolName: string
   }
 ): Finding[] {
-  if (state.active._tag === "Missing") {
+  if (state.active instanceof MissingToolingConfig) {
     return [
       {
         currentState: `The managed \`${options.configFile}\` file is missing.`,
@@ -272,7 +288,7 @@ export function getConfigFindings(
     ]
   }
 
-  if (state.active._tag === "Legacy") {
+  if (state.active instanceof LegacyToolingConfig) {
     return [
       {
         currentState: `Legacy \`${state.active.file.file}\` is the active ${options.toolName} configuration.`,
@@ -475,7 +491,7 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
         const configContent = options.configContent(workspace)
 
         const inspection =
-          state.active._tag === "Current"
+          state.active instanceof CurrentToolingConfig
             ? options.inspectConfig(yield* readFile(state.active.file.path), workspace)
             : undefined
 

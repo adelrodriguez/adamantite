@@ -1,4 +1,5 @@
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
@@ -7,6 +8,7 @@ import * as Path from "effect/Path"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import {
   CUSTOM_RULES_MODULE,
+  DynamicCustomRulesCall,
   findCustomRulesCalls,
   findRuntimeImports,
   hasLegacyRuleImports,
@@ -30,10 +32,11 @@ interface SourceModule {
  * `unresolved` is an import of a relative path, a `#` subpath, or a workspace package that Doctor
  * cannot follow. Imports of other packages are `external`.
  */
-type ResolvedImport =
-  | { readonly _tag: "external" }
-  | { readonly _tag: "found"; readonly module: SourceModule }
-  | { readonly _tag: "unresolved" }
+class ExternalImport extends Data.TaggedClass("external") {}
+
+class FoundImport extends Data.TaggedClass("found")<{ readonly module: SourceModule }> {}
+
+class UnresolvedImport extends Data.TaggedClass("unresolved") {}
 
 /**
  * A `custom()` call whose rules folder Doctor can read. A call whose `dir` only running the config
@@ -101,20 +104,18 @@ const resolveImport = Effect.fn("resolveImport")(function* (
   const file = yield* resolver.resolve(from, specifier)
 
   if (Option.isNone(file)) {
-    return local
-      ? ({ _tag: "unresolved" } satisfies ResolvedImport)
-      : ({ _tag: "external" } satisfies ResolvedImport)
+    return local ? new UnresolvedImport() : new ExternalImport()
   }
 
   if (file.value.split(path.sep).includes("node_modules")) {
-    return { _tag: "external" } satisfies ResolvedImport
+    return new ExternalImport()
   }
 
   const module = yield* readFirstFile([file.value])
 
   return Option.match(module, {
-    onNone: (): ResolvedImport => ({ _tag: "unresolved" }),
-    onSome: (found): ResolvedImport => ({ _tag: "found", module: found }),
+    onNone: () => new UnresolvedImport(),
+    onSome: (found) => new FoundImport({ module: found }),
   })
 })
 
@@ -198,7 +199,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
 
       if (module.content.includes(CUSTOM_RULES_MODULE)) {
         for (const call of findCustomRulesCalls(module.file, module.content)) {
-          if (call._tag === "Dynamic") {
+          if (call instanceof DynamicCustomRulesCall) {
             unresolvedCalls.push(module.file)
           } else {
             calls.push({
@@ -229,10 +230,10 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     for (const [index, result] of resolved.entries()) {
       const source = imports[index]
 
-      if (result._tag === "found" && source !== undefined) {
+      if (result instanceof FoundImport && source !== undefined) {
         resolvedImports.push({ ...source, file: result.module.file })
         queue.push(result.module)
-      } else if (result._tag === "unresolved" && source !== undefined) {
+      } else if (result instanceof UnresolvedImport && source !== undefined) {
         unresolvedImports.push(source)
       }
     }

@@ -1,46 +1,70 @@
 import process from "node:process"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { OxlintPlugin, NativeOverride } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
+import {
+  BindingOverride,
+  type NativeOverride,
+  NativeRuntime,
+  type OxlintPlugin,
+} from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import { NativeRuntimeConflict, PackageNotInstalled } from "#lib/shared/errors.ts"
 import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 
 /**
- * A file that Oxlint loads. `Stock` lets Oxlint find its own file. `Replaced` gives Oxlint the file
- * at `path` in its place.
+ * Oxlint finds its own file.
  */
-export type RuntimePart =
-  | { readonly _tag: "Stock" }
-  | { readonly _tag: "Replaced"; readonly path: string }
+export class StockPart extends Data.TaggedClass("Stock") {}
 
 /**
- * The type-aware backend that Oxlint starts. `None` runs Oxlint as it is installed, so it fails
- * only when it runs a type-aware rule. `Tsrs` starts the installed tsrs through its `tsrs-lint`
- * launcher, because Oxlint does not find tsrs by itself. `Replaced` sets the variables of a plugin
- * that replaces the whole backend.
+ * Oxlint loads the file at `path` in place of its own file.
  */
-export type RuntimeBackend =
-  | { readonly _tag: "None" }
-  | { readonly _tag: "Replaced"; readonly env: Readonly<Record<string, string>> }
-  | { readonly _tag: "Tsrs"; readonly launcher: string }
+export class ReplacedPart extends Data.TaggedClass("Replaced")<{ readonly path: string }> {}
+
+/**
+ * A file that Oxlint loads.
+ */
+export type RuntimePart = StockPart | ReplacedPart
+
+/**
+ * Oxlint runs as it is installed, so it fails only when it runs a type-aware rule.
+ */
+export class NoBackend extends Data.TaggedClass("None") {}
+
+/**
+ * Oxlint starts the installed tsrs through its `tsrs-lint` launcher, because Oxlint does not find
+ * tsrs by itself.
+ */
+export class TsrsBackend extends Data.TaggedClass("Tsrs")<{ readonly launcher: string }> {}
+
+/**
+ * Oxlint starts the backend of a plugin that replaces the whole backend, with the plugin's
+ * variables.
+ */
+export class ReplacedBackend extends Data.TaggedClass("Replaced")<{
+  readonly env: Readonly<Record<string, string>>
+}> {}
+
+/**
+ * The type-aware backend that Oxlint starts.
+ */
+export type RuntimeBackend = NoBackend | ReplacedBackend | TsrsBackend
 
 /**
  * The variables that make Oxlint start the backend.
  */
 export function toBackendEnv(backend: RuntimeBackend) {
-  switch (backend._tag) {
-    case "None":
-      return {}
-    case "Replaced":
-      return backend.env
-    case "Tsrs":
-      // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` bin adds the `--lint`
-      // flag of tsrs.
-      return { OXLINT_TSGOLINT_PATH: backend.launcher }
-  }
+  return Match.valueTags(backend, {
+    None: () => ({}),
+    Replaced: ({ env }) => env,
+    // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` bin adds the `--lint`
+    // flag of tsrs.
+    Tsrs: ({ launcher }) => ({ OXLINT_TSGOLINT_PATH: launcher }),
+  })
 }
 
 /**
@@ -102,8 +126,8 @@ const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (proj
       : Option.some(path.join(tsrs.value, "bin", "tsrs-lint"))
 
   return Option.match(launcher, {
-    onNone: (): RuntimeBackend => ({ _tag: "None" }),
-    onSome: (file): RuntimeBackend => ({ _tag: "Tsrs", launcher: file }),
+    onNone: (): RuntimeBackend => new NoBackend(),
+    onSome: (file): RuntimeBackend => new TsrsBackend({ launcher: file }),
   })
 })
 
@@ -123,12 +147,12 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
     return yield* new PackageNotInstalled({ packageName: "oxlint", project })
   }
 
-  let binding: RuntimePart = { _tag: "Stock" }
+  let binding: RuntimePart = new StockPart()
   let backend: RuntimeBackend | undefined
   const owners = new Map<NativeOverride["_tag"], string>()
 
   for (const plugin of plugins) {
-    if (plugin.runtime._tag !== "Native") {
+    if (!(plugin.runtime instanceof NativeRuntime)) {
       continue
     }
 
@@ -146,12 +170,12 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
 
       owners.set(override._tag, plugin.name)
 
-      if (override._tag === "Binding") {
-        binding = { _tag: "Replaced", path: override.path }
+      if (override instanceof BindingOverride) {
+        binding = new ReplacedPart({ path: override.path })
       } else {
         // An override replaces the whole backend, so the default and the native backend variables
         // never mix.
-        backend = { _tag: "Replaced", env: override.env }
+        backend = new ReplacedBackend({ env: override.env })
       }
     }
   }

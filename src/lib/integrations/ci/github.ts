@@ -18,8 +18,9 @@ import { fillTemplate } from "#lib/shared/template.ts"
 import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
-  type NodeVersionSource,
+  NodeVersionFile,
   NodeVersionResolver,
+  type NodeVersionSource,
 } from "#lib/workspace/node-version-resolver.ts"
 import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
 
@@ -100,7 +101,7 @@ const readWorkflow = (content: string, path: string) =>
 
 function renderNodeSetup(source: NodeVersionSource): string {
   const versionInput =
-    source._tag === "File"
+    source instanceof NodeVersionFile
       ? `node-version-file: "${source.path}"`
       : `node-version: "${source.value}"`
 
@@ -223,7 +224,7 @@ export default defineIntegration({
       const workflowPath = path.join(cwd, files[0].path)
       const content = yield* readFileIfExists(workflowPath)
 
-      if (content._tag === "None") {
+      if (Option.isNone(content)) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 

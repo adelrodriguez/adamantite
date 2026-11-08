@@ -4,11 +4,15 @@ import type * as PlatformError from "effect/PlatformError"
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
-import type { ToolingConfigState } from "#lib/integrations/tooling/base.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
+import {
+  LegacyToolingConfig,
+  MissingToolingConfig,
+  type ToolingConfigState,
+} from "#lib/integrations/tooling/base.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
@@ -61,7 +65,7 @@ export function setupToolConfig<E, R>(
             yield* prompter.log.warning(warning)
           }
 
-          if (state.active._tag === "Missing") {
+          if (state.active instanceof MissingToolingConfig) {
             yield* spinner.message(`\`${tool.config}\` not found, creating...`)
             yield* create
           } else {
@@ -74,13 +78,13 @@ export function setupToolConfig<E, R>(
         failure: `Failed to set up ${tool.name} config.`,
         start: `Setting up ${tool.name} config...`,
         success: (detected) =>
-          detected._tag === "Missing"
+          detected instanceof MissingToolingConfig
             ? `${tool.name} config created.`
             : `Existing ${tool.name} config kept.`,
       }
     )
 
-    if (active._tag === "Legacy") {
+    if (active instanceof LegacyToolingConfig) {
       yield* prompter.log.info(
         `Legacy \`${active.file.file}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool.name} config.`
       )

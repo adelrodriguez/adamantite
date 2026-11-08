@@ -15,7 +15,7 @@ import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
-import { chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
+import { AgentSessionEnded, chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
 
@@ -97,7 +97,7 @@ export default Command.make("doctor").pipe(
           subject: "findings",
         })
 
-        if (resolution._tag !== "Ended") {
+        if (!(resolution instanceof AgentSessionEnded)) {
           return yield* failWithFindings
         }
 

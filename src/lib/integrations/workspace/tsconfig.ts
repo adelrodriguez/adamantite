@@ -2,6 +2,7 @@ import type { JsonObject, JsonValue } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { Project } from "#lib/workspace/project.ts"
@@ -57,7 +58,7 @@ export default defineIntegration({
       const configPath = path.join(cwd, files[0].path)
       const content = yield* readFileIfExists(configPath)
 
-      if (content._tag === "None") {
+      if (Option.isNone(content)) {
         return {
           applicable: true,
           findings: [

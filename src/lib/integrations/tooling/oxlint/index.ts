@@ -9,6 +9,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import {
+  CurrentToolingConfig,
   detectToolingConfig,
   getConfigFindings,
   getPackageActions,
@@ -109,7 +110,7 @@ export default defineIntegration({
 
       // The active TypeScript config is `oxlint.config.ts`, which the project holds.
       const inspection =
-        state.active._tag === "Current"
+        state.active instanceof CurrentToolingConfig
           ? lintConfig.pipe(
               Option.map((content) => inspectRequiredOxlintConfig(content)),
               Option.getOrUndefined

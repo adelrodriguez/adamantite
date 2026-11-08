@@ -10,6 +10,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
 import {
   formatJson,
   mergeConfig,
@@ -68,7 +69,7 @@ describe("readPackageJson", () => {
       expect(Result.isFailure(result)).toBe(true)
 
       if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
+        expect(result.failure).toBeInstanceOf(FailedToReadFile)
       }
     })
   )
@@ -95,7 +96,7 @@ describe("parseJson", () => {
       expect(Result.isFailure(result)).toBe(true)
 
       if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
+        expect(result.failure).toBeInstanceOf(FailedToParseFile)
       }
     })
   )

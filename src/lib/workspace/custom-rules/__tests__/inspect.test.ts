@@ -1,10 +1,12 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Option from "effect/Option"
 import {
+  DynamicCustomRulesCall,
   findCustomRulesCalls,
   hasLegacyRuleImports,
   inspectRuleFile,
   isRuleFile,
+  LiteralCustomRulesCall,
 } from "#lib/workspace/custom-rules/inspect.ts"
 import {
   DEFAULT_DIRECTORY,
@@ -45,7 +47,7 @@ describe("findCustomRulesCalls", () => {
     ].join("\n")
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { _tag: "Literal", dir: ".adamantite/lint", name: Option.some("project") },
+      new LiteralCustomRulesCall({ dir: ".adamantite/lint", name: Option.some("project") }),
     ])
   })
 
@@ -53,7 +55,10 @@ describe("findCustomRulesCalls", () => {
     expect(
       findCustomRulesCalls("oxlint.config.ts", `${IMPORT}export default { extends: [custom()] }`)
     ).toStrictEqual([
-      { _tag: "Literal", dir: DEFAULT_DIRECTORY, name: Option.fromNullOr(DEFAULT_PLUGIN_NAME) },
+      new LiteralCustomRulesCall({
+        dir: DEFAULT_DIRECTORY,
+        name: Option.fromNullOr(DEFAULT_PLUGIN_NAME),
+      }),
     ])
   })
 
@@ -64,8 +69,8 @@ describe("findCustomRulesCalls", () => {
     ].join("\n")
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { _tag: "Literal", dir: "tooling/rules", name: Option.some("acme") },
-      { _tag: "Literal", dir: ".adamantite/lint", name: Option.some("web") },
+      new LiteralCustomRulesCall({ dir: "tooling/rules", name: Option.some("acme") }),
+      new LiteralCustomRulesCall({ dir: ".adamantite/lint", name: Option.some("web") }),
     ])
   })
 
@@ -73,9 +78,9 @@ describe("findCustomRulesCalls", () => {
     const content = `${IMPORT}const options = {}\nexport default { extends: [custom({ dir: join("a", "b") }), custom({ ...options }), custom(options)] }`
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { _tag: "Dynamic" },
-      { _tag: "Dynamic" },
-      { _tag: "Dynamic" },
+      new DynamicCustomRulesCall(),
+      new DynamicCustomRulesCall(),
+      new DynamicCustomRulesCall(),
     ])
   })
 
@@ -83,7 +88,7 @@ describe("findCustomRulesCalls", () => {
     const content = `${IMPORT}export default { extends: [custom({ dir: "rules", name: getName() })] }`
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { _tag: "Literal", dir: "rules", name: Option.none() },
+      new LiteralCustomRulesCall({ dir: "rules", name: Option.none() }),
     ])
   })
 
@@ -91,7 +96,7 @@ describe("findCustomRulesCalls", () => {
     const content = `${IMPORT}export default { extends: [custom({ dir: "a", dir: "b" })] }`
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { _tag: "Literal", dir: "b", name: Option.some("project") },
+      new LiteralCustomRulesCall({ dir: "b", name: Option.some("project") }),
     ])
   })
 

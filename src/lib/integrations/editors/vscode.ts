@@ -81,7 +81,7 @@ export default defineIntegration({
       const settingsPath = path.join(cwd, files[0].path)
       const content = yield* readFileIfExists(settingsPath)
 
-      if (content._tag === "None") {
+      if (Option.isNone(content)) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 
@@ -225,10 +225,10 @@ export default defineIntegration({
           })
           .pipe(
             Effect.mapError((cause) =>
-              cause._tag === "CliNotFound" && cause.command === "code"
+              Predicate.isTagged(cause, "CliNotFound") && cause.command === "code"
                 ? new VscodeCliNotFound({ cause })
                 : new FailedToInstallExtension({
-                    cause: cause._tag === "CommandFailed" ? cause.exitCode : cause,
+                    cause: Predicate.isTagged(cause, "CommandFailed") ? cause.exitCode : cause,
                     extension,
                   })
             )

@@ -90,9 +90,7 @@ const exitCode = Effect.fn("CommandRunner.exitCode")(function* (options: Command
       return yield* handle.exitCode
     })
   ).pipe(
-    Effect.mapError((cause) =>
-      cause.reason._tag === "NotFound" ? new CliNotFound({ command }) : cause
-    )
+    Effect.catchReason("PlatformError", "NotFound", () => Effect.fail(new CliNotFound({ command })))
   )
 })
 

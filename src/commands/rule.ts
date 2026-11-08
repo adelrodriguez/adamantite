@@ -10,6 +10,8 @@ import * as Schema from "effect/Schema"
 import { parseSync } from "oxc-parser"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
+  CurrentSetting,
+  ErrorSetting,
   parseTrialCase,
   type TrialCaseResult,
   type TrialSetting,
@@ -230,7 +232,7 @@ const current = Flag.Boolean("current").pipe(
 )
 
 function describeSetting(rule: string, setting: TrialSetting) {
-  return setting._tag === "Current"
+  return setting instanceof CurrentSetting
     ? `\`${rule}\` as the project config sets it`
     : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
 }
@@ -312,9 +314,9 @@ const trial = Command.make("try", {
         ...accept.map((value) => parseTrialCase(value, "accepted")),
       ])
 
-      const setting: TrialSetting = current
-        ? { _tag: "Current" }
-        : { _tag: "Error", options: Option.getOrElse(options, () => []) }
+      const setting = current
+        ? new CurrentSetting()
+        : new ErrorSetting({ options: Option.getOrElse(options, () => []) })
 
       const cwd = process.cwd()
 

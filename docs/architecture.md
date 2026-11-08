@@ -40,18 +40,22 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Layers
 
-Two layer maps in the `adamantite/layers` rule in `oxlint.config.ts` are the only statement of
-the layers. Each layer imports only the layers it lists and the layers below those.
+The layer maps in `adamantite/layers` in `oxlint.config.ts` are the only statement of the
+layers. Each layer has an explicit `imports` list and can contain another map in `layers`.
+Imports are transitive within each map. Declaration order does not change permissions.
 
 The `src` map puts `lib` below `terminal`, and `terminal` below `commands`. Lib code returns
 data, and commands render it, so no lib module imports `terminal`. `cli.ts` and `index.ts` are
 entries. Tests share the helpers in `src/__tests__`, so this map does not check them.
+That ignore does not exempt tests from the child map.
 
-The `src/lib` map holds the lib layers. A layer that the map does not connect to another
-layer is its sibling, so `workspace` and `execution` do not import each other, and
+The nested `lib.layers` map holds the lib layers, with its root derived as `src/lib`.
+A layer that the map does not connect to another layer is its sibling, so `workspace` and
+`execution` do not import each other, and
 `assessment` does not import `hardening`: harden is not an assessment. `workspace` knows
 target-project files and package state, but not integration types such as `Finding`. An import
-that breaks a map, or a folder that is not in its map, fails `pnpm run check`. See ADR 0013.
+that breaks a map, or a folder that is not in its map, fails `pnpm run check`. See ADR 0013
+and ADR 0024.
 
 `toolchain`, `assessment`, and `hardening` are siblings above `integrations`. The `check`,
 `fix`, and `analyze` commands call `toolchain/index.ts`, and `harden` calls its `check`
@@ -309,6 +313,13 @@ import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `
 takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/layers/`, one for each layer model, and
 `src/__tests__/presets/layers.test.ts` lints each one in a real Oxlint run. See ADR 0013.
+
+Nested maps activate from the concrete matched parent folder before any parent exemption.
+Each active map checks imports with its own entries, ignores, isolation, type-import policy,
+and resolver conditions. A duplicate concrete scope fails lint. Diagnostics name the concrete
+root and the declaration path. The Oxlint assessment reads the source snapshot from config
+discovery to detect old array-valued declarations and give Doctor migration instructions.
+Doctor does not change the config. See ADR 0024.
 
 `adamantite/import-owners` also needs options from the target project. It matches each import
 as written, so it reads no module, but it reads `package.json` and `pnpm-workspace.yaml` files to

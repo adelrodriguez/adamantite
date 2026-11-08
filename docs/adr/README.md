@@ -23,3 +23,4 @@
 - [ADR 0021: The type-aware rules run on tsrs](0021-type-aware-rules-run-on-tsrs.md)
 - [ADR 0022: Toolchain coordinates tools and shares runtime resolution with Doctor](0022-toolchain-owns-tooling-workflows.md)
 - [ADR 0023: Effect editors use unpatched compilers](0023-effect-editors-use-unpatched-compilers.md)
+- [ADR 0024: Layer maps nest with explicit imports](0024-layer-maps-nest-with-explicit-imports.md)

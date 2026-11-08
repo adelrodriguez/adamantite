@@ -6,8 +6,8 @@ import { globToRegExp } from "../glob.ts"
 import { isStringLiteral } from "../imports.ts"
 import {
   readBooleanOption,
+  readObjectOption,
   readStringArrayOption,
-  readStringArrayRecordOption,
   readStringOption,
 } from "../options.ts"
 
@@ -25,6 +25,8 @@ export type LayerMap = Readonly<Record<string, readonly string[]>>
  * One layer map and its settings: one option object of the rule.
  */
 export interface LayersOptions {
+  readonly children: ReadonlyMap<string, LayersOptions>
+  readonly configPath: string
   /**
    * Import conditions to match before the default ones, such as the `customConditions` of the
    * target project's `tsconfig.json`.
@@ -50,7 +52,7 @@ export interface LayersOptions {
    */
   readonly root: RegExp
   /**
-   * The root glob as the option states it, which messages use to name the map.
+   * The declared root glob, before matching a concrete folder.
    */
   readonly rootGlob: string
 }
@@ -97,7 +99,7 @@ export type MapError =
   | { readonly kind: "unknownIsolate"; readonly name: string }
 
 const LAYER_MAP_HINT =
-  "Layer map: the `adamantite/layers` options for root `{{root}}` in the Oxlint config."
+  "Layer map: the `adamantite/layers` options for root `{{root}}` in the Oxlint config at `{{configPath}}`."
 
 function toPosixPath(path: string) {
   return path.replaceAll("\\", "/")
@@ -106,23 +108,47 @@ function toPosixPath(path: string) {
 /**
  * Read one layer map from one option object. Undefined when `root` or `layers` is missing.
  */
-function readLayerMap(option: Options[number]): LayersOptions | undefined {
-  // The option readers read the first option object.
+function readLayerMap(
+  option: Options[number],
+  root: string | undefined,
+  configPath: string
+): LayersOptions | undefined {
+  // Oxlint validates the recursive schema before it calls the rule.
   const options = [option]
-  const root = readStringOption(options, "root")
-  const layers = readStringArrayRecordOption(options, "layers")
+  const declarations = readObjectOption(options, "layers")
 
-  if (root === undefined || layers === undefined) {
+  if (root === undefined || declarations === undefined) {
     return undefined
   }
 
+  const layers: Array<[string, readonly string[]]> = []
+  const children = new Map<string, LayersOptions>()
+
+  for (const [name, declaration] of Object.entries(declarations)) {
+    const imports = readStringArrayOption([declaration], "imports")
+
+    if (imports === undefined) {
+      return undefined
+    }
+
+    layers.push([name, imports])
+
+    const child = readLayerMap(declaration, posix.join(root, name), `${configPath}.${name}.layers`)
+
+    if (child !== undefined) {
+      children.set(name, child)
+    }
+  }
+
   return {
+    children,
     conditions: readStringArrayOption(options, "conditions") ?? [],
+    configPath,
     entries: (readStringArrayOption(options, "entries") ?? []).map((glob) => globToRegExp(glob)),
     ignore: (readStringArrayOption(options, "ignore") ?? []).map((glob) => globToRegExp(glob)),
     ignoreTypes: readBooleanOption(options, "ignoreTypes") ?? false,
     isolate: new Set(readStringArrayOption(options, "isolate")),
-    layers,
+    layers: Object.fromEntries(layers),
     root: globToRegExp(
       root
         .split("/")
@@ -138,7 +164,10 @@ function readLayerMap(option: Options[number]): LayersOptions | undefined {
  * left out.
  */
 export function readLayersOptions(options: Readonly<Options>): LayersOptions[] {
-  return options.flatMap((option) => readLayerMap(option) ?? [])
+  return options.flatMap(
+    (option, index) =>
+      readLayerMap(option, readStringOption([option], "root"), `options[${index}].layers`) ?? []
+  )
 }
 
 /**
@@ -457,6 +486,15 @@ const modules: Modules = {
   },
 }
 
+const MAP_PROPERTIES = {
+  conditions: { items: { type: "string" }, type: "array" },
+  entries: { items: { type: "string" }, type: "array" },
+  ignore: { items: { type: "string" }, type: "array" },
+  ignoreTypes: { type: "boolean" },
+  isolate: { items: { type: "string" }, type: "array" },
+  layers: { additionalProperties: { $ref: "#/definitions/layer" }, type: "object" },
+} as const
+
 function isTypeOnlyImport(node: ESTree.ImportDeclaration) {
   return (
     node.importKind === "type"
@@ -494,6 +532,7 @@ interface ReportedFile {
   readonly errors: readonly MapError[]
   readonly from: Location
   readonly options: LayersOptions
+  readonly root: string
 }
 
 function formatCycle(cycle: readonly string[]) {
@@ -504,39 +543,53 @@ function reportUnmapped(
   context: Context,
   node: ESTree.Program | ESTree.StringLiteral,
   location: UnmappedLocation,
-  root: string
+  root: string,
+  configPath: string
 ) {
   if (location.kind === "unmappedFolder") {
     context.report({
-      data: { folder: location.folder, path: location.path, root },
+      data: { configPath, folder: location.folder, path: location.path, root },
       messageId: "unmappedFolder",
       node,
     })
   } else {
-    context.report({ data: { path: location.path, root }, messageId: "unmappedFile", node })
+    context.report({
+      data: { configPath, path: location.path, root },
+      messageId: "unmappedFile",
+      node,
+    })
   }
 }
 
 function reportFile(context: Context, node: ESTree.Program, file: ReportedFile) {
   const { errors, from } = file
-  const root = file.options.rootGlob
+  const root = file.root || "."
+  const { configPath } = file.options
 
   for (const error of errors) {
     if (error.kind === "cycle") {
-      context.report({ data: { cycle: formatCycle(error.cycle), root }, messageId: "cycle", node })
+      context.report({
+        data: { configPath, cycle: formatCycle(error.cycle), root },
+        messageId: "cycle",
+        node,
+      })
     } else if (error.kind === "unknownImport") {
       context.report({
-        data: { layer: error.layer, name: error.name, root },
+        data: { configPath, layer: error.layer, name: error.name, root },
         messageId: "unknownImport",
         node,
       })
     } else {
-      context.report({ data: { name: error.name, root }, messageId: "unknownIsolate", node })
+      context.report({
+        data: { configPath, name: error.name, root },
+        messageId: "unknownIsolate",
+        node,
+      })
     }
   }
 
   if (from.kind === "unmappedFile" || from.kind === "unmappedFolder") {
-    reportUnmapped(context, node, from, root)
+    reportUnmapped(context, node, from, root, configPath)
   }
 }
 
@@ -547,7 +600,7 @@ function checkImport(
   typeOnly: boolean
 ) {
   const { from, options } = file
-  const root = options.rootGlob
+  const root = file.root || "."
 
   if (typeOnly && options.ignoreTypes) {
     return
@@ -555,27 +608,27 @@ function checkImport(
 
   // An import that does not resolve is outside the map. TypeScript reports it.
   const target = file.modules.resolve(file.importer, source.value, options.conditions)
-  const relative = target === undefined ? undefined : posix.relative(file.packageDir, target)
+  const relative =
+    target === undefined
+      ? undefined
+      : posix.relative(posix.join(file.packageDir, file.root), target)
 
   // A dependency, or a file outside the package, is outside the map, even below a `.` root.
-  const split =
+  if (
     relative === undefined
+    || relative === ".."
     || relative.startsWith("../")
     || relative.split("/").includes("node_modules")
-      ? undefined
-      : splitAtRoot(options.root, relative)
-
-  // A target in another root, such as another app of a monorepo, is outside this map.
-  if (split === undefined || split.root !== file.root) {
+  ) {
     return
   }
 
-  const to = locate(options, split.root, split.below)
+  const to = locate(options, file.root, relative.split("/"))
 
   // No layer imports an entry, and a file in no layer is reported where it is imported.
   if (to.kind === "entry") {
     context.report({
-      data: { from: describeLayer(from), root, to: to.path },
+      data: { configPath: options.configPath, from: describeLayer(from), root, to: to.path },
       messageId: "entry",
       node: source,
     })
@@ -583,7 +636,7 @@ function checkImport(
   }
 
   if (to.kind !== "layer") {
-    reportUnmapped(context, source, to, root)
+    reportUnmapped(context, source, to, root, options.configPath)
     return
   }
 
@@ -595,6 +648,7 @@ function checkImport(
 
   context.report({
     data: {
+      configPath: options.configPath,
       from: describeLayer(from),
       layer: from.layer,
       repair: describeRepairs(
@@ -623,27 +677,60 @@ export function createLayersRule(modules: Modules): Rule {
       const relative = posix.relative(packageDir, importer)
       const reported: ReportedFile[] = []
       const linted: LintedFile[] = []
+      const active: Array<{
+        readonly options: LayersOptions
+        readonly root: string
+        readonly below: readonly string[]
+      }> = []
 
-      // Each map checks the file on its own, so a file below two roots meets both maps.
-      for (const options of readLayersOptions(context.options)) {
-        const split = splitAtRoot(options.root, relative)
+      function activate(options: LayersOptions, root: string, below: readonly string[]) {
+        active.push({ below, options, root })
 
-        if (
-          split !== undefined
-          && !options.ignore.some((pattern) => pattern.test(split.below.join("/")))
-        ) {
-          const from = locate(options, split.root, split.below)
-          const errors = findMapErrors(options.layers, options.isolate)
+        const [folder = "", ...inside] = below
+        const child = options.children.get(folder)
 
-          if (errors.length > 0 || from.kind !== "layer") {
-            reported.push({ errors, from, options })
-          } else {
-            linted.push({ from, importer, modules, options, packageDir, root: split.root })
-          }
+        if (child !== undefined && inside.length > 0) {
+          activate(child, posix.join(root, folder), inside)
         }
       }
 
-      if (reported.length === 0 && linted.length === 0) {
+      for (const options of readLayersOptions(context.options)) {
+        const split = splitAtRoot(options.root, relative)
+
+        if (split !== undefined) {
+          activate(options, split.root, split.below)
+        }
+      }
+
+      const declarations = new Map<string, string[]>()
+
+      for (const { options, root } of active) {
+        declarations.set(root, [...(declarations.get(root) ?? []), options.configPath])
+      }
+
+      const duplicates = [...declarations].filter(([, paths]) => paths.length > 1)
+      const duplicateRoots = new Set(duplicates.map(([root]) => root))
+
+      // Physical scope discovery is independent from each map's exemptions and graph errors.
+      for (const { below, options, root } of active) {
+        if (
+          duplicateRoots.has(root)
+          || options.ignore.some((pattern) => pattern.test(below.join("/")))
+        ) {
+          continue
+        }
+
+        const from = locate(options, root, below)
+        const errors = findMapErrors(options.layers, options.isolate)
+
+        if (errors.length > 0 || from.kind !== "layer") {
+          reported.push({ errors, from, options, root })
+        } else {
+          linted.push({ from, importer, modules, options, packageDir, root })
+        }
+      }
+
+      if (reported.length === 0 && linted.length === 0 && duplicates.length === 0) {
         return {}
       }
 
@@ -671,6 +758,17 @@ export function createLayersRule(modules: Modules): Rule {
           }
         },
         Program(node) {
+          for (const [root, paths] of duplicates) {
+            context.report({
+              data: {
+                declarations: paths.map((path) => `\`${path}\``).join(" and "),
+                root: root || ".",
+              },
+              messageId: "duplicateMap",
+              node,
+            })
+          }
+
           for (const file of reported) {
             reportFile(context, node, file)
           }
@@ -687,6 +785,8 @@ export function createLayersRule(modules: Modules): Rule {
       },
       messages: {
         cycle: `The layer map has a cycle: {{cycle}}. Layers import in one direction. ${LAYER_MAP_HINT}`,
+        duplicateMap:
+          "Root `{{root}}` has more than one layer map: {{declarations}}. Keep one declaration for this scope.",
         entry: `\`{{from}}\` cannot import the entry \`{{to}}\`: no layer imports an entry. Move the code that it needs into a layer. ${LAYER_MAP_HINT}`,
         isolated: `\`{{from}}\` cannot import \`{{to}}\`: units in \`{{layer}}\` do not import each other.{{repair}} ${LAYER_MAP_HINT}`,
         sibling: `\`{{from}}\` cannot import \`{{to}}\`: they are siblings.{{repair}} ${LAYER_MAP_HINT}`,
@@ -698,18 +798,31 @@ export function createLayersRule(modules: Modules): Rule {
       },
       // Each option object is one layer map.
       schema: {
+        definitions: {
+          layer: {
+            oneOf: [
+              {
+                additionalProperties: false,
+                properties: { imports: { items: { type: "string" }, type: "array" } },
+                required: ["imports"],
+                type: "object",
+              },
+              {
+                additionalProperties: false,
+                properties: {
+                  ...MAP_PROPERTIES,
+                  imports: { items: { type: "string" }, type: "array" },
+                },
+                required: ["imports", "layers"],
+                type: "object",
+              },
+            ],
+          },
+        },
         items: {
           additionalProperties: false,
           properties: {
-            conditions: { items: { type: "string" }, type: "array" },
-            entries: { items: { type: "string" }, type: "array" },
-            ignore: { items: { type: "string" }, type: "array" },
-            ignoreTypes: { type: "boolean" },
-            isolate: { items: { type: "string" }, type: "array" },
-            layers: {
-              additionalProperties: { items: { type: "string" }, type: "array" },
-              type: "object",
-            },
+            ...MAP_PROPERTIES,
             root: { type: "string" },
           },
           required: ["layers", "root"],

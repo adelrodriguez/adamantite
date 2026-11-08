@@ -8,33 +8,15 @@
           "**/__tests__/**"
         ],
         "layers": {
-          "core": [],
-          "shared": [],
-          "layout": [
-            "core",
-            "shared"
-          ],
-          "manifests": [
-            "layout"
-          ],
-          "registries": [
-            "layout"
-          ],
-          "store": [
-            "layout"
-          ],
-          "workspace": [
-            "layout"
-          ],
-          "sources": [
-            "registries",
-            "manifests",
-            "store",
-            "workspace"
-          ],
-          "references": [
-            "sources"
-          ]
+          "core": { "imports": [] },
+          "shared": { "imports": [] },
+          "layout": { "imports": ["core", "shared"] },
+          "manifests": { "imports": ["layout"] },
+          "registries": { "imports": ["layout"] },
+          "store": { "imports": ["layout"] },
+          "workspace": { "imports": ["layout"] },
+          "sources": { "imports": ["registries", "manifests", "store", "workspace"] },
+          "references": { "imports": ["sources"] }
         }
       }
     ]

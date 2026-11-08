@@ -18,16 +18,24 @@
               "routes"
             ],
             "layers": {
-              "shared": [],
-              "features": [
-                "shared"
-              ],
-              "pages": [
-                "features"
-              ],
-              "routes": [
-                "features"
-              ]
+              "shared": {
+                "imports": []
+              },
+              "features": {
+                "imports": [
+                  "shared"
+                ]
+              },
+              "pages": {
+                "imports": [
+                  "features"
+                ]
+              },
+              "routes": {
+                "imports": [
+                  "features"
+                ]
+              }
             }
           }
         ]
@@ -49,13 +57,19 @@
               "features"
             ],
             "layers": {
-              "shared": [],
-              "features": [
-                "shared"
-              ],
-              "routes": [
-                "features"
-              ]
+              "shared": {
+                "imports": []
+              },
+              "features": {
+                "imports": [
+                  "shared"
+                ]
+              },
+              "routes": {
+                "imports": [
+                  "features"
+                ]
+              }
             }
           }
         ]

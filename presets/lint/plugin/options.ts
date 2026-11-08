@@ -60,26 +60,13 @@ export function readBooleanOption(options: Readonly<Options>, key: string): bool
 }
 
 /**
- * Read an object of string arrays, such as `{ shared: [], workspace: ["shared"] }`, from the rule's
- * first option object. Entries whose value is not a string array are dropped.
+ * Read an object from the rule's first option object.
  */
-export function readStringArrayRecordOption(
+export function readObjectOption(
   options: Readonly<Options>,
   key: string
-): Record<string, string[]> | undefined {
+): Record<string, Options[number]> | undefined {
   const value = readOption(options, key)
 
-  if (!isOptionObject(value)) {
-    return undefined
-  }
-
-  const record: Record<string, string[]> = {}
-
-  for (const [name, entry] of Object.entries(value)) {
-    if (isStringArray(entry)) {
-      record[name] = entry
-    }
-  }
-
-  return record
+  return isOptionObject(value) ? value : undefined
 }

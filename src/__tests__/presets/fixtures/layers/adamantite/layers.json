@@ -5,43 +5,22 @@
       {
         "root": "src",
         "layers": {
-          "lib": [],
-          "terminal": [
-            "lib"
-          ],
-          "commands": [
-            "terminal"
-          ]
+          "lib": {
+            "imports": [],
+            "conditions": ["development"],
+            "layers": {
+              "shared": { "imports": [] },
+              "execution": { "imports": ["shared"] },
+              "workspace": { "imports": ["shared"] },
+              "hardening": { "imports": ["workspace", "execution"] },
+              "integrations": { "imports": ["workspace", "execution"] },
+              "assessment": { "imports": ["integrations"] }
+            }
+          },
+          "terminal": { "imports": ["lib"] },
+          "commands": { "imports": ["terminal"] }
         },
-        "entries": [
-          "cli.ts"
-        ]
-      },
-      {
-        "root": "src/lib",
-        "layers": {
-          "shared": [],
-          "execution": [
-            "shared"
-          ],
-          "workspace": [
-            "shared"
-          ],
-          "hardening": [
-            "workspace",
-            "execution"
-          ],
-          "integrations": [
-            "workspace",
-            "execution"
-          ],
-          "assessment": [
-            "integrations"
-          ]
-        },
-        "conditions": [
-          "development"
-        ]
+        "entries": ["cli.ts"]
       }
     ]
   }

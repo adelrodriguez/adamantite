@@ -16,6 +16,7 @@ import {
   toOxlintTsConfigContent,
   type LintPreset,
 } from "#lib/integrations/tooling/oxlint/config.ts"
+import { assessLayerMaps } from "#lib/integrations/tooling/oxlint/layers.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -40,11 +41,17 @@ export default defineIntegration({
     Effect.gen(function* () {
       const { cwd, lintConfig, packageJson } = project
       const managedScripts = getManagedScripts(packageJson)
+      const layerFindings = yield* assessLayerMaps(project)
 
       if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
-        return {
-          applicable: false,
-        } satisfies IntegrationAssessment
+        return layerFindings.length === 0
+          ? ({ applicable: false } satisfies IntegrationAssessment)
+          : ({
+              applicable: true,
+              findings: layerFindings,
+              packageActions: [],
+              warnings: [],
+            } satisfies IntegrationAssessment)
       }
 
       const state = yield* detect(cwd)
@@ -87,6 +94,7 @@ export default defineIntegration({
           ...getPackageFindings(packageActions, "oxlint"),
           ...runtimeFindings,
           ...presetFindings,
+          ...layerFindings,
           ...getConfigFindings(state, {
             configContent,
             configFile: CONFIG_FILE,

@@ -620,7 +620,10 @@ export default defineConfig({
       "error",
       {
         root: "src/lib",
-        layers: { shared: [], services: ["shared"] },
+        layers: {
+          shared: { imports: [] },
+          services: { imports: ["shared"] },
+        },
       },
     ],
     "adamantite/import-owners": [
@@ -633,6 +636,11 @@ export default defineConfig({
 
 Each option after the severity is one layer map or one import and its owners. Set these
 options for your project. The preset enables neither rule by default.
+
+Each layer's `imports` list names siblings, and permissions are transitive. Put a child map
+in that layer's `layers` property. Its root derives from the containing folder, and its
+settings remain local. Every containing map checks the file independently. For the previous
+array-valued declarations, run `adamantite doctor` and follow its migration instructions.
 
 You can also select it during setup with
 `adamantite init --non-interactive --script check --preset architecture`.

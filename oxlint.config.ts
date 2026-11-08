@@ -97,8 +97,8 @@ export default defineConfig({
         ],
       },
     ],
-    // Two layer maps, from the bottom up. Each layer imports only the layers it lists and the layers
-    // below those. See "Layers" in docs/architecture.md.
+    // Each scope states its dependency graph. Child maps keep their own settings and checks.
+    // See "Layers" in docs/architecture.md.
     "adamantite/layers": [
       "error",
       // Terminal interaction belongs to `commands` and the entries. Lib code returns data for
@@ -107,29 +107,25 @@ export default defineConfig({
         entries: ["cli.ts", "index.ts", "oxlint.ts"],
         ignore: ["**/__tests__/**"],
         layers: {
-          lib: [],
+          lib: {
+            imports: [],
+            layers: {
+              assessment: { imports: ["integrations"] },
+              execution: { imports: ["shared"] },
+              // These layers independently compose integrations.
+              hardening: { imports: ["integrations"] },
+              integrations: { imports: ["workspace", "execution"] },
+              shared: { imports: [] },
+              toolchain: { imports: ["integrations"] },
+              workspace: { imports: ["shared"] },
+            },
+          },
 
-          terminal: ["lib"],
+          terminal: { imports: ["lib"] },
 
-          commands: ["terminal"],
+          commands: { imports: ["terminal"] },
         },
         root: "src",
-      },
-      {
-        layers: {
-          shared: [],
-
-          execution: ["shared"],
-          workspace: ["shared"],
-
-          // Harden is not an assessment, so `assessment` does not import `hardening`.
-          hardening: ["integrations"],
-          integrations: ["workspace", "execution"],
-
-          assessment: ["integrations"],
-          toolchain: ["integrations"],
-        },
-        root: "src/lib",
       },
     ],
     // Repository suppressions use `@ts-expect-error - reason`, so the format belongs in the check.

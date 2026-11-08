@@ -186,7 +186,7 @@ const test = Command.make("test", { path: testPath }).pipe(
 
       if (Option.isNone(command)) {
         return yield* prompter.log.info(
-          "No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule."
+          "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test."
         )
       }
 

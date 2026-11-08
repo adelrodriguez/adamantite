@@ -3,7 +3,9 @@ import { describe, it } from "vitest"
 import plugin from "#presets/lint/plugin/index.ts"
 
 RuleTester.describe = describe
+
 RuleTester.it = it
+
 RuleTester.itOnly = it.only
 
 const CWD = "/project"

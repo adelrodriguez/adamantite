@@ -69,6 +69,7 @@ function lintModel(options: ModelFixtureOptions, tempDir: string, model: string)
   const sourceDirs = readdirSync(join(options.fixturesDir, model), { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
+
   const result = spawnSync(
     join(REPO_ROOT, "node_modules/.bin/oxlint"),
     ["-c", "oxlint.config.ts", "-f", "json", ...sourceDirs],

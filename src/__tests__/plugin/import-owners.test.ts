@@ -7,7 +7,9 @@ import {
 } from "#presets/lint/plugin/rules/import-owners.ts"
 
 RuleTester.describe = describe
+
 RuleTester.it = it
+
 RuleTester.itOnly = it.only
 
 // Every file is in the project at `/project`. The fixture test covers the real workspace lookup.
@@ -21,6 +23,7 @@ const HINT = "Owners: the `adamantite/import-owners` options in the Oxlint confi
 
 const GIGET = { import: "giget", owners: ["src/lib/sources/repository/fetch.ts"] }
 const ZOD = { import: "zod", owners: ["packages/utils"] }
+
 const ALERT = {
   import: "react-native",
   names: ["Alert"],

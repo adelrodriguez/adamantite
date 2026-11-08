@@ -40,6 +40,7 @@ export function globToRegExp(glob: string): RegExp {
       index += end + 1
     } else if (rest.startsWith("{") && rest.includes("}")) {
       const end = rest.indexOf("}")
+
       const alternatives = rest
         .slice(1, end)
         .split(",")

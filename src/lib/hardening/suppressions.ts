@@ -79,6 +79,7 @@ export const readSuppressions = Effect.fn("readSuppressions")(function* (
 ) {
   const path = yield* Path.Path
   const files = yield* listLintedFiles(cwd).pipe(Effect.option)
+
   const isInScope = (file: string) =>
     scope === null || scope === "." || file.startsWith(`${scope}/`)
 
@@ -110,6 +111,7 @@ export const readSuppressions = Effect.fn("readSuppressions")(function* (
               ),
             { concurrency: 16 }
           )
+
           const byRule = Array.groupBy(found.flat(), (entry) =>
             Option.getOrElse(entry.rule, () => "")
           )

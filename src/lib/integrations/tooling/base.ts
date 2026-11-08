@@ -141,25 +141,30 @@ export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
+
   const candidates = [files.config, ...files.legacyConfigs].map((file) => ({
     file,
     format: getConfigFormat(file),
     path: path.join(cwd, file),
   }))
+
   const existence = yield* Effect.forEach(candidates, (candidate) => fs.exists(candidate.path), {
     concurrency: "unbounded",
   })
+
   const present = candidates.filter((_, index) => existence[index])
 
   const toFile = ({ file, path }: (typeof candidates)[number]): ToolingConfigFileState => ({
     file,
     path,
   })
+
   const activeCandidate = pipe(
     Array.findFirst(present, (candidate) => candidate.format === "ts"),
     Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "jsonc")),
     Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "json"))
   )
+
   const active = Option.match(activeCandidate, {
     onNone: (): ActiveToolingConfig => ({ _tag: "Missing" }),
     onSome: (candidate): ActiveToolingConfig => ({
@@ -167,12 +172,12 @@ export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
       file: toFile(candidate),
     }),
   })
-  const legacy = present
-    .filter(
-      (candidate) =>
-        candidate.format !== "ts" && !Option.exists(activeCandidate, (file) => file === candidate)
-    )
-    .map((candidate) => toFile(candidate))
+
+  const legacy = present.flatMap((candidate) =>
+    candidate.format !== "ts" && !Option.exists(activeCandidate, (file) => file === candidate)
+      ? [toFile(candidate)]
+      : []
+  )
 
   return {
     active,
@@ -352,10 +357,12 @@ export function definePackageTooling(options: {
     assess: (project: Project) =>
       Effect.sync((): IntegrationAssessment => {
         const { packageJson } = project
+
         const isApplicable =
           checkHasManagedScript(packageJson, options.scripts)
           && (!options.monorepoOnly || project.workspace.isMonorepo)
           && (options.isRequired === undefined || options.isRequired(project))
+
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 
         if (!isApplicable) {
@@ -400,6 +407,7 @@ export interface ToolingFacts {
 
 const readToolingFacts = Effect.fn("readToolingFacts")(function* (cwd: string) {
   const path = yield* Path.Path
+
   const [isMonorepo, lintConfig] = yield* Effect.all(
     [checkIsMonorepo(cwd), readFileIfExists(path.join(cwd, "oxlint.config.ts"))],
     { concurrency: "unbounded" }
@@ -440,6 +448,7 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
       (path) => ({ path, type: "legacy_config" }) satisfies IntegrationFile
     ),
   ]
+
   const detect = (cwd: string) => detectToolingConfig(cwd, options.name, options.configFiles)
 
   return defineIntegration({
@@ -464,6 +473,7 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
         const workspace = options.workspace({ isMonorepo, lintConfig })
         const packageActions = getPackageActions(packageJson, options, options.purpose)
         const configContent = options.configContent(workspace)
+
         const inspection =
           state.active._tag === "Current"
             ? options.inspectConfig(yield* readFile(state.active.file.path), workspace)

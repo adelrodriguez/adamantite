@@ -11,6 +11,7 @@ import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
+
 describe("check", () => {
   describe("stage flags", () => {
     it.effect("run only the lint stage when selected", () =>
@@ -143,6 +144,7 @@ describe("check", () => {
         const files = createFileSystemTestContext({
           files: { "index.ts": "export const value = 1\n" },
         })
+
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(checkCommand, ["index.ts"], {

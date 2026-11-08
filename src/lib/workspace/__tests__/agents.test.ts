@@ -136,6 +136,7 @@ describe("writeAgentsGuidance", () => {
   )
 
   const ALL_SCRIPTS: Script[] = ["check", "fix", "analyze"]
+
   const guidanceOptions = {
     isMonorepo: Schema.Boolean,
     packageManager: Schema.Literals(["bun", "deno", "npm", "pnpm", "yarn"]),
@@ -143,6 +144,7 @@ describe("writeAgentsGuidance", () => {
       Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
     ),
   }
+
   // Marker-free so generated content cannot collide with the managed block by accident.
   const markerFreeContent = Schema.String.check(Schema.isMaxLength(200)).check(
     Schema.makeFilter((content) => !content.includes("ADAMANTITE"))
@@ -178,7 +180,9 @@ describe("writeAgentsGuidance", () => {
           agents.matchAll(/^- Run `[^`\n]+ (check|fix|analyze)`/gm),
           ([, script]) => script
         )
+
         expect(new Set(writtenScripts)).toStrictEqual(new Set(scripts))
+
         if (scripts.length > 0) {
           expect(agents).toContain(`${packageManager} `)
         }
@@ -239,6 +243,7 @@ describe("writeAgentsGuidance", () => {
             : variant === "end-only"
               ? `${prefix}${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
               : `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
+
         const files = makeFiles({ "AGENTS.md": existing })
         const { isMonorepo, packageManager, scripts } = guidance
 

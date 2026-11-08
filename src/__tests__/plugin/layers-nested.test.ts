@@ -4,7 +4,9 @@ import { describe, it } from "vitest"
 import { createLayersRule, type Modules } from "#presets/lint/plugin/rules/layers.ts"
 
 RuleTester.describe = describe
+
 RuleTester.it = it
+
 RuleTester.itOnly = it.only
 
 const MODULES: Modules = {

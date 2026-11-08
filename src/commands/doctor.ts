@@ -67,6 +67,7 @@ export default Command.make("doctor").pipe(
 
       const failWithFindings = Effect.gen(function* () {
         yield* prompter.outro("⚠️ Doctor found issues.")
+
         return yield* doctorFailed()
       })
 
@@ -112,6 +113,7 @@ export default Command.make("doctor").pipe(
         )
         yield* printFindings(after.findings)
         yield* offerPromptCopy(renderAssessmentMarkdown(after, version))
+
         return yield* failWithFindings
       })
 
@@ -143,6 +145,7 @@ export default Command.make("doctor").pipe(
       })
 
       const packageJson = yield* readPackageJson(cwd)
+
       const outcome =
         packageJson.devDependencies?.adamantite || packageJson.dependencies?.adamantite
           ? classifyAssessment(yield* assessProject(yield* readProject(cwd, packageJson)))
@@ -154,6 +157,7 @@ export default Command.make("doctor").pipe(
         Effect.gen(function* () {
           const prompter = yield* Prompter
           yield* prompter.cancel("Doctor was cancelled. The findings remain.")
+
           return yield* doctorFailed()
         })
       )

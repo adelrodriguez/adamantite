@@ -46,6 +46,7 @@ const copyPrompt = Effect.fn("copyPrompt")(function* (prompt: string) {
 
 export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: string) {
   const prompter = yield* Prompter
+
   const shouldCopyPrompt = yield* prompter.confirm({
     initialValue: true,
     message: "Copy the agent prompt?",
@@ -100,6 +101,7 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
 
   if (action === "copy") {
     yield* copyPrompt(options.prompt)
+
     return { _tag: "Copied" } satisfies Resolution
   }
 
@@ -124,6 +126,7 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
 
   if (!started) {
     yield* offerPromptCopy(options.prompt)
+
     return { _tag: "Failed", agent } satisfies Resolution
   }
 

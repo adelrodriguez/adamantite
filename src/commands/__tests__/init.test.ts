@@ -84,10 +84,12 @@ const EXISTING_MONOREPO_TSCONFIG = JSON.stringify(
 function runFreshSetup() {
   return Effect.gen(function* () {
     const files = createInitTestContext()
+
     const prompter = createPrompterTestContext({
       confirmResponses: [true, false, false, false],
       multiselectResponses: [["check", "analyze"], ["react"], ["vscode"]],
     })
+
     const installer = createDependencyInstallerTestContext()
 
     const exit = yield* runCommand(initCommand, [], {
@@ -369,6 +371,7 @@ describe("init", () => {
             scripts: { prepare: "husky" },
           }),
         })
+
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
@@ -395,6 +398,7 @@ describe("init", () => {
           "package.json": monorepoPackageJson,
           "tsconfig.json": "{}",
         })
+
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
@@ -417,10 +421,12 @@ describe("init", () => {
     it.effect("add the react preset when react-strict is selected without it", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false, false],
           multiselectResponses: [["check"], ["react-strict"], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -476,6 +482,7 @@ describe("init", () => {
         Effect.gen(function* () {
           const files = createInitTestContext({ "package.json": monorepoPackageJson })
           const prompter = createPrompterTestContext()
+
           const installer = createDependencyInstallerTestContext({
             detectedPackageManager: { name },
           })
@@ -550,6 +557,7 @@ describe("init", () => {
           "})",
           "",
         ].join("\n")
+
         const files = createInitTestContext({
           ".vscode/settings.json": yield* formatJson({ "editor.tabSize": 4 }),
           "oxfmt.config.ts": originalOxfmtConfig,
@@ -566,6 +574,7 @@ describe("init", () => {
           confirmResponses: [true, false, false, false],
           multiselectResponses: [["check"], [], ["vscode"]],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -592,10 +601,12 @@ describe("init", () => {
     it.effect("apply only the requested scripts and editor setup", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false, false, false],
           multiselectResponses: [["check"], [], ["zed"]],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -639,6 +650,7 @@ describe("init", () => {
               version: "1.0.0",
             }),
           })
+
           const prompter = createPrompterTestContext()
           const installer = createDependencyInstallerTestContext()
 
@@ -806,6 +818,7 @@ describe("init", () => {
           const files = createInitTestContext()
           const originalPackageJson = files.read("package.json")
           const prompter = createPrompterTestContext()
+
           const installer = createDependencyInstallerTestContext({
             detectedPackageManager: { name: "aube" },
           })
@@ -920,6 +933,7 @@ describe("init", () => {
           confirmResponses: [true, false, false, false],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -955,6 +969,7 @@ describe("init", () => {
           confirmResponses: [false, false, false, false],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -991,6 +1006,7 @@ describe("init", () => {
             confirmResponses: [false, false, false],
             multiselectResponses: [["check"], [], []],
           })
+
           const installer = createDependencyInstallerTestContext()
 
           const exit = yield* runCommand(initCommand, [], {
@@ -1037,10 +1053,12 @@ describe("init", () => {
     it.effect("uses the detected package manager in AGENTS.md guidance", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false, true],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: { name: "npm" },
         })
@@ -1068,6 +1086,7 @@ describe("init", () => {
             confirmResponses: [false, false, true],
             multiselectResponses: [["check"], [], []],
           })
+
           const installer = createDependencyInstallerTestContext()
 
           const exit = yield* runCommand(initCommand, [], {
@@ -1094,6 +1113,7 @@ describe("init", () => {
           confirmResponses: [false, false, false],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1116,6 +1136,7 @@ describe("init", () => {
           confirmResponses: [false, false, true],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1161,6 +1182,7 @@ describe("init", () => {
         for (const [file, content] of Object.entries(shippedSkill)) {
           expect(files.read(`.claude/skills/adamantite/${file}`)).toBe(content)
         }
+
         expect(prompter.spinnerEntries).toContainEqual({
           message: "Adamantite skill added to `.agents/skills` and `.claude/skills`.",
           type: "stop",
@@ -1171,10 +1193,12 @@ describe("init", () => {
     it.effect("ask one question for the AGENTS.md section and the skill", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false, true],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1196,10 +1220,12 @@ describe("init", () => {
     it.effect("write no skill when coding agent setup is declined", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({ ".claude/settings.json": "{}\n" })
+
         const prompter = createPrompterTestContext({
           confirmResponses: [false, false, false],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1220,6 +1246,7 @@ describe("init", () => {
             content,
           ])
         )
+
         const files = createInitTestContext(copy)
         files.makeReadOnly(".agents/skills/adamantite/SKILL.md")
         const prompter = createPrompterTestContext()
@@ -1275,6 +1302,7 @@ describe("init", () => {
           confirmResponses: [false, false],
           multiselectResponses: [["analyze"], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1298,6 +1326,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext()
+
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: null,
         })
@@ -1316,10 +1345,12 @@ describe("init", () => {
     it.effect("create a GitHub Actions workflow for CI-compatible scripts when requested", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+
         const prompter = createPrompterTestContext({
           confirmResponses: [true, true, true, false],
           multiselectResponses: [["check"], ["react"], ["zed"]],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1335,11 +1366,13 @@ describe("init", () => {
     it.effect("not offer GitHub Actions interactively with an unsupported package manager", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+
         const prompter = createPrompterTestContext({
           // TypeScript and the AGENTS.md guidance.
           confirmResponses: [false, false],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: { name: "aube" },
         })
@@ -1372,6 +1405,7 @@ describe("init", () => {
           confirmResponses: [false, true, false],
           multiselectResponses: [["check"], [], []],
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1405,6 +1439,7 @@ describe("init", () => {
         const prompter = createPrompterTestContext({
           cancelAtPromptIndex: 1,
         })
+
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1425,7 +1460,9 @@ describe("init", () => {
           confirmResponses: [false, true, false, false],
           multiselectResponses: [["check"], [], ["vscode"]],
         })
+
         const installer = createDependencyInstallerTestContext()
+
         const runner = createRunnerTestContext({
           implementation: (options) =>
             Effect.succeed(ChildProcessSpawner.ExitCode(options.command === "code" ? 1 : 0)),
@@ -1452,11 +1489,14 @@ describe("init", () => {
     it.effect("continue successfully and show guidance when the VS Code CLI is unavailable", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+
         const prompter = createPrompterTestContext({
           confirmResponses: [false, true, false, false],
           multiselectResponses: [["check"], [], ["vscode"]],
         })
+
         const installer = createDependencyInstallerTestContext()
+
         const runner = createRunnerTestContext({
           implementation: (options) =>
             options.command === "code"

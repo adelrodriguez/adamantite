@@ -51,9 +51,11 @@ function getMatchPath(context: Context) {
 const rule: Rule = {
   create(context): Visitor {
     const hooks = new Set(readStringArrayOption(context.options, "hooks") ?? DEFAULT_HOOKS)
+
     const allow = (readStringArrayOption(context.options, "allow") ?? DEFAULT_ALLOW).map((glob) =>
       globToRegExp(glob)
     )
+
     const matchPath = getMatchPath(context)
 
     if (allow.some((pattern) => pattern.test(matchPath))) {

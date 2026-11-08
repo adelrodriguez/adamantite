@@ -4,10 +4,11 @@ import type { Script, SupportedPackageManager } from "#lib/workspace/package-jso
 const CI_SCRIPTS = ["check", "analyze"] as const satisfies readonly Script[]
 
 export function getCIWorkflowEntries(packageManager: SupportedPackageManager, scripts: Script[]) {
-  return CI_SCRIPTS.filter((script) => scripts.includes(script)).map((script) => ({
-    command: runScriptCommand(packageManager, script),
-    name: script,
-  }))
+  return CI_SCRIPTS.flatMap((script) =>
+    scripts.includes(script)
+      ? [{ command: runScriptCommand(packageManager, script), name: script }]
+      : []
+  )
 }
 
 export function hasCICompatibleScripts(scripts: Script[]): boolean {

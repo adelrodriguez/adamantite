@@ -8,10 +8,13 @@ import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/
 
 const unsupportedConfigReason =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."
+
 const unsupportedOptionsReason =
   "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can inspect."
+
 const ambiguousOptionsReason =
   "`oxlint.config.ts` has an `options` object Adamantite cannot inspect. Make sure each required option is a plain `key: true | false` property. Avoid spreads (`...rest`), computed keys (`[name]: ...`), duplicate keys, methods/getters/setters, and non-boolean-literal values."
+
 const missingOptionsReason = "The required Oxlint options are missing."
 const invalidOptionsReason = "The required Oxlint options are missing or are not set to true."
 

@@ -34,6 +34,7 @@ import {
 } from "#lib/shared/json.ts"
 
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
+
 const CONFIG = {
   "[css]": {
     "editor.defaultFormatter": "oxc.oxc-vscode",
@@ -92,6 +93,7 @@ export default defineIntegration({
 
       const current = config["oxc.path.oxlint"]
       const expected = CONFIG["oxc.path.oxlint"]
+
       const findings: Finding[] =
         current === expected
           ? []
@@ -110,15 +112,20 @@ export default defineIntegration({
                 title: "VS Code does not use the Oxlint entry",
               },
             ]
+
       const effect = yield* readEffectEditor(cwd)
+
       if (Option.isSome(effect)) {
         const customizations = config["oxc.lint.customization"]
+
         const hidesDuplicates =
           checkIsJsonObject(customizations)
           && Object.keys(effect.value.rulesCustomization).every((rule) => {
             const customization = customizations[rule]
+
             return checkIsJsonObject(customization) && customization["severity"] === "off"
           })
+
         if (config["js/ts.tsdk.path"] !== EFFECT_SDK_PATH || !hidesDuplicates) {
           findings.push({
             currentState: `\`${files[0].path}\` does not select the Effect editor SDK with duplicate Oxlint Effect reports hidden.`,
@@ -134,6 +141,7 @@ export default defineIntegration({
             title: "VS Code does not use the Effect language server",
           })
         }
+
         const sdkState = yield* effect.value.sdkIsCurrent.pipe(
           Effect.map((current) =>
             current
@@ -142,6 +150,7 @@ export default defineIntegration({
           ),
           Effect.catchTag("EffectEditorUnavailable", (error) => Effect.succeed(error.message))
         )
+
         if (sdkState !== undefined) {
           findings.push({
             currentState: sdkState,
@@ -168,6 +177,7 @@ export default defineIntegration({
       const path = yield* Path.Path
       const settingsPath = path.join(cwd, files[0].path)
       const effect = yield* readEffectEditor(cwd)
+
       const config = Option.isSome(effect)
         ? {
             ...CONFIG,
@@ -175,6 +185,7 @@ export default defineIntegration({
             "oxc.lint.customization": effect.value.rulesCustomization,
           }
         : CONFIG
+
       if (Option.isSome(effect)) {
         yield* effect.value.prepareSdk
       }
@@ -186,6 +197,7 @@ export default defineIntegration({
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
+
       return yield* fs.exists(path.join(cwd, files[0].path))
     }),
   extension: (scripts: Script[] = [], presets: readonly string[] = []) =>
@@ -199,6 +211,7 @@ export default defineIntegration({
       if (scripts.includes("analyze")) {
         extensions.push("webpro.vscode-knip")
       }
+
       if (presets.includes("effect")) {
         extensions.push("TypeScriptTeam.native-preview")
       }
@@ -238,6 +251,7 @@ export default defineIntegration({
       }
 
       const effect = yield* readEffectEditor(cwd)
+
       const base = Option.isSome(effect)
         ? {
             ...CONFIG,
@@ -245,9 +259,11 @@ export default defineIntegration({
             "oxc.lint.customization": effect.value.rulesCustomization,
           }
         : CONFIG
+
       if (Option.isSome(effect)) {
         yield* effect.value.prepareSdk
       }
+
       const newConfig = yield* mergeConfig(base, existingConfig)
 
       yield* writeFile(settingsPath, updateJsonText(vscodeFile, newConfig))

@@ -76,6 +76,7 @@ describe("update", () => {
       const files = createFileSystemTestContext({
         files: { "package.json": manifest({ devDependencies: { knip: knip.version } }) },
       })
+
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
@@ -95,6 +96,7 @@ describe("update", () => {
       const files = createFileSystemTestContext({
         files: { "package.json": manifest({ devDependencies: { knip: `^${knip.version}` } }) },
       })
+
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
@@ -119,6 +121,7 @@ describe("update", () => {
           }),
         },
       })
+
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
@@ -141,6 +144,7 @@ describe("update", () => {
           }),
         },
       })
+
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
@@ -159,6 +163,7 @@ describe("update", () => {
           "package.json": manifest({ devDependencies: { adamantite: "0.0.1", knip: "5.0.0" } }),
         },
       })
+
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
@@ -184,7 +189,9 @@ describe("update", () => {
           }),
         },
       })
+
       const prompter = createPrompterTestContext()
+
       const installer = createDependencyInstallerTestContext({
         detectedPackageManager: { name: "pnpm" },
       })
@@ -209,6 +216,7 @@ describe("update", () => {
           }),
         },
       })
+
       const prompter = createPrompterTestContext()
       const installer = createDependencyInstallerTestContext()
 
@@ -233,7 +241,9 @@ describe("update", () => {
       const files = createFileSystemTestContext({
         files: { "package.json": manifest({ devDependencies: { knip: "5.0.0" } }) },
       })
+
       const prompter = createPrompterTestContext()
+
       const installer = createDependencyInstallerTestContext({
         addDevDependenciesError: new FailedToInstallDependency({ packages: ["knip"] }),
       })
@@ -277,6 +287,7 @@ describe("update", () => {
             "references/setup.md": "# An older setup guide\n",
           }),
         })
+
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
 
@@ -320,6 +331,7 @@ describe("update", () => {
           ...makeSkillCopy(".agents/skills"),
           "skills-lock.json": makeSkillsLock({ adamantite: "./node_modules/adamantite" }),
         })
+
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
 
@@ -346,6 +358,7 @@ describe("update", () => {
             other: "someone/other",
           }),
         })
+
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
 
@@ -393,6 +406,7 @@ describe("update", () => {
             other: "someone/other",
           }),
         })
+
         files.makeReadOnly("skills-lock.json")
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()
@@ -418,6 +432,7 @@ describe("update", () => {
         const files = makeSkillFiles(
           makeSkillCopy(".claude/skills", { ...shippedSkill, "SKILL.md": "# Adamantite 1\n" })
         )
+
         files.makeReadOnly(".claude/skills/adamantite/SKILL.md")
         const prompter = createPrompterTestContext()
         const installer = createDependencyInstallerTestContext()

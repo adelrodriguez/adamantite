@@ -106,9 +106,11 @@ export default Command.make("init", initCommandOptions).pipe(
       const input = options.nonInteractive
         ? options
         : yield* collectInteractiveInitOptions(cwd, isMonorepo, packageManager.name)
+
       const initOptions = yield* validateInitOptions(input, packageManager.name)
       const selectedScripts = [...initOptions.scripts]
       const { lint } = initOptions
+
       const presets = Option.match(lint, {
         onNone: (): readonly LintPreset[] => [],
         onSome: (setup) => setup.presets,
@@ -119,10 +121,12 @@ export default Command.make("init", initCommandOptions).pipe(
       const hasSherif = hasKnip && isMonorepo
 
       const packageJson = yield* readPackageJson(cwd)
+
       // A project that already depends on Adamantite keeps the version or source that it chose.
       const dependsOnAdamantite = Predicate.isNotUndefined(
         packageJson.devDependencies?.adamantite ?? packageJson.dependencies?.adamantite
       )
+
       const dependencies = dependsOnAdamantite ? [] : ["adamantite"]
 
       if (Option.isSome(lint)) {

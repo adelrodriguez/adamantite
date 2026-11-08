@@ -14,6 +14,7 @@ const ROOT = "/project"
 
 function makeFiles(files?: Record<string, string>) {
   const target = `${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : process.platform === "win32" ? "-msvc" : ""}`
+
   return createFileSystemTestContext({
     files: {
       "/usr/bin/ldd": "GNU libc",
@@ -73,10 +74,12 @@ describe("oxlint", () => {
           "adamantite/lint/tailwind",
           "adamantite/lint/shadcn"
         )
+
         const manifest = makePackageJson({
           devDependencies: { oxlint: oxlint.version },
           scripts: { check: "adamantite check" },
         })
+
         const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
 
         const result = yield* runAssess(files)
@@ -107,6 +110,7 @@ describe("oxlint", () => {
           '// Previously imported "adamantite/lint/shadcn".',
           toOxlintTsConfigContent(["tailwind"]),
         ].join("\n")
+
         const files = makeFiles({
           "oxlint.config.ts": config,
           "package.json": makePackageJson({
@@ -132,6 +136,7 @@ describe("oxlint", () => {
             scripts: { check: "adamantite check" },
           }),
         })
+
         const result = yield* runAssess(files)
 
         expect(result.applicable ? result.findings : []).toStrictEqual(
@@ -179,6 +184,7 @@ describe("oxlint", () => {
               scripts: { check: "adamantite check" },
             }),
           })
+
           const snapshot = files.list().map((name) => [name, files.read(name)])
           const result = yield* runAssess(files)
           const findings = result.applicable ? result.findings : []
@@ -217,6 +223,7 @@ describe("oxlint", () => {
   },
 }\n`,
           })
+
           const before = files.list().map((file) => [file, files.read(file)])
           const result = yield* runAssess(files)
 
@@ -291,6 +298,7 @@ describe("oxlint", () => {
               scripts: { check: "adamantite check" },
             }),
           })
+
           const result = yield* runAssess(files)
 
           expect(

@@ -17,6 +17,7 @@ const project = getProjectDirectory(
   process.cwd(),
   process.env[PROJECT_VARIABLE]
 )
+
 const result = await Effect.runPromise(
   resolveOxlintRuntime(project).pipe(
     Effect.result,

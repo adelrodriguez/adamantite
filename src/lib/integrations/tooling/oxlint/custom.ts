@@ -53,13 +53,17 @@ export default defineIntegration({
       const { calls, legacyImports, unresolvedCalls, unresolvedImports } = customRules
       // A call with an unknown `dir`, or an unresolved import, can load any folder.
       const isComplete = isDiscoveryComplete(customRules)
+
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )
+
       const loadedFolders = Array.dedupe(calls.map((call) => call.dir))
+
       const oldDefaultFolders = packageDirectories.map((directory) =>
         path.join(directory, ".adamantite/rules")
       )
+
       const folders = Array.getSomes(
         yield* Effect.forEach(
           Array.dedupe([...defaultFolders, ...oldDefaultFolders, ...loadedFolders]),
@@ -67,6 +71,7 @@ export default defineIntegration({
           { concurrency: "unbounded" }
         )
       ).filter((folder) => folder.ruleFiles.length > 0)
+
       const legacyFolders = folders.filter(
         (folder) =>
           isComplete
@@ -79,6 +84,7 @@ export default defineIntegration({
       }
 
       const unknownNameCalls = calls.filter((call) => Option.isNone(call.name))
+
       const warnings = [
         ...unresolvedImports.map(
           ({ from, specifier }) =>
@@ -93,6 +99,7 @@ export default defineIntegration({
             `Doctor cannot read the \`name\` of a \`custom()\` call in \`${relative(call.source)}\`, because it is not a string literal. Doctor does not check that its plugin name differs from the other rules folders.`
         ),
       ]
+
       const findings: Finding[] = []
 
       // An unloaded folder is reported only when discovery is complete.

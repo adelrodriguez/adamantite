@@ -71,11 +71,13 @@ describe("script management", () => {
   const requestedScripts = Schema.mutable(
     Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
   )
+
   const scriptCommand = Schema.Union([
     Schema.Literals(Object.values(MANAGED_SCRIPT_COMMANDS)),
     Schema.Literals(["", "tsc && eslint .", "prettier --write ."]),
     Schema.String,
   ])
+
   const manifestScripts = Schema.Record(
     Schema.Union([Schema.Literals([...ALL_SCRIPTS]), Schema.Literals(["build", "dev", "test"])]),
     Schema.optionalKey(scriptCommand)
@@ -86,14 +88,17 @@ describe("script management", () => {
     { requested: requestedScripts, scripts: manifestScripts },
     ({ requested, scripts }) => {
       const adoptedScripts = { ...scripts }
+
       for (const script of requested) {
         adoptedScripts[script] = MANAGED_SCRIPT_COMMANDS[script]
       }
+
       const adopted: PackageJson = { name: "fixture", scripts: adoptedScripts }
 
       expect(getConflictingScripts(adopted, requested)).toStrictEqual([])
 
       const managed = getManagedScripts(adopted)
+
       for (const script of requested) {
         expect(managed).toContain(script)
       }

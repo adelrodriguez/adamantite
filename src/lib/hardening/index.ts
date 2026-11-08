@@ -71,14 +71,18 @@ function selectPackages(path: Path.Path, cwd: string, workspace: Workspace, scop
       fromFolder !== ".." && !fromFolder.startsWith(`..${path.sep}`) && !path.isAbsolute(fromFolder)
     )
   }
+
   const byDepth = Order.mapInput(Order.flip(Order.Number), (directory: string) => directory.length)
   const packageDirectories = [cwd, ...workspace.packageDirectories]
   const packagesInScope = packageDirectories.filter((directory) => contains(scope, directory))
+
   const owner = Array.sort(
     packageDirectories.filter((directory) => contains(directory, scope)),
     byDepth
   ).slice(0, 1)
+
   const selectedPackages = packagesInScope.length > 0 ? packagesInScope : owner
+
   // The innermost package that contains the file owns it.
   const isSelectedFile = (file: string) => {
     const [innermost = cwd] = Array.sort(
@@ -106,11 +110,13 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const { contains, isSelectedFile } = selectPackages(path, cwd, workspace, scope)
+
   const isReadInScope = (file: string) => {
     const folder = path.dirname(path.join(cwd, file))
 
     return contains(folder, scope) || contains(scope, folder)
   }
+
   // The git index also has the files that a delete or a sparse checkout left out of the working
   // tree, and the agent cannot read those.
   const markdownFiles = yield* Effect.transposeOption(
@@ -128,6 +134,7 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
       )
     )
   )
+
   const agentReach = yield* Effect.transposeOption(
     markdownFiles.pipe(
       Option.map((files) =>
@@ -181,10 +188,12 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
   const { packageDirectories, selectedPackages } = selectPackages(path, cwd, workspace, scope)
+
   // The root instructions apply to every package, so a scope keeps them.
   const instructionCandidates = [...new Set([cwd, ...selectedPackages])].map((directory) =>
     path.join(directory, AGENTS_FILE)
   )
+
   // Git lists the Markdown files while discovery reads the workspace packages.
   const [{ calls, configs, unresolvedCalls }, instructionFiles, documentation] = yield* Effect.all(
     [
@@ -229,6 +238,7 @@ function renderAgentReach(reach: AgentReach) {
     reach.unreached.length === 0
       ? "Links and code spans from each `AGENTS.md` reach each Markdown file."
       : `No chain of links or code spans from an \`AGENTS.md\` reaches these Markdown files:\n\n${renderList(reach.unreached, "")}`
+
   const brokenLinks =
     reach.brokenLinks.length === 0
       ? []
@@ -275,10 +285,12 @@ function renderSuppressions(suppressions: Option.Option<readonly RuleSuppression
           onNone: () => "All rules",
           onSome: (ruleName) => `\`${ruleName}\``,
         })
+
         const shown = locations
           .slice(0, SHOWN_SUPPRESSIONS)
           .map((location) => `\`${location}\``)
           .join(", ")
+
         const more =
           locations.length > SHOWN_SUPPRESSIONS
             ? `, and ${locations.length - SHOWN_SUPPRESSIONS} more`

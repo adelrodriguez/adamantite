@@ -20,6 +20,7 @@ const sherifStep = {
   stdin: "inherit",
   title: "📦 Analyzing the monorepo",
 }
+
 const knipStep = {
   command: "knip",
   cwd: process.cwd(),

@@ -131,7 +131,9 @@ describe("rule add test", () => {
           ".adamantite/lint/no-window.ts": "// another rule\n",
         },
       })
+
       const prompter = createPrompterTestContext({ selectResponses: ["no-debugger"] })
+
       const exit = yield* runCommand(ruleCommand, ["add", "test"], {
         files,
         layers: [prompter.layer, interactiveTerminalLayer],
@@ -159,7 +161,9 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
       })
+
       const prompter = createPrompterTestContext()
+
       const exit = yield* runCommand(ruleCommand, ["add", "test"], {
         files,
         layers: [prompter.layer],
@@ -177,6 +181,7 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
       })
+
       const exit = yield* runCommand(
         ruleCommand,
         ["add", "test", "no-debugger", "--path", "tests/lint/no-debugger.test.ts"],
@@ -196,8 +201,10 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { ".adamantite/lint/no-debugger.ts": "// user-owned rule\n" },
       })
+
       const prompter = createPrompterTestContext()
       const runner = createRunnerTestContext()
+
       const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
         files,
         layers: [prompter.layer, runner.layer],
@@ -218,6 +225,7 @@ describe("rule add test", () => {
   it.effect("require an existing rule before creating a test", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext()
+
       const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
         files,
         layers: [createPrompterTestContext().layer],
@@ -239,6 +247,7 @@ describe("rule add test", () => {
           ".adamantite/lint/no-debugger.ts": "// rule\n",
         },
       })
+
       const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
         files,
         layers: [createPrompterTestContext().layer],
@@ -257,6 +266,7 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { "tooling/lint/no-window.mjs": "export default {}\n" },
       })
+
       const exit = yield* runCommand(
         ruleCommand,
         ["add", "test", "no-window", "--dir", "tooling/lint"],
@@ -288,7 +298,9 @@ describe("rule test", () => {
       const files = createFileSystemTestContext({
         files: { "tests/lint/no-debugger.test.ts": "// test\n" },
       })
+
       const runner = createRunnerTestContext()
+
       const exit = yield* runCommand(
         ruleCommand,
         ["test", "--path", "tests/lint/no-debugger.test.ts"],
@@ -325,6 +337,7 @@ describe("rule test", () => {
           "tooling/rules/no-b.test.ts": "// test\n",
         },
       })
+
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
@@ -353,6 +366,7 @@ describe("rule test", () => {
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
       })
+
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
@@ -403,6 +417,7 @@ describe("rule test", () => {
           "tooling/rules/no-b.test.ts": "// test\n",
         },
       })
+
       const prompter = createPrompterTestContext()
       const runner = createRunnerTestContext()
 
@@ -433,6 +448,7 @@ describe("rule test", () => {
           "package.json": PACKAGE_JSON,
         },
       })
+
       const prompter = createPrompterTestContext()
       const runner = createRunnerTestContext()
 
@@ -498,6 +514,7 @@ describe("rule ast", () => {
       const files = createFileSystemTestContext({
         files: { "src/value.ts": "export const value = (1 + 2) as number\n" },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["ast", "src/value.ts"], {
@@ -520,6 +537,7 @@ describe("rule ast", () => {
       const files = createFileSystemTestContext({
         files: { "src/broken.ts": "export const = 1\n" },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["ast", "src/broken.ts"], {
@@ -542,6 +560,7 @@ describe("rule try", () => {
     path: "src/cart.ts",
     source: Option.some("/tmp/before.ts"),
   } as const
+
   const acceptCase = { expected: "accepted", path: "src/cart.ts", source: Option.none() } as const
   const report = { column: 1, line: 1, message: "'node:fs' import is restricted from being used." }
 

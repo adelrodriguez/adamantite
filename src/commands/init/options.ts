@@ -100,6 +100,7 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
 
   if (Option.isSome(missingPreset)) {
     const { required, requiredBy } = missingPreset.value
+
     return yield* new InvalidInitOptions({
       reason: `\`--preset ${requiredBy}\` requires \`--preset ${required}\`.`,
     })

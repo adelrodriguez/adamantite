@@ -33,6 +33,7 @@ function readModule(
 ) {
   const { file, content } = source
   const json = file.endsWith(".json")
+
   const parsed = parseSync(json ? `${file}.ts` : file, json ? `(${content})` : content, {
     preserveParens: false,
     sourceType: "module",
@@ -44,6 +45,7 @@ function readModule(
 
   const bindings = new Map<string, Binding>()
   const exports = new Map<string, Binding>()
+
   const targets = new Map(
     imports.filter((item) => item.from === file).map((item) => [item.specifier, item.file])
   )
@@ -57,6 +59,7 @@ function readModule(
         if (variable.id.type === "Identifier" && variable.init !== null) {
           const value: SourceValue = { expression: variable.init, file, type: "value" }
           bindings.set(variable.id.name, value)
+
           if (statement.type === "ExportNamedDeclaration") {
             exports.set(variable.id.name, value)
           }
@@ -66,9 +69,11 @@ function readModule(
 
     if (statement.type === "ImportDeclaration" && statement.importKind !== "type") {
       const target = targets.get(statement.source.value)
+
       if (target === undefined) {
         continue
       }
+
       for (const specifier of statement.specifiers) {
         if (specifier.type === "ImportDefaultSpecifier") {
           bindings.set(specifier.local.name, { file: target, name: "default", type: "export" })
@@ -77,6 +82,7 @@ function readModule(
             specifier.imported.type === "Identifier"
               ? specifier.imported.name
               : specifier.imported.value
+
           bindings.set(specifier.local.name, { file: target, name, type: "export" })
         }
       }
@@ -84,6 +90,7 @@ function readModule(
 
     if (statement.type === "ExportDefaultDeclaration") {
       const value = statement.declaration
+
       if (
         value.type !== "FunctionDeclaration"
         && value.type !== "ClassDeclaration"
@@ -99,7 +106,9 @@ function readModule(
           specifier.exported.type === "Identifier"
             ? specifier.exported.name
             : specifier.exported.value
+
         const target = statement.source === null ? undefined : targets.get(statement.source.value)
+
         if (target !== undefined) {
           exports.set(name, {
             file: target,
@@ -125,9 +134,11 @@ function resolve(value: SourceValue, modules: ReadonlyMap<string, SourceModule>)
 
   while (current !== undefined) {
     const key = current.type === "value" ? current.expression : current
+
     if (visited.has(key)) {
       return
     }
+
     visited.add(key)
 
     if (current.type === "export") {
@@ -136,6 +147,7 @@ function resolve(value: SourceValue, modules: ReadonlyMap<string, SourceModule>)
     }
 
     const expression = current.expression
+
     if (expression.type === "Identifier") {
       current = modules.get(current.file)?.bindings.get(expression.name)
     } else if (
@@ -158,19 +170,23 @@ function findLegacyNodes(
   visited = new Set<Expression>()
 ): string[] {
   const object = value.expression
+
   if (object.type !== "ObjectExpression" || visited.has(object)) {
     return []
   }
+
   visited.add(object)
 
   const property = object.properties.find(
     (item) => item.type === "Property" && getPropertyName(item) === "layers"
   )
+
   if (property?.type !== "Property") {
     return []
   }
 
   const layers = resolve({ ...value, expression: property.value }, modules)
+
   if (layers?.expression.type !== "ObjectExpression") {
     return []
   }
@@ -179,10 +195,13 @@ function findLegacyNodes(
     if (node.type !== "Property") {
       return []
     }
+
     const child = resolve({ ...layers, expression: node.value }, modules)
+
     if (child === undefined) {
       return []
     }
+
     return child.expression.type === "ArrayExpression"
       ? [child.file]
       : findLegacyNodes(child, modules, visited)
@@ -199,18 +218,23 @@ function findLegacyLayerMaps(modules: ReadonlyMap<string, SourceModule>) {
           if (property.type !== "Property" || getPropertyName(property) !== "adamantite/layers") {
             continue
           }
+
           const value = resolve(
             { expression: property.value, file: module.file, type: "value" },
             modules
           )
+
           if (value?.expression.type !== "ArrayExpression") {
             continue
           }
+
           for (const element of value.expression.elements) {
             if (element === null || element.type === "SpreadElement") {
               continue
             }
+
             const option = resolve({ ...value, expression: element }, modules)
+
             if (option !== undefined) {
               for (const file of findLegacyNodes(option, modules)) {
                 files.add(file)
@@ -220,6 +244,7 @@ function findLegacyLayerMaps(modules: ReadonlyMap<string, SourceModule>) {
         }
       },
     })
+
     visitor.visit(module.program)
   }
 
@@ -233,12 +258,15 @@ function findLegacyLayerMaps(modules: ReadonlyMap<string, SourceModule>) {
 export const assessLayerMaps = Effect.fn("assessLayerMaps")(function* (project: Project) {
   const path = yield* Path.Path
   const modules = new Map<string, SourceModule>()
+
   for (const source of project.customRules.sources) {
     const module = readModule(source, project.customRules.resolvedImports)
+
     if (module !== undefined) {
       modules.set(module.file, module)
     }
   }
+
   const sources = findLegacyLayerMaps(modules)
 
   if (sources.length === 0) {

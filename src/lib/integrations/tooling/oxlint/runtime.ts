@@ -94,6 +94,7 @@ const findWindowsLauncher = Effect.fn("findWindowsLauncher")(function* (project:
 const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (project: string) {
   const path = yield* Path.Path
   const tsrs = yield* resolvePackageDirectory(project, "tsrs")
+
   const launcher = Option.isNone(tsrs)
     ? Option.none<string>()
     : process.platform === "win32"

@@ -169,15 +169,18 @@ describe("custom preset", () => {
     async (preset) => {
       expect.hasAssertions()
       const rulePath = ".adamantite/lint/no-debugger-here.ts"
+
       const files = createFileSystemTestContext({
         files: { [rulePath]: makeStub() },
         root: project,
       })
+
       const testPath = await Effect.runPromise(
         addCustomRuleTest(project, "no-debugger-here").pipe(
           Effect.provide([files.layer, Path.layer])
         )
       )
+
       write(rulePath, makeStub())
       write(".adamantite/lint/no-debugger-here.test.ts", files.read(testPath))
       write(
@@ -198,6 +201,7 @@ describe("custom preset", () => {
 
     function writeRuleAndVerify(rule: string) {
       write(rulePath, rule)
+
       const input = [
         `import { RuleTester } from ${JSON.stringify(TESTING_MODULE)}`,
         `import rule from ${JSON.stringify(join(project, rulePath))}`,

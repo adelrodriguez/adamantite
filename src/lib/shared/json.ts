@@ -106,6 +106,7 @@ function findShadowedProperty(text: string, path: JSONPath): Node | undefined {
   const key = path.at(-1)
   const root = parseTree(text)
   const parent = root && findNodeAtLocation(root, path.slice(0, -1))
+
   const properties =
     parent?.type === "object"
       ? (parent.children ?? []).filter((property) => property.children?.[0]?.value === key)
@@ -168,6 +169,7 @@ function setJsonValue(
 ): string {
   const edit = (source: string) =>
     applyEdits(source, modify(source, path, value, { formattingOptions }))
+
   const root = parseTree(text)
   const parentPath = path.slice(0, -1)
   const last = root && findNodeAtLocation(root, parentPath)?.children?.at(-1)

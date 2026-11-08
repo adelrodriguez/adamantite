@@ -26,6 +26,7 @@ describe("agents", () => {
     it.effect("report a missing AGENTS.md at the project root", () =>
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)
@@ -64,6 +65,7 @@ describe("agents", () => {
           "AGENTS.md": content,
           "package.json": yield* stringifyJson(packageJson),
         })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)
@@ -81,11 +83,13 @@ describe("agents", () => {
     it.effect("check only the root of a monorepo", () =>
       Effect.gen(function* () {
         const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
+
         const files = makeFiles({
           "AGENTS.md": "# Monorepo\n",
           "package.json": yield* stringifyJson(monorepoPackageJson),
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         })
+
         const result = yield* readProject(ROOT, monorepoPackageJson).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)
@@ -99,6 +103,7 @@ describe("agents", () => {
       Effect.gen(function* () {
         const unmanagedPackageJson = { scripts: { check: "tsc --noEmit" } }
         const files = makeFiles({ "package.json": yield* stringifyJson(unmanagedPackageJson) })
+
         const result = yield* readProject(ROOT, unmanagedPackageJson).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)

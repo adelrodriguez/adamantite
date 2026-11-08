@@ -117,9 +117,11 @@ export function createRunnerTestContext(
                 ...options,
                 args: [...options.args],
               })
+
               if (implementation) {
                 return yield* implementation(options)
               }
+
               return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
             })
           )
@@ -157,6 +159,7 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
             ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
             : Effect.fail(new CliNotFound({ command: invocation.command }))
         }
+
         if (!codingAgents.some((agent) => agent.command === invocation.command)) {
           const commandExit = options.commandExits?.[invocation.name ?? invocation.command] ?? 0
 
@@ -164,9 +167,11 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
             ? Effect.fail(new CliNotFound({ command: invocation.command }))
             : Effect.succeed(ChildProcessSpawner.ExitCode(commandExit))
         }
+
         if (options.agentExit === "not-found") {
           return Effect.fail(new CliNotFound({ command: invocation.command }))
         }
+
         if (options.agentExit === "spawn-error") {
           return Effect.fail(
             PlatformError.systemError({
@@ -177,7 +182,9 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
             })
           )
         }
+
         options.onAgentRun?.()
+
         return Effect.succeed(ChildProcessSpawner.ExitCode(options.agentExit ?? 0))
       }),
   })
@@ -228,6 +235,7 @@ export function createPrompterTestContext(options?: {
   // CancelAtPromptIndex is 1-based: 1 means cancel the first prompt shown.
   function shouldCancelPrompt() {
     promptIndex += 1
+
     return cancelAtPromptIndex === promptIndex
   }
 
@@ -248,6 +256,7 @@ export function createPrompterTestContext(options?: {
           }
 
           confirmCalls.push(config)
+
           return shiftResponse(confirmResponses, "confirm")
         }),
       intro: (message) =>
@@ -283,6 +292,7 @@ export function createPrompterTestContext(options?: {
           }
 
           multiselectCalls.push(config)
+
           // SAFETY: each test queues multiselect responses matching the option type of the prompt it triggers.
           return shiftResponse(multiselectResponses, "multiselect") as T[]
         }),
@@ -301,6 +311,7 @@ export function createPrompterTestContext(options?: {
           }
 
           selectCalls.push(config)
+
           // SAFETY: each test queues a select response that matches the option type of the prompt.
           return shiftResponse(selectResponses, "select") as T
         }),
@@ -346,6 +357,7 @@ export function createDependencyInstallerTestContext(options?: {
   readonly detectedPackageManager?: DetectedPackageManager | null
 }): DependencyInstallerTestContext {
   const calls: DependencyInstallerCall[] = []
+
   const detectedPackageManager: DetectedPackageManager | null =
     options && "detectedPackageManager" in options
       ? (options.detectedPackageManager ?? null)

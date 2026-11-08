@@ -10,6 +10,7 @@ import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
+
 describe("fix", () => {
   describe("default invocation", () => {
     it.effect("lint before formatting", () =>
@@ -121,6 +122,7 @@ describe("fix", () => {
         const files = createFileSystemTestContext({
           files: { "index.ts": "export const value = 1\n" },
         })
+
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(fixCommand, ["index.ts", "index.ts"], {

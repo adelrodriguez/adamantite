@@ -13,6 +13,7 @@ for (const file of [
 ]) {
   const path = join(root, file)
   const content = readFileSync(path, "utf8")
+
   const updated = content
     .replaceAll('"react-doctor"', '"react-strict"')
     .replaceAll("`react-doctor`", "`react-strict`")
@@ -27,5 +28,6 @@ for (const file of [
       'import reactDoctor from "adamantite/lint/react-doctor"',
       'import reactStrict from "adamantite/lint/react-strict"'
     )
+
   if (updated !== content) writeFileSync(path, updated)
 }

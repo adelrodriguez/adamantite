@@ -19,6 +19,7 @@ const NAME = "@effect/tsgo"
 
 const readVersion = Effect.fn("readVersion")(function* (directory: string) {
   const { version } = yield* readPackageJson(directory)
+
   return version ?? ""
 })
 
@@ -36,6 +37,7 @@ const findArtifact = Effect.fn("findArtifact")(function* (
   const path = yield* Path.Path
   const toolDirectory = path.join(platformDirectory, "artifacts", tool)
   const files = yield* readDirectoryIfExists(path.join(toolDirectory, version))
+
   const artifact = pipe(
     files,
     Option.flatMap((entries) => Array.findFirst(entries, (file) => isArtifact(file)))
@@ -90,7 +92,9 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
     [readVersion(tsgo.value), readVersion(tsrs.value), readVersion(oxlint)],
     { concurrency: "unbounded" }
   )
+
   const tsrsFile = process.platform === "win32" ? "tsrs.exe" : "tsrs"
+
   // Resolve the backend first so a project missing both builds always gets the backend error.
   const backend = yield* findArtifact(
     platformDirectory.value,
@@ -99,6 +103,7 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
     tsrsVersion,
     (file) => file === tsrsFile
   )
+
   const binding = yield* findArtifact(
     platformDirectory.value,
     effectVersion,

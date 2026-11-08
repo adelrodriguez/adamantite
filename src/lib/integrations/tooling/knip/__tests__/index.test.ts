@@ -208,11 +208,13 @@ describe("knip", () => {
             devDependencies: { knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
           })
+
           const missing = makeFiles({
             "knip.config.ts": toKnipTsConfigContent(),
             "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
             "package.json": packageJson,
           })
+
           const configured = makeFiles({
             "knip.config.ts": toKnipTsConfigContent({ isMonorepo: false, usesEffectPreset: true }),
             "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
@@ -244,11 +246,13 @@ describe("knip", () => {
           scripts: { analyze: "adamantite analyze" },
           workspaces: ["packages/*"],
         })
+
         const files = makeFiles({
           "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: false }),
           "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
           "package.json": packageJson,
         })
+
         const configured = makeFiles({
           "knip.config.ts": toKnipTsConfigContent({ isMonorepo: true, usesEffectPreset: true }),
           "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),

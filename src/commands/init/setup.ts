@@ -50,6 +50,7 @@ export function setupToolConfig<E, R>(
 ) {
   return Effect.gen(function* () {
     const prompter = yield* Prompter
+
     // Init creates only a missing config, so the detected state also tells what init did.
     const active = yield* prompter.withSpinner(
       (spinner) =>
@@ -154,6 +155,7 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
         MONOREPO_GUIDANCE,
         Effect.forEach((line) => prompter.log.info(line))
       )
+
       return
     }
 
@@ -165,11 +167,13 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
           if (typescriptExists) {
             yield* spinner.message(`\`${tsconfig.config}\` found, updating...`)
             yield* tsconfig.update(cwd)
+
             return false
           }
 
           yield* spinner.message(`\`${tsconfig.config}\` not found, creating...`)
           yield* tsconfig.create(cwd)
+
           return true
         }),
       {
@@ -206,6 +210,7 @@ export const setupEffectTsgo = (cwd: string) =>
 export const setupEditors = (cwd: string, editors: readonly string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
+
     if (editors.includes("vscode")) {
       yield* prompter.withSpinner(
         (spinner) =>
@@ -215,6 +220,7 @@ export const setupEditors = (cwd: string, editors: readonly string[]) =>
               `\`${vscode.config}\` ${exists ? "found, updating" : "not found, creating"}...`
             )
             yield* exists ? vscode.update(cwd) : vscode.create(cwd)
+
             return !exists
           }),
         {
@@ -235,6 +241,7 @@ export const setupEditors = (cwd: string, editors: readonly string[]) =>
               `\`${zed.config}\` ${exists ? "found, updating" : "not found, creating"}...`
             )
             yield* exists ? zed.update(cwd) : zed.create(cwd)
+
             return !exists
           }),
         {
@@ -282,6 +289,7 @@ export const installEditorExtensions = (
             Effect.gen(function* () {
               yield* prompter.log.warning(`⚠️ ${error.message}`)
               yield* prompter.log.warning("Install the extension manually after setup finishes.")
+
               return false as const
             }),
           VscodeCliNotFound: () =>
@@ -293,6 +301,7 @@ export const installEditorExtensions = (
                 "  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)"
               )
               yield* prompter.log.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
+
               return false as const
             }),
         })
@@ -300,6 +309,7 @@ export const installEditorExtensions = (
 
     if (hasZed) {
       yield* prompter.log.info("Install the Zed `oxc` extension: zed://extension/oxc")
+
       if (presets.includes("effect")) {
         yield* prompter.log.info(
           "Install the Zed TypeScript language server extension: zed://extension/tsgo"
@@ -326,6 +336,7 @@ export const setupGitHubActions = (
           yield* exists
             ? github.update(cwd, { packageManager, scripts })
             : github.create(cwd, { packageManager, scripts })
+
           return !exists
         }),
       {
@@ -367,6 +378,7 @@ export const setupAgentsGuidance = (
 ) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
+
     const result = yield* prompter
       .withSpinner(() => writeAgentsGuidance(cwd, { isMonorepo, packageManager, scripts }), {
         failure: "Failed to update AGENTS.md.",
@@ -379,6 +391,7 @@ export const setupAgentsGuidance = (
             yield* prompter.log.warning(
               `Could not update AGENTS.md. ${error.message} Adamantite will continue initialization.`
             )
+
             return "failed" as const
           })
         )

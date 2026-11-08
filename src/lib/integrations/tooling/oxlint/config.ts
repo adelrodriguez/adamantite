@@ -18,10 +18,13 @@ const REQUIRED_BOOLEAN_OPTIONS = [
   "typeAware",
   "typeCheck",
 ] as const
+
 const UNSUPPORTED_CONFIG_REASON =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."
+
 const UNSUPPORTED_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can inspect."
+
 const NON_BOOLEAN_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` object Adamantite cannot inspect. Make sure each required option is a plain `key: true | false` property. Avoid spreads (`...rest`), computed keys (`[name]: ...`), duplicate keys, methods/getters/setters, and non-boolean-literal values."
 
@@ -40,6 +43,7 @@ function getImportName(preset: LintPreset | "core") {
  */
 export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
   const presetNames = ["core", ...presets] as const
+
   return [
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
@@ -203,9 +207,11 @@ function getNamedObjectProperty(
 function inspectOptionsObject(options: ObjectExpression): RequiredConfigInspection {
   for (const option of REQUIRED_BOOLEAN_OPTIONS) {
     const property = getNamedObjectProperty(options, option)
+
     if (property.status === "invalid") {
       return { kind: "invalid", reason: NON_BOOLEAN_OPTIONS_REASON }
     }
+
     if (
       property.status === "missing"
       || property.property.value.type !== "Literal"
@@ -217,6 +223,7 @@ function inspectOptionsObject(options: ObjectExpression): RequiredConfigInspecti
       }
     }
   }
+
   return { kind: "configured" }
 }
 

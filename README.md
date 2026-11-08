@@ -52,7 +52,7 @@ npx adamantite init
 ```
 
 The interactive setup lets you choose package scripts, presets, TypeScript, editors, CI,
-agent guidance, and the coding agents that get the [Adamantite skill](#agent-skill). After setup, use the scripts written to `package.json`:
+agent guidance, and the skill folders that get the [Adamantite skill](#agent-skill). After setup, use the scripts written to `package.json`:
 
 ```sh
 bun run check
@@ -270,8 +270,8 @@ adamantite doctor
 ```
 
 `update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
-`adamantite doctor` as the CI gate. It also refreshes the [Adamantite skill](#agent-skill)
-that `init` installed when the copy differs from the skill in the installed package.
+`adamantite doctor` as the CI gate. It also refreshes each copy of the
+[Adamantite skill](#agent-skill) that differs from the skill of the installed Adamantite version.
 
 ### `adamantite prepare`
 
@@ -875,25 +875,35 @@ resolves them as Node.js does, so run it after you install the dependencies. It 
 The Adamantite skill teaches coding agents how to initialize, assess, repair, and update a
 project, and how to write [custom rules](#custom-rules). The Adamantite package ships it.
 
-`adamantite init` asks which coding agents get the skill, and selects the agents whose CLI
-is installed. In non-interactive mode, repeat `--skill-agent` for each agent. Init runs
-the [`skills` CLI](https://github.com/vercel-labs/skills) with `npx`, and copies the skill
-from `node_modules/adamantite`, so the copy matches the installed Adamantite version:
+`adamantite init` asks one question about coding agents. You choose the `AGENTS.md` section
+and the skill folders that get the skill:
 
-```sh
-npx skills add ./node_modules/adamantite --skill adamantite --agent claude-code --yes
-```
+| Skill folder     | Agents                                  |
+| ---------------- | --------------------------------------- |
+| `.agents/skills` | Codex, Cursor, Gemini CLI, and OpenCode |
+| `.claude/skills` | Claude Code                             |
+| `.grok/skills`   | Grok Build                              |
 
-The `skills` CLI records the skill in `skills-lock.json`. After you update Adamantite,
-`adamantite update` copies the skill again when it changed. Commit the skill folders and
-`skills-lock.json`, so every clone has the skill.
+`.agents/skills` is selected by default. Init also selects the folder of each agent whose CLI
+is installed. In non-interactive mode, repeat `--skill-agent` for each agent, and init writes
+the folder of each agent once.
 
-To install the skill from GitHub instead:
+The Adamantite CLI bundles the skill, so the copy matches the Adamantite version that wrote
+it. After you update Adamantite, `adamantite update` writes the skill again to each folder
+whose copy changed. It also removes the `adamantite` entry from `skills-lock.json`, so the
+`skills` CLI does not write the same folders. Commit the skill folders, so every clone has
+the skill.
+
+To install the skill from GitHub instead, with the
+[`skills` CLI](https://github.com/vercel-labs/skills):
 
 ```sh
 npx skills add adelrodriguez/adamantite --list
 npx skills add adelrodriguez/adamantite --skill adamantite
 ```
+
+`adamantite update` replaces a copy from GitHub with the skill of the installed Adamantite
+version.
 
 With pnpm 12.11 or later, `pnpm install` can also link the skill that the package ships
 into the agent skill directories that exist in the project, such as `.claude/skills`,

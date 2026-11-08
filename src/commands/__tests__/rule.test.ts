@@ -452,7 +452,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule.",
+            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test.",
         },
       ])
     })
@@ -485,7 +485,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No custom rule tests found. Run `adamantite rule add test` to add a test for an existing rule.",
+            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test.",
         },
       ])
     })

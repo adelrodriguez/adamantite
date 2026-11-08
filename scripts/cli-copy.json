@@ -226,11 +226,6 @@
   },
   {
     "file": "src/commands/init/prompts.ts",
-    "before": "\"Strict React feature code: no state, effect, or memoization hooks outside hook modules\"",
-    "after": "\"Keep React state, effect, and memoization hooks in hook modules.\""
-  },
-  {
-    "file": "src/commands/init/prompts.ts",
     "before": "\"TanStack Query: queries defined once with queryOptions() so route loaders can preload them, no query data copied into state\"",
     "after": "\"Define queries once with queryOptions(), reuse them in route loaders, and avoid copying query data into state.\""
   },

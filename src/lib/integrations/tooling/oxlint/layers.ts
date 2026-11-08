@@ -1,13 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
-import {
-  parseSync,
-  type Expression,
-  type ObjectExpression,
-  type ObjectProperty,
-  Visitor,
-} from "oxc-parser"
+import { parseSync, type Expression, type ObjectProperty, Visitor } from "oxc-parser"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/workspace/project.ts"
 
@@ -23,24 +17,133 @@ function getPropertyName(property: ObjectProperty) {
       : undefined
 }
 
-function resolve(expression: Expression, bindings: ReadonlyMap<string, Expression>) {
-  let current: Expression | undefined = expression
-  const visited = new Set<string>()
+interface SourceValue {
+  readonly type: "value"
+  readonly file: string
+  readonly expression: Expression
+}
+
+type Binding =
+  | SourceValue
+  | { readonly type: "export"; readonly file: string; readonly name: string }
+
+function readModule(
+  source: Project["customRules"]["sources"][number],
+  imports: Project["customRules"]["resolvedImports"]
+) {
+  const { file, content } = source
+  const json = file.endsWith(".json")
+  const parsed = parseSync(json ? `${file}.ts` : file, json ? `(${content})` : content, {
+    preserveParens: false,
+    sourceType: "module",
+  })
+
+  if (parsed.errors.length > 0) {
+    return
+  }
+
+  const bindings = new Map<string, Binding>()
+  const exports = new Map<string, Binding>()
+  const targets = new Map(
+    imports.filter((item) => item.from === file).map((item) => [item.specifier, item.file])
+  )
+
+  for (const statement of parsed.program.body) {
+    const declaration =
+      statement.type === "ExportNamedDeclaration" ? statement.declaration : statement
+
+    if (declaration?.type === "VariableDeclaration" && declaration.kind === "const") {
+      for (const variable of declaration.declarations) {
+        if (variable.id.type === "Identifier" && variable.init !== null) {
+          const value: SourceValue = { expression: variable.init, file, type: "value" }
+          bindings.set(variable.id.name, value)
+          if (statement.type === "ExportNamedDeclaration") {
+            exports.set(variable.id.name, value)
+          }
+        }
+      }
+    }
+
+    if (statement.type === "ImportDeclaration" && statement.importKind !== "type") {
+      const target = targets.get(statement.source.value)
+      if (target === undefined) {
+        continue
+      }
+      for (const specifier of statement.specifiers) {
+        if (specifier.type === "ImportDefaultSpecifier") {
+          bindings.set(specifier.local.name, { file: target, name: "default", type: "export" })
+        } else if (specifier.type === "ImportSpecifier" && specifier.importKind !== "type") {
+          const name =
+            specifier.imported.type === "Identifier"
+              ? specifier.imported.name
+              : specifier.imported.value
+          bindings.set(specifier.local.name, { file: target, name, type: "export" })
+        }
+      }
+    }
+
+    if (statement.type === "ExportDefaultDeclaration") {
+      const value = statement.declaration
+      if (
+        value.type !== "FunctionDeclaration"
+        && value.type !== "ClassDeclaration"
+        && value.type !== "TSInterfaceDeclaration"
+      ) {
+        exports.set("default", { expression: value, file, type: "value" })
+      }
+    } else if (json && statement.type === "ExpressionStatement") {
+      exports.set("default", { expression: statement.expression, file, type: "value" })
+    } else if (statement.type === "ExportNamedDeclaration") {
+      for (const specifier of statement.specifiers) {
+        const name =
+          specifier.exported.type === "Identifier"
+            ? specifier.exported.name
+            : specifier.exported.value
+        const target = statement.source === null ? undefined : targets.get(statement.source.value)
+        if (target !== undefined) {
+          exports.set(name, {
+            file: target,
+            name:
+              specifier.local.type === "Identifier" ? specifier.local.name : specifier.local.value,
+            type: "export",
+          })
+        } else if (specifier.local.type === "Identifier") {
+          exports.set(name, { expression: specifier.local, file, type: "value" })
+        }
+      }
+    }
+  }
+
+  return { bindings, exports, file, program: parsed.program }
+}
+
+type SourceModule = NonNullable<ReturnType<typeof readModule>>
+
+function resolve(value: SourceValue, modules: ReadonlyMap<string, SourceModule>) {
+  let current: Binding | undefined = value
+  const visited = new Set<Binding | Expression>()
 
   while (current !== undefined) {
-    if (current.type === "Identifier") {
-      if (visited.has(current.name)) {
-        return
-      }
+    const key = current.type === "value" ? current.expression : current
+    if (visited.has(key)) {
+      return
+    }
+    visited.add(key)
 
-      visited.add(current.name)
-      current = bindings.get(current.name)
+    if (current.type === "export") {
+      current = modules.get(current.file)?.exports.get(current.name)
+      continue
+    }
+
+    const expression = current.expression
+    if (expression.type === "Identifier") {
+      current = modules.get(current.file)?.bindings.get(expression.name)
     } else if (
-      current.type === "TSAsExpression"
-      || current.type === "TSSatisfiesExpression"
-      || current.type === "TSNonNullExpression"
+      expression.type === "TSAsExpression"
+      || expression.type === "TSSatisfiesExpression"
+      || expression.type === "TSNonNullExpression"
     ) {
-      current = current.expression
+      current = { ...current, expression: expression.expression }
     } else {
       return current
     }
@@ -49,100 +152,78 @@ function resolve(expression: Expression, bindings: ReadonlyMap<string, Expressio
   return current
 }
 
-function readLayers(object: ObjectExpression, bindings: ReadonlyMap<string, Expression>) {
+function findLegacyNodes(
+  value: SourceValue,
+  modules: ReadonlyMap<string, SourceModule>,
+  visited = new Set<Expression>()
+): string[] {
+  const object = value.expression
+  if (object.type !== "ObjectExpression" || visited.has(object)) {
+    return []
+  }
+  visited.add(object)
+
   const property = object.properties.find(
     (item) => item.type === "Property" && getPropertyName(item) === "layers"
   )
-
   if (property?.type !== "Property") {
-    return
+    return []
   }
 
-  const value = resolve(property.value, bindings)
+  const layers = resolve({ ...value, expression: property.value }, modules)
+  if (layers?.expression.type !== "ObjectExpression") {
+    return []
+  }
 
-  return value?.type === "ObjectExpression" ? value : undefined
-}
-
-function hasLegacyNodes(
-  object: ObjectExpression,
-  bindings: ReadonlyMap<string, Expression>
-): boolean {
-  const layers = readLayers(object, bindings)
-
-  return (
-    layers?.properties.some((property) => {
-      if (property.type !== "Property") {
-        return false
-      }
-
-      const value = resolve(property.value, bindings)
-
-      return (
-        value?.type === "ArrayExpression"
-        || (value?.type === "ObjectExpression" && hasLegacyNodes(value, bindings))
-      )
-    }) ?? false
-  )
-}
-
-function hasLegacyLayerMaps(file: string, content: string) {
-  const json = file.endsWith(".json")
-  const parsed = parseSync(json ? `${file}.ts` : file, json ? `(${content})` : content, {
-    preserveParens: false,
-    sourceType: "module",
+  return layers.expression.properties.flatMap((node) => {
+    if (node.type !== "Property") {
+      return []
+    }
+    const child = resolve({ ...layers, expression: node.value }, modules)
+    if (child === undefined) {
+      return []
+    }
+    return child.expression.type === "ArrayExpression"
+      ? [child.file]
+      : findLegacyNodes(child, modules, visited)
   })
+}
 
-  if (parsed.errors.length > 0) {
-    return false
-  }
+function findLegacyLayerMaps(modules: ReadonlyMap<string, SourceModule>) {
+  const files = new Set<string>()
 
-  const bindings = new Map<string, Expression>()
-
-  for (const statement of parsed.program.body) {
-    const declaration =
-      statement.type === "ExportNamedDeclaration" ? statement.declaration : statement
-
-    if (declaration?.type !== "VariableDeclaration" || declaration.kind !== "const") {
-      continue
-    }
-
-    for (const variable of declaration.declarations) {
-      if (variable.id.type === "Identifier" && variable.init !== null) {
-        bindings.set(variable.id.name, variable.init)
-      }
-    }
-  }
-
-  let legacy = false
-  const visitor = new Visitor({
-    ObjectExpression(object) {
-      for (const property of object.properties) {
-        if (property.type !== "Property" || getPropertyName(property) !== "adamantite/layers") {
-          continue
-        }
-
-        const value = resolve(property.value, bindings)
-
-        if (value?.type !== "ArrayExpression") {
-          continue
-        }
-
-        legacy ||= value.elements.some((element) => {
-          if (element === null || element.type === "SpreadElement") {
-            return false
+  for (const module of modules.values()) {
+    const visitor = new Visitor({
+      ObjectExpression(object) {
+        for (const property of object.properties) {
+          if (property.type !== "Property" || getPropertyName(property) !== "adamantite/layers") {
+            continue
           }
+          const value = resolve(
+            { expression: property.value, file: module.file, type: "value" },
+            modules
+          )
+          if (value?.expression.type !== "ArrayExpression") {
+            continue
+          }
+          for (const element of value.expression.elements) {
+            if (element === null || element.type === "SpreadElement") {
+              continue
+            }
+            const option = resolve({ ...value, expression: element }, modules)
+            if (option !== undefined) {
+              for (const file of findLegacyNodes(option, modules)) {
+                files.add(file)
+              }
+            }
+          }
+        }
+      },
+    })
+    visitor.visit(module.program)
+  }
 
-          const option = resolve(element, bindings)
-
-          return option?.type === "ObjectExpression" && hasLegacyNodes(option, bindings)
-        })
-      }
-    },
-  })
-
-  visitor.visit(parsed.program)
-
-  return legacy
+  return [...files]
 }
 
 /**
@@ -151,9 +232,14 @@ function hasLegacyLayerMaps(file: string, content: string) {
  */
 export const assessLayerMaps = Effect.fn("assessLayerMaps")(function* (project: Project) {
   const path = yield* Path.Path
-  const sources = project.customRules.sources.filter((source) =>
-    hasLegacyLayerMaps(source.file, source.content)
-  )
+  const modules = new Map<string, SourceModule>()
+  for (const source of project.customRules.sources) {
+    const module = readModule(source, project.customRules.resolvedImports)
+    if (module !== undefined) {
+      modules.set(module.file, module)
+    }
+  }
+  const sources = findLegacyLayerMaps(modules)
 
   if (sources.length === 0) {
     return []
@@ -163,8 +249,8 @@ export const assessLayerMaps = Effect.fn("assessLayerMaps")(function* (project: 
     {
       currentState: sources
         .map(
-          (source) =>
-            `\`${path.relative(project.cwd, source.file)}\` uses arrays for layer declarations in \`adamantite/layers\`.`
+          (file) =>
+            `\`${path.relative(project.cwd, file)}\` uses arrays for layer declarations in \`adamantite/layers\`.`
         )
         .join("\n"),
       goal: [

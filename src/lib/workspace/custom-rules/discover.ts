@@ -165,6 +165,11 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   const configs = packageConfigs.filter((config) => nearestConfigs.has(config))
   const visited = new Set<string>()
   const sources = new Map<string, SourceModule>()
+  const resolvedImports: Array<{
+    readonly from: string
+    readonly specifier: string
+    readonly file: string
+  }> = []
   const calls: ResolvedCall[] = []
   const legacyImports: string[] = []
   // The module of each call whose `dir` is not a string literal, once for each call.
@@ -215,7 +220,8 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     for (const [index, result] of resolved.entries()) {
       const source = imports[index]
 
-      if (result._tag === "found") {
+      if (result._tag === "found" && source !== undefined) {
+        resolvedImports.push({ ...source, file: result.module.file })
         queue.push(result.module)
       } else if (result._tag === "unresolved" && source !== undefined) {
         unresolvedImports.push(source)
@@ -227,6 +233,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
     calls,
     configs: configs.map((config) => config.file),
     legacyImports,
+    resolvedImports,
     sources: [...sources.values()],
     unresolvedCalls,
     unresolvedImports,

@@ -147,22 +147,25 @@ describe("oxlint", () => {
 
     it.effect.each([
       {
-        file: "graph.json",
-        config: 'import graph from "./graph.json" with { type: "json" }; export default { rules: { "adamantite/layers": ["error", { root: "src", layers: graph }] } }',
-        before: '{ "shared": [] }',
         after: '{ "shared": { "imports": [] } }',
+        before: '{ "shared": [] }',
+        config:
+          'import graph from "./graph.json" with { type: "json" }; export default { rules: { "adamantite/layers": ["error", { root: "src", layers: graph }] } }',
+        file: "graph.json",
       },
       {
-        file: "graph.ts",
-        config: 'import graph from "./graph.ts"; export default { rules: { "adamantite/layers": ["error", { root: "src", layers: graph }] } }',
-        before: "export default { shared: [] }",
         after: "export default { shared: { imports: [] } }",
+        before: "export default { shared: [] }",
+        config:
+          'import graph from "./graph.ts"; export default { rules: { "adamantite/layers": ["error", { root: "src", layers: graph }] } }',
+        file: "graph.ts",
       },
       {
-        file: "options.ts",
-        config: 'import { map as options } from "./options.ts"; export default { rules: { "adamantite/layers": ["error", options] } }',
-        before: 'export const map = { root: "src", layers: { shared: [] } } as const',
         after: 'export const map = { root: "src", layers: { shared: { imports: [] } } } as const',
+        before: 'export const map = { root: "src", layers: { shared: [] } } as const',
+        config:
+          'import { map as options } from "./options.ts"; export default { rules: { "adamantite/layers": ["error", options] } }',
+        file: "options.ts",
       },
     ])(
       "inspect imported layer values in $file without changing files",
@@ -180,7 +183,7 @@ describe("oxlint", () => {
           const result = yield* runAssess(files)
           const findings = result.applicable ? result.findings : []
 
-          expect(findings.filter((finding) => finding.id === "layers-map-migration")).toEqual(
+          expect(findings.filter((finding) => finding.id === "layers-map-migration")).toStrictEqual(
             [expect.objectContaining({ currentState: expect.stringContaining(file) })]
           )
           expect(files.list().map((name) => [name, files.read(name)])).toStrictEqual(snapshot)
@@ -188,7 +191,7 @@ describe("oxlint", () => {
           files.write(file, after)
           const migrated = yield* runAssess(files)
 
-          expect(migrated.applicable ? migrated.findings : []).not.toEqual(
+          expect(migrated.applicable ? migrated.findings : []).not.toStrictEqual(
             expect.arrayContaining([expect.objectContaining({ id: "layers-map-migration" })])
           )
         })

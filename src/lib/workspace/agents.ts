@@ -4,10 +4,10 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as String from "effect/String"
 import { runScriptCommand, type PackageManagerName } from "nypm"
+import type { Script } from "#lib/workspace/package-json.ts"
 import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { getAgentsSectionTemplate } from "#lib/workspace/agents-section.macro.ts" with { type: "macro" }
-import { MANAGED_SCRIPT_COMMANDS, type Script } from "#lib/workspace/package-json.ts"
 
 const AGENTS_NAME = "AGENTS.md"
 const agentsSectionTemplate = getAgentsSectionTemplate()
@@ -27,15 +27,14 @@ function getScriptGuidance(
   isMonorepo: boolean
 ) {
   const command = runScriptCommand(packageManager, script)
-  const directCommand = MANAGED_SCRIPT_COMMANDS[script]
 
   switch (script) {
     case "analyze":
-      return `- Run \`${command}\` after changing dependencies, imports, or exports.${isMonorepo ? " It also checks monorepo package consistency." : ""} Direct command: \`${directCommand}\`.`
+      return `- Run \`${command}\` after changing dependencies, imports, or exports.${isMonorepo ? " It also checks monorepo package consistency." : ""}`
     case "check":
-      return `- Run \`${command}\` to catch formatting, lint, and type issues. Direct command: \`${directCommand}\`.`
+      return `- Run \`${command}\` to catch formatting, lint, and type issues.`
     case "fix":
-      return `- Run \`${command}\` to apply safe lint fixes and format code. Direct command: \`${directCommand}\`.`
+      return `- Run \`${command}\` to apply safe lint fixes and format code.`
   }
 }
 
@@ -51,7 +50,7 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
   return fillTemplate(agentsSectionTemplate, {
     customRules:
       scripts.includes("check") || scripts.includes("fix")
-        ? '- Write project-specific lint rules in `.adamantite/lint/`, one rule for each file. Run `adamantite rule add <name>` to start a rule, and follow the "Custom rules" section of the Adamantite skill.\n'
+        ? '- For custom rules, follow the "Custom rules" section and linked guide in the Adamantite skill. Complete its verification and cleanup checks.\n'
         : "",
     end: ADAMANTITE_AGENTS_END_MARKER,
     scripts:

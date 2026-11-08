@@ -1044,7 +1044,7 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
 
         const agents = files.read("AGENTS.md")
-        expect(agents).toContain("adamantite check")
+        expect(agents).toContain("bun run check")
         expect(agents).not.toContain("analyze")
       })
     )

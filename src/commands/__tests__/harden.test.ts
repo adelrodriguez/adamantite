@@ -61,16 +61,16 @@ function getMissingPhrases(section: string, phrases: readonly string[]) {
 // The phrases that each section must keep, so a failure names each lost one.
 const REQUIRED_PHRASES = {
   "## 1. Explore the documentation": [
-    "Start with each `AGENTS.md` above.",
-    "It must point to the other documentation of the project.",
+    "Start with each `AGENTS.md` above",
     "that the agent reach above lists as not reached, is a **discovery gap**",
     "Each link to a Markdown file that does not exist is a discovery gap too.",
-    "the files that the instructions link to or tell agents to read, also when the list does not have them",
+    "the files that the instructions link to or tell agents to read, including files absent from the list",
     "**discovery gap**",
     "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
   ],
   "## 2. List the written standards": [
     "Each written standard is a candidate, and goes on to step 5",
+    "Continue when every written standard has a source location and a candidate entry.",
   ],
   "## 3. Survey the code": [
     "the command that gives the count",
@@ -118,26 +118,31 @@ const REQUIRED_PHRASES = {
     "one case that the rule must report and one similar case that it must accept",
     "Say what the rule guarantees and what it does not",
     "is a decision, not a candidate",
+    "Continue when every remaining candidate has a proposed step, evidence, limits, and cases",
   ],
   "## 8. Show the candidates and wait for approval": [
     "or the fix commits",
     "each rule with many suppressions, and each gap in a shipped rule that no option can close",
     "Score each candidate from 1 to 5",
+    "name it on the first line of the report and state the fallback you used",
+    "put the approval question last in the report, with no text after it",
     "Show the candidates with a score of 4 or 5, from the highest score to the lowest.",
     "**Decisions:**",
     "**Discovery gaps:**",
     "**Also considered:**",
-    "This step is done when the user names the candidates to write",
+    "Wait until the user names the candidates to write or approves none",
     "When no human can approve",
-    "Stop after this step.",
+    "stop after this step.",
   ],
   "## 9. Write the approved standards": [
     "**Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail",
+    "Continue when every approved candidate is implemented",
+    'Follow its "Custom rules" section and linked guide',
     "When no file has the form, tell the user that the change is not verified.",
     "Do not change a rule that a preset or plugin ships.",
     "remove only the files that no longer break the rule",
     "`adamantite rule add <name>`",
-    'the "Custom rules" section of the Adamantite skill',
+    "skills/adamantite/SKILL.md",
     "pass it with `--dir`",
     "states the standard and why it exists",
     "delete the instruction of each standard that a rule now checks",
@@ -150,14 +155,14 @@ const REQUIRED_PHRASES = {
     "add each approved pointer to the `AGENTS.md` that the gap names, or to a file that it reaches, as a Markdown link",
   ],
   "## Verify": [
-    "Remove your temporary verification cases, fixtures, and verification-only helpers",
+    "no temporary verification cases, fixtures, or verification-only helpers remain",
     "Do not add saved rule tests or CI steps unless the user requests them",
-    "run `adamantite harden` again without a terminal, and read its agent reach",
+    "run `adamantite harden` again without a terminal and read its agent reach",
     "`adamantite check` and `adamantite doctor`",
     "Both must exit 0.",
     "When you changed a project check, also run that check with the project's own command",
     "add the file to the override as step 9 says, not a disable comment",
-    "When verification fails, fix the rule. Change a case only when the case itself is wrong",
+    "If a check is blocked, record its command and reason instead of claiming completion.",
   ],
 } satisfies Readonly<Record<string, readonly string[]>>
 
@@ -507,6 +512,8 @@ describe("harden", () => {
           "## 8. Show the candidates and wait for approval",
           "## 9. Write the approved standards",
           "## Verify",
+          "## Report the result",
+          "## Check the result",
         ],
       ])
       expect(prompter).toMatchObject({ intros: [], logs: [], notes: [], outros: [] })
@@ -575,7 +582,7 @@ describe("harden", () => {
       ])
       expect(
         getMissingPhrases(getSection(prompt, "## 1. Explore the documentation"), [
-          "read each file in the documentation list above",
+          "read each file in the documentation list",
           "This step is done when each file in the documentation list, and each file that the instructions link to, has its mark.",
         ])
       ).toStrictEqual([])
@@ -650,10 +657,10 @@ describe("harden", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(getSection(prompter.messages[0] ?? "", "### Documentation")).toContain(
-        "Git could not list the files of this project."
+        "Git could not list project files."
       )
       expect(getSection(prompter.messages[0] ?? "", "### Agent reach")).toContain(
-        "Follow the links from each `AGENTS.md` yourself."
+        "Follow the links from each `AGENTS.md` and record the files you checked."
       )
     })
   )
@@ -835,7 +842,7 @@ describe("harden", () => {
         )
 
         expect(prompt.slice(0, prompt.indexOf("\n## Context\n"))).toContain(
-          "Steps 1 to 8 are read-only."
+          "Steps 1 to 8 are read-only for the target project."
         )
         expect(missing).toStrictEqual([])
       })

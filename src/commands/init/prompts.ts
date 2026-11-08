@@ -80,7 +80,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "react-strict",
         },
         {
-          hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects. Requires react. Installs oxlint-plugin-react-doctor",
+          hint: "Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset.",
           label: "react-doctor",
           value: "react-doctor",
         },
@@ -100,7 +100,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "vue",
         },
         {
-          hint: "Effect misuse, such as effects that never run and unhandled errors. Installs @effect/tsgo",
+          hint: "Find unhandled errors and effects that never run. Init installs @effect/tsgo.",
           label: "effect",
           value: "effect",
         },
@@ -120,7 +120,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "node",
         },
         {
-          hint: "Layer dependencies and import ownership. Configure the rules in your project",
+          hint: "Check layer dependencies and package imports with rules you configure for your project.",
           label: "architecture",
           value: "architecture",
         },
@@ -135,7 +135,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
           value: "antislop",
         },
         {
-          hint: "Tailwind v4 design system: no restyled components, raw colors, arbitrary values, or unknown classes. Installs @shadcn/lint",
+          hint: "Check Tailwind v4 classes and component styles against your design system. Init installs @shadcn/lint.",
           label: "tailwind",
           value: "tailwind",
         },

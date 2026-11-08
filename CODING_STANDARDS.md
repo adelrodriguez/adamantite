@@ -232,7 +232,7 @@ that `init` no longer performs.
 hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects; requires react"
 
 // Prefer: the choice names the package before the user selects it.
-hint: "React state and effect misuse, such as effects used as event handlers and fetches in effects. Requires react. Installs oxlint-plugin-react-doctor"
+hint: "Find React state and effect mistakes. Init installs oxlint-plugin-react-doctor and selects the react preset."
 ```
 
 The [init choices](src/commands/init/prompts.ts) name the installed packages for each managed

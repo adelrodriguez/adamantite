@@ -108,12 +108,16 @@ try {
     cwd: fixture,
     encoding: "utf8",
   })
+  // This fixture still has unrelated setup findings, so a normal reassessment prints a report.
   if (
     reassessed.error
+    || reassessed.signal !== null
+    || reassessed.status !== 1
+    || !reassessed.stdout.includes("# Adamantite doctor findings")
     || reassessed.stdout.includes("React Doctor rules now belong to react-strict")
   ) {
     throw new Error(
-      `Doctor still reports the repaired preset: ${reassessed.stdout}${reassessed.stderr}`
+      `Doctor did not complete reassessment of the repaired preset: ${reassessed.stdout}${reassessed.stderr}`
     )
   }
   mkdirSync(join(fixture, "src/hooks"), { recursive: true })

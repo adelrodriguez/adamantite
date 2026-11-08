@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process"
 import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
+import process from "node:process"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
@@ -77,7 +78,8 @@ export function listFixtureRules(fixturesDir: string): string[] {
 
 /**
  * Lint every fixture in one real Oxlint run through the preset, and return one case per fixture
- * file with the reports of that file's own rule.
+ * file with the reports of that file's own rule. The run goes through the Oxlint entry, as
+ * `adamantite check` does, so a preset that needs the Effect build of Oxlint loads too.
  */
 export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[] {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-rule-fixtures-"))
@@ -97,8 +99,15 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
     )
 
     const result = spawnSync(
-      join(REPO_ROOT, "node_modules/.bin/oxlint"),
-      ["-c", "oxlint.config.ts", "-f", "json", FIXTURES_DIRECTORY],
+      process.execPath,
+      [
+        join(REPO_ROOT, "src/oxlint.ts"),
+        "-c",
+        "oxlint.config.ts",
+        "-f",
+        "json",
+        FIXTURES_DIRECTORY,
+      ],
       { cwd: tempDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
     )
 

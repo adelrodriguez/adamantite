@@ -3,7 +3,11 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { Project } from "#lib/workspace/project.ts"
-import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
+import {
+  defineIntegration,
+  type Finding,
+  type IntegrationAssessment,
+} from "#lib/integrations/base.ts"
 import {
   detectToolingConfig,
   getConfigFindings,
@@ -33,6 +37,46 @@ const files = [
 const configFiles = { config: CONFIG_FILE, legacyConfigs: [LEGACY_CONFIG_FILE] }
 
 const VERSION = getDependencyVersion("oxlint")
+
+/**
+ * Presets that Adamantite no longer publishes. Doctor reports an import of one with the steps that
+ * move the config to its replacement. Assessment does not write the config.
+ */
+const retiredLintPresets = [
+  {
+    finding: {
+      currentState: "`oxlint.config.ts` imports the removed `adamantite/lint/shadcn` preset.",
+      goal: [
+        "Replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind` in `oxlint.config.ts`. Keep the local import name and its `extends` entry.",
+        "Keep the managed `@shadcn/lint` package, `shadcn/*` rule names, `settings.shadcn` keys, rule severity, rule options, and all other project settings.",
+        "Use `--preset tailwind` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
+      ],
+      id: "tailwind-preset-migration",
+      integration: "oxlint",
+      title: "The shadcn preset was renamed to tailwind",
+    },
+    name: "shadcn",
+  },
+  {
+    finding: {
+      currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/react-doctor` preset.",
+      goal: [
+        "Replace `adamantite/lint/react-doctor` with `adamantite/lint/react-strict`. If react-strict is already imported, use its existing binding and remove the old import.",
+        "Keep the `react` preset and exactly one `react-strict` entry in extends. Keep `oxlint-plugin-react-doctor` as a devDependency. Run `adamantite update` if the package is missing or off its managed version.",
+        "Preserve project settings, custom rules, rule severity, and rule options, including `react-doctor/*` overrides. The upstream rule namespace stays the same.",
+        "The react-strict preset also reports state, effect, and memoization hooks outside hook modules. Follow those reports when updating feature code.",
+        "Run `adamantite check`, then run Doctor again.",
+      ],
+      id: "react-doctor-preset-migration",
+      integration: "oxlint",
+      title: "React Doctor rules now belong to react-strict",
+    },
+    name: "react-doctor",
+  },
+] as const satisfies ReadonlyArray<{
+  readonly finding: Finding
+  readonly name: string
+}>
 
 const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 
@@ -71,29 +115,16 @@ export default defineIntegration({
             )
           : undefined
       const configContent = toOxlintTsConfigContent()
-      const presetFindings = checkImportsLintPreset(lintConfig, "shadcn")
-        ? [
-            {
-              currentState:
-                "`oxlint.config.ts` imports the removed `adamantite/lint/shadcn` preset.",
-              goal: [
-                "Replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind` in `oxlint.config.ts`. Keep the local import name and its `extends` entry.",
-                "Keep the managed `@shadcn/lint` package, `shadcn/*` rule names, `settings.shadcn` keys, rule severity, rule options, and all other project settings.",
-                "Use `--preset tailwind` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
-              ],
-              id: "tailwind-preset-migration",
-              integration: "oxlint",
-              title: "The shadcn preset was renamed to tailwind",
-            },
-          ]
-        : []
+      const retiredPresetFindings = retiredLintPresets
+        .filter((retired) => checkImportsLintPreset(lintConfig, retired.name))
+        .map(({ finding }) => finding)
 
       return {
         applicable: true,
         findings: [
           ...getPackageFindings(packageActions, "oxlint"),
           ...runtimeFindings,
-          ...presetFindings,
+          ...retiredPresetFindings,
           ...layerFindings,
           ...getConfigFindings(state, {
             configContent,
@@ -103,24 +134,6 @@ export default defineIntegration({
               "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting.",
             toolName: "oxlint",
           }),
-          ...(checkImportsLintPreset(lintConfig, "react-doctor")
-            ? [
-                {
-                  currentState:
-                    "`oxlint.config.ts` imports the retired `adamantite/lint/react-doctor` preset.",
-                  goal: [
-                    "Replace `adamantite/lint/react-doctor` with `adamantite/lint/react-strict`. If react-strict is already imported, use its existing binding and remove the old import.",
-                    "Keep the `react` preset and exactly one `react-strict` entry in extends. Keep `oxlint-plugin-react-doctor` as a devDependency. Run `adamantite update` if the package is missing or off its managed version.",
-                    "Preserve project settings, custom rules, rule severity, and rule options, including `react-doctor/*` overrides. The upstream rule namespace stays the same.",
-                    "The react-strict preset also reports state, effect, and memoization hooks outside hook modules. Follow those reports when updating feature code.",
-                    "Run `adamantite check`, then run Doctor again.",
-                  ],
-                  id: "react-doctor-preset-migration",
-                  integration: "oxlint",
-                  title: "React Doctor rules now belong to react-strict",
-                },
-              ]
-            : []),
         ],
         packageActions,
         warnings: state.warnings,

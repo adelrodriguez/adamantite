@@ -928,7 +928,8 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(prompter.logs).toContainEqual({
           level: "warning",
-          message: "`check` runs `tsc && eslint .`. Init would replace it with `adamantite check`.",
+          message:
+            "`check` runs `tsc && eslint .`. Adamantite would replace it with `adamantite check`.",
         })
         expect(prompter.confirmCalls[0]).toMatchObject({
           message: "Replace this script with Adamantite's command?",

@@ -12,7 +12,7 @@ import { Prompter } from "#terminal/prompter.ts"
 import type { InitOptions, InitOptionsInput } from "./options.ts"
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
-  `\`${conflict.script}\` runs \`${conflict.command}\`. Init would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
+  `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
   cwd: string,
@@ -22,7 +22,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const prompter = yield* Prompter
 
   const selectedScripts = yield* prompter.multiselect({
-    message: "Which scripts should init add to `package.json`?",
+    message: "Which scripts should Adamantite add to `package.json`?",
     options: [
       {
         hint: "recommended",
@@ -66,7 +66,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   if (hasOxlint) {
     selectedPresets = yield* prompter.multiselect({
-      message: "Which presets should init use with the core preset?",
+      message: "Which presets should Adamantite use with the core preset?",
       options: [
         {
           hint: "Check React code, JSX accessibility, and performance.",
@@ -153,7 +153,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     : false
 
   const selectedEditors = yield* prompter.multiselect({
-    message: "Which editors should init configure?",
+    message: "Which editors should Adamantite configure?",
     options: [
       { label: "VS Code / Cursor / Windsurf", value: "vscode" },
       { label: "Zed", value: "zed" },

@@ -20,9 +20,7 @@ const MODULES: Modules = {
       return "/project/apps/api/src/lib/execution/run.ts"
     }
 
-    return specifier.startsWith(".")
-      ? posix.resolve(posix.dirname(importer), specifier)
-      : undefined
+    return specifier.startsWith(".") ? posix.resolve(posix.dirname(importer), specifier) : undefined
   },
 }
 
@@ -53,8 +51,11 @@ const tester = new RuleTester({
 tester.run("nested layers", createLayersRule(MODULES), {
   invalid: [
     {
-      code: 'import { prompt } from "../../../terminal/prompter.ts"\nimport { base } from "../integrations/base.ts"',
-      errors: [{ messageId: "upward" }, { messageId: "upward" }],
+      code: 'import { prompt } from "../../terminal/prompter.ts"\nimport { base } from "../integrations/base.ts"',
+      errors: [
+        { message: /root `src`.*`options\[0\]\.layers`/u },
+        { message: /root `src\/lib`.*`options\[0\]\.layers\.lib\.layers`/u },
+      ],
       filename: "/project/src/lib/shared/value.ts",
       options: [OPTIONS],
     },
@@ -74,7 +75,9 @@ tester.run("nested layers", createLayersRule(MODULES), {
       code: 'import { run } from "../execution/run.ts"',
       errors: [{ messageId: "cycle" }, { messageId: "sibling" }],
       filename: "/project/src/lib/workspace/project.ts",
-      options: [{ ...OPTIONS, layers: { ...OPTIONS.layers, lib: { ...LIB, imports: ["terminal"] } } }],
+      options: [
+        { ...OPTIONS, layers: { ...OPTIONS.layers, lib: { ...LIB, imports: ["terminal"] } } },
+      ],
     },
     {
       code: 'import type { Run } from "../execution/run.ts"',
@@ -128,7 +131,61 @@ tester.run("nested layers", createLayersRule(MODULES), {
       code: "export const value = 1",
       errors: [{ messageId: "unknownImport" }],
       filename: "/project/src/lib/workspace/project.ts",
-      options: [{ ...OPTIONS, layers: { lib: { imports: [], layers: { workspace: { imports: ["shard"] } } } } }],
+      options: [
+        {
+          ...OPTIONS,
+          layers: { lib: { imports: [], layers: { workspace: { imports: ["shard"] } } } },
+        },
+      ],
+    },
+    {
+      code: 'import { compose } from "../compose.ts"',
+      errors: [{ messageId: "entry" }],
+      filename: "/project/src/lib/workspace/project.ts",
+      options: [
+        {
+          ...OPTIONS,
+          layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, entries: ["compose.ts"] } },
+        },
+      ],
+    },
+    {
+      code: 'import { value } from "../two/value.ts"',
+      errors: [{ messageId: "isolated" }],
+      filename: "/project/src/lib/workspace/one/value.ts",
+      options: [
+        {
+          ...OPTIONS,
+          layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, isolate: ["workspace"] } },
+        },
+      ],
+    },
+    {
+      code: "export const value = 1",
+      errors: [{ messageId: "unmappedFile" }],
+      filename: "/project/src/lib/index.ts",
+      options: [OPTIONS],
+    },
+    {
+      code: 'import { tool } from "../tooling/tool.ts"',
+      errors: [{ messageId: "upward" }],
+      filename: "/project/src/lib/integrations/base/value.ts",
+      options: [
+        {
+          layers: {
+            lib: {
+              imports: [],
+              layers: {
+                integrations: {
+                  imports: [],
+                  layers: { base: { imports: [] }, tooling: { imports: ["base"] } },
+                },
+              },
+            },
+          },
+          root: "src",
+        },
+      ],
     },
   ],
   valid: [
@@ -140,22 +197,39 @@ tester.run("nested layers", createLayersRule(MODULES), {
     {
       code: 'import { run } from "../execution/run.ts"',
       filename: "/project/src/lib/workspace/ignored.ts",
-      options: [{ ...OPTIONS, layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, ignore: ["**/ignored.ts"] } } }],
+      options: [
+        {
+          ...OPTIONS,
+          layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, ignore: ["**/ignored.ts"] } },
+        },
+      ],
     },
     {
       code: 'import type { Run } from "../execution/run.ts"',
       filename: "/project/src/lib/workspace/project.ts",
-      options: [{ ...OPTIONS, layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, ignoreTypes: true } } }],
+      options: [
+        {
+          ...OPTIONS,
+          layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, ignoreTypes: true } },
+        },
+      ],
     },
     {
       code: 'import { value } from "#conditional"',
       filename: "/project/src/lib/workspace/project.ts",
-      options: [{ ...OPTIONS, layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, conditions: ["development"] } } }],
+      options: [
+        {
+          ...OPTIONS,
+          layers: { ...OPTIONS.layers, lib: { imports: [], ...LIB, conditions: ["development"] } },
+        },
+      ],
     },
     {
       code: 'import { run } from "../execution/run.ts"',
       filename: "/project/src/feature/src/lib/workspace/project.ts",
-      options: [{ ...OPTIONS, root: "**/src", layers: { ...OPTIONS.layers, feature: { imports: [] } } }],
+      options: [
+        { ...OPTIONS, layers: { ...OPTIONS.layers, feature: { imports: [] } }, root: "**/src" },
+      ],
     },
     {
       code: 'import { run } from "#other-app"',

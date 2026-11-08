@@ -1,6 +1,6 @@
 import { posix } from "node:path"
 import { RuleTester } from "oxlint/plugins-dev"
-import { describe, expect, it } from "vitest"
+import { describe, expect, expectTypeOf, it } from "vitest"
 import {
   createLayersRule,
   findLowerRepairs,
@@ -9,6 +9,7 @@ import {
   findViolation,
   listImportable,
   locate,
+  type LayersOptions,
   type Modules,
   readLayersOptions,
   splitAtRoot,
@@ -54,19 +55,26 @@ const LIB_LAYERS = {
   workspace: ["shared"],
 }
 
-const LIB_OPTIONS = { layers: LIB_LAYERS, root: "src/lib" }
+const LIB_OPTIONS = {
+  layers: Object.fromEntries(
+    Object.entries(LIB_LAYERS).map(([name, imports]) => [name, { imports }])
+  ),
+  root: "src/lib",
+}
 
 const APP_LAYERS = { features: ["shared"], routes: ["features"], shared: [] }
 
 const APP_OPTIONS = {
   entries: ["*.tsx"],
   isolate: ["features", "routes"],
-  layers: APP_LAYERS,
+  layers: Object.fromEntries(
+    Object.entries(APP_LAYERS).map(([name, imports]) => [name, { imports }])
+  ),
   root: "src",
 }
 
-function hint(root: string) {
-  return `Layer map: the \`adamantite/layers\` options for root \`${root}\` in the Oxlint config.`
+function hint(root: string, configPath = "options[0].layers") {
+  return `Layer map: the \`adamantite/layers\` options for root \`${root}\` in the Oxlint config at \`${configPath}\`.`
 }
 
 const HINT = hint("src/lib")
@@ -75,7 +83,11 @@ const APP_HINT = hint("src")
 // The `src` map above the lib map: the lib folder is one layer, below the terminal.
 const SRC_OPTIONS = {
   entries: ["cli.ts"],
-  layers: { commands: ["terminal"], lib: [], terminal: ["lib"] },
+  layers: {
+    commands: { imports: ["terminal"] },
+    lib: { imports: [] },
+    terminal: { imports: ["lib"] },
+  },
   root: "src",
 }
 
@@ -198,7 +210,12 @@ tester.run("layers", createLayersRule(MODULES), {
       errors: [
         {
           column: 0,
-          data: { folder: "cache", path: "src/lib/cache", root: "src/lib" },
+          data: {
+            configPath: "options[0].layers",
+            folder: "cache",
+            path: "src/lib/cache",
+            root: "src/lib",
+          },
           line: 1,
           messageId: "unmappedFolder",
         },
@@ -208,13 +225,23 @@ tester.run("layers", createLayersRule(MODULES), {
     },
     {
       code: "export const value = 1",
-      errors: [{ data: { path: "src/lib/index.ts", root: "src/lib" }, messageId: "unmappedFile" }],
+      errors: [
+        {
+          data: { configPath: "options[0].layers", path: "src/lib/index.ts", root: "src/lib" },
+          messageId: "unmappedFile",
+        },
+      ],
       filename: lib("index.ts"),
       options: [LIB_OPTIONS],
     },
     {
       code: 'import { value } from "#lib/index.ts"',
-      errors: [{ data: { path: "src/lib/index.ts", root: "src/lib" }, messageId: "unmappedFile" }],
+      errors: [
+        {
+          data: { configPath: "options[0].layers", path: "src/lib/index.ts", root: "src/lib" },
+          messageId: "unmappedFile",
+        },
+      ],
       filename: lib("workspace/files.ts"),
       options: [LIB_OPTIONS],
     },
@@ -256,13 +283,28 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
-      options: [{ layers: { shared: [], workspace: ["shard"] }, root: "src/lib" }],
+      options: [
+        { layers: { shared: { imports: [] }, workspace: { imports: ["shard"] } }, root: "src/lib" },
+      ],
     },
     {
       code: "export const value = 1",
-      errors: [{ data: { name: "feature", root: "src" }, messageId: "unknownIsolate" }],
+      errors: [
+        {
+          data: { configPath: "options[0].layers", name: "feature", root: "src" },
+          messageId: "unknownIsolate",
+        },
+      ],
       filename: app("features/auth/index.ts"),
-      options: [{ isolate: ["feature"], layers: APP_LAYERS, root: "src" }],
+      options: [
+        {
+          isolate: ["feature"],
+          layers: Object.fromEntries(
+            Object.entries(APP_LAYERS).map(([name, imports]) => [name, { imports }])
+          ),
+          root: "src",
+        },
+      ],
     },
     {
       code: "export const value = 1",
@@ -272,7 +314,12 @@ tester.run("layers", createLayersRule(MODULES), {
         },
       ],
       filename: lib("workspace/files.ts"),
-      options: [{ layers: { shared: ["workspace"], workspace: ["shared"] }, root: "src/lib" }],
+      options: [
+        {
+          layers: { shared: { imports: ["workspace"] }, workspace: { imports: ["shared"] } },
+          root: "src/lib",
+        },
+      ],
     },
     {
       code: 'import { prompt } from "#terminal/prompter.ts"',
@@ -296,21 +343,27 @@ tester.run("layers", createLayersRule(MODULES), {
     {
       code: 'import { base } from "../integrations/base.ts"',
       errors: [
-        { data: { folder: "lib", path: "src/lib", root: "src" }, messageId: "unmappedFolder" },
+        {
+          data: { configPath: "options[0].layers", folder: "lib", path: "src/lib", root: "src" },
+          messageId: "unmappedFolder",
+        },
         { line: 1, message: /^`shared` cannot import `integrations`/u },
       ],
       filename: lib("shared/errors.ts"),
-      options: [{ ...SRC_OPTIONS, layers: { terminal: [] } }, LIB_OPTIONS],
+      options: [{ ...SRC_OPTIONS, layers: { terminal: { imports: [] } } }, LIB_OPTIONS],
     },
     {
       code: "export const value = 1",
       errors: [
         {
-          message: `\`workspace\` imports \`shard\`, which is not a layer. ${HINT}`,
+          message: `\`workspace\` imports \`shard\`, which is not a layer. ${hint("src/lib", "options[1].layers")}`,
         },
       ],
       filename: lib("workspace/files.ts"),
-      options: [SRC_OPTIONS, { layers: { shared: [], workspace: ["shard"] }, root: "src/lib" }],
+      options: [
+        SRC_OPTIONS,
+        { layers: { shared: { imports: [] }, workspace: { imports: ["shard"] } }, root: "src/lib" },
+      ],
     },
   ],
   valid: [
@@ -342,7 +395,9 @@ tester.run("layers", createLayersRule(MODULES), {
     {
       code: 'import dep from "#dep"\nimport { other } from "../../other/index.ts"',
       filename: "/project/shared/index.ts",
-      options: [{ layers: { features: ["shared"], shared: [] }, root: "." }],
+      options: [
+        { layers: { features: { imports: ["shared"] }, shared: { imports: [] } }, root: "." },
+      ],
     },
     {
       code: 'import { missing } from "#missing/integrations/base.ts"',
@@ -382,7 +437,10 @@ tester.run("layers", createLayersRule(MODULES), {
     {
       code: 'import { run } from "#lib/execution/run.ts"\nimport { prompt } from "#terminal/prompter.ts"',
       filename: lib("hardening/index.ts"),
-      options: [{ ...SRC_OPTIONS, layers: { lib: ["terminal"], terminal: [] } }, LIB_OPTIONS],
+      options: [
+        { ...SRC_OPTIONS, layers: { lib: { imports: ["terminal"] }, terminal: { imports: [] } } },
+        LIB_OPTIONS,
+      ],
     },
     {
       code: 'import { errors } from "#lib/shared/errors.ts"\nimport { prompt } from "#terminal/prompter.ts"',
@@ -393,6 +451,10 @@ tester.run("layers", createLayersRule(MODULES), {
 })
 
 describe("readLayersOptions", () => {
+  it("exposes child maps as read-only maps", () => {
+    expectTypeOf<LayersOptions["children"]>().toEqualTypeOf<ReadonlyMap<string, LayersOptions>>()
+  })
+
   it("reads one map for each option object", () => {
     expect(
       readLayersOptions([SRC_OPTIONS, LIB_OPTIONS]).map((options) => options.rootGlob)

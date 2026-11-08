@@ -145,6 +145,55 @@ describe("oxlint", () => {
       })
     )
 
+    it.effect.each([
+      {
+        file: "graph.json",
+        config: 'import graph from "./graph.json" with { type: "json" }; export default { rules: { "adamantite/layers": ["error", { root: "src", layers: graph }] } }',
+        before: '{ "shared": [] }',
+        after: '{ "shared": { "imports": [] } }',
+      },
+      {
+        file: "graph.ts",
+        config: 'import graph from "./graph.ts"; export default { rules: { "adamantite/layers": ["error", { root: "src", layers: graph }] } }',
+        before: "export default { shared: [] }",
+        after: "export default { shared: { imports: [] } }",
+      },
+      {
+        file: "options.ts",
+        config: 'import { map as options } from "./options.ts"; export default { rules: { "adamantite/layers": ["error", options] } }',
+        before: 'export const map = { root: "src", layers: { shared: [] } } as const',
+        after: 'export const map = { root: "src", layers: { shared: { imports: [] } } } as const',
+      },
+    ])(
+      "inspect imported layer values in $file without changing files",
+      ({ file, config, before, after }) =>
+        Effect.gen(function* () {
+          const files = makeFiles({
+            [file]: before,
+            "oxlint.config.ts": config,
+            "package.json": makePackageJson({
+              devDependencies: { oxlint: oxlint.version },
+              scripts: { check: "adamantite check" },
+            }),
+          })
+          const snapshot = files.list().map((name) => [name, files.read(name)])
+          const result = yield* runAssess(files)
+          const findings = result.applicable ? result.findings : []
+
+          expect(findings.filter((finding) => finding.id === "layers-map-migration")).toEqual(
+            [expect.objectContaining({ currentState: expect.stringContaining(file) })]
+          )
+          expect(files.list().map((name) => [name, files.read(name)])).toStrictEqual(snapshot)
+
+          files.write(file, after)
+          const migrated = yield* runAssess(files)
+
+          expect(migrated.applicable ? migrated.findings : []).not.toEqual(
+            expect.arrayContaining([expect.objectContaining({ id: "layers-map-migration" })])
+          )
+        })
+    )
+
     it.effect.each(["check", "lint"])(
       "give read-only migration instructions with the %s script",
       (script) =>

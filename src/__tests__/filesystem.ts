@@ -1,5 +1,5 @@
 import type * as Layer from "effect/Layer"
-import { basename, dirname, relative, resolve } from "node:path"
+import { basename, dirname, relative, resolve, sep } from "node:path"
 import * as EffectArray from "effect/Array"
 import * as ByteSize from "effect/ByteSize"
 import * as Effect from "effect/Effect"
@@ -89,6 +89,10 @@ function makeFileInfo(type: FileSystem.File.Type, size: number): FileSystem.File
  */
 export function createFileSystemTestContext(options?: {
   readonly files?: Record<string, string>
+  /**
+   * Directory symlinks, from an absolute link path to its target. A target resolves from the root.
+   */
+  readonly links?: Record<string, string>
   readonly root?: string
 }): FileSystemTestContext {
   const root = options?.root ?? process.cwd()
@@ -101,8 +105,17 @@ export function createFileSystemTestContext(options?: {
     directories.add(dirname(current))
   }
 
+  const links = Object.entries(options?.links ?? {}).map(([link, target]) => ({
+    link,
+    target: resolve(root, target),
+  }))
+
+  // Follow a directory symlink in the path, as the operating system does.
   function normalize(path: string) {
-    return resolve(root, path)
+    const target = resolve(root, path)
+    const match = links.find(({ link }) => target === link || target.startsWith(`${link}${sep}`))
+
+    return match === undefined ? target : `${match.target}${target.slice(match.link.length)}`
   }
 
   // Mirrors POSIX permissions: a read-only directory rejects writes anywhere below it.
@@ -250,7 +263,15 @@ export function createFileSystemTestContext(options?: {
           : Effect.fail(makeSystemError("NotFound", "readFileString", path))
       }),
     readLink: makeUnimplemented("readLink"),
-    realPath: makeUnimplemented("realPath"),
+    // The real path of an entry follows the directory symlinks.
+    realPath: (path) =>
+      Effect.suspend(() => {
+        const target = normalize(path)
+
+        return files.has(target) || directories.has(target)
+          ? Effect.succeed(target)
+          : Effect.fail(makeSystemError("NotFound", "realPath", path))
+      }),
     remove: (path, removeOptions) =>
       Effect.suspend(() => {
         const target = normalize(path)

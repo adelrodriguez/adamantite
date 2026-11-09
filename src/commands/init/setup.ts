@@ -203,7 +203,7 @@ export const setupEffectTsgo = (cwd: string) =>
     }
   })
 
-export const setupEditors = (cwd: string, editors: string[]) =>
+export const setupEditors = (cwd: string, editors: readonly string[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
     if (editors.includes("vscode")) {
@@ -248,7 +248,7 @@ export const setupEditors = (cwd: string, editors: string[]) =>
   })
 
 export const installEditorExtensions = (
-  editors: string[],
+  editors: readonly string[],
   scripts: Script[],
   presets: readonly string[] = []
 ) =>

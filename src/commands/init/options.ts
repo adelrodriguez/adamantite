@@ -22,21 +22,35 @@ const INIT_EDITORS = ["vscode", "zed"] as const
 
 type InitEditor = (typeof INIT_EDITORS)[number]
 
+/**
+ * The setup that init applies. Each optional part exists only with the parts that it needs, so the
+ * options cannot select a preset without linting or an extension install without an editor.
+ */
 export interface InitOptions {
   /**
    * Add the Adamantite section to `AGENTS.md` and the Adamantite skill.
    */
   readonly agents: boolean
-  readonly editors: InitEditor[]
   /**
-   * The package manager that the GitHub Actions workflow runs, or `undefined` for no workflow.
+   * The editors to configure, and whether to install their recommended extensions.
    */
-  readonly githubActions: SupportedPackageManager | undefined
-  readonly installExtensions: boolean
+  readonly editors: Option.Option<{
+    readonly installExtensions: boolean
+    readonly names: Array.NonEmptyReadonlyArray<InitEditor>
+  }>
+  /**
+   * The package manager that the GitHub Actions workflow runs.
+   */
+  readonly githubActions: Option.Option<SupportedPackageManager>
+  /**
+   * The Oxlint setup, which the `check` and `fix` scripts need.
+   */
+  readonly lint: Option.Option<{
+    readonly presets: readonly LintPreset[]
+    readonly typescript: boolean
+  }>
   readonly overwriteScripts: boolean
-  readonly presets: LintPreset[]
-  readonly scripts: Script[]
-  readonly typescript: boolean
+  readonly scripts: readonly Script[]
 }
 
 export interface InitOptionsInput {
@@ -50,6 +64,9 @@ export interface InitOptionsInput {
   readonly typescript: boolean
 }
 
+/**
+ * Parses the flat options of the flags or the prompts into the setup that init applies.
+ */
 export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   input: InitOptionsInput,
   packageManager: PackageManagerName
@@ -106,18 +123,26 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  const githubActions =
-    options.githubActions && checkIsSupportedPackageManager(packageManager)
-      ? packageManager
-      : undefined
-
-  if (options.githubActions && githubActions === undefined) {
+  if (options.githubActions && !checkIsSupportedPackageManager(packageManager)) {
     return yield* new InvalidInitOptions({
       reason: `\`--github-actions\` does not support the detected package manager \`${packageManager}\`. Use bun, deno, npm, pnpm, or yarn.`,
     })
   }
 
-  return { ...options, githubActions } satisfies InitOptions
+  return {
+    agents: options.agents,
+    editors: Array.isReadonlyArrayNonEmpty(options.editors)
+      ? Option.some({ installExtensions: options.installExtensions, names: options.editors })
+      : Option.none(),
+    githubActions: options.githubActions
+      ? Option.liftPredicate(packageManager, checkIsSupportedPackageManager)
+      : Option.none(),
+    lint: hasOxlint
+      ? Option.some({ presets: options.presets, typescript: options.typescript })
+      : Option.none(),
+    overwriteScripts: options.overwriteScripts,
+    scripts: options.scripts,
+  } satisfies InitOptions
 })
 
 const nonInteractive = Flag.Boolean("non-interactive").pipe(

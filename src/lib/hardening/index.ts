@@ -10,6 +10,7 @@ import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" 
 import { OverridesLintFailed, type OverridesReport } from "#lib/hardening/overrides.ts"
 import { listProjectFiles, type ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
+import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/inspect.ts"
@@ -375,6 +376,7 @@ export function renderHardenPrompt(
       context.configs,
       "No Oxlint config was found. When you show the candidates, tell the user to run `adamantite init` before step 9."
     ),
+    customRulesSection: CUSTOM_RULES_SECTION,
     documentationFiles: Option.match(context.documentationFiles, {
       onNone: () =>
         "Git could not list project files. Find Markdown files with a file search, excluding dependencies, build output, changesets, and changelogs. Record the search scope and report this fallback with the missing sources.",

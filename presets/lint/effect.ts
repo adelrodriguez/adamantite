@@ -164,6 +164,13 @@ const config: OxlintConfig = {
     "anti-slop-effect/no-manual-tagged-construction": "error",
     "anti-slop-effect/no-service-constructor-imports": "error",
     "anti-slop-effect/prefer-effect-match": "error",
+
+    // Core turns on these unicorn rules, which match an array method by its name only. They read
+    // `Option.some(value)` as `Array.prototype.some` with a callback, and the data-first
+    // `Array.findLast(values, predicate)` as an array method with a `thisArg`. Oxlint gives the
+    // rules no option to ignore a receiver, so an Effect project turns them off.
+    "unicorn/no-array-callback-reference": "off",
+    "unicorn/no-array-method-this-argument": "off",
   },
 }
 

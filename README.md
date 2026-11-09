@@ -530,6 +530,10 @@ extra needs to be installed. The rules report tagged values that code handles by
 - `no-service-constructor-imports` reports a `make*` import from a project file outside tests.
   Import the Layer of the service instead.
 
+The preset turns off two core rules, `unicorn/no-array-callback-reference` and
+`unicorn/no-array-method-this-argument`. They match an array method by its name only, so they
+report Effect calls such as `Option.some(value)` and `Array.findLast(values, predicate)`.
+
 The `@effect/tsgo` rules are not a JavaScript plugin. They exist only in the Effect builds of the Oxlint
 binding and tsrs, which `@effect/tsgo` ships. When the project installs
 `@effect/tsgo`, Adamantite runs Oxlint with those builds. Nothing changes in

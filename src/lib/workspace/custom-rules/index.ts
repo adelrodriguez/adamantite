@@ -51,17 +51,19 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
     return yield* new InvalidRuleName({ rule: name })
   }
 
-  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const directory = path.resolve(cwd, dir)
   const rulePath = path.join(directory, `${name}.ts`)
 
-  const exists = yield* fs
-    .exists(rulePath)
-    .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: rulePath })))
+  // A rule file with any rule extension, such as `no-foo.js`, already defines the rule.
+  const existing = (yield* listCustomRules(cwd, dir)).filter(
+    (file) => file.slice(0, -path.extname(file).length) === name
+  )
 
-  if (exists) {
-    return yield* new CustomRuleExists({ paths: [rulePath] })
+  if (existing.length > 0) {
+    return yield* new CustomRuleExists({
+      paths: existing.map((file) => path.join(directory, file)),
+    })
   }
 
   yield* ensureDirectory(directory)

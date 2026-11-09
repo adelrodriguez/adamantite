@@ -36,10 +36,29 @@ export function isRuleFile(name: string): boolean {
 }
 
 /**
- * The rule files in a rules folder. Subfolders are not read, so helpers can also live there.
+ * The rule files in a rules folder. Subfolders are not read, so helpers can also live there. Each
+ * rule name must have one file, because `custom()` and `loadRules` key the rules by name. Two files
+ * for one name, such as `no-foo.js` and `no-foo.ts`, throw instead of one silently replacing the
+ * other.
  */
 export function listRuleFiles(dir: string): string[] {
-  return readdirSync(dir, { withFileTypes: true })
+  const files = readdirSync(dir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && isRuleFile(entry.name))
     .map((entry) => entry.name)
+
+  const filesByRule = new Map<string, string[]>()
+
+  for (const file of files) {
+    filesByRule.set(getRuleName(file), [...(filesByRule.get(getRuleName(file)) ?? []), file])
+  }
+
+  for (const [rule, ruleFiles] of filesByRule) {
+    if (ruleFiles.length > 1) {
+      throw new Error(
+        `The rules folder ${dir} has more than one file for the rule \`${rule}\`: ${ruleFiles.join(", ")}. Keep one of them.`
+      )
+    }
+  }
+
+  return files
 }

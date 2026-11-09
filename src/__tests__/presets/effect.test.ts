@@ -100,11 +100,18 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the files with the effect preset in one real Oxlint run, through the Oxlint entry. Oxlint,
+ * Lint the files with the presets in one real Oxlint run, through the Oxlint entry. Oxlint,
  * `@effect/tsgo`, and `effect` resolve from the repository's `node_modules`, which nothing patches.
- * `jsPlugins` adds plugins next to the preset.
+ * The presets extend in order, as in the config that init writes. `jsPlugins` adds plugins next to
+ * the presets.
  */
-function lint(files: Record<string, string>, jsPlugins: readonly string[] = []) {
+function lint(
+  files: Record<string, string>,
+  {
+    jsPlugins = [],
+    presets = ["effect"],
+  }: { jsPlugins?: readonly string[]; presets?: readonly string[] } = {}
+) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-effect-"))
 
   try {
@@ -128,9 +135,12 @@ function lint(files: Record<string, string>, jsPlugins: readonly string[] = []) 
       join(tempDir, "oxlint.config.ts"),
       [
         'import { defineConfig } from "oxlint"',
-        `import effect from ${JSON.stringify(join(REPO_ROOT, "presets/lint/effect.ts"))}`,
+        ...presets.map(
+          (preset) =>
+            `import ${preset} from ${JSON.stringify(join(REPO_ROOT, `presets/lint/${preset}.ts`))}`
+        ),
         "",
-        `export default defineConfig({ extends: [effect], jsPlugins: ${JSON.stringify(jsPlugins)} })`,
+        `export default defineConfig({ extends: [${presets.join(", ")}], jsPlugins: ${JSON.stringify(jsPlugins)} })`,
         "",
       ].join("\n")
     )
@@ -221,6 +231,30 @@ describe("effect preset", () => {
     ])
   })
 
+  // Core's unicorn array rules match a method by its name only. They read `Option.some(value)` as
+  // `Array.prototype.some` with a callback, and a data-first `Array` function as an array method
+  // with a `thisArg`.
+  it("accept Effect module functions that share a name with array methods", () => {
+    const diagnostics = lint(
+      {
+        "good.ts": [
+          'import * as Array from "effect/Array"',
+          'import * as Option from "effect/Option"',
+          "",
+          "export function first(values: readonly string[], fallback: string) {",
+          "  const found = Array.findLast(values, (value) => value.length > 0)",
+          "",
+          "  return Option.isSome(found) ? found : Option.some(fallback)",
+          "}",
+          "",
+        ].join("\n"),
+      },
+      { presets: ["core", "effect"] }
+    )
+
+    expect(diagnostics.map(({ code }) => code)).toStrictEqual([])
+  })
+
   // The Effect binding loads through `NAPI_RS_NATIVE_LIBRARY_PATH`, which every napi-rs package
   // reads. The plugin loads `oxc-parser`, which the entry does not load itself, so the plugin fails
   // to load when the variable outlives the Oxlint binding.
@@ -244,7 +278,7 @@ describe("effect preset", () => {
           "",
         ].join("\n"),
       },
-      ["./napi-plugin.mjs"]
+      { jsPlugins: ["./napi-plugin.mjs"] }
     )
 
     expect(diagnostics.map(({ code }) => code)).toStrictEqual([`${NAMESPACE}(floating-effect)`])

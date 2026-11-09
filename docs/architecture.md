@@ -364,8 +364,8 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
 - `presets/rules/custom.ts` implements `custom()`, which runs while Oxlint loads the config. It
   finds the calling file in the call stack, resolves the rules folder from it, lists the
   rule files, and enables each one. It writes one entry module for each rules folder to
-  `node_modules/.cache/adamantite/`, or to the OS temporary directory, and returns a
-  `jsPlugins` entry that points to it. Without a rules folder it returns an empty config.
+  `node_modules/.cache/adamantite/`, or to a folder in the OS temporary directory that only the
+  current user can write, and returns a `jsPlugins` entry that points to it. Without a rules folder it returns an empty config.
 - `presets/rules/index.ts` is published as `adamantite/rules`. Its default export is `custom()`
   from `presets/rules/custom.ts`. `presets/rules/load.ts` holds the internal `loadRules`, which
   the entry module calls to import every rule file and assemble them with `definePlugin`.

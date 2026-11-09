@@ -96,6 +96,26 @@ describe("analyze", () => {
       })
     )
 
+    it.effect("run knip with --only unused without reading the workspace file", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const files = createFileSystemTestContext({
+          files: { "package.json": "{}", "pnpm-workspace.yaml": "packages:\n  - packages/*\n" },
+        })
+
+        files.makeUnreadable("pnpm-workspace.yaml")
+
+        const exit = yield* runCommand(analyzeCommand, ["--only", "unused"], {
+          files,
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
+      })
+    )
+
     it.effect("apply --fix to both stages and --strict to knip only", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()

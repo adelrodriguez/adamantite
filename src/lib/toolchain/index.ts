@@ -132,9 +132,11 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   const path = yield* Path.Path
 
   // Without a usable manifest there is no monorepo to analyze. Knip reports the manifest. Any other
-  // read failure, such as of `pnpm-workspace.yaml`, could hide a monorepo, so it propagates.
+  // read failure, such as of `pnpm-workspace.yaml`, could hide a monorepo, so it propagates. The
+  // unused stage alone does not need to know.
   const isMonorepo =
-    (yield* checkExists(path.join(cwd, "package.json")))
+    only !== "unused"
+    && (yield* checkExists(path.join(cwd, "package.json")))
     && (yield* checkIsMonorepo(cwd).pipe(
       Effect.catchTags({
         FailedToParseFile: () => Effect.succeed(false),

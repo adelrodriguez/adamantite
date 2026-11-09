@@ -282,7 +282,7 @@ the upstream diff, and adjust the owning preset's rules if rules were added, rem
 renamed; each preset's drift test catches a mismatch.
 
 One upstream can supply more than one bundle. The anti-slop repository has two entry points.
-The `anti-slop` bundle ships in the `antislop` preset, and the `anti-slop-effect` bundle ships in
+The `anti-slop` bundle ships in the `strict` preset, and the `anti-slop-effect` bundle ships in
 the `effect` preset. The script lists each entry point with the same pinned ref. When upstream
 copies third-party code into its source, the script adds that code's license to `license.md`.
 The build copies each bundle into `dist/presets/lint/vendor/`, and `scripts/test-build.ts` fails
@@ -310,8 +310,8 @@ options for all rules, and `imports.ts` finds calls of imported functions, such 
 rule under the `adamantite` namespace. Tsdown builds the plugin with the presets, so it
 ships at `dist/presets/lint/plugin/index.js`.
 
-A preset loads the plugin with a file URL from its own location, as the antislop preset
-loads its vendored bundle. The source tree has `plugin/index.ts` and the dist tree has
+A preset loads the plugin with a file URL from its own location, as the strict preset also
+loads its vendored anti-slop bundle. The source tree has `plugin/index.ts` and the dist tree has
 `plugin/index.js`, so the preset takes the extension from its own module URL. Rule code
 runs under the runtime that executes Oxlint in the target project, so it uses only
 runtime-neutral APIs. It imports only types from `@oxlint/plugins`, a devDependency pinned

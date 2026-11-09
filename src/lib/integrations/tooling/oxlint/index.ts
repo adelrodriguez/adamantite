@@ -73,6 +73,21 @@ const retiredLintPresets = [
     },
     name: "react-doctor",
   },
+  {
+    finding: {
+      currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/antislop` preset.",
+      goal: [
+        "Replace `adamantite/lint/antislop` with `adamantite/lint/strict`. If strict is already imported, remove the antislop import and its `extends` entry.",
+        "Keep `anti-slop/*` rule overrides, rule severity, rule options, and all other project settings. The rule namespace stays the same.",
+        "The strict preset also bans type assertions outside tests, console calls other than `console.info`, task comments, and deep destructuring, and it requires a reason on each suppression. Follow those reports when updating the code.",
+        "Use `--preset strict` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
+      ],
+      id: "strict-preset-migration",
+      integration: "oxlint",
+      title: "The antislop rules now belong to strict",
+    },
+    name: "antislop",
+  },
 ] as const satisfies ReadonlyArray<{
   readonly finding: Finding
   readonly name: string

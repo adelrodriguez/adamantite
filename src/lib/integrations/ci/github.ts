@@ -5,6 +5,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Schema from "effect/Schema"
+import { runScriptCommand } from "nypm"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import {
@@ -28,16 +29,34 @@ import {
   NodeVersionResolver,
   type NodeVersionSource,
 } from "#lib/workspace/node-version-resolver.ts"
-import { checkIsSupportedPackageManager, getManagedScripts } from "#lib/workspace/package-json.ts"
+import {
+  checkIsSupportedPackageManager,
+  getManagedScripts,
+  SUPPORTED_PACKAGE_MANAGERS,
+} from "#lib/workspace/package-json.ts"
 
-const CHECK_COMMAND_REGEX =
-  /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+check|deno(?:\s+(?!task\b)\S+)*\s+task\s+check)\b/
+/**
+ * A pattern that matches a package manager command that runs a script that `script` matches, as
+ * `runScriptCommand` writes it, such as `pnpm run check` or `deno task check`. Flags can come
+ * between the package manager and its run verb, such as `pnpm --filter web run check`.
+ */
+function makeScriptCommandPattern(script: string) {
+  return SUPPORTED_PACKAGE_MANAGERS.map((packageManager) => {
+    const [binary, verb] = runScriptCommand(packageManager, "script").split(" ")
 
-const FORMAT_CHECK_COMMAND_REGEX =
-  /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+format|deno(?:\s+(?!task\b)\S+)*\s+task\s+format)(?:\s+--)?\s+--check\b/
+    return `${binary}(?:\\s+(?!${verb}\\b)\\S+)*\\s+${verb}\\s+${script}`
+  }).join("|")
+}
 
-const MONOREPO_COMMAND_REGEX =
-  /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+(?:check|fix):monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+(?:check|fix):monorepo|adamantite\s+monorepo)(?=\s|$)/
+const CHECK_COMMAND_REGEX = new RegExp(String.raw`\b(?:${makeScriptCommandPattern("check")})\b`)
+
+const FORMAT_CHECK_COMMAND_REGEX = new RegExp(
+  String.raw`\b(?:${makeScriptCommandPattern("format")})(?:\s+--)?\s+--check\b`
+)
+
+const MONOREPO_COMMAND_REGEX = new RegExp(
+  String.raw`\b(?:${makeScriptCommandPattern("(?:check|fix):monorepo")}|adamantite\s+monorepo)(?=\s|$)`
+)
 
 const workflowTemplate = getWorkflowTemplate()
 

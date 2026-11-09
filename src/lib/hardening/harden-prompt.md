@@ -164,7 +164,7 @@ Otherwise, put the approval question last in the report, with no text after it. 
 Write only the approved candidates:
 
 - **Type, structure, preset rule, import rule, or project check:** change the types, the Oxlint config, `tsconfig.json`, or the check.
-- **Custom rule:** read `skills/adamantite/SKILL.md` in the installed `adamantite` package. Follow its "Custom rules" section and linked guide to write, verify, and clean up the approved rule. Run `adamantite rule add <name>`. When the rules folder above is not `.adamantite/lint`, pass it with `--dir`. A comment at the top of the rule file states the standard and why it exists.
+- **Custom rule:** read `skills/adamantite/SKILL.md` in the installed `adamantite` package. Follow its "{{customRulesSection}}" section and linked guide to write, verify, and clean up the approved rule. Run `adamantite rule add <name>`. When the rules folder above is not `.adamantite/lint`, pass it with `--dir`. A comment at the top of the rule file states the standard and why it exists.
 - **Gap in a custom rule:** create a temporary regression case first, and use RuleTester to see it fail. Follow the custom-rule guide above until all valid and invalid cases pass and cleanup is complete.
 - **Gap in the config of a rule,** such as a layer map, an import-owners option, a `no-restricted-imports` path, or an override glob: change the Oxlint config. Then lint a file that has the missed form, and read the report. When no file has the form, tell the user that the change is not verified. Do not change a rule that a preset or plugin ships.
 - **Override that can shrink:** remove only the files that no longer break the rule.

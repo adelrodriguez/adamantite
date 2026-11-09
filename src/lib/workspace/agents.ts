@@ -6,6 +6,7 @@ import * as String from "effect/String"
 import { runScriptCommand, type PackageManagerName } from "nypm"
 import type { Script } from "#lib/workspace/package-json.ts"
 import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { getAgentsSectionTemplate } from "#lib/workspace/agents-section.macro.ts" with { type: "macro" }
 import { SCRIPT_ORDER, checkRunsTool } from "#lib/workspace/package-json.ts"
@@ -48,7 +49,7 @@ function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGu
   // no blank line.
   return fillTemplate(agentsSectionTemplate, {
     customRules: checkRunsTool(scripts, "oxlint")
-      ? '- For custom rules, follow the "Custom rules" section and linked guide in the Adamantite skill. Complete its verification and cleanup checks.\n'
+      ? `- For custom rules, follow the "${CUSTOM_RULES_SECTION}" section and linked guide in the Adamantite skill. Complete its verification and cleanup checks.\n`
       : "",
     end: ADAMANTITE_AGENTS_END_MARKER,
     scripts:

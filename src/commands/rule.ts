@@ -20,6 +20,7 @@ import {
 import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
 import { formatJson } from "#lib/shared/json.ts"
+import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import {
   addCustomRule,
   addCustomRuleTest,
@@ -147,7 +148,7 @@ const add = addCommand.pipe(
 
       yield* prompter.log.success(`Wrote ${path.relative(cwd, rulePath)}.`)
       yield* prompter.log.info(
-        '`custom()` from `adamantite/rules` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells agents how to verify the rule with temporary cases.'
+        `\`custom()\` from \`adamantite/rules\` loads the rule. Run \`adamantite doctor\` to check the wiring. The "${CUSTOM_RULES_SECTION}" section of the Adamantite skill tells agents how to verify the rule with temporary cases.`
       )
     })
   ),

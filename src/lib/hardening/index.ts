@@ -8,7 +8,7 @@ import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { type AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { OverridesLintFailed, type OverridesReport } from "#lib/hardening/overrides.ts"
-import { listProjectFiles } from "#lib/hardening/project-files.ts"
+import { listProjectFiles, type ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
@@ -40,7 +40,7 @@ interface HardenContext {
    * Which Markdown files each `AGENTS.md` reaches, or none when git cannot list them.
    */
   readonly agentReach: Option.Option<AgentReach>
-  readonly configs: readonly string[]
+  readonly configs: readonly ProjectPath[]
   /**
    * The Markdown files of the project, or none when git cannot list them.
    */
@@ -51,7 +51,7 @@ interface HardenContext {
    * The folder that `--path` selects, relative to the project root with `/` between folders, as git
    * and Oxlint list files, or `null` for the whole project.
    */
-  readonly scope: string | null
+  readonly scope: ProjectPath | null
   /**
    * Files with a `custom()` call whose `dir` is not a string literal, so only the agent can find
    * its rules folder.
@@ -203,11 +203,11 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
 
   return {
     agentReach: documentation.agentReach,
-    configs: configs.map((config) => relative(config)),
+    configs: configs.map((config) => toProjectPath(path, cwd, config)),
     documentationFiles: documentation.documentationFiles,
     instructionFiles: instructionFiles.map((file) => relative(file)),
     rulesFolders: [...new Set(calls.map((call) => relative(call.dir)))],
-    scope: scope === cwd ? null : relative(scope).split(path.sep).join("/"),
+    scope: scope === cwd ? null : toProjectPath(path, cwd, scope),
     unresolvedCalls: [...new Set(unresolvedCalls.map((source) => relative(source)))],
   } satisfies HardenContext
 })

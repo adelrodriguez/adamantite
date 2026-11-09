@@ -4,6 +4,7 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import { parseSync } from "oxc-parser"
+import type { ProjectPath } from "#lib/hardening/project-files.ts"
 import { listLintedFiles } from "#lib/hardening/oxlint.ts"
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
 
@@ -75,7 +76,7 @@ export function findSuppressions(
  */
 export const readSuppressions = Effect.fn("readSuppressions")(function* (
   cwd: string,
-  scope: string | null
+  scope: ProjectPath | null
 ) {
   const path = yield* Path.Path
   const files = yield* listLintedFiles(cwd).pipe(Effect.option)

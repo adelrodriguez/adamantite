@@ -457,7 +457,6 @@ describe("doctor", () => {
             ),
           ],
           command: "claude",
-          detached: false,
           stderr: "inherit",
           stdin: "inherit",
           stdout: "inherit",

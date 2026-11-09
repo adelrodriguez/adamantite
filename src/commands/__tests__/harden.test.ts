@@ -1172,7 +1172,6 @@ describe("harden", () => {
         expect.objectContaining({
           args: [expect.stringMatching(/^# Adamantite harden\n[\s\S]*## Verify/)],
           command: "claude",
-          detached: false,
           stderr: "inherit",
           stdin: "inherit",
           stdout: "inherit",

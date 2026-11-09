@@ -92,8 +92,8 @@ const ignoreSigint = () => {
   // Adamantite stays alive; the agent in the foreground process group handles the signal.
 }
 
-// The session spawns with `detached: false`, so the agent joins Adamantite's foreground process
-// group and gets terminal SIGINT and SIGWINCH. On POSIX, the platform spawner otherwise starts it
+// The session inherits stdin, so the runner keeps the agent in Adamantite's foreground process
+// group, where it gets terminal SIGINT and SIGWINCH. On POSIX, the platform spawner otherwise starts it
 // in a new session. The same SIGINT also reaches Adamantite's runtime, whose spawner finalizer
 // would kill the agent mid-edit. This shield ignores SIGINT until the enclosing scope closes.
 const sigintShield = Effect.acquireRelease(
@@ -164,7 +164,6 @@ export class CodingAgents extends Context.Service<
               args: agent.seedArguments(prompt),
               command: agent.command,
               cwd,
-              detached: false,
               stderr: "inherit",
               stdin: "inherit",
               stdout: "inherit",

@@ -36,6 +36,9 @@ is retired.
   below 1.0, so this is a minor version.
 - Doctor reports an import of `adamantite/lint/antislop` with the `strict-preset-migration`
   finding. `init` no longer offers `antislop`.
-- The rule namespace stays `anti-slop`, so project overrides of `anti-slop/*` rules keep working.
+- The rule namespace stays `anti-slop`, so project settings for `anti-slop/*` rules keep working.
+  The three assertion rules are the exception. The test-file override of `strict` takes priority
+  over top-level `rules`, so a project sets those rules in its own override for test files. The
+  Doctor finding tells the project to move them.
 - A test asserts that `strict` enables each rule of the bundle exactly once, either for all files
   or for test files.

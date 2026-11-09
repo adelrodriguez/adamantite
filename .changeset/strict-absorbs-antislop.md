@@ -13,5 +13,5 @@ The assertion rules `require-safety-comment-for-type-assertion`, `no-chained-typ
 To upgrade an existing project:
 
 - Run `adamantite update` to install the new version.
-- If `oxlint.config.ts` imports `adamantite/lint/antislop`, replace it with `adamantite/lint/strict`, or remove it when the config already imports `strict`. `adamantite doctor` reports this import. Overrides of `anti-slop/*` rules keep working.
+- If `oxlint.config.ts` imports `adamantite/lint/antislop`, replace it with `adamantite/lint/strict`, or remove it when the config already imports `strict`. `adamantite doctor` reports this import. Settings for `anti-slop/*` rules keep working, with one exception: `strict` sets the three assertion rules in an override for test files, which takes priority over top-level `rules`. Move a project setting for those rules into an `overrides` entry with `files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"]`.
 - If the project used `strict` without `antislop`, run `adamantite fix` to add the blank lines that `require-readable-spacing` reports, and expect `adamantite check` to report the code that the other anti-slop rules describe.

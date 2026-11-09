@@ -129,6 +129,9 @@ describe("oxlint", () => {
               goal: expect.arrayContaining([
                 expect.stringContaining("adamantite/lint/strict"),
                 expect.stringContaining("anti-slop/*"),
+                expect.stringContaining(
+                  "Move a project setting for these three rules into an `overrides` entry"
+                ),
               ]),
               id: "strict-preset-migration",
               integration: "oxlint",

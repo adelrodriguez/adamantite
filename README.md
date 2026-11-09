@@ -683,7 +683,9 @@ It needs no extra package. Most of its type rules come from
 - In test files, where type assertions are allowed, `anti-slop/require-safety-comment-for-type-assertion`
   requires a `SAFETY:` comment on each assertion, and `anti-slop/no-chained-type-assertions` and
   `anti-slop/no-widen-then-assert` report assertions that hide the source type. Outside tests,
-  `typescript/consistent-type-assertions` is the only rule that reports an assertion.
+  `typescript/consistent-type-assertions` is the only rule that reports an assertion. To change
+  one of these three rules, set it in an `overrides` entry for the same test files, because the
+  preset's override takes priority over top-level `rules`.
 - The preset turns off the core preset's `typescript/consistent-indexed-object-style` and
   `unicorn/no-immediate-mutation`, which conflict with `anti-slop/no-known-value-widening`.
 

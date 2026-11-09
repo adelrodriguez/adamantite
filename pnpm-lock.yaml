@@ -178,9 +178,6 @@ importers:
       '@oxlint/plugins':
         specifier: 1.91.0
         version: 1.91.0
-      defu:
-        specifier: 6.1.7
-        version: 6.1.7
       effect:
         specifier: 4.1.2
         version: 4.1.2

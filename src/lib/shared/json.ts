@@ -1,5 +1,4 @@
 import type { JsonObject, JsonValue } from "type-fest"
-import { defu } from "defu"
 
 import * as Effect from "effect/Effect"
 import * as Equal from "effect/Equal"
@@ -54,10 +53,67 @@ export const checkIsJsonArray = (
   value: JsonValue | Schema.Json | undefined
 ): value is JsonValue[] => Array.isArray(value)
 
-export const mergeConfig = (base: Schema.JsonObject, override: Schema.JsonObject) =>
+interface ConfigLayers {
+  /**
+   * The object whose values win.
+   */
+  readonly preferred: Schema.JsonObject
+  /**
+   * The object that supplies only the keys that `preferred` does not set.
+   */
+  readonly fallback: Schema.JsonObject
+}
+
+function mergeJsonValues(
+  preferred: Schema.Json | undefined,
+  fallback: Schema.Json | undefined
+): Schema.Json | undefined {
+  if (preferred === undefined) {
+    return fallback
+  }
+
+  if (checkIsJsonObject(preferred) && checkIsJsonObject(fallback)) {
+    return mergeJsonObjects(preferred, fallback)
+  }
+
+  if (checkIsJsonArray(preferred) && checkIsJsonArray(fallback)) {
+    return [...preferred, ...fallback]
+  }
+
+  // A null is a value that the preferred object sets, such as a setting turned off.
+  return preferred
+}
+
+function mergeJsonObjects(
+  preferred: Schema.JsonObject,
+  fallback: Schema.JsonObject
+): Schema.JsonObject {
+  const keys = [
+    ...Object.keys(fallback),
+    ...Object.keys(preferred).filter((key) => !Object.hasOwn(fallback, key)),
+  ]
+
+  return Object.fromEntries(
+    keys.flatMap((key) => {
+      // Only own keys count, so a key such as `toString` does not read the prototype.
+      const value = mergeJsonValues(
+        Object.hasOwn(preferred, key) ? preferred[key] : undefined,
+        Object.hasOwn(fallback, key) ? fallback[key] : undefined
+      )
+
+      return value === undefined ? [] : [[key, value] as const]
+    })
+  )
+}
+
+/**
+ * Merges two JSON objects deeply. `preferred` wins each key that it sets, also with `null`, and
+ * arrays join with the `preferred` items first.
+ */
+export const mergeConfig = ({ fallback, preferred }: ConfigLayers) =>
   Effect.try({
     catch: (cause) => new FailedToMergeConfig({ cause }),
-    try: () => defu(base, override),
+    try: () => mergeJsonObjects(preferred, fallback),
   })
 
 // The first indented property line shows the file's indentation. A file without one, such as `{}`,

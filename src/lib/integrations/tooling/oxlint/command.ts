@@ -23,12 +23,20 @@ export function check(options: Options & { readonly allowWarnings: boolean }): C
   }
 }
 
-export function fix(
-  options: Options & {
-    readonly suggested: boolean
-    readonly dangerous: boolean
-  }
-): CommandRunOptions {
+/**
+ * The Oxlint fixes to apply on top of the safe fixes: none, the suggested fixes, the dangerous
+ * fixes, or both.
+ */
+export type FixLevel = "all" | "dangerous" | "safe" | "suggested"
+
+const FIX_LEVEL_FLAGS = {
+  all: ["--fix-suggestions", "--fix-dangerously"],
+  dangerous: ["--fix-dangerously"],
+  safe: [],
+  suggested: ["--fix-suggestions"],
+} as const satisfies Record<FixLevel, readonly string[]>
+
+export function fix(options: Options & { readonly level: FixLevel }): CommandRunOptions {
   const entry = getOxlintCommand(options.cwd)
 
   return {
@@ -36,8 +44,7 @@ export function fix(
     args: [
       ...entry.args,
       "--fix",
-      ...(options.suggested ? ["--fix-suggestions"] : []),
-      ...(options.dangerous ? ["--fix-dangerously"] : []),
+      ...FIX_LEVEL_FLAGS[options.level],
       ...options.files,
       ...options.forwardedArguments,
     ],

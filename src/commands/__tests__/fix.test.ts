@@ -37,11 +37,14 @@ describe("fix", () => {
   })
 
   describe("fix mode flags", () => {
-    it.effect("add all fix modes when all is requested", () =>
+    it.effect.each([
+      { args: ["--all"], name: "all is requested" },
+      { args: ["--suggested", "--dangerous"], name: "suggested and dangerous fixes are requested" },
+    ])("add all fix modes when $name", ({ args }) =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
-        const exit = yield* runCommand(fixCommand, ["--all"], { layers: [runner.layer] })
+        const exit = yield* runCommand(fixCommand, args, { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(runner.invocations[0]?.args).toStrictEqual([

@@ -32,18 +32,36 @@ const only = Flag.Literals("only", ["format", "lint"]).pipe(
   Flag.withDescription("Run only format (Oxfmt) or lint (Oxlint). Pass tool arguments after --")
 )
 
+/**
+ * The fix level that the flags select. `--all` and the pair of `--suggested` and `--dangerous`
+ * select both kinds of fixes.
+ */
+function toFixLevel(flags: {
+  readonly all: boolean
+  readonly dangerous: boolean
+  readonly suggested: boolean
+}): Toolchain.FixLevel {
+  if (flags.all || (flags.suggested && flags.dangerous)) {
+    return "all"
+  }
+
+  if (flags.suggested) {
+    return "suggested"
+  }
+
+  return flags.dangerous ? "dangerous" : "safe"
+}
+
 export default Command.make("fix", { all, dangerous, files, only, suggested }).pipe(
   Command.withDescription("Apply lint fixes and format code"),
   Command.withHandler(({ all, dangerous, files, only, suggested }) =>
     Effect.gen(function* () {
       yield* Toolchain.fix({
-        all,
         cwd: process.cwd(),
-        dangerous,
         files,
         forwardedArguments: yield* ForwardedArguments,
+        level: toFixLevel({ all, dangerous, suggested }),
         only: Option.getOrUndefined(only),
-        suggested,
       })
     })
   )

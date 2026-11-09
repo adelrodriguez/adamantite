@@ -1,10 +1,11 @@
 import process from "node:process"
+import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
-import { getPackageActions } from "#lib/integrations/tooling/base.ts"
+import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
@@ -45,18 +46,28 @@ export default Command.make("update").pipe(
       yield* prompter.intro("💠 adamantite update")
 
       const packageJson = yield* readPackageJson(cwd)
-      const assessment = yield* assessProject(yield* readProject(cwd, packageJson))
+      const project = yield* readProject(cwd, packageJson)
+      const assessment = yield* assessProject(project)
       const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
 
+      // A known package that no integration action covers. One that the project does not install
+      // stays uninstalled.
+      const fallback = knownPackages.flatMap((pkg) =>
+        coveredPackages.has(pkg.name)
+          ? []
+          : [assessPackage(project, pkg, "Adamantite", "adamantite")]
+      )
+
       const updates = [
         ...packageActions,
-        // A known package that the project does not install stays uninstalled.
-        ...knownPackages
-          .filter((pkg) => !coveredPackages.has(pkg.name))
-          .flatMap((pkg) => getPackageActions(packageJson, pkg, "Adamantite"))
+        ...fallback
+          .flatMap((pkg) => pkg.packageActions)
           .filter((action) => action.type === "update_package"),
       ]
+
+      // A catalog entry or a specifier that update cannot change keeps its finding or warning.
+      const unchanged = fallback.filter((pkg) => pkg.packageActions.length === 0)
 
       if (updates.length > 0) {
         yield* prompter.log.info("Packages to install or update:")
@@ -140,11 +151,23 @@ export default Command.make("update").pipe(
       const finalAssessment =
         packages === "idle" ? assessment : yield* assessProject(yield* readProject(cwd))
 
-      for (const warning of finalAssessment.warnings) {
+      const findingIds = new Set(finalAssessment.findings.map((finding) => finding.id))
+
+      const warnings = Array.dedupe([
+        ...finalAssessment.warnings,
+        ...unchanged.flatMap((pkg) => pkg.warnings),
+      ])
+
+      for (const warning of warnings) {
         yield* prompter.log.warning(warning)
       }
 
-      const findings = finalAssessment.findings
+      const findings = [
+        ...finalAssessment.findings,
+        ...unchanged
+          .flatMap((pkg) => pkg.findings)
+          .filter((finding) => !findingIds.has(finding.id)),
+      ]
 
       if (findings.length > 0) {
         yield* printFindings(findings)

@@ -19,7 +19,11 @@ import {
   updateJsonText,
 } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
-import { normalizeDependencyVersion, readPackageJson } from "#lib/workspace/package-json.ts"
+import {
+  matchDeclaredVersion,
+  parseDependencySpecifier,
+  readPackageJson,
+} from "#lib/workspace/package-json.ts"
 import { printTitle } from "#terminal/title.ts"
 
 const ROOT = "/project"
@@ -448,7 +452,15 @@ describe("printTitle", () => {
   )
 })
 
-describe("normalizeDependencyVersion", () => {
+function describeSpecifier(specifier: string) {
+  return matchDeclaredVersion(parseDependencySpecifier(specifier), {
+    Catalog: ({ catalog }) => `catalog ${catalog}`,
+    Unreadable: () => "unreadable",
+    Version: ({ version }) => `version ${version}`,
+  })
+}
+
+describe("parseDependencySpecifier", () => {
   // The input domain is real dependency specifiers: optional whitespace padding, an optional
   // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
   // valid specifiers and are out of scope.
@@ -476,8 +488,20 @@ describe("normalizeDependencyVersion", () => {
     ({ padding, rangePrefix, version: versionCore, workspacePrefix }) => {
       const specifier = `${padding}${workspacePrefix}${rangePrefix}${versionCore}${padding}`
 
-      expect(normalizeDependencyVersion(specifier)).toBe(versionCore)
+      expect(describeSpecifier(specifier)).toBe(`version ${versionCore}`)
     },
     { arbitrary: { runs: 500 } }
   )
+
+  it.each([
+    ["catalog:", "catalog default"],
+    ["catalog:tools", "catalog tools"],
+    ["0.21.0-ts7.1.0-beta", "version 0.21.0-ts7.1.0-beta"],
+    ["npm:oxlint@1.2.3", "unreadable"],
+    ["workspace:*", "unreadable"],
+    [">=1.2.3", "unreadable"],
+    ["link:../oxlint", "unreadable"],
+  ])("read %s", (specifier, expected) => {
+    expect(describeSpecifier(specifier)).toBe(expected)
+  })
 })

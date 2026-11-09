@@ -101,6 +101,18 @@ describe("workspacePatternToRegExp", () => {
   })
 })
 
+function readPnpmWorkspace(pnpmWorkspace: string) {
+  return readWorkspace(ROOT).pipe(
+    Effect.provide([
+      createFileSystemTestContext({
+        files: { "package.json": "{}", "pnpm-workspace.yaml": pnpmWorkspace },
+        root: ROOT,
+      }).layer,
+      Path.layer,
+    ])
+  )
+}
+
 describe("readWorkspace", () => {
   it.effect("find nested packages with ** and leave out excluded packages", () =>
     Effect.gen(function* () {
@@ -117,6 +129,7 @@ describe("readWorkspace", () => {
       const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(workspace).toStrictEqual({
+        catalogs: {},
         isMonorepo: true,
         packageDirectories: ["/project/packages/group/web"],
       })
@@ -141,6 +154,7 @@ describe("readWorkspace", () => {
       const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(workspace).toStrictEqual({
+        catalogs: {},
         isMonorepo: true,
         packageDirectories: [
           "/project/packages/api",
@@ -166,6 +180,7 @@ describe("readWorkspace", () => {
       const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(workspace).toStrictEqual({
+        catalogs: {},
         isMonorepo: true,
         packageDirectories: ["/project/apps/site"],
       })
@@ -189,7 +204,7 @@ describe("readWorkspace", () => {
 
       expect(result).toStrictEqual([
         true,
-        { isMonorepo: true, packageDirectories: ["/project/packages/api"] },
+        { catalogs: {}, isMonorepo: true, packageDirectories: ["/project/packages/api"] },
       ])
     })
   )
@@ -206,7 +221,46 @@ describe("readWorkspace", () => {
 
       const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
-      expect(workspace).toStrictEqual({ isMonorepo: true, packageDirectories: [] })
+      expect(workspace).toStrictEqual({ catalogs: {}, isMonorepo: true, packageDirectories: [] })
+    })
+  )
+
+  it.effect("read a catalog version that YAML parses as a number", () =>
+    Effect.gen(function* () {
+      // YAML reads an unquoted `6` as a number, and pnpm reads the entry as version 6.
+      const workspace = yield* readPnpmWorkspace(
+        "packages:\n  - packages/*\ncatalog:\n  knip: 6\n  oxlint: 1.91.0\n"
+      )
+
+      expect(workspace.catalogs).toStrictEqual({ default: { knip: "6", oxlint: "1.91.0" } })
+    })
+  )
+
+  it.effect("read the default and named catalogs, and keep the patterns with a bad catalog", () =>
+    Effect.gen(function* () {
+      const valid = yield* readPnpmWorkspace(
+        [
+          "packages:",
+          "  - packages/*",
+          "catalog:",
+          "  oxlint: 1.2.3",
+          "catalogs:",
+          "  tools:",
+          "    knip: ^6.0.0",
+          "",
+        ].join("\n")
+      )
+
+      const invalid = yield* readPnpmWorkspace("packages:\n  - packages/*\ncatalog: oxlint\n")
+
+      expect([valid, invalid]).toStrictEqual([
+        {
+          catalogs: { default: { oxlint: "1.2.3" }, tools: { knip: "^6.0.0" } },
+          isMonorepo: true,
+          packageDirectories: [],
+        },
+        { catalogs: {}, isMonorepo: true, packageDirectories: [] },
+      ])
     })
   )
 
@@ -219,7 +273,7 @@ describe("readWorkspace", () => {
 
       const workspace = yield* readWorkspace(ROOT).pipe(Effect.provide([files.layer, Path.layer]))
 
-      expect(workspace).toStrictEqual({ isMonorepo: false, packageDirectories: [] })
+      expect(workspace).toStrictEqual({ catalogs: {}, isMonorepo: false, packageDirectories: [] })
     })
   )
 })

@@ -2,6 +2,7 @@ import process from "node:process"
 import type { PackageManagerName } from "nypm"
 import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
@@ -12,9 +13,45 @@ import { parseJson, updateJsonText } from "#lib/shared/json.ts"
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
 const RANGE_PREFIX_REGEX = /^[\^~]/
+const VERSION_REGEX = /^\d+\.\d+\.\d+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/
+const CATALOG_PROTOCOL = "catalog:"
 
-export function normalizeDependencyVersion(specifier: string) {
-  return specifier.trim().replace(WORKSPACE_PREFIX_REGEX, "").replace(RANGE_PREFIX_REGEX, "")
+/**
+ * What a dependency specifier in `package.json` says about the version of the package.
+ */
+export type DeclaredVersion =
+  /**
+   * A pnpm catalog entry, such as `catalog:` for the default catalog or `catalog:tools`.
+   */
+  | { readonly _tag: "Catalog"; readonly catalog: string }
+  /**
+   * A specifier whose version Adamantite cannot read, such as `npm:`, `link:`, or `>=1.0.0`.
+   */
+  | { readonly _tag: "Unreadable" }
+  /**
+   * A version, with an optional `workspace:` protocol and one `^` or `~` prefix.
+   */
+  | { readonly _tag: "Version"; readonly version: string }
+
+const {
+  $match: matchDeclaredVersion,
+  Catalog,
+  Unreadable,
+  Version,
+} = Data.taggedEnum<DeclaredVersion>()
+
+export { matchDeclaredVersion }
+
+export function parseDependencySpecifier(specifier: string): DeclaredVersion {
+  const trimmed = specifier.trim()
+
+  if (trimmed.startsWith(CATALOG_PROTOCOL)) {
+    return Catalog({ catalog: trimmed.slice(CATALOG_PROTOCOL.length) || "default" })
+  }
+
+  const version = trimmed.replace(WORKSPACE_PREFIX_REGEX, "").replace(RANGE_PREFIX_REGEX, "")
+
+  return VERSION_REGEX.test(version) ? Version({ version }) : Unreadable()
 }
 
 export const readPackageJson = (cwd: string = process.cwd()) =>

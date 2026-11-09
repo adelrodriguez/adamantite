@@ -12,8 +12,7 @@ import {
   CurrentToolingConfig,
   detectToolingConfig,
   getConfigFindings,
-  getPackageActions,
-  getPackageFindings,
+  assessPackage,
 } from "#lib/integrations/tooling/base.ts"
 import * as commands from "#lib/integrations/tooling/oxlint/command.ts"
 import {
@@ -118,10 +117,11 @@ export default defineIntegration({
       const state = yield* detect(cwd)
       const runtimeFindings = yield* assessOxlintRuntime(project)
 
-      const packageActions = getPackageActions(
-        packageJson,
+      const pkg = assessPackage(
+        project,
         { name: "oxlint", version: VERSION },
-        "the managed lint scripts"
+        "the managed lint scripts",
+        "oxlint"
       )
 
       // The active TypeScript config is `oxlint.config.ts`, which the project holds.
@@ -142,7 +142,7 @@ export default defineIntegration({
       return {
         applicable: true,
         findings: [
-          ...getPackageFindings(packageActions, "oxlint"),
+          ...pkg.findings,
           ...runtimeFindings,
           ...retiredPresetFindings,
           ...layerFindings,
@@ -153,8 +153,8 @@ export default defineIntegration({
             toolName: "oxlint",
           }),
         ],
-        packageActions,
-        warnings: state.warnings,
+        packageActions: pkg.packageActions,
+        warnings: [...pkg.warnings, ...state.warnings],
       } satisfies IntegrationAssessment
     }),
   check: commands.check,

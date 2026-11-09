@@ -206,6 +206,35 @@ describe("update", () => {
     })
   )
 
+  it.effect("report an outdated catalog entry of a known package without installing it", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": manifest({ devDependencies: { knip: "catalog:", oxfmt: "npm:oxfmt@1" } }),
+          "pnpm-workspace.yaml": "catalog:\n  knip: 0.0.1\n",
+        },
+      })
+
+      const prompter = createPrompterTestContext()
+      const installer = createDependencyInstallerTestContext()
+
+      const exit = yield* runCommand(updateCommand, [], {
+        files,
+        layers: [prompter.layer, installer.layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls).toStrictEqual([])
+      expect(prompter.notes).toContainEqual(expect.objectContaining({ title: "1. Outdated knip" }))
+      expect(prompter.logs).toContainEqual(
+        expect.objectContaining({
+          level: "warning",
+          message: expect.stringContaining("`oxfmt` is declared as `npm:oxfmt@1`"),
+        })
+      )
+    })
+  )
+
   it.effect("keep findings informational", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

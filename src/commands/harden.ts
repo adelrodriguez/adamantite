@@ -105,6 +105,40 @@ const commits = Flag.Int("commits").pipe(
   Flag.withDescription("Set how many recent commits the agent reads to find past fixes")
 )
 
+/**
+ * Read the project before the session, and render the prompt. The agent can change the project, so
+ * only the prompt and the agent reach leave this function, and the reads after the session read the
+ * project again.
+ */
+const preparePrompt = Effect.fn("preparePrompt")(function* (
+  cwd: string,
+  scopeDirectory: string | undefined,
+  commits: number
+) {
+  // Each step before the session takes this read of the workspace.
+  const workspace = yield* readWorkspace(cwd)
+  const context = yield* readHardenContext(cwd, workspace, scopeDirectory)
+
+  // These reads change no file in the project, so they run together.
+  const [overrides, suppressions] = yield* Effect.all(
+    [
+      readOverrides(cwd, workspace, context.configs, context.scope),
+      readSuppressions(cwd, context.scope),
+    ],
+    { concurrency: "unbounded" }
+  )
+
+  return {
+    agentReach: context.agentReach,
+    prompt: renderHardenPrompt(context, {
+      adamantiteVersion: version,
+      commits,
+      overrides,
+      suppressions,
+    }),
+  }
+})
+
 export default Command.make("harden", { commits, scope }).pipe(
   Command.withDescription(
     "Ask a coding agent to turn project standards into custom rules and instructions"
@@ -173,25 +207,7 @@ export default Command.make("harden", { commits, scope }).pipe(
         }
       }
 
-      // Each step before the session takes this read of the workspace.
-      const workspace = yield* readWorkspace(cwd)
-      const context = yield* readHardenContext(cwd, workspace, scopeDirectory)
-
-      // These reads change no file in the project, so they run together.
-      const [overrides, suppressions] = yield* Effect.all(
-        [
-          readOverrides(cwd, workspace, context.configs, context.scope),
-          readSuppressions(cwd, context.scope),
-        ],
-        { concurrency: "unbounded" }
-      )
-
-      const prompt = renderHardenPrompt(context, {
-        adamantiteVersion: version,
-        commits,
-        overrides,
-        suppressions,
-      })
+      const { agentReach, prompt } = yield* preparePrompt(cwd, scopeDirectory, commits)
 
       if (!isInteractive) {
         yield* prompter.message(prompt)
@@ -237,7 +253,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       // A link that was broken before the session is a gap that the user may not have approved, so
       // only a link that the session added fails the verification.
       const brokenBefore = new Set(
-        Option.match(context.agentReach, {
+        Option.match(agentReach, {
           onNone: () => [],
           onSome: (reach) => reach.brokenLinks.map((link) => getLinkKey(link)),
         })

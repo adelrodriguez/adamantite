@@ -10,7 +10,6 @@ import {
 } from "#lib/assessment/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
@@ -144,11 +143,12 @@ export default Command.make("doctor").pipe(
         Unmanaged: () => Effect.void,
       })
 
-      const packageJson = yield* readPackageJson(cwd)
+      const project = yield* readProject(cwd)
+      const { packageJson } = project
 
       const outcome =
         packageJson.devDependencies?.adamantite || packageJson.dependencies?.adamantite
-          ? classifyAssessment(yield* assessProject(yield* readProject(cwd, packageJson)))
+          ? classifyAssessment(yield* assessProject(project))
           : NotInstalled()
 
       yield* isInteractive ? reportInteractive(outcome) : reportPlain(outcome)

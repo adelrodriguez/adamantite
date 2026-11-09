@@ -31,20 +31,14 @@ export interface Project {
 }
 
 /**
- * Reads the project at `cwd`. Reads `package.json` unless a parsed manifest is provided.
+ * Reads the project at `cwd`. Each part comes from this read, so a manifest from before an install
+ * or a handoff cannot enter the snapshot.
  */
-export const readProject = Effect.fn("readProject")(function* (
-  cwd: string,
-  manifest?: PackageJson
-) {
+export const readProject = Effect.fn("readProject")(function* (cwd: string) {
   const path = yield* Path.Path
 
   const [packageJson, workspace, lintConfig] = yield* Effect.all(
-    [
-      manifest === undefined ? readPackageJson(cwd) : Effect.succeed(manifest),
-      readWorkspace(cwd),
-      readFileIfExists(path.join(cwd, LINT_CONFIG_FILE)),
-    ],
+    [readPackageJson(cwd), readWorkspace(cwd), readFileIfExists(path.join(cwd, LINT_CONFIG_FILE))],
     { concurrency: "unbounded" }
   )
 

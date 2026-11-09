@@ -31,7 +31,7 @@ describe("tsconfig", () => {
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => tsconfig.assess(project)),
           provideFiles(files)
         )
@@ -54,7 +54,7 @@ describe("tsconfig", () => {
           "tsconfig.json": yield* stringifyJson(config),
         })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => tsconfig.assess(project)),
           provideFiles(files)
         )
@@ -74,7 +74,7 @@ describe("tsconfig", () => {
             "tsconfig.json": yield* stringifyJson({ extends: preset }),
           })
 
-          const result = yield* readProject(ROOT, packageJson).pipe(
+          const result = yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => tsconfig.assess(project)),
             provideFiles(files)
           )
@@ -89,7 +89,7 @@ describe("tsconfig", () => {
         const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
         const files = makeFiles({ "package.json": yield* stringifyJson(monorepoPackageJson) })
 
-        const result = yield* readProject(ROOT, monorepoPackageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => tsconfig.assess(project)),
           provideFiles(files)
         )
@@ -112,7 +112,7 @@ describe("tsconfig", () => {
         yield* tsconfig.create(ROOT).pipe(provideFiles(files))
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => tsconfig.assess(project)),
             provideFiles(files)
           )

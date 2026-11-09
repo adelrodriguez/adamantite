@@ -1,3 +1,6 @@
+import * as Array from "effect/Array"
+import { pipe } from "effect/Function"
+import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import {
   parseSync,
@@ -40,13 +43,15 @@ export function isRuleTestFile(name: string): boolean {
 }
 
 /**
- * A `custom()` call. `dir` is relative to the file that holds the call. A `null` value is an
- * argument that is not a string literal, which only running the config can resolve.
+ * A `custom()` call. A `Literal` call gives its `dir` as a string literal, relative to the file
+ * that holds the call, and its `name` when that is a string literal too. Only running the config
+ * can resolve the rules folder of a `Dynamic` call.
  */
-export interface CustomRulesCall {
-  readonly dir: string | null
-  readonly name: string | null
-}
+export type CustomRulesCall =
+  | { readonly _tag: "Dynamic" }
+  | { readonly _tag: "Literal"; readonly dir: string; readonly name: Option.Option<string> }
+
+const DYNAMIC_CALL: CustomRulesCall = { _tag: "Dynamic" }
 
 function parse(file: string, content: string) {
   return parseSync(file, content, { preserveParens: false, sourceType: "module" })
@@ -125,26 +130,51 @@ function getPropertyKey(key: ObjectProperty["key"]) {
   return key.type === "Literal" && Predicate.isString(key.value) ? key.value : null
 }
 
-function readCallOptions(options: ObjectExpression): CustomRulesCall {
-  let dir: string | null = DEFAULT_DIRECTORY
-  let name: string | null = DEFAULT_PLUGIN_NAME
+/**
+ * The string literal of an option, the default when the call omits the option, or none when the
+ * value is not a string literal. A later property wins, as in a JavaScript object.
+ */
+function readStringOption(properties: readonly ObjectProperty[], key: string, fallback: string) {
+  const property = pipe(
+    properties,
+    Array.findLast(
+      (candidate) =>
+        (candidate.key.type === "Identifier" ? candidate.key.name : getPropertyKey(candidate.key))
+        === key
+    )
+  )
 
-  for (const property of options.properties) {
-    if (property.type === "SpreadElement" || property.computed) {
-      return { dir: null, name: null }
-    }
+  return Option.fromNullOr(
+    Option.match(property, {
+      onNone: () => fallback,
+      onSome: ({ value }) => getStaticString(value),
+    })
+  )
+}
 
-    const key =
-      property.key.type === "Identifier" ? property.key.name : getPropertyKey(property.key)
+/**
+ * Reads the options object of a call. A call without options passes no property, so it gets the
+ * defaults, as `custom()` does.
+ */
+function readCallOptions(options: ObjectExpression["properties"]): CustomRulesCall {
+  const properties = options.filter(
+    (property): property is ObjectProperty =>
+      property.type !== "SpreadElement" && !property.computed
+  )
 
-    if (key === "dir") {
-      dir = getStaticString(property.value)
-    } else if (key === "name") {
-      name = getStaticString(property.value)
-    }
+  // A spread or a computed key can set any option.
+  if (properties.length < options.length) {
+    return DYNAMIC_CALL
   }
 
-  return { dir, name }
+  return Option.match(readStringOption(properties, "dir", DEFAULT_DIRECTORY), {
+    onNone: () => DYNAMIC_CALL,
+    onSome: (dir): CustomRulesCall => ({
+      _tag: "Literal",
+      dir,
+      name: readStringOption(properties, "name", DEFAULT_PLUGIN_NAME),
+    }),
+  })
 }
 
 /**
@@ -169,11 +199,11 @@ export function findCustomRulesCalls(file: string, content: string): CustomRules
       const [options] = node.arguments
 
       if (options === undefined) {
-        calls.push({ dir: DEFAULT_DIRECTORY, name: DEFAULT_PLUGIN_NAME })
+        calls.push(readCallOptions([]))
       } else if (options.type === "ObjectExpression") {
-        calls.push(readCallOptions(options))
+        calls.push(readCallOptions(options.properties))
       } else {
-        calls.push({ dir: null, name: null })
+        calls.push(DYNAMIC_CALL)
       }
     },
   })

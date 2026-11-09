@@ -7,6 +7,7 @@ import adamantitePlugin from "#presets/lint/plugin/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
+import antislopPlugin from "#presets/lint/vendor/antislop/plugin.mjs"
 import packageJson from "../../../package.json" with { type: "json" }
 import {
   lintRuleFixtures,
@@ -27,14 +28,32 @@ function getFirstPartyRules(rules: OxlintConfig["rules"]) {
 
 const presetRules = getFirstPartyRules(strict.rules)
 
+// The preset enables some anti-slop rules for every file and the assertion rules only in tests.
+const antislopRules = [
+  ...Object.keys(strict.rules ?? {}),
+  ...(strict.overrides ?? []).flatMap((override) => Object.keys(override.rules ?? {})),
+].filter((name) => name.startsWith("anti-slop/"))
+
 // These rules need options from the target project, such as a layer map, so the project turns them
 // on.
 const PROJECT_RULES = ["import-owners", "layers"]
 
 describe("strict preset", () => {
+  it("enable each rule of the vendored anti-slop plugin exactly once", () => {
+    expect(EffectArray.sort(antislopRules, Order.String)).toStrictEqual(
+      EffectArray.sort(
+        Object.keys(antislopPlugin.rules).map((rule) => `anti-slop/${rule}`),
+        Order.String
+      )
+    )
+  })
+
   it("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
-      EffectArray.sort(presetRules, Order.String)
+      EffectArray.sort(
+        [...presetRules.map((rule) => `${NAMESPACE}/${rule}`), ...antislopRules],
+        Order.String
+      )
     )
   })
 })
@@ -64,7 +83,6 @@ describe("strict rule fixtures", () => {
   beforeAll(() => {
     cases = lintRuleFixtures({
       fixturesDir: FIXTURES_DIR,
-      namespace: NAMESPACE,
       presetPath: join(REPO_ROOT, "presets/lint/strict.ts"),
     })
   })

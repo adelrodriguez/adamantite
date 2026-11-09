@@ -24,3 +24,4 @@
 - [ADR 0022: Toolchain coordinates tools and shares runtime resolution with Doctor](0022-toolchain-owns-tooling-workflows.md)
 - [ADR 0023: Effect editors use unpatched compilers](0023-effect-editors-use-unpatched-compilers.md)
 - [ADR 0024: Layer maps nest with explicit imports](0024-layer-maps-nest-with-explicit-imports.md)
+- [ADR 0025: The strict preset absorbs the anti-slop rules](0025-strict-absorbs-anti-slop.md)

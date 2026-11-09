@@ -46,20 +46,20 @@ jobs:
           npm install --engine-strict ./adamantite-*.tgz
           node node_modules/adamantite/bin/adamantite --help
           node --input-type=module --eval 'await import("adamantite/lint")'
-          node --input-type=module --eval 'await import("adamantite/lint/antislop")'
+          node --input-type=module --eval 'await import("adamantite/lint/strict")'
           node --input-type=module --eval 'const fs = await import("node:fs"); const url = await import("node:url"); const path = url.fileURLToPath(import.meta.resolve("adamantite/typescript")); if (!fs.statSync(path).isFile()) process.exit(1)'
           oxlint_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.oxlint")"
           react_doctor_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['oxlint-plugin-react-doctor']")"
           npm install "oxlint@${oxlint_version}" "oxlint-plugin-react-doctor@${react_doctor_version}"
           npm pkg set type=module
-          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import antislop from "adamantite/lint/antislop"' '' 'export default defineConfig({ extends: [antislop] })' > oxlint.config.ts
-          printf '%s\n' 'export const value = JSON.parse("{}") as unknown as string' > bad.ts
+          printf '%s\n' 'import { defineConfig } from "oxlint"' 'import strict from "adamantite/lint/strict"' '' 'export default defineConfig({ extends: [strict] })' > oxlint.config.ts
+          printf '%s\n' 'export const value: number = Reflect.get({ count: 1 }, "count")' > bad.ts
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.ts > oxlint-output.txt 2>&1; then
-            echo "Expected anti-slop diagnostics from the packaged preset to fail the lint run"
+            echo "Expected anti-slop diagnostics from the packaged strict preset to fail the lint run"
             cat oxlint-output.txt
             exit 1
           fi
-          grep "anti-slop(no-chained-type-assertions)" oxlint-output.txt
+          grep "anti-slop(no-reflect-get)" oxlint-output.txt
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import reactStrict from "adamantite/lint/react-strict"' '' 'export default defineConfig({ extends: [reactStrict] })' > oxlint.config.ts
           printf '%s\n' 'import { useState } from "react"' '' 'export const Counter = () => useState(0)[0]' > bad.tsx
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.tsx > oxlint-output.txt 2>&1; then

@@ -1,5 +1,8 @@
 # Core absorbs no plugin rules while Oxlint JS plugins are alpha
 
+ADR 0025 moves the anti-slop rules from the retired `antislop` preset to `strict`. Read each
+"Stays in `antislop`" below as "stays in `strict`". The decision about core still applies.
+
 Issue #407 asked which anti-slop rules and first-party rules the `core` lint preset absorbs
 after the opt-in presets have shipped. We decided (2026-10-03, issue #407) that core absorbs
 none of them now. Each rule stays in the preset that owns it.

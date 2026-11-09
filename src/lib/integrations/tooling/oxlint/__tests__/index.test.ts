@@ -105,6 +105,44 @@ describe("oxlint", () => {
       })
     )
 
+    it.effect("report the retired antislop preset import without changing the project", () =>
+      Effect.gen(function* () {
+        const config = toOxlintTsConfigContent(["strict"]).replaceAll(
+          "adamantite/lint/strict",
+          "adamantite/lint/antislop"
+        )
+
+        const manifest = makePackageJson({
+          devDependencies: { oxlint: oxlint.version },
+          scripts: { check: "adamantite check" },
+        })
+
+        const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("adamantite/lint/antislop"),
+              goal: expect.arrayContaining([
+                expect.stringContaining("adamantite/lint/strict"),
+                expect.stringContaining("anti-slop/*"),
+                expect.stringContaining(
+                  "Move a project setting for these three rules into an `overrides` entry"
+                ),
+              ]),
+              id: "strict-preset-migration",
+              integration: "oxlint",
+            },
+          ],
+        })
+        expect(files.read("oxlint.config.ts")).toBe(config)
+        expect(files.read("package.json")).toBe(manifest)
+      })
+    )
+
     it.effect("report no migration for the tailwind preset or an old import in a comment", () =>
       Effect.gen(function* () {
         const config = [

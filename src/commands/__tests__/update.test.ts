@@ -385,6 +385,34 @@ describe("update", () => {
       })
     )
 
+    it.effect("warn and finish the update when the skills lock cannot be written", () =>
+      Effect.gen(function* () {
+        const files = makeSkillFiles({
+          "skills-lock.json": makeSkillsLock({
+            adamantite: "./node_modules/adamantite",
+            other: "someone/other",
+          }),
+        })
+        files.makeReadOnly("skills-lock.json")
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(updateCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.logs).toContainEqual(
+          expect.objectContaining({
+            level: "warning",
+            message: expect.stringContaining("Could not update `skills-lock.json`."),
+          })
+        )
+        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+      })
+    )
+
     it.effect("warn and finish the update when the refresh fails", () =>
       Effect.gen(function* () {
         const files = makeSkillFiles(

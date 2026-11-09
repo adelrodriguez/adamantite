@@ -17,15 +17,38 @@ export type RuntimePart =
   | { readonly _tag: "Replaced"; readonly path: string }
 
 /**
+ * The type-aware backend that Oxlint starts. `None` runs Oxlint as it is installed, so it fails
+ * only when it runs a type-aware rule. `Tsrs` starts the installed tsrs through its `tsrs-lint`
+ * launcher, because Oxlint does not find tsrs by itself. `Replaced` sets the variables of a plugin
+ * that replaces the whole backend.
+ */
+export type RuntimeBackend =
+  | { readonly _tag: "None" }
+  | { readonly _tag: "Replaced"; readonly env: Readonly<Record<string, string>> }
+  | { readonly _tag: "Tsrs"; readonly launcher: string }
+
+/**
+ * The variables that make Oxlint start the backend.
+ */
+export function toBackendEnv(backend: RuntimeBackend) {
+  switch (backend._tag) {
+    case "None":
+      return {}
+    case "Replaced":
+      return backend.env
+    case "Tsrs":
+      // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` bin adds the `--lint`
+      // flag of tsrs.
+      return { OXLINT_TSGOLINT_PATH: backend.launcher }
+  }
+}
+
+/**
  * What runs Oxlint for one project: the Oxlint package, its native binding, and its type-aware
  * backend.
  */
 export interface OxlintRuntime {
-  /**
-   * The variables that make Oxlint start its type-aware backend. Oxlint does not find tsrs by
-   * itself. Empty when the project does not install tsrs, or when Windows has no launcher for it.
-   */
-  readonly backend: Readonly<Record<string, string>>
+  readonly backend: RuntimeBackend
   readonly binding: RuntimePart
   /**
    * The folder of the Oxlint package that the project installs.
@@ -65,14 +88,12 @@ const findWindowsLauncher = Effect.fn("findWindowsLauncher")(function* (project:
 })
 
 /**
- * The variables that make Oxlint start the installed tsrs. Empty when the project does not install
- * tsrs, so Oxlint runs as it is installed, and fails only when it runs a type-aware rule.
+ * The installed tsrs, or no backend when the project does not install tsrs or when Windows has no
+ * launcher for it.
  */
 const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (project: string) {
   const path = yield* Path.Path
   const tsrs = yield* resolvePackageDirectory(project, "tsrs")
-  // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` bin adds the `--lint` flag
-  // of tsrs.
   const launcher = Option.isNone(tsrs)
     ? Option.none<string>()
     : process.platform === "win32"
@@ -80,8 +101,8 @@ const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (proj
       : Option.some(path.join(tsrs.value, "bin", "tsrs-lint"))
 
   return Option.match(launcher, {
-    onNone: () => ({}),
-    onSome: (file) => ({ OXLINT_TSGOLINT_PATH: file }),
+    onNone: (): RuntimeBackend => ({ _tag: "None" }),
+    onSome: (file): RuntimeBackend => ({ _tag: "Tsrs", launcher: file }),
   })
 })
 
@@ -102,7 +123,7 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
   }
 
   let binding: RuntimePart = { _tag: "Stock" }
-  let backend: Readonly<Record<string, string>> | undefined
+  let backend: RuntimeBackend | undefined
   const owners = new Map<NativeOverride["_tag"], string>()
 
   for (const plugin of plugins) {
@@ -129,7 +150,7 @@ export const resolveOxlintRuntime = Effect.fn("resolveOxlintRuntime")(function* 
       } else {
         // An override replaces the whole backend, so the default and the native backend variables
         // never mix.
-        backend = override.env
+        backend = { _tag: "Replaced", env: override.env }
       }
     }
   }

@@ -52,7 +52,9 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
   return yield* Effect.gen(function* () {
     const runtime: OxlintRuntime = yield* resolveOxlintRuntime(project.cwd)
 
-    if (declared("tsrs") && Object.keys(runtime.backend).length === 0) {
+    const { backend, binding } = runtime
+
+    if (declared("tsrs") && backend._tag === "None") {
       return finding("Oxlint cannot resolve the declared tsrs backend or its launcher.", [
         "Install the target project's dependencies so that the tsrs-lint launcher is available.",
       ])
@@ -68,9 +70,8 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
       }
     }
 
-    const launcher = runtime.backend["OXLINT_TSGOLINT_PATH"]
-
-    if (runtime.binding._tag === "Replaced" && launcher === undefined) {
+    // A plugin that replaces the binding and the backend checks its own builds.
+    if (binding._tag === "Replaced" && backend._tag !== "Tsrs") {
       return []
     }
 
@@ -108,7 +109,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
     }
     const bindingTarget = platform + (suffix[process.platform] ?? "")
 
-    if (runtime.binding._tag === "Stock") {
+    if (binding._tag === "Stock") {
       const override = yield* Config.String("NAPI_RS_NATIVE_LIBRARY_PATH").pipe(
         Config.withDefault("")
       )
@@ -145,7 +146,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
       }
     }
 
-    if (launcher !== undefined) {
+    if (backend._tag === "Tsrs") {
       const tsrs = yield* resolvePackageDirectory(project.cwd, "tsrs")
       const override = yield* Config.String("TSRS_BINARY").pipe(Config.withDefault(""))
       const target = `${platform}${process.platform === "linux" ? `-${libc}` : ""}`
@@ -160,7 +161,11 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
             : undefined
           : override
 
-      if (!(yield* fs.exists(launcher)) || binary === undefined || !(yield* fs.exists(binary))) {
+      if (
+        !(yield* fs.exists(backend.launcher))
+        || binary === undefined
+        || !(yield* fs.exists(binary))
+      ) {
         return finding("Oxlint cannot resolve the installed tsrs binary or its launcher.", [
           "Install the target project's optional dependencies for this platform, or restore TSRS_BINARY.",
         ])

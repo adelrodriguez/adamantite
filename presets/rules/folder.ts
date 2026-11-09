@@ -17,7 +17,7 @@ export const DEFAULT_DIRECTORY = ".adamantite/lint"
  * A test in the CLI checks that the trial copy of `adamantite rule try` does not link this folder
  * to the project.
  */
-export const CACHE_DIRECTORY = join("node_modules", ".cache", "adamantite")
+export const CACHE_DIRECTORY: string = join("node_modules", ".cache", "adamantite")
 
 /**
  * The plugin name that prefixes every rule when `custom()` is given no `name`.

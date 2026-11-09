@@ -3,6 +3,7 @@ import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
@@ -23,6 +24,7 @@ import {
   AdamantiteNotInstalled,
   AdamantiteVersionMismatch,
   CommandFailed,
+  FailedToReadFile,
   ScopeOutsideProject,
 } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -110,6 +112,7 @@ export default Command.make("harden", { commits, scope }).pipe(
   Command.withHandler(({ commits, scope }) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
+      const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const prompter = yield* Prompter
       const terminal = yield* TerminalCapabilities
@@ -149,7 +152,14 @@ export default Command.make("harden", { commits, scope }).pipe(
         })
       }
 
-      const scopeDirectory = Option.isSome(scope) ? path.resolve(cwd, scope.value) : undefined
+      // The current directory is a real path, so the scope must be one too. A scope through a
+      // directory symlink, such as `/var` for `/private/var` on macOS, then stays inside the
+      // project. The flag requires the folder to exist.
+      const scopeDirectory = Option.isSome(scope)
+        ? yield* fs
+            .realPath(path.resolve(cwd, scope.value))
+            .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: scope.value })))
+        : undefined
 
       if (scopeDirectory !== undefined) {
         const fromRoot = path.relative(cwd, scopeDirectory)

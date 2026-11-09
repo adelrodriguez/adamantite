@@ -1462,6 +1462,36 @@ describe("init", () => {
       })
     )
 
+    it.effect("not offer GitHub Actions when no selected script runs in CI", () =>
+      Effect.gen(function* () {
+        // `check` is managed already, but init validates the workflow against the selected scripts.
+        const files = createInitTestContext({
+          "package.json": yield* stringifyJson({
+            name: "test-project",
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        const prompter = createPrompterTestContext({
+          // TypeScript and the AGENTS.md guidance.
+          confirmResponses: [false, false],
+          multiselectResponses: [["fix"], [], []],
+        })
+
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
+          "Add a GitHub Actions workflow to run the selected checks?"
+        )
+      })
+    )
+
     it.effect("not offer GitHub Actions when the user keeps every conflicting CI script", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({

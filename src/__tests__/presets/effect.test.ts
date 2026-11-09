@@ -260,7 +260,10 @@ describe("effect preset anti-slop rules", () => {
 
   it("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
-      EffectArray.sort(antislopPresetRules, Order.String)
+      EffectArray.sort(
+        antislopPresetRules.map((rule) => `${ANTISLOP_NAMESPACE}/${rule}`),
+        Order.String
+      )
     )
   })
 })
@@ -271,7 +274,6 @@ describe("effect preset anti-slop rule fixtures", () => {
   beforeAll(() => {
     cases = lintRuleFixtures({
       fixturesDir: FIXTURES_DIR,
-      namespace: ANTISLOP_NAMESPACE,
       presetPath: join(REPO_ROOT, "presets/lint/effect.ts"),
     })
   })

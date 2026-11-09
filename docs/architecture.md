@@ -289,13 +289,13 @@ The build copies each bundle into `dist/presets/lint/vendor/`, and `scripts/test
 when a built preset loads a file that the build did not copy.
 
 Each enabled rule of a bundle has `valid/` and `invalid/` fixtures under
-`src/__tests__/presets/fixtures/<preset>/<rule>/`, one case per file. The harness in
-`src/__tests__/presets/rule-fixtures.ts` lints them through the preset in one real Oxlint
-run. The run starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the
+`src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/`, one case per file. The
+namespace folder, such as `anti-slop`, lets one preset hold fixtures for several plugins. The
+harness in `src/__tests__/presets/rule-fixtures.ts` lints them through the preset in one real
+Oxlint run. The run starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the
 effect preset loads the Effect build of Oxlint. A re-vendor that tightens or relaxes a rule
 fails the fixture of that case. Add fixtures when a rule is added, and move or change a
-fixture only when the upstream change
-is accepted.
+fixture only when the upstream change is accepted.
 
 A bundle has no tests for each rule. Adamantite does not change vendored rules, so their message
 ids, placeholder data, and report positions are upstream behaviour, and the fixture run already
@@ -321,7 +321,7 @@ modules with their `.ts` extension, which Node.js needs to load the source plugi
 
 Each rule has a `RuleTester` test under `src/__tests__/plugin/<rule>.test.ts` for messages,
 locations, and options, and `valid/` and `invalid/` fixtures under
-`src/__tests__/presets/fixtures/<preset>/<rule>/` that the preset test lints in one real
+`src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
 Oxlint run.
 
 The `architecture` preset loads the first-party plugin without enabling rules. Init offers it

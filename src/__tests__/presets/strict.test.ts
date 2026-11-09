@@ -34,7 +34,10 @@ const PROJECT_RULES = ["import-owners", "layers"]
 describe("strict preset", () => {
   it("have fixtures for exactly the rules the preset enables", () => {
     expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
-      EffectArray.sort(presetRules, Order.String)
+      EffectArray.sort(
+        presetRules.map((rule) => `${NAMESPACE}/${rule}`),
+        Order.String
+      )
     )
   })
 })
@@ -64,7 +67,6 @@ describe("strict rule fixtures", () => {
   beforeAll(() => {
     cases = lintRuleFixtures({
       fixturesDir: FIXTURES_DIR,
-      namespace: NAMESPACE,
       presetPath: join(REPO_ROOT, "presets/lint/strict.ts"),
     })
   })

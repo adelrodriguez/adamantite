@@ -1,6 +1,5 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
@@ -10,6 +9,7 @@ import { type AgentReach, readAgentReach } from "#lib/hardening/agent-reach.ts"
 import { getHardenPromptTemplate } from "#lib/hardening/harden-prompt.macro.ts" with { type: "macro" }
 import { OverridesLintFailed, type OverridesReport } from "#lib/hardening/overrides.ts"
 import { listProjectFiles } from "#lib/hardening/project-files.ts"
+import { checkExists } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
@@ -107,7 +107,6 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
   workspace: Workspace,
   scope: string
 ) {
-  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const { contains, isSelectedFile } = selectPackages(path, cwd, workspace, scope)
 
@@ -125,10 +124,7 @@ const readScopedDocumentation = Effect.fn("readScopedDocumentation")(function* (
         Effect.forEach(
           files.filter((file) => isDocumentation(file)),
           (file) =>
-            fs.exists(path.join(cwd, file)).pipe(
-              Effect.orElseSucceed(() => false),
-              Effect.map((exists) => (exists ? [file] : []))
-            ),
+            checkExists(path.join(cwd, file)).pipe(Effect.map((exists) => (exists ? [file] : []))),
           { concurrency: "unbounded" }
         ).pipe(Effect.map((files) => files.flat()))
       )
@@ -184,7 +180,6 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   workspace: Workspace,
   scope: string = cwd
 ) {
-  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const relative = (target: string) => path.relative(cwd, target) || "."
   const { packageDirectories, selectedPackages } = selectPackages(path, cwd, workspace, scope)
@@ -198,11 +193,9 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   const [{ calls, configs, unresolvedCalls }, instructionFiles, documentation] = yield* Effect.all(
     [
       discoverCustomRules(packageDirectories, selectedPackages),
-      Effect.filter(
-        instructionCandidates,
-        (file) => fs.exists(file).pipe(Effect.orElseSucceed(() => false)),
-        { concurrency: "unbounded" }
-      ),
+      Effect.filter(instructionCandidates, (file) => checkExists(file), {
+        concurrency: "unbounded",
+      }),
       readScopedDocumentation(cwd, workspace, scope),
     ],
     { concurrency: "unbounded" }

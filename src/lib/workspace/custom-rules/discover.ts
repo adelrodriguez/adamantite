@@ -5,7 +5,7 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { readFileIfFile } from "#lib/shared/filesystem.ts"
 import {
   CUSTOM_RULES_MODULE,
   DynamicCustomRulesCall,
@@ -67,15 +67,14 @@ const readFirstFile = Effect.fn("readFirstFile")(function* (candidates: readonly
   const modules = yield* Effect.forEach(
     candidates,
     (candidate) =>
-      readFileIfExists(candidate).pipe(
+      // A candidate can be a folder, such as an import of a directory.
+      readFileIfFile(candidate).pipe(
         Effect.map((content: Option.Option<string>) =>
           pipe(
             content,
             Option.map((value): SourceModule => ({ content: value, file: candidate }))
           )
-        ),
-        // A directory cannot be read as a file.
-        Effect.orElseSucceed(() => Option.none<SourceModule>())
+        )
       ),
     { concurrency: "unbounded" }
   )

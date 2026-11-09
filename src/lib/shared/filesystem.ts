@@ -35,6 +35,35 @@ export const readFileIfExists = (path: string) =>
   )
 
 /**
+ * Reads a path that may be missing or may be a folder. A missing path, or a path that is not a
+ * file, is `Option.none`; every other failure, such as a permission error, is a
+ * `FailedToReadFile`.
+ */
+export const readFileIfFile = (path: string) =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.readFileString(path)),
+    Effect.asSome,
+    Effect.catchReasons(
+      "PlatformError",
+      {
+        BadResource: () => Effect.succeedNone,
+        NotFound: () => Effect.succeedNone,
+      },
+      (_reason, error) => Effect.fail(new FailedToReadFile({ cause: error, path }))
+    )
+  )
+
+/**
+ * Whether a path exists. A failure to check, such as a permission error, is a `FailedToReadFile`,
+ * because the path can exist.
+ */
+export const checkExists = (path: string) =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.exists(path)),
+    Effect.mapError((cause) => new FailedToReadFile({ cause, path }))
+  )
+
+/**
  * Lists the entry names of a directory that may not exist. With `recursive`, the names are paths
  * relative to the directory and include nested directories. A missing path, or a path that is not a
  * directory, is `Option.none`; every other failure is a `FailedToReadFile`.

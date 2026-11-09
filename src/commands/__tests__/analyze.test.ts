@@ -5,7 +5,12 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import analyzeCommand from "#commands/analyze.ts"
-import { CliNotFound, CommandFailed, InvalidAnalyzeOptions } from "#lib/shared/errors.ts"
+import {
+  CliNotFound,
+  CommandFailed,
+  FailedToReadFile,
+  InvalidAnalyzeOptions,
+} from "#lib/shared/errors.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 function createMonorepoFiles() {
@@ -66,6 +71,43 @@ describe("analyze", () => {
 
         const exit = yield* runCommand(analyzeCommand, [], {
           files: createFileSystemTestContext({ files: { "package.json": "{" } }),
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
+      })
+    )
+
+    it.effect("fail when the workspace file cannot be read, instead of skipping sherif", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const files = createFileSystemTestContext({
+          files: { "package.json": "{}", "pnpm-workspace.yaml": "packages:\n  - packages/*\n" },
+        })
+
+        files.makeUnreadable("pnpm-workspace.yaml")
+
+        const exit = yield* runCommand(analyzeCommand, [], { files, layers: [runner.layer] })
+
+        expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(FailedToReadFile)
+        expect(runner.invocations).toStrictEqual([])
+      })
+    )
+
+    it.effect("run knip with --only unused without reading the workspace file", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const files = createFileSystemTestContext({
+          files: { "package.json": "{}", "pnpm-workspace.yaml": "packages:\n  - packages/*\n" },
+        })
+
+        files.makeUnreadable("pnpm-workspace.yaml")
+
+        const exit = yield* runCommand(analyzeCommand, ["--only", "unused"], {
+          files,
           layers: [runner.layer],
         })
 

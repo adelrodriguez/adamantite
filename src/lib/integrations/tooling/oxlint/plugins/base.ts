@@ -7,6 +7,7 @@ import type {
   EffectPlatformUnsupported,
   FailedToParseFile,
   FailedToReadFile,
+  InvalidPackageJson,
   PackageNotInstalled,
 } from "#lib/shared/errors.ts"
 import type { ModuleResolver } from "#lib/workspace/module-resolver.ts"
@@ -47,7 +48,8 @@ export class NativeRuntime extends Data.TaggedClass("Native")<{
     | EffectPlatformUnsupported
     | PackageNotInstalled
     | FailedToReadFile
-    | FailedToParseFile,
+    | FailedToParseFile
+    | InvalidPackageJson,
     FileSystem.FileSystem | Path.Path | ModuleResolver
   >
 }> {}

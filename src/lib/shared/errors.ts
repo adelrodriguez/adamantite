@@ -298,6 +298,15 @@ export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")
   }
 }
 
+export class InvalidPackageJson extends Data.TaggedError("InvalidPackageJson")<{
+  issue: string
+  path: string
+}> {
+  override get message() {
+    return `\`${this.path}\` is not a valid \`package.json\`. ${this.issue}`
+  }
+}
+
 export class InvalidAnalyzeOptions extends Data.TaggedError("InvalidAnalyzeOptions")<{
   reason: string
 }> {

@@ -64,13 +64,25 @@ export default defineIntegration({
         path.join(directory, ".adamantite/rules")
       )
 
-      const folders = Array.getSomes(
-        yield* Effect.forEach(
-          Array.dedupe([...defaultFolders, ...oldDefaultFolders, ...loadedFolders]),
-          (dir) => readRulesFolder(dir),
-          { concurrency: "unbounded" }
-        )
-      ).filter((folder) => folder.ruleFiles.length > 0)
+      const readFolders = yield* Effect.forEach(
+        Array.dedupe([...defaultFolders, ...oldDefaultFolders, ...loadedFolders]),
+        (dir) => readRulesFolder(dir),
+        { concurrency: "unbounded" }
+      )
+
+      const existingFolders = Array.getSomes(readFolders)
+      const folders = existingFolders.filter((folder) => folder.ruleFiles.length > 0)
+
+      // A call without `dir` loads the default folder, which a project creates with its first rule.
+      // A call that names a folder expects it to exist, and `custom()` loads nothing without it.
+      const missingFolderCalls = Array.dedupeWith(
+        calls.filter(
+          (call) =>
+            call.dir !== path.join(path.dirname(call.source), CUSTOM_RULES_DIRECTORY)
+            && !existingFolders.some((folder) => folder.dir === call.dir)
+        ),
+        (first, second) => first.dir === second.dir
+      )
 
       const legacyFolders = folders.filter(
         (folder) =>
@@ -100,7 +112,16 @@ export default defineIntegration({
         ),
       ]
 
-      const findings: Finding[] = []
+      const findings: Finding[] = missingFolderCalls.map((call) => ({
+        currentState: `The \`custom()\` call in \`${relative(call.source)}\` loads \`${relative(call.dir)}\`, but that folder does not exist, so Oxlint runs none of its rules.`,
+        goal: [
+          `Set \`dir\` to the folder that holds the rules, or move the rules to \`${relative(call.dir)}\`. A relative \`dir\` resolves from the file that calls \`custom()\`.`,
+          "Preserve every other setting in the Oxlint config.",
+        ],
+        id: `custom-rules-folder-missing:${relative(call.dir)}`,
+        integration: NAME,
+        title: `The rules folder \`${relative(call.dir)}\` does not exist`,
+      }))
 
       // An unloaded folder is reported only when discovery is complete.
       if (isComplete) {

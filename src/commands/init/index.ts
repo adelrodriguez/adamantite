@@ -160,13 +160,13 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupToolConfig(cwd, knip, knip.create(cwd))
       }
 
-      const writtenScripts = yield* addScripts(cwd, selectedScripts, {
+      const managedScripts = yield* addScripts(cwd, selectedScripts, {
         nonInteractive: options.nonInteractive,
         overwriteScripts: initOptions.overwriteScripts,
       })
 
       if (initOptions.agents) {
-        yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts, isMonorepo)
+        yield* setupAgentsGuidance(cwd, packageManager.name, managedScripts, isMonorepo)
         yield* setupSkill(cwd)
       }
 
@@ -190,7 +190,7 @@ export default Command.make("init", initCommandOptions).pipe(
       }
 
       if (Option.isSome(initOptions.githubActions)) {
-        yield* setupGitHubActions(cwd, initOptions.githubActions.value, selectedScripts)
+        yield* setupGitHubActions(cwd, initOptions.githubActions.value, managedScripts)
       }
 
       yield* prompter.outro("💠 Setup finished.")

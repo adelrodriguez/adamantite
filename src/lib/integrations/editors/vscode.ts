@@ -14,6 +14,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { EFFECT_SDK_PATH, readEffectEditor } from "#lib/integrations/editors/effect.ts"
+import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
 import {
   FailedToInstallExtension,
   InvalidConfigFormat,
@@ -73,7 +74,7 @@ const CONFIG = {
   // against the first workspace folder, and it expands no `${workspaceFolder}`. It starts a `.js`
   // path with Node.js, without a working directory in the project, so the entry finds the project
   // from its own path.
-  "oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js",
+  "oxc.path.oxlint": EDITOR_OXLINT_ENTRY,
   "oxc.typeAware": true,
 } as const
 

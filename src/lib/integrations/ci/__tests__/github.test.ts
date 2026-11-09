@@ -178,7 +178,8 @@ function expectNodeVersionFileWorkflow(packageManager: "bun" | "npm" | "pnpm" | 
 
 describe("github", () => {
   describe("assess", () => {
-    const packageJson = { scripts: { check: "adamantite check" } }
+    // The managed check script, which each workflow assessment reads from package.json.
+    const PACKAGE_JSON = JSON.stringify({ scripts: { check: "adamantite check" } })
 
     it.effect("report hard-coded Node.js and a missing check command", () =>
       Effect.gen(function* () {
@@ -189,9 +190,10 @@ describe("github", () => {
             '    node-version: "22"',
             "- run: pnpm format"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
         )
@@ -210,9 +212,9 @@ describe("github", () => {
 
     it.effect("do not create a finding when the workflow is absent", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
+        const files = makeFiles({ "package.json": PACKAGE_JSON })
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -236,9 +238,10 @@ describe("github", () => {
             "      - name: pnpm run check",
             "        run: pnpm run format",
           ].join("\n"),
+          "package.json": PACKAGE_JSON,
         })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
         )
@@ -266,10 +269,10 @@ describe("github", () => {
       },
     ])("accept a package-manager check command in $name", ({ workflow }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ [WORKFLOW_PATH]: workflow })
+        const files = makeFiles({ [WORKFLOW_PATH]: workflow, "package.json": PACKAGE_JSON })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -287,10 +290,11 @@ describe("github", () => {
             "      pnpm install --frozen-lockfile",
             "      pnpm --filter app run check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -311,10 +315,11 @@ describe("github", () => {
             "    EOF",
             "    pnpm run check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -331,10 +336,11 @@ describe("github", () => {
             { command: "pnpm run check", name: "check" },
             { command: "pnpm run format --check", name: "format" }
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -352,10 +358,11 @@ describe("github", () => {
             { command: "pnpm run check", name: "check" },
             { command: "pnpm run check:monorepo", name: "monorepo" }
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -374,10 +381,11 @@ describe("github", () => {
             "    pnpm run check",
             "    pnpm exec adamantite monorepo -- -i react"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -391,10 +399,11 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check", "- run: npm run fix:monorepo"),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -411,10 +420,11 @@ describe("github", () => {
             "- run: pnpm run check",
             "- run: pnpm exec adamantite analyze --only monorepo"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -432,10 +442,11 @@ describe("github", () => {
             "    npm run check",
             "    npm run format -- --check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -454,10 +465,11 @@ describe("github", () => {
             '    node-version: "22"',
             "- run: pnpm run format --check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -479,10 +491,11 @@ describe("github", () => {
             "- run: pnpm run check",
             "- run: pnpm run format"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -497,10 +510,11 @@ describe("github", () => {
         const files = makeFiles({
           ...RULE_TEST_FILES,
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check"),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -526,10 +540,14 @@ describe("github", () => {
       },
     ])("accept an optional rule test command in $name", ({ workflow }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ ...RULE_TEST_FILES, [WORKFLOW_PATH]: workflow })
+        const files = makeFiles({
+          ...RULE_TEST_FILES,
+          [WORKFLOW_PATH]: workflow,
+          "package.json": PACKAGE_JSON,
+        })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -547,7 +565,7 @@ describe("github", () => {
 
         const before = files.read(WORKFLOW_PATH)
 
-        const result = yield* readProject(ROOT, { name: "app", version: "1.0.0" }).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
         )
@@ -566,10 +584,11 @@ describe("github", () => {
             "    pnpm run check",
             "    pnpm exec adamantite rule test"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -589,9 +608,10 @@ describe("github", () => {
             '    node-version: "22"',
             "- run: pnpm run check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
         )
@@ -620,10 +640,11 @@ describe("github", () => {
             "    steps:",
             "      - run: pnpm run check",
           ].join("\n"),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
-          yield* readProject(ROOT, packageJson).pipe(
+          yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
             provideAssessment(files)
           )
@@ -637,9 +658,10 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           [WORKFLOW_PATH]: "jobs:\n  verify:\n    steps: [\n      run: pnpm run check\n",
+          "package.json": PACKAGE_JSON,
         })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
         )
@@ -665,7 +687,7 @@ describe("github", () => {
           ),
         })
 
-        const result = yield* readProject(ROOT, {}).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
         )

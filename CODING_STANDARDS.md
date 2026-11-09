@@ -136,7 +136,7 @@ Effect.gen(function* () {
 
 // Prefer: Doctor reads the project and renders the assessment.
 Effect.gen(function* () {
-  const assessment = yield* assessProject(yield* readProject(cwd, initialPackageJson))
+  const assessment = yield* assessProject(yield* readProject(cwd))
   return assessment
 })
 ```

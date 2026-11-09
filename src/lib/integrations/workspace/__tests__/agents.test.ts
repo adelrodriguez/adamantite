@@ -27,7 +27,7 @@ describe("agents", () => {
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)
         )
@@ -66,7 +66,7 @@ describe("agents", () => {
           "package.json": yield* stringifyJson(packageJson),
         })
 
-        const result = yield* readProject(ROOT, packageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)
         )
@@ -90,7 +90,7 @@ describe("agents", () => {
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         })
 
-        const result = yield* readProject(ROOT, monorepoPackageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)
         )
@@ -104,7 +104,7 @@ describe("agents", () => {
         const unmanagedPackageJson = { scripts: { check: "tsc --noEmit" } }
         const files = makeFiles({ "package.json": yield* stringifyJson(unmanagedPackageJson) })
 
-        const result = yield* readProject(ROOT, unmanagedPackageJson).pipe(
+        const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => agents.assess(project)),
           provideFiles(files)
         )

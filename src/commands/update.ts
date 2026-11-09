@@ -12,7 +12,6 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { printFindings } from "#terminal/findings.ts"
 import { Prompter } from "#terminal/prompter.ts"
@@ -45,8 +44,7 @@ export default Command.make("update").pipe(
 
       yield* prompter.intro("💠 adamantite update")
 
-      const packageJson = yield* readPackageJson(cwd)
-      const project = yield* readProject(cwd, packageJson)
+      const project = yield* readProject(cwd)
       const assessment = yield* assessProject(project)
       const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))

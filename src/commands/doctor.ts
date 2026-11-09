@@ -144,11 +144,14 @@ export default Command.make("doctor").pipe(
         Unmanaged: () => Effect.void,
       })
 
+      // The root manifest decides whether Doctor assesses at all, so a project without Adamantite
+      // gets the install instruction even when its workspace packages do not read. The assessment
+      // reads its own snapshot.
       const packageJson = yield* readPackageJson(cwd)
 
       const outcome =
         packageJson.devDependencies?.adamantite || packageJson.dependencies?.adamantite
-          ? classifyAssessment(yield* assessProject(yield* readProject(cwd, packageJson)))
+          ? classifyAssessment(yield* assessProject(yield* readProject(cwd)))
           : NotInstalled()
 
       yield* isInteractive ? reportInteractive(outcome) : reportPlain(outcome)

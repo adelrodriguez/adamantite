@@ -7,7 +7,12 @@ import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
-import { CliNotFound, InvalidAnalyzeOptions, InvalidFixOptions } from "#lib/shared/errors.ts"
+import {
+  CliNotFound,
+  InvalidAnalyzeOptions,
+  InvalidCheckOptions,
+  InvalidFixOptions,
+} from "#lib/shared/errors.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
@@ -30,6 +35,12 @@ export const check = Effect.fn("Toolchain.check")(function* ({
   readonly forwardedArguments?: readonly string[]
   readonly only?: "format" | "lint"
 }) {
+  if (only === "format" && allowWarnings) {
+    return yield* new InvalidCheckOptions({
+      reason: "`--allow-warnings` applies to the lint stage. Remove it or `--only format`.",
+    })
+  }
+
   const runner = yield* CommandRunner
   const forwardedStage = only ?? "lint"
 

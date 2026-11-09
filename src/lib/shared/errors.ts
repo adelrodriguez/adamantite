@@ -306,6 +306,14 @@ export class InvalidAnalyzeOptions extends Data.TaggedError("InvalidAnalyzeOptio
   }
 }
 
+export class InvalidCheckOptions extends Data.TaggedError("InvalidCheckOptions")<{
+  reason: string
+}> {
+  override get message() {
+    return `Invalid check options. ${this.reason}`
+  }
+}
+
 export class InvalidFixOptions extends Data.TaggedError("InvalidFixOptions")<{
   reason: string
 }> {

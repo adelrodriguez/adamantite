@@ -8,6 +8,7 @@ import * as Path from "effect/Path"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Stream from "effect/Stream"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { CliNotFound, TrialLintFailed } from "#lib/shared/errors.ts"
@@ -19,12 +20,26 @@ import { stringifyJson } from "#lib/shared/json.ts"
  */
 const JSON_REPORT_START = /^\{/mu
 
+/**
+ * A path in an Oxlint report, with `/` between folders. Oxlint prints the separators of the
+ * platform, and the trial and the overrides compare the path with project paths that git prints.
+ */
+const ReportPath = Schema.String.pipe(
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (path) => path.replaceAll("\\", "/"),
+      encode: (path) => path,
+    })
+  )
+)
+
 const OxlintReport = Schema.Struct({
   diagnostics: Schema.Array(
     Schema.Struct({
       // A parse error has no rule, so it has no code.
       code: Schema.optional(Schema.String),
-      filename: Schema.String,
+      filename: ReportPath,
       labels: Schema.Array(
         Schema.Struct({ span: Schema.Struct({ column: Schema.Int, line: Schema.Int }) })
       ),
@@ -135,13 +150,21 @@ const runOxlint = Effect.fn("runOxlint")(
 )
 
 /**
+ * The JSON report in the output of `oxlint -f json`, or none when the output has no report.
+ */
+export function parseOxlintReport(stdout: string) {
+  const start = stdout.search(JSON_REPORT_START)
+
+  return start === -1 ? Option.none() : decodeOxlintReport(stdout.slice(start))
+}
+
+/**
  * Lints `files` in `cwd` with Oxlint, and returns its JSON report. Oxlint finds the config of each
  * file.
  */
 export const lintFiles = Effect.fn("lintFiles")(function* (cwd: string, files: readonly string[]) {
   const { output, stdout } = yield* runOxlint(cwd, ["-f", "json", ...files])
-  const start = stdout.search(JSON_REPORT_START)
-  const report = start === -1 ? Option.none() : decodeOxlintReport(stdout.slice(start))
+  const report = parseOxlintReport(stdout)
 
   if (Option.isNone(report)) {
     return yield* new TrialLintFailed({ output })

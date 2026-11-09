@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { tmpdir, userInfo } from "node:os"
 import { dirname, isAbsolute, join, resolve } from "node:path"
+import process from "node:process"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { DummyRule, OxlintConfig } from "oxlint"
 import { DEFAULT_DIRECTORY, DEFAULT_PLUGIN_NAME, getRuleName, listRuleFiles } from "./folder.ts"
@@ -123,9 +124,32 @@ function writeIfChanged(path: string, content: string) {
 }
 
 /**
+ * A folder in the OS temporary directory that only the current user can write. The temporary
+ * directory can be shared, so another user could create a folder there first, and then replace an
+ * entry module after `custom()` writes it. Windows gives each user a temporary directory.
+ */
+function getPrivateTemporaryDirectory() {
+  const { uid } = userInfo()
+  const dir = join(tmpdir(), `adamantite-${uid}`)
+
+  mkdirSync(dir, { mode: 0o700, recursive: true })
+
+  const stats = lstatSync(dir)
+
+  if (
+    process.platform !== "win32"
+    && (!stats.isDirectory() || stats.uid !== uid || (stats.mode & 0o022) !== 0)
+  ) {
+    throw new Error(`${dir} is not a folder that only the current user can write.`)
+  }
+
+  return dir
+}
+
+/**
  * Write the entry module for a rules folder and return its file URL. The module goes to
- * `node_modules/.cache/adamantite` above the folder, or to the OS temporary directory when no
- * `node_modules` folder is found or it cannot be written.
+ * `node_modules/.cache/adamantite` above the folder, or to a private folder in the OS temporary
+ * directory when no `node_modules` folder is found or it cannot be written.
  */
 function writeEntryModule(dir: string, name: string) {
   const hash = createHash("sha256").update(`${dir}\0${name}`).digest("hex").slice(0, 16)
@@ -140,15 +164,17 @@ function writeEntryModule(dir: string, name: string) {
 
   const root = findNodeModules(dir)
 
-  const candidates = [
-    ...(root === undefined ? [] : [join(root, CACHE_DIRECTORY, fileName)]),
-    join(tmpdir(), "adamantite", fileName),
+  const folders = [
+    ...(root === undefined ? [] : [() => join(root, CACHE_DIRECTORY)]),
+    () => getPrivateTemporaryDirectory(),
   ]
 
   const failures: unknown[] = []
 
-  for (const path of candidates) {
+  for (const folder of folders) {
     try {
+      const path = join(folder(), fileName)
+
       writeIfChanged(path, content)
 
       return pathToFileURL(path).href

@@ -1,8 +1,18 @@
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
+import { tmpdir, userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import process from "node:process"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -311,5 +321,63 @@ describe("custom preset", () => {
 
     expect(result.stderr).toBe("")
     expect(result.stdout.trim()).toBe('{"project/no-debugger-here":"error"}')
+  })
+})
+
+// The shared temporary directory can hold files of other users, so the fallback entry module must
+// go to a folder that only this user can write. A child process gets its own TMPDIR.
+describe.skipIf(process.platform === "win32")("custom preset without node_modules", () => {
+  let temporary: string
+  let rules: string
+
+  beforeEach(() => {
+    temporary = mkdtempSync(join(tmpdir(), "adamantite-shared-tmp-"))
+    rules = join(temporary, "project/.adamantite/lint")
+    mkdirSync(rules, { recursive: true })
+    writeFileSync(join(rules, "no-debugger-here.ts"), "export default {}\n")
+  })
+
+  afterEach(() => {
+    rmSync(temporary, { force: true, recursive: true })
+  })
+
+  function writeEntryModule() {
+    return spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        [
+          `import custom from ${JSON.stringify(pathToFileURL(CUSTOM_PRESET).href)}`,
+          `console.log(custom({ dir: ${JSON.stringify(rules)} }).jsPlugins[0].specifier)`,
+        ].join("\n"),
+      ],
+      { encoding: "utf8", env: { ...process.env, TMPDIR: temporary } }
+    )
+  }
+
+  it("write the entry module to a folder that only this user can write", () => {
+    // Another user could create the shared folder first and replace the module after the write.
+    const shared = join(temporary, "adamantite")
+    mkdirSync(shared)
+    chmodSync(shared, 0o777)
+
+    const result = writeEntryModule()
+    const folder = dirname(fileURLToPath(result.stdout.trim()))
+
+    expect(result.stderr).toBe("")
+    expect(folder).not.toBe(shared)
+    expect(statSync(folder).mode & 0o077).toBe(0)
+  })
+
+  it("refuse a fallback folder that another user can write", () => {
+    const folder = join(temporary, `adamantite-${userInfo().uid}`)
+    mkdirSync(folder)
+    chmodSync(folder, 0o777)
+
+    const result = writeEntryModule()
+
+    expect(result.status).not.toBe(0)
+    expect(result.stderr).toContain("custom() could not write the entry module")
   })
 })

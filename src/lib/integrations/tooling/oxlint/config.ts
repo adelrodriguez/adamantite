@@ -11,7 +11,7 @@ import {
   type PropertyKey,
 } from "oxc-parser"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
-import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import type { LintPreset, RetiredLintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",
@@ -117,7 +117,10 @@ export function getImportedLintPresets(content: string): string[] {
  * Whether the `oxlint.config.ts` content imports the lint preset, such as `effect` for
  * `adamantite/lint/effect`. A missing config imports none.
  */
-export function checkImportsLintPreset(lintConfig: Option.Option<string>, preset: string): boolean {
+export function checkImportsLintPreset(
+  lintConfig: Option.Option<string>,
+  preset: LintPreset | RetiredLintPreset
+): boolean {
   return Option.exists(lintConfig, (content) => getImportedLintPresets(content).includes(preset))
 }
 

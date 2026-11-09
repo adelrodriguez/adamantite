@@ -4,6 +4,7 @@ import type * as PlatformError from "effect/PlatformError"
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
+import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
@@ -28,6 +29,7 @@ import {
   type SupportedPackageManager,
 } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
+import { INIT_EDITORS, type InitEditor } from "./options.ts"
 
 export const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
@@ -215,57 +217,44 @@ export const setupEffectTsgo = (cwd: string) =>
     }
   })
 
-export const setupEditors = (cwd: string, editors: readonly string[]) =>
+const editorIntegrations = {
+  vscode: { integration: vscode, name: "VS Code" },
+  zed: { integration: zed, name: "Zed" },
+} as const satisfies Record<InitEditor, { readonly integration: unknown; readonly name: string }>
+
+export const setupEditors = (cwd: string, editors: readonly InitEditor[]) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
 
-    if (editors.includes("vscode")) {
+    // The editors run in the order of INIT_EDITORS, whatever order the flags give.
+    for (const editor of INIT_EDITORS.filter((candidate) => editors.includes(candidate))) {
+      const { integration, name } = editorIntegrations[editor]
+
       yield* prompter.withSpinner(
         (spinner) =>
           Effect.gen(function* () {
-            const exists = yield* vscode.detect(cwd)
+            const exists = yield* integration.detect(cwd)
             yield* spinner.message(
-              `\`${vscode.config}\` ${exists ? "found, updating" : "not found, creating"}...`
+              `\`${integration.config}\` ${exists ? "found, updating" : "not found, creating"}...`
             )
-            yield* exists ? vscode.update(cwd) : vscode.create(cwd)
+            yield* exists ? integration.update(cwd) : integration.create(cwd)
 
             return !exists
           }),
         {
-          failure: "Failed to set up VS Code config.",
-          start: `Checking for \`${vscode.config}\`...`,
+          failure: `Failed to set up ${name} config.`,
+          start: `Checking for \`${integration.config}\`...`,
           success: (created) =>
-            `\`${vscode.config}\` ${created ? "created" : "updated"} with Adamantite preset.`,
-        }
-      )
-    }
-
-    if (editors.includes("zed")) {
-      yield* prompter.withSpinner(
-        (spinner) =>
-          Effect.gen(function* () {
-            const exists = yield* zed.detect(cwd)
-            yield* spinner.message(
-              `\`${zed.config}\` ${exists ? "found, updating" : "not found, creating"}...`
-            )
-            yield* exists ? zed.update(cwd) : zed.create(cwd)
-
-            return !exists
-          }),
-        {
-          failure: "Failed to set up Zed config.",
-          start: `Checking for \`${zed.config}\`...`,
-          success: (created) =>
-            `\`${zed.config}\` ${created ? "created" : "updated"} with Adamantite preset.`,
+            `\`${integration.config}\` ${created ? "created" : "updated"} with Adamantite preset.`,
         }
       )
     }
   })
 
 export const installEditorExtensions = (
-  editors: readonly string[],
+  editors: readonly InitEditor[],
   scripts: Script[],
-  presets: readonly string[] = []
+  presets: readonly LintPreset[] = []
 ) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter

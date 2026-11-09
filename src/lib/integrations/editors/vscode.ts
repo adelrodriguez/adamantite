@@ -4,6 +4,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { Script } from "#lib/workspace/package-json.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -202,7 +203,7 @@ export default defineIntegration({
 
       return yield* fs.exists(path.join(cwd, files[0].path))
     }),
-  extension: (scripts: Script[] = [], presets: readonly string[] = []) =>
+  extension: (scripts: Script[] = [], presets: readonly LintPreset[] = []) =>
     Effect.gen(function* () {
       const extensions: string[] = []
 

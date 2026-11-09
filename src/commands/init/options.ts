@@ -19,9 +19,17 @@ import {
   listSupportedPackageManagers,
 } from "#lib/workspace/package-json.ts"
 
-const INIT_EDITORS = ["vscode", "zed"] as const
+export const INIT_EDITORS = ["vscode", "zed"] as const
 
-type InitEditor = (typeof INIT_EDITORS)[number]
+export type InitEditor = (typeof INIT_EDITORS)[number]
+
+/**
+ * The name that the interactive prompt shows for each editor.
+ */
+export const INIT_EDITOR_LABELS = {
+  vscode: "VS Code / Cursor / Windsurf",
+  zed: "Zed",
+} as const satisfies Record<InitEditor, string>
 
 /**
  * The setup that init applies. Each optional part exists only with the parts that it needs, so the

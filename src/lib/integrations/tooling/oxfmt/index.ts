@@ -5,6 +5,7 @@ import {
   toOxfmtTsConfigContent,
 } from "#lib/integrations/tooling/oxfmt/config.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
 export default {
   check: commands.check,
@@ -34,7 +35,7 @@ export default {
         : [],
     name: "oxfmt",
     purpose: "the managed `check` and `fix` scripts",
-    scripts: ["check", "fix"],
+    scripts: getScriptsThatRun("oxfmt"),
     version: getDependencyVersion("oxfmt"),
     workspace: ({ isMonorepo }) => ({ isMonorepo }),
   }),

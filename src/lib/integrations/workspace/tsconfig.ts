@@ -10,7 +10,7 @@ import { defineIntegration, type IntegrationAssessment } from "#lib/integrations
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { formatJson, mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
-import { getManagedScripts } from "#lib/workspace/package-json.ts"
+import { getManagedScripts, checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
 const PRESET_EXTENDS = "adamantite/typescript"
@@ -41,7 +41,7 @@ export default defineIntegration({
     Effect.gen(function* () {
       const managedScripts = getManagedScripts(packageJson)
 
-      if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
+      if (!checkRunsTool(managedScripts, "oxlint")) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 

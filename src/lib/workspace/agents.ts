@@ -8,6 +8,7 @@ import type { Script } from "#lib/workspace/package-json.ts"
 import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { getAgentsSectionTemplate } from "#lib/workspace/agents-section.macro.ts" with { type: "macro" }
+import { SCRIPT_ORDER, checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const AGENTS_NAME = "AGENTS.md"
 const agentsSectionTemplate = getAgentsSectionTemplate()
@@ -39,19 +40,16 @@ function getScriptGuidance(
 }
 
 function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGuidanceOptions) {
-  const scriptOrder: Script[] = ["check", "fix", "analyze"]
-
-  const selectedScriptGuidance = scriptOrder.flatMap((script) =>
+  const selectedScriptGuidance = SCRIPT_ORDER.flatMap((script) =>
     scripts.includes(script) ? [getScriptGuidance(packageManager, script, isMonorepo)] : []
   )
 
   // The scripts and customRules values carry their own trailing newline, so an empty value leaves
   // no blank line.
   return fillTemplate(agentsSectionTemplate, {
-    customRules:
-      scripts.includes("check") || scripts.includes("fix")
-        ? '- For custom rules, follow the "Custom rules" section and linked guide in the Adamantite skill. Complete its verification and cleanup checks.\n'
-        : "",
+    customRules: checkRunsTool(scripts, "oxlint")
+      ? '- For custom rules, follow the "Custom rules" section and linked guide in the Adamantite skill. Complete its verification and cleanup checks.\n'
+      : "",
     end: ADAMANTITE_AGENTS_END_MARKER,
     scripts:
       selectedScriptGuidance.length > 0

@@ -12,6 +12,7 @@ import {
   readPackageJson,
   MANAGED_SCRIPT_COMMANDS,
   type ScriptConflict,
+  checkRunsTool,
 } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import type { InitOptionsInput } from "./options.ts"
@@ -91,7 +92,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         })
       : false
 
-  const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
+  const hasOxlint = checkRunsTool(selectedScripts, "oxlint")
   const selectedPresets = hasOxlint ? yield* promptPresets : []
 
   const shouldSetupTypescript = hasOxlint

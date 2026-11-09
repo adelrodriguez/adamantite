@@ -33,6 +33,7 @@ import {
   stringifyJson,
   updateJsonText,
 } from "#lib/shared/json.ts"
+import { checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 
@@ -205,11 +206,11 @@ export default defineIntegration({
     Effect.gen(function* () {
       const extensions: string[] = []
 
-      if (scripts.includes("check") || scripts.includes("fix")) {
+      if (checkRunsTool(scripts, "oxlint")) {
         extensions.push("oxc.oxc-vscode")
       }
 
-      if (scripts.includes("analyze")) {
+      if (checkRunsTool(scripts, "knip")) {
         extensions.push("webpro.vscode-knip")
       }
 

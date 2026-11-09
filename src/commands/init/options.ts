@@ -14,9 +14,9 @@ import {
   checkIsSupportedPackageManager,
   type Script,
   type SupportedPackageManager,
+  SCRIPT_ORDER,
+  checkRunsTool,
 } from "#lib/workspace/package-json.ts"
-
-const INIT_SCRIPTS = ["check", "fix", "analyze"] as const satisfies readonly Script[]
 
 const INIT_EDITORS = ["vscode", "zed"] as const
 
@@ -88,7 +88,7 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  const hasOxlint = options.scripts.includes("check") || options.scripts.includes("fix")
+  const hasOxlint = checkRunsTool(options.scripts, "oxlint")
 
   if (options.presets.length > 0 && !hasOxlint) {
     return yield* new InvalidInitOptions({
@@ -151,8 +151,8 @@ const nonInteractive = Flag.Boolean("non-interactive").pipe(
   Flag.withDescription("Configure without prompts. Select at least one --script")
 )
 
-const scripts = Flag.Literals("script", INIT_SCRIPTS).pipe(
-  Flag.atMost(INIT_SCRIPTS.length),
+const scripts = Flag.Literals("script", SCRIPT_ORDER).pipe(
+  Flag.atMost(SCRIPT_ORDER.length),
   Flag.withDescription(
     "Add a package script. Repeat --script to add more. Required with --non-interactive"
   )

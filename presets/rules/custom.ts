@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import { tmpdir, userInfo } from "node:os"
+import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import process from "node:process"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -129,15 +129,17 @@ function writeIfChanged(path: string, content: string) {
  * entry module after `custom()` writes it. Windows gives each user a temporary directory.
  */
 function getPrivateTemporaryDirectory() {
-  const { uid } = userInfo()
-  const dir = join(tmpdir(), `adamantite-${uid}`)
+  // The effective user ID, without the account lookup of `os.userInfo()`, which throws for a user
+  // without a passwd entry, such as in a container. Windows has no user IDs.
+  const uid = process.geteuid?.()
+  const dir = join(tmpdir(), uid === undefined ? "adamantite" : `adamantite-${uid}`)
 
   mkdirSync(dir, { mode: 0o700, recursive: true })
 
   const stats = lstatSync(dir)
 
   if (
-    process.platform !== "win32"
+    uid !== undefined
     && (!stats.isDirectory() || stats.uid !== uid || (stats.mode & 0o022) !== 0)
   ) {
     throw new Error(`${dir} is not a folder that only the current user can write.`)

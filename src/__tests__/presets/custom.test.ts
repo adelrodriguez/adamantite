@@ -9,7 +9,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs"
-import { tmpdir, userInfo } from "node:os"
+import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import process from "node:process"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -324,6 +324,13 @@ describe("custom preset", () => {
   })
 })
 
+/**
+ * The fallback folder of `custom()` for the current user. The tests that use it skip Windows.
+ */
+function getPrivateFolderName() {
+  return `adamantite-${process.geteuid?.() ?? 0}`
+}
+
 // The shared temporary directory can hold files of other users, so the fallback entry module must
 // go to a folder that only this user can write. A child process gets its own TMPDIR.
 describe.skipIf(process.platform === "win32")("custom preset without node_modules", () => {
@@ -341,14 +348,15 @@ describe.skipIf(process.platform === "win32")("custom preset without node_module
     rmSync(temporary, { force: true, recursive: true })
   })
 
-  function writeEntryModule() {
+  function writeEntryModule(setup: readonly string[] = []) {
     return spawnSync(
       process.execPath,
       [
         "--input-type=module",
         "--eval",
         [
-          `import custom from ${JSON.stringify(pathToFileURL(CUSTOM_PRESET).href)}`,
+          ...setup,
+          `const { default: custom } = await import(${JSON.stringify(pathToFileURL(CUSTOM_PRESET).href)})`,
           `console.log(custom({ dir: ${JSON.stringify(rules)} }).jsPlugins[0].specifier)`,
         ].join("\n"),
       ],
@@ -370,8 +378,23 @@ describe.skipIf(process.platform === "win32")("custom preset without node_module
     expect(statSync(folder).mode & 0o077).toBe(0)
   })
 
+  it("work for a user without an account entry, as in a container", () => {
+    // `os.userInfo()` throws when the user ID has no passwd entry, such as with `docker --user`.
+    const result = writeEntryModule([
+      'import os from "node:os"',
+      'import { syncBuiltinESMExports } from "node:module"',
+      'os.userInfo = () => { throw new Error("no passwd entry") }',
+      "syncBuiltinESMExports()",
+    ])
+
+    expect(result.stderr).toBe("")
+    expect(dirname(fileURLToPath(result.stdout.trim()))).toBe(
+      join(temporary, getPrivateFolderName())
+    )
+  })
+
   it("refuse a fallback folder that another user can write", () => {
-    const folder = join(temporary, `adamantite-${userInfo().uid}`)
+    const folder = join(temporary, getPrivateFolderName())
     mkdirSync(folder)
     chmodSync(folder, 0o777)
 

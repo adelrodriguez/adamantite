@@ -50,7 +50,8 @@ export function setupToolConfig<E, R>(
 ) {
   return Effect.gen(function* () {
     const prompter = yield* Prompter
-    const outcome = yield* prompter.withSpinner(
+    // Init creates only a missing config, so the detected state also tells what init did.
+    const active = yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
           const state = yield* tool.detect(cwd)
@@ -59,31 +60,28 @@ export function setupToolConfig<E, R>(
             yield* prompter.log.warning(warning)
           }
 
-          if (state.active === null) {
+          if (state.active._tag === "Missing") {
             yield* spinner.message(`\`${tool.config}\` not found, creating...`)
             yield* create
-            return { created: true, legacyConfig: null }
+          } else {
+            yield* spinner.message(`Found \`${state.active.file.file}\`, keeping it.`)
           }
 
-          if (state.active.format === "ts") {
-            yield* spinner.message(`Found \`${tool.config}\`, keeping it.`)
-            return { created: false, legacyConfig: null }
-          }
-
-          yield* spinner.message(`Found \`${state.active.file}\`, keeping it.`)
-          return { created: false, legacyConfig: state.active.file }
+          return state.active
         }),
       {
         failure: `Failed to set up ${tool.name} config.`,
         start: `Setting up ${tool.name} config...`,
-        success: (result) =>
-          result.created ? `${tool.name} config created.` : `Existing ${tool.name} config kept.`,
+        success: (detected) =>
+          detected._tag === "Missing"
+            ? `${tool.name} config created.`
+            : `Existing ${tool.name} config kept.`,
       }
     )
 
-    if (outcome.legacyConfig) {
+    if (active._tag === "Legacy") {
       yield* prompter.log.info(
-        `Legacy \`${outcome.legacyConfig}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool.name} config.`
+        `Legacy \`${active.file.file}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool.name} config.`
       )
     }
   })

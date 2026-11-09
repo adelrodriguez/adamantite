@@ -29,15 +29,26 @@ export interface ToolingConfigFileState {
    * Path relative to the target project root, e.g. `knip.json`.
    */
   readonly file: string
-  readonly format: ToolingConfigFormat
   /**
    * Absolute path.
    */
   readonly path: string
 }
 
+/**
+ * The config that the tool uses: none, the latest supported TypeScript config, or a legacy JSON or
+ * JSONC config.
+ */
+export type ActiveToolingConfig =
+  | { readonly _tag: "Missing" }
+  | { readonly _tag: "Current"; readonly file: ToolingConfigFileState }
+  | { readonly _tag: "Legacy"; readonly file: ToolingConfigFileState }
+
 export interface ToolingConfigState {
-  readonly active: ToolingConfigFileState | null
+  readonly active: ActiveToolingConfig
+  /**
+   * The legacy configs that the tool does not use.
+   */
   readonly legacy: readonly ToolingConfigFileState[]
   readonly warnings: readonly string[]
 }
@@ -95,14 +106,14 @@ function getLegacyConfigDisplayName(files: ToolingConfigFiles) {
 function getToolingConfigWarnings(
   toolName: string,
   files: ToolingConfigFiles,
-  active: ToolingConfigFileState | null,
+  active: ActiveToolingConfig,
   legacy: readonly ToolingConfigFileState[]
 ) {
-  if (active === null || legacy.length === 0) {
+  if (active._tag === "Missing" || legacy.length === 0) {
     return []
   }
 
-  if (active.format === "ts") {
+  if (active._tag === "Current") {
     return [
       `Found both \`${files.config}\` and \`${getLegacyConfigDisplayName(files)}\`. Adamantite will use \`${files.config}\`.`,
     ]
@@ -140,13 +151,28 @@ export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
   })
   const present = candidates.filter((_, index) => existence[index])
 
-  const active = pipe(
+  const toFile = ({ file, path }: (typeof candidates)[number]): ToolingConfigFileState => ({
+    file,
+    path,
+  })
+  const activeCandidate = pipe(
     Array.findFirst(present, (candidate) => candidate.format === "ts"),
     Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "jsonc")),
-    Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "json")),
-    Option.getOrNull
+    Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "json"))
   )
-  const legacy = present.filter((candidate) => candidate !== active && candidate.format !== "ts")
+  const active = Option.match(activeCandidate, {
+    onNone: (): ActiveToolingConfig => ({ _tag: "Missing" }),
+    onSome: (candidate): ActiveToolingConfig => ({
+      _tag: candidate.format === "ts" ? "Current" : "Legacy",
+      file: toFile(candidate),
+    }),
+  })
+  const legacy = present
+    .filter(
+      (candidate) =>
+        candidate.format !== "ts" && !Option.exists(activeCandidate, (file) => file === candidate)
+    )
+    .map((candidate) => toFile(candidate))
 
   return {
     active,
@@ -217,12 +243,15 @@ export function getConfigFindings(
   options: {
     readonly configContent: string
     readonly configFile: string
+    /**
+     * The inspection of a `Current` config. The findings ignore it for the other states.
+     */
     readonly inspection?: RequiredConfigInspection
     readonly invalidGoal?: string
     readonly toolName: string
   }
 ): Finding[] {
-  if (state.active === null) {
+  if (state.active._tag === "Missing") {
     return [
       {
         currentState: `The managed \`${options.configFile}\` file is missing.`,
@@ -238,10 +267,10 @@ export function getConfigFindings(
     ]
   }
 
-  if (state.active.format !== "ts") {
+  if (state.active._tag === "Legacy") {
     return [
       {
-        currentState: `Legacy \`${state.active.file}\` is the active ${options.toolName} configuration.`,
+        currentState: `Legacy \`${state.active.file.file}\` is the active ${options.toolName} configuration.`,
         goal: [
           `Move the project settings into \`${options.configFile}\` using the reference content as the base.`,
           `Delete every legacy ${options.toolName} JSON or JSONC config after its settings are preserved.`,
@@ -436,8 +465,8 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
         const packageActions = getPackageActions(packageJson, options, options.purpose)
         const configContent = options.configContent(workspace)
         const inspection =
-          state.active?.format === "ts"
-            ? options.inspectConfig(yield* readFile(state.active.path), workspace)
+          state.active._tag === "Current"
+            ? options.inspectConfig(yield* readFile(state.active.file.path), workspace)
             : undefined
 
         return {

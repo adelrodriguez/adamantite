@@ -108,7 +108,7 @@ export default defineIntegration({
 
       // The active TypeScript config is `oxlint.config.ts`, which the project holds.
       const inspection =
-        state.active?.format === "ts"
+        state.active._tag === "Current"
           ? lintConfig.pipe(
               Option.map((content) => inspectRequiredOxlintConfig(content)),
               Option.getOrUndefined

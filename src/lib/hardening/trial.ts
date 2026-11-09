@@ -19,7 +19,7 @@ import {
 import { listIgnoredFiles, listProjectFiles } from "#lib/hardening/project-files.ts"
 import {
   type CliNotFound,
-  FailedToWriteFile,
+  ProjectCopyFailed,
   InvalidTrialCase,
   TrialCaseIgnored,
   TrialCaseUnparsable,
@@ -381,9 +381,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
 
     return toProjectCopy(copy)
   },
-  Effect.catchTag("PlatformError", (cause) =>
-    Effect.fail(new FailedToWriteFile({ cause, path: "the copy of the project" }))
-  )
+  Effect.catchTag("PlatformError", (cause) => Effect.fail(new ProjectCopyFailed({ cause })))
 )
 
 /**
@@ -605,7 +603,5 @@ export const tryRule = Effect.fn("tryRule")(
     return Array.getSomes(cases.map((trialCase) => Option.fromUndefinedOr(results.get(trialCase))))
   },
   Effect.scoped,
-  Effect.catchTag("PlatformError", (cause) =>
-    Effect.fail(new FailedToWriteFile({ cause, path: "the copy of the project" }))
-  )
+  Effect.catchTag("PlatformError", (cause) => Effect.fail(new ProjectCopyFailed({ cause })))
 )

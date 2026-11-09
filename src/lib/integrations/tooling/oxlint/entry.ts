@@ -1,10 +1,18 @@
 import { fileURLToPath } from "node:url"
 
 /**
- * The entry that runs Oxlint with the project's Oxlint runtime. The build writes it beside the CLI
- * bundle, as `dist/oxlint.js`, so the CLI runs the entry of its own version.
+ * The file name of the entry that runs Oxlint with the project's Oxlint runtime. The build writes
+ * it beside the CLI bundle, as `dist/oxlint.js`, so the CLI runs the entry of its own version.
+ * `scripts/test-build.ts` checks that the build writes it.
  */
-const OXLINT_ENTRY = fileURLToPath(new URL("oxlint.js", import.meta.url))
+export const OXLINT_ENTRY_FILE = "oxlint.js"
+
+/**
+ * The entry as an editor in the target project starts it, relative to the workspace folder.
+ */
+export const EDITOR_OXLINT_ENTRY = `node_modules/adamantite/dist/${OXLINT_ENTRY_FILE}`
+
+const OXLINT_ENTRY = fileURLToPath(new URL(OXLINT_ENTRY_FILE, import.meta.url))
 
 /**
  * The variable through which a command names the project that the entry runs Oxlint for.

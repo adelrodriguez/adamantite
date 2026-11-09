@@ -13,6 +13,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { readEffectEditor } from "#lib/integrations/editors/effect.ts"
+import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { EffectEditorUnavailable, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
@@ -105,7 +106,7 @@ const CONFIG = {
     // Zed starts the language server in the worktree root, so the relative entry path resolves. The
     // entry finds the project from that path and loads the project's Oxlint runtime.
     oxlint: {
-      binary: { arguments: ["node_modules/adamantite/dist/oxlint.js", "--lsp"], path: "node" },
+      binary: { arguments: [EDITOR_OXLINT_ENTRY, "--lsp"], path: "node" },
       initialization_options: {
         settings: {
           configPath: null,

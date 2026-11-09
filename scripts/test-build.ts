@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import packageJson from "../package.json" with { type: "json" }
+import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/tooling/oxlint/entry.ts"
 
 const cliPath = join(import.meta.dirname, "..", "bin", "adamantite")
 
@@ -22,6 +23,13 @@ if (!output.includes(expectedVersion)) {
 }
 
 console.info(`Verified built CLI: ${expectedVersion}`)
+
+// Editors start the entry from the target project's node_modules by this file name.
+if (!existsSync(join(import.meta.dirname, "..", "dist", OXLINT_ENTRY_FILE))) {
+  throw new Error(`Expected the build to write the Oxlint entry dist/${OXLINT_ENTRY_FILE}.`)
+}
+
+console.info(`Verified the Oxlint entry: dist/${OXLINT_ENTRY_FILE}`)
 
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-cli-"))
 

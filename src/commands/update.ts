@@ -26,6 +26,13 @@ const knownPackages = [
   knip,
 ] as const satisfies readonly ToolingPackage[]
 
+/**
+ * What one step of update did. `idle` means that the step found nothing to update. A step that
+ * fails while it checks for work found none, and a step that fails while it applies work found
+ * some. Each failure leaves a warning, and update continues.
+ */
+type StepOutcome = "applied" | "applyFailed" | "checkFailed" | "idle"
+
 export default Command.make("update").pipe(
   Command.withDescription(
     "Update managed packages and the Adamantite skill, then report setup issues"
@@ -76,50 +83,60 @@ export default Command.make("update").pipe(
         )
       }
 
+      // A failed package update fails the whole command.
+      const packages: StepOutcome = updates.length === 0 ? "idle" : "applied"
+
       // The skill that init wrote is a copy, so it stays at the Adamantite version that wrote it.
-      const staleSkillFolders = yield* findStaleSkillFolders(cwd).pipe(
+      const skill: StepOutcome = yield* findStaleSkillFolders(cwd).pipe(
+        Effect.flatMap((folders) =>
+          folders.length === 0
+            ? Effect.succeed("idle" as const)
+            : prompter
+                .withSpinner(() => writeSkill(cwd, folders), {
+                  failure: "Failed to refresh the Adamantite skill.",
+                  start: "Refreshing the Adamantite skill...",
+                  success: "Adamantite skill refreshed.",
+                })
+                .pipe(
+                  Effect.as("applied" as const),
+                  Effect.catchTag(
+                    ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
+                    (error) =>
+                      prompter.log
+                        .warning(`Could not refresh the Adamantite skill. ${error.message}`)
+                        .pipe(Effect.as("applyFailed" as const))
+                  )
+                )
+        ),
         Effect.catchTag("FailedToReadFile", (error) =>
-          Effect.as(
-            prompter.log.warning(`Could not check the Adamantite skill. ${error.message}`),
-            []
-          )
+          prompter.log
+            .warning(`Could not check the Adamantite skill. ${error.message}`)
+            .pipe(Effect.as("checkFailed" as const))
         )
       )
 
-      if (staleSkillFolders.length > 0) {
-        yield* prompter
-          .withSpinner(() => writeSkill(cwd, staleSkillFolders), {
-            failure: "Failed to refresh the Adamantite skill.",
-            start: "Refreshing the Adamantite skill...",
-            success: "Adamantite skill refreshed.",
-          })
-          .pipe(
-            Effect.catchTag(
-              ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
-              (error) =>
-                prompter.log.warning(`Could not refresh the Adamantite skill. ${error.message}`)
-            )
-          )
-      }
-
       // `npx skills add` records the skill in `skills-lock.json`, and `skills update` would then
       // write the same folders. Adamantite owns the copy, so the lock entry goes away.
-      const removedLockEntry = yield* removeSkillsLockEntry(cwd).pipe(
-        Effect.tap((removed) =>
+      const lockWarning = (error: { readonly message: string }) =>
+        prompter.log.warning(`Could not update \`skills-lock.json\`. ${error.message}`)
+      const lock: StepOutcome = yield* removeSkillsLockEntry(cwd).pipe(
+        Effect.flatMap((removed) =>
           removed
-            ? prompter.log.info("Removed the `adamantite` entry from `skills-lock.json`.")
-            : Effect.void
+            ? prompter.log
+                .info("Removed the `adamantite` entry from `skills-lock.json`.")
+                .pipe(Effect.as("applied" as const))
+            : Effect.succeed("idle" as const)
         ),
-        Effect.catchTag(["FailedToParseFile", "FailedToReadFile", "FailedToWriteFile"], (error) =>
-          Effect.as(
-            prompter.log.warning(`Could not update \`skills-lock.json\`. ${error.message}`),
-            false
-          )
+        Effect.catchTag(["FailedToParseFile", "FailedToReadFile"], (error) =>
+          lockWarning(error).pipe(Effect.as("checkFailed" as const))
+        ),
+        Effect.catchTag("FailedToWriteFile", (error) =>
+          lockWarning(error).pipe(Effect.as("applyFailed" as const))
         )
       )
 
       const finalAssessment =
-        updates.length === 0 ? assessment : yield* assessProject(yield* readProject(cwd))
+        packages === "idle" ? assessment : yield* assessProject(yield* readProject(cwd))
 
       for (const warning of finalAssessment.warnings) {
         yield* prompter.log.warning(warning)
@@ -134,12 +151,11 @@ export default Command.make("update").pipe(
         )
       }
 
-      if (
-        updates.length === 0
-        && staleSkillFolders.length === 0
-        && !removedLockEntry
-        && findings.length === 0
-      ) {
+      const foundWork = [packages, skill, lock].some(
+        (outcome) => outcome === "applied" || outcome === "applyFailed"
+      )
+
+      if (!foundWork && findings.length === 0) {
         return "no-changes" as const
       }
 

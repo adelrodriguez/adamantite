@@ -1,5 +1,13 @@
-import { createHash } from "node:crypto"
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { createHash, randomUUID } from "node:crypto"
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, isAbsolute, join, resolve } from "node:path"
 import process from "node:process"
@@ -114,13 +122,38 @@ function findNodeModules(from: string) {
   }
 }
 
+function hasContent(path: string, content: string) {
+  return existsSync(path) && readFileSync(path, "utf8") === content
+}
+
+/**
+ * Write `content` to `path` unless the file already holds it. Several Oxlint processes can load the
+ * config at once, as in a monorepo task runner, and one can import the module while another writes
+ * it. A write in place truncates the file first, so the module goes to a temporary file that a
+ * rename moves over `path` in one step.
+ */
 function writeIfChanged(path: string, content: string) {
-  if (existsSync(path) && readFileSync(path, "utf8") === content) {
+  if (hasContent(path, content)) {
     return
   }
 
   mkdirSync(dirname(path), { recursive: true })
-  writeFileSync(path, content)
+
+  const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
+
+  writeFileSync(temporary, content, { flag: "wx" })
+
+  try {
+    renameSync(temporary, path)
+  } catch (error) {
+    rmSync(temporary, { force: true })
+
+    // Windows refuses to replace a file that another process has open. That process wrote the
+    // same content, because the file name comes from the content.
+    if (!hasContent(path, content)) {
+      throw error
+    }
+  }
 }
 
 /**
@@ -154,7 +187,12 @@ function getPrivateTemporaryDirectory() {
  * directory when no `node_modules` folder is found or it cannot be written.
  */
 function writeEntryModule(dir: string, name: string) {
-  const hash = createHash("sha256").update(`${dir}\0${name}`).digest("hex").slice(0, 16)
+  // The content names this Adamantite copy, so two installed copies get two files.
+  const hash = createHash("sha256")
+    .update(`${RULES_MODULE_URL}\0${dir}\0${name}`)
+    .digest("hex")
+    .slice(0, 16)
+
   const fileName = `rules-${hash}.mjs`
 
   const content = [

@@ -4,13 +4,14 @@ import {
   mkdirSync,
   mkdtempSync,
   readdirSync,
+  readFileSync,
   rmSync,
   statSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import process from "node:process"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
@@ -299,6 +300,49 @@ describe("custom preset", () => {
       "project(no-debugger-here):error",
       "web(no-debugger-in-web):error",
     ])
+  })
+
+  it("give each Adamantite copy its own entry module for one rules folder", () => {
+    write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
+
+    // Two installed copies, such as two versions in a monorepo, load the same rules folder. Each
+    // entry module imports `loadRules` from its own copy, so the copies must not share the file.
+    const results = ["a", "b"].map((copy) => {
+      for (const file of ["custom.ts", "folder.ts"]) {
+        write(
+          `copies/${copy}/${file}`,
+          readFileSync(join(REPO_ROOT, "presets/rules", file), "utf8")
+        )
+      }
+
+      const result = spawnSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "--eval",
+          [
+            `import custom from ${JSON.stringify(pathToFileURL(join(project, `copies/${copy}/custom.ts`)).href)}`,
+            `console.log(custom({ dir: ${JSON.stringify(join(project, ".adamantite/lint"))} }).jsPlugins[0].specifier)`,
+          ].join("\n"),
+        ],
+        { encoding: "utf8" }
+      )
+
+      return { error: result.stderr, specifier: result.stdout.trim() }
+    })
+
+    const specifiers = results.map((result) => result.specifier)
+
+    expect(results.map((result) => result.error)).toStrictEqual(["", ""])
+    expect(new Set(specifiers).size).toBe(2)
+    expect(
+      EffectArray.sort(readdirSync(join(project, "node_modules/.cache/adamantite")), Order.String)
+    ).toStrictEqual(
+      EffectArray.sort(
+        specifiers.map((specifier) => basename(fileURLToPath(specifier))),
+        Order.String
+      )
+    )
   })
 
   // Bun prints stack frames as plain paths, where Node.js prints file URLs.

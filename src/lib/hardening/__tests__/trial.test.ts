@@ -6,8 +6,10 @@ import {
   parseTrialCase,
   renderOverrideTrialConfig,
   renderTrialConfig,
+  TRIAL_SKIPPED_MODULES_ENTRY,
 } from "#lib/hardening/trial.ts"
 import { InvalidTrialCase } from "#lib/shared/errors.ts"
+import { CACHE_DIRECTORY } from "#presets/rules/folder.ts"
 
 describe("parseTrialCase", () => {
   it.effect("read a project path, and a path with the file that holds its content", () =>
@@ -120,5 +122,16 @@ describe("replaceConfigs", () => {
     expectTypeOf<Parameters<typeof replaceConfigs>[1]>().toEqualTypeOf<
       ReadonlyMap<string, (base: string) => string>
     >()
+  })
+})
+
+describe("project copy", () => {
+  it("skip the node_modules folder where custom() writes its entry modules", () => {
+    // The copy links every other node_modules entry to the project, so a linked cache folder
+    // would let custom() in the copy write into the project.
+    expect(CACHE_DIRECTORY.split(/[/\\]/u).slice(0, 2)).toStrictEqual([
+      "node_modules",
+      TRIAL_SKIPPED_MODULES_ENTRY,
+    ])
   })
 })

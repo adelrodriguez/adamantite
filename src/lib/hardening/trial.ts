@@ -96,6 +96,13 @@ export interface TrialCaseResult {
 const BASE_CONFIG_NAME = "oxlint.trial-base.config"
 
 /**
+ * The `node_modules` entry that the copy does not link to the project. `custom()` writes its entry
+ * modules below it, so they stay in the copy. A test keeps it equal to the cache folder in
+ * `presets/rules/folder.ts`.
+ */
+export const TRIAL_SKIPPED_MODULES_ENTRY = ".cache"
+
+/**
  * Parses a case of `rule try`: a project path, or `<path>=<file>` to lint the content of `<file>`
  * at `<path>`. The path must stay inside the project.
  */
@@ -288,7 +295,9 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       const entries = yield* readDirectoryIfExists(modules)
 
       const packages = yield* Effect.forEach(
-        Option.getOrElse(entries, () => []).filter((entry) => entry !== ".cache"),
+        Option.getOrElse(entries, () => []).filter(
+          (entry) => entry !== TRIAL_SKIPPED_MODULES_ENTRY
+        ),
         Effect.fnUntraced(function* (entry) {
           const isScope =
             entry.startsWith("@")

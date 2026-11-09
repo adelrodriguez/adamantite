@@ -19,7 +19,8 @@ import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   getManagedScripts,
-  normalizeDependencyVersion,
+  matchDeclaredVersion,
+  parseDependencySpecifier,
   type Script,
 } from "#lib/workspace/package-json.ts"
 
@@ -202,61 +203,126 @@ export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
   } satisfies ToolingConfigState
 })
 
+export interface PackageAssessment {
+  readonly findings: readonly Finding[]
+  readonly packageActions: readonly PackageAction[]
+  readonly warnings: readonly string[]
+}
+
+const CURRENT: PackageAssessment = { findings: [], packageActions: [], warnings: [] }
+
 /**
- * Classify package drift for a managed tooling package: missing install or version mismatch.
+ * Compare the version that the project declares for a managed package with the version that
+ * Adamantite requires. `adamantite update` installs a missing or outdated package. A version from a
+ * pnpm catalog needs a change to the catalog, which `update` does not make, because `pnpm add`
+ * replaces the `catalog:` specifier.
  */
-export function getPackageActions(
-  packageJson: PackageJson,
+export function assessPackage(
+  { packageJson, workspace: { catalogs } }: Pick<Project, "packageJson" | "workspace">,
   pkg: ToolingPackage,
-  purpose: string
-): PackageAction[] {
+  purpose: string,
+  integration: string
+): PackageAssessment {
   const specifier = packageJson.devDependencies?.[pkg.name] ?? packageJson.dependencies?.[pkg.name]
 
   if (!specifier) {
-    return [
-      {
-        description: `Install \`${pkg.name}@${pkg.version}\` for ${purpose}.`,
-        package: pkg.name,
-        targetVersion: pkg.version,
-        type: "install_package",
-      },
-    ]
+    return {
+      findings: [
+        {
+          currentState: `The required package \`${pkg.name}\` is not installed.`,
+          goal: [`Run \`adamantite update\` so \`${pkg.name}@${pkg.version}\` is installed.`],
+          id: `missing-${pkg.name}`,
+          integration,
+          title: `Missing ${pkg.name}`,
+        },
+      ],
+      packageActions: [
+        {
+          description: `Install \`${pkg.name}@${pkg.version}\` for ${purpose}.`,
+          package: pkg.name,
+          targetVersion: pkg.version,
+          type: "install_package",
+        },
+      ],
+      warnings: [],
+    }
   }
 
-  if (normalizeDependencyVersion(specifier) !== pkg.version) {
-    return [
-      {
-        currentVersion: specifier,
-        description: `Update \`${pkg.name}\` from \`${specifier}\` to \`${pkg.version}\`.`,
-        package: pkg.name,
-        targetVersion: pkg.version,
-        type: "update_package",
-      },
-    ]
+  function unreadable(declared: string): PackageAssessment {
+    return {
+      findings: [],
+      packageActions: [],
+      warnings: [
+        `\`${pkg.name}\` is declared as \`${declared}\`, so Adamantite cannot check it against the required version \`${pkg.version}\`.`,
+      ],
+    }
   }
 
-  return []
-}
+  function outdatedCatalog(catalog: string, entry: string): PackageAssessment {
+    const catalogName = catalog === "default" ? "the `catalog`" : `the \`${catalog}\` catalog`
 
-export function getPackageFindings(
-  actions: readonly PackageAction[],
-  integration: string
-): Finding[] {
-  return actions.map((action) => ({
-    currentState:
-      action.type === "install_package"
-        ? `The required package \`${action.package}\` is not installed.`
-        : `The installed \`${action.package}\` version is \`${action.currentVersion}\`, but Adamantite requires \`${action.targetVersion}\`.`,
-    goal: [
-      `Run \`adamantite update\` so \`${action.package}@${action.targetVersion}\` is installed.`,
-    ],
-    id: `${action.type === "install_package" ? "missing" : "outdated"}-${action.package}`,
-    integration,
-    title:
-      action.type === "install_package"
-        ? `Missing ${action.package}`
-        : `Outdated ${action.package}`,
-  }))
+    return {
+      findings: [
+        {
+          currentState: `${catalogName} of \`pnpm-workspace.yaml\` sets \`${pkg.name}\` to \`${entry}\`, but Adamantite requires \`${pkg.version}\`.`,
+          goal: [
+            `Set \`${pkg.name}\` to \`${pkg.version}\` in ${catalogName} of \`pnpm-workspace.yaml\`, then install the dependencies.`,
+          ],
+          id: `outdated-${pkg.name}`,
+          integration,
+          notes: [
+            "Keep the `catalog:` specifier in `package.json`. `adamantite update` does not change catalogs.",
+          ],
+          title: `Outdated ${pkg.name}`,
+        },
+      ],
+      packageActions: [],
+      warnings: [],
+    }
+  }
+
+  return matchDeclaredVersion(parseDependencySpecifier(specifier), {
+    Catalog: ({ catalog }) => {
+      const entry = catalogs[catalog]?.[pkg.name]
+
+      if (entry === undefined) {
+        return unreadable(specifier)
+      }
+
+      // A catalog entry is itself a specifier, but a catalog cannot refer to another catalog.
+      return matchDeclaredVersion(parseDependencySpecifier(entry), {
+        Catalog: () => unreadable(specifier),
+        Unreadable: () => unreadable(specifier),
+        Version: ({ version }) =>
+          version === pkg.version ? CURRENT : outdatedCatalog(catalog, entry),
+      })
+    },
+    Unreadable: () => unreadable(specifier),
+    Version: ({ version }): PackageAssessment =>
+      version === pkg.version
+        ? CURRENT
+        : {
+            findings: [
+              {
+                currentState: `The installed \`${pkg.name}\` version is \`${specifier}\`, but Adamantite requires \`${pkg.version}\`.`,
+                goal: [`Run \`adamantite update\` so \`${pkg.name}@${pkg.version}\` is installed.`],
+                id: `outdated-${pkg.name}`,
+                integration,
+                title: `Outdated ${pkg.name}`,
+              },
+            ],
+            packageActions: [
+              {
+                currentVersion: specifier,
+                description: `Update \`${pkg.name}\` from \`${specifier}\` to \`${pkg.version}\`.`,
+                package: pkg.name,
+                targetVersion: pkg.version,
+                type: "update_package",
+              },
+            ],
+            warnings: [],
+          },
+  })
 }
 
 export function getConfigFindings(
@@ -382,13 +448,13 @@ export function definePackageTooling(options: {
             : { applicable: false }
         }
 
-        const packageActions = getPackageActions(packageJson, options, options.purpose)
+        const pkg = assessPackage(project, options, options.purpose, options.name)
 
         return {
           applicable: true,
-          findings: [...getPackageFindings(packageActions, options.name), ...legacyFindings],
-          packageActions,
-          warnings: [],
+          findings: [...pkg.findings, ...legacyFindings],
+          packageActions: pkg.packageActions,
+          warnings: pkg.warnings,
         }
       }),
     kind: "tooling",
@@ -463,8 +529,15 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
   const detect = (cwd: string) => detectToolingConfig(cwd, options.name, options.configFiles)
 
   return defineIntegration({
-    assess: ({ cwd, lintConfig, packageJson, workspace: { isMonorepo } }: Project) =>
+    assess: (project: Project) =>
       Effect.gen(function* () {
+        const {
+          cwd,
+          lintConfig,
+          packageJson,
+          workspace: { isMonorepo },
+        } = project
+
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 
         if (!checkHasManagedScript(packageJson, options.scripts)) {
@@ -482,7 +555,7 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
 
         const state = yield* detect(cwd)
         const workspace = options.workspace({ isMonorepo, lintConfig })
-        const packageActions = getPackageActions(packageJson, options, options.purpose)
+        const pkg = assessPackage(project, options, options.purpose, options.name)
         const configContent = options.configContent(workspace)
 
         const inspection =
@@ -493,7 +566,7 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
         return {
           applicable: true,
           findings: [
-            ...getPackageFindings(packageActions, options.name),
+            ...pkg.findings,
             ...getConfigFindings(state, {
               configContent,
               configFile: options.configFiles.config,
@@ -502,8 +575,8 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
             }),
             ...legacyFindings,
           ],
-          packageActions,
-          warnings: state.warnings,
+          packageActions: pkg.packageActions,
+          warnings: [...pkg.warnings, ...state.warnings],
         } satisfies IntegrationAssessment
       }),
     config: options.configFiles.config,

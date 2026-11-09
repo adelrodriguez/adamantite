@@ -4,7 +4,7 @@ import * as Effect from "effect/Effect"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
-import { getPackageActions } from "#lib/integrations/tooling/base.ts"
+import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
@@ -45,7 +45,8 @@ export default Command.make("update").pipe(
       yield* prompter.intro("💠 adamantite update")
 
       const packageJson = yield* readPackageJson(cwd)
-      const assessment = yield* assessProject(yield* readProject(cwd, packageJson))
+      const project = yield* readProject(cwd, packageJson)
+      const assessment = yield* assessProject(project)
       const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
 
@@ -54,7 +55,7 @@ export default Command.make("update").pipe(
         // A known package that the project does not install stays uninstalled.
         ...knownPackages
           .filter((pkg) => !coveredPackages.has(pkg.name))
-          .flatMap((pkg) => getPackageActions(packageJson, pkg, "Adamantite"))
+          .flatMap((pkg) => assessPackage(project, pkg, "Adamantite", "adamantite").packageActions)
           .filter((action) => action.type === "update_package"),
       ]
 

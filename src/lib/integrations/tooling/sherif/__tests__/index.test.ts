@@ -70,6 +70,28 @@ describe("sherif", () => {
       })
     )
 
+    it.effect("accept a pnpm catalog entry at the required version", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": yield* stringifyJson({
+            devDependencies: { sherif: "catalog:" },
+            name: "test-project",
+            scripts: { analyze: "adamantite analyze" },
+          }),
+          "pnpm-workspace.yaml": `packages:\n  - packages/*\ncatalog:\n  sherif: ${sherif.version}\n`,
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
+      })
+    )
+
     it.effect("report not applicable for a managed analyze script outside a monorepo", () =>
       Effect.gen(function* () {
         const files = makeFiles({

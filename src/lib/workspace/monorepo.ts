@@ -12,45 +12,80 @@ import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const PnpmWorkspace = Schema.Struct({ packages: Schema.Array(Schema.String) })
 
+const PnpmCatalogs = Schema.Struct({
+  catalog: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+  catalogs: Schema.optionalKey(
+    Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String))
+  ),
+})
+
+/**
+ * The pnpm catalogs of the project by name, each a map from a package name to its specifier. The
+ * `catalog` field of `pnpm-workspace.yaml` is the catalog named `default`.
+ */
+export type Catalogs = Readonly<Record<string, Readonly<Record<string, string>>>>
+
+const parseYaml = (content: string) =>
+  Effect.try({
+    catch: (cause) => new FailedToParseYaml({ cause, path: "pnpm-workspace.yaml" }),
+    try: () => Yaml.parse(content),
+  })
+
 /**
  * The package patterns in a `pnpm-workspace.yaml`. A file that does not parse, or that has no
  * `packages` list, declares none.
  */
 export const readPnpmWorkspacePatterns = (content: string) =>
-  Effect.try({
-    catch: (cause) => new FailedToParseYaml({ cause, path: "pnpm-workspace.yaml" }),
-    try: () => Yaml.parse(content),
-  }).pipe(
+  parseYaml(content).pipe(
     Effect.flatMap((parsed) => Schema.decodeUnknownEffect(PnpmWorkspace)(parsed)),
     Effect.map(({ packages }) => packages),
     Effect.orElseSucceed(() => [])
   )
 
 /**
- * The workspace patterns of the project: the `packages` of `pnpm-workspace.yaml`, or the
- * `workspaces` of `package.json` when `pnpm-workspace.yaml` declares none. A `pnpm-workspace.yaml`
- * can hold only settings, such as `allowBuilds`.
+ * The catalogs in a `pnpm-workspace.yaml`. A file that does not parse, or whose catalogs do not
+ * decode, declares none.
  */
-const readWorkspacePatterns = (cwd: string) =>
+const readPnpmCatalogs = (content: string) =>
+  parseYaml(content).pipe(
+    Effect.flatMap((parsed) => Schema.decodeUnknownEffect(PnpmCatalogs)(parsed)),
+    Effect.map(({ catalog, catalogs = {} }) =>
+      catalog === undefined ? catalogs : { ...catalogs, default: catalog }
+    ),
+    Effect.orElseSucceed(() => ({}))
+  )
+
+/**
+ * The workspace declarations of the project. The patterns are the `packages` of
+ * `pnpm-workspace.yaml`, or the `workspaces` of `package.json` when `pnpm-workspace.yaml` declares
+ * none. A `pnpm-workspace.yaml` can hold only settings, such as `allowBuilds`.
+ */
+const readWorkspaceDeclarations = (cwd: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const pnpmWorkspace = yield* readFileIfExists(path.join(cwd, "pnpm-workspace.yaml"))
 
-    const pnpmPatterns = Option.isSome(pnpmWorkspace)
-      ? yield* readPnpmWorkspacePatterns(pnpmWorkspace.value)
-      : []
+    const [pnpmPatterns, catalogs] = Option.isSome(pnpmWorkspace)
+      ? yield* Effect.all([
+          readPnpmWorkspacePatterns(pnpmWorkspace.value),
+          readPnpmCatalogs(pnpmWorkspace.value),
+        ])
+      : [[], {}]
 
     if (pnpmPatterns.length > 0) {
-      return pnpmPatterns
+      return { catalogs, patterns: pnpmPatterns }
     }
 
     const { workspaces } = yield* readPackageJson(cwd)
 
-    return (Array.isArray(workspaces) ? workspaces : workspaces?.packages) ?? []
+    return {
+      catalogs,
+      patterns: (Array.isArray(workspaces) ? workspaces : workspaces?.packages) ?? [],
+    }
   })
 
 export const checkIsMonorepo = (cwd: string = process.cwd()) =>
-  readWorkspacePatterns(cwd).pipe(Effect.map((patterns) => patterns.length > 0))
+  readWorkspaceDeclarations(cwd).pipe(Effect.map(({ patterns }) => patterns.length > 0))
 
 function escapeRegExp(text: string) {
   return text.replaceAll(/[$()+.[\\\]^{|}]/gu, String.raw`\$&`)
@@ -178,6 +213,10 @@ const findPackageDirectories = (cwd: string, patterns: readonly string[]) =>
  * also before any package exists.
  */
 export interface Workspace {
+  /**
+   * The pnpm catalogs that `catalog:` dependency specifiers refer to.
+   */
+  readonly catalogs: Catalogs
   readonly isMonorepo: boolean
   /**
    * The absolute directories of the workspace packages, without the root.
@@ -190,9 +229,10 @@ export interface Workspace {
  */
 export const readWorkspace = (cwd: string) =>
   Effect.gen(function* () {
-    const patterns = yield* readWorkspacePatterns(cwd)
+    const { catalogs, patterns } = yield* readWorkspaceDeclarations(cwd)
 
     return {
+      catalogs,
       isMonorepo: patterns.length > 0,
       packageDirectories: yield* findPackageDirectories(cwd, patterns),
     } satisfies Workspace

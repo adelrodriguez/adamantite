@@ -122,7 +122,7 @@ function makeConfig(body: string) {
 }
 
 // The fixtures without a workspace package declare no workspace.
-const NO_WORKSPACE: Workspace = { isMonorepo: false, packageDirectories: [] }
+const NO_WORKSPACE: Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
 
 function makeCase(filePath: string, expected: TrialCase["expected"], source?: string): TrialCase {
   return { expected, path: filePath, source: Option.fromUndefinedOr(source) }
@@ -303,7 +303,7 @@ describe("rule trials in a real project", () => {
         "project/no-debugger-here",
         new CurrentSetting(),
         [makeCase("src/legacy.ts", "reported")],
-        { isMonorepo: true, packageDirectories: [join(project, "packages/tooling")] }
+        { catalogs: {}, isMonorepo: true, packageDirectories: [join(project, "packages/tooling")] }
       )
 
       expect(getReportCounts(results)).toStrictEqual([1])

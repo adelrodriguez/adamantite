@@ -1,7 +1,9 @@
 import { posix } from "node:path"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import { readFileIfFile } from "#lib/shared/filesystem.ts"
 
 /**
  * The Markdown files that a coding agent can find from `AGENTS.md`. Paths are relative to the
@@ -68,9 +70,12 @@ export const readAgentReach = Effect.fn("readAgentReach")(function* (
     yield* Effect.forEach(
       files,
       (file) =>
-        fs.readFileString(path.join(cwd, file)).pipe(
-          Effect.orElseSucceed(() => ""),
-          Effect.map((content) => [file, content.replaceAll(FENCED_BLOCK, "")] as const)
+        // Git can list a file that a delete or a sparse checkout left out of the working tree.
+        readFileIfFile(path.join(cwd, file)).pipe(
+          Effect.map(
+            (content) =>
+              [file, Option.getOrElse(content, () => "").replaceAll(FENCED_BLOCK, "")] as const
+          )
         ),
       { concurrency: "unbounded" }
     )

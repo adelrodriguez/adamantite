@@ -1,5 +1,6 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -13,6 +14,7 @@ import {
   InvalidCheckOptions,
   InvalidFixOptions,
 } from "#lib/shared/errors.ts"
+import { checkExists } from "#lib/shared/filesystem.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
@@ -127,13 +129,18 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
 }) {
   const runner = yield* CommandRunner
 
-  // Without a usable manifest there is no monorepo to analyze. Knip reports the manifest.
-  const isMonorepo = yield* checkIsMonorepo(cwd).pipe(
-    Effect.catchTags({
-      FailedToParseFile: () => Effect.succeed(false),
-      FailedToReadFile: () => Effect.succeed(false),
-    })
-  )
+  const path = yield* Path.Path
+
+  // Without a usable manifest there is no monorepo to analyze. Knip reports the manifest. Any other
+  // read failure, such as of `pnpm-workspace.yaml`, could hide a monorepo, so it propagates.
+  const isMonorepo =
+    (yield* checkExists(path.join(cwd, "package.json")))
+    && (yield* checkIsMonorepo(cwd).pipe(
+      Effect.catchTags({
+        FailedToParseFile: () => Effect.succeed(false),
+        InvalidPackageJson: () => Effect.succeed(false),
+      })
+    ))
 
   if (only === "monorepo") {
     if (strict) {

@@ -36,6 +36,10 @@ export interface FileSystemTestContext {
    * Make writes to the path fail with a `PermissionDenied` system error.
    */
   readonly makeReadOnly: (path: string) => void
+  /**
+   * Make reads and existence checks of the path fail with a `PermissionDenied` system error.
+   */
+  readonly makeUnreadable: (path: string) => void
 }
 
 /**
@@ -99,6 +103,7 @@ export function createFileSystemTestContext(options?: {
   const files = new Map<string, string>()
   const directories = new Set<string>([root])
   const readOnlyPaths = new Set<string>()
+  const unreadablePaths = new Set<string>()
 
   // Register every ancestor so strict parent-directory checks pass for roots.
   for (let current = root; dirname(current) !== current; current = dirname(current)) {
@@ -189,7 +194,9 @@ export function createFileSystemTestContext(options?: {
     exists: (path) => {
       const target = normalize(path)
 
-      return Effect.succeed(files.has(target) || directories.has(target))
+      return unreadablePaths.has(target)
+        ? Effect.fail(makeSystemError("PermissionDenied", "exists", path))
+        : Effect.succeed(files.has(target) || directories.has(target))
     },
     glob: makeUnimplemented("glob"),
     link: makeUnimplemented("link"),
@@ -250,6 +257,11 @@ export function createFileSystemTestContext(options?: {
     readFileString: (path) =>
       Effect.suspend(() => {
         const target = normalize(path)
+
+        if (unreadablePaths.has(target)) {
+          return Effect.fail(makeSystemError("PermissionDenied", "readFileString", path))
+        }
+
         const content = files.get(target)
 
         if (content !== undefined) {
@@ -363,6 +375,9 @@ export function createFileSystemTestContext(options?: {
       ),
     makeReadOnly: (path) => {
       readOnlyPaths.add(normalize(path))
+    },
+    makeUnreadable: (path) => {
+      unreadablePaths.add(normalize(path))
     },
     read: (path) => {
       const content = files.get(normalize(path))

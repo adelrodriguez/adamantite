@@ -1,7 +1,6 @@
 import * as Array from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
-import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import {
@@ -15,7 +14,7 @@ import {
 import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfig } from "#lib/hardening/trial.ts"
-import { readFile } from "#lib/shared/filesystem.ts"
+import { checkExists, readFile } from "#lib/shared/filesystem.ts"
 
 /**
  * An entry of `overrides` in an Oxlint config that turns one or more rules off.
@@ -245,7 +244,6 @@ export function findRuleOffOverrides(file: string, content: string): RuleOffOver
  */
 export const readOverrides = Effect.fn("readOverrides")(
   function* (cwd: string, workspace: Workspace, configs: readonly string[], scope: string | null) {
-    const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
 
     const isInScope = (file: string) =>
@@ -284,7 +282,7 @@ export const readOverrides = Effect.fn("readOverrides")(
     const existing = new Set(
       yield* Effect.filter(
         Array.dedupe(entries.flatMap((entry) => entry.literals)),
-        (file) => fs.exists(path.join(cwd, file)).pipe(Effect.orElseSucceed(() => false)),
+        (file) => checkExists(path.join(cwd, file)),
         { concurrency: "unbounded" }
       )
     )

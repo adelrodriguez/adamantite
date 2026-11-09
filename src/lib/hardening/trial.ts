@@ -27,7 +27,7 @@ import {
   TrialProjectUnlisted,
   TrialRuleNotFound,
 } from "#lib/shared/errors.ts"
-import { readDirectoryIfExists, readFile, writeFile } from "#lib/shared/filesystem.ts"
+import { checkExists, readDirectoryIfExists, readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { CONFIG_FILES } from "#lib/workspace/custom-rules/discover.ts"
 
 /**
@@ -368,7 +368,6 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
  * folder above it, as Oxlint finds nested configs.
  */
 const findConfig = Effect.fn("findConfig")(function* (copy: string, file: string) {
-  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const candidates: string[] = []
 
@@ -380,9 +379,7 @@ const findConfig = Effect.fn("findConfig")(function* (copy: string, file: string
     candidates.push(...CONFIG_FILES.map((name) => path.join(folder, name)))
   }
 
-  return yield* Effect.findFirst(candidates, (candidate) =>
-    fs.exists(candidate).pipe(Effect.orElseSucceed(() => false))
-  )
+  return yield* Effect.findFirst(candidates, (candidate) => checkExists(candidate))
 })
 
 /**

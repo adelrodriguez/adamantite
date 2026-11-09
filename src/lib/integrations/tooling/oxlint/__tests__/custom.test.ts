@@ -8,6 +8,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
+import { FailedToReadFile } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readProject } from "#lib/workspace/project.ts"
@@ -337,6 +338,26 @@ describe("oxlint-custom", () => {
       expect(
         getFindings(yield* runAssess(files, { "./lint/rules.js": "lint/rules.ts" }))
       ).toStrictEqual([])
+    })
+  )
+
+  it.effect("fail when an Oxlint config cannot be read, instead of using another config", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "oxlint.config.ts": makeConfig("core, custom()"),
+          "package.json": MONOREPO_PACKAGE_JSON,
+          "packages/app/oxlint.config.ts": makeConfig('core, custom({ name: "app" })'),
+          "packages/app/package.json": yield* stringifyJson({ name: "app" }),
+        },
+        root: ROOT,
+      })
+
+      files.makeUnreadable("packages/app/oxlint.config.ts")
+
+      const error = yield* Effect.flip(runAssess(files))
+
+      expect(error).toBeInstanceOf(FailedToReadFile)
     })
   )
 

@@ -5,7 +5,7 @@ import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import { parseSync } from "oxc-parser"
 import { listLintedFiles } from "#lib/hardening/oxlint.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { readFileIfFile } from "#lib/shared/filesystem.ts"
 
 /**
  * The comments that turn off one rule, or all rules.
@@ -90,8 +90,7 @@ export const readSuppressions = Effect.fn("readSuppressions")(function* (
           const found = yield* Effect.forEach(
             listed.filter((file) => SOURCE_FILE.test(file) && isInScope(file)),
             (file) =>
-              readFileIfExists(path.join(cwd, file)).pipe(
-                Effect.orElseSucceed(() => Option.none<string>()),
+              readFileIfFile(path.join(cwd, file)).pipe(
                 Effect.map((content) =>
                   Option.match(content, {
                     onNone: () => [],

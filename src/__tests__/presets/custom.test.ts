@@ -247,6 +247,16 @@ describe("custom preset", () => {
     })
   })
 
+  it("fail the run when two files in a rules folder define one rule", () => {
+    write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
+    write(".adamantite/lint/no-debugger-here.js", "export default {}\n")
+    write("oxlint.config.ts", makeConfig("custom()"))
+
+    expect(() => lint("src")).toThrow(
+      /has more than one file for the rule `no-debugger-here`: no-debugger-here\.(?:js, no-debugger-here\.ts|ts, no-debugger-here\.js)\. Keep one of them\./
+    )
+  })
+
   it("apply severity overrides from the rules option", () => {
     write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
     write("oxlint.config.ts", makeConfig('custom({ rules: { "no-debugger-here": "warn" } })'))

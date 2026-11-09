@@ -4,7 +4,8 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { addCustomRuleTest } from "#lib/workspace/custom-rules/index.ts"
+import { CustomRuleExists } from "#lib/shared/errors.ts"
+import { addCustomRule, addCustomRuleTest } from "#lib/workspace/custom-rules/index.ts"
 
 // `ROOT` is the real path, as `process.cwd()` reports it. `/link` is a symlink to it at a different
 // depth, as `/var` is to `/private/var` on macOS.
@@ -43,6 +44,24 @@ describe("addCustomRuleTest", () => {
       const rulePath = path.resolve(path.dirname(realTestPath), specifier)
 
       expect(yield* Effect.option(fs.realPath(rulePath))).toStrictEqual(Option.some(RULE_PATH))
+    }).pipe(Effect.provide([files.layer, Path.layer]))
+  })
+})
+
+describe("addCustomRule", () => {
+  it.effect("refuse a rule name that a file with another extension already uses", () => {
+    const existing = `${ROOT}/.adamantite/lint/no-example.js`
+
+    const files = createFileSystemTestContext({
+      files: { [existing]: "export default {}\n" },
+      root: ROOT,
+    })
+
+    return Effect.gen(function* () {
+      const error = yield* Effect.flip(addCustomRule(ROOT, "no-example"))
+
+      expect(error).toStrictEqual(new CustomRuleExists({ paths: [existing] }))
+      expect(files.exists(RULE_PATH)).toBe(false)
     }).pipe(Effect.provide([files.layer, Path.layer]))
   })
 })

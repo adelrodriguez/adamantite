@@ -8,6 +8,8 @@ import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Result from "effect/Result"
+import * as Schema from "effect/Schema"
+import { InvalidPackageJson } from "#lib/shared/errors.ts"
 import { readFile, writeFile } from "#lib/shared/filesystem.ts"
 import { parseJson, updateJsonText } from "#lib/shared/json.ts"
 
@@ -54,6 +56,25 @@ export function parseDependencySpecifier(specifier: string): DeclaredVersion {
   return VERSION_REGEX.test(version) ? Version({ version }) : Unreadable()
 }
 
+const StringRecord = Schema.Record(Schema.String, Schema.String)
+
+/**
+ * The `package.json` fields that Adamantite reads, with the types that the code relies on.
+ */
+const PackageManifest = Schema.Struct({
+  dependencies: Schema.optionalKey(StringRecord),
+  devDependencies: Schema.optionalKey(StringRecord),
+  name: Schema.optionalKey(Schema.String),
+  scripts: Schema.optionalKey(StringRecord),
+  version: Schema.optionalKey(Schema.String),
+  workspaces: Schema.optionalKey(
+    Schema.Union([
+      Schema.Array(Schema.String),
+      Schema.Struct({ packages: Schema.optionalKey(Schema.Array(Schema.String)) }),
+    ])
+  ),
+})
+
 export const readPackageJson = (cwd: string = process.cwd()) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
@@ -61,9 +82,16 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
     const content = yield* readFile(packagePath)
     const parsed = yield* parseJson(content, packagePath)
 
-    // SAFETY: the file is the project's package.json; every manifest field is optional in
-    // `PackageJson`, so any parsed JSON object satisfies it.
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- No schema decodes `PackageJson` yet; see the SAFETY note.
+    yield* Schema.decodeUnknownEffect(PackageManifest)(parsed).pipe(
+      Effect.mapError(
+        (error) => new InvalidPackageJson({ issue: error.message, path: packagePath })
+      )
+    )
+
+    // SAFETY: the decode above checked that the manifest is an object and that each field that
+    // Adamantite reads has the type that `PackageJson` gives it. The manifest is returned whole,
+    // because `writePackageJson` writes every field back.
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- `PackageJson` from type-fest has no schema; see the SAFETY note.
     return parsed as PackageJson
   })
 

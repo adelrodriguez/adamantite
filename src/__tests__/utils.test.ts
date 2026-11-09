@@ -10,7 +10,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
+import { FailedToParseFile, FailedToReadFile, InvalidPackageJson } from "#lib/shared/errors.ts"
 import {
   formatJson,
   mergeConfig,
@@ -75,6 +75,34 @@ describe("readPackageJson", () => {
       if (Result.isFailure(result)) {
         expect(result.failure).toBeInstanceOf(FailedToReadFile)
       }
+    })
+  )
+
+  it.effect.each([
+    ["null", "null"],
+    ["an array", "[]"],
+    ["scripts as a string", '{ "scripts": "build" }'],
+    ["workspaces packages as a string", '{ "workspaces": { "packages": "packages/*" } }'],
+    ["a dependency version as a number", '{ "devDependencies": { "oxlint": 1 } }'],
+  ] as const)("reject a package.json with %s", ([, content]) =>
+    Effect.gen(function* () {
+      const files = makeFiles({ "package.json": content })
+
+      const error = yield* Effect.flip(readPackageJson(ROOT).pipe(provideFiles(files)))
+
+      expect(error).toBeInstanceOf(InvalidPackageJson)
+      expect(error.message).toMatch(
+        /^`\/project\/package\.json` is not a valid `package\.json`\. Expected /
+      )
+    })
+  )
+
+  it.effect("keep the fields that Adamantite does not read", () =>
+    Effect.gen(function* () {
+      const manifest = { devEngines: { runtime: { name: "node" } }, name: "app", private: true }
+      const files = makeFiles({ "package.json": yield* stringifyJson(manifest) })
+
+      expect(yield* readPackageJson(ROOT).pipe(provideFiles(files))).toStrictEqual(manifest)
     })
   )
 })

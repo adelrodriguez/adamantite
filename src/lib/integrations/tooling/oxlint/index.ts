@@ -1,7 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import {
   defineIntegration,
@@ -21,6 +20,11 @@ import {
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 import { assessLayerMaps } from "#lib/integrations/tooling/oxlint/layers.ts"
+import {
+  type LintPreset,
+  RETIRED_LINT_PRESETS,
+  type RetiredLintPreset,
+} from "#lib/integrations/tooling/oxlint/presets.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -39,60 +43,48 @@ const configFiles = { config: CONFIG_FILE, legacyConfigs: [LEGACY_CONFIG_FILE] }
 const VERSION = getDependencyVersion("oxlint")
 
 /**
- * Presets that Adamantite no longer publishes. Doctor reports an import of one with the steps that
+ * The finding for an import of each preset that Adamantite no longer publishes, with the steps that
  * move the config to its replacement. Assessment does not write the config.
  */
-const retiredLintPresets = [
-  {
-    finding: {
-      currentState: "`oxlint.config.ts` imports the removed `adamantite/lint/shadcn` preset.",
-      goal: [
-        "Replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind` in `oxlint.config.ts`. Keep the local import name and its `extends` entry.",
-        "Keep the managed `@shadcn/lint` package, `shadcn/*` rule names, `settings.shadcn` keys, rule severity, rule options, and all other project settings.",
-        "Use `--preset tailwind` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
-      ],
-      id: "tailwind-preset-migration",
-      integration: "oxlint",
-      title: "The shadcn preset was renamed to tailwind",
-    },
-    name: "shadcn",
+const retiredLintPresetFindings = {
+  antislop: {
+    currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/antislop` preset.",
+    goal: [
+      "Replace `adamantite/lint/antislop` with `adamantite/lint/strict`. If strict is already imported, remove the antislop import and its `extends` entry.",
+      "Keep `anti-slop/*` rule settings, rule severity, rule options, and all other project settings. The rule namespace stays the same.",
+      'strict sets `anti-slop/no-chained-type-assertions`, `anti-slop/no-widen-then-assert`, and `anti-slop/require-safety-comment-for-type-assertion` in an override for test files, which takes priority over top-level `rules`. Move a project setting for these three rules into an `overrides` entry with `files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"]`.',
+      "The strict preset also bans type assertions outside tests, console calls other than `console.info`, task comments, and deep destructuring, and it requires a reason on each suppression. Follow those reports when updating the code.",
+      "Use `--preset strict` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
+    ],
+    id: "strict-preset-migration",
+    integration: "oxlint",
+    title: "The antislop rules now belong to strict",
   },
-  {
-    finding: {
-      currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/react-doctor` preset.",
-      goal: [
-        "Replace `adamantite/lint/react-doctor` with `adamantite/lint/react-strict`. If react-strict is already imported, use its existing binding and remove the old import.",
-        "Keep the `react` preset and exactly one `react-strict` entry in extends. Keep `oxlint-plugin-react-doctor` as a devDependency. Run `adamantite update` if the package is missing or off its managed version.",
-        "Preserve project settings, custom rules, rule severity, and rule options, including `react-doctor/*` overrides. The upstream rule namespace stays the same.",
-        "The react-strict preset also reports state, effect, and memoization hooks outside hook modules. Follow those reports when updating feature code.",
-        "Run `adamantite check`, then run Doctor again.",
-      ],
-      id: "react-doctor-preset-migration",
-      integration: "oxlint",
-      title: "React Doctor rules now belong to react-strict",
-    },
-    name: "react-doctor",
+  "react-doctor": {
+    currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/react-doctor` preset.",
+    goal: [
+      "Replace `adamantite/lint/react-doctor` with `adamantite/lint/react-strict`. If react-strict is already imported, use its existing binding and remove the old import.",
+      "Keep the `react` preset and exactly one `react-strict` entry in extends. Keep `oxlint-plugin-react-doctor` as a devDependency. Run `adamantite update` if the package is missing or off its managed version.",
+      "Preserve project settings, custom rules, rule severity, and rule options, including `react-doctor/*` overrides. The upstream rule namespace stays the same.",
+      "The react-strict preset also reports state, effect, and memoization hooks outside hook modules. Follow those reports when updating feature code.",
+      "Run `adamantite check`, then run Doctor again.",
+    ],
+    id: "react-doctor-preset-migration",
+    integration: "oxlint",
+    title: "React Doctor rules now belong to react-strict",
   },
-  {
-    finding: {
-      currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/antislop` preset.",
-      goal: [
-        "Replace `adamantite/lint/antislop` with `adamantite/lint/strict`. If strict is already imported, remove the antislop import and its `extends` entry.",
-        "Keep `anti-slop/*` rule settings, rule severity, rule options, and all other project settings. The rule namespace stays the same.",
-        'strict sets `anti-slop/no-chained-type-assertions`, `anti-slop/no-widen-then-assert`, and `anti-slop/require-safety-comment-for-type-assertion` in an override for test files, which takes priority over top-level `rules`. Move a project setting for these three rules into an `overrides` entry with `files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"]`.',
-        "The strict preset also bans type assertions outside tests, console calls other than `console.info`, task comments, and deep destructuring, and it requires a reason on each suppression. Follow those reports when updating the code.",
-        "Use `--preset strict` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
-      ],
-      id: "strict-preset-migration",
-      integration: "oxlint",
-      title: "The antislop rules now belong to strict",
-    },
-    name: "antislop",
+  shadcn: {
+    currentState: "`oxlint.config.ts` imports the removed `adamantite/lint/shadcn` preset.",
+    goal: [
+      "Replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind` in `oxlint.config.ts`. Keep the local import name and its `extends` entry.",
+      "Keep the managed `@shadcn/lint` package, `shadcn/*` rule names, `settings.shadcn` keys, rule severity, rule options, and all other project settings.",
+      "Use `--preset tailwind` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
+    ],
+    id: "tailwind-preset-migration",
+    integration: "oxlint",
+    title: "The shadcn preset was renamed to tailwind",
   },
-] as const satisfies ReadonlyArray<{
-  readonly finding: Finding
-  readonly name: string
-}>
+} as const satisfies Record<RetiredLintPreset, Finding>
 
 const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 
@@ -135,8 +127,8 @@ export default defineIntegration({
 
       const configContent = toOxlintTsConfigContent()
 
-      const retiredPresetFindings = retiredLintPresets.flatMap((retired) =>
-        checkImportsLintPreset(lintConfig, retired.name) ? [retired.finding] : []
+      const retiredPresetFindings = RETIRED_LINT_PRESETS.flatMap((retired) =>
+        checkImportsLintPreset(lintConfig, retired) ? [retiredLintPresetFindings[retired]] : []
       )
 
       return {

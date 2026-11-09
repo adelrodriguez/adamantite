@@ -1,10 +1,15 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import {
+  checkImportsLintPreset,
   getImportedLintPresets,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
-import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import {
+  LINT_PRESETS,
+  type LintPreset,
+  type RetiredLintPreset,
+} from "#lib/integrations/tooling/oxlint/presets.ts"
 
 const unsupportedConfigReason =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."
@@ -144,5 +149,14 @@ describe("getImportedLintPresets", () => {
     expect(
       getImportedLintPresets('import tailwind from "adamantite/lint/tailwind"\nexport default {')
     ).toStrictEqual([])
+  })
+})
+
+describe("checkImportsLintPreset", () => {
+  it("take only the name of a current or retired preset", () => {
+    // A renamed preset must fail every check that names it, instead of matching nothing.
+    expectTypeOf(checkImportsLintPreset)
+      .parameter(1)
+      .toEqualTypeOf<LintPreset | RetiredLintPreset>()
   })
 })

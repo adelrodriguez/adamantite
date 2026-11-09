@@ -100,6 +100,13 @@ export type LintPreset = (typeof lintPresets)[number]["name"]
 export const LINT_PRESETS = lintPresets.map((preset) => preset.name)
 
 /**
+ * Presets that Adamantite no longer publishes, in the order that Doctor reports them.
+ */
+export const RETIRED_LINT_PRESETS = ["shadcn", "react-doctor", "antislop"] as const
+
+export type RetiredLintPreset = (typeof RETIRED_LINT_PRESETS)[number]
+
+/**
  * The init hint: what the rules check, then the package that init installs and the presets that it
  * selects, so the user knows what a choice adds before selecting it.
  */

@@ -1,13 +1,15 @@
 import type { JsonObject } from "type-fest"
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import type { InitOptions } from "#commands/init/options.ts"
+import type { InitEditor, InitOptions } from "#commands/init/options.ts"
+import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import initCommand from "#commands/init/index.ts"
+import { installEditorExtensions, setupEditors } from "#commands/init/setup.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -1688,5 +1690,16 @@ describe("InitOptions", () => {
     const editors: InitOptions["editors"] = Option.some({ installExtensions: true, names: [] })
 
     expect(Option.isSome(editors)).toBe(true)
+  })
+})
+
+describe("editor setup", () => {
+  it("take only the editors and presets that init knows", () => {
+    // A typo or a renamed editor must fail the type check, instead of setting up nothing.
+    expectTypeOf(setupEditors).parameter(1).toEqualTypeOf<readonly InitEditor[]>()
+    expectTypeOf(installEditorExtensions).parameter(0).toEqualTypeOf<readonly InitEditor[]>()
+    expectTypeOf(installEditorExtensions)
+      .parameter(2)
+      .toEqualTypeOf<readonly LintPreset[] | undefined>()
   })
 })

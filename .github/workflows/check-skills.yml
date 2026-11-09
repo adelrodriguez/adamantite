@@ -42,8 +42,9 @@ jobs:
         with:
           node-version-file: ".node-version"
 
+      # The version that package.json pins, so CI checks the skills as the local scripts do.
       - name: Install intent
-        run: npm install -g @tanstack/intent@0.3.6
+        run: npm install -g "@tanstack/intent@$(node -p 'require("./package.json").devDependencies["@tanstack/intent"]')"
 
       - name: Validate skills
         run: intent validate --github-summary
@@ -66,8 +67,9 @@ jobs:
         with:
           node-version-file: ".node-version"
 
+      # The version that package.json pins, so CI checks the skills as the local scripts do.
       - name: Install intent
-        run: npm install -g @tanstack/intent@0.3.6
+        run: npm install -g "@tanstack/intent@$(node -p 'require("./package.json").devDependencies["@tanstack/intent"]')"
 
       - name: Check skills
         id: stale

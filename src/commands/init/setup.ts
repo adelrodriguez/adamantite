@@ -284,6 +284,7 @@ export const installEditorExtensions = (
             return true as const
           }),
         {
+          failure: "Failed to install editor extensions.",
           start: "Installing editor extensions...",
           success:
             hasZed && !hasVscode

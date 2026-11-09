@@ -9,11 +9,17 @@ function createSpinner() {
   const messages: string[] = []
   const starts: Array<string | undefined> = []
   const stops: Array<string | undefined> = []
+  const errors: Array<string | undefined> = []
+  const cancels: Array<string | undefined> = []
 
   const spinner: SpinnerResult = {
-    cancel: Function.constVoid,
+    cancel(message) {
+      cancels.push(message)
+    },
     clear: Function.constVoid,
-    error: Function.constVoid,
+    error(message) {
+      errors.push(message)
+    },
     get isCancelled() {
       return false
     },
@@ -30,7 +36,7 @@ function createSpinner() {
     },
   }
 
-  return { messages, spinner, starts, stops }
+  return { cancels, errors, messages, spinner, starts, stops }
 }
 
 function runWithPrompter<A, E>(effect: Effect.Effect<A, E, Prompter>, spinner: SpinnerResult) {
@@ -70,9 +76,9 @@ describe("Prompter.withSpinner", () => {
     })
   )
 
-  it.effect("stop the spinner when the effect fails", () =>
+  it.effect("end the spinner as an error when the effect fails", () =>
     Effect.gen(function* () {
-      const { spinner, stops } = createSpinner()
+      const { errors, spinner, stops } = createSpinner()
 
       const exit = yield* runWithPrompter(
         Effect.gen(function* () {
@@ -88,13 +94,13 @@ describe("Prompter.withSpinner", () => {
       )
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(stops).toStrictEqual(["Operation failed."])
+      expect({ errors, stops }).toStrictEqual({ errors: ["Operation failed."], stops: [] })
     })
   )
 
-  it.effect("stop the spinner when the effect is interrupted", () =>
+  it.effect("end the spinner as cancelled when the effect is interrupted", () =>
     Effect.gen(function* () {
-      const { spinner, stops } = createSpinner()
+      const { cancels, spinner, stops } = createSpinner()
 
       const exit = yield* runWithPrompter(
         Effect.gen(function* () {
@@ -110,7 +116,7 @@ describe("Prompter.withSpinner", () => {
       )
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(stops).toStrictEqual(["Operation interrupted."])
+      expect({ cancels, stops }).toStrictEqual({ cancels: ["Operation interrupted."], stops: [] })
     })
   )
 })

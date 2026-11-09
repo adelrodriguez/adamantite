@@ -75,6 +75,7 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   const prompter = yield* Prompter
 
   const installedAgents = yield* prompter.withSpinner(() => agents.detectInstalled(options.cwd), {
+    failure: "Could not check for installed coding agents.",
     start: "Checking for installed coding agents...",
     success: (detected) =>
       detected.length === 0

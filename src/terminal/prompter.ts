@@ -1,4 +1,5 @@
 import * as p from "@clack/prompts"
+import * as Cause from "effect/Cause"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -28,7 +29,7 @@ interface PrompterService {
       readonly message: (message: string) => Effect.Effect<void>
     }) => Effect.Effect<A, E, R>,
     options: {
-      readonly failure?: string
+      readonly failure: string
       readonly start: string
       readonly success: string | ((value: A) => string | undefined)
     }
@@ -112,17 +113,24 @@ export class Prompter extends Context.Service<Prompter, PrompterService>()("Prom
                   spinner.message(message)
                 }),
             }),
+          // The end symbol follows the exit: a check mark for success, an error mark for a failure,
+          // and a cancel mark for an interrupt, such as Ctrl-C.
           (spinner, exit) =>
             Effect.sync(() => {
-              spinner.stop(
-                Exit.match(exit, {
-                  onFailure: () => options.failure,
-                  onSuccess: (value) =>
-                    Predicate.isFunction(options.success)
-                      ? options.success(value)
-                      : options.success,
-                })
-              )
+              Exit.match(exit, {
+                onFailure: (cause) => {
+                  if (Cause.hasInterruptsOnly(cause)) {
+                    spinner.cancel(options.failure)
+                  } else {
+                    spinner.error(options.failure)
+                  }
+                },
+                onSuccess: (value) => {
+                  spinner.stop(
+                    Predicate.isFunction(options.success) ? options.success(value) : options.success
+                  )
+                },
+              })
             })
         ),
     })

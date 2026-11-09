@@ -303,50 +303,39 @@ const trial = Command.make("try", {
     Effect.gen(function* () {
       const prompter = yield* Prompter
 
-      if (current && Option.isSome(options)) {
-        return yield* new InvalidTrialOptions({
-          reason: "Give `--options` or `--current`, not both.",
-        })
-      }
-
-      const cases = yield* Effect.all([
-        ...report.map((value) => parseTrialCase(value, "reported")),
-        ...accept.map((value) => parseTrialCase(value, "accepted")),
-      ])
-
       const setting = current
         ? new CurrentSetting()
         : new ErrorSetting({ options: Option.getOrElse(options, () => []) })
 
-      const cwd = process.cwd()
+      const results = yield* Effect.gen(function* () {
+        if (current && Option.isSome(options)) {
+          return yield* new InvalidTrialOptions({
+            reason: "Give `--options` or `--current`, not both.",
+          })
+        }
 
-      const results = yield* tryRule({
-        cases,
-        cwd,
-        rule,
-        setting,
-        workspace: yield* readWorkspace(cwd),
+        const cases = yield* Effect.all([
+          ...report.map((value) => parseTrialCase(value, "reported")),
+          ...accept.map((value) => parseTrialCase(value, "accepted")),
+        ])
+
+        const cwd = process.cwd()
+
+        return yield* tryRule({ cases, cwd, rule, setting, workspace: yield* readWorkspace(cwd) })
       }).pipe(
-        Effect.catchTag(
-          [
-            "TrialCaseIgnored",
-            "TrialCaseUnparsable",
-            "TrialConfigNotFound",
-            "TrialLintFailed",
-            "TrialProjectUnlisted",
-            "TrialRuleNotFound",
-          ],
-          (error) =>
-            prompter.log.error(error.message).pipe(
-              Effect.andThen(
-                Effect.fail(
-                  new CommandFailed({
-                    command: "rule try",
-                    exitCode: ChildProcessSpawner.ExitCode(2),
-                  })
-                )
+        // Exit code 1 means that a case differs. A failure before the verdict checked no case, so
+        // every failure here exits with 2.
+        Effect.catch((error) =>
+          prompter.log.error(error.message).pipe(
+            Effect.andThen(
+              Effect.fail(
+                new CommandFailed({
+                  command: "rule try",
+                  exitCode: ChildProcessSpawner.ExitCode(2),
+                })
               )
             )
+          )
         )
       )
 

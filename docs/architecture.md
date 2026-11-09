@@ -288,6 +288,13 @@ copies third-party code into its source, the script adds that code's license to 
 The build copies each bundle into `dist/presets/lint/vendor/`, and `scripts/test-build.ts` fails
 when a built preset loads a file that the build did not copy.
 
+When an upstream rule has a defect, Adamantite fixes it with a patch in
+`scripts/vendor-patches/<name>/`. The script applies each patch that the plugin lists before
+it builds the bundle, so a re-vendor keeps the fix, and `git apply` fails when a patch no longer
+applies. The bundle banner names each patch. The `anti-slop-effect` bundle has one patch: it lets
+`no-manual-tagged-construction` accept Effect constructors that take `_tag` as input, such as
+`PlatformError.systemError`. Delete a patch when upstream ships the fix.
+
 Each enabled rule of a bundle has `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/`, one case per file. The
 namespace folder, such as `anti-slop`, lets one preset hold fixtures for several plugins. The

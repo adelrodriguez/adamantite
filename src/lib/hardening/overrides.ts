@@ -11,6 +11,7 @@ import {
   type ObjectProperty,
   type Program,
 } from "oxc-parser"
+import type { ProjectPath } from "#lib/hardening/project-files.ts"
 import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfigs } from "#lib/hardening/trial.ts"
@@ -243,7 +244,12 @@ export function findRuleOffOverrides(file: string, content: string): RuleOffOver
  * linted. One Oxlint run covers each config.
  */
 export const readOverrides = Effect.fn("readOverrides")(
-  function* (cwd: string, workspace: Workspace, configs: readonly string[], scope: string | null) {
+  function* (
+    cwd: string,
+    workspace: Workspace,
+    configs: readonly ProjectPath[],
+    scope: ProjectPath | null
+  ) {
     const path = yield* Path.Path
 
     const isInScope = (file: string) =>

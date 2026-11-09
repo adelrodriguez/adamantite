@@ -1,4 +1,6 @@
+import type * as Path from "effect/Path"
 import * as Array from "effect/Array"
+import * as Brand from "effect/Brand"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
@@ -6,6 +8,22 @@ import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stream from "effect/Stream"
 import * as String from "effect/String"
+
+/**
+ * A path relative to the project root, with `/` between folders, as git and Oxlint list files.
+ * Discovery gives absolute paths, so the brand keeps one from reaching code that joins a project
+ * path with the project root.
+ */
+export type ProjectPath = string & Brand.Brand<"ProjectPath">
+
+const ProjectPathBrand = Brand.nominal<ProjectPath>()
+
+/**
+ * The project path of `target`, an absolute path inside `cwd`. The root itself is `.`.
+ */
+export function toProjectPath(path: Path.Path, cwd: string, target: string): ProjectPath {
+  return ProjectPathBrand((path.relative(cwd, target) || ".").split(path.sep).join("/"))
+}
 
 /**
  * The files that `git ls-files` lists with `args` in `cwd`, as paths relative to `cwd` with `/`

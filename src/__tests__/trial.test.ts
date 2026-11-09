@@ -9,9 +9,11 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as Path from "effect/Path"
 import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { LintedOverrides, readOverrides } from "#lib/hardening/overrides.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
+import { toProjectPath } from "#lib/hardening/project-files.ts"
 import {
   CurrentSetting,
   ErrorSetting,
@@ -152,6 +154,20 @@ describe("rule trials in a real project", () => {
    */
   function listProject() {
     return EffectArray.sort(readdirSync(project, { recursive: true }).map(String), Order.String)
+  }
+
+  function readRootOverrides() {
+    return Path.Path.pipe(
+      Effect.flatMap((path) =>
+        readOverrides(
+          project,
+          NO_WORKSPACE,
+          [toProjectPath(path, project, join(project, "oxlint.config.ts"))],
+          null
+        )
+      ),
+      Effect.provide(TEST_LAYER)
+    )
   }
 
   function runTrial(
@@ -470,9 +486,7 @@ describe("rule trials in a real project", () => {
     Effect.gen(function* () {
       const before = listProject()
 
-      const report = yield* readOverrides(project, NO_WORKSPACE, ["oxlint.config.ts"], null).pipe(
-        Effect.provide(TEST_LAYER)
-      )
+      const report = yield* readRootOverrides()
 
       expect(report).toStrictEqual(
         new LintedOverrides({
@@ -505,9 +519,7 @@ describe("rule trials in a real project", () => {
       write("src/generated/old.ts", "export function stop() {\n  debugger\n}\n")
       write("src/broken.ts", "export const = ;\n")
 
-      const report = yield* readOverrides(project, NO_WORKSPACE, ["oxlint.config.ts"], null).pipe(
-        Effect.provide(TEST_LAYER)
-      )
+      const report = yield* readRootOverrides()
 
       expect(report).toStrictEqual(
         new LintedOverrides({

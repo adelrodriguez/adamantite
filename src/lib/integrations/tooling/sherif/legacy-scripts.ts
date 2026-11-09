@@ -1,6 +1,7 @@
 import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import type { Finding } from "#lib/integrations/base.ts"
+import { formatInitCommand } from "#lib/workspace/init-command.ts"
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const LEGACY_SCRIPT_NAMES: ReadonlySet<string> = new Set(["check:monorepo", "fix:monorepo"])
@@ -100,7 +101,7 @@ export function getLegacyMonorepoScriptFindings(packageJson: PackageJson): Findi
         ...(hasAnalyze
           ? []
           : [
-              "Adopt the managed `analyze` script with `adamantite init --non-interactive --script analyze`. It runs Sherif in a detected monorepo.",
+              `Adopt the managed \`analyze\` script with \`${formatInitCommand({ scripts: ["analyze"] })}\`. It runs Sherif in a detected monorepo.`,
             ]),
         // Paired scripts usually carry the same flags; one goal per setting is enough.
         ...Array.dedupe(legacyScripts.flatMap((script) => getSettingGoals(script))),

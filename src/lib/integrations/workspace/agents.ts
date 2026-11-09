@@ -3,6 +3,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import type { Project } from "#lib/workspace/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
+import { formatInitCommand } from "#lib/workspace/init-command.ts"
 import { getManagedScripts } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "AGENTS.md", type: "config" }] as const
@@ -21,7 +22,6 @@ export default defineIntegration({
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const exists = yield* fs.exists(path.join(cwd, files[0].path))
-      const scriptFlags = managedScripts.map((script) => `--script ${script}`).join(" ")
 
       return {
         applicable: true,
@@ -38,7 +38,7 @@ export default defineIntegration({
                 integration: "agents",
                 notes: [
                   "`AGENTS.md` is where coding agents start. It points to the other documentation of the project.",
-                  `To create the file with an Adamantite section that lists the package scripts, run \`adamantite init --non-interactive ${scriptFlags} --agents\`.`,
+                  `To create the file with an Adamantite section that lists the package scripts, run \`${formatInitCommand({ agents: true, scripts: managedScripts })}\`.`,
                 ],
                 title: "Missing AGENTS.md",
               },

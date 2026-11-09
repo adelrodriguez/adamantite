@@ -38,6 +38,7 @@ export const readProject = Effect.fn("readProject")(function* (
   manifest?: PackageJson
 ) {
   const path = yield* Path.Path
+
   const [packageJson, workspace, lintConfig] = yield* Effect.all(
     [
       manifest === undefined ? readPackageJson(cwd) : Effect.succeed(manifest),
@@ -46,6 +47,7 @@ export const readProject = Effect.fn("readProject")(function* (
     ],
     { concurrency: "unbounded" }
   )
+
   const customRules = yield* discoverCustomRules([cwd, ...workspace.packageDirectories])
 
   return { customRules, cwd, lintConfig, packageJson, workspace } satisfies Project

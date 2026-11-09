@@ -9,6 +9,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import {
+  CurrentToolingConfig,
   detectToolingConfig,
   getConfigFindings,
   getPackageActions,
@@ -73,6 +74,22 @@ const retiredLintPresets = [
     },
     name: "react-doctor",
   },
+  {
+    finding: {
+      currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/antislop` preset.",
+      goal: [
+        "Replace `adamantite/lint/antislop` with `adamantite/lint/strict`. If strict is already imported, remove the antislop import and its `extends` entry.",
+        "Keep `anti-slop/*` rule settings, rule severity, rule options, and all other project settings. The rule namespace stays the same.",
+        'strict sets `anti-slop/no-chained-type-assertions`, `anti-slop/no-widen-then-assert`, and `anti-slop/require-safety-comment-for-type-assertion` in an override for test files, which takes priority over top-level `rules`. Move a project setting for these three rules into an `overrides` entry with `files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"]`.',
+        "The strict preset also bans type assertions outside tests, console calls other than `console.info`, task comments, and deep destructuring, and it requires a reason on each suppression. Follow those reports when updating the code.",
+        "Use `--preset strict` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
+      ],
+      id: "strict-preset-migration",
+      integration: "oxlint",
+      title: "The antislop rules now belong to strict",
+    },
+    name: "antislop",
+  },
 ] as const satisfies ReadonlyArray<{
   readonly finding: Finding
   readonly name: string
@@ -100,6 +117,7 @@ export default defineIntegration({
 
       const state = yield* detect(cwd)
       const runtimeFindings = yield* assessOxlintRuntime(project)
+
       const packageActions = getPackageActions(
         packageJson,
         { name: "oxlint", version: VERSION },
@@ -108,16 +126,18 @@ export default defineIntegration({
 
       // The active TypeScript config is `oxlint.config.ts`, which the project holds.
       const inspection =
-        state.active._tag === "Current"
+        state.active instanceof CurrentToolingConfig
           ? lintConfig.pipe(
               Option.map((content) => inspectRequiredOxlintConfig(content)),
               Option.getOrUndefined
             )
           : undefined
+
       const configContent = toOxlintTsConfigContent()
-      const retiredPresetFindings = retiredLintPresets
-        .filter((retired) => checkImportsLintPreset(lintConfig, retired.name))
-        .map(({ finding }) => finding)
+
+      const retiredPresetFindings = retiredLintPresets.flatMap((retired) =>
+        checkImportsLintPreset(lintConfig, retired.name) ? [retired.finding] : []
+      )
 
       return {
         applicable: true,
@@ -130,8 +150,6 @@ export default defineIntegration({
             configContent,
             configFile: CONFIG_FILE,
             inspection,
-            invalidGoal:
-              "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting.",
             toolName: "oxlint",
           }),
         ],

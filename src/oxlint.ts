@@ -6,7 +6,11 @@ import * as NodePath from "@effect/platform-node/NodePath"
 import * as Effect from "effect/Effect"
 import * as Result from "effect/Result"
 import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/integrations/tooling/oxlint/entry.ts"
-import { resolveOxlintRuntime, toBackendEnv } from "#lib/integrations/tooling/oxlint/runtime.ts"
+import {
+  ReplacedPart,
+  resolveOxlintRuntime,
+  toBackendEnv,
+} from "#lib/integrations/tooling/oxlint/runtime.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 
 // Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
@@ -17,6 +21,7 @@ const project = getProjectDirectory(
   process.cwd(),
   process.env[PROJECT_VARIABLE]
 )
+
 const result = await Effect.runPromise(
   resolveOxlintRuntime(project).pipe(
     Effect.result,
@@ -37,7 +42,7 @@ Object.assign(process.env, toBackendEnv(backend))
 // Oxlint loads its binding from `NAPI_RS_NATIVE_LIBRARY_PATH` once, when `bindings.js` loads. Every
 // napi-rs package reads the same variable, such as `oxc-resolver` in a JS plugin, so it must not
 // outlive that load. JS plugins load later, through dynamic imports in `cli.js`.
-if (binding._tag === "Replaced") {
+if (binding instanceof ReplacedPart) {
   process.env["NAPI_RS_NATIVE_LIBRARY_PATH"] = binding.path
   await importOxlint("bindings.js")
   delete process.env["NAPI_RS_NATIVE_LIBRARY_PATH"]

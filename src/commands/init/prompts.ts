@@ -24,6 +24,7 @@ const describeScriptConflict = (conflict: ScriptConflict) =>
  */
 const promptPresets = Effect.gen(function* () {
   const prompter = yield* Prompter
+
   const selected = yield* prompter.multiselect({
     message: "Which presets should Adamantite use with the core preset?",
     options: lintPresets.map((preset) => ({
@@ -33,6 +34,7 @@ const promptPresets = Effect.gen(function* () {
     })),
     required: false,
   })
+
   const missingPresets = findMissingRequiredPresets(selected)
 
   for (const { required, requiredBy } of missingPresets) {
@@ -73,6 +75,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   const packageJson = yield* readPackageJson(cwd)
   const conflicts = getConflictingScripts(packageJson, selectedScripts)
+
   for (const conflict of conflicts) {
     yield* prompter.log.warning(describeScriptConflict(conflict))
   }

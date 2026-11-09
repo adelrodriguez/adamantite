@@ -7,9 +7,14 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/workspace/project.ts"
+import { NativeRuntime } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import {
+  NoBackend,
+  ReplacedPart,
   resolveOxlintRuntime,
+  StockPart,
+  TsrsBackend,
   type OxlintRuntime,
 } from "#lib/integrations/tooling/oxlint/runtime.ts"
 import { PackageNotInstalled } from "#lib/shared/errors.ts"
@@ -54,14 +59,14 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
 
     const { backend, binding } = runtime
 
-    if (declared("tsrs") && backend._tag === "None") {
+    if (declared("tsrs") && backend instanceof NoBackend) {
       return finding("Oxlint cannot resolve the declared tsrs backend or its launcher.", [
         "Install the target project's dependencies so that the tsrs-lint launcher is available.",
       ])
     }
 
     for (const plugin of oxlintPlugins) {
-      if (plugin.runtime._tag === "Native" && declared(plugin.name)) {
+      if (plugin.runtime instanceof NativeRuntime && declared(plugin.name)) {
         const installed = yield* resolvePackageDirectory(project.cwd, plugin.name)
 
         if (Option.isNone(installed)) {
@@ -71,7 +76,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
     }
 
     // A plugin that replaces the binding and the backend checks its own builds.
-    if (binding._tag === "Replaced" && backend._tag !== "Tsrs") {
+    if (binding instanceof ReplacedPart && !(backend instanceof TsrsBackend)) {
       return []
     }
 
@@ -85,6 +90,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
     if (process.platform === "linux") {
       const ldd = yield* readFileIfExists("/usr/bin/ldd")
       const report = Option.isNone(ldd) ? decodeReport(process.report.getReport()) : Option.none()
+
       const musl = Option.isSome(ldd)
         ? ldd.value.includes("musl")
         : Option.isSome(report)
@@ -92,6 +98,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
           && report.value.sharedObjects.some(
             (file) => file.includes("libc.musl-") || file.includes("ld-musl-")
           )
+
       libc = musl ? "musl" : "gnu"
     }
 
@@ -107,24 +114,30 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
           ? "-gnu"
           : "-msvc",
     }
+
     const bindingTarget = platform + (suffix[process.platform] ?? "")
 
-    if (binding._tag === "Stock") {
+    if (binding instanceof StockPart) {
       const override = yield* Config.String("NAPI_RS_NATIVE_LIBRARY_PATH").pipe(
         Config.withDefault("")
       )
+
       const targets =
         process.platform === "darwin" ? ["darwin-universal", bindingTarget] : [bindingTarget]
+
       const nativeCandidates = override
         ? [override]
         : targets.flatMap((target) => [`./oxlint.${target}.node`, `@oxlint/binding-${target}`])
+
       const candidates = [...nativeCandidates, "./oxlint.wasi.cjs", "@oxlint/binding-wasm32-wasi"]
+
       const binding = yield* Effect.findFirst(candidates, (specifier) =>
         Effect.gen(function* () {
           const resolved = yield* resolver.resolve(
             path.join(runtime.oxlint, "dist", "bindings.js"),
             specifier
           )
+
           if (Option.isNone(resolved) || !(yield* fs.exists(resolved.value))) {
             return false
           }
@@ -146,14 +159,16 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
       }
     }
 
-    if (backend._tag === "Tsrs") {
+    if (backend instanceof TsrsBackend) {
       const tsrs = yield* resolvePackageDirectory(project.cwd, "tsrs")
       const override = yield* Config.String("TSRS_BINARY").pipe(Config.withDefault(""))
       const target = `${platform}${process.platform === "linux" ? `-${libc}` : ""}`
+
       const installed =
         Option.isSome(tsrs) && !override
           ? yield* resolvePackageDirectory(tsrs.value, `@tsrs/${target}`)
           : Option.none<string>()
+
       const binary =
         override === ""
           ? Option.isSome(installed)

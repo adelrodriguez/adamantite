@@ -8,7 +8,12 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
-import { CliNotFound } from "#lib/shared/errors.ts"
+import {
+  CliNotFound,
+  EffectEditorUnavailable,
+  InvalidConfigFormat,
+  VscodeCliNotFound,
+} from "#lib/shared/errors.ts"
 import { formatJson, parseJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import {
@@ -81,10 +86,8 @@ describe("vscode", () => {
           .extension(["check"])
           .pipe(Effect.provide(runner.layer), Effect.flip)
 
-        expect(error).toMatchObject({
-          _tag: "VscodeCliNotFound",
-          cause: { _tag: "CliNotFound", command: "code" },
-        })
+        expect(error).toBeInstanceOf(VscodeCliNotFound)
+        expect(error).toMatchObject({ cause: new CliNotFound({ command: "code" }) })
       })
     )
   })
@@ -112,6 +115,7 @@ describe("vscode", () => {
           const binary = EFFECT_COMPILER.split("/").at(-1)
           expect(files.read(`${EFFECT_SDK}/${binary}`)).toBe("native compiler")
           expect(files.read(`${EFFECT_SDK}/lib.es5.d.ts`)).toBe("interface String {}")
+
           for (const [path, content] of Object.entries(installed)) {
             expect(files.read(path)).toBe(content)
           }
@@ -120,6 +124,7 @@ describe("vscode", () => {
             Effect.flatMap((project) => vscode.assess(project)),
             provideFiles(files)
           )
+
           expect(assessment).toMatchObject({ applicable: true, findings: [] })
         })
     )
@@ -188,10 +193,12 @@ describe("vscode", () => {
           })
         )
         const before = files.list().map((path) => [path, files.read(path)])
+
         const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => vscode.assess(project)),
           provideFiles(files)
         )
+
         expect(result).toMatchObject({
           findings: expect.arrayContaining([
             {
@@ -234,10 +241,12 @@ describe("vscode", () => {
           const fs = yield* FileSystem.FileSystem
           yield* fs.remove(`${ROOT}/${EFFECT_SDK}/lib.es5.d.ts`)
         }).pipe(provideFiles(files))
+
         const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => vscode.assess(project)),
           provideFiles(files)
         )
+
         expect(result).toMatchObject({
           findings: [expect.objectContaining({ id: "vscode-effect-sdk" })],
         })
@@ -258,10 +267,12 @@ describe("vscode", () => {
           yield* formatJson({ gitHead: "unsupported", version: "7.0.2" })
         )
         const before = files.list().map((path) => [path, files.read(path)])
+
         const result = yield* readProject(ROOT).pipe(
           Effect.flatMap((project) => vscode.assess(project)),
           provideFiles(files)
         )
+
         expect(result).toMatchObject({
           findings: expect.arrayContaining([
             expect.objectContaining({
@@ -271,7 +282,7 @@ describe("vscode", () => {
           ]),
         })
         const error = yield* vscode.update(ROOT).pipe(provideFiles(files), Effect.flip)
-        expect(error).toMatchObject({ _tag: "EffectEditorUnavailable" })
+        expect(error).toBeInstanceOf(EffectEditorUnavailable)
         expect(files.list().map((path) => [path, files.read(path)])).toStrictEqual(before)
       })
     )
@@ -286,8 +297,8 @@ describe("vscode", () => {
 
         const error = yield* vscode.update(ROOT).pipe(provideFiles(files), Effect.flip)
 
+        expect(error).toBeInstanceOf(EffectEditorUnavailable)
         expect(error).toMatchObject({
-          _tag: "EffectEditorUnavailable",
           reason: expect.stringContaining(
             "needs an installed native TypeScript package with its gitHead"
           ),
@@ -383,8 +394,9 @@ describe("vscode", () => {
         const result = yield* Effect.result(vscode.update(ROOT).pipe(provideFiles(files)))
 
         expect(Result.isFailure(result)).toBe(true)
+
         if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
+          expect(result.failure).toBeInstanceOf(InvalidConfigFormat)
         }
       })
     )

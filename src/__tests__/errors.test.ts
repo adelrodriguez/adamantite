@@ -15,6 +15,7 @@ function createParseErrors(count: number): ParseError[] {
   parse("{ invalid", errors)
 
   const [firstError] = errors
+
   if (!firstError) {
     throw new Error("Expected jsonc-parser to produce at least one parse error")
   }
@@ -73,6 +74,7 @@ describe("errors", () => {
           "Got: v22.22.0",
         ].join("\n")
       )
+
       const error = new FailedToInstallDependency({ cause, packages: ["adamantite"] })
 
       expect(error.message).toContain("Failed to install dependencies: adamantite.")

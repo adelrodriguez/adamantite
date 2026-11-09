@@ -1,5 +1,4 @@
 import { defineConfig } from "oxlint"
-import antislop from "./presets/lint/antislop.ts"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import effect from "./presets/lint/effect.ts"
 import node from "./presets/lint/node.ts"
@@ -7,7 +6,7 @@ import strict from "./presets/lint/strict.ts"
 import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
 export default defineConfig({
-  extends: [core, node, antislop, effect, strict],
+  extends: [core, node, effect, strict],
   ignorePatterns: [
     ...ignorePatterns,
     // Vendored plugin bundles are entirely generated; see scripts/vendor-plugins.ts.

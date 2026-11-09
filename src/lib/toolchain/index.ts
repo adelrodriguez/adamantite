@@ -1,12 +1,18 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Predicate from "effect/Predicate"
 import type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
-import { CliNotFound, InvalidAnalyzeOptions, InvalidFixOptions } from "#lib/shared/errors.ts"
+import {
+  CliNotFound,
+  InvalidAnalyzeOptions,
+  InvalidCheckOptions,
+  InvalidFixOptions,
+} from "#lib/shared/errors.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
@@ -29,8 +35,15 @@ export const check = Effect.fn("Toolchain.check")(function* ({
   readonly forwardedArguments?: readonly string[]
   readonly only?: "format" | "lint"
 }) {
+  if (only === "format" && allowWarnings) {
+    return yield* new InvalidCheckOptions({
+      reason: "`--allow-warnings` applies to the lint stage. Remove it or `--only format`.",
+    })
+  }
+
   const runner = yield* CommandRunner
   const forwardedStage = only ?? "lint"
+
   const stages = {
     format: oxfmt.check({
       cwd,
@@ -76,6 +89,7 @@ export const fix = Effect.fn("Toolchain.fix")(function* ({
   const runner = yield* CommandRunner
   const targets = Array.dedupe(files)
   const forwardedStage = only ?? "lint"
+
   const stages = {
     format: oxfmt.fix({
       cwd,
@@ -112,6 +126,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   readonly strict?: boolean
 }) {
   const runner = yield* CommandRunner
+
   // Without a usable manifest there is no monorepo to analyze. Knip reports the manifest.
   const isMonorepo = yield* checkIsMonorepo(cwd).pipe(
     Effect.catchTags({
@@ -136,6 +151,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   }
 
   const forwardedStage = only ?? "unused"
+
   const stages = {
     monorepo: sherif.analyze({
       cwd,
@@ -149,6 +165,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
       strict,
     }),
   }
+
   const steps =
     only === undefined ? [...(isMonorepo ? [stages.monorepo] : []), stages.unused] : [stages[only]]
 
@@ -156,7 +173,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   // dependency graph.
   yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
     Effect.mapError((error) =>
-      error._tag === "CliNotFound" && error.command === sherif.name
+      Predicate.isTagged(error, "CliNotFound") && error.command === sherif.name
         ? new CliNotFound({
             command: error.command,
             hint: "Run `adamantite update` to install it.",

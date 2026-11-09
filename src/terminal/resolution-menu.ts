@@ -1,3 +1,4 @@
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
@@ -20,16 +21,21 @@ interface ResolutionMenuOptions {
   readonly subject: string
 }
 
+class PromptCopied extends Data.TaggedClass("Copied") {}
+
+class ResolutionDeclined extends Data.TaggedClass("Declined") {}
+
 /**
- * The user's choice in the resolution menu. `Failed` means that the agent CLI did not start, and
- * `Ended` means that the handoff ran and the agent session ended. The command decides what happens
- * next.
+ * The handoff ran and the agent session ended.
  */
-type Resolution =
-  | { readonly _tag: "Copied" }
-  | { readonly _tag: "Declined" }
-  | { readonly _tag: "Ended"; readonly agent: CodingAgent }
-  | { readonly _tag: "Failed"; readonly agent: CodingAgent }
+export class AgentSessionEnded extends Data.TaggedClass("Ended")<{
+  readonly agent: CodingAgent
+}> {}
+
+/**
+ * The agent CLI did not start.
+ */
+class AgentStartFailed extends Data.TaggedClass("Failed")<{ readonly agent: CodingAgent }> {}
 
 type ResolveAction = CodingAgent | "copy" | "done"
 
@@ -46,6 +52,7 @@ const copyPrompt = Effect.fn("copyPrompt")(function* (prompt: string) {
 
 export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: string) {
   const prompter = yield* Prompter
+
   const shouldCopyPrompt = yield* prompter.confirm({
     initialValue: true,
     message: "Copy the agent prompt?",
@@ -58,7 +65,8 @@ export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: s
 
 /**
  * Offers a handoff to each installed coding agent, a copy of the Markdown prompt, or nothing, and
- * runs the choice. When the agent CLI does not start, it offers the prompt copy instead.
+ * runs the choice. When the agent CLI does not start, it offers the prompt copy instead. It returns
+ * the user's choice, and the command decides what happens next.
  */
 export const chooseResolution = Effect.fn("chooseResolution")(function* (
   options: ResolutionMenuOptions
@@ -95,12 +103,13 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   })
 
   if (action === "done") {
-    return { _tag: "Declined" } satisfies Resolution
+    return new ResolutionDeclined()
   }
 
   if (action === "copy") {
     yield* copyPrompt(options.prompt)
-    return { _tag: "Copied" } satisfies Resolution
+
+    return new PromptCopied()
   }
 
   const agent = action
@@ -124,8 +133,9 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
 
   if (!started) {
     yield* offerPromptCopy(options.prompt)
-    return { _tag: "Failed", agent } satisfies Resolution
+
+    return new AgentStartFailed({ agent })
   }
 
-  return { _tag: "Ended", agent } satisfies Resolution
+  return new AgentSessionEnded({ agent })
 })

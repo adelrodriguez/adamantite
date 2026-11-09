@@ -73,6 +73,7 @@ for (const file of files) {
   const target = resolve(root, to)
   const source = existsSync(resolve(root, from)) ? resolve(root, from) : target
   const content = readFileSync(source, "utf8")
+
   const renamed = replacements.reduce(
     (text, [before, after]) => text.replaceAll(before, after),
     content

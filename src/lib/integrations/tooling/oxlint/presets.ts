@@ -83,14 +83,9 @@ export const lintPresets = [
     name: "architecture",
   },
   {
-    hint: "Limit type assertions, deep destructuring, and TODOs.",
+    hint: "Ban type assertions, unknown parameters, module mocks, and TODOs.",
     label: "strict",
     name: "strict",
-  },
-  {
-    hint: "Ban module mocks, Reflect.get, and unknown parameters.",
-    label: "antislop",
-    name: "antislop",
   },
   {
     hint: "Check Tailwind v4 classes.",

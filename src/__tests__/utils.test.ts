@@ -10,6 +10,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
 import {
   formatJson,
   mergeConfig,
@@ -66,8 +67,9 @@ describe("readPackageJson", () => {
       const result = yield* Effect.result(readPackageJson(ROOT).pipe(provideFiles(files)))
 
       expect(Result.isFailure(result)).toBe(true)
+
       if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToReadFile" })
+        expect(result.failure).toBeInstanceOf(FailedToReadFile)
       }
     })
   )
@@ -92,8 +94,9 @@ describe("parseJson", () => {
       const result = yield* Effect.result(parseJson(invalidJson))
 
       expect(Result.isFailure(result)).toBe(true)
+
       if (Result.isFailure(result)) {
-        expect(result.failure).toMatchObject({ _tag: "FailedToParseFile" })
+        expect(result.failure).toBeInstanceOf(FailedToParseFile)
       }
     })
   )
@@ -104,9 +107,11 @@ describe("mergeConfig", () => {
   // concatenates arrays on conflicts, so this property holds on array-free, null-free configs with
   // plain keys.
   const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean])
+
   const plainKey = Schema.String.check(
     Schema.makeFilter((key) => key !== "__proto__" && key !== "constructor")
   )
+
   const arrayFreeConfig = Schema.Record(
     plainKey,
     Schema.Union([
@@ -125,11 +130,13 @@ describe("mergeConfig", () => {
         for (const key of [...Object.keys(base), ...Object.keys(override)]) {
           expect(Object.hasOwn(merged, key)).toBe(true)
         }
+
         for (const [key, value] of Object.entries(base)) {
           if (!Predicate.isObject(value)) {
             expect(merged[key]).toBe(value)
           }
         }
+
         for (const key of Object.keys(override)) {
           if (!Object.hasOwn(base, key)) {
             expect(merged[key]).toStrictEqual(override[key])
@@ -383,6 +390,7 @@ describe("checkIsMonorepo", () => {
 
 function makeConsoleContext() {
   const capturedLogs: string[] = []
+
   const mockConsole: Console.Console = {
     assert: noop,
     clear: noop,
@@ -398,6 +406,7 @@ function makeConsoleContext() {
     info: (...args: unknown[]) => {
       const message = args.map(String).join(" ")
       capturedLogs.push(message)
+
       return null
     },
     log: noop,
@@ -450,6 +459,7 @@ describe("normalizeDependencyVersion", () => {
   // `workspace:` protocol, and at most one range prefix. Stacked prefixes like `~~1.0.0` are not
   // valid specifiers and are out of scope.
   const versionNumber = Schema.Int.check(Schema.isBetween({ maximum: 99, minimum: 0 }))
+
   const version = Schema.TemplateLiteral([
     versionNumber,
     ".",
@@ -458,6 +468,7 @@ describe("normalizeDependencyVersion", () => {
     versionNumber,
     Schema.Literals(["", "-alpha", "-beta.1", "-rc.0"]),
   ])
+
   const specifierParts = {
     padding: Schema.Literals(["", " ", "  ", "\t"]),
     rangePrefix: Schema.Literals(["", "^", "~"]),

@@ -2,6 +2,7 @@ import type { JsonObject, JsonValue } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { Project } from "#lib/workspace/project.ts"
@@ -57,7 +58,7 @@ export default defineIntegration({
       const configPath = path.join(cwd, files[0].path)
       const content = yield* readFileIfExists(configPath)
 
-      if (content._tag === "None") {
+      if (Option.isNone(content)) {
         return {
           applicable: true,
           findings: [
@@ -81,6 +82,7 @@ export default defineIntegration({
       }
 
       const config = yield* parseJson(content.value, configPath)
+
       const configured =
         Predicate.isObject(config)
         && (config.extends === PRESET_EXTENDS
@@ -119,6 +121,7 @@ export default defineIntegration({
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
+
       return yield* fs.exists(path.join(cwd, files[0].path))
     }),
   files,
@@ -137,6 +140,7 @@ export default defineIntegration({
       }
 
       const merged = yield* mergeConfig(CONFIG, existingConfig)
+
       // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON object.
       const newConfig: JsonObject = Object.fromEntries([
         ...Object.entries(merged),

@@ -36,7 +36,9 @@ const commands = [
   ruleCommand,
   updateCommand,
 ] as const
+
 const commandNames: ReadonlySet<string> = new Set(commands.map((command) => command.name))
+
 const passthroughCommandNames: ReadonlySet<string> = new Set(
   passthroughCommands.map((command) => command.name)
 )
@@ -68,6 +70,7 @@ export const runCli = Effect.fn("runCli")(function* (args: readonly string[], ve
     args,
     (argument) => argument === "--"
   )
+
   const forwardedArguments = Array.drop(forwardedWithSeparator, 1)
   const activeCommand = commandArguments.find((argument) => commandNames.has(argument))
 

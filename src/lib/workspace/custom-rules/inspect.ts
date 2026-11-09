@@ -1,4 +1,5 @@
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
@@ -43,15 +44,25 @@ export function isRuleTestFile(name: string): boolean {
 }
 
 /**
- * A `custom()` call. A `Literal` call gives its `dir` as a string literal, relative to the file
- * that holds the call, and its `name` when that is a string literal too. Only running the config
- * can resolve the rules folder of a `Dynamic` call.
+ * A `custom()` call whose rules folder only running the config can resolve.
  */
-export type CustomRulesCall =
-  | { readonly _tag: "Dynamic" }
-  | { readonly _tag: "Literal"; readonly dir: string; readonly name: Option.Option<string> }
+export class DynamicCustomRulesCall extends Data.TaggedClass("Dynamic") {}
 
-const DYNAMIC_CALL: CustomRulesCall = { _tag: "Dynamic" }
+/**
+ * A `custom()` call that gives its `dir` as a string literal, relative to the file that holds the
+ * call, and its `name` when that is a string literal too.
+ */
+export class LiteralCustomRulesCall extends Data.TaggedClass("Literal")<{
+  readonly dir: string
+  readonly name: Option.Option<string>
+}> {}
+
+/**
+ * A `custom()` call.
+ */
+export type CustomRulesCall = DynamicCustomRulesCall | LiteralCustomRulesCall
+
+const DYNAMIC_CALL: CustomRulesCall = new DynamicCustomRulesCall()
 
 function parse(file: string, content: string) {
   return parseSync(file, content, { preserveParens: false, sourceType: "module" })
@@ -169,11 +180,11 @@ function readCallOptions(options: ObjectExpression["properties"]): CustomRulesCa
 
   return Option.match(readStringOption(properties, "dir", DEFAULT_DIRECTORY), {
     onNone: () => DYNAMIC_CALL,
-    onSome: (dir): CustomRulesCall => ({
-      _tag: "Literal",
-      dir,
-      name: readStringOption(properties, "name", DEFAULT_PLUGIN_NAME),
-    }),
+    onSome: (dir): CustomRulesCall =>
+      new LiteralCustomRulesCall({
+        dir,
+        name: readStringOption(properties, "name", DEFAULT_PLUGIN_NAME),
+      }),
   })
 }
 
@@ -190,6 +201,7 @@ export function findCustomRulesCalls(file: string, content: string): CustomRules
   }
 
   const calls: CustomRulesCall[] = []
+
   const visitor = new Visitor({
     CallExpression(node) {
       if (node.callee.type !== "Identifier" || !localNames.includes(node.callee.name)) {
@@ -317,11 +329,13 @@ export function inspectRuleFile(file: string, content: string): string[] {
   }
 
   const problems: string[] = []
+
   const report = (offset: number, construct: string) => {
     problems.push(
       `Line ${getLine(content, offset)}: ${construct} needs a TypeScript transform, which type stripping does not do.`
     )
   }
+
   const visitor = new Visitor({
     TSEnumDeclaration(node) {
       if (!node.declare) {

@@ -77,6 +77,7 @@ describe("oxlint-custom", () => {
           },
           root: ROOT,
         })
+
         const before = files.list().map((file) => [file, files.read(file)])
 
         expect(getFindings(yield* runAssess(files))).toStrictEqual([])
@@ -119,6 +120,7 @@ describe("oxlint-custom", () => {
         },
         root: ROOT,
       })
+
       const before = files.list().map((file) => [file, files.read(file)])
 
       const findings = getFindings(yield* runAssess(files))
@@ -364,6 +366,7 @@ describe("oxlint-custom", () => {
   it.effect("clear the resolver cache before each traversal", () =>
     Effect.gen(function* () {
       const events: string[] = []
+
       const resolverLayer = Layer.succeed(ModuleResolver)({
         clearCache: Effect.sync(() => {
           events.push("clear")
@@ -375,6 +378,7 @@ describe("oxlint-custom", () => {
             return Option.none()
           }),
       })
+
       const files = createFileSystemTestContext({
         files: {
           "oxlint.config.ts": makeConfig("core, rules", ['import rules from "./lint/rules.ts"']),
@@ -382,6 +386,7 @@ describe("oxlint-custom", () => {
         },
         root: ROOT,
       })
+
       const assess = readProject(ROOT).pipe(
         Effect.flatMap((project) => oxlintCustom.assess(project)),
         Effect.provide([files.layer, Path.layer, resolverLayer])

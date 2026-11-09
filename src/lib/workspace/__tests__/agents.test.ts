@@ -136,6 +136,7 @@ describe("writeAgentsGuidance", () => {
   )
 
   const ALL_SCRIPTS: Script[] = ["check", "fix", "analyze"]
+
   const guidanceOptions = {
     isMonorepo: Schema.Boolean,
     packageManager: Schema.Literals(["bun", "deno", "npm", "pnpm", "yarn"]),
@@ -143,6 +144,7 @@ describe("writeAgentsGuidance", () => {
       Schema.UniqueArray(Schema.Literals(ALL_SCRIPTS)).check(Schema.isMaxLength(ALL_SCRIPTS.length))
     ),
   }
+
   // Marker-free so generated content cannot collide with the managed block by accident.
   const markerFreeContent = Schema.String.check(Schema.isMaxLength(200)).check(
     Schema.makeFilter((content) => !content.includes("ADAMANTITE"))
@@ -178,7 +180,9 @@ describe("writeAgentsGuidance", () => {
           agents.matchAll(/^- Run `[^`\n]+ (check|fix|analyze)`/gm),
           ([, script]) => script
         )
+
         expect(new Set(writtenScripts)).toStrictEqual(new Set(scripts))
+
         if (scripts.length > 0) {
           expect(agents).toContain(`${packageManager} `)
         }
@@ -233,12 +237,12 @@ describe("writeAgentsGuidance", () => {
     },
     ({ prefix, suffix, variant, ...guidance }) =>
       Effect.gen(function* () {
-        const existing =
-          variant === "start-only"
-            ? `${prefix}${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
-            : variant === "end-only"
-              ? `${prefix}${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
-              : `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`
+        const existing = {
+          "end-before-start": `${prefix}${ADAMANTITE_AGENTS_END_MARKER}\n${ADAMANTITE_AGENTS_START_MARKER}${suffix}`,
+          "end-only": `${prefix}${ADAMANTITE_AGENTS_END_MARKER}${suffix}`,
+          "start-only": `${prefix}${ADAMANTITE_AGENTS_START_MARKER}${suffix}`,
+        }[variant]
+
         const files = makeFiles({ "AGENTS.md": existing })
         const { isMonorepo, packageManager, scripts } = guidance
 

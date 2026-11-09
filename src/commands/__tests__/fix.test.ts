@@ -7,9 +7,11 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { CommandFailed, InvalidFixOptions } from "#lib/shared/errors.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
+
 describe("fix", () => {
   describe("default invocation", () => {
     it.effect("lint before formatting", () =>
@@ -109,7 +111,7 @@ describe("fix", () => {
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "InvalidFixOptions" })
+        expect(error).toBeInstanceOf(InvalidFixOptions)
         expect(runner.invocations).toStrictEqual([])
       })
     )
@@ -121,6 +123,7 @@ describe("fix", () => {
         const files = createFileSystemTestContext({
           files: { "index.ts": "export const value = 1\n" },
         })
+
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(fixCommand, ["index.ts", "index.ts"], {
@@ -183,7 +186,8 @@ describe("fix", () => {
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed", command: "node", exitCode: 1 })
+        expect(error).toBeInstanceOf(CommandFailed)
+        expect(error).toMatchObject({ command: "node", exitCode: 1 })
         expect(
           runner.invocations.map((invocation) => invocation.name ?? invocation.command)
         ).toStrictEqual(["oxlint", "oxfmt"])
@@ -198,7 +202,8 @@ describe("fix", () => {
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
+        expect(error).toBeInstanceOf(CommandFailed)
+        expect(error).toMatchObject({ command: "oxfmt", exitCode: 2 })
       })
     )
   })

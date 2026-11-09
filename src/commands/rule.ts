@@ -10,6 +10,8 @@ import * as Schema from "effect/Schema"
 import { parseSync } from "oxc-parser"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
+  CurrentSetting,
+  ErrorSetting,
   parseTrialCase,
   type TrialCaseResult,
   type TrialSetting,
@@ -102,6 +104,7 @@ const addTest = Command.make("test", {
 
         if (!(yield* terminal.isInteractive)) {
           yield* prompter.message(names.join("\n"))
+
           return yield* prompter.log.info(
             "Pass a rule name with `adamantite rule add test <name>`."
           )
@@ -119,6 +122,7 @@ const addTest = Command.make("test", {
         directory,
         Option.getOrUndefined(target)
       )
+
       yield* prompter.log.success(`Wrote ${path.relative(cwd, written)}.`)
       yield* prompter.log.info(
         `Adapt the valid and invalid cases to the rule, then run \`adamantite rule test\`${Option.isSome(target) ? " with `--path` and the test file path." : "."}`
@@ -168,6 +172,7 @@ const test = Command.make("test", { path: testPath }).pipe(
           title: "🧪 Testing custom rules",
         })
       }
+
       const { command, unresolvedCalls, unresolvedImports } = yield* readCustomRuleTestCommand(
         yield* readProject(cwd)
       )
@@ -227,7 +232,7 @@ const current = Flag.Boolean("current").pipe(
 )
 
 function describeSetting(rule: string, setting: TrialSetting) {
-  return setting._tag === "Current"
+  return setting instanceof CurrentSetting
     ? `\`${rule}\` as the project config sets it`
     : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
 }
@@ -245,12 +250,15 @@ export function renderTrial(
   results: readonly TrialCaseResult[]
 ): string {
   const configs = [...new Set(results.map((result) => `\`${result.config}\``))].join(", ")
+
   const lines = results.map((result) => {
     const name = Option.match(result.case.source, {
       onNone: () => `\`${result.case.path}\``,
       onSome: (source) => `\`${result.case.path}\` from \`${source}\``,
     })
+
     const outcome = result.diagnostics.length > 0 ? "reported" : "accepted"
+
     const verdict = isAsExpected(result)
       ? `✓ ${name}: ${outcome}, as expected.`
       : `✗ ${name}: ${outcome}, but it must be ${result.case.expected}.`
@@ -262,7 +270,9 @@ export function renderTrial(
       ),
     ].join("\n")
   })
+
   const failures = results.filter((result) => !isAsExpected(result)).length
+
   const summary =
     failures === 0
       ? "All cases produced the expected result."
@@ -303,10 +313,13 @@ const trial = Command.make("try", {
         ...report.map((value) => parseTrialCase(value, "reported")),
         ...accept.map((value) => parseTrialCase(value, "accepted")),
       ])
-      const setting: TrialSetting = current
-        ? { _tag: "Current" }
-        : { _tag: "Error", options: Option.getOrElse(options, () => []) }
+
+      const setting = current
+        ? new CurrentSetting()
+        : new ErrorSetting({ options: Option.getOrElse(options, () => []) })
+
       const cwd = process.cwd()
+
       const results = yield* tryRule({
         cases,
         cwd,

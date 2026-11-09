@@ -13,6 +13,7 @@ const effectTsgo = managedPlugin("@effect/tsgo")
 
 const ROOT = "/project"
 const PREPARE = "adamantite prepare"
+
 const CONFIGURED_TSCONFIG = JSON.stringify({
   compilerOptions: { plugins: [{ diagnostics: true, name: "@effect/language-service" }] },
 })

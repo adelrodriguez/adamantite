@@ -48,6 +48,7 @@ export default Command.make("update").pipe(
       const assessment = yield* assessProject(yield* readProject(cwd, packageJson))
       const packageActions = assessment.packageActions
       const coveredPackages = new Set(packageActions.map((action) => action.package))
+
       const updates = [
         ...packageActions,
         // A known package that the project does not install stays uninstalled.
@@ -119,6 +120,7 @@ export default Command.make("update").pipe(
       // write the same folders. Adamantite owns the copy, so the lock entry goes away.
       const lockWarning = (error: { readonly message: string }) =>
         prompter.log.warning(`Could not update \`skills-lock.json\`. ${error.message}`)
+
       const lock: StepOutcome = yield* removeSkillsLockEntry(cwd).pipe(
         Effect.flatMap((removed) =>
           removed

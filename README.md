@@ -93,7 +93,7 @@ Available setup values:
 - Scripts: `check`, `fix`, and `analyze`. In a detected monorepo, `analyze` also installs
   Sherif.
 - Presets: `react`, `react-strict`, `tanstack`, `nextjs`, `vue`, `effect`,
-  `jest`, `vitest`, `node`, `architecture`, `strict`, `antislop`, and `tailwind`. `react-strict` requires `react`.
+  `jest`, `vitest`, `node`, `architecture`, `strict`, and `tailwind`. `react-strict` requires `react`.
 - Editors: `vscode` and `zed`.
 
 Presets and TypeScript require the `check` or `fix` script. Editor extension installation
@@ -340,13 +340,12 @@ Adamantite publishes configuration that can also be consumed directly:
 | `adamantite/lint/tanstack`     | Opinions for [TanStack Query](https://tanstack.com/query) with route loaders: queries defined once with `queryOptions()`, and no query data copied into state. See [the tanstack preset](#the-tanstack-preset).                                                                            |
 | `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                                 |
-| `adamantite/lint/effect`       | Curated [@effect/tsgo](https://github.com/Effect-TS/tsgo) rules for Effect misuse, such as effects that never run and unhandled errors. See [the effect preset](#the-effect-preset).                                                                                                       |
+| `adamantite/lint/effect`       | Curated [@effect/tsgo](https://github.com/Effect-TS/tsgo) rules for Effect misuse, such as effects that never run and unhandled errors, and vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules for tagged values. See [the effect preset](#the-effect-preset).              |
 | `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/jest`         | Jest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                                |
 | `adamantite/lint/vitest`       | Vitest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                              |
 | `adamantite/lint/architecture` | Load first-party rules for project-defined layer maps and import owners. No rules are enabled by default.                                                                                                                                                                                  |
-| `adamantite/lint/strict`       | Framework-neutral opinions: no deep or wide destructuring, no type assertions outside tests, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                                                                            |
-| `adamantite/lint/antislop`     | Vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules that reject low-evidence, low-signal patterns. Also turns off `typescript/consistent-indexed-object-style` and `unicorn/no-immediate-mutation` from the core preset, which conflict with these rules.                    |
+| `adamantite/lint/strict`       | Framework-neutral opinions: no type assertions outside tests, no `unknown` in signatures, no module mocks, no deep or wide destructuring, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                               |
 | `adamantite/lint/tailwind`     | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the tailwind preset](#the-tailwind-preset). |
 | `adamantite/rules`             | A function, `custom()`, that loads the project's own rules from `.adamantite/lint/`. See [custom rules](#custom-rules).                                                                                                                                                                    |
 | `adamantite/rules/plugin`      | `definePlugin`, `defineRule`, `eslintCompatPlugin`, and all Oxlint authoring types.                                                                                                                                                                                                        |
@@ -516,7 +515,22 @@ simpler replacement (`catch-all-to-map-error`). The rules come from
 [@effect/tsgo](https://github.com/Effect-TS/tsgo), the Effect Language Service for
 TypeScript-Go, and need Oxlint's type-aware mode.
 
-The rules are not a JavaScript plugin. They exist only in the Effect builds of the Oxlint
+The preset also turns on the rules of the `anti-slop-effect` plugin from
+[anti-slop](https://github.com/dmmulroy/anti-slop). Adamantite ships a build of it, so nothing
+extra needs to be installed. The rules report tagged values that code handles by hand:
+
+- `no-manual-tagged-construction` reports an object literal with a `_tag`. Use a tagged class,
+  such as `Data.TaggedClass` or `Data.TaggedError`, or the `make` of a tagged Schema.
+- `no-manual-tag-comparison` reports a comparison or a `switch` on `_tag`. Use `Match.tag`,
+  `Predicate.isTagged`, or a helper such as `Option.isNone`.
+- `no-manual-effect-error-tag` reports a broad `Effect.catch` handler that branches on `_tag`.
+  Use `Effect.catchTag` or `Effect.catchReason`.
+- `prefer-effect-match` reports a chain of ternaries that compare one value with literals. Use
+  `Match` or a lookup table.
+- `no-service-constructor-imports` reports a `make*` import from a project file outside tests.
+  Import the Layer of the service instead.
+
+The `@effect/tsgo` rules are not a JavaScript plugin. They exist only in the Effect builds of the Oxlint
 binding and tsrs, which `@effect/tsgo` ships. When the project installs
 `@effect/tsgo`, Adamantite runs Oxlint with those builds. Nothing changes in
 installed package files, so linting needs no install script. These run Oxlint with the builds:
@@ -645,7 +659,8 @@ You can also select it during setup with
 ### The strict preset
 
 `adamantite/lint/strict` holds framework-neutral opinions. Use it with any other preset.
-It needs no extra package.
+It needs no extra package. Most of its type rules come from
+[anti-slop](https://github.com/dmmulroy/anti-slop), which Adamantite ships as a vendored build.
 
 - `adamantite/no-overzealous-destructuring` reports destructuring patterns nested more than
   `maxDepth` levels deep (default 2), such as `const { data: { user: { name } } } = query`,
@@ -660,6 +675,19 @@ It needs no extra package.
   comment that names no rule is reported by the core preset's `unicorn/no-abusive-eslint-disable`.
 - `no-warning-comments` reports a comment that starts with `TODO`, `FIXME`, `XXX`, or `HACK`.
   Fix the code now, or track the work in your issue tracker. Do not only rename the marker.
+- The anti-slop rules ask the code to decode input at its boundary into types that it owns.
+  They report `unknown` in function signatures and type aliases, loose dictionary types, a
+  `typeof` check outside a type predicate, `Reflect.get` and `Reflect.apply`, and Vitest or Jest
+  module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
+  accumulator, `shape` in symbol names, and a missing blank line between statement groups.
+- In test files, where type assertions are allowed, `anti-slop/require-safety-comment-for-type-assertion`
+  requires a `SAFETY:` comment on each assertion, and `anti-slop/no-chained-type-assertions` and
+  `anti-slop/no-widen-then-assert` report assertions that hide the source type. Outside tests,
+  `typescript/consistent-type-assertions` is the only rule that reports an assertion. To change
+  one of these three rules, set it in an `overrides` entry for the same test files, because the
+  preset's override takes priority over top-level `rules`.
+- The preset turns off the core preset's `typescript/consistent-indexed-object-style` and
+  `unicorn/no-immediate-mutation`, which conflict with `anti-slop/no-known-value-widening`.
 
 Set `maxDepth` and `maxProperties` to change the destructuring limits:
 

@@ -35,6 +35,7 @@ const readWorkspacePatterns = (cwd: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const pnpmWorkspace = yield* readFileIfExists(path.join(cwd, "pnpm-workspace.yaml"))
+
     const pnpmPatterns = Option.isSome(pnpmWorkspace)
       ? yield* readPnpmWorkspacePatterns(pnpmWorkspace.value)
       : []
@@ -138,9 +139,11 @@ const findPackageDirectories = (cwd: string, patterns: readonly string[]) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const includes = patterns.filter((pattern) => !pattern.startsWith("!"))
-    const excludes = patterns
-      .filter((pattern) => pattern.startsWith("!"))
-      .map((pattern) => workspacePatternToRegExp(pattern.slice(1)))
+
+    const excludes = patterns.flatMap((pattern) =>
+      pattern.startsWith("!") ? [workspacePatternToRegExp(pattern.slice(1))] : []
+    )
+
     const candidates = yield* Effect.forEach(
       includes,
       (pattern) =>
@@ -153,9 +156,11 @@ const findPackageDirectories = (cwd: string, patterns: readonly string[]) =>
         }),
       { concurrency: "unbounded" }
     )
+
     const matched = Array.dedupe(candidates.flat()).filter(
       (directory) => !excludes.some((exclude) => exclude.test(directory))
     )
+
     const packages = yield* Effect.forEach(
       matched,
       (directory) =>

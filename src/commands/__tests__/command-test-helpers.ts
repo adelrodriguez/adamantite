@@ -4,13 +4,16 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as PlatformError from "effect/PlatformError"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stdio from "effect/Stdio"
 import * as Terminal from "effect/Terminal"
 import { TestConsole } from "effect/testing"
-import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import {
+  type FileSystemTestContext,
+  createFileSystemTestContext,
+  makeSystemError,
+} from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import {
@@ -117,9 +120,11 @@ export function createRunnerTestContext(
                 ...options,
                 args: [...options.args],
               })
+
               if (implementation) {
                 return yield* implementation(options)
               }
+
               return ChildProcessSpawner.ExitCode(remainingExitCodes.shift() ?? 0)
             })
           )
@@ -157,6 +162,7 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
             ? Effect.succeed(ChildProcessSpawner.ExitCode(0))
             : Effect.fail(new CliNotFound({ command: invocation.command }))
         }
+
         if (!codingAgents.some((agent) => agent.command === invocation.command)) {
           const commandExit = options.commandExits?.[invocation.name ?? invocation.command] ?? 0
 
@@ -164,20 +170,17 @@ export function makeHandoffRunner(options: HandoffRunnerOptions = {}) {
             ? Effect.fail(new CliNotFound({ command: invocation.command }))
             : Effect.succeed(ChildProcessSpawner.ExitCode(commandExit))
         }
+
         if (options.agentExit === "not-found") {
           return Effect.fail(new CliNotFound({ command: invocation.command }))
         }
+
         if (options.agentExit === "spawn-error") {
-          return Effect.fail(
-            PlatformError.systemError({
-              _tag: "PermissionDenied",
-              method: "spawn",
-              module: "FileSystem",
-              pathOrDescriptor: invocation.command,
-            })
-          )
+          return Effect.fail(makeSystemError("PermissionDenied", "spawn", invocation.command))
         }
+
         options.onAgentRun?.()
+
         return Effect.succeed(ChildProcessSpawner.ExitCode(options.agentExit ?? 0))
       }),
   })
@@ -228,6 +231,7 @@ export function createPrompterTestContext(options?: {
   // CancelAtPromptIndex is 1-based: 1 means cancel the first prompt shown.
   function shouldCancelPrompt() {
     promptIndex += 1
+
     return cancelAtPromptIndex === promptIndex
   }
 
@@ -248,6 +252,7 @@ export function createPrompterTestContext(options?: {
           }
 
           confirmCalls.push(config)
+
           return shiftResponse(confirmResponses, "confirm")
         }),
       intro: (message) =>
@@ -283,6 +288,7 @@ export function createPrompterTestContext(options?: {
           }
 
           multiselectCalls.push(config)
+
           // SAFETY: each test queues multiselect responses matching the option type of the prompt it triggers.
           return shiftResponse(multiselectResponses, "multiselect") as T[]
         }),
@@ -301,6 +307,7 @@ export function createPrompterTestContext(options?: {
           }
 
           selectCalls.push(config)
+
           // SAFETY: each test queues a select response that matches the option type of the prompt.
           return shiftResponse(selectResponses, "select") as T
         }),
@@ -346,6 +353,7 @@ export function createDependencyInstallerTestContext(options?: {
   readonly detectedPackageManager?: DetectedPackageManager | null
 }): DependencyInstallerTestContext {
   const calls: DependencyInstallerCall[] = []
+
   const detectedPackageManager: DetectedPackageManager | null =
     options && "detectedPackageManager" in options
       ? (options.detectedPackageManager ?? null)

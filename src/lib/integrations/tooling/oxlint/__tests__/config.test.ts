@@ -8,14 +8,23 @@ import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/
 
 const unsupportedConfigReason =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."
+
 const unsupportedOptionsReason =
   "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can inspect."
+
 const ambiguousOptionsReason =
   "`oxlint.config.ts` has an `options` object Adamantite cannot inspect. Make sure each required option is a plain `key: true | false` property. Avoid spreads (`...rest`), computed keys (`[name]: ...`), duplicate keys, methods/getters/setters, and non-boolean-literal values."
+
 const missingOptionsReason = "The required Oxlint options are missing."
 const invalidOptionsReason = "The required Oxlint options are missing or are not set to true."
 
 const requiredOptions = "respectEslintDisableDirectives: true, typeAware: true, typeCheck: true"
+
+const exportGoal =
+  "Export the config object literal directly from `oxlint.config.ts`, with or without `defineConfig(...)`. Preserve every project setting."
+
+const optionsGoal =
+  "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting."
 
 describe("inspectRequiredOxlintConfig", () => {
   it("accept the generated config with selected presets", () => {
@@ -35,33 +44,58 @@ describe("inspectRequiredOxlintConfig", () => {
   })
 
   it.each([
-    ["export default {", unsupportedConfigReason],
-    ["export default makeConfig()", unsupportedConfigReason],
-    ["export default {}", missingOptionsReason],
-    ["export default { options: getOptions() }", unsupportedOptionsReason],
-    ["export default { options: {} }", invalidOptionsReason],
+    [
+      "export default {",
+      unsupportedConfigReason,
+      "Fix the syntax errors in `oxlint.config.ts`. Preserve every project setting.",
+    ],
+    ["export default makeConfig()", unsupportedConfigReason, exportGoal],
+    ["export default {}", missingOptionsReason, optionsGoal],
+    ["export default { options: getOptions() }", unsupportedOptionsReason, optionsGoal],
+    ["export default { options: {} }", invalidOptionsReason, optionsGoal],
     [
       `export default { options: { ${requiredOptions.replace("typeAware: true", "typeAware: false")} } }`,
       invalidOptionsReason,
+      optionsGoal,
     ],
     [
       `export default { options: { ${requiredOptions.replace("typeAware: true", "typeAware: enabled")} } }`,
       invalidOptionsReason,
+      optionsGoal,
     ],
-    [`export default { options: { ${requiredOptions}, ...other } }`, ambiguousOptionsReason],
+    [
+      `export default { options: { ${requiredOptions}, ...other } }`,
+      ambiguousOptionsReason,
+      optionsGoal,
+    ],
     [
       `export default { options: { ${requiredOptions}, typeAware: false } }`,
       ambiguousOptionsReason,
+      optionsGoal,
     ],
-    [`export default { options: { ${requiredOptions}, [key]: false } }`, ambiguousOptionsReason],
-    [`export default { ...other, options: { ${requiredOptions} } }`, unsupportedOptionsReason],
-    [`export default { options: { ${requiredOptions} }, options: {} }`, unsupportedOptionsReason],
+    [
+      `export default { options: { ${requiredOptions}, [key]: false } }`,
+      ambiguousOptionsReason,
+      optionsGoal,
+    ],
+    [
+      `export default { ...other, options: { ${requiredOptions} } }`,
+      unsupportedOptionsReason,
+      optionsGoal,
+    ],
+    [
+      `export default { options: { ${requiredOptions} }, options: {} }`,
+      unsupportedOptionsReason,
+      optionsGoal,
+    ],
     [
       `export default { get options() { return { ${requiredOptions} } } }`,
       unsupportedOptionsReason,
+      optionsGoal,
     ],
-  ])("report an invalid config without generating a repair: %s", (content, reason) => {
+  ])("report an invalid config without generating a repair: %s", (content, reason, goal) => {
     expect(inspectRequiredOxlintConfig(content)).toStrictEqual({
+      goal,
       kind: "invalid",
       reason,
     })

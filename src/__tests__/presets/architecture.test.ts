@@ -6,9 +6,11 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
+
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(Schema.Struct({ code: Schema.optional(Schema.String) })),
 })
+
 const decodeOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 describe("architecture preset", () => {
@@ -37,6 +39,7 @@ describe("architecture preset", () => {
           "",
         ].join("\n")
       )
+
       const result = spawnSync(
         join(REPO_ROOT, "node_modules/.bin/oxlint"),
         ["-c", "oxlint.config.ts", "-f", "json", "example.ts"],

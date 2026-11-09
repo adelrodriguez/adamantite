@@ -10,10 +10,17 @@ import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import type { Workspace } from "#lib/workspace/monorepo.ts"
-import { readOverrides } from "#lib/hardening/overrides.ts"
+import { LintedOverrides, readOverrides } from "#lib/hardening/overrides.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
-import { type TrialCase, type TrialSetting, tryRule } from "#lib/hardening/trial.ts"
+import {
+  CurrentSetting,
+  ErrorSetting,
+  type TrialCase,
+  type TrialSetting,
+  tryRule,
+} from "#lib/hardening/trial.ts"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { InvalidTrialCase } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")
@@ -186,9 +193,10 @@ describe("rule trials in a real project", () => {
   it.live("report the case with the mistake and accept the correct code at the same path", () =>
     Effect.gen(function* () {
       const before = listProject()
+
       const results = yield* runTrial(
         "no-restricted-imports",
-        { _tag: "Error", options: [{ paths: ["node:fs"] }] },
+        new ErrorSetting({ options: [{ paths: ["node:fs"] }] }),
         [
           makeCase(
             "src/cart.ts",
@@ -213,7 +221,7 @@ describe("rule trials in a real project", () => {
 
   it.live("turn on the built-in plugin of a rule that the config does not turn on", () =>
     Effect.gen(function* () {
-      const results = yield* runTrial("react/jsx-key", { _tag: "Error", options: [] }, [
+      const results = yield* runTrial("react/jsx-key", new ErrorSetting({ options: [] }), [
         makeCase(
           "src/list.tsx",
           "reported",
@@ -229,7 +237,8 @@ describe("rule trials in a real project", () => {
     Effect.gen(function* () {
       const before = listProject()
       const debuggerCase = writeCase("debugger.ts", "export function stop() {\n  debugger\n}\n")
-      const results = yield* runTrial("project/no-debugger-here", { _tag: "Current" }, [
+
+      const results = yield* runTrial("project/no-debugger-here", new CurrentSetting(), [
         makeCase("src/new.ts", "reported", debuggerCase),
         makeCase("src/legacy.ts", "accepted"),
       ])
@@ -251,7 +260,7 @@ describe("rule trials in a real project", () => {
       write("tsconfig.json", '{ "compilerOptions": { "strict": true } }\n')
       write("oxlint.config.ts", EFFECT_CONFIG)
 
-      const results = yield* runTrial("effecttsgo/floating-effect", { _tag: "Current" }, [
+      const results = yield* runTrial("effecttsgo/floating-effect", new CurrentSetting(), [
         makeCase(
           "src/program.ts",
           "reported",
@@ -289,9 +298,10 @@ describe("rule trials in a real project", () => {
       symlinkSync("../packages/tooling", join(project, "node_modules/tooling"))
 
       const before = listProject()
+
       const results = yield* runTrial(
         "project/no-debugger-here",
-        { _tag: "Current" },
+        new CurrentSetting(),
         [makeCase("src/legacy.ts", "reported")],
         { isMonorepo: true, packageDirectories: [join(project, "packages/tooling")] }
       )
@@ -306,7 +316,7 @@ describe("rule trials in a real project", () => {
     Effect.gen(function* () {
       const results = yield* runTrial(
         "@typescript-eslint/no-explicit-any",
-        { _tag: "Error", options: [] },
+        new ErrorSetting({ options: [] }),
         [makeCase("src/value.ts", "reported", writeCase("value.ts", "export type Value = any\n"))]
       )
 
@@ -320,7 +330,7 @@ describe("rule trials in a real project", () => {
 
       const results = yield* runTrial(
         "typescript/no-restricted-imports",
-        { _tag: "Error", options: [{ paths: ["node:fs"] }] },
+        new ErrorSetting({ options: [{ paths: ["node:fs"] }] }),
         [
           makeCase(
             "src/cart.ts",
@@ -342,7 +352,7 @@ describe("rule trials in a real project", () => {
         makeConfig('{ extends: [custom()], rules: { "no-console": "error" } }')
       )
 
-      const results = yield* runTrial("project/no-console", { _tag: "Current" }, [
+      const results = yield* runTrial("project/no-console", new CurrentSetting(), [
         makeCase("src/log.ts", "reported", writeCase("log.ts", "console.log(1)\n")),
       ])
 
@@ -351,8 +361,8 @@ describe("rule trials in a real project", () => {
   )
 
   it.live.each([
-    { name: "the project setting", setting: { _tag: "Current" } },
-    { name: "a trial setting", setting: { _tag: "Error", options: [] } },
+    { name: "the project setting", setting: new CurrentSetting() },
+    { name: "a trial setting", setting: new ErrorSetting({ options: [] }) },
   ] satisfies ReadonlyArray<{ name: string; setting: TrialSetting }>)(
     "keep the root options for a case under a nested config, with $name",
     ({ setting }) =>
@@ -389,12 +399,12 @@ describe("rule trials in a real project", () => {
       write(".gitignore", "node_modules\nsrc/local.ts\n")
       write("src/local.ts", "console.log(1)\n")
 
-      const failure = yield* runTrial("no-console", { _tag: "Error", options: [] }, [
+      const failure = yield* runTrial("no-console", new ErrorSetting({ options: [] }), [
         makeCase("src/local.ts", "reported"),
       ]).pipe(Effect.flip)
 
+      expect(failure).toBeInstanceOf(InvalidTrialCase)
       expect(failure).toMatchObject({
-        _tag: "InvalidTrialCase",
         reason: expect.stringContaining("Git ignores this file"),
       })
     })
@@ -431,7 +441,7 @@ describe("rule trials in a real project", () => {
     },
   ])("$name", ({ error, rule, source, target }) =>
     Effect.gen(function* () {
-      const failure = yield* runTrial(rule, { _tag: "Error", options: [] }, [
+      const failure = yield* runTrial(rule, new ErrorSetting({ options: [] }), [
         makeCase(target, "reported", writeCase("case.ts", source)),
       ]).pipe(Effect.flip)
 
@@ -442,25 +452,27 @@ describe("rule trials in a real project", () => {
   it.live("mark each file of an override that turns a rule off", () =>
     Effect.gen(function* () {
       const before = listProject()
+
       const report = yield* readOverrides(project, NO_WORKSPACE, ["oxlint.config.ts"], null).pipe(
         Effect.provide(TEST_LAYER)
       )
 
-      expect(report).toStrictEqual({
-        _tag: "Linted",
-        rules: [
-          {
-            config: "oxlint.config.ts",
-            files: [
-              { file: "src/legacy.ts", mark: "breaks" },
-              { file: "src/fixed.ts", mark: "clean" },
-              { file: "src/gone.ts", mark: "missing" },
-            ],
-            globs: ["**/*.test.ts"],
-            rule: "project/no-debugger-here",
-          },
-        ],
-      })
+      expect(report).toStrictEqual(
+        new LintedOverrides({
+          rules: [
+            {
+              config: "oxlint.config.ts",
+              files: [
+                { file: "src/legacy.ts", mark: "breaks" },
+                { file: "src/fixed.ts", mark: "clean" },
+                { file: "src/gone.ts", mark: "missing" },
+              ],
+              globs: ["**/*.test.ts"],
+              rule: "project/no-debugger-here",
+            },
+          ],
+        })
+      )
       expect(listProject()).toStrictEqual(before)
     })
   )
@@ -480,20 +492,21 @@ describe("rule trials in a real project", () => {
         Effect.provide(TEST_LAYER)
       )
 
-      expect(report).toStrictEqual({
-        _tag: "Linted",
-        rules: [
-          {
-            config: "oxlint.config.ts",
-            files: [
-              { file: "src/generated/old.ts", mark: "ignored" },
-              { file: "src/broken.ts", mark: "unparsable" },
-            ],
-            globs: [],
-            rule: "project/no-debugger-here",
-          },
-        ],
-      })
+      expect(report).toStrictEqual(
+        new LintedOverrides({
+          rules: [
+            {
+              config: "oxlint.config.ts",
+              files: [
+                { file: "src/generated/old.ts", mark: "ignored" },
+                { file: "src/broken.ts", mark: "unparsable" },
+              ],
+              globs: [],
+              rule: "project/no-debugger-here",
+            },
+          ],
+        })
+      )
     })
   )
 })

@@ -8,9 +8,11 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import checkCommand from "#commands/check.ts"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { CommandFailed, InvalidCheckOptions } from "#lib/shared/errors.ts"
 import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
+
 describe("check", () => {
   describe("stage flags", () => {
     it.effect("run only the lint stage when selected", () =>
@@ -83,6 +85,21 @@ describe("check", () => {
       })
     )
 
+    it.effect("reject --allow-warnings with the format stage", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, ["--only", "format", "--allow-warnings"], {
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isFailure(exit)).toBe(true)
+        const error = Option.getOrThrow(Exit.findErrorOption(exit))
+        expect(error).toBeInstanceOf(InvalidCheckOptions)
+        expect(runner.invocations).toStrictEqual([])
+      })
+    )
+
     it.effect("pass a forwarded --deny-warnings to Oxlint one time", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
@@ -143,6 +160,7 @@ describe("check", () => {
         const files = createFileSystemTestContext({
           files: { "index.ts": "export const value = 1\n" },
         })
+
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(checkCommand, ["index.ts"], {
@@ -184,7 +202,8 @@ describe("check", () => {
 
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
-        expect(error).toMatchObject({ _tag: "CommandFailed", command: "oxfmt", exitCode: 2 })
+        expect(error).toBeInstanceOf(CommandFailed)
+        expect(error).toMatchObject({ command: "oxfmt", exitCode: 2 })
         expect(
           runner.invocations.map((invocation) => invocation.name ?? invocation.command)
         ).toStrictEqual(["oxfmt", "oxlint"])

@@ -5,7 +5,11 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { NativeOverride } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
+import {
+  BackendOverride,
+  BindingOverride,
+  type NativeOverride,
+} from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import {
   EffectBuildMissing,
   EffectPlatformUnsupported,
@@ -19,6 +23,7 @@ const NAME = "@effect/tsgo"
 
 const readVersion = Effect.fn("readVersion")(function* (directory: string) {
   const { version } = yield* readPackageJson(directory)
+
   return version ?? ""
 })
 
@@ -36,6 +41,7 @@ const findArtifact = Effect.fn("findArtifact")(function* (
   const path = yield* Path.Path
   const toolDirectory = path.join(platformDirectory, "artifacts", tool)
   const files = yield* readDirectoryIfExists(path.join(toolDirectory, version))
+
   const artifact = pipe(
     files,
     Option.flatMap((entries) => Array.findFirst(entries, (file) => isArtifact(file)))
@@ -90,7 +96,9 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
     [readVersion(tsgo.value), readVersion(tsrs.value), readVersion(oxlint)],
     { concurrency: "unbounded" }
   )
+
   const tsrsFile = process.platform === "win32" ? "tsrs.exe" : "tsrs"
+
   // Resolve the backend first so a project missing both builds always gets the backend error.
   const backend = yield* findArtifact(
     platformDirectory.value,
@@ -99,6 +107,7 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
     tsrsVersion,
     (file) => file === tsrsFile
   )
+
   const binding = yield* findArtifact(
     platformDirectory.value,
     effectVersion,
@@ -109,10 +118,9 @@ export const resolveEffectRuntime = Effect.fn("resolveEffectRuntime")(function* 
 
   // With the mode `tsrs`, the Effect binding starts the backend as `<path> --lint headless`.
   return [
-    { _tag: "Binding", path: binding },
-    {
-      _tag: "Backend",
+    new BindingOverride({ path: binding }),
+    new BackendOverride({
       env: { EFFECT_TSGO_TSGOLINT_MODE: "tsrs", EFFECT_TSGO_TSGOLINT_PATH: backend },
-    },
-  ] satisfies readonly NativeOverride[]
+    }),
+  ]
 })

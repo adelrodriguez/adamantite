@@ -38,7 +38,10 @@ export interface FileSystemTestContext {
   readonly makeReadOnly: (path: string) => void
 }
 
-function makeSystemError(tag: PlatformError.SystemErrorTag, method: string, path: string) {
+/**
+ * Make the system error that the Node.js FileSystem backend fails with.
+ */
+export function makeSystemError(tag: PlatformError.SystemErrorTag, method: string, path: string) {
   return PlatformError.systemError({
     _tag: tag,
     method,
@@ -108,6 +111,7 @@ export function createFileSystemTestContext(options?: {
       if (readOnlyPaths.has(current)) {
         return true
       }
+
       if (dirname(current) === current) {
         return false
       }
@@ -138,31 +142,40 @@ export function createFileSystemTestContext(options?: {
       Effect.suspend(() => {
         const source = normalize(fromPath)
         const target = normalize(toPath)
+
         if (checkIsReadOnly(target)) {
           return Effect.fail(makeSystemError("PermissionDenied", "copy", toPath))
         }
+
         if (!files.has(source) && !directories.has(source)) {
           return Effect.fail(makeSystemError("NotFound", "copy", fromPath))
         }
+
         const entries = [...files].filter(
           ([file]) => file === source || file.startsWith(`${source}/`)
         )
+
         for (const [file, content] of entries) {
           const destination = `${target}${file.slice(source.length)}`
+
           if (copyOptions?.overwrite === false && files.has(destination)) {
             continue
           }
+
           addDirectoryRecursive(dirname(destination))
           files.set(destination, content)
         }
+
         if (directories.has(source)) {
           addDirectoryRecursive(target)
         }
+
         return Effect.void
       }),
     copyFile: makeUnimplemented("copyFile"),
     exists: (path) => {
       const target = normalize(path)
+
       return Effect.succeed(files.has(target) || directories.has(target))
     },
     glob: makeUnimplemented("glob"),
@@ -177,6 +190,7 @@ export function createFileSystemTestContext(options?: {
 
         if (makeOptions?.recursive) {
           addDirectoryRecursive(target)
+
           return Effect.void
         }
 
@@ -189,6 +203,7 @@ export function createFileSystemTestContext(options?: {
         }
 
         directories.add(target)
+
         return Effect.void
       }),
     makeTempDirectory: makeUnimplemented("makeTempDirectory"),
@@ -208,13 +223,13 @@ export function createFileSystemTestContext(options?: {
         }
 
         // A recursive listing gives paths relative to the directory, as the Node backend does.
-        const children = [...files.keys(), ...directories]
-          .filter((entry) =>
-            readOptions?.recursive
-              ? entry.startsWith(`${target}/`)
-              : entry !== target && dirname(entry) === target
-          )
-          .map((entry) => (readOptions?.recursive ? relative(target, entry) : basename(entry)))
+        const children = [...files.keys(), ...directories].flatMap((entry) => {
+          if (readOptions?.recursive) {
+            return entry.startsWith(`${target}/`) ? [relative(target, entry)] : []
+          }
+
+          return entry !== target && dirname(entry) === target ? [basename(entry)] : []
+        })
 
         return Effect.succeed(EffectArray.sort(new Set(children), Order.String))
       }),
@@ -246,6 +261,7 @@ export function createFileSystemTestContext(options?: {
 
         if (directories.has(target)) {
           const prefix = `${target}/`
+
           const hasEntries =
             [...files.keys()].some((file) => file.startsWith(prefix))
             || [...directories].some((directory) => directory.startsWith(prefix))
@@ -259,11 +275,13 @@ export function createFileSystemTestContext(options?: {
               files.delete(file)
             }
           }
+
           for (const directory of directories) {
             if (directory === target || directory.startsWith(prefix)) {
               directories.delete(directory)
             }
           }
+
           return Effect.void
         }
 
@@ -305,6 +323,7 @@ export function createFileSystemTestContext(options?: {
         }
 
         files.set(target, data)
+
         return Effect.void
       }),
   })
@@ -312,6 +331,7 @@ export function createFileSystemTestContext(options?: {
   return {
     exists: (path) => {
       const target = normalize(path)
+
       return files.has(target) || directories.has(target)
     },
     layer,

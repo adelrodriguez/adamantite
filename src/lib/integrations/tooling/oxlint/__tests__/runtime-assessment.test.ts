@@ -8,6 +8,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
+import { FailedToParseFile } from "#lib/shared/errors.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
@@ -15,15 +16,18 @@ const PLATFORM_PACKAGE = `@effect/tsgo-${process.platform}-${process.arch}`
 const TSRS_VERSION = "0.21.0-ts7.1.0-beta"
 const TSRS = process.platform === "win32" ? "tsrs.exe" : "tsrs"
 const ARTIFACTS = `node_modules/${PLATFORM_PACKAGE}/artifacts`
-const STOCK_TARGET = `${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : process.platform === "win32" ? "-msvc" : ""}`
+const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }
+const STOCK_TARGET = `${process.platform}-${process.arch}${BINDING_SUFFIXES[process.platform] ?? ""}`
 const STOCK_BINDING = `node_modules/oxlint/dist/oxlint.${STOCK_TARGET}.node`
 const STOCK_TSRS_PACKAGE = `@tsrs/${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : ""}`
 const STOCK_BACKEND = `node_modules/${STOCK_TSRS_PACKAGE}/${TSRS}`
+
 const STOCK_PACKAGES = {
   "oxlint/package.json": "node_modules/oxlint/package.json",
   "tsrs/package.json": "node_modules/tsrs/package.json",
   [`${STOCK_TSRS_PACKAGE}/package.json`]: `node_modules/${STOCK_TSRS_PACKAGE}/package.json`,
 }
+
 const PACKAGES = {
   "@effect/tsgo/package.json": "node_modules/@effect/tsgo/package.json",
   [`${PLATFORM_PACKAGE}/package.json`]: `node_modules/${PLATFORM_PACKAGE}/package.json`,
@@ -121,6 +125,7 @@ describe("Oxlint runtime assessment", () => {
     Effect.gen(function* () {
       const native = `@oxlint/binding-${STOCK_TARGET}`
       const file = `node_modules/${native}/oxlint.node`
+
       const result = yield* runAssess(makeStockFiles({ [STOCK_BACKEND]: "", [file]: "" }), {
         ...STOCK_PACKAGES,
         [native]: file,
@@ -140,11 +145,13 @@ describe("Oxlint runtime assessment", () => {
       const platform = process.platform
       const arch = process.arch
       const nativePackage = `@tsrs/${target.tsrs}`
+
       const files = makeStockFiles({
         "/usr/bin/ldd": target.ldd,
         [`node_modules/${nativePackage}/tsrs${target.platform === "win32" ? ".exe" : ""}`]: "",
         [`node_modules/oxlint/dist/oxlint.${target.binding}.node`]: "",
       })
+
       const result = yield* Effect.acquireUseRelease(
         Effect.sync(() => {
           Object.defineProperty(process, "platform", { value: target.platform })
@@ -228,6 +235,7 @@ describe("Oxlint runtime assessment", () => {
       const files = makeFiles({
         "node_modules/oxlint/package.json": '{"version":"2.0.0"}',
       })
+
       const result = yield* runAssess(files)
 
       expect(result.applicable && result.findings).toContainEqual(
@@ -308,6 +316,7 @@ describe("Oxlint runtime assessment", () => {
   it.effect("leave an undeclared package to package assessment", () =>
     Effect.gen(function* () {
       const files = makeFiles({ "package.json": "{}" })
+
       const findings = yield* readProject(ROOT).pipe(
         Effect.flatMap((project) => assessOxlintRuntime(project)),
         Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, {})])
@@ -325,7 +334,7 @@ describe("Oxlint runtime assessment", () => {
         })
       ).pipe(Effect.flip)
 
-      expect(error).toMatchObject({ _tag: "FailedToParseFile" })
+      expect(error).toBeInstanceOf(FailedToParseFile)
     })
   )
 })

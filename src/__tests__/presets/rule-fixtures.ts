@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process"
 import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
+import process from "node:process"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
@@ -10,22 +11,19 @@ const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIRECTORY = "fixtures"
 
 /**
- * A plugin's rule fixtures live in one directory. Files in `<fixturesDir>/<rule>/valid/` must not
- * get a report from the rule. Files in `<fixturesDir>/<rule>/invalid/` must get at least one
- * report.
+ * A preset's rule fixtures live in one directory, with one directory for each plugin namespace,
+ * such as `anti-slop`, and one directory for each rule in it. Files in
+ * `<fixturesDir>/<namespace>/<rule>/valid/` must not get a report from the rule. Files in
+ * `<fixturesDir>/<namespace>/<rule>/invalid/` must get at least one report.
  *
  * Keep one case per file, so a relaxed rule cannot hide behind another report in the same file, and
  * the file name tells which case changed.
  */
 export interface RuleFixtureOptions {
   /**
-   * Absolute path of the directory that holds one directory per rule.
+   * Absolute path of the directory that holds one directory for each plugin namespace.
    */
   readonly fixturesDir: string
-  /**
-   * Plugin namespace as Oxlint prints it in diagnostic codes, such as `anti-slop`.
-   */
-  readonly namespace: string
   /**
    * Absolute path of the preset module that loads the plugin and enables its rules.
    */
@@ -44,6 +42,9 @@ export interface RuleFixtureCase {
    * Lines where the rule under test reported the file.
    */
   readonly reportedLines: readonly number[]
+  /**
+   * The rule name as a config sets it, such as `anti-slop/no-reflect-get`.
+   */
   readonly rule: string
 }
 
@@ -68,16 +69,19 @@ function listDirectory(path: string): string[] {
 }
 
 /**
- * List the rules that have a fixture directory. Synchronous, so a test file can use the result to
- * declare its tests.
+ * List the rules that have a fixture directory, as a config names them, such as
+ * `anti-slop/no-reflect-get`. Synchronous, so a test file can use the result to declare its tests.
  */
 export function listFixtureRules(fixturesDir: string): string[] {
-  return listDirectory(fixturesDir)
+  return listDirectory(fixturesDir).flatMap((namespace) =>
+    listDirectory(join(fixturesDir, namespace)).map((rule) => `${namespace}/${rule}`)
+  )
 }
 
 /**
  * Lint every fixture in one real Oxlint run through the preset, and return one case per fixture
- * file with the reports of that file's own rule.
+ * file with the reports of that file's own rule. The run goes through the Oxlint entry, as
+ * `adamantite check` does, so a preset that needs the Effect build of Oxlint loads too.
  */
 export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[] {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-rule-fixtures-"))
@@ -97,8 +101,15 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
     )
 
     const result = spawnSync(
-      join(REPO_ROOT, "node_modules/.bin/oxlint"),
-      ["-c", "oxlint.config.ts", "-f", "json", FIXTURES_DIRECTORY],
+      process.execPath,
+      [
+        join(REPO_ROOT, "src/oxlint.ts"),
+        "-c",
+        "oxlint.config.ts",
+        "-f",
+        "json",
+        FIXTURES_DIRECTORY,
+      ],
       { cwd: tempDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
     )
 
@@ -128,14 +139,17 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
 
     const kinds: RuleFixtureKind[] = ["valid", "invalid"]
 
-    return listFixtureRules(options.fixturesDir).flatMap((rule) =>
-      kinds.flatMap((kind) =>
-        listDirectory(join(options.fixturesDir, rule, kind)).map((name) => {
-          const file = `${rule}/${kind}/${name}`
-          const key = `${options.namespace}(${rule}):${FIXTURES_DIRECTORY}/${file}`
+    return listDirectory(options.fixturesDir).flatMap((namespace) =>
+      listDirectory(join(options.fixturesDir, namespace)).flatMap((ruleName) =>
+        kinds.flatMap((kind) =>
+          listDirectory(join(options.fixturesDir, namespace, ruleName, kind)).map((name) => {
+            const rule = `${namespace}/${ruleName}`
+            const file = `${rule}/${kind}/${name}`
+            const key = `${namespace}(${ruleName}):${FIXTURES_DIRECTORY}/${file}`
 
-          return { file, kind, reportedLines: reportedLinesByFile.get(key) ?? [], rule }
-        })
+            return { file, kind, reportedLines: reportedLinesByFile.get(key) ?? [], rule }
+          })
+        )
       )
     )
   } finally {

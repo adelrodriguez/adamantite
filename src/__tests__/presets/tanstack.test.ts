@@ -14,9 +14,9 @@ const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/tanstack")
 const NAMESPACE = "adamantite"
 
-const presetRules = Object.keys(tanstack.rules ?? {})
-  .filter((name) => name.startsWith(`${NAMESPACE}/`))
-  .map((name) => name.slice(NAMESPACE.length + 1))
+const presetRules = Object.keys(tanstack.rules ?? {}).filter((name) =>
+  name.startsWith(`${NAMESPACE}/`)
+)
 
 describe("tanstack preset", () => {
   it("have fixtures for exactly the rules the preset enables", () => {
@@ -32,7 +32,6 @@ describe("tanstack rule fixtures", () => {
   beforeAll(() => {
     cases = lintRuleFixtures({
       fixturesDir: FIXTURES_DIR,
-      namespace: NAMESPACE,
       presetPath: join(REPO_ROOT, "presets/lint/tanstack.ts"),
     })
   })

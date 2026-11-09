@@ -55,6 +55,7 @@ export const addCustomRule = Effect.fn("addCustomRule")(function* (
   const path = yield* Path.Path
   const directory = path.resolve(cwd, dir)
   const rulePath = path.join(directory, `${name}.ts`)
+
   const exists = yield* fs
     .exists(rulePath)
     .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: rulePath })))
@@ -80,6 +81,7 @@ export const listCustomRules = Effect.fn("listCustomRules")(function* (
   const fs = yield* FileSystem.FileSystem
   const directory = path.resolve(cwd, dir)
   const entries = yield* readDirectoryIfExists(directory)
+
   const files = yield* Effect.filter(
     Option.getOrElse(entries, () => []).filter((entry) => isRuleFile(entry)),
     (entry) =>
@@ -120,6 +122,7 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
 
   const testPath =
     target === undefined ? path.join(directory, `${name}.test.ts`) : path.resolve(cwd, target)
+
   const exists = yield* fs
     .exists(testPath)
     .pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: testPath })))
@@ -132,6 +135,7 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
     .relative(path.dirname(testPath), path.join(directory, rule))
     .split(path.sep)
     .join("/")
+
   const ruleImport = relative.startsWith("../") ? relative : `./${relative}`
   const importLiteral = yield* stringifyJson(ruleImport)
   yield* ensureDirectory(path.dirname(testPath))
@@ -154,6 +158,7 @@ export const findCustomRuleTests = Effect.fn("findCustomRuleTests")(function* (
 ) {
   const path = yield* Path.Path
   const testDirectories = Array.dedupe(customRules.calls.map((call) => call.dir))
+
   const tests = yield* Effect.forEach(
     testDirectories,
     (directory) =>

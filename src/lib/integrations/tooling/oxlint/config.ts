@@ -18,10 +18,19 @@ const REQUIRED_BOOLEAN_OPTIONS = [
   "typeAware",
   "typeCheck",
 ] as const
+
 const UNSUPPORTED_CONFIG_REASON =
   "`oxlint.config.ts` must export an object literal directly, with or without `defineConfig(...)`, for Adamantite to inspect `options`."
+
 const UNSUPPORTED_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` property, but it is not an object literal that Adamantite can inspect."
+
+const EXPORT_GOAL =
+  "Export the config object literal directly from `oxlint.config.ts`, with or without `defineConfig(...)`. Preserve every project setting."
+
+const OPTIONS_GOAL =
+  "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting."
+
 const NON_BOOLEAN_OPTIONS_REASON =
   "`oxlint.config.ts` has an `options` object Adamantite cannot inspect. Make sure each required option is a plain `key: true | false` property. Avoid spreads (`...rest`), computed keys (`[name]: ...`), duplicate keys, methods/getters/setters, and non-boolean-literal values."
 
@@ -40,6 +49,7 @@ function getImportName(preset: LintPreset | "core") {
  */
 export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
   const presetNames = ["core", ...presets] as const
+
   return [
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
@@ -203,20 +213,24 @@ function getNamedObjectProperty(
 function inspectOptionsObject(options: ObjectExpression): RequiredConfigInspection {
   for (const option of REQUIRED_BOOLEAN_OPTIONS) {
     const property = getNamedObjectProperty(options, option)
+
     if (property.status === "invalid") {
-      return { kind: "invalid", reason: NON_BOOLEAN_OPTIONS_REASON }
+      return { goal: OPTIONS_GOAL, kind: "invalid", reason: NON_BOOLEAN_OPTIONS_REASON }
     }
+
     if (
       property.status === "missing"
       || property.property.value.type !== "Literal"
       || property.property.value.value !== true
     ) {
       return {
+        goal: OPTIONS_GOAL,
         kind: "invalid",
         reason: "The required Oxlint options are missing or are not set to true.",
       }
     }
   }
+
   return { kind: "configured" }
 }
 
@@ -225,6 +239,7 @@ export function inspectRequiredOxlintConfig(content: string): RequiredConfigInsp
 
   if (Option.isNone(parsed)) {
     return {
+      goal: "Fix the syntax errors in `oxlint.config.ts`. Preserve every project setting.",
       kind: "invalid",
       reason: UNSUPPORTED_CONFIG_REASON,
     }
@@ -234,6 +249,7 @@ export function inspectRequiredOxlintConfig(content: string): RequiredConfigInsp
 
   if (Option.isNone(configObjectExpression)) {
     return {
+      goal: EXPORT_GOAL,
       kind: "invalid",
       reason: UNSUPPORTED_CONFIG_REASON,
     }
@@ -243,17 +259,23 @@ export function inspectRequiredOxlintConfig(content: string): RequiredConfigInsp
 
   if (optionsPropertyResult.status === "invalid") {
     return {
+      goal: OPTIONS_GOAL,
       kind: "invalid",
       reason: UNSUPPORTED_OPTIONS_REASON,
     }
   }
 
   if (optionsPropertyResult.status === "missing") {
-    return { kind: "invalid", reason: "The required Oxlint options are missing." }
+    return {
+      goal: OPTIONS_GOAL,
+      kind: "invalid",
+      reason: "The required Oxlint options are missing.",
+    }
   }
 
   if (optionsPropertyResult.property.value.type !== "ObjectExpression") {
     return {
+      goal: OPTIONS_GOAL,
       kind: "invalid",
       reason: UNSUPPORTED_OPTIONS_REASON,
     }

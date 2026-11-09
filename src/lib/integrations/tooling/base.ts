@@ -1,5 +1,6 @@
 import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
@@ -36,13 +37,28 @@ export interface ToolingConfigFileState {
 }
 
 /**
- * The config that the tool uses: none, the latest supported TypeScript config, or a legacy JSON or
- * JSONC config.
+ * The tool has no config.
  */
-export type ActiveToolingConfig =
-  | { readonly _tag: "Missing" }
-  | { readonly _tag: "Current"; readonly file: ToolingConfigFileState }
-  | { readonly _tag: "Legacy"; readonly file: ToolingConfigFileState }
+export class MissingToolingConfig extends Data.TaggedClass("Missing") {}
+
+/**
+ * The tool uses the latest supported TypeScript config.
+ */
+export class CurrentToolingConfig extends Data.TaggedClass("Current")<{
+  readonly file: ToolingConfigFileState
+}> {}
+
+/**
+ * The tool uses a legacy JSON or JSONC config.
+ */
+export class LegacyToolingConfig extends Data.TaggedClass("Legacy")<{
+  readonly file: ToolingConfigFileState
+}> {}
+
+/**
+ * The config that the tool uses.
+ */
+export type ActiveToolingConfig = MissingToolingConfig | CurrentToolingConfig | LegacyToolingConfig
 
 export interface ToolingConfigState {
   readonly active: ActiveToolingConfig
@@ -68,9 +84,9 @@ export type RequiredConfigInspection =
   | { readonly kind: "configured" }
   | {
       /**
-       * The repair to make. Defaults to adding the required preset.
+       * The repair for `reason`.
        */
-      readonly goal?: string
+      readonly goal: string
       readonly kind: "invalid"
       readonly reason: string
     }
@@ -109,11 +125,11 @@ function getToolingConfigWarnings(
   active: ActiveToolingConfig,
   legacy: readonly ToolingConfigFileState[]
 ) {
-  if (active._tag === "Missing" || legacy.length === 0) {
+  if (active instanceof MissingToolingConfig || legacy.length === 0) {
     return []
   }
 
-  if (active._tag === "Current") {
+  if (active instanceof CurrentToolingConfig) {
     return [
       `Found both \`${files.config}\` and \`${getLegacyConfigDisplayName(files)}\`. Adamantite will use \`${files.config}\`.`,
     ]
@@ -141,38 +157,43 @@ export const detectToolingConfig = Effect.fn("detectToolingConfig")(function* (
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
+
   const candidates = [files.config, ...files.legacyConfigs].map((file) => ({
     file,
     format: getConfigFormat(file),
     path: path.join(cwd, file),
   }))
+
   const existence = yield* Effect.forEach(candidates, (candidate) => fs.exists(candidate.path), {
     concurrency: "unbounded",
   })
+
   const present = candidates.filter((_, index) => existence[index])
 
   const toFile = ({ file, path }: (typeof candidates)[number]): ToolingConfigFileState => ({
     file,
     path,
   })
+
   const activeCandidate = pipe(
     Array.findFirst(present, (candidate) => candidate.format === "ts"),
     Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "jsonc")),
     Option.orElse(() => Array.findFirst(present, (candidate) => candidate.format === "json"))
   )
+
   const active = Option.match(activeCandidate, {
-    onNone: (): ActiveToolingConfig => ({ _tag: "Missing" }),
-    onSome: (candidate): ActiveToolingConfig => ({
-      _tag: candidate.format === "ts" ? "Current" : "Legacy",
-      file: toFile(candidate),
-    }),
+    onNone: (): ActiveToolingConfig => new MissingToolingConfig(),
+    onSome: (candidate): ActiveToolingConfig =>
+      candidate.format === "ts"
+        ? new CurrentToolingConfig({ file: toFile(candidate) })
+        : new LegacyToolingConfig({ file: toFile(candidate) }),
   })
-  const legacy = present
-    .filter(
-      (candidate) =>
-        candidate.format !== "ts" && !Option.exists(activeCandidate, (file) => file === candidate)
-    )
-    .map((candidate) => toFile(candidate))
+
+  const legacy = present.flatMap((candidate) =>
+    candidate.format !== "ts" && !Option.exists(activeCandidate, (file) => file === candidate)
+      ? [toFile(candidate)]
+      : []
+  )
 
   return {
     active,
@@ -247,11 +268,10 @@ export function getConfigFindings(
      * The inspection of a `Current` config. The findings ignore it for the other states.
      */
     readonly inspection?: RequiredConfigInspection
-    readonly invalidGoal?: string
     readonly toolName: string
   }
 ): Finding[] {
-  if (state.active._tag === "Missing") {
+  if (state.active instanceof MissingToolingConfig) {
     return [
       {
         currentState: `The managed \`${options.configFile}\` file is missing.`,
@@ -267,7 +287,7 @@ export function getConfigFindings(
     ]
   }
 
-  if (state.active._tag === "Legacy") {
+  if (state.active instanceof LegacyToolingConfig) {
     return [
       {
         currentState: `Legacy \`${state.active.file.file}\` is the active ${options.toolName} configuration.`,
@@ -303,11 +323,7 @@ export function getConfigFindings(
   if (options.inspection?.kind === "invalid") {
     findings.push({
       currentState: `\`${options.configFile}\` does not meet Adamantite's required shape. ${options.inspection.reason}`,
-      goal: [
-        options.invalidGoal
-          ?? options.inspection.goal
-          ?? `Update \`${options.configFile}\` so it includes the required Adamantite preset while preserving project-specific settings.`,
-      ],
+      goal: [options.inspection.goal],
       id: `invalid-${options.toolName}-config`,
       integration: options.toolName,
       notes: ["Treat the reference as a known-good example, not an exact replacement."],
@@ -352,10 +368,12 @@ export function definePackageTooling(options: {
     assess: (project: Project) =>
       Effect.sync((): IntegrationAssessment => {
         const { packageJson } = project
+
         const isApplicable =
           checkHasManagedScript(packageJson, options.scripts)
           && (!options.monorepoOnly || project.workspace.isMonorepo)
           && (options.isRequired === undefined || options.isRequired(project))
+
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []
 
         if (!isApplicable) {
@@ -400,6 +418,7 @@ export interface ToolingFacts {
 
 const readToolingFacts = Effect.fn("readToolingFacts")(function* (cwd: string) {
   const path = yield* Path.Path
+
   const [isMonorepo, lintConfig] = yield* Effect.all(
     [checkIsMonorepo(cwd), readFileIfExists(path.join(cwd, "oxlint.config.ts"))],
     { concurrency: "unbounded" }
@@ -440,6 +459,7 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
       (path) => ({ path, type: "legacy_config" }) satisfies IntegrationFile
     ),
   ]
+
   const detect = (cwd: string) => detectToolingConfig(cwd, options.name, options.configFiles)
 
   return defineIntegration({
@@ -464,8 +484,9 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
         const workspace = options.workspace({ isMonorepo, lintConfig })
         const packageActions = getPackageActions(packageJson, options, options.purpose)
         const configContent = options.configContent(workspace)
+
         const inspection =
-          state.active._tag === "Current"
+          state.active instanceof CurrentToolingConfig
             ? options.inspectConfig(yield* readFile(state.active.file.path), workspace)
             : undefined
 

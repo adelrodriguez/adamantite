@@ -104,6 +104,7 @@ const runOxlint = Effect.fn("runOxlint")(
   function* (cwd: string, args: readonly string[], project: string = cwd) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
     const command = (yield* OxlintCommand)(project)
+
     const handle = yield* spawner.spawn(
       ChildProcess.make(command.command, [...command.args, ...args], {
         cwd,
@@ -112,6 +113,7 @@ const runOxlint = Effect.fn("runOxlint")(
         stdin: "ignore",
       })
     )
+
     const [stdout, stderr, exitCode] = yield* Effect.all(
       [
         Stream.mkString(Stream.decodeText(handle.stdout)),
@@ -124,10 +126,11 @@ const runOxlint = Effect.fn("runOxlint")(
     return { exitCode, output: `${stdout}${stderr}`.trim(), stdout }
   },
   Effect.scoped,
-  Effect.mapError((cause) =>
-    cause.reason._tag === "NotFound"
-      ? new CliNotFound({ command: "node" })
-      : new TrialLintFailed({ output: cause.message })
+  Effect.catchReason(
+    "PlatformError",
+    "NotFound",
+    () => Effect.fail(new CliNotFound({ command: "node" })),
+    (_reason, error) => Effect.fail(new TrialLintFailed({ output: error.message }))
   )
 )
 
@@ -199,6 +202,7 @@ export const resolveRule = Effect.fn("resolveRule")(function* (rule: string, pro
   )
 
   const printed = yield* runOxlint(folder, ["--print-config"], project)
+
   const resolved = decodeOxlintConfig(printed.stdout).pipe(
     Option.flatMap((config) =>
       Array.findFirst(Object.keys(config.rules), (key) => splitRuleName(key).name === name)

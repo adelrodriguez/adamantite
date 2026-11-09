@@ -16,7 +16,9 @@ import {
 } from "#presets/lint/plugin/rules/layers.ts"
 
 RuleTester.describe = describe
+
 RuleTester.it = it
+
 RuleTester.itOnly = it.only
 
 // A fake of the file system: relative imports resolve from the importer, `#` imports from

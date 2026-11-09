@@ -1,4 +1,5 @@
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
@@ -56,11 +57,18 @@ export interface OverriddenRule {
 }
 
 /**
- * The overrides that turn a rule off, or the reason why Adamantite could not lint their files.
+ * The overrides that turn a rule off, with a mark for each file that they name.
  */
-export type OverridesReport =
-  | { readonly _tag: "Failed"; readonly reason: string }
-  | { readonly _tag: "Linted"; readonly rules: readonly OverriddenRule[] }
+export class LintedOverrides extends Data.TaggedClass("Linted")<{
+  readonly rules: readonly OverriddenRule[]
+}> {}
+
+/**
+ * The reason why Adamantite could not lint the files of the overrides.
+ */
+export class OverridesLintFailed extends Data.TaggedClass("Failed")<{ readonly reason: string }> {}
+
+export type OverridesReport = LintedOverrides | OverridesLintFailed
 
 const GLOB_CHARACTERS = /[!*?[\]{}]/u
 
@@ -217,6 +225,7 @@ export function findRuleOffOverrides(file: string, content: string): RuleOffOver
     }
 
     const patterns = files.elements.map((pattern) => getStaticString(pattern))
+
     const offRules = rules.properties.flatMap((property) => {
       const name = property.type === "Property" ? getPropertyName(property) : null
 
@@ -238,13 +247,16 @@ export const readOverrides = Effect.fn("readOverrides")(
   function* (cwd: string, workspace: Workspace, configs: readonly string[], scope: string | null) {
     const fs = yield* FileSystem.FileSystem
     const path = yield* Path.Path
+
     const isInScope = (file: string) =>
       scope === null || scope === "." || file === scope || file.startsWith(`${scope}/`)
+
     const toProjectPath = (config: string, file: string) =>
       path
         .relative(cwd, path.join(cwd, path.dirname(config), file))
         .split(path.sep)
         .join("/")
+
     const found = yield* Effect.forEach(
       configs,
       (config) =>
@@ -253,6 +265,7 @@ export const readOverrides = Effect.fn("readOverrides")(
         ),
       { concurrency: "unbounded" }
     )
+
     const entries = found.flatMap(({ config, overrides }) =>
       overrides.flatMap((override) =>
         override.rules.map((rule) => ({
@@ -267,6 +280,7 @@ export const readOverrides = Effect.fn("readOverrides")(
         }))
       )
     )
+
     const existing = new Set(
       yield* Effect.filter(
         Array.dedupe(entries.flatMap((entry) => entry.literals)),
@@ -274,6 +288,7 @@ export const readOverrides = Effect.fn("readOverrides")(
         { concurrency: "unbounded" }
       )
     )
+
     const linted = entries.filter((entry) => entry.literals.some((file) => existing.has(file)))
     const marks = new Map<string, OverrideFileMark>()
 
@@ -286,6 +301,7 @@ export const readOverrides = Effect.fn("readOverrides")(
           { concurrency: "unbounded" }
         )
       )
+
       const copy = yield* makeProjectCopy(cwd, workspace)
 
       for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
@@ -305,10 +321,13 @@ export const readOverrides = Effect.fn("readOverrides")(
       const files = Array.dedupe(linted.flatMap((entry) => entry.literals)).filter((file) =>
         existing.has(file)
       )
+
       const report = yield* lintFiles(copy, files)
+
       const listed = new Set(
         report.number_of_files < files.length ? yield* listLintedFiles(copy, files) : files
       )
+
       const unparsable = new Set(
         report.diagnostics
           .filter((diagnostic) => diagnostic.code === undefined)
@@ -326,6 +345,7 @@ export const readOverrides = Effect.fn("readOverrides")(
               && rule !== undefined
               && isReportOf(diagnostic.code, rule)
           )
+
           const mark: OverrideFileMark = listed.has(file)
             ? unparsable.has(file)
               ? "unparsable"
@@ -339,8 +359,7 @@ export const readOverrides = Effect.fn("readOverrides")(
       }
     }
 
-    return {
-      _tag: "Linted",
+    return new LintedOverrides({
       rules: entries
         .filter((entry) => entry.literals.length > 0 || entry.globs.length > 0)
         .map((entry): OverriddenRule => ({
@@ -352,10 +371,8 @@ export const readOverrides = Effect.fn("readOverrides")(
           globs: entry.globs,
           rule: entry.rule,
         })),
-    } satisfies OverridesReport
+    })
   },
   Effect.scoped,
-  Effect.catch((error) =>
-    Effect.succeed({ _tag: "Failed", reason: error.message } satisfies OverridesReport)
-  )
+  Effect.catch((error) => Effect.succeed(new OverridesLintFailed({ reason: error.message })))
 )

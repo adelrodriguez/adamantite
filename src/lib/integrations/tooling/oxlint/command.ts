@@ -9,11 +9,13 @@ interface Options {
 
 export function check(options: Options & { readonly allowWarnings: boolean }): CommandRunOptions {
   const entry = getOxlintCommand(options.cwd)
+
   // A forwarded `--deny-warnings` or `--max-warnings` is the project's own warning policy, and
   // Oxlint rejects `--deny-warnings` twice.
   const forwardsWarningPolicy = options.forwardedArguments.some(
     (argument) => argument === "--deny-warnings" || argument.startsWith("--max-warnings")
   )
+
   const denyWarnings = options.allowWarnings || forwardsWarningPolicy ? [] : ["--deny-warnings"]
 
   return {

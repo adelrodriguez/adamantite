@@ -187,6 +187,7 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       const relative = posix.relative(root, importer)
+
       const restricted = readImportOwners(context.options).filter(
         (entry) => !entry.patterns.some((pattern) => pattern.test(relative))
       )
@@ -255,6 +256,7 @@ export function createImportOwnersRule(project: Project): Rule {
       function checkImportType(node: ESTree.TSImportType) {
         if (node.qualifier === null) {
           checkWhole(node.source)
+
           return
         }
 

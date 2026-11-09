@@ -1,5 +1,6 @@
 import type { JsonObject, JsonValue } from "type-fest"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/workspace/project.ts"
@@ -16,9 +17,11 @@ import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 const TSCONFIG_FILE = "tsconfig.json"
 const LANGUAGE_SERVICE = "@effect/language-service"
+
 // Semantic quick fixes need the language service diagnostics. Editor integrations hide the
 // corresponding Oxlint reports; CLI Oxlint still uses the Effect preset.
 const LANGUAGE_SERVICE_PLUGIN = { diagnostics: true, name: LANGUAGE_SERVICE }
+
 const TSCONFIG_REFERENCE = `${JSON.stringify(
   { compilerOptions: { plugins: [LANGUAGE_SERVICE_PLUGIN] } },
   null,
@@ -54,16 +57,16 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
   const path = yield* Path.Path
   const configPath = path.join(cwd, TSCONFIG_FILE)
   const content = yield* readFileIfExists(configPath)
-  const plugin =
-    content._tag === "None"
-      ? undefined
-      : yield* parseJson(content.value, configPath).pipe(
-          Effect.map((config) =>
-            checkIsJsonObject(config) && checkIsJsonObject(config["compilerOptions"])
-              ? findLanguageServicePlugin(config["compilerOptions"]["plugins"])
-              : undefined
-          )
+
+  const plugin = Option.isNone(content)
+    ? undefined
+    : yield* parseJson(content.value, configPath).pipe(
+        Effect.map((config) =>
+          checkIsJsonObject(config) && checkIsJsonObject(config["compilerOptions"])
+            ? findLanguageServicePlugin(config["compilerOptions"]["plugins"])
+            : undefined
         )
+      )
 
   if (plugin !== undefined && plugin["diagnostics"] !== false) {
     return { findings: [], warnings: [] }
@@ -103,7 +106,7 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
   const configPath = path.join(cwd, TSCONFIG_FILE)
   const content = yield* readFileIfExists(configPath)
 
-  if (content._tag === "None") {
+  if (Option.isNone(content)) {
     return "missing" as const
   }
 
@@ -126,6 +129,7 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
   }
 
   const existing = findLanguageServicePlugin(plugins)
+
   const nextPlugins = existing
     ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: true } : entry))
     : [...plugins, LANGUAGE_SERVICE_PLUGIN]

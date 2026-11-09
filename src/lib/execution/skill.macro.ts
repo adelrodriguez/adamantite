@@ -11,6 +11,7 @@ import * as Order from "effect/Order"
  */
 export function getShippedSkillFiles(): Record<string, string> {
   const root = fileURLToPath(new URL("../../../skills/adamantite/", import.meta.url))
+
   const files = Array.sort(
     readdirSync(root, { recursive: true, withFileTypes: true })
       .filter((entry) => entry.isFile())

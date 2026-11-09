@@ -7,9 +7,12 @@ import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
+  CurrentToolingConfig,
   detectToolingConfig,
   getConfigFindings,
   getPackageActions,
+  LegacyToolingConfig,
+  MissingToolingConfig,
   type ToolingConfigState,
 } from "#lib/integrations/tooling/base.ts"
 
@@ -41,10 +44,11 @@ describe("detectToolingConfig", () => {
 
       const state = yield* detect(files)
 
-      expect(state.active).toStrictEqual({
-        _tag: "Current",
-        file: { file: "tool.config.ts", path: `${ROOT}/tool.config.ts` },
-      })
+      expect(state.active).toStrictEqual(
+        new CurrentToolingConfig({
+          file: { file: "tool.config.ts", path: `${ROOT}/tool.config.ts` },
+        })
+      )
       expect(state.legacy).toStrictEqual([
         { file: "tool.json", path: `${ROOT}/tool.json` },
         { file: "tool.jsonc", path: `${ROOT}/tool.jsonc` },
@@ -58,10 +62,9 @@ describe("detectToolingConfig", () => {
 
       const state = yield* detect(files)
 
-      expect(state.active).toStrictEqual({
-        _tag: "Legacy",
-        file: { file: "tool.json", path: `${ROOT}/tool.json` },
-      })
+      expect(state.active).toStrictEqual(
+        new LegacyToolingConfig({ file: { file: "tool.json", path: `${ROOT}/tool.json` } })
+      )
       expect(state.legacy).toStrictEqual([])
     })
   )
@@ -70,7 +73,7 @@ describe("detectToolingConfig", () => {
     Effect.gen(function* () {
       const state = yield* detect(makeFiles())
 
-      expect(state.active).toStrictEqual({ _tag: "Missing" })
+      expect(state.active).toStrictEqual(new MissingToolingConfig())
     })
   )
 
@@ -133,15 +136,19 @@ describe("detectToolingConfig", () => {
     ({ hasJson, hasJsonc, hasTs, legacyOrder }) =>
       Effect.gen(function* () {
         const fixtures: Record<string, string> = {}
+
         if (hasTs) {
           fixtures["tool.config.ts"] = "export default {}\n"
         }
+
         if (hasJsonc) {
           fixtures["tool.jsonc"] = "{}\n"
         }
+
         if (hasJson) {
           fixtures["tool.json"] = "{}\n"
         }
+
         const files = makeFiles(fixtures)
 
         const state = yield* detect(files, { config: "tool.config.ts", legacyConfigs: legacyOrder })
@@ -153,14 +160,22 @@ describe("detectToolingConfig", () => {
             : hasJson
               ? "tool.json"
               : null
-        expect(state.active._tag === "Missing" ? null : state.active.file.file).toBe(expectedActive)
-        expect(state.active._tag).toBe(
-          expectedActive === null ? "Missing" : hasTs ? "Current" : "Legacy"
+
+        expect(state.active instanceof MissingToolingConfig ? null : state.active.file.file).toBe(
+          expectedActive
+        )
+        expect(state.active).toBeInstanceOf(
+          expectedActive === null
+            ? MissingToolingConfig
+            : hasTs
+              ? CurrentToolingConfig
+              : LegacyToolingConfig
         )
 
         const expectedLegacy = [hasJson ? "tool.json" : null, hasJsonc ? "tool.jsonc" : null]
           .filter((file) => file !== null)
           .filter((file) => file !== expectedActive)
+
         expect(
           EffectArray.sort(
             state.legacy.map((entry) => entry.file),
@@ -190,6 +205,7 @@ describe("getPackageActions", () => {
     Arbitrary.map((parts) => {
       if (parts === null) return null
       const [workspacePrefix, rangePrefix, version] = parts
+
       return { version, written: `${workspacePrefix}${rangePrefix}${version}` }
     })
   )
@@ -228,17 +244,16 @@ function state(active: ToolingConfigState["active"]): ToolingConfigState {
   return { active, legacy: [], warnings: [] }
 }
 
-const CURRENT = {
-  _tag: "Current",
+const CURRENT = new CurrentToolingConfig({
   file: { file: "tool.config.ts", path: "/tmp/tool.config.ts" },
-} as const
+})
 
 describe("ToolingConfigState", () => {
   it("require a file for a current or legacy config", () => {
     // @ts-expect-error - A current config always has its file.
-    const current: ToolingConfigState["active"] = { _tag: "Current" }
+    const current = new CurrentToolingConfig({})
     // @ts-expect-error - A missing config has no file.
-    const missing: ToolingConfigState["active"] = { _tag: "Missing", file: CURRENT.file }
+    const missing = new MissingToolingConfig({ file: CURRENT.file })
 
     expect([current._tag, missing._tag]).toStrictEqual(["Current", "Missing"])
   })
@@ -252,7 +267,7 @@ describe("getConfigFindings", () => {
   }
 
   it("report a missing config with canonical content", () => {
-    expect(getConfigFindings(state({ _tag: "Missing" }), options)).toStrictEqual([
+    expect(getConfigFindings(state(new MissingToolingConfig()), options)).toStrictEqual([
       expect.objectContaining({
         id: "missing-tool-config",
         reference: { content: options.configContent, language: "ts" },
@@ -263,7 +278,7 @@ describe("getConfigFindings", () => {
   it("report the ideal state when a legacy config is active", () => {
     expect(
       getConfigFindings(
-        state({ _tag: "Legacy", file: { file: "tool.jsonc", path: "/tmp/tool.jsonc" } }),
+        state(new LegacyToolingConfig({ file: { file: "tool.jsonc", path: "/tmp/tool.jsonc" } })),
         options
       )
     ).toStrictEqual([expect.objectContaining({ id: "legacy-tool-config" })])
@@ -283,7 +298,10 @@ describe("getConfigFindings", () => {
           legacy: [{ file: "tool.json", path: "/tmp/tool.json" }],
           warnings: [],
         },
-        { ...options, inspection: { kind: "invalid", reason: "Preset missing." } }
+        {
+          ...options,
+          inspection: { goal: "Add the preset.", kind: "invalid", reason: "Preset missing." },
+        }
       ).map(({ id }) => id)
     ).toStrictEqual(["shadowed-legacy-tool-config", "invalid-tool-config"])
   })

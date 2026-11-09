@@ -36,6 +36,7 @@ export function defineManagedPlugin<
   AssessRequirements = never,
 >(options: ManagedPluginOptions<AssessError, AssessRequirements> & Extensions) {
   const { assess: assessMore, name, preset, version, ...extensions } = options
+
   const tooling = definePackageTooling({
     isRequired: ({ lintConfig }) => checkImportsLintPreset(lintConfig, preset),
     name,

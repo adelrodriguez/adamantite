@@ -41,9 +41,9 @@ function getScriptGuidance(
 function getAgentsSection({ isMonorepo, packageManager, scripts }: WriteAgentsGuidanceOptions) {
   const scriptOrder: Script[] = ["check", "fix", "analyze"]
 
-  const selectedScriptGuidance = scriptOrder
-    .filter((script) => scripts.includes(script))
-    .map((script) => getScriptGuidance(packageManager, script, isMonorepo))
+  const selectedScriptGuidance = scriptOrder.flatMap((script) =>
+    scripts.includes(script) ? [getScriptGuidance(packageManager, script, isMonorepo)] : []
+  )
 
   // The scripts and customRules values carry their own trailing newline, so an empty value leaves
   // no blank line.
@@ -69,16 +69,20 @@ export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOpt
   Effect.gen(function* () {
     const path = yield* Path.Path
     const agentsPath = path.join(cwd, AGENTS_NAME)
+
     const existing = pipe(
       yield* readFileIfExists(agentsPath),
       Option.getOrElse(() => "")
     )
+
     const startIndex = pipe(existing, String.indexOf(ADAMANTITE_AGENTS_START_MARKER))
     const endIndex = pipe(existing, String.indexOf(ADAMANTITE_AGENTS_END_MARKER))
+
     const markerRange = pipe(
       Option.all({ end: endIndex, start: startIndex }),
       Option.filter(({ end, start }) => start < end)
     )
+
     const section = getAgentsSection(options)
 
     if (Option.isSome(markerRange)) {

@@ -11,9 +11,11 @@ import { formatJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
+const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }
 
 function makeFiles(files?: Record<string, string>) {
-  const target = `${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : process.platform === "win32" ? "-msvc" : ""}`
+  const target = `${process.platform}-${process.arch}${BINDING_SUFFIXES[process.platform] ?? ""}`
+
   return createFileSystemTestContext({
     files: {
       "/usr/bin/ldd": "GNU libc",
@@ -73,10 +75,12 @@ describe("oxlint", () => {
           "adamantite/lint/tailwind",
           "adamantite/lint/shadcn"
         )
+
         const manifest = makePackageJson({
           devDependencies: { oxlint: oxlint.version },
           scripts: { check: "adamantite check" },
         })
+
         const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
 
         const result = yield* runAssess(files)
@@ -101,12 +105,51 @@ describe("oxlint", () => {
       })
     )
 
+    it.effect("report the retired antislop preset import without changing the project", () =>
+      Effect.gen(function* () {
+        const config = toOxlintTsConfigContent(["strict"]).replaceAll(
+          "adamantite/lint/strict",
+          "adamantite/lint/antislop"
+        )
+
+        const manifest = makePackageJson({
+          devDependencies: { oxlint: oxlint.version },
+          scripts: { check: "adamantite check" },
+        })
+
+        const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
+
+        const result = yield* runAssess(files)
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("adamantite/lint/antislop"),
+              goal: expect.arrayContaining([
+                expect.stringContaining("adamantite/lint/strict"),
+                expect.stringContaining("anti-slop/*"),
+                expect.stringContaining(
+                  "Move a project setting for these three rules into an `overrides` entry"
+                ),
+              ]),
+              id: "strict-preset-migration",
+              integration: "oxlint",
+            },
+          ],
+        })
+        expect(files.read("oxlint.config.ts")).toBe(config)
+        expect(files.read("package.json")).toBe(manifest)
+      })
+    )
+
     it.effect("report no migration for the tailwind preset or an old import in a comment", () =>
       Effect.gen(function* () {
         const config = [
           '// Previously imported "adamantite/lint/shadcn".',
           toOxlintTsConfigContent(["tailwind"]),
         ].join("\n")
+
         const files = makeFiles({
           "oxlint.config.ts": config,
           "package.json": makePackageJson({
@@ -132,6 +175,7 @@ describe("oxlint", () => {
             scripts: { check: "adamantite check" },
           }),
         })
+
         const result = yield* runAssess(files)
 
         expect(result.applicable ? result.findings : []).toStrictEqual(
@@ -179,6 +223,7 @@ describe("oxlint", () => {
               scripts: { check: "adamantite check" },
             }),
           })
+
           const snapshot = files.list().map((name) => [name, files.read(name)])
           const result = yield* runAssess(files)
           const findings = result.applicable ? result.findings : []
@@ -217,6 +262,7 @@ describe("oxlint", () => {
   },
 }\n`,
           })
+
           const before = files.list().map((file) => [file, files.read(file)])
           const result = yield* runAssess(files)
 
@@ -291,6 +337,7 @@ describe("oxlint", () => {
               scripts: { check: "adamantite check" },
             }),
           })
+
           const result = yield* runAssess(files)
 
           expect(
@@ -407,10 +454,47 @@ describe("oxlint", () => {
 
         expect(result).toMatchObject({
           applicable: true,
-          findings: [{ id: "invalid-oxlint-config" }],
+          findings: [
+            {
+              goal: [expect.stringContaining("Set `respectEslintDisableDirectives`")],
+              id: "invalid-oxlint-config",
+            },
+          ],
           packageActions: [],
           warnings: [],
         })
+      })
+    )
+
+    it.effect("ask to export an object literal when the config exports a variable", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            "",
+            "const config = defineConfig({",
+            "  extends: [core],",
+            "  options: { respectEslintDisableDirectives: true, typeAware: true, typeCheck: true },",
+            "})",
+            "",
+            "export default config",
+            "",
+          ].join("\n"),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.findings).toMatchObject([
+          {
+            goal: [expect.stringContaining("Export the config object literal")],
+            id: "invalid-oxlint-config",
+          },
+        ])
       })
     )
   })

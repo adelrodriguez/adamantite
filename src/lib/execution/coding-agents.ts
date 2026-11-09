@@ -3,6 +3,7 @@ import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
+import * as Predicate from "effect/Predicate"
 import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 
@@ -101,11 +102,13 @@ const sigintShield = Effect.acquireRelease(
     process.removeAllListeners("SIGINT")
     // With no listener at all, Node's default SIGINT behavior kills the process.
     process.on("SIGINT", ignoreSigint)
+
     return previous
   }),
   (previous) =>
     Effect.sync(() => {
       process.removeAllListeners("SIGINT")
+
       for (const listener of previous) {
         process.on("SIGINT", listener)
       }
@@ -172,7 +175,7 @@ export class CodingAgents extends Context.Service<
             (cause) =>
               new HandoffFailed({
                 cause,
-                reason: cause._tag === "CliNotFound" ? "not-found" : "spawn-failed",
+                reason: Predicate.isTagged(cause, "CliNotFound") ? "not-found" : "spawn-failed",
               })
           )
         ),

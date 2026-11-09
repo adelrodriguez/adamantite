@@ -7,6 +7,7 @@ import * as Schema from "effect/Schema"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
+import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
@@ -29,6 +30,7 @@ describe("tsconfig", () => {
     it.effect("report a missing root config outside a monorepo", () =>
       Effect.gen(function* () {
         const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => tsconfig.assess(project)),
           provideFiles(files)
@@ -51,6 +53,7 @@ describe("tsconfig", () => {
           "package.json": yield* stringifyJson(packageJson),
           "tsconfig.json": yield* stringifyJson(config),
         })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => tsconfig.assess(project)),
           provideFiles(files)
@@ -70,6 +73,7 @@ describe("tsconfig", () => {
             "package.json": yield* stringifyJson(packageJson),
             "tsconfig.json": yield* stringifyJson({ extends: preset }),
           })
+
           const result = yield* readProject(ROOT, packageJson).pipe(
             Effect.flatMap((project) => tsconfig.assess(project)),
             provideFiles(files)
@@ -84,6 +88,7 @@ describe("tsconfig", () => {
       Effect.gen(function* () {
         const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
         const files = makeFiles({ "package.json": yield* stringifyJson(monorepoPackageJson) })
+
         const result = yield* readProject(ROOT, monorepoPackageJson).pipe(
           Effect.flatMap((project) => tsconfig.assess(project)),
           provideFiles(files)
@@ -188,8 +193,9 @@ describe("tsconfig", () => {
 
         const result = yield* Effect.result(tsconfig.update(ROOT).pipe(provideFiles(files)))
         expect(Result.isFailure(result)).toBe(true)
+
         if (Result.isFailure(result)) {
-          expect(result.failure).toMatchObject({ _tag: "InvalidConfigFormat" })
+          expect(result.failure).toBeInstanceOf(InvalidConfigFormat)
         }
       })
     )
@@ -220,6 +226,7 @@ describe("tsconfig update properties", () => {
       ).check(Schema.isMaxLength(4))
     ),
   ])
+
   const userConfig = Schema.Struct({
     compilerOptions: Schema.Union([
       Schema.Struct({ strict: Schema.Literal(true) }),
@@ -251,6 +258,7 @@ describe("tsconfig update properties", () => {
             : (Array.isArray(extendsValue) ? extendsValue : [extendsValue]).filter(
                 (entry) => entry !== PRESET
               )
+
         expect(mergedExtends.filter((entry) => entry !== PRESET)).toStrictEqual(userEntries)
 
         const parsed = readTsConfig(files)

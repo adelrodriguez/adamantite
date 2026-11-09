@@ -8,8 +8,10 @@ describe("Toolchain", () => {
   it.effect("run a check for the supplied project without CLI command context", () =>
     Effect.gen(function* () {
       const invocations: CommandRunOptions[] = []
+
       const runner = CommandRunner.make((options) => {
         invocations.push(options)
+
         return Effect.succeed(ChildProcessSpawner.ExitCode(0))
       })
 

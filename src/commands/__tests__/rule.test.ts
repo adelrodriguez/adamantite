@@ -4,6 +4,16 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand, { renderTrial } from "#commands/rule.ts"
+import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
+import {
+  CommandFailed,
+  CustomRuleExists,
+  CustomRuleNotFound,
+  FailedToParseSource,
+  InvalidRuleName,
+  InvalidTrialCase,
+  InvalidTrialOptions,
+} from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 import {
@@ -90,8 +100,8 @@ describe("rule add", () => {
         layers: [createPrompterTestContext().layer],
       })
 
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CustomRuleExists)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        _tag: "CustomRuleExists",
         paths: [`${files.root}/.adamantite/lint/no-process-env.ts`],
       })
       expect(files.read(".adamantite/lint/no-process-env.ts")).toBe("// mine\n")
@@ -108,8 +118,8 @@ describe("rule add", () => {
         layers: [createPrompterTestContext().layer],
       })
 
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(InvalidRuleName)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        _tag: "InvalidRuleName",
         name: "InvalidRuleName",
         rule: "_helpers",
       })
@@ -131,7 +141,9 @@ describe("rule add test", () => {
           ".adamantite/lint/no-window.ts": "// another rule\n",
         },
       })
+
       const prompter = createPrompterTestContext({ selectResponses: ["no-debugger"] })
+
       const exit = yield* runCommand(ruleCommand, ["add", "test"], {
         files,
         layers: [prompter.layer, interactiveTerminalLayer],
@@ -159,7 +171,9 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
       })
+
       const prompter = createPrompterTestContext()
+
       const exit = yield* runCommand(ruleCommand, ["add", "test"], {
         files,
         layers: [prompter.layer],
@@ -177,6 +191,7 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
       })
+
       const exit = yield* runCommand(
         ruleCommand,
         ["add", "test", "no-debugger", "--path", "tests/lint/no-debugger.test.ts"],
@@ -196,8 +211,10 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { ".adamantite/lint/no-debugger.ts": "// user-owned rule\n" },
       })
+
       const prompter = createPrompterTestContext()
       const runner = createRunnerTestContext()
+
       const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
         files,
         layers: [prompter.layer, runner.layer],
@@ -218,13 +235,14 @@ describe("rule add test", () => {
   it.effect("require an existing rule before creating a test", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext()
+
       const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
         files,
         layers: [createPrompterTestContext().layer],
       })
 
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CustomRuleNotFound)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        _tag: "CustomRuleNotFound",
         rule: "no-debugger",
       })
       expect(files.list()).toStrictEqual([])
@@ -239,13 +257,14 @@ describe("rule add test", () => {
           ".adamantite/lint/no-debugger.ts": "// rule\n",
         },
       })
+
       const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
         files,
         layers: [createPrompterTestContext().layer],
       })
 
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CustomRuleExists)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        _tag: "CustomRuleExists",
         paths: [`${files.root}/.adamantite/lint/no-debugger.test.ts`],
       })
       expect(files.read(".adamantite/lint/no-debugger.test.ts")).toBe("// user-owned test\n")
@@ -257,6 +276,7 @@ describe("rule add test", () => {
       const files = createFileSystemTestContext({
         files: { "tooling/lint/no-window.mjs": "export default {}\n" },
       })
+
       const exit = yield* runCommand(
         ruleCommand,
         ["add", "test", "no-window", "--dir", "tooling/lint"],
@@ -288,7 +308,9 @@ describe("rule test", () => {
       const files = createFileSystemTestContext({
         files: { "tests/lint/no-debugger.test.ts": "// test\n" },
       })
+
       const runner = createRunnerTestContext()
+
       const exit = yield* runCommand(
         ruleCommand,
         ["test", "--path", "tests/lint/no-debugger.test.ts"],
@@ -325,6 +347,7 @@ describe("rule test", () => {
           "tooling/rules/no-b.test.ts": "// test\n",
         },
       })
+
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
@@ -353,6 +376,7 @@ describe("rule test", () => {
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
         },
       })
+
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
@@ -382,8 +406,8 @@ describe("rule test", () => {
         layers: [createPrompterTestContext().layer, createRunnerTestContext([1]).layer],
       })
 
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CommandFailed)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        _tag: "CommandFailed",
         command: "node",
         exitCode: 1,
       })
@@ -403,6 +427,7 @@ describe("rule test", () => {
           "tooling/rules/no-b.test.ts": "// test\n",
         },
       })
+
       const prompter = createPrompterTestContext()
       const runner = createRunnerTestContext()
 
@@ -433,6 +458,7 @@ describe("rule test", () => {
           "package.json": PACKAGE_JSON,
         },
       })
+
       const prompter = createPrompterTestContext()
       const runner = createRunnerTestContext()
 
@@ -498,6 +524,7 @@ describe("rule ast", () => {
       const files = createFileSystemTestContext({
         files: { "src/value.ts": "export const value = (1 + 2) as number\n" },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["ast", "src/value.ts"], {
@@ -520,6 +547,7 @@ describe("rule ast", () => {
       const files = createFileSystemTestContext({
         files: { "src/broken.ts": "export const = 1\n" },
       })
+
       const prompter = createPrompterTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["ast", "src/broken.ts"], {
@@ -527,8 +555,8 @@ describe("rule ast", () => {
         layers: [prompter.layer],
       })
 
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(FailedToParseSource)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        _tag: "FailedToParseSource",
         path: `${files.root}/src/broken.ts`,
       })
       expect(prompter.messages).toStrictEqual([])
@@ -542,15 +570,20 @@ describe("rule try", () => {
     path: "src/cart.ts",
     source: Option.some("/tmp/before.ts"),
   } as const
+
   const acceptCase = { expected: "accepted", path: "src/cart.ts", source: Option.none() } as const
   const report = { column: 1, line: 1, message: "'node:fs' import is restricted from being used." }
 
   it("show each case with its verdict and the reports of the rule", () => {
     expect(
-      renderTrial("no-restricted-imports", { _tag: "Error", options: [{ paths: ["node:fs"] }] }, [
-        { case: reportCase, config: "oxlint.config.ts", diagnostics: [report] },
-        { case: acceptCase, config: "oxlint.config.ts", diagnostics: [report] },
-      ])
+      renderTrial(
+        "no-restricted-imports",
+        new ErrorSetting({ options: [{ paths: ["node:fs"] }] }),
+        [
+          { case: reportCase, config: "oxlint.config.ts", diagnostics: [report] },
+          { case: acceptCase, config: "oxlint.config.ts", diagnostics: [report] },
+        ]
+      )
     ).toBe(
       [
         'Trial of `no-restricted-imports` at ["error",{"paths":["node:fs"]}], in `oxlint.config.ts`.',
@@ -567,7 +600,7 @@ describe("rule try", () => {
 
   it("say that the trial keeps the project setting, and that each case is as expected", () => {
     expect(
-      renderTrial("no-console", { _tag: "Current" }, [
+      renderTrial("no-console", new CurrentSetting(), [
         { case: acceptCase, config: "packages/web/oxlint.config.ts", diagnostics: [] },
       ])
     ).toBe(
@@ -584,15 +617,17 @@ describe("rule try", () => {
   it.effect.each([
     {
       args: ["--current", "--options", "[]", "--report", "src/cart.ts"],
-      error: { _tag: "InvalidTrialOptions" },
+      error: InvalidTrialOptions,
+      fields: {},
       name: "reject --current with --options",
     },
     {
       args: ["--report", "../cart.ts"],
-      error: { _tag: "InvalidTrialCase", value: "../cart.ts" },
+      error: InvalidTrialCase,
+      fields: { value: "../cart.ts" },
       name: "reject a case outside the project",
     },
-  ])("$name before it copies the project", ({ args, error }) =>
+  ])("$name before it copies the project", ({ args, error, fields }) =>
     Effect.gen(function* () {
       // The test spawner dies on each process, so the error comes before the copy.
       const exit = yield* runCommand(ruleCommand, ["try", "no-console", ...args], {
@@ -600,7 +635,10 @@ describe("rule try", () => {
         layers: [createPrompterTestContext().layer],
       })
 
-      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject(error)
+      const failure = Option.getOrThrow(Exit.findErrorOption(exit))
+
+      expect(failure).toBeInstanceOf(error)
+      expect(failure).toMatchObject(fields)
     })
   )
 })

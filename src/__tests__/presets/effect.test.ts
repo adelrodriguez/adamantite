@@ -4,12 +4,23 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import process from "node:process"
-import { describe, expect, it } from "@effect/vitest"
+import { beforeAll, describe, expect, it } from "@effect/vitest"
+import * as EffectArray from "effect/Array"
+import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import effect from "#presets/lint/effect.ts"
+import antislopEffectPlugin from "#presets/lint/vendor/antislop-effect/plugin.mjs"
+import {
+  lintRuleFixtures,
+  listFixtureRules,
+  type RuleFixtureCase,
+  selectRuleFixtures,
+} from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const NAMESPACE = "effecttsgo"
+const ANTISLOP_NAMESPACE = "anti-slop-effect"
+const FIXTURES_DIR = join(import.meta.dirname, "fixtures/effect")
 const CATEGORY_PRESETS = ["correctness", "antipattern", "effect-native", "style"] as const
 
 // Every upstream rule that the preset does not enable. ADR 0007 gives the criteria.
@@ -56,9 +67,11 @@ const tsgoPackageJson = require.resolve("@effect/tsgo/package.json")
 
 const CategoryPreset = Schema.Struct({ rules: Schema.Record(Schema.String, Schema.String) })
 const decodeCategoryPreset = Schema.decodeUnknownSync(Schema.fromJsonString(CategoryPreset))
+
 const RootPackageJson = Schema.Struct({
   devDependencies: Schema.Record(Schema.String, Schema.String),
 })
+
 const decodeRootPackageJson = Schema.decodeUnknownSync(Schema.fromJsonString(RootPackageJson))
 
 const upstreamRules = CATEGORY_PRESETS.flatMap((category) =>
@@ -69,7 +82,14 @@ const upstreamRules = CATEGORY_PRESETS.flatMap((category) =>
   )
 ).map((name) => name.slice(NAMESPACE.length + 1))
 
-const presetRules = Object.keys(effect.rules ?? {}).map((name) => name.slice(NAMESPACE.length + 1))
+function listPresetRules(namespace: string) {
+  return Object.keys(effect.rules ?? {})
+    .filter((name) => name.startsWith(`${namespace}/`))
+    .map((name) => name.slice(namespace.length + 1))
+}
+
+const presetRules = listPresetRules(NAMESPACE)
+const antislopPresetRules = listPresetRules(ANTISLOP_NAMESPACE)
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(
@@ -162,14 +182,18 @@ describe("effect preset", () => {
     const { devDependencies } = decodeRootPackageJson(
       readFileSync(join(REPO_ROOT, "package.json"), "utf8")
     )
+
     const platformDirectory = dirname(
       createRequire(tsgoPackageJson).resolve(
         `@effect/tsgo-${process.platform}-${process.arch}/package.json`
       )
     )
-    const missing = ["oxlint", "tsrs"]
-      .map((tool) => `${tool}/${devDependencies[tool]}`)
-      .filter((artifact) => !existsSync(join(platformDirectory, "artifacts", artifact)))
+
+    const artifacts = ["oxlint", "tsrs"].map((tool) => `${tool}/${devDependencies[tool]}`)
+
+    const missing = artifacts.filter(
+      (artifact) => !existsSync(join(platformDirectory, "artifacts", artifact))
+    )
 
     expect(missing).toStrictEqual([])
   })
@@ -224,5 +248,53 @@ describe("effect preset", () => {
     )
 
     expect(diagnostics.map(({ code }) => code)).toStrictEqual([`${NAMESPACE}(floating-effect)`])
+  })
+})
+
+describe("effect preset anti-slop rules", () => {
+  it("enable exactly the rules the vendored plugin defines", () => {
+    expect(new Set(antislopPresetRules)).toStrictEqual(
+      new Set(Object.keys(antislopEffectPlugin.rules))
+    )
+  })
+
+  it("have fixtures for exactly the rules the preset enables", () => {
+    expect(listFixtureRules(FIXTURES_DIR)).toStrictEqual(
+      EffectArray.sort(
+        antislopPresetRules.map((rule) => `${ANTISLOP_NAMESPACE}/${rule}`),
+        Order.String
+      )
+    )
+  })
+})
+
+describe("effect preset anti-slop rule fixtures", () => {
+  let cases: RuleFixtureCase[]
+
+  beforeAll(() => {
+    cases = lintRuleFixtures({
+      fixturesDir: FIXTURES_DIR,
+      presetPath: join(REPO_ROOT, "presets/lint/effect.ts"),
+    })
+  })
+
+  describe.each(listFixtureRules(FIXTURES_DIR))("%s", (rule) => {
+    it("report every invalid fixture", () => {
+      const invalid = selectRuleFixtures(cases, rule, "invalid")
+      const missed = invalid.filter((entry) => entry.reportedLines.length === 0)
+
+      expect(invalid).not.toStrictEqual([])
+      expect(missed.map((entry) => entry.file)).toStrictEqual([])
+    })
+
+    it("report no valid fixture", () => {
+      const valid = selectRuleFixtures(cases, rule, "valid")
+      const reported = valid.filter((entry) => entry.reportedLines.length > 0)
+
+      expect(valid).not.toStrictEqual([])
+      expect(
+        reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)
+      ).toStrictEqual([])
+    })
   })
 })

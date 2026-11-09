@@ -13,8 +13,10 @@ import github from "#lib/integrations/ci/github.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
-  type NodeVersionSource,
+  NodeVersion,
+  NodeVersionFile,
   NodeVersionResolver,
+  type NodeVersionSource,
 } from "#lib/workspace/node-version-resolver.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import testWorkflow from "../../../../../.github/workflows/test.yml?raw"
@@ -55,7 +57,7 @@ function provideFallback(files: FileSystemTestContext) {
     files.layer,
     Path.layer,
     makeModuleResolverLayer(ROOT),
-    makeResolverLayer({ _tag: "Version", value: "lts/*" }),
+    makeResolverLayer(new NodeVersion({ value: "lts/*" })),
   ])
 }
 
@@ -142,7 +144,7 @@ function provideFileResolver(files: FileSystemTestContext) {
     files.layer,
     Path.layer,
     makeModuleResolverLayer(ROOT),
-    makeResolverLayer({ _tag: "File", path: ".node-version" }),
+    makeResolverLayer(new NodeVersionFile({ path: ".node-version" })),
   ])
 }
 
@@ -188,6 +190,7 @@ describe("github", () => {
             "- run: pnpm format"
           ),
         })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
@@ -234,6 +237,7 @@ describe("github", () => {
             "        run: pnpm run format",
           ].join("\n"),
         })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
@@ -540,7 +544,9 @@ describe("github", () => {
         const files = makeFiles({
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm exec adamantite rule test"),
         })
+
         const before = files.read(WORKFLOW_PATH)
+
         const result = yield* readProject(ROOT, { name: "app", version: "1.0.0" }).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
@@ -584,6 +590,7 @@ describe("github", () => {
             "- run: pnpm run check"
           ),
         })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
@@ -631,6 +638,7 @@ describe("github", () => {
         const files = makeFiles({
           [WORKFLOW_PATH]: "jobs:\n  verify:\n    steps: [\n      run: pnpm run check\n",
         })
+
         const result = yield* readProject(ROOT, packageJson).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
@@ -656,6 +664,7 @@ describe("github", () => {
             '    node-version: "22"'
           ),
         })
+
         const result = yield* readProject(ROOT, {}).pipe(
           Effect.flatMap((project) => github.assess(project)),
           provideAssessment(files)
@@ -812,6 +821,7 @@ describe("github", () => {
         }
 
         const reference = getPinnedActions(testWorkflow)
+
         const shared = EffectArray.sort(
           [...generated.keys()].filter((action) => reference.has(action)),
           Order.String
@@ -861,6 +871,7 @@ describe("github", () => {
             "check",
             "analyze",
           ])
+
           if (packageManager === "deno") {
             expect(getSetupNodeInputs(files)).toBeUndefined()
           }

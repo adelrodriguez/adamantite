@@ -2,6 +2,7 @@ import { describe, it } from "node:test"
 import { RuleTester } from "oxlint/plugins-dev"
 
 export { RuleTester } from "oxlint/plugins-dev"
+
 export type * from "oxlint/plugins-dev"
 
 // Agents use RuleTester from stdin or a temporary file. Connect it to node:test so each case
@@ -9,9 +10,11 @@ export type * from "oxlint/plugins-dev"
 RuleTester.describe = (text, method) => {
   void describe(text, method)
 }
+
 RuleTester.it = (text, method) => {
   void it(text, method)
 }
+
 RuleTester.itOnly = (text, method) => {
   void it.only(text, method)
 }

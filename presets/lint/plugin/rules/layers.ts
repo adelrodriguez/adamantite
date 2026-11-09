@@ -380,6 +380,15 @@ function formatList(names: readonly string[]) {
 }
 
 /**
+ * The words of each repair, by the rule that the import breaks.
+ */
+const REPAIR_WORDS = {
+  isolated: { lower: "both need", upper: "compose them in" },
+  sibling: { lower: "both need", upper: "move this file up to" },
+  upward: { lower: "this file needs", upper: "move this file up to" },
+} as const satisfies Record<Violation, { readonly lower: string; readonly upper: string }>
+
+/**
  * The repair sentence for a layer violation, with a leading space, or an empty string when the map
  * allows no repair.
  */
@@ -388,21 +397,12 @@ export function describeRepairs(
   lower: readonly string[],
   upper: readonly string[]
 ): string {
-  const parts: string[] = []
+  const words = REPAIR_WORDS[violation]
 
-  if (lower.length > 0) {
-    const need = violation === "upward" ? "this file needs" : "both need"
-
-    parts.push(`move the code that ${need} down to ${formatList(lower)}`)
-  }
-
-  if (upper.length > 0) {
-    parts.push(
-      violation === "isolated"
-        ? `compose them in ${formatList(upper)}`
-        : `move this file up to ${formatList(upper)}`
-    )
-  }
+  const parts = [
+    ...(lower.length > 0 ? [`move the code that ${words.lower} down to ${formatList(lower)}`] : []),
+    ...(upper.length > 0 ? [`${words.upper} ${formatList(upper)}`] : []),
+  ]
 
   const text = parts.join(", or ")
 
@@ -562,31 +562,32 @@ function reportUnmapped(
   }
 }
 
+/**
+ * The message data of a layer map error. The switch has no default, so a new kind of error fails
+ * the type check until it has its data.
+ */
+function getMapErrorData(error: MapError) {
+  switch (error.kind) {
+    case "cycle":
+      return { cycle: formatCycle(error.cycle) }
+    case "unknownImport":
+      return { layer: error.layer, name: error.name }
+    case "unknownIsolate":
+      return { name: error.name }
+  }
+}
+
 function reportFile(context: Context, node: ESTree.Program, file: ReportedFile) {
   const { errors, from } = file
   const root = file.root || "."
   const { configPath } = file.options
 
   for (const error of errors) {
-    if (error.kind === "cycle") {
-      context.report({
-        data: { configPath, cycle: formatCycle(error.cycle), root },
-        messageId: "cycle",
-        node,
-      })
-    } else if (error.kind === "unknownImport") {
-      context.report({
-        data: { configPath, layer: error.layer, name: error.name, root },
-        messageId: "unknownImport",
-        node,
-      })
-    } else {
-      context.report({
-        data: { configPath, name: error.name, root },
-        messageId: "unknownIsolate",
-        node,
-      })
-    }
+    context.report({
+      data: { configPath, root, ...getMapErrorData(error) },
+      messageId: error.kind,
+      node,
+    })
   }
 
   if (from.kind === "unmappedFile" || from.kind === "unmappedFolder") {

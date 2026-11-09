@@ -212,7 +212,7 @@ describe("github", () => {
 
     it.effect("do not create a finding when the workflow is absent", () =>
       Effect.gen(function* () {
-        const files = makeFiles()
+        const files = makeFiles({ "package.json": PACKAGE_JSON })
         expect(
           yield* readProject(ROOT).pipe(
             Effect.flatMap((project) => github.assess(project)),
@@ -269,7 +269,7 @@ describe("github", () => {
       },
     ])("accept a package-manager check command in $name", ({ workflow }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ [WORKFLOW_PATH]: workflow })
+        const files = makeFiles({ [WORKFLOW_PATH]: workflow, "package.json": PACKAGE_JSON })
 
         expect(
           yield* readProject(ROOT).pipe(
@@ -290,6 +290,7 @@ describe("github", () => {
             "      pnpm install --frozen-lockfile",
             "      pnpm --filter app run check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -314,6 +315,7 @@ describe("github", () => {
             "    EOF",
             "    pnpm run check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -334,6 +336,7 @@ describe("github", () => {
             { command: "pnpm run check", name: "check" },
             { command: "pnpm run format --check", name: "format" }
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -355,6 +358,7 @@ describe("github", () => {
             { command: "pnpm run check", name: "check" },
             { command: "pnpm run check:monorepo", name: "monorepo" }
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -377,6 +381,7 @@ describe("github", () => {
             "    pnpm run check",
             "    pnpm exec adamantite monorepo -- -i react"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -394,6 +399,7 @@ describe("github", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check", "- run: npm run fix:monorepo"),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -414,6 +420,7 @@ describe("github", () => {
             "- run: pnpm run check",
             "- run: pnpm exec adamantite analyze --only monorepo"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -435,6 +442,7 @@ describe("github", () => {
             "    npm run check",
             "    npm run format -- --check"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -483,6 +491,7 @@ describe("github", () => {
             "- run: pnpm run check",
             "- run: pnpm run format"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -501,6 +510,7 @@ describe("github", () => {
         const files = makeFiles({
           ...RULE_TEST_FILES,
           [WORKFLOW_PATH]: makeWorkflow("- run: pnpm run check"),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -530,7 +540,11 @@ describe("github", () => {
       },
     ])("accept an optional rule test command in $name", ({ workflow }) =>
       Effect.gen(function* () {
-        const files = makeFiles({ ...RULE_TEST_FILES, [WORKFLOW_PATH]: workflow })
+        const files = makeFiles({
+          ...RULE_TEST_FILES,
+          [WORKFLOW_PATH]: workflow,
+          "package.json": PACKAGE_JSON,
+        })
 
         expect(
           yield* readProject(ROOT).pipe(
@@ -570,6 +584,7 @@ describe("github", () => {
             "    pnpm run check",
             "    pnpm exec adamantite rule test"
           ),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(
@@ -625,6 +640,7 @@ describe("github", () => {
             "    steps:",
             "      - run: pnpm run check",
           ].join("\n"),
+          "package.json": PACKAGE_JSON,
         })
 
         expect(

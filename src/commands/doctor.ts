@@ -10,6 +10,7 @@ import {
 } from "#lib/assessment/index.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
@@ -143,12 +144,14 @@ export default Command.make("doctor").pipe(
         Unmanaged: () => Effect.void,
       })
 
-      const project = yield* readProject(cwd)
-      const { packageJson } = project
+      // The root manifest decides whether Doctor assesses at all, so a project without Adamantite
+      // gets the install instruction even when its workspace packages do not read. The assessment
+      // reads its own snapshot.
+      const packageJson = yield* readPackageJson(cwd)
 
       const outcome =
         packageJson.devDependencies?.adamantite || packageJson.dependencies?.adamantite
-          ? classifyAssessment(yield* assessProject(project))
+          ? classifyAssessment(yield* assessProject(yield* readProject(cwd)))
           : NotInstalled()
 
       yield* isInteractive ? reportInteractive(outcome) : reportPlain(outcome)

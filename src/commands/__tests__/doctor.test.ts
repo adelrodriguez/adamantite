@@ -180,6 +180,27 @@ describe("doctor", () => {
     })
   )
 
+  it.effect("report a missing install before it reads the workspace packages", () =>
+    Effect.gen(function* () {
+      // A workspace package manifest that does not parse must not hide the install instruction.
+      const files = createFileSystemTestContext({
+        files: {
+          "package.json": manifest({ workspaces: ["packages/*"] }),
+          "packages/web/package.json": "{",
+        },
+      })
+
+      const prompter = createPrompterTestContext()
+
+      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(prompter.messages).toStrictEqual([
+        "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
+      ])
+    })
+  )
+
   it.effect("print the Markdown prompt directly in a non-interactive terminal", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

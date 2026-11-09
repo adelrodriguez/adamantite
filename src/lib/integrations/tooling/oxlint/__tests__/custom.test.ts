@@ -240,6 +240,39 @@ describe("oxlint-custom", () => {
     })
   )
 
+  it.effect("report an explicit rules folder that does not exist", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          "lint-rules/no-process-env.ts": RULE,
+          "oxlint.config.ts": makeConfig('core, custom({ dir: "./rules", name: "acme" })'),
+          "package.json": PACKAGE_JSON,
+        },
+        root: ROOT,
+      })
+
+      expect(getFindings(yield* runAssess(files))).toStrictEqual([
+        expect.objectContaining({
+          currentState:
+            "The `custom()` call in `oxlint.config.ts` loads `rules`, but that folder does not exist, so Oxlint runs none of its rules.",
+          id: "custom-rules-folder-missing:rules",
+          integration: "oxlint-custom",
+        }),
+      ])
+    })
+  )
+
+  it.effect("accept the default rules folder before the project writes a rule", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "oxlint.config.ts": makeConfig("core, custom()"), "package.json": PACKAGE_JSON },
+        root: ROOT,
+      })
+
+      expect(getFindings(yield* runAssess(files))).toStrictEqual([])
+    })
+  )
+
   it.effect("report a rules folder that no custom() call loads", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

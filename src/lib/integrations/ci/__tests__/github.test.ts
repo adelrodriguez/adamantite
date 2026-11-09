@@ -1028,6 +1028,25 @@ describe("github", () => {
       })
     )
 
+    it.effect("rewrite a generated workflow that a checkout gave CRLF line endings", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+
+        yield* github
+          .create(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(provideFallback(files))
+
+        // Git with core.autocrlf, or an editor, can change the line endings and the last newline.
+        files.write(WORKFLOW_PATH, `${files.read(WORKFLOW_PATH).replaceAll("\n", "\r\n")}\r\n`)
+
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check", "analyze"] })
+          .pipe(provideFallback(files))
+
+        expect(result).toBe("updated")
+      })
+    )
+
     it.effect("keep a Node.js version that the project wrote into the workflow", () =>
       Effect.gen(function* () {
         const files = makeFiles()

@@ -186,11 +186,21 @@ function generateWorkflow(
  * or remove a version file after init. Any other content, such as a hard-coded Node.js version,
  * holds choices that the project made, so `update` keeps it.
  */
+// Line endings and trailing blank lines change with a checkout or an editor, not with a choice of
+// the project, so the comparison ignores them.
+function normalizeWorkflowText(content: string) {
+  return content.replaceAll("\r\n", "\n").trimEnd()
+}
+
 function checkIsGeneratedWorkflow(content: string) {
+  const normalized = normalizeWorkflowText(content)
+
   return NODE_VERSION_SOURCES.some((source) =>
     Record.keys(getSetupSteps(source)).some((packageManager) =>
       getCIScriptSets().some(
-        (scripts) => generateWorkflow({ packageManager, scripts }, source) === content
+        (scripts) =>
+          normalizeWorkflowText(generateWorkflow({ packageManager, scripts }, source) ?? "")
+          === normalized
       )
     )
   )

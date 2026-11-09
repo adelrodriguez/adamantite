@@ -15,11 +15,6 @@ export interface CommandRunOptions {
   readonly command: string
   readonly cwd?: string
   /**
-   * The platform spawner defaults to a new session on POSIX. Pass `false` to keep the child in this
-   * process's group so terminal-generated signals reach it.
-   */
-  readonly detached?: boolean
-  /**
    * Variables to set for the child, on top of this process's environment.
    */
   readonly env?: Readonly<Record<string, string>>
@@ -28,6 +23,11 @@ export interface CommandRunOptions {
    */
   readonly name?: string
   readonly stderr?: "ignore" | "inherit"
+  /**
+   * A child with `"inherit"` reads the terminal, so it stays in this process group, where terminal
+   * signals such as SIGINT and SIGWINCH reach it. Any other child starts in a new session on POSIX,
+   * the default of the platform spawner.
+   */
   readonly stdin?: "ignore" | "inherit"
   readonly stdout?: "ignore" | "inherit"
   /**
@@ -79,7 +79,7 @@ const exitCode = Effect.fn("CommandRunner.exitCode")(function* (options: Command
     Effect.gen(function* () {
       const handle = yield* ChildProcess.make(command, options.args, {
         cwd: options.cwd,
-        detached: options.detached,
+        detached: options.stdin === "inherit" ? false : undefined,
         env: { ...options.env, NODE_OPTIONS: quietNodeOptions() },
         extendEnv: true,
         stderr: options.stderr ?? "inherit",

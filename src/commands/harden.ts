@@ -67,7 +67,7 @@ function getLinkKey(link: BrokenLink) {
 const readInstalledVersion = Effect.fn("readInstalledVersion")(function* (cwd: string) {
   const path = yield* Path.Path
   const resolver = yield* ModuleResolver
-  const entry = yield* resolver.resolve(path.join(cwd, "package.json"), "adamantite/lint")
+  const entry = yield* resolver.resolve(cwd, "adamantite/lint")
 
   if (Option.isNone(entry)) {
     return Option.none<string>()

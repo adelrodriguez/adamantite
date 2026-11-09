@@ -18,6 +18,10 @@ import {
   NodeVersionResolver,
   type NodeVersionSource,
 } from "#lib/workspace/node-version-resolver.ts"
+import {
+  SUPPORTED_PACKAGE_MANAGERS,
+  type SupportedPackageManager,
+} from "#lib/workspace/package-json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import testWorkflow from "../../../../../.github/workflows/test.yml?raw"
 
@@ -38,6 +42,10 @@ const RULE_FILES = {
 }
 
 const RULE_TEST_FILES = { ...RULE_FILES, ".adamantite/lint/no-a.test.ts": "// test\n" }
+
+const PACKAGE_JSON_WITH_SCRIPTS = JSON.stringify({
+  scripts: { analyze: "adamantite analyze", check: "adamantite check" },
+})
 
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({
@@ -61,7 +69,10 @@ function provideFallback(files: FileSystemTestContext) {
   ])
 }
 
-function provideAssessment(files: FileSystemTestContext, packageManager: "deno" | "pnpm" = "pnpm") {
+function provideAssessment(
+  files: FileSystemTestContext,
+  packageManager: SupportedPackageManager = "pnpm"
+) {
   return Effect.provide([
     files.layer,
     Path.layer,
@@ -831,7 +842,7 @@ describe("github", () => {
       Effect.gen(function* () {
         const generated = new Map<string, string>()
 
-        for (const packageManager of ["bun", "deno", "npm", "pnpm", "yarn"] as const) {
+        for (const packageManager of SUPPORTED_PACKAGE_MANAGERS) {
           const files = makeFiles()
           yield* github
             .create(ROOT, { packageManager, scripts: ["check"] })
@@ -879,7 +890,34 @@ describe("github", () => {
       })
     )
 
-    it.effect.each(["bun", "deno", "npm", "pnpm", "yarn"] as const)(
+    it.effect.each(SUPPORTED_PACKAGE_MANAGERS)(
+      "accept the workflow that create writes for %s",
+      (packageManager) =>
+        Effect.gen(function* () {
+          const files = makeFiles({
+            ".node-version": "24\n",
+            "package.json": PACKAGE_JSON_WITH_SCRIPTS,
+          })
+
+          yield* github
+            .create(ROOT, { packageManager, scripts: ["check", "analyze"] })
+            .pipe(provideFallback(files))
+
+          const result = yield* readProject(ROOT).pipe(
+            Effect.flatMap((project) => github.assess(project)),
+            provideAssessment(files, packageManager)
+          )
+
+          expect(result).toStrictEqual({
+            applicable: true,
+            findings: [],
+            packageActions: [],
+            warnings: [],
+          })
+        })
+    )
+
+    it.effect.each(SUPPORTED_PACKAGE_MANAGERS)(
       "omit saved rule tests from the workflow for %s",
       (packageManager) =>
         Effect.gen(function* () {

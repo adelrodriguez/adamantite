@@ -16,6 +16,7 @@ import {
   type SupportedPackageManager,
   SCRIPT_ORDER,
   checkRunsTool,
+  listSupportedPackageManagers,
 } from "#lib/workspace/package-json.ts"
 
 const INIT_EDITORS = ["vscode", "zed"] as const
@@ -126,7 +127,7 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
 
   if (options.githubActions && !checkIsSupportedPackageManager(packageManager)) {
     return yield* new InvalidInitOptions({
-      reason: `\`--github-actions\` does not support the detected package manager \`${packageManager}\`. Use bun, deno, npm, pnpm, or yarn.`,
+      reason: `\`--github-actions\` does not support the detected package manager \`${packageManager}\`. Use ${listSupportedPackageManagers("disjunction")}.`,
     })
   }
 
@@ -183,7 +184,7 @@ const installExtensions = Flag.Boolean("install-extensions").pipe(
 const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
-    "Add a GitHub Actions workflow. Requires --script check or --script analyze and bun, deno, npm, pnpm, or yarn"
+    `Add a GitHub Actions workflow. Requires --script check or --script analyze and ${listSupportedPackageManagers("disjunction")}`
   )
 )
 

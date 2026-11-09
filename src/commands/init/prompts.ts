@@ -13,6 +13,7 @@ import {
   MANAGED_SCRIPT_COMMANDS,
   type ScriptConflict,
   checkRunsTool,
+  listSupportedPackageManagers,
 } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import type { InitOptionsInput } from "./options.ts"
@@ -130,7 +131,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   if (hasCICompatibleScripts(writtenScripts) && !canEnableGitHubActions) {
     yield* prompter.log.info(
-      `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports bun, deno, npm, pnpm, and yarn.`
+      `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports ${listSupportedPackageManagers("conjunction")}.`
     )
   }
 

@@ -112,15 +112,23 @@ export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
  * `PackageManagerName`; niche managers (e.g. `aube`, `nub`) are out of scope because they lack
  * established GitHub Actions setup steps.
  */
-export type SupportedPackageManager = Extract<
-  PackageManagerName,
-  "bun" | "deno" | "npm" | "pnpm" | "yarn"
->
+export const SUPPORTED_PACKAGE_MANAGERS = [
+  "bun",
+  "deno",
+  "npm",
+  "pnpm",
+  "yarn",
+] as const satisfies readonly PackageManagerName[]
 
-export function checkIsSupportedPackageManager(
-  name: PackageManagerName
-): name is SupportedPackageManager {
-  return name === "bun" || name === "deno" || name === "npm" || name === "pnpm" || name === "yarn"
+export type SupportedPackageManager = (typeof SUPPORTED_PACKAGE_MANAGERS)[number]
+
+export const checkIsSupportedPackageManager = Schema.is(Schema.Literals(SUPPORTED_PACKAGE_MANAGERS))
+
+/**
+ * The supported package managers as prose, such as "bun, deno, npm, pnpm, or yarn".
+ */
+export function listSupportedPackageManagers(type: "conjunction" | "disjunction"): string {
+  return new Intl.ListFormat("en-US", { type }).format(SUPPORTED_PACKAGE_MANAGERS)
 }
 
 /**

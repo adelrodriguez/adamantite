@@ -1,3 +1,4 @@
+import * as EffectRegExp from "effect/RegExp"
 import type {
   RequiredConfigInspection,
   ToolingFacts,
@@ -14,45 +15,65 @@ export interface KnipWorkspace extends ToolingWorkspace {
   readonly usesEffectPreset: boolean
 }
 
-type IgnoreList = "effect" | "monorepo"
+/**
+ * The `ignoreDependencies` lists of `adamantite/analyze`, in the order that a generated config
+ * spreads them.
+ */
+const IGNORE_LISTS = ["monorepo", "effect"] as const
+
+type IgnoreList = (typeof IGNORE_LISTS)[number]
+
+/**
+ * The entries of each list. A test keeps them equal to `ignoreDependencies` in
+ * `presets/analyze.ts`.
+ */
+export const IGNORED_ENTRIES = {
+  effect: ["@effect/language-service"],
+  monorepo: ["sherif"],
+} as const satisfies Record<IgnoreList, readonly string[]>
+
+const IS_REQUIRED = {
+  effect: (workspace) => workspace.usesEffectPreset,
+  monorepo: (workspace) => workspace.isMonorepo,
+} as const satisfies Record<IgnoreList, (workspace: KnipWorkspace) => boolean>
+
+const IGNORE_REASON = {
+  effect:
+    "the `effect` lint preset names the `@effect/language-service` plugin in `tsconfig.json`, and no package has that name",
+  monorepo: "Knip cannot see that `adamantite analyze` runs Sherif in a monorepo",
+} as const satisfies Record<IgnoreList, string>
 
 const DEFAULT_WORKSPACE: KnipWorkspace = { isMonorepo: false, usesEffectPreset: false }
 
 // Bounded by the array's closing bracket, so an entry in a later property does not count. Matches
 // a string or a regular expression entry, which Knip both accepts.
-const ENTRY_REGEX: Record<IgnoreList, RegExp> = {
-  effect: /ignoreDependencies\s*:\s*\[[^\]]*?@effect\/language-service/u,
-  monorepo: /ignoreDependencies\s*:\s*\[[^\]]*?sherif/u,
+function checkListsEntry(content: string, entry: string) {
+  return new RegExp(
+    String.raw`ignoreDependencies\s*:\s*\[[^\]]*?${EffectRegExp.escape(entry)}`,
+    "u"
+  ).test(content)
 }
 
 // The preset's list, alone or spread into the array. It needs the named import: without it the
 // config passes this check and then throws a ReferenceError when Knip loads it.
-const PRESET_LIST_REGEX: Record<IgnoreList, RegExp> = {
-  effect:
-    /ignoreDependencies\s*:\s*(?:ignoreDependencies\.effect|\[[^\]]*?ignoreDependencies\.effect)/u,
-  monorepo:
-    /ignoreDependencies\s*:\s*(?:ignoreDependencies\.monorepo|\[[^\]]*?ignoreDependencies\.monorepo)/u,
+function checkUsesPresetList(content: string, list: IgnoreList) {
+  return new RegExp(
+    String.raw`ignoreDependencies\s*:\s*(?:ignoreDependencies\.${list}|\[[^\]]*?ignoreDependencies\.${list})`,
+    "u"
+  ).test(content)
 }
 
 const PRESET_LIST_IMPORT_REGEX =
   /import\s[^;]*?\{[^}]*\bignoreDependencies\b[^}]*\}\s*from\s*["']adamantite\/analyze["']/u
 
-const IGNORE_REASON: Record<IgnoreList, string> = {
-  effect:
-    "the `effect` lint preset names the `@effect/language-service` plugin in `tsconfig.json`, and no package has that name",
-  monorepo: "Knip cannot see that `adamantite analyze` runs Sherif in a monorepo",
-}
-
 function getRequiredLists(workspace: KnipWorkspace) {
-  return (["monorepo", "effect"] as const).filter((list) =>
-    list === "monorepo" ? workspace.isMonorepo : workspace.usesEffectPreset
-  )
+  return IGNORE_LISTS.filter((list) => IS_REQUIRED[list](workspace))
 }
 
 function checkIgnoresList(content: string, list: IgnoreList) {
   return (
-    ENTRY_REGEX[list].test(content)
-    || (PRESET_LIST_REGEX[list].test(content) && PRESET_LIST_IMPORT_REGEX.test(content))
+    IGNORED_ENTRIES[list].every((entry) => checkListsEntry(content, entry))
+    || (checkUsesPresetList(content, list) && PRESET_LIST_IMPORT_REGEX.test(content))
   )
 }
 

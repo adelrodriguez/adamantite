@@ -13,7 +13,7 @@ import {
 } from "oxc-parser"
 import type { Workspace } from "#lib/workspace/monorepo.ts"
 import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
-import { makeProjectCopy, renderOverrideTrialConfig, replaceConfig } from "#lib/hardening/trial.ts"
+import { makeProjectCopy, renderOverrideTrialConfig, replaceConfigs } from "#lib/hardening/trial.ts"
 import { checkExists, readFile } from "#lib/shared/filesystem.ts"
 
 /**
@@ -302,17 +302,20 @@ export const readOverrides = Effect.fn("readOverrides")(
 
       const copy = yield* makeProjectCopy(cwd, workspace)
 
-      for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
-        const removals = new Map<number, string[]>()
+      yield* replaceConfigs(
+        copy,
+        new Map(
+          Array.dedupe(linted.map((entry) => entry.config)).map((config) => {
+            const removals = new Map<number, string[]>()
 
-        for (const entry of linted.filter((candidate) => candidate.config === config)) {
-          removals.set(entry.index, [...(removals.get(entry.index) ?? []), entry.rule])
-        }
+            for (const entry of linted.filter((candidate) => candidate.config === config)) {
+              removals.set(entry.index, [...(removals.get(entry.index) ?? []), entry.rule])
+            }
 
-        yield* replaceConfig(path.join(copy, config), (base) =>
-          renderOverrideTrialConfig({ config: base, removals })
+            return [config, (base: string) => renderOverrideTrialConfig({ config: base, removals })]
+          })
         )
-      }
+      )
 
       // Oxlint runs from the root, as a project lint does, so each file gets the options of the
       // root config and the rules of its nearest config.

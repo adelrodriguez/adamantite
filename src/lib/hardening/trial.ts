@@ -1,6 +1,7 @@
 import type * as Schema from "effect/Schema"
 import { posix, win32 } from "node:path"
 import * as Array from "effect/Array"
+import * as Brand from "effect/Brand"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -165,19 +166,32 @@ export function renderTrialConfig(options: {
 }
 
 /**
- * Replaces `config` in the copy with the trial config that `render` gives for the name of the moved
- * config. The moved config stays in its folder, so its relative imports and `custom()` calls work.
+ * A temporary copy of the project. Only `makeProjectCopy` makes one, so a trial cannot change the
+ * files of the project itself.
  */
-export const replaceConfig = Effect.fn("replaceConfig")(function* (
-  config: string,
-  render: (base: string) => string
+export type ProjectCopy = string & Brand.Brand<"ProjectCopy">
+
+const toProjectCopy = Brand.nominal<ProjectCopy>()
+
+/**
+ * Replaces each config in the copy with the trial config that its render gives for the name of the
+ * moved config. Each key is a config path relative to the copy, so each config moves one time. The
+ * moved config stays in its folder, so its relative imports and `custom()` calls work.
+ */
+export const replaceConfigs = Effect.fn("replaceConfigs")(function* (
+  copy: ProjectCopy,
+  renders: ReadonlyMap<string, (base: string) => string>
 ) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const base = `${BASE_CONFIG_NAME}${path.extname(config)}`
 
-  yield* fs.rename(config, path.join(path.dirname(config), base))
-  yield* writeFile(config, render(base))
+  for (const [config, render] of renders) {
+    const target = path.join(copy, config)
+    const base = `${BASE_CONFIG_NAME}${path.extname(config)}`
+
+    yield* fs.rename(target, path.join(path.dirname(target), base))
+    yield* writeFile(target, render(base))
+  }
 })
 
 /**
@@ -356,7 +370,7 @@ export const makeProjectCopy = Effect.fn("makeProjectCopy")(
       { concurrency: 16, discard: true }
     )
 
-    return copy
+    return toProjectCopy(copy)
   },
   Effect.catchTag("PlatformError", (cause) =>
     Effect.fail(new FailedToWriteFile({ cause, path: "the copy of the project" }))
@@ -475,22 +489,27 @@ export const tryRule = Effect.fn("tryRule")(
     )
 
     if (setting instanceof ErrorSetting) {
-      for (const config of Array.dedupe(linted.map((entry) => entry.config))) {
-        yield* replaceConfig(config, (base) =>
-          renderTrialConfig({
-            config: base,
-            files: Array.dedupe(
-              linted.filter((entry) => entry.config === config).map((entry) => entry.configFile)
-            ),
-            plugin: Option.liftPredicate(
-              resolved.plugin,
-              (name) => resolved.builtIn && name !== "eslint"
-            ),
-            rule,
-            settingOptions: setting.options,
-          })
+      yield* replaceConfigs(
+        copy,
+        new Map(
+          Array.dedupe(linted.map((entry) => entry.config)).map((config) => [
+            path.relative(copy, config),
+            (base: string) =>
+              renderTrialConfig({
+                config: base,
+                files: Array.dedupe(
+                  linted.filter((entry) => entry.config === config).map((entry) => entry.configFile)
+                ),
+                plugin: Option.liftPredicate(
+                  resolved.plugin,
+                  (name) => resolved.builtIn && name !== "eslint"
+                ),
+                rule,
+                settingOptions: setting.options,
+              }),
+          ])
         )
-      }
+      )
     }
 
     const results = new Map<TrialCase, TrialCaseResult>()

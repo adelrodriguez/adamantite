@@ -1,6 +1,7 @@
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
+import type { replaceConfigs } from "#lib/hardening/trial.ts"
 import {
   parseTrialCase,
   renderOverrideTrialConfig,
@@ -107,5 +108,17 @@ describe("renderOverrideTrialConfig", () => {
         "",
       ].join("\n")
     )
+  })
+})
+
+describe("replaceConfigs", () => {
+  it("take only a project copy, and each config one time", () => {
+    // A path in the project would rename the user's config, so it must not type-check.
+    expectTypeOf<Parameters<typeof replaceConfigs>[0]>().not.toEqualTypeOf<string>()
+    expectTypeOf<string>().not.toExtend<Parameters<typeof replaceConfigs>[0]>()
+    // A map holds each config one time, so a second replacement cannot move the trial config.
+    expectTypeOf<Parameters<typeof replaceConfigs>[1]>().toEqualTypeOf<
+      ReadonlyMap<string, (base: string) => string>
+    >()
   })
 })

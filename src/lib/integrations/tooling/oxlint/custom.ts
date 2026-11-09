@@ -10,8 +10,8 @@ import {
 } from "#lib/integrations/base.ts"
 import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
 import { isDiscoveryComplete } from "#lib/workspace/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
 import {
+  CUSTOM_RULES_DIRECTORY,
   hasLegacyRuleImports,
   inspectRuleFile,
   isRuleFile,

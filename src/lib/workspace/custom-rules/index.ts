@@ -14,7 +14,11 @@ import {
 } from "#lib/shared/errors.ts"
 import { ensureDirectory, readDirectoryIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { isRuleFile, isRuleTestFile } from "#lib/workspace/custom-rules/inspect.ts"
+import {
+  CUSTOM_RULES_DIRECTORY,
+  isRuleFile,
+  isRuleTestFile,
+} from "#lib/workspace/custom-rules/inspect.ts"
 import {
   getStubTemplate,
   getTestStubTemplate,
@@ -22,12 +26,6 @@ import {
 
 const stubTemplate = getStubTemplate()
 const testStubTemplate = getTestStubTemplate()
-
-/**
- * The rules folder that `custom()` loads when no `dir` is given, relative to the file that calls
- * it.
- */
-export const CUSTOM_RULES_DIRECTORY = ".adamantite/lint"
 
 const RULE_NAME_PATTERN = /^[a-z][\da-z]*(?:-[\da-z]+)*$/
 

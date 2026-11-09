@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
+import analyze from "#presets/analyze.ts"
+import { DEFAULT_DIRECTORY, RULE_FILE_EXTENSIONS } from "#presets/rules/folder.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const ANALYZE_PRESET = join(REPO_ROOT, "presets/analyze.ts")
@@ -22,6 +24,16 @@ const KnipJsonOutput = Schema.Struct({
 const decodeKnipJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(KnipJsonOutput))
 
 const RULE = "export default { create: () => ({}) }\n"
+
+describe("analyze preset rules folder", () => {
+  it("add the rule files of the folder and extensions that custom() loads", () => {
+    const extensions = [...RULE_FILE_EXTENSIONS].map((extension) => extension.slice(1)).join(",")
+
+    expect(analyze.oxlint).toStrictEqual({
+      entry: [`${DEFAULT_DIRECTORY}/[!_]*.{${extensions}}`],
+    })
+  })
+})
 
 describe("analyze preset", () => {
   let project: string

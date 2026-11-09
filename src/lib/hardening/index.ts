@@ -12,7 +12,7 @@ import { listProjectFiles } from "#lib/hardening/project-files.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 import { discoverCustomRules } from "#lib/workspace/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/inspect.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 

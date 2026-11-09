@@ -18,9 +18,17 @@ import {
 export const CUSTOM_RULES_MODULE = "adamantite/rules"
 
 const DEFAULT_PLUGIN_NAME = "project"
-const DEFAULT_DIRECTORY = ".adamantite/lint"
 
-const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts", ".ts"])
+/**
+ * The rules folder that `custom()` loads when no `dir` is given, relative to the file that calls
+ * it. A test keeps it equal to `DEFAULT_DIRECTORY` in `presets/rules/folder.ts`.
+ */
+export const CUSTOM_RULES_DIRECTORY = ".adamantite/lint"
+
+/**
+ * The extensions of rule files. A test keeps them equal to the ones in `presets/rules/folder.ts`.
+ */
+export const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts", ".ts"])
 
 /**
  * Whether a file in a rules folder is a rule. Keep this the same as `isRuleFile` in
@@ -178,7 +186,7 @@ function readCallOptions(options: ObjectExpression["properties"]): CustomRulesCa
     return DYNAMIC_CALL
   }
 
-  return Option.match(readStringOption(properties, "dir", DEFAULT_DIRECTORY), {
+  return Option.match(readStringOption(properties, "dir", CUSTOM_RULES_DIRECTORY), {
     onNone: () => DYNAMIC_CALL,
     onSome: (dir): CustomRulesCall =>
       new LiteralCustomRulesCall({

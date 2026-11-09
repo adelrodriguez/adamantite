@@ -1,20 +1,30 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Option from "effect/Option"
 import {
+  CUSTOM_RULES_DIRECTORY,
   DynamicCustomRulesCall,
   findCustomRulesCalls,
   hasLegacyRuleImports,
   inspectRuleFile,
   isRuleFile,
   LiteralCustomRulesCall,
+  RULE_FILE_EXTENSIONS,
 } from "#lib/workspace/custom-rules/inspect.ts"
 import {
   DEFAULT_DIRECTORY,
   DEFAULT_PLUGIN_NAME,
   isRuleFile as isLoadedRuleFile,
+  RULE_FILE_EXTENSIONS as LOADED_RULE_FILE_EXTENSIONS,
 } from "#presets/rules/folder.ts"
 
 const IMPORT = 'import custom from "adamantite/rules"\n'
+
+describe("rules folder defaults", () => {
+  it("use the folder and the rule file extensions that custom() loads", () => {
+    expect(CUSTOM_RULES_DIRECTORY).toBe(DEFAULT_DIRECTORY)
+    expect([...RULE_FILE_EXTENSIONS]).toStrictEqual([...LOADED_RULE_FILE_EXTENSIONS])
+  })
+})
 
 describe("isRuleFile", () => {
   it.each([

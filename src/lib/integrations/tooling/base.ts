@@ -74,11 +74,12 @@ export interface ToolingConfigFiles {
   /**
    * The latest supported config file, e.g. `knip.config.ts`.
    */
-  readonly config: string
+  readonly config: `${string}.ts`
   /**
-   * Legacy config files. When several exist, `jsonc` wins over `json` as the active one.
+   * Legacy config files. When several exist, `jsonc` wins over `json` as the active one. Detection
+   * tells a legacy config by its extension, so each one is a JSON or JSONC file.
    */
-  readonly legacyConfigs: readonly string[]
+  readonly legacyConfigs: ReadonlyArray<`${string}.json` | `${string}.jsonc`>
 }
 
 export type RequiredConfigInspection =

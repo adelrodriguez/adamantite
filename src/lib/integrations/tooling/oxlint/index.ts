@@ -12,6 +12,7 @@ import {
   detectToolingConfig,
   getConfigFindings,
   assessPackage,
+  type ToolingConfigFiles,
 } from "#lib/integrations/tooling/base.ts"
 import * as commands from "#lib/integrations/tooling/oxlint/command.ts"
 import {
@@ -38,7 +39,10 @@ const files = [
   { path: LEGACY_CONFIG_FILE, type: "legacy_config" },
 ] as const
 
-const configFiles = { config: CONFIG_FILE, legacyConfigs: [LEGACY_CONFIG_FILE] }
+const configFiles = {
+  config: CONFIG_FILE,
+  legacyConfigs: [LEGACY_CONFIG_FILE],
+} satisfies ToolingConfigFiles
 
 const VERSION = getDependencyVersion("oxlint")
 

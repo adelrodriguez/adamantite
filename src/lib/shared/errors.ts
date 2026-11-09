@@ -298,6 +298,17 @@ export class InvalidConfigFormat extends Data.TaggedError("InvalidConfigFormat")
   }
 }
 
+/**
+ * The trial of `rule try` or `harden` could not copy the project to its temporary folder.
+ */
+export class ProjectCopyFailed extends Data.TaggedError("ProjectCopyFailed")<{
+  cause?: unknown
+}> {
+  override get message() {
+    return `Could not copy the project to a temporary folder for the trial. Check the free disk space and the permissions of the temporary folder, then try again.${formatCauseDetail(this.cause)}`
+  }
+}
+
 export class InvalidPackageJson extends Data.TaggedError("InvalidPackageJson")<{
   issue: string
   path: string

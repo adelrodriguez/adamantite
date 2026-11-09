@@ -8,6 +8,7 @@ import {
   FailedToParseFile,
   FailedToReadFile,
   FailedToWriteFile,
+  ProjectCopyFailed,
 } from "#lib/shared/errors.ts"
 
 function createParseErrors(count: number): ParseError[] {
@@ -27,6 +28,16 @@ function createParseErrors(count: number): ParseError[] {
 }
 
 describe("errors", () => {
+  describe("ProjectCopyFailed", () => {
+    it("say that the trial copy failed, with the cause, instead of a file path", () => {
+      expect(
+        new ProjectCopyFailed({ cause: new Error("ENOSPC: no space left on device") }).message
+      ).toBe(
+        "Could not copy the project to a temporary folder for the trial. Check the free disk space and the permissions of the temporary folder, then try again. Cause: ENOSPC: no space left on device."
+      )
+    })
+  })
+
   describe("CustomRuleExists", () => {
     it("name the one file that exists", () => {
       expect(new CustomRuleExists({ paths: ["rules/tests/no-foo.ts"] }).message).toBe(

@@ -17,7 +17,10 @@ export const DEFAULT_DIRECTORY = ".adamantite/lint"
  */
 export const DEFAULT_PLUGIN_NAME = "project"
 
-const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts", ".ts"])
+/**
+ * The extensions of rule files.
+ */
+export const RULE_FILE_EXTENSIONS: ReadonlySet<string> = new Set([".js", ".mjs", ".mts", ".ts"])
 
 export function getRuleName(file: string): string {
   return file.slice(0, -extname(file).length)

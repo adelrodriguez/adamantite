@@ -23,10 +23,10 @@ import { formatJson } from "#lib/shared/json.ts"
 import {
   addCustomRule,
   addCustomRuleTest,
-  CUSTOM_RULES_DIRECTORY,
   listCustomRules,
   readCustomRuleTestCommand,
 } from "#lib/workspace/custom-rules/index.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/inspect.ts"
 import { readWorkspace } from "#lib/workspace/monorepo.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { TerminalCapabilities } from "#terminal/capabilities.ts"

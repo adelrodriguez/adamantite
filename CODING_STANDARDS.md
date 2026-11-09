@@ -150,27 +150,30 @@ Effect.gen(function* () {
 Preserve a target project's explicit optional setup when changing a generated default. A default
 defines fresh setup, and does not remove a user's opt-in.
 
-Spot it: Regenerating a workflow removes a manually added `rule test` step or the settings that
-the step needs.
+Spot it: Regenerating a file removes a manually added step, such as a `rule test` step, or another
+setting that the project changed.
 
 ```ts
-// Avoid: regenerating an existing workflow without inspecting its commands.
+// Avoid: regenerating an existing workflow without inspecting its content.
 Effect.gen(function* () {
   yield* writeWorkflow(cwd, options)
 })
 
-// Prefer: github.update preserves an explicit saved-test workflow.
+// Prefer: github.update rewrites only a workflow that Adamantite generated.
 Effect.gen(function* () {
-  if (workflow.commands.some((command) => RULE_TEST_COMMAND_REGEX.test(command))) {
-    return
+  if (Option.isSome(content) && !checkIsGeneratedWorkflow(content.value, source)) {
+    return "kept"
   }
   yield* writeWorkflow(cwd, options)
+  return "updated"
 })
 ```
 
-The [GitHub integration](src/lib/integrations/ci/github.ts) preserves the whole opted-in workflow,
-including its Node setup and matrix. [PR #636](https://github.com/adelrodriguez/adamantite/pull/636)
-fixed the repeated-init path after review found that it removed the optional test step.
+The [GitHub integration](src/lib/integrations/ci/github.ts) keeps any workflow that differs from
+every workflow it can generate, and `init` points to `adamantite doctor`.
+[PR #636](https://github.com/adelrodriguez/adamantite/pull/636) fixed the repeated-init path after
+review found that it removed the optional test step. A later audit found that the fix matched only
+the literal `adamantite rule test` command, so other edits were still lost.
 
 ### Keep shared editor commands relative to the workspace
 

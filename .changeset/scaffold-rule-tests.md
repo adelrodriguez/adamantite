@@ -19,5 +19,4 @@ Saved tests use `node:test`; exclude them from Vitest/Jest discovery. The comman
 README explain that setup. The template accepts the shipped lint presets for both runners.
 
 Automatic test scaffolding, CI test steps, and post-handoff test runs are removed.
-Doctor preserves user-owned tests and optional CI steps. Init keeps an existing workflow
-that explicitly runs `rule test`, including its setup and other settings.
+Doctor preserves user-owned tests and optional CI steps.

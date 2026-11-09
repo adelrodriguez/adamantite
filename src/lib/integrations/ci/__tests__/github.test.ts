@@ -954,31 +954,74 @@ describe("github", () => {
           { command: "pnpm exec adamantite rule test", name: "rule test" }
         ),
       },
+      {
+        name: "a test step that runs a package script",
+        packageManager: "pnpm",
+        workflow: makeMatrixWorkflow(
+          { command: "pnpm run check", name: "check" },
+          { command: "pnpm run test:rules", name: "rule test" }
+        ),
+      },
+      {
+        name: "a workflow that Adamantite did not write",
+        packageManager: "bun",
+        workflow: "name: Old Workflow",
+      },
     ] as const)("preserve $name", ({ packageManager, workflow }) =>
       Effect.gen(function* () {
         const files = makeFiles({ ...RULE_TEST_FILES, [WORKFLOW_PATH]: workflow })
 
-        yield* github
+        const result = yield* github
           .update(ROOT, { packageManager, scripts: ["check", "analyze"] })
           .pipe(provideFallback(files))
 
         expect(files.read(WORKFLOW_PATH)).toBe(workflow)
+        expect(result).toBe("kept")
       })
     )
 
-    it.effect("update an existing workflow", () =>
+    it.effect("keep a generated workflow that the project changed", () =>
       Effect.gen(function* () {
-        const files = makeFiles({ [WORKFLOW_PATH]: "name: Old Workflow" })
+        const files = makeFiles()
 
         yield* github
-          .update(ROOT, {
-            packageManager: "bun",
-            scripts: ["check"],
-          })
+          .create(ROOT, { packageManager: "pnpm", scripts: ["check"] })
           .pipe(provideFallback(files))
 
+        const edited = files
+          .read(WORKFLOW_PATH)
+          .replace("runs-on: ubuntu-latest", "runs-on: macos-latest")
+
+        files.write(WORKFLOW_PATH, edited)
+
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check", "analyze"] })
+          .pipe(provideFallback(files))
+
+        expect(files.read(WORKFLOW_PATH)).toBe(edited)
+        expect(result).toBe("kept")
+      })
+    )
+
+    it.effect("rewrite a workflow that Adamantite generated", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+
+        yield* github
+          .create(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(provideFallback(files))
+
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check", "analyze"] })
+          .pipe(provideFallback(files))
+
+        expect(result).toBe("updated")
         expect(Yaml.parse(files.read(WORKFLOW_PATH))).toMatchObject({
-          jobs: { verify: { strategy: { matrix: { include: [{ name: "check" }] } } } },
+          jobs: {
+            verify: {
+              strategy: { matrix: { include: [{ name: "check" }, { name: "analyze" }] } },
+            },
+          },
           name: "adamantite",
         })
       })

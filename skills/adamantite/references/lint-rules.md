@@ -89,7 +89,7 @@ existing compatible child scopes. Verify allowed and forbidden imports with
 `adamantite check`, then run Doctor again. Continue when the migrated maps preserve the
 project's intended imports and Doctor reports no layer-map migration finding.
 
-For a package import that belongs to one file or folder, set `adamantite/import-owners`:
+For an import that belongs to one file or folder, set `adamantite/import-owners`:
 
 ```ts
 import architecture from "adamantite/lint/architecture"
@@ -102,6 +102,7 @@ export default defineConfig({
       "error",
       { import: "giget", owners: ["src/services/download.ts"] },
       { import: "react-native", names: ["Alert"], owners: ["src/shared/alerts.ts"] },
+      { import: "#lib/database.ts", owners: ["src/lib/repositories"] },
     ],
   },
 })
@@ -110,8 +111,10 @@ export default defineConfig({
 Resolve owners from the workspace root, or the `package.json` folder outside a workspace.
 An owner folder covers every file below it. A package name covers its subpaths.
 Use `names` to restrict selected exports. Namespace imports and `export *` are also reported
-when names are restricted. Use layer maps for project files, because import owners match
-the package import as written.
+when names are restricted. An `import` that starts with `#`, `.`, or `/` names a file or folder of
+the project, resolved from the same root as the owners. The rule resolves each import of a linted
+file, so a relative path or another alias to that module counts too. Use layer maps for the
+dependencies between folders.
 
 Repair a report by using what the owner exports or moving the code to its layer or owner.
 Adding an owner, layer dependency, or `ignore` glob only to pass the check weakens the standard.

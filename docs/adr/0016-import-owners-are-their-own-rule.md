@@ -14,9 +14,14 @@ takes the same option form as `layers`: each option after the severity is one ob
 import and its owners. `strict` loads the rule and does not turn it on, because the owners belong
 to one project.
 
-The rule matches the import as written. A module covers its subpaths, so `zod` covers `zod/mini`.
-It resolves nothing, so it does not cover files of the project, where relative paths and aliases
-would bypass a text match. `adamantite/layers` covers those. `names` restricts only some exports,
+The rule matches a package import as written. A module covers its subpaths, so `zod` covers
+`zod/mini`. An `import` that starts with `#`, `.`, or `/` names a module of the project instead,
+such as `#lib/workspace/monorepo.ts` or the folder `#lib/integrations/tooling`. A text match there
+lets a relative path, such as `./monorepo.ts`, bypass the owners, so the rule resolves each import
+of a linted file with the resolver of `adamantite/layers` and compares files. The module resolves
+from the root that owner paths use, and a folder covers each file that `<import>/<path>` resolves
+to. We added this on 2026-11-09, after an audit found that this repository's own entries matched
+only their `#` spelling. `names` restricts only some exports,
 such as `Alert`, and a namespace import or `export *` of that module is a report, because it
 reaches the restricted exports.
 
@@ -35,6 +40,8 @@ root is where a root Oxlint config states its `files` globs. A `pnpm-workspace.y
   hold `names` without a second value form, or two entries for one module.
 - **`no-restricted-imports` with overrides.** This is the duplication that issue #524 removes,
   and its message cannot name the owner.
+- **Reject project modules in the options.** The rule stays a text match, but a project that
+  protects one of its own modules then needs a custom rule that resolves imports anyway.
 
 ## Consequences
 
@@ -42,3 +49,6 @@ root is where a root Oxlint config states its `files` globs. A `pnpm-workspace.y
   nested Oxlint config.
 - A project that is below a workspace root but is not one of its packages gets the outer root.
 - Type-only imports count. An `ignoreTypes` option is a follow-up if a project needs one.
+- An option for a project module resolves the imports of each linted file that it applies to.
+  An alias from `tsconfig.json` `paths` that does not start with `#`, `.`, or `/`, such as `@/db`,
+  is still matched as written.

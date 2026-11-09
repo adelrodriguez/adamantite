@@ -4,9 +4,10 @@ import { posix } from "node:path"
 import { globToRegExp } from "../glob.ts"
 import { isStringLiteral } from "../imports.ts"
 import { readStringArrayOption, readStringOption } from "../options.ts"
+import { resolveImport } from "../resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs: Node.js built-ins that Bun also provides.
+// runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.
 
 /**
  * One import and its owners: one option object of the rule.
@@ -17,6 +18,12 @@ export interface ImportOwner {
    * as `zod/mini` for `zod`.
    */
   readonly import: string
+  /**
+   * Whether the module is a file or folder of the project: an import that starts with `#`, `.`, or
+   * `/`. A project module is reached through any spelling that resolves to it, such as a relative
+   * path, so the rule compares resolved files. A package is matched as the import states it.
+   */
+  readonly local: boolean
   /**
    * The exports that the owners own. Undefined when they own the whole module.
    */
@@ -40,6 +47,11 @@ export interface Project {
    * the nearest folder above `file` that holds a `package.json` when no workspace holds it.
    */
   readonly findRoot: (file: string) => string | undefined
+  /**
+   * The file that `specifier` in `importer` resolves to, with `/` between folders, or undefined
+   * when it does not resolve.
+   */
+  readonly resolve: (importer: string, specifier: string) => string | undefined
 }
 
 const OWNERS_HINT = "Owners: the `adamantite/import-owners` options in the Oxlint config."
@@ -72,6 +84,7 @@ function readImportOwner(option: Options[number]): ImportOwner | undefined {
 
   return {
     import: specifier,
+    local: /^[#./]/.test(specifier),
     names: names === undefined ? undefined : new Set(names),
     owners,
     patterns: owners.flatMap((owner) => [
@@ -174,9 +187,42 @@ function findPackage(dir: string): string | undefined {
 
 const project: Project = {
   findRoot: (file) => findWorkspace(posix.dirname(file)) ?? findPackage(posix.dirname(file)),
+  resolve: resolveImport,
 }
 
 export function createImportOwnersRule(project: Project): Rule {
+  // Whether a project module covers a resolved file, by module, root, and file. Oxlint loads the
+  // rule one time for a lint run, so the answers carry over between files.
+  const coverage = new Map<string, boolean>()
+
+  /**
+   * Whether `file` is the project module `entry.import`, or a file below it when the module is a
+   * folder. The module resolves from the root, as owner paths do. A folder resolves only through a
+   * file in it, so each tail of the file's path is tried below the module.
+   */
+  function covers(entry: ImportOwner, root: string, file: string) {
+    const key = [entry.import, root, file].join("\0")
+    const known = coverage.get(key)
+
+    if (known !== undefined) {
+      return known
+    }
+
+    const anchor = posix.join(root, "package.json")
+    const segments = posix.relative(root, file).split("/")
+
+    const result =
+      project.resolve(anchor, entry.import) === file
+      || segments.some(
+        (_, index) =>
+          project.resolve(anchor, `${entry.import}/${segments.slice(index).join("/")}`) === file
+      )
+
+    coverage.set(key, result)
+
+    return result
+  }
+
   return {
     create(context): Visitor {
       const importer = toPosixPath(context.filename)
@@ -186,6 +232,8 @@ export function createImportOwnersRule(project: Project): Rule {
         return {}
       }
 
+      // The closures below keep the narrowed root.
+      const projectRoot = root
       const relative = posix.relative(root, importer)
 
       const restricted = readImportOwners(context.options).filter(
@@ -224,8 +272,18 @@ export function createImportOwnersRule(project: Project): Rule {
         })
       }
 
+      const hasProjectModule = restricted.some((entry) => entry.local)
+
       function findRestricted(source: ESTree.StringLiteral) {
-        return restricted.filter((entry) => isImportOf(entry.import, source.value))
+        // A project module can match only an import that resolves to a file of the project.
+        const resolved = hasProjectModule ? project.resolve(importer, source.value) : undefined
+        const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
+
+        return restricted.filter((entry) =>
+          entry.local
+            ? file !== undefined && covers(entry, projectRoot, file)
+            : isImportOf(entry.import, source.value)
+        )
       }
 
       /**

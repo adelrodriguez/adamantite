@@ -1,3 +1,4 @@
+import { constUndefined } from "effect/Function"
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, expect, it } from "vitest"
 import {
@@ -12,8 +13,9 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-// Every file is in the project at `/project`. The fixture test covers the real workspace lookup.
-const rule = createImportOwnersRule({ findRoot: () => "/project" })
+// Every file is in the project at `/project`, and no import resolves. The fixture tests cover the
+// real workspace lookup and the resolution of project modules.
+const rule = createImportOwnersRule({ findRoot: () => "/project", resolve: constUndefined })
 
 const tester = new RuleTester({
   languageOptions: { parserOptions: { lang: "tsx" }, sourceType: "module" },

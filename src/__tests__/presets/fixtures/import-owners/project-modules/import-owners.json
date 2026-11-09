@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "adamantite/import-owners": [
+      "error",
+      {
+        "import": "#lib/workspace/monorepo.ts",
+        "names": ["readWorkspace"],
+        "owners": ["src/lib/workspace/project.ts", "src/commands/rule.ts"]
+      },
+      { "import": "#lib/integrations/tooling", "owners": ["src/lib"] }
+    ]
+  }
+}

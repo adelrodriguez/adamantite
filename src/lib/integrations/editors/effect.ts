@@ -7,8 +7,11 @@ import * as Schema from "effect/Schema"
 import { EffectEditorUnavailable, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
+import { formatInitCommand } from "#lib/workspace/init-command.ts"
 import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
+
+const VSCODE_REPAIR_COMMAND = formatInitCommand({ editors: ["vscode"], scripts: ["check"] })
 
 export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect"
 const SDK_METADATA = "adamantite-sdk.json"
@@ -51,8 +54,7 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
 
   if (Option.isNone(native)) {
     return yield* new EffectEditorUnavailable({
-      reason:
-        "The Effect editor SDK needs an installed native TypeScript package with its gitHead. Install TypeScript 7 or later, then run `adamantite init --non-interactive --script check --editor vscode`.",
+      reason: `The Effect editor SDK needs an installed native TypeScript package with its gitHead. Install TypeScript 7 or later, then run \`${VSCODE_REPAIR_COMMAND}\`.`,
     })
   }
 
@@ -107,7 +109,7 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   }
 
   return yield* new EffectEditorUnavailable({
-    reason: `@effect/tsgo ${effectVersion} has no editor compiler matching TypeScript ${typescriptVersion} (${gitHead}). Install a supported TypeScript version, then run \`adamantite init --non-interactive --script check --editor vscode\`.`,
+    reason: `@effect/tsgo ${effectVersion} has no editor compiler matching TypeScript ${typescriptVersion} (${gitHead}). Install a supported TypeScript version, then run \`${VSCODE_REPAIR_COMMAND}\`.`,
   })
 })
 

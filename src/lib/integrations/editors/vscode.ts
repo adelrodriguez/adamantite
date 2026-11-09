@@ -35,6 +35,7 @@ import {
   stringifyJson,
   updateJsonText,
 } from "#lib/shared/json.ts"
+import { formatInitCommand } from "#lib/workspace/init-command.ts"
 import { checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
@@ -159,7 +160,7 @@ export default defineIntegration({
           findings.push({
             currentState: sdkState,
             goal: [
-              "Install a supported native TypeScript version and the Effect optional dependencies. Run `adamantite init --non-interactive --script check --editor vscode` to prepare the SDK cache, then restart the TypeScript server.",
+              `Install a supported native TypeScript version and the Effect optional dependencies. Run \`${formatInitCommand({ editors: ["vscode"], scripts: ["check"] })}\` to prepare the SDK cache, then restart the TypeScript server.`,
             ],
             id: "vscode-effect-sdk",
             integration: "vscode",

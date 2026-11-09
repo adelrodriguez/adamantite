@@ -31,6 +31,7 @@ import {
   stringifyJson,
   updateJsonText,
 } from "#lib/shared/json.ts"
+import { formatInitCommand } from "#lib/workspace/init-command.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
 
@@ -149,8 +150,7 @@ const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
 
     if (parent === directory) {
       return yield* new EffectEditorUnavailable({
-        reason:
-          "Zed cannot find the installed Effect CLI in node_modules. Install @effect/tsgo, then run `adamantite init --non-interactive --script check --editor zed`.",
+        reason: `Zed cannot find the installed Effect CLI in node_modules. Install @effect/tsgo, then run \`${formatInitCommand({ editors: ["zed"], scripts: ["check"] })}\`.`,
       })
     }
 

@@ -1,5 +1,5 @@
 import type { PackageJson } from "type-fest"
-import { describe, expect, it } from "@effect/vitest"
+import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Arbitrary from "effect/Arbitrary"
 import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -15,12 +15,21 @@ import {
   assessPackage,
   LegacyToolingConfig,
   MissingToolingConfig,
+  type ToolingConfigFiles,
   type ToolingConfigState,
 } from "#lib/integrations/tooling/base.ts"
 
 const ROOT = "/project"
-const FILES = { config: "tool.config.ts", legacyConfigs: ["tool.json", "tool.jsonc"] }
-const SINGLE_LEGACY_FILES = { config: "tool.config.ts", legacyConfigs: [".toolrc.json"] }
+
+const FILES = {
+  config: "tool.config.ts",
+  legacyConfigs: ["tool.json", "tool.jsonc"],
+} satisfies ToolingConfigFiles
+
+const SINGLE_LEGACY_FILES = {
+  config: "tool.config.ts",
+  legacyConfigs: [".toolrc.json"],
+} satisfies ToolingConfigFiles
 
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
@@ -357,5 +366,19 @@ describe("getConfigFindings", () => {
         }
       ).map(({ id }) => id)
     ).toStrictEqual(["shadowed-legacy-tool-config", "invalid-tool-config"])
+  })
+})
+
+describe("ToolingConfigFiles", () => {
+  it("accept only JSON and JSONC legacy configs beside a TypeScript config", () => {
+    // Detection reads a `.ts` file as the current config, so a legacy `.ts` file must not be listed.
+    expectTypeOf<{
+      config: "tool.config.ts"
+      legacyConfigs: ["tool.json", "tool.jsonc"]
+    }>().toExtend<ToolingConfigFiles>()
+    expectTypeOf<{
+      config: "tool.config.ts"
+      legacyConfigs: ["tool.ts"]
+    }>().not.toExtend<ToolingConfigFiles>()
   })
 })

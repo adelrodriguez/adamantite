@@ -362,6 +362,8 @@ describe("vscode", () => {
             "editor.formatOnSave": false,
             "oxc.path.oxlint": "node_modules/.bin/oxlint",
             "oxc.typeAware": false,
+            // A null setting is a project choice, such as no default terminal profile.
+            "terminal.integrated.defaultProfile.linux": null,
           }),
         })
 
@@ -373,6 +375,7 @@ describe("vscode", () => {
           "editor.formatOnSave": false,
           "oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js",
           "oxc.typeAware": false,
+          "terminal.integrated.defaultProfile.linux": null,
         })
       })
     )

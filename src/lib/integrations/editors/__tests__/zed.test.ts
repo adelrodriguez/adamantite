@@ -193,7 +193,7 @@ describe("zed", () => {
       Effect.gen(function* () {
         const files = makeFiles({
           [SETTINGS_PATH]: yield* stringifyJson({
-            languages: { TypeScript: { format_on_save: "off" } },
+            languages: { TypeScript: { format_on_save: "off", formatter: null } },
             lsp: {
               oxlint: {
                 binary: { arguments: ["--lsp"], path: "oxlint" },
@@ -208,7 +208,7 @@ describe("zed", () => {
         const config = yield* parseJson(files.read(SETTINGS_PATH))
 
         expect(config).toMatchObject({
-          languages: { TypeScript: { format_on_save: "off" } },
+          languages: { TypeScript: { format_on_save: "off", formatter: null } },
           lsp: {
             oxlint: {
               binary: { arguments: [OXLINT_ENTRY, "--lsp"], path: "node" },

@@ -103,20 +103,14 @@ describe("parseJson", () => {
 })
 
 describe("mergeConfig", () => {
-  // defu drops `__proto__`/`constructor` keys and null-valued keys from `preferred`, and
-  // concatenates arrays on conflicts, so this property holds on array-free, null-free configs with
-  // plain keys.
-  const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean])
-
-  const plainKey = Schema.String.check(
-    Schema.makeFilter((key) => key !== "__proto__" && key !== "constructor")
-  )
+  // mergeConfig concatenates arrays on conflicts, so this property holds on array-free configs.
+  const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean, Schema.Null])
 
   const arrayFreeConfig = Schema.Record(
-    plainKey,
+    Schema.String,
     Schema.Union([
       jsonPrimitive,
-      Schema.Record(plainKey, jsonPrimitive).check(Schema.isMaxProperties(4)),
+      Schema.Record(Schema.String, jsonPrimitive).check(Schema.isMaxProperties(4)),
     ])
   ).check(Schema.isMaxProperties(8))
 

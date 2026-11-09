@@ -100,7 +100,7 @@ const resolveImport = Effect.fn("resolveImport")(function* (
     || path.isAbsolute(specifier)
     || [...packageNames].some((name) => specifier === name || specifier.startsWith(`${name}/`))
 
-  const file = yield* resolver.resolve(from, specifier)
+  const file = yield* resolver.resolve(path.dirname(from), specifier)
 
   if (Option.isNone(file)) {
     return local ? new UnresolvedImport() : new ExternalImport()

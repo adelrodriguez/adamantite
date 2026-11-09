@@ -16,11 +16,12 @@ export class ModuleResolver extends Context.Service<
      */
     readonly clearCache: Effect.Effect<void>
     /**
-     * The file that Node.js loads for `specifier` when `from` imports it, as Oxlint imports a
-     * config. None when the specifier does not resolve, such as a workspace package before an
-     * install.
+     * The file that Node.js loads for `specifier` when a file in `directory` imports it, as Oxlint
+     * imports a config. None when the specifier does not resolve, such as a workspace package
+     * before an install. The resolver resolves from `directory` itself, so a caller that has the
+     * importing file passes its folder.
      */
-    readonly resolve: (from: string, specifier: string) => Effect.Effect<Option.Option<string>>
+    readonly resolve: (directory: string, specifier: string) => Effect.Effect<Option.Option<string>>
   }
 >()("ModuleResolver") {
   static readonly layer = Layer.sync(this, () => {
@@ -41,8 +42,8 @@ export class ModuleResolver extends Context.Service<
       clearCache: Effect.sync(() => {
         resolver.clearCache()
       }),
-      resolve: (from, specifier) =>
-        Effect.sync(() => Option.fromUndefinedOr(resolver.resolveFileSync(from, specifier).path)),
+      resolve: (directory, specifier) =>
+        Effect.sync(() => Option.fromUndefinedOr(resolver.sync(directory, specifier).path)),
     }
   })
 }
@@ -57,7 +58,7 @@ export const resolvePackageDirectory = Effect.fn("resolvePackageDirectory")(func
 ) {
   const path = yield* Path.Path
   const resolver = yield* ModuleResolver
-  const manifest = yield* resolver.resolve(path.join(from, "package.json"), `${name}/package.json`)
+  const manifest = yield* resolver.resolve(from, `${name}/package.json`)
 
   return pipe(
     manifest,

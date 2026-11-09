@@ -133,10 +133,7 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
 
       const binding = yield* Effect.findFirst(candidates, (specifier) =>
         Effect.gen(function* () {
-          const resolved = yield* resolver.resolve(
-            path.join(runtime.oxlint, "dist", "bindings.js"),
-            specifier
-          )
+          const resolved = yield* resolver.resolve(path.join(runtime.oxlint, "dist"), specifier)
 
           if (Option.isNone(resolved) || !(yield* fs.exists(resolved.value))) {
             return false

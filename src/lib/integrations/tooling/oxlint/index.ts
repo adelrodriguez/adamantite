@@ -24,7 +24,7 @@ import { assessLayerMaps } from "#lib/integrations/tooling/oxlint/layers.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { getManagedScripts } from "#lib/workspace/package-json.ts"
+import { getManagedScripts, checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const CONFIG_FILE = "oxlint.config.ts"
 const LEGACY_CONFIG_FILE = ".oxlintrc.json"
@@ -103,7 +103,7 @@ export default defineIntegration({
       const managedScripts = getManagedScripts(packageJson)
       const layerFindings = yield* assessLayerMaps(project)
 
-      if (!managedScripts.includes("check") && !managedScripts.includes("fix")) {
+      if (!checkRunsTool(managedScripts, "oxlint")) {
         return layerFindings.length === 0
           ? ({ applicable: false } satisfies IntegrationAssessment)
           : ({

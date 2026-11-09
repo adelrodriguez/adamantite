@@ -6,6 +6,7 @@ import {
   toKnipWorkspace,
 } from "#lib/integrations/tooling/knip/config.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
 function analyze(options: {
   readonly cwd: string
@@ -37,7 +38,7 @@ export default {
     inspectConfig: inspectRequiredKnipConfig,
     name: "knip",
     purpose: "the managed `analyze` script",
-    scripts: ["analyze"],
+    scripts: getScriptsThatRun("knip"),
     version: getDependencyVersion("knip"),
     workspace: toKnipWorkspace,
   }),

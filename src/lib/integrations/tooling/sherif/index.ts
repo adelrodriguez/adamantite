@@ -2,6 +2,7 @@ import type { CommandRunOptions } from "#lib/execution/command-runner.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
 import { getLegacyMonorepoScriptFindings } from "#lib/integrations/tooling/sherif/legacy-scripts.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
 function analyze(options: {
   readonly cwd: string
@@ -25,7 +26,7 @@ export default {
     monorepoOnly: true,
     name: "sherif",
     purpose: "the managed `analyze` script in a monorepo",
-    scripts: ["analyze"],
+    scripts: getScriptsThatRun("sherif"),
     version: getDependencyVersion("sherif"),
   }),
 }

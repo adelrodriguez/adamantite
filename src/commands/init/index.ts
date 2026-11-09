@@ -14,7 +14,7 @@ import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
+import { readPackageJson, checkRunsTool } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
@@ -116,9 +116,9 @@ export default Command.make("init", initCommandOptions).pipe(
         onSome: (setup) => setup.presets,
       })
 
-      const hasKnip = selectedScripts.includes("analyze")
+      const hasKnip = checkRunsTool(selectedScripts, "knip")
       // `adamantite analyze` runs Sherif in a monorepo.
-      const hasSherif = hasKnip && isMonorepo
+      const hasSherif = checkRunsTool(selectedScripts, "sherif") && isMonorepo
 
       const packageJson = yield* readPackageJson(cwd)
 

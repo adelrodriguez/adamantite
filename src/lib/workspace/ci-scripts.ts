@@ -1,7 +1,6 @@
 import { runScriptCommand } from "nypm"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
-
-const CI_SCRIPTS = ["check", "analyze"] as const satisfies readonly Script[]
+import { CI_SCRIPTS } from "#lib/workspace/package-json.ts"
 
 export function getCIWorkflowEntries(packageManager: SupportedPackageManager, scripts: Script[]) {
   return CI_SCRIPTS.flatMap((script) =>

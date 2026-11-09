@@ -107,8 +107,6 @@ export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
     yield* writeFile(packagePath, updateJsonText(content, packageJson))
   })
 
-export type Script = keyof typeof MANAGED_SCRIPT_COMMANDS
-
 /**
  * Package managers Adamantite supports for CI workflow generation. A subset of nypm's
  * `PackageManagerName`; niche managers (e.g. `aube`, `nub`) are out of scope because they lack
@@ -125,11 +123,57 @@ export function checkIsSupportedPackageManager(
   return name === "bun" || name === "deno" || name === "npm" || name === "pnpm" || name === "yarn"
 }
 
-export const MANAGED_SCRIPT_COMMANDS = {
-  analyze: "adamantite analyze",
-  check: "adamantite check",
-  fix: "adamantite fix",
-} as const
+/**
+ * A code-quality tool that a managed script runs.
+ */
+export type ManagedTool = "knip" | "oxfmt" | "oxlint" | "sherif"
+
+/**
+ * The package scripts that Adamantite manages: the command of each, the tools that it runs, and
+ * whether CI runs it. Each other fact about a script derives from this table.
+ */
+const MANAGED_SCRIPTS = {
+  analyze: { ci: true, command: "adamantite analyze", tools: ["knip", "sherif"] },
+  check: { ci: true, command: "adamantite check", tools: ["oxfmt", "oxlint"] },
+  fix: { ci: false, command: "adamantite fix", tools: ["oxfmt", "oxlint"] },
+} as const satisfies Record<
+  string,
+  { readonly ci: boolean; readonly command: string; readonly tools: readonly ManagedTool[] }
+>
+
+export type Script = keyof typeof MANAGED_SCRIPTS
+
+export const MANAGED_SCRIPT_COMMANDS = Record.map(MANAGED_SCRIPTS, (script) => script.command)
+
+/**
+ * Every managed script, in the order that prompts, guidance, and CI list them.
+ */
+export const SCRIPT_ORDER = ["check", "fix", "analyze"] as const satisfies readonly Script[]
+
+/**
+ * The managed scripts that CI runs, in `SCRIPT_ORDER`.
+ */
+export const CI_SCRIPTS: readonly Script[] = SCRIPT_ORDER.filter(
+  (script) => MANAGED_SCRIPTS[script].ci
+)
+
+/**
+ * The managed scripts that run `tool`, in `SCRIPT_ORDER`.
+ */
+export function getScriptsThatRun(tool: ManagedTool): Script[] {
+  return SCRIPT_ORDER.filter((script) => checkRunsTool([script], tool))
+}
+
+/**
+ * Whether one of `scripts` runs `tool`.
+ */
+export function checkRunsTool(scripts: readonly Script[], tool: ManagedTool): boolean {
+  return scripts.some((script) => {
+    const tools: readonly ManagedTool[] = MANAGED_SCRIPTS[script].tools
+
+    return tools.includes(tool)
+  })
+}
 
 export function getManagedScripts(packageJson: PackageJson): Script[] {
   const scripts = packageJson.scripts ?? {}

@@ -4,6 +4,7 @@ import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
 import { checkImportsLintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
+import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
 interface ManagedPluginOptions<AssessError, AssessRequirements> {
   /**
@@ -41,7 +42,7 @@ export function defineManagedPlugin<
     isRequired: ({ lintConfig }) => checkImportsLintPreset(lintConfig, preset),
     name,
     purpose: `the \`adamantite/lint/${preset}\` preset`,
-    scripts: ["check", "fix"],
+    scripts: getScriptsThatRun("oxlint"),
     version,
   })
 

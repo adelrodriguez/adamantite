@@ -355,6 +355,28 @@ describe("vscode", () => {
       })
     )
 
+    it.effect("keep the project's values and set the Oxlint entry", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          ".vscode/settings.json": yield* formatJson({
+            "editor.formatOnSave": false,
+            "oxc.path.oxlint": "node_modules/.bin/oxlint",
+            "oxc.typeAware": false,
+          }),
+        })
+
+        yield* vscode.update(ROOT).pipe(provideFiles(files))
+
+        const config = yield* parseJson(files.read(".vscode/settings.json"))
+
+        expect(config).toMatchObject({
+          "editor.formatOnSave": false,
+          "oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js",
+          "oxc.typeAware": false,
+        })
+      })
+    )
+
     it.effect("remain idempotent across repeated updates", () =>
       Effect.gen(function* () {
         const files = makeFiles({

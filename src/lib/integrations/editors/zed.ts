@@ -190,7 +190,7 @@ const setEffectSettings = Effect.fn("setEffectSettings")(function* (
   const lsp = checkIsJsonObject(config.lsp) ? config.lsp : {}
   const legacy = checkIsJsonObject(lsp["tsgo"]) ? lsp["tsgo"] : {}
   const current = checkIsJsonObject(lsp["typescript-ls"]) ? lsp["typescript-ls"] : {}
-  const server = yield* mergeConfig(current, legacy)
+  const server = yield* mergeConfig({ fallback: legacy, preferred: current })
   const oxlint = checkIsJsonObject(lsp["oxlint"]) ? lsp["oxlint"] : {}
 
   const initialization = checkIsJsonObject(oxlint["initialization_options"])
@@ -203,7 +203,10 @@ const setEffectSettings = Effect.fn("setEffectSettings")(function* (
     ? settings["rulesCustomization"]
     : {}
 
-  const mergedCustomization = yield* mergeConfig(rulesCustomization, customization)
+  const mergedCustomization = yield* mergeConfig({
+    fallback: customization,
+    preferred: rulesCustomization,
+  })
 
   return Object.fromEntries([
     ...Object.entries(config),
@@ -464,7 +467,9 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      const mergedConfig = yield* mergeConfig(CONFIG, existingConfig)
+      // The project's values win. `setOxlintBinary` and `setEffectSettings` then set only the values
+      // that the assessment checks.
+      const mergedConfig = yield* mergeConfig({ fallback: CONFIG, preferred: existingConfig })
       const effect = yield* readEffectEditor(cwd)
       const base = setOxlintBinary(deduplicateManagedFormatters(mergedConfig))
 

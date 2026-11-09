@@ -54,10 +54,25 @@ export const checkIsJsonArray = (
   value: JsonValue | Schema.Json | undefined
 ): value is JsonValue[] => Array.isArray(value)
 
-export const mergeConfig = (base: Schema.JsonObject, override: Schema.JsonObject) =>
+interface ConfigLayers {
+  /**
+   * The object whose values win.
+   */
+  readonly preferred: Schema.JsonObject
+  /**
+   * The object that supplies only the keys that `preferred` does not set.
+   */
+  readonly fallback: Schema.JsonObject
+}
+
+/**
+ * Merges two JSON objects deeply. `preferred` wins each key that both objects set, and arrays join
+ * with the `preferred` items first.
+ */
+export const mergeConfig = ({ fallback, preferred }: ConfigLayers) =>
   Effect.try({
     catch: (cause) => new FailedToMergeConfig({ cause }),
-    try: () => defu(base, override),
+    try: () => defu(preferred, fallback),
   })
 
 // The first indented property line shows the file's indentation. A file without one, such as `{}`,

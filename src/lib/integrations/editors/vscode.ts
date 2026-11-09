@@ -1,3 +1,4 @@
+import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
@@ -252,19 +253,33 @@ export default defineIntegration({
 
       const effect = yield* readEffectEditor(cwd)
 
-      const base = Option.isSome(effect)
-        ? {
-            ...CONFIG,
-            "js/ts.tsdk.path": EFFECT_SDK_PATH,
-            "oxc.lint.customization": effect.value.rulesCustomization,
-          }
-        : CONFIG
+      // The project's values win. Adamantite then sets only the values that the assessment checks.
+      const merged = yield* mergeConfig({ fallback: CONFIG, preferred: existingConfig })
+
+      const effectSettings = Option.isSome(effect)
+        ? [
+            ["js/ts.tsdk.path", EFFECT_SDK_PATH],
+            [
+              "oxc.lint.customization",
+              yield* mergeConfig({
+                fallback: checkIsJsonObject(existingConfig["oxc.lint.customization"])
+                  ? existingConfig["oxc.lint.customization"]
+                  : {},
+                preferred: effect.value.rulesCustomization,
+              }),
+            ],
+          ]
+        : []
 
       if (Option.isSome(effect)) {
         yield* effect.value.prepareSdk
       }
 
-      const newConfig = yield* mergeConfig(base, existingConfig)
+      const newConfig: Schema.JsonObject = Object.fromEntries([
+        ...Object.entries(merged),
+        ["oxc.path.oxlint", CONFIG["oxc.path.oxlint"]],
+        ...effectSettings,
+      ])
 
       yield* writeFile(settingsPath, updateJsonText(vscodeFile, newConfig))
     }),

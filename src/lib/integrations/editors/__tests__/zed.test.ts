@@ -189,6 +189,36 @@ describe("zed", () => {
   })
 
   describe("update", () => {
+    it.effect("keep the project's values and set the Oxlint entry", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [SETTINGS_PATH]: yield* stringifyJson({
+            languages: { TypeScript: { format_on_save: "off" } },
+            lsp: {
+              oxlint: {
+                binary: { arguments: ["--lsp"], path: "oxlint" },
+                initialization_options: { settings: { run: "onSave" } },
+              },
+            },
+          }),
+        })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
+
+        expect(config).toMatchObject({
+          languages: { TypeScript: { format_on_save: "off" } },
+          lsp: {
+            oxlint: {
+              binary: { arguments: [OXLINT_ENTRY, "--lsp"], path: "node" },
+              initialization_options: { settings: { run: "onSave" } },
+            },
+          },
+        })
+      })
+    )
+
     it.effect("migrate the old tsgo server and preserve other servers and settings", () =>
       Effect.gen(function* () {
         const files = makeFiles({
@@ -369,7 +399,7 @@ describe("zed", () => {
 
         expect(config).toHaveProperty(
           ["languages", "JavaScript", "formatter"],
-          [OXFMT_FORMATTER, OXC_FIX_ALL, formatter]
+          [formatter, OXFMT_FORMATTER, OXC_FIX_ALL]
         )
       })
     )

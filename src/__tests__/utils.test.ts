@@ -103,7 +103,7 @@ describe("parseJson", () => {
 })
 
 describe("mergeConfig", () => {
-  // defu drops `__proto__`/`constructor` keys and null-valued keys from its first argument, and
+  // defu drops `__proto__`/`constructor` keys and null-valued keys from `preferred`, and
   // concatenates arrays on conflicts, so this property holds on array-free, null-free configs with
   // plain keys.
   const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean])
@@ -121,25 +121,25 @@ describe("mergeConfig", () => {
   ).check(Schema.isMaxProperties(8))
 
   it.effect.prop(
-    "keep every key from both inputs and prefer the first argument on conflicts",
-    { base: arrayFreeConfig, override: arrayFreeConfig },
-    ({ base, override }) =>
+    "keep every key from both inputs and prefer the preferred values on conflicts",
+    { fallback: arrayFreeConfig, preferred: arrayFreeConfig },
+    ({ fallback, preferred }) =>
       Effect.gen(function* () {
-        const merged = yield* mergeConfig(base, override)
+        const merged = yield* mergeConfig({ fallback, preferred })
 
-        for (const key of [...Object.keys(base), ...Object.keys(override)]) {
+        for (const key of [...Object.keys(preferred), ...Object.keys(fallback)]) {
           expect(Object.hasOwn(merged, key)).toBe(true)
         }
 
-        for (const [key, value] of Object.entries(base)) {
+        for (const [key, value] of Object.entries(preferred)) {
           if (!Predicate.isObject(value)) {
             expect(merged[key]).toBe(value)
           }
         }
 
-        for (const key of Object.keys(override)) {
-          if (!Object.hasOwn(base, key)) {
-            expect(merged[key]).toStrictEqual(override[key])
+        for (const key of Object.keys(fallback)) {
+          if (!Object.hasOwn(preferred, key)) {
+            expect(merged[key]).toStrictEqual(fallback[key])
           }
         }
       }),

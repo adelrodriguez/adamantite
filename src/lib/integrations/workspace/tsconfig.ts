@@ -139,7 +139,7 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: configPath })
       }
 
-      const merged = yield* mergeConfig(CONFIG, existingConfig)
+      const merged = yield* mergeConfig({ fallback: CONFIG, preferred: existingConfig })
 
       // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON object.
       const newConfig: JsonObject = Object.fromEntries([

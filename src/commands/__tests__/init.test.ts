@@ -1462,6 +1462,36 @@ describe("init", () => {
       })
     )
 
+    it.effect("not offer GitHub Actions when the user keeps every conflicting CI script", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "package.json": yield* stringifyJson({
+            name: "test-project",
+            scripts: { check: "eslint ." },
+          }),
+        })
+
+        const prompter = createPrompterTestContext({
+          // Keep the conflicting script, then TypeScript and the AGENTS.md guidance.
+          confirmResponses: [false, false, false],
+          multiselectResponses: [["check"], [], []],
+        })
+
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
+          "Add a GitHub Actions workflow to run the selected checks?"
+        )
+        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
+      })
+    )
+
     it.effect("not offer GitHub Actions interactively with an unsupported package manager", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()

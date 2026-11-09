@@ -9,6 +9,7 @@ import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,
   getConflictingScripts,
+  getManagedScripts,
   readPackageJson,
   MANAGED_SCRIPT_COMMANDS,
   type ScriptConflict,
@@ -121,15 +122,25 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
       : false
 
   const canEnableGitHubActions = checkIsSupportedPackageManager(packageManager)
+  const keptConflicts = shouldOverwriteScripts ? [] : conflicts.map((conflict) => conflict.script)
 
-  if (hasCICompatibleScripts(selectedScripts) && !canEnableGitHubActions) {
+  // The workflow runs the scripts that package.json manages after init, so a conflicting script that
+  // the user keeps does not count.
+  const managedScripts = [
+    ...new Set([
+      ...getManagedScripts(packageJson),
+      ...selectedScripts.filter((script) => !keptConflicts.includes(script)),
+    ]),
+  ]
+
+  if (hasCICompatibleScripts(managedScripts) && !canEnableGitHubActions) {
     yield* prompter.log.info(
       `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports bun, deno, npm, pnpm, and yarn.`
     )
   }
 
   const shouldEnableGitHubActions =
-    hasCICompatibleScripts(selectedScripts) && canEnableGitHubActions
+    hasCICompatibleScripts(managedScripts) && canEnableGitHubActions
       ? yield* prompter.confirm({
           message: "Add a GitHub Actions workflow to run the selected checks?",
         })

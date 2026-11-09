@@ -13,7 +13,13 @@ import { dirname, isAbsolute, join, resolve } from "node:path"
 import process from "node:process"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { DummyRule, OxlintConfig } from "oxlint"
-import { DEFAULT_DIRECTORY, DEFAULT_PLUGIN_NAME, getRuleName, listRuleFiles } from "./folder.ts"
+import {
+  CACHE_DIRECTORY,
+  DEFAULT_DIRECTORY,
+  DEFAULT_PLUGIN_NAME,
+  getRuleName,
+  listRuleFiles,
+} from "./folder.ts"
 
 // Custom rules are Oxlint rules that the target project writes in its own rules folder. `custom()`
 // runs while Oxlint loads the config. It lists the rule files, enables each one, and points Oxlint
@@ -27,8 +33,6 @@ import { DEFAULT_DIRECTORY, DEFAULT_PLUGIN_NAME, getRuleName, listRuleFiles } fr
 // both provide.
 const MODULE_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 const RULES_MODULE_URL = new URL(`load.${MODULE_EXTENSION}`, import.meta.url).href
-
-const CACHE_DIRECTORY = join("node_modules", ".cache", "adamantite")
 
 export interface CustomRulesOptions {
   /**

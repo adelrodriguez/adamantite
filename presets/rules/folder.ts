@@ -1,5 +1,5 @@
 import { readdirSync } from "node:fs"
-import { extname } from "node:path"
+import { extname, join } from "node:path"
 
 // What a rules folder holds. `custom()` and `loadRules` both read rules folders, so they share this
 // module. The package exports map does not list it, so it is not public. This module runs under
@@ -11,6 +11,13 @@ import { extname } from "node:path"
  * it.
  */
 export const DEFAULT_DIRECTORY = ".adamantite/lint"
+
+/**
+ * The folder, relative to a project, where `custom()` writes the entry module of each rules folder.
+ * A test in the CLI checks that the trial copy of `adamantite rule try` does not link this folder
+ * to the project.
+ */
+export const CACHE_DIRECTORY: string = join("node_modules", ".cache", "adamantite")
 
 /**
  * The plugin name that prefixes every rule when `custom()` is given no `name`.

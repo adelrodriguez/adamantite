@@ -249,6 +249,23 @@ describe("rule trials in a real project", () => {
     })
   )
 
+  it.live("leave the entry module cache of the project as it is", () =>
+    Effect.gen(function* () {
+      // A project that already ran `check` has a cache folder for the entry modules of `custom()`.
+      write("node_modules/.cache/adamantite/rules-earlier.mjs", "export default {}\n")
+
+      const before = listProject()
+      const debuggerCase = writeCase("debugger.ts", "export function stop() {\n  debugger\n}\n")
+
+      const results = yield* runTrial("project/no-debugger-here", new CurrentSetting(), [
+        makeCase("src/new.ts", "reported", debuggerCase),
+      ])
+
+      expect(getReportCounts(results)).toStrictEqual([1])
+      expect(listProject()).toStrictEqual(before)
+    })
+  )
+
   it.live("run a rule of the effect preset with the Effect runtime of the project", () =>
     Effect.gen(function* () {
       // A plain `oxlint` fails to load a config with the `effecttsgo` plugin. The Effect runtime

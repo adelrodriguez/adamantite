@@ -1363,6 +1363,29 @@ describe("init", () => {
       })
     )
 
+    it.effect("keep a GitHub Actions workflow that the project wrote, and point to doctor", () =>
+      Effect.gen(function* () {
+        const workflowPath = ".github/workflows/adamantite.yml"
+        const workflow = "name: team checks\n"
+        const files = createInitTestContext({ [workflowPath]: workflow })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--github-actions"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read(workflowPath)).toBe(workflow)
+        expect(prompter.logs).toContainEqual({
+          level: "info",
+          message: `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`,
+        })
+      })
+    )
+
     it.effect("not offer GitHub Actions interactively with an unsupported package manager", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()

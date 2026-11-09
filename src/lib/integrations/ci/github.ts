@@ -3,6 +3,7 @@ import * as Yaml from "effect/encoding/Yaml"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Record from "effect/Record"
 import * as Schema from "effect/Schema"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import type { Project } from "#lib/workspace/project.ts"
@@ -15,9 +16,14 @@ import { getWorkflowTemplate } from "#lib/integrations/ci/github-workflow.macro.
 import { FailedToParseYaml } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
-import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import {
+  getCIScriptSets,
+  getCIWorkflowEntries,
+  hasCICompatibleScripts,
+} from "#lib/workspace/ci-scripts.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
+  NODE_VERSION_SOURCES,
   NodeVersionFile,
   NodeVersionResolver,
   type NodeVersionSource,
@@ -32,8 +38,6 @@ const FORMAT_CHECK_COMMAND_REGEX =
 
 const MONOREPO_COMMAND_REGEX =
   /\b(?:(?:bun|npm|pnpm|yarn)(?:\s+(?!run\b)\S+)*\s+run\s+(?:check|fix):monorepo|deno(?:\s+(?!task\b)\S+)*\s+task\s+(?:check|fix):monorepo|adamantite\s+monorepo)(?=\s|$)/
-
-const RULE_TEST_COMMAND_REGEX = /\badamantite\s+rule\s+test(?=\s|$)/
 
 const workflowTemplate = getWorkflowTemplate()
 
@@ -174,6 +178,32 @@ function generateWorkflow(
     matrix: matrixInclude,
     setup: getSetupSteps(source)[packageManager],
   })
+}
+
+/**
+ * Whether `create` could have written this content for some package manager, set of CI scripts, and
+ * Node.js version source. The source can differ from the current one, because the project can add
+ * or remove a version file after init. Any other content, such as a hard-coded Node.js version,
+ * holds choices that the project made, so `update` keeps it.
+ */
+// Line endings and trailing blank lines change with a checkout or an editor, not with a choice of
+// the project, so the comparison ignores them.
+function normalizeWorkflowText(content: string) {
+  return content.replaceAll("\r\n", "\n").trimEnd()
+}
+
+function checkIsGeneratedWorkflow(content: string) {
+  const normalized = normalizeWorkflowText(content)
+
+  return NODE_VERSION_SOURCES.some((source) =>
+    Record.keys(getSetupSteps(source)).some((packageManager) =>
+      getCIScriptSets().some(
+        (scripts) =>
+          normalizeWorkflowText(generateWorkflow({ packageManager, scripts }, source) ?? "")
+          === normalized
+      )
+    )
+  )
 }
 
 const legacyFormatStepFinding: Finding = {
@@ -341,18 +371,14 @@ export default defineIntegration({
   update: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      const workflowPath = path.join(cwd, files[0].path)
-      const content = yield* readFileIfExists(workflowPath)
+      const content = yield* readFileIfExists(path.join(cwd, files[0].path))
 
-      if (Option.isSome(content)) {
-        const workflow = yield* readWorkflow(content.value, workflowPath)
-
-        // An explicit test step is a user opt-in. Keep its setup, conditions, and other settings.
-        if (workflow.commands.some((command) => RULE_TEST_COMMAND_REGEX.test(command))) {
-          return
-        }
+      if (Option.isSome(content) && !checkIsGeneratedWorkflow(content.value)) {
+        return "kept"
       }
 
       yield* writeWorkflow(cwd, options)
+
+      return "updated"
     }),
 })

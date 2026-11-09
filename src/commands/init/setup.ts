@@ -330,25 +330,35 @@ export const setupGitHubActions = (
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const workflowPath = github.files[0].path
-    yield* prompter.withSpinner(
+
+    const result = yield* prompter.withSpinner(
       (spinner) =>
         Effect.gen(function* () {
           const exists = yield* github.detect(cwd)
           yield* spinner.message(
             exists ? `\`${workflowPath}\` found, updating...` : `Creating \`${workflowPath}\`...`
           )
-          yield* exists
-            ? github.update(cwd, { packageManager, scripts })
-            : github.create(cwd, { packageManager, scripts })
 
-          return !exists
+          if (exists) {
+            return yield* github.update(cwd, { packageManager, scripts })
+          }
+
+          yield* github.create(cwd, { packageManager, scripts })
+
+          return "created" as const
         }),
       {
         failure: "Failed to set up GitHub Actions workflow.",
         start: "Setting up GitHub Actions workflow...",
-        success: (created) => `GitHub Actions workflow ${created ? "created" : "updated"}.`,
+        success: (outcome) => `GitHub Actions workflow ${outcome}.`,
       }
     )
+
+    if (result === "kept") {
+      yield* prompter.log.info(
+        `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
+      )
+    }
   }).pipe(
     // GitHub Actions setup is optional, so initialization continues; the failure must still
     // reach the user instead of disappearing. Named tags keep a future error type from

@@ -1363,6 +1363,82 @@ describe("init", () => {
       })
     )
 
+    it.effect("write AGENTS.md and CI for every managed script, not only this run's", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "package.json": yield* stringifyJson({
+            name: "test-project",
+            scripts: { analyze: "adamantite analyze", check: "adamantite check" },
+          }),
+        })
+
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--agents", "--github-actions"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read("AGENTS.md")).toContain("bun run analyze")
+        expect(files.read(".github/workflows/adamantite.yml")).toContain("command: bun run analyze")
+      })
+    )
+
+    it.effect("leave out a conflicting script that init kept from AGENTS.md and CI", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "package.json": yield* stringifyJson({
+            name: "test-project",
+            scripts: { analyze: "adamantite analyze", check: "eslint ." },
+          }),
+        })
+
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--agents", "--github-actions"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read("AGENTS.md")).not.toContain("bun run check")
+        expect(files.read(".github/workflows/adamantite.yml")).not.toContain("bun run check")
+      })
+    )
+
+    it.effect("write no workflow when init kept every CI script as a conflict", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "package.json": yield* stringifyJson({
+            name: "test-project",
+            scripts: { check: "eslint ." },
+          }),
+        })
+
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--github-actions"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message:
+            "No CI script runs an Adamantite command, so `adamantite init` did not set up the GitHub Actions workflow.",
+        })
+      })
+    )
+
     it.effect("keep a GitHub Actions workflow that the project wrote, and point to doctor", () =>
       Effect.gen(function* () {
         const workflowPath = ".github/workflows/adamantite.yml"
@@ -1383,6 +1459,36 @@ describe("init", () => {
           level: "info",
           message: `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`,
         })
+      })
+    )
+
+    it.effect("not offer GitHub Actions when the user keeps every conflicting CI script", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          "package.json": yield* stringifyJson({
+            name: "test-project",
+            scripts: { check: "eslint ." },
+          }),
+        })
+
+        const prompter = createPrompterTestContext({
+          // Keep the conflicting script, then TypeScript and the AGENTS.md guidance.
+          confirmResponses: [false, false, false],
+          multiselectResponses: [["check"], [], []],
+        })
+
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
+          "Add a GitHub Actions workflow to run the selected checks?"
+        )
+        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
       })
     )
 

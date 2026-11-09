@@ -16,9 +16,11 @@ import {
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
+import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import {
   getConflictingScripts,
+  getManagedScripts,
   readPackageJson,
   writePackageJson,
   MANAGED_SCRIPT_COMMANDS,
@@ -147,7 +149,9 @@ export const addScripts = (
       )
     }
 
-    return writtenScripts
+    // The scripts that package.json now manages, including scripts from earlier runs. A conflicting
+    // script that init kept is not managed.
+    return getManagedScripts(packageJson)
   })
 
 export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
@@ -330,6 +334,13 @@ export const setupGitHubActions = (
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const workflowPath = github.files[0].path
+
+    // A conflicting script that init kept is not managed, so it can leave no script to run in CI.
+    if (!hasCICompatibleScripts(scripts)) {
+      return yield* prompter.log.warning(
+        "No CI script runs an Adamantite command, so `adamantite init` did not set up the GitHub Actions workflow."
+      )
+    }
 
     const result = yield* prompter.withSpinner(
       (spinner) =>

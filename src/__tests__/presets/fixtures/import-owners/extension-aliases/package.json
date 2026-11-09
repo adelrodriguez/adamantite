@@ -1,0 +1,8 @@
+{
+  "name": "fixture-extension-aliases",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*.ts"
+  }
+}

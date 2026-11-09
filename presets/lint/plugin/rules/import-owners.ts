@@ -190,6 +190,18 @@ const project: Project = {
   resolve: resolveImport,
 }
 
+/**
+ * The names that an alias can give the file at `path`: the path itself, the path without its
+ * extension for an alias such as `"#lib/*": "./src/lib/*.ts"`, and the folder of an index file for
+ * an alias that adds `/index.ts` after the name.
+ */
+function listAliasNames(path: string) {
+  const bare = path.slice(0, path.length - posix.extname(path).length)
+  const folder = posix.basename(bare) === "index" ? posix.dirname(bare) : bare
+
+  return [...new Set([path, bare, folder])].filter((name) => name !== ".")
+}
+
 export function createImportOwnersRule(project: Project): Rule {
   // Whether a project module covers a resolved file, by module, root, and file. Oxlint loads the
   // rule one time for a lint run, so the answers carry over between files.
@@ -198,7 +210,8 @@ export function createImportOwnersRule(project: Project): Rule {
   /**
    * Whether `file` is the project module `entry.import`, or a file below it when the module is a
    * folder. The module resolves from the root, as owner paths do. A folder resolves only through a
-   * file in it, so each tail of the file's path is tried below the module.
+   * file in it, so each tail of the file's path is tried below the module, in each name that an
+   * alias can give it.
    */
   function covers(entry: ImportOwner, root: string, file: string) {
     const key = [entry.import, root, file].join("\0")
@@ -210,13 +223,11 @@ export function createImportOwnersRule(project: Project): Rule {
 
     const anchor = posix.join(root, "package.json")
     const segments = posix.relative(root, file).split("/")
+    const tails = segments.flatMap((_, index) => listAliasNames(segments.slice(index).join("/")))
 
     const result =
       project.resolve(anchor, entry.import) === file
-      || segments.some(
-        (_, index) =>
-          project.resolve(anchor, `${entry.import}/${segments.slice(index).join("/")}`) === file
-      )
+      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`) === file)
 
     coverage.set(key, result)
 

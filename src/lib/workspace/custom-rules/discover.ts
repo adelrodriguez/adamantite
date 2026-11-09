@@ -45,9 +45,9 @@ interface ResolvedCall {
    */
   readonly dir: string
   /**
-   * The plugin name, or `null` when only running the config can resolve it.
+   * The plugin name, or none when only running the config can resolve it.
    */
-  readonly name: string | null
+  readonly name: Option.Option<string>
   readonly source: string
 }
 
@@ -190,7 +190,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
 
       if (module.content.includes(CUSTOM_RULES_MODULE)) {
         for (const call of findCustomRulesCalls(module.file, module.content)) {
-          if (call.dir === null) {
+          if (call._tag === "Dynamic") {
             unresolvedCalls.push(module.file)
           } else {
             calls.push({
@@ -241,3 +241,13 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
 })
 
 export type CustomRuleDiscovery = Effect.Success<ReturnType<typeof discoverCustomRules>>
+
+/**
+ * Whether discovery followed every `custom()` call and import. An incomplete discovery can miss a
+ * rules folder that the config loads.
+ */
+export function isDiscoveryComplete(
+  discovery: Pick<CustomRuleDiscovery, "unresolvedCalls" | "unresolvedImports">
+) {
+  return discovery.unresolvedCalls.length === 0 && discovery.unresolvedImports.length === 0
+}

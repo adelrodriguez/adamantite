@@ -14,10 +14,33 @@ import {
   type ScriptConflict,
 } from "#lib/workspace/package-json.ts"
 import { Prompter } from "#terminal/prompter.ts"
-import type { InitOptions, InitOptionsInput } from "./options.ts"
+import type { InitOptionsInput } from "./options.ts"
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
   `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
+
+/**
+ * Asks for the lint presets, and adds each preset that a selected preset requires.
+ */
+const promptPresets = Effect.gen(function* () {
+  const prompter = yield* Prompter
+  const selected = yield* prompter.multiselect({
+    message: "Which presets should Adamantite use with the core preset?",
+    options: lintPresets.map((preset) => ({
+      hint: describeLintPreset(preset),
+      label: preset.label,
+      value: preset.name,
+    })),
+    required: false,
+  })
+  const missingPresets = findMissingRequiredPresets(selected)
+
+  for (const { required, requiredBy } of missingPresets) {
+    yield* prompter.log.info(`Added the \`${required}\` preset, which \`${requiredBy}\` requires.`)
+  }
+
+  return [...missingPresets.map(({ required }) => required), ...selected]
+})
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
   cwd: string,
@@ -50,45 +73,23 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   const packageJson = yield* readPackageJson(cwd)
   const conflicts = getConflictingScripts(packageJson, selectedScripts)
-  let shouldOverwriteScripts = false
-
-  if (conflicts.length > 0) {
-    for (const conflict of conflicts) {
-      yield* prompter.log.warning(describeScriptConflict(conflict))
-    }
-
-    shouldOverwriteScripts = yield* prompter.confirm({
-      initialValue: false,
-      message:
-        conflicts.length === 1
-          ? "Replace this script with Adamantite's command?"
-          : "Replace these scripts with Adamantite's commands?",
-    })
+  for (const conflict of conflicts) {
+    yield* prompter.log.warning(describeScriptConflict(conflict))
   }
+
+  const shouldOverwriteScripts =
+    conflicts.length > 0
+      ? yield* prompter.confirm({
+          initialValue: false,
+          message:
+            conflicts.length === 1
+              ? "Replace this script with Adamantite's command?"
+              : "Replace these scripts with Adamantite's commands?",
+        })
+      : false
 
   const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
-  let selectedPresets: InitOptions["presets"] = []
-
-  if (hasOxlint) {
-    selectedPresets = yield* prompter.multiselect({
-      message: "Which presets should Adamantite use with the core preset?",
-      options: lintPresets.map((preset) => ({
-        hint: describeLintPreset(preset),
-        label: preset.label,
-        value: preset.name,
-      })),
-      required: false,
-    })
-
-    const missingPresets = findMissingRequiredPresets(selectedPresets)
-    selectedPresets = [...missingPresets.map(({ required }) => required), ...selectedPresets]
-
-    for (const { required, requiredBy } of missingPresets) {
-      yield* prompter.log.info(
-        `Added the \`${required}\` preset, which \`${requiredBy}\` requires.`
-      )
-    }
-  }
+  const selectedPresets = hasOxlint ? yield* promptPresets : []
 
   const shouldSetupTypescript = hasOxlint
     ? yield* prompter.confirm({

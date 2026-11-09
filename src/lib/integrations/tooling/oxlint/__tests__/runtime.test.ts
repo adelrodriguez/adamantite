@@ -11,6 +11,7 @@ import {
 } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import {
   resolveOxlintRuntime,
+  toBackendEnv,
   type OxlintRuntime,
   type RuntimePart,
 } from "#lib/integrations/tooling/oxlint/runtime.ts"
@@ -106,7 +107,8 @@ describe("Oxlint runtime", () => {
 
       expect(runtime).toStrictEqual({
         backend: {
-          OXLINT_TSGOLINT_PATH:
+          _tag: "Tsrs",
+          launcher:
             process.platform === "win32"
               ? `${ROOT}/node_modules/.bin/tsrs-lint.cmd`
               : `${ROOT}/node_modules/tsrs/bin/tsrs-lint`,
@@ -126,7 +128,8 @@ describe("Oxlint runtime", () => {
         )
 
         expect(runtime.backend).toStrictEqual({
-          OXLINT_TSGOLINT_PATH: `${ROOT}/node_modules/.bin/tsrs-lint.cmd`,
+          _tag: "Tsrs",
+          launcher: `${ROOT}/node_modules/.bin/tsrs-lint.cmd`,
         })
       })
   )
@@ -138,7 +141,8 @@ describe("Oxlint runtime", () => {
       )
 
       expect(runtime.backend).toStrictEqual({
-        OXLINT_TSGOLINT_PATH: `${ROOT}/node_modules/.bin/tsrs-lint.exe`,
+        _tag: "Tsrs",
+        launcher: `${ROOT}/node_modules/.bin/tsrs-lint.exe`,
       })
     })
   )
@@ -150,7 +154,7 @@ describe("Oxlint runtime", () => {
       })
 
       expect(runtime).toStrictEqual({
-        backend: {},
+        backend: { _tag: "None" },
         binding: { _tag: "Stock" },
         oxlint: `${ROOT}/node_modules/oxlint`,
       })
@@ -165,8 +169,11 @@ describe("Oxlint runtime", () => {
 
         expect(runtime).toStrictEqual({
           backend: {
-            EFFECT_TSGO_TSGOLINT_MODE: "tsrs",
-            EFFECT_TSGO_TSGOLINT_PATH: `${ROOT}/${ARTIFACTS}/tsrs/${TSRS_VERSION}/${TSRS}`,
+            _tag: "Replaced",
+            env: {
+              EFFECT_TSGO_TSGOLINT_MODE: "tsrs",
+              EFFECT_TSGO_TSGOLINT_PATH: `${ROOT}/${ARTIFACTS}/tsrs/${TSRS_VERSION}/${TSRS}`,
+            },
           },
           binding: {
             _tag: "Replaced",
@@ -340,12 +347,28 @@ describe("native runtime overrides", () => {
       )
 
       expect(runtime).toStrictEqual({
-        backend: { NATIVE_BACKEND: "/backend" },
+        backend: { _tag: "Replaced", env: { NATIVE_BACKEND: "/backend" } },
         binding: { _tag: "Replaced", path: "/binding.node" },
         oxlint: "/project/node_modules/oxlint",
       })
     })
   )
+})
+
+describe("toBackendEnv", () => {
+  it.each([
+    { backend: { _tag: "None" } as const, env: {} },
+    {
+      backend: { _tag: "Tsrs", launcher: "/tsrs-lint" } as const,
+      env: { OXLINT_TSGOLINT_PATH: "/tsrs-lint" },
+    },
+    {
+      backend: { _tag: "Replaced", env: { NATIVE_BACKEND: "/backend" } } as const,
+      env: { NATIVE_BACKEND: "/backend" },
+    },
+  ])("give the variables that start the $backend._tag backend", ({ backend, env }) => {
+    expect(toBackendEnv(backend)).toStrictEqual(env)
+  })
 })
 
 describe("runtime types", () => {

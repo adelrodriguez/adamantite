@@ -17,6 +17,26 @@ const NATIVE_TYPESCRIPT = Schema.Struct({
   version: Schema.NonEmptyString,
 })
 
+/**
+ * The version and gitHead of the first installed TypeScript 7 or later package, or none when that
+ * package has no gitHead or no such package is installed.
+ */
+const findNativeTypescript = Effect.fn("findNativeTypescript")(function* (cwd: string) {
+  for (const name of ["typescript", "@typescript/native"]) {
+    const directory = yield* resolvePackageDirectory(cwd, name)
+
+    if (Option.isSome(directory)) {
+      const installed = yield* readPackageJson(directory.value)
+
+      if (Number(installed.version?.split(".")[0]) >= 7) {
+        return Schema.decodeUnknownOption(NATIVE_TYPESCRIPT)(installed)
+      }
+    }
+  }
+
+  return Option.none()
+})
+
 // Match the installed native TypeScript by gitHead, as @effect/tsgo/lib/getExePath does.
 // Resolving through Effect services keeps assessment read-only and tests off the host filesystem.
 const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
@@ -26,32 +46,16 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
 ) {
   const path = yield* Path.Path
   const fs = yield* FileSystem.FileSystem
-  let gitHead: string | undefined
-  let typescriptVersion = ""
+  const native = yield* findNativeTypescript(cwd)
 
-  for (const name of ["typescript", "@typescript/native"]) {
-    const directory = yield* resolvePackageDirectory(cwd, name)
-    if (Option.isNone(directory)) {
-      continue
-    }
-    const installed = yield* readPackageJson(directory.value)
-    if (Number(installed.version?.split(".")[0]) >= 7) {
-      const native = Schema.decodeUnknownOption(NATIVE_TYPESCRIPT)(installed)
-      if (Option.isSome(native)) {
-        gitHead = native.value.gitHead
-        typescriptVersion = native.value.version
-      }
-      break
-    }
-  }
-
-  if (gitHead === undefined) {
+  if (Option.isNone(native)) {
     return yield* new EffectEditorUnavailable({
       reason:
         "The Effect editor SDK needs an installed native TypeScript package with its gitHead. Install TypeScript 7 or later, then run `adamantite init --non-interactive --script check --editor vscode`.",
     })
   }
 
+  const { gitHead, version: typescriptVersion } = native.value
   const platform = `${process.platform}-${process.arch}`
   const platformDirectory = yield* resolvePackageDirectory(
     effectDirectory,

@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import type { InitOptions } from "#commands/init/options.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import initCommand from "#commands/init/index.ts"
@@ -1479,5 +1480,14 @@ describe("init", () => {
         expect(files.exists(".vscode/settings.json")).toBe(true)
       })
     )
+  })
+})
+
+describe("InitOptions", () => {
+  it("require an editor for an editor setup", () => {
+    // @ts-expect-error - An editor setup names at least one editor.
+    const editors: InitOptions["editors"] = Option.some({ installExtensions: true, names: [] })
+
+    expect(Option.isSome(editors)).toBe(true)
   })
 })

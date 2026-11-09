@@ -2,7 +2,9 @@ import process from "node:process"
 import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
+import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
@@ -105,15 +107,13 @@ export default Command.make("init", initCommandOptions).pipe(
         ? options
         : yield* collectInteractiveInitOptions(cwd, isMonorepo, packageManager.name)
       const initOptions = yield* validateInitOptions(input, packageManager.name)
-      const selectedScripts = initOptions.scripts
-      const presets = initOptions.presets
-      const selectedEditors = initOptions.editors
-      const shouldSetupTypescript = initOptions.typescript
-      const installExtensions = initOptions.installExtensions
-      const gitHubActionsPackageManager = initOptions.githubActions
-      const shouldSetupAgents = initOptions.agents
+      const selectedScripts = [...initOptions.scripts]
+      const { lint } = initOptions
+      const presets = Option.match(lint, {
+        onNone: (): readonly LintPreset[] => [],
+        onSome: (setup) => setup.presets,
+      })
 
-      const hasOxlint = selectedScripts.includes("check") || selectedScripts.includes("fix")
       const hasKnip = selectedScripts.includes("analyze")
       // `adamantite analyze` runs Sherif in a monorepo.
       const hasSherif = hasKnip && isMonorepo
@@ -125,7 +125,7 @@ export default Command.make("init", initCommandOptions).pipe(
       )
       const dependencies = dependsOnAdamantite ? [] : ["adamantite"]
 
-      if (hasOxlint) {
+      if (Option.isSome(lint)) {
         dependencies.push(
           `${oxlint.name}@${oxlint.version}`,
           `${tsrs.name}@${tsrs.version}`,
@@ -147,7 +147,7 @@ export default Command.make("init", initCommandOptions).pipe(
 
       yield* installDependencies(cwd, dependencies)
 
-      if (hasOxlint) {
+      if (Option.isSome(lint)) {
         yield* setupToolConfig(cwd, oxfmt, oxfmt.create(cwd))
         yield* setupToolConfig(cwd, oxlint, oxlint.create(cwd, presets))
       }
@@ -161,12 +161,12 @@ export default Command.make("init", initCommandOptions).pipe(
         overwriteScripts: initOptions.overwriteScripts,
       })
 
-      if (shouldSetupAgents) {
+      if (initOptions.agents) {
         yield* setupAgentsGuidance(cwd, packageManager.name, writtenScripts, isMonorepo)
         yield* setupSkill(cwd)
       }
 
-      if (shouldSetupTypescript) {
+      if (Option.exists(lint, (setup) => setup.typescript)) {
         yield* setupTypescript(cwd, isMonorepo)
       }
 
@@ -175,14 +175,18 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupEffectTsgo(cwd)
       }
 
-      yield* setupEditors(cwd, selectedEditors)
+      if (Option.isSome(initOptions.editors)) {
+        const { installExtensions, names } = initOptions.editors.value
 
-      if (installExtensions) {
-        yield* installEditorExtensions(selectedEditors, selectedScripts, presets)
+        yield* setupEditors(cwd, names)
+
+        if (installExtensions) {
+          yield* installEditorExtensions(names, selectedScripts, presets)
+        }
       }
 
-      if (gitHubActionsPackageManager !== undefined) {
-        yield* setupGitHubActions(cwd, gitHubActionsPackageManager, selectedScripts)
+      if (Option.isSome(initOptions.githubActions)) {
+        yield* setupGitHubActions(cwd, initOptions.githubActions.value, selectedScripts)
       }
 
       yield* prompter.outro("💠 Setup finished.")

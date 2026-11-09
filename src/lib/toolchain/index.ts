@@ -1,5 +1,6 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
@@ -7,6 +8,8 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { CliNotFound, InvalidAnalyzeOptions, InvalidFixOptions } from "#lib/shared/errors.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
+
+export type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
 
 /**
  * Checks the formatting with Oxfmt, then lints with Oxlint. Both stages run, and the operation
@@ -50,21 +53,20 @@ export const check = Effect.fn("Toolchain.check")(function* ({
  * with the first failure. The forwarded arguments go to the lint stage, or to the stage that `only`
  * selects.
  */
-export const fix = Effect.fn("Toolchain.fix")(function* (options: {
-  readonly all?: boolean
+export const fix = Effect.fn("Toolchain.fix")(function* ({
+  cwd,
+  files = [],
+  forwardedArguments = [],
+  level = "safe",
+  only,
+}: {
   readonly cwd: string
-  readonly dangerous?: boolean
   readonly files?: readonly string[]
   readonly forwardedArguments?: readonly string[]
+  readonly level?: FixLevel
   readonly only?: "format" | "lint"
-  readonly suggested?: boolean
 }) {
-  const { cwd, files = [], forwardedArguments = [], only } = options
-  // `--all` turns on both fix levels.
-  const suggested = options.suggested === true || options.all === true
-  const dangerous = options.dangerous === true || options.all === true
-
-  if (only === "format" && (suggested || dangerous)) {
+  if (only === "format" && level !== "safe") {
     return yield* new InvalidFixOptions({
       reason:
         "`--suggested`, `--dangerous`, and `--all` apply to the lint stage. Remove them or `--only format`.",
@@ -82,10 +84,9 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
     }),
     lint: oxlint.fix({
       cwd,
-      dangerous,
       files: targets,
       forwardedArguments: forwardedStage === "lint" ? forwardedArguments : [],
-      suggested,
+      level,
     }),
   }
 

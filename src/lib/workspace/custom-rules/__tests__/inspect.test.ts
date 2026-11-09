@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as Option from "effect/Option"
 import {
   findCustomRulesCalls,
   hasLegacyRuleImports,
@@ -44,14 +45,16 @@ describe("findCustomRulesCalls", () => {
     ].join("\n")
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { dir: ".adamantite/lint", name: "project" },
+      { _tag: "Literal", dir: ".adamantite/lint", name: Option.some("project") },
     ])
   })
 
   it("use the default folder and name for a call without options, as custom() does", () => {
     expect(
       findCustomRulesCalls("oxlint.config.ts", `${IMPORT}export default { extends: [custom()] }`)
-    ).toStrictEqual([{ dir: DEFAULT_DIRECTORY, name: DEFAULT_PLUGIN_NAME }])
+    ).toStrictEqual([
+      { _tag: "Literal", dir: DEFAULT_DIRECTORY, name: Option.fromNullOr(DEFAULT_PLUGIN_NAME) },
+    ])
   })
 
   it("read string literal options under the local import name", () => {
@@ -61,8 +64,8 @@ describe("findCustomRulesCalls", () => {
     ].join("\n")
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { dir: "tooling/rules", name: "acme" },
-      { dir: ".adamantite/lint", name: "web" },
+      { _tag: "Literal", dir: "tooling/rules", name: Option.some("acme") },
+      { _tag: "Literal", dir: ".adamantite/lint", name: Option.some("web") },
     ])
   })
 
@@ -70,9 +73,25 @@ describe("findCustomRulesCalls", () => {
     const content = `${IMPORT}const options = {}\nexport default { extends: [custom({ dir: join("a", "b") }), custom({ ...options }), custom(options)] }`
 
     expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
-      { dir: null, name: "project" },
-      { dir: null, name: null },
-      { dir: null, name: null },
+      { _tag: "Dynamic" },
+      { _tag: "Dynamic" },
+      { _tag: "Dynamic" },
+    ])
+  })
+
+  it("keep a literal dir when only the name is not a string literal", () => {
+    const content = `${IMPORT}export default { extends: [custom({ dir: "rules", name: getName() })] }`
+
+    expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
+      { _tag: "Literal", dir: "rules", name: Option.none() },
+    ])
+  })
+
+  it("use the last property when a call repeats an option", () => {
+    const content = `${IMPORT}export default { extends: [custom({ dir: "a", dir: "b" })] }`
+
+    expect(findCustomRulesCalls("oxlint.config.ts", content)).toStrictEqual([
+      { _tag: "Literal", dir: "b", name: Option.some("project") },
     ])
   })
 

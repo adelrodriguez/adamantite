@@ -9,6 +9,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
+import { isDiscoveryComplete } from "#lib/workspace/custom-rules/discover.ts"
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/index.ts"
 import {
   hasLegacyRuleImports,
@@ -50,6 +51,8 @@ export default defineIntegration({
       const relative = (target: string) => path.relative(cwd, target) || "."
       const packageDirectories = [cwd, ...workspace.packageDirectories]
       const { calls, legacyImports, unresolvedCalls, unresolvedImports } = customRules
+      // A call with an unknown `dir`, or an unresolved import, can load any folder.
+      const isComplete = isDiscoveryComplete(customRules)
       const defaultFolders = packageDirectories.map((directory) =>
         path.join(directory, CUSTOM_RULES_DIRECTORY)
       )
@@ -66,23 +69,16 @@ export default defineIntegration({
       ).filter((folder) => folder.ruleFiles.length > 0)
       const legacyFolders = folders.filter(
         (folder) =>
-          unresolvedCalls.length === 0
-          && unresolvedImports.length === 0
+          isComplete
           && oldDefaultFolders.includes(folder.dir)
           && !loadedFolders.includes(folder.dir)
       )
 
-      if (
-        calls.length === 0
-        && unresolvedCalls.length === 0
-        && folders.length === 0
-        && unresolvedImports.length === 0
-        && legacyImports.length === 0
-      ) {
+      if (isComplete && calls.length === 0 && folders.length === 0 && legacyImports.length === 0) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const unknownNameCalls = calls.filter((call) => call.name === null)
+      const unknownNameCalls = calls.filter((call) => Option.isNone(call.name))
       const warnings = [
         ...unresolvedImports.map(
           ({ from, specifier }) =>
@@ -99,9 +95,8 @@ export default defineIntegration({
       ]
       const findings: Finding[] = []
 
-      // A call with an unknown `dir`, or an unresolved import, can load any folder, so an unloaded
-      // folder is reported only when every `dir` and import is resolved.
-      if (unresolvedCalls.length === 0 && unresolvedImports.length === 0) {
+      // An unloaded folder is reported only when discovery is complete.
+      if (isComplete) {
         for (const folder of folders) {
           if (loadedFolders.includes(folder.dir) || legacyFolders.includes(folder)) {
             continue
@@ -190,7 +185,9 @@ export default defineIntegration({
       }
 
       const loadingCalls = calls.flatMap(({ dir, name, source }) =>
-        name !== null && folders.some((folder) => folder.dir === dir) ? [{ dir, name, source }] : []
+        Option.isSome(name) && folders.some((folder) => folder.dir === dir)
+          ? [{ dir, name: name.value, source }]
+          : []
       )
 
       for (const [name, group] of Object.entries(

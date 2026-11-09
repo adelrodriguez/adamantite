@@ -1,12 +1,14 @@
 import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import type { BrokenLink } from "#lib/hardening/agent-reach.ts"
+import type { Finding } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import {
   DEFAULT_FIX_HISTORY_COMMITS,
@@ -35,6 +37,21 @@ import { Prompter } from "#terminal/prompter.ts"
 import { chooseResolution } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
+
+/**
+ * A reason why the project fails the verification after a harden session.
+ */
+type VerificationFailure =
+  | { readonly _tag: "BrokenLink"; readonly link: BrokenLink }
+  | { readonly _tag: "CheckFailed" }
+  | { readonly _tag: "Findings"; readonly findings: readonly Finding[] }
+
+const {
+  $match: matchFailure,
+  BrokenLink: brokenLink,
+  CheckFailed: checkFailed,
+  Findings: doctorFindings,
+} = Data.taggedEnum<VerificationFailure>()
 
 function getLinkKey(link: BrokenLink) {
   return `${link.file}\0${link.target}`
@@ -185,11 +202,12 @@ export default Command.make("harden", { commits, scope }).pipe(
       const { agent } = resolution
       // The agent verifies custom rules during the session with temporary cases. The resulting
       // project must still pass check and Doctor after the session ends.
-      const checkPassed = yield* Toolchain.check({ cwd }).pipe(
-        Effect.as(true),
+      const checkFailures = yield* Toolchain.check({ cwd }).pipe(
+        Effect.as([]),
         Effect.catchTags({
-          CliNotFound: (error) => prompter.log.error(error.message).pipe(Effect.as(false)),
-          CommandFailed: () => Effect.succeed(false),
+          CliNotFound: (error) =>
+            prompter.log.error(error.message).pipe(Effect.as([checkFailed()])),
+          CommandFailed: () => Effect.succeed([checkFailed()]),
         })
       )
       // The session can change the project, so agent reach and assessment share a fresh read.
@@ -211,26 +229,36 @@ export default Command.make("harden", { commits, scope }).pipe(
         onSome: (reach) => reach.brokenLinks.filter((link) => !brokenBefore.has(getLinkKey(link))),
       })
 
+      const failures = [
+        ...checkFailures,
+        ...(assessment.findings.length > 0
+          ? [doctorFindings({ findings: assessment.findings })]
+          : []),
+        ...addedBrokenLinks.map((link) => brokenLink({ link })),
+      ]
+
       for (const warning of assessment.warnings) {
         yield* prompter.log.warning(warning)
       }
 
-      if (!checkPassed) {
-        yield* prompter.log.error(`\`adamantite check\` failed after the ${agent.name} session.`)
-      }
+      yield* Effect.forEach(
+        failures,
+        matchFailure({
+          BrokenLink: ({ link }) =>
+            prompter.log.error(
+              `\`${link.file}\` links to \`${link.target}\`, which does not exist, after the ${agent.name} session.`
+            ),
+          CheckFailed: () =>
+            prompter.log.error(`\`adamantite check\` failed after the ${agent.name} session.`),
+          Findings: ({ findings }) =>
+            prompter.log
+              .warning(`Doctor found issues after the ${agent.name} session.`)
+              .pipe(Effect.andThen(printFindings(findings))),
+        }),
+        { discard: true }
+      )
 
-      if (assessment.findings.length > 0) {
-        yield* prompter.log.warning(`Doctor found issues after the ${agent.name} session.`)
-        yield* printFindings(assessment.findings)
-      }
-
-      for (const link of addedBrokenLinks) {
-        yield* prompter.log.error(
-          `\`${link.file}\` links to \`${link.target}\`, which does not exist, after the ${agent.name} session.`
-        )
-      }
-
-      if (!checkPassed || assessment.findings.length > 0 || addedBrokenLinks.length > 0) {
+      if (failures.length > 0) {
         yield* prompter.outro("⚠️ Harden verification failed.")
         return yield* new CommandFailed({
           command: "harden",

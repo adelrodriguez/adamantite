@@ -5,6 +5,7 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import type { Script } from "#lib/workspace/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import { CliNotFound } from "#lib/shared/errors.ts"
@@ -12,6 +13,7 @@ import { formatJson, parseJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import {
   EFFECT_COMPILER,
+  EFFECT_EDITOR_PACKAGES,
   EFFECT_SDK,
   effectEditorFiles,
   effectEditorResolver,
@@ -271,6 +273,52 @@ describe("vscode", () => {
         const error = yield* vscode.update(ROOT).pipe(provideFiles(files), Effect.flip)
         expect(error).toMatchObject({ _tag: "EffectEditorUnavailable" })
         expect(files.list().map((path) => [path, files.read(path)])).toStrictEqual(before)
+      })
+    )
+
+    it.effect.each([
+      { name: "only TypeScript 6 is installed", typescript: { version: "6.0.3" } },
+      { name: "TypeScript 7 has no gitHead", typescript: { version: "7.0.2" } },
+    ])("refuse the Effect editor SDK when $name", ({ typescript }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ ...effectEditorFiles(), ".vscode/settings.json": "{}" })
+        files.write("node_modules/typescript/package.json", yield* formatJson(typescript))
+
+        const error = yield* vscode.update(ROOT).pipe(provideFiles(files), Effect.flip)
+
+        expect(error).toMatchObject({
+          _tag: "EffectEditorUnavailable",
+          reason: expect.stringContaining(
+            "needs an installed native TypeScript package with its gitHead"
+          ),
+        })
+      })
+    )
+
+    it.effect("use @typescript/native when the typescript package is older than 7", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          ...effectEditorFiles(),
+          ".vscode/settings.json": "{}",
+          "node_modules/@typescript/native/package.json": yield* formatJson({
+            gitHead: "typescript-commit",
+            version: "7.0.2",
+          }),
+          "node_modules/typescript/package.json": yield* formatJson({ version: "6.0.3" }),
+        })
+
+        yield* vscode.update(ROOT).pipe(
+          Effect.provide([
+            files.layer,
+            Path.layer,
+            makeModuleResolverLayer(ROOT, {
+              ...EFFECT_EDITOR_PACKAGES,
+              "@typescript/native/package.json": "node_modules/@typescript/native/package.json",
+            }),
+          ])
+        )
+
+        expect(files.read(`${EFFECT_SDK}/lib.es5.d.ts`)).toBe("interface String {}")
       })
     )
 

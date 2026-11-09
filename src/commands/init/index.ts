@@ -118,7 +118,7 @@ export default Command.make("init", initCommandOptions).pipe(
 
       const hasKnip = checkRunsTool(selectedScripts, "knip")
       // `adamantite analyze` runs Sherif in a monorepo.
-      const hasSherif = hasKnip && isMonorepo
+      const hasSherif = checkRunsTool(selectedScripts, "sherif") && isMonorepo
 
       const packageJson = yield* readPackageJson(cwd)
 

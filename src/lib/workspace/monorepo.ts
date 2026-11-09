@@ -6,17 +6,32 @@ import * as Yaml from "effect/encoding/Yaml"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import { FailedToParseYaml, type FailedToReadFile } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfExists } from "#lib/shared/filesystem.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const PnpmWorkspace = Schema.Struct({ packages: Schema.Array(Schema.String) })
 
-const PnpmCatalogs = Schema.Struct({
-  catalog: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-  catalogs: Schema.optionalKey(
-    Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.String))
+// YAML reads an unquoted version such as `6` as a number, and pnpm reads it as that version.
+const CatalogSpecifier = Schema.Union([
+  Schema.String,
+  Schema.Finite.pipe(
+    Schema.decodeTo(
+      Schema.String,
+      SchemaTransformation.transform({
+        decode: String,
+        encode: Number,
+      })
+    )
   ),
+])
+
+const Catalog = Schema.Record(Schema.String, CatalogSpecifier)
+
+const PnpmCatalogs = Schema.Struct({
+  catalog: Schema.optionalKey(Catalog),
+  catalogs: Schema.optionalKey(Schema.Record(Schema.String, Catalog)),
 })
 
 /**

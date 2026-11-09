@@ -225,6 +225,17 @@ describe("readWorkspace", () => {
     })
   )
 
+  it.effect("read a catalog version that YAML parses as a number", () =>
+    Effect.gen(function* () {
+      // YAML reads an unquoted `6` as a number, and pnpm reads the entry as version 6.
+      const workspace = yield* readPnpmWorkspace(
+        "packages:\n  - packages/*\ncatalog:\n  knip: 6\n  oxlint: 1.91.0\n"
+      )
+
+      expect(workspace.catalogs).toStrictEqual({ default: { knip: "6", oxlint: "1.91.0" } })
+    })
+  )
+
   it.effect("read the default and named catalogs, and keep the patterns with a bad catalog", () =>
     Effect.gen(function* () {
       const valid = yield* readPnpmWorkspace(

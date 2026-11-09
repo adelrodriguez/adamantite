@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import ruleCommand, { renderTrial } from "#commands/rule.ts"
 import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
@@ -11,8 +12,6 @@ import {
   CustomRuleNotFound,
   FailedToParseSource,
   InvalidRuleName,
-  InvalidTrialCase,
-  InvalidTrialOptions,
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
@@ -617,28 +616,32 @@ describe("rule try", () => {
   it.effect.each([
     {
       args: ["--current", "--options", "[]", "--report", "src/cart.ts"],
-      error: InvalidTrialOptions,
-      fields: {},
+      message: "Invalid trial options. Give `--options` or `--current`, not both.",
       name: "reject --current with --options",
     },
     {
       args: ["--report", "../cart.ts"],
-      error: InvalidTrialCase,
-      fields: { value: "../cart.ts" },
+      message:
+        "Invalid case `../cart.ts`. The path must be a file inside the project, relative to the project root.",
       name: "reject a case outside the project",
     },
-  ])("$name before it copies the project", ({ args, error, fields }) =>
+  ])("$name with exit code 2 before it copies the project", ({ args, message }) =>
     Effect.gen(function* () {
+      const prompter = createPrompterTestContext()
+
       // The test spawner dies on each process, so the error comes before the copy.
       const exit = yield* runCommand(ruleCommand, ["try", "no-console", ...args], {
         files: createFileSystemTestContext(),
-        layers: [createPrompterTestContext().layer],
+        layers: [prompter.layer],
       })
 
       const failure = Option.getOrThrow(Exit.findErrorOption(exit))
 
-      expect(failure).toBeInstanceOf(error)
-      expect(failure).toMatchObject(fields)
+      // Exit code 1 means that a case differs, so an input that checks no case must not use it.
+      expect(failure).toStrictEqual(
+        new CommandFailed({ command: "rule try", exitCode: ChildProcessSpawner.ExitCode(2) })
+      )
+      expect(prompter.logs).toStrictEqual([{ level: "error", message }])
     })
   )
 })

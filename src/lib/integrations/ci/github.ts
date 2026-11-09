@@ -23,6 +23,7 @@ import {
 } from "#lib/workspace/ci-scripts.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
+  NODE_VERSION_SOURCES,
   NodeVersionFile,
   NodeVersionResolver,
   type NodeVersionSource,
@@ -180,13 +181,17 @@ function generateWorkflow(
 }
 
 /**
- * Whether `create` could have written this content for some package manager and set of CI scripts.
- * Any other content holds choices that the project made, so `update` keeps it.
+ * Whether `create` could have written this content for some package manager, set of CI scripts, and
+ * Node.js version source. The source can differ from the current one, because the project can add
+ * or remove a version file after init. Any other content, such as a hard-coded Node.js version,
+ * holds choices that the project made, so `update` keeps it.
  */
-function checkIsGeneratedWorkflow(content: string, source: NodeVersionSource) {
-  return Record.keys(getSetupSteps(source)).some((packageManager) =>
-    getCIScriptSets().some(
-      (scripts) => generateWorkflow({ packageManager, scripts }, source) === content
+function checkIsGeneratedWorkflow(content: string) {
+  return NODE_VERSION_SOURCES.some((source) =>
+    Record.keys(getSetupSteps(source)).some((packageManager) =>
+      getCIScriptSets().some(
+        (scripts) => generateWorkflow({ packageManager, scripts }, source) === content
+      )
     )
   )
 }
@@ -356,11 +361,9 @@ export default defineIntegration({
   update: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      const resolver = yield* NodeVersionResolver
       const content = yield* readFileIfExists(path.join(cwd, files[0].path))
-      const source = yield* resolver.resolve(cwd)
 
-      if (Option.isSome(content) && !checkIsGeneratedWorkflow(content.value, source)) {
+      if (Option.isSome(content) && !checkIsGeneratedWorkflow(content.value)) {
         return "kept"
       }
 

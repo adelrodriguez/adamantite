@@ -1003,6 +1003,54 @@ describe("github", () => {
       })
     )
 
+    it.effect("rewrite a generated workflow after the Node.js version source changes", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({ ".nvmrc": "24\n" })
+
+        yield* github
+          .create(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(provideFallback(files))
+
+        // The project adds a version file after init wrote the workflow with the default.
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(
+            Effect.provide([
+              files.layer,
+              Path.layer,
+              makeModuleResolverLayer(ROOT),
+              makeResolverLayer(new NodeVersionFile({ path: ".nvmrc" })),
+            ])
+          )
+
+        expect(result).toBe("updated")
+        expect(files.read(WORKFLOW_PATH)).toContain('node-version-file: ".nvmrc"')
+      })
+    )
+
+    it.effect("keep a Node.js version that the project wrote into the workflow", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+
+        yield* github
+          .create(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(provideFallback(files))
+
+        const edited = files
+          .read(WORKFLOW_PATH)
+          .replace('node-version: "lts/*"', 'node-version: "20"')
+
+        files.write(WORKFLOW_PATH, edited)
+
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(provideFallback(files))
+
+        expect(files.read(WORKFLOW_PATH)).toBe(edited)
+        expect(result).toBe("kept")
+      })
+    )
+
     it.effect("rewrite a workflow that Adamantite generated", () =>
       Effect.gen(function* () {
         const files = makeFiles()

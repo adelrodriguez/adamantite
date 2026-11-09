@@ -292,11 +292,12 @@ function makeProcessLayer(
 function runHarden(
   files: Record<string, string>,
   args: readonly string[] = [],
-  processes: ProcessOptions = {}
+  processes: ProcessOptions = {},
+  links: Record<string, string> = {}
 ) {
   return Effect.gen(function* () {
     const prompter = createPrompterTestContext()
-    const context = createFileSystemTestContext({ files })
+    const context = createFileSystemTestContext({ files, links })
 
     const exit = yield* runCommand(hardenCommand, args, {
       files: context,
@@ -1106,6 +1107,23 @@ describe("harden", () => {
           /^`--path` must be a folder inside the project\. `.+` is outside `.+`\.$/u
         ),
       ])
+    })
+  )
+
+  // `/var` is a symlink to `/private/var` on macOS, and the current directory is the real path.
+  it.effect("accept --path through a directory symlink to a folder inside the project", () =>
+    Effect.gen(function* () {
+      const { exit, prompter } = yield* runHarden(
+        MONOREPO_FILES,
+        ["--path", "/link/packages/web"],
+        {},
+        { "/link": "." }
+      )
+
+      const direct = yield* runHardenPrompt(MONOREPO_FILES, ["--path", "packages/web"])
+
+      expect(prompter.messages).toStrictEqual([direct])
+      expect(Exit.isSuccess(exit)).toBe(true)
     })
   )
 

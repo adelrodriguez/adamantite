@@ -7,6 +7,7 @@ import {
   type PackageManagerName,
 } from "nypm"
 import { FailedToInstallDependency, NoPackageManager } from "#lib/shared/errors.ts"
+import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export interface DetectedPackageManager {
@@ -63,17 +64,24 @@ function needsWorkspaceRootFlag(
   return isMonorepo && packageManager !== "npm"
 }
 
+/**
+ * Install `packages` at the workspace root. An install changes `node_modules`, so the module
+ * resolver forgets what earlier resolutions read, also when the install fails part way.
+ */
 export const addRootDevDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {
     const dependencyInstaller = yield* DependencyInstaller
+    const resolver = yield* ModuleResolver
 
     const [isMonorepo, packageManager] = yield* Effect.all(
       [checkIsMonorepo(cwd), dependencyInstaller.detectPackageManager(cwd)],
       { concurrency: "unbounded" }
     )
 
-    yield* dependencyInstaller.addDevDependencies(packages, cwd, {
-      silent: true,
-      workspace: needsWorkspaceRootFlag(packageManager?.name, isMonorepo),
-    })
+    yield* dependencyInstaller
+      .addDevDependencies(packages, cwd, {
+        silent: true,
+        workspace: needsWorkspaceRootFlag(packageManager?.name, isMonorepo),
+      })
+      .pipe(Effect.ensuring(resolver.clearCache))
   })

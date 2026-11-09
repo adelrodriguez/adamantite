@@ -10,9 +10,9 @@ export class ModuleResolver extends Context.Service<
   ModuleResolver,
   {
     /**
-     * Forget the files and package manifests that earlier resolutions read. Call it before each
-     * traversal, because a coding agent can change the project between two assessments in one
-     * command.
+     * Forget the files and package manifests that earlier resolutions read. Custom rule discovery
+     * calls it before each traversal, because a coding agent can change the project between two
+     * assessments in one command, and `addRootDevDependencies` calls it after each install.
      */
     readonly clearCache: Effect.Effect<void>
     /**

@@ -86,6 +86,8 @@ export function inspectRequiredPresetConfig(
     readonly presetName: string
   }
 ): RequiredConfigInspection {
+  const goal = `Import the ${options.presetName} preset from \`${options.moduleName}\`, and use it in the exported config. Preserve every project-specific setting.`
+
   const parsed = parseSync("config.ts", content, {
     astType: "ts",
     lang: "ts",
@@ -94,6 +96,7 @@ export function inspectRequiredPresetConfig(
 
   if (parsed.errors.length > 0) {
     return {
+      goal: "Fix the syntax errors in the file. Preserve every project-specific setting.",
       kind: "invalid",
       reason: "The file is not valid TypeScript.",
     }
@@ -103,6 +106,7 @@ export function inspectRequiredPresetConfig(
 
   if (!presetIdentifier) {
     return {
+      goal,
       kind: "invalid",
       reason: `The file must import the ${options.presetName} preset from \`${options.moduleName}\`.`,
     }
@@ -110,6 +114,7 @@ export function inspectRequiredPresetConfig(
 
   if (!checkExportUsesPreset(parsed.program, presetIdentifier)) {
     return {
+      goal,
       kind: "invalid",
       reason: `The imported ${options.presetName} preset is not used by the exported configuration.`,
     }

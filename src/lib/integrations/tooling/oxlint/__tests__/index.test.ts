@@ -454,10 +454,47 @@ describe("oxlint", () => {
 
         expect(result).toMatchObject({
           applicable: true,
-          findings: [{ id: "invalid-oxlint-config" }],
+          findings: [
+            {
+              goal: [expect.stringContaining("Set `respectEslintDisableDirectives`")],
+              id: "invalid-oxlint-config",
+            },
+          ],
           packageActions: [],
           warnings: [],
         })
+      })
+    )
+
+    it.effect("ask to export an object literal when the config exports a variable", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxlint.config.ts": [
+            'import { defineConfig } from "oxlint"',
+            'import core from "adamantite/lint"',
+            "",
+            "const config = defineConfig({",
+            "  extends: [core],",
+            "  options: { respectEslintDisableDirectives: true, typeAware: true, typeCheck: true },",
+            "})",
+            "",
+            "export default config",
+            "",
+          ].join("\n"),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        const result = yield* runAssess(files)
+
+        expect(result.findings).toMatchObject([
+          {
+            goal: [expect.stringContaining("Export the config object literal")],
+            id: "invalid-oxlint-config",
+          },
+        ])
       })
     )
   })

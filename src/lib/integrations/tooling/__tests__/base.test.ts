@@ -298,7 +298,10 @@ describe("getConfigFindings", () => {
           legacy: [{ file: "tool.json", path: "/tmp/tool.json" }],
           warnings: [],
         },
-        { ...options, inspection: { kind: "invalid", reason: "Preset missing." } }
+        {
+          ...options,
+          inspection: { goal: "Add the preset.", kind: "invalid", reason: "Preset missing." },
+        }
       ).map(({ id }) => id)
     ).toStrictEqual(["shadowed-legacy-tool-config", "invalid-tool-config"])
   })

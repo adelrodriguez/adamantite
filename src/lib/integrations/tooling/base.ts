@@ -84,9 +84,9 @@ export type RequiredConfigInspection =
   | { readonly kind: "configured" }
   | {
       /**
-       * The repair to make. Defaults to adding the required preset.
+       * The repair for `reason`.
        */
-      readonly goal?: string
+      readonly goal: string
       readonly kind: "invalid"
       readonly reason: string
     }
@@ -268,7 +268,6 @@ export function getConfigFindings(
      * The inspection of a `Current` config. The findings ignore it for the other states.
      */
     readonly inspection?: RequiredConfigInspection
-    readonly invalidGoal?: string
     readonly toolName: string
   }
 ): Finding[] {
@@ -324,11 +323,7 @@ export function getConfigFindings(
   if (options.inspection?.kind === "invalid") {
     findings.push({
       currentState: `\`${options.configFile}\` does not meet Adamantite's required shape. ${options.inspection.reason}`,
-      goal: [
-        options.invalidGoal
-          ?? options.inspection.goal
-          ?? `Update \`${options.configFile}\` so it includes the required Adamantite preset while preserving project-specific settings.`,
-      ],
+      goal: [options.inspection.goal],
       id: `invalid-${options.toolName}-config`,
       integration: options.toolName,
       notes: ["Treat the reference as a known-good example, not an exact replacement."],

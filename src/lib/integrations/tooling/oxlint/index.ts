@@ -150,8 +150,6 @@ export default defineIntegration({
             configContent,
             configFile: CONFIG_FILE,
             inspection,
-            invalidGoal:
-              "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting.",
             toolName: "oxlint",
           }),
         ],

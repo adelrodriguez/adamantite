@@ -20,6 +20,12 @@ const invalidOptionsReason = "The required Oxlint options are missing or are not
 
 const requiredOptions = "respectEslintDisableDirectives: true, typeAware: true, typeCheck: true"
 
+const exportGoal =
+  "Export the config object literal directly from `oxlint.config.ts`, with or without `defineConfig(...)`. Preserve every project setting."
+
+const optionsGoal =
+  "Set `respectEslintDisableDirectives`, `typeAware`, and `typeCheck` to `true` in the `options` object. Preserve every other project setting."
+
 describe("inspectRequiredOxlintConfig", () => {
   it("accept the generated config with selected presets", () => {
     expect(inspectRequiredOxlintConfig(toOxlintTsConfigContent(["react", "vitest"]))).toStrictEqual(
@@ -38,33 +44,58 @@ describe("inspectRequiredOxlintConfig", () => {
   })
 
   it.each([
-    ["export default {", unsupportedConfigReason],
-    ["export default makeConfig()", unsupportedConfigReason],
-    ["export default {}", missingOptionsReason],
-    ["export default { options: getOptions() }", unsupportedOptionsReason],
-    ["export default { options: {} }", invalidOptionsReason],
+    [
+      "export default {",
+      unsupportedConfigReason,
+      "Fix the syntax errors in `oxlint.config.ts`. Preserve every project setting.",
+    ],
+    ["export default makeConfig()", unsupportedConfigReason, exportGoal],
+    ["export default {}", missingOptionsReason, optionsGoal],
+    ["export default { options: getOptions() }", unsupportedOptionsReason, optionsGoal],
+    ["export default { options: {} }", invalidOptionsReason, optionsGoal],
     [
       `export default { options: { ${requiredOptions.replace("typeAware: true", "typeAware: false")} } }`,
       invalidOptionsReason,
+      optionsGoal,
     ],
     [
       `export default { options: { ${requiredOptions.replace("typeAware: true", "typeAware: enabled")} } }`,
       invalidOptionsReason,
+      optionsGoal,
     ],
-    [`export default { options: { ${requiredOptions}, ...other } }`, ambiguousOptionsReason],
+    [
+      `export default { options: { ${requiredOptions}, ...other } }`,
+      ambiguousOptionsReason,
+      optionsGoal,
+    ],
     [
       `export default { options: { ${requiredOptions}, typeAware: false } }`,
       ambiguousOptionsReason,
+      optionsGoal,
     ],
-    [`export default { options: { ${requiredOptions}, [key]: false } }`, ambiguousOptionsReason],
-    [`export default { ...other, options: { ${requiredOptions} } }`, unsupportedOptionsReason],
-    [`export default { options: { ${requiredOptions} }, options: {} }`, unsupportedOptionsReason],
+    [
+      `export default { options: { ${requiredOptions}, [key]: false } }`,
+      ambiguousOptionsReason,
+      optionsGoal,
+    ],
+    [
+      `export default { ...other, options: { ${requiredOptions} } }`,
+      unsupportedOptionsReason,
+      optionsGoal,
+    ],
+    [
+      `export default { options: { ${requiredOptions} }, options: {} }`,
+      unsupportedOptionsReason,
+      optionsGoal,
+    ],
     [
       `export default { get options() { return { ${requiredOptions} } } }`,
       unsupportedOptionsReason,
+      optionsGoal,
     ],
-  ])("report an invalid config without generating a repair: %s", (content, reason) => {
+  ])("report an invalid config without generating a repair: %s", (content, reason, goal) => {
     expect(inspectRequiredOxlintConfig(content)).toStrictEqual({
+      goal,
       kind: "invalid",
       reason,
     })

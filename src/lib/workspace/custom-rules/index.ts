@@ -131,14 +131,21 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
     return yield* new CustomRuleExists({ paths: [testPath] })
   }
 
-  const relative = path
-    .relative(path.dirname(testPath), path.join(directory, rule))
-    .split(path.sep)
-    .join("/")
+  // Node resolves the import from the real path of the test, so the import joins the real paths. A
+  // path through a directory symlink, such as `/var` for `/private/var` on macOS, then resolves.
+  yield* ensureDirectory(path.dirname(testPath))
 
+  const readRealPath = (file: string) =>
+    fs.realPath(file).pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: file })))
+
+  const [testDirectory, rulePath] = yield* Effect.all([
+    readRealPath(path.dirname(testPath)),
+    readRealPath(path.join(directory, rule)),
+  ])
+
+  const relative = path.relative(testDirectory, rulePath).split(path.sep).join("/")
   const ruleImport = relative.startsWith("../") ? relative : `./${relative}`
   const importLiteral = yield* stringifyJson(ruleImport)
-  yield* ensureDirectory(path.dirname(testPath))
   yield* writeFile(
     testPath,
     testStubTemplate.replaceAll("{{name}}", name).replace("{{ruleImport}}", importLiteral)

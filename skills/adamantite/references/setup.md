@@ -45,7 +45,6 @@ If the selected presets include a managed plugin, check its setup:
   Keep `{ "name": "@effect/language-service", "diagnostics": true }` in
   `compilerOptions.plugins`. In a monorepo, add it to each package's tsconfig or a shared base.
   Use `ignoreDependencies.effect` from `adamantite/analyze` in `knip.config.ts`.
-  Remove the obsolete `adamantite prepare` command from an existing `prepare` script.
 - For Effect editor support, follow Doctor's editor findings. After a dependency install or
   update, run `adamantite init --non-interactive --script check --editor vscode` to prepare
   or refresh the VS Code SDK cache. Keep the project's other setup options when needed.

@@ -270,14 +270,6 @@ adamantite doctor
 `adamantite doctor` as the CI gate. It also refreshes each copy of the
 [Adamantite skill](#agent-skill) that differs from the skill of the installed Adamantite version.
 
-### `adamantite prepare`
-
-Does nothing and exits 0. Earlier versions patched Oxlint for
-[the effect preset](#the-effect-preset) from the `prepare` script. Adamantite now loads the
-Effect builds when it runs Oxlint, so remove `adamantite prepare` from the `prepare` script.
-`adamantite doctor` reports a `prepare` script that still runs it. A later release removes the
-command.
-
 ### `adamantite rule`
 
 Write, try, and inspect [custom rules](#custom-rules) and other Oxlint rules:

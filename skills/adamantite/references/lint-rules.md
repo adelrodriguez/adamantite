@@ -83,12 +83,6 @@ parent's actual matched folder, including when the top root is a glob. Declare e
 concrete scope once. Keep separate option objects for roots that cannot nest without a
 new intermediate map.
 
-If the config uses the previous array-valued declarations, run `adamantite doctor` and
-follow its migration instructions. Preserve every dependency and map setting. Nest only
-existing compatible child scopes. Verify allowed and forbidden imports with
-`adamantite check`, then run Doctor again. Continue when the migrated maps preserve the
-project's intended imports and Doctor reports no layer-map migration finding.
-
 For an import that belongs to one file or folder, set `adamantite/import-owners`:
 
 ```ts

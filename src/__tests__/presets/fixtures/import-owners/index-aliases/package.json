@@ -1,0 +1,8 @@
+{
+  "name": "fixture-index-aliases",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#lib/*": "./src/lib/*/index.ts"
+  }
+}

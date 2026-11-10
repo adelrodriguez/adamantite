@@ -1,7 +1,6 @@
 import type { Context, ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync } from "node:fs"
 import { posix } from "node:path"
-import { type NapiResolveOptions, ResolverFactory } from "oxc-resolver"
 import { globToRegExp } from "../glob.ts"
 import { isStringLiteral } from "../imports.ts"
 import {
@@ -10,6 +9,7 @@ import {
   readStringArrayOption,
   readStringOption,
 } from "../options.ts"
+import { resolveImport } from "../resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver, which ships
@@ -434,57 +434,9 @@ function findPackage(dir: string): string | undefined {
   return found
 }
 
-const DEFAULT_CONDITIONS = ["types", "import", "node", "default"]
-
-// TypeScript substitutes the source and declaration extensions for a runtime extension, such as
-// `./view.tsx` for `./view.jsx`, and `tsconfig.json` `paths` resolve from the nearest config.
-// oxc-resolver does not read `customConditions`, so they come from the `conditions` option. The
-// resolver keeps symlinked paths as they are, so they compare with the paths that Oxlint lints.
-const resolverOptions = {
-  extensionAlias: {
-    ".cjs": [".cts", ".d.cts", ".cjs"],
-    ".js": [".ts", ".tsx", ".d.ts", ".js", ".jsx"],
-    ".jsx": [".tsx", ".ts", ".d.ts", ".jsx", ".js"],
-    ".mjs": [".mts", ".d.mts", ".mjs"],
-  },
-  extensions: [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".json"],
-  symlinks: false,
-  tsconfig: "auto",
-} as const satisfies NapiResolveOptions
-
-const baseResolver = new ResolverFactory({ ...resolverOptions, conditionNames: DEFAULT_CONDITIONS })
-
-// One resolver for each set of conditions. Clones share the cache of the base resolver.
-const resolvers = new Map<string, ResolverFactory>()
-
-function getResolver(conditions: readonly string[]) {
-  if (conditions.length === 0) {
-    return baseResolver
-  }
-
-  const key = conditions.join("\0")
-  let resolver = resolvers.get(key)
-
-  if (resolver === undefined) {
-    resolver = baseResolver.cloneWithOptions({
-      ...resolverOptions,
-      conditionNames: [...conditions, ...DEFAULT_CONDITIONS],
-    })
-    resolvers.set(key, resolver)
-  }
-
-  return resolver
-}
-
-// Oxlint caches the loaded plugin, so an editor language server needs a restart after a
-// `package.json` or `tsconfig.json` changes.
 const modules: Modules = {
   findPackage: (file) => findPackage(posix.dirname(file)),
-  resolve: (importer, specifier, conditions) => {
-    const { path } = getResolver(conditions).resolveFileSync(importer, specifier)
-
-    return path === undefined ? undefined : toPosixPath(path)
-  },
+  resolve: resolveImport,
 }
 
 const MAP_PROPERTIES = {

@@ -59,7 +59,7 @@ export default defineConfig({
       },
       {
         import: "oxc-resolver",
-        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/rules/layers.ts"],
+        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/resolver.ts"],
       },
       // Commands run tools through Toolchain. Only the lifecycle commands `init` and `update` use
       // the tooling integrations directly.
@@ -72,6 +72,8 @@ export default defineConfig({
           "src/commands/__tests__",
           "src/__tests__",
           "src/oxlint.ts",
+          // The build check reads the file name of the Oxlint entry.
+          "scripts/test-build.ts",
         ],
       },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every

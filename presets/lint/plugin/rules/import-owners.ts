@@ -4,9 +4,10 @@ import { posix } from "node:path"
 import { globToRegExp } from "../glob.ts"
 import { isStringLiteral } from "../imports.ts"
 import { readStringArrayOption, readStringOption } from "../options.ts"
+import { resolveImport } from "../resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
-// runtime-neutral APIs: Node.js built-ins that Bun also provides.
+// runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.
 
 /**
  * One import and its owners: one option object of the rule.
@@ -17,6 +18,10 @@ export interface ImportOwner {
    * as `zod/mini` for `zod`.
    */
   readonly import: string
+  /**
+   * How the option names the module, which sets how the rule matches an import of it.
+   */
+  readonly kind: ModuleKind
   /**
    * The exports that the owners own. Undefined when they own the whole module.
    */
@@ -32,6 +37,35 @@ export interface ImportOwner {
 }
 
 /**
+ * How an option names its module, by the start of `import`:
+ *
+ * - `package`, such as `giget`: the rule matches the import as written.
+ * - `alias`, such as `#lib/db`: a module of the project. The rule matches the import as written, and
+ *   also any import that resolves to the module, such as a relative path. The alias resolves from
+ *   the root, so the text match keeps an alias that a workspace package declares.
+ * - `path`, such as `./src/lib/db` or `/src/lib/db`: a module of the project that the rule matches
+ *   only by the resolved file, because the text of a relative import depends on its file.
+ */
+export type ModuleKind = "alias" | "package" | "path"
+
+/**
+ * Whether an import of each kind of module matches by its text, and by its resolved file.
+ */
+const MODULE_MATCHES = {
+  alias: { file: true, text: true },
+  package: { file: false, text: true },
+  path: { file: true, text: false },
+} as const satisfies Record<ModuleKind, { readonly file: boolean; readonly text: boolean }>
+
+function readModuleKind(specifier: string): ModuleKind {
+  if (specifier.startsWith("#")) {
+    return "alias"
+  }
+
+  return /^[./]/.test(specifier) ? "path" : "package"
+}
+
+/**
  * What the rule reads from the file system. The plugin reads real files, and unit tests pass fakes.
  */
 export interface Project {
@@ -40,6 +74,11 @@ export interface Project {
    * the nearest folder above `file` that holds a `package.json` when no workspace holds it.
    */
   readonly findRoot: (file: string) => string | undefined
+  /**
+   * The file that `specifier` in `importer` resolves to, with `/` between folders, or undefined
+   * when it does not resolve.
+   */
+  readonly resolve: (importer: string, specifier: string) => string | undefined
 }
 
 const OWNERS_HINT = "Owners: the `adamantite/import-owners` options in the Oxlint config."
@@ -72,6 +111,7 @@ function readImportOwner(option: Options[number]): ImportOwner | undefined {
 
   return {
     import: specifier,
+    kind: readModuleKind(specifier),
     names: names === undefined ? undefined : new Set(names),
     owners,
     patterns: owners.flatMap((owner) => [
@@ -174,9 +214,58 @@ function findPackage(dir: string): string | undefined {
 
 const project: Project = {
   findRoot: (file) => findWorkspace(posix.dirname(file)) ?? findPackage(posix.dirname(file)),
+  resolve: resolveImport,
+}
+
+/**
+ * The names that an alias can give the file at `path`: the path itself, the path without its
+ * extension for an alias such as `"#lib/*": "./src/lib/*.ts"`, and the folder of an index file for
+ * an alias that adds `/index.ts` after the name. A declaration file such as `rows.d.ts` has two
+ * names without its extension: `rows.d` for an alias that adds `.ts`, and `rows` for an alias that
+ * adds `.d.ts`.
+ */
+function listAliasNames(path: string) {
+  const bareNames = [path.replace(/\.[^./]+$/, ""), path.replace(/\.d\.[^./]+$/, "")]
+
+  const folders = bareNames.flatMap((name) =>
+    posix.basename(name) === "index" ? [posix.dirname(name)] : []
+  )
+
+  return [...new Set([path, ...bareNames, ...folders])].filter((name) => name !== ".")
 }
 
 export function createImportOwnersRule(project: Project): Rule {
+  // Whether a project module covers a resolved file, by module, root, and file. Oxlint loads the
+  // rule one time for a lint run, so the answers carry over between files.
+  const coverage = new Map<string, boolean>()
+
+  /**
+   * Whether `file` is the project module `entry.import`, or a file below it when the module is a
+   * folder. The module resolves from the root, as owner paths do. A folder resolves only through a
+   * file in it, so each tail of the file's path is tried below the module, in each name that an
+   * alias can give it.
+   */
+  function covers(entry: ImportOwner, root: string, file: string) {
+    const key = [entry.import, root, file].join("\0")
+    const known = coverage.get(key)
+
+    if (known !== undefined) {
+      return known
+    }
+
+    const anchor = posix.join(root, "package.json")
+    const segments = posix.relative(root, file).split("/")
+    const tails = segments.flatMap((_, index) => listAliasNames(segments.slice(index).join("/")))
+
+    const result =
+      project.resolve(anchor, entry.import) === file
+      || tails.some((tail) => project.resolve(anchor, `${entry.import}/${tail}`) === file)
+
+    coverage.set(key, result)
+
+    return result
+  }
+
   return {
     create(context): Visitor {
       const importer = toPosixPath(context.filename)
@@ -186,6 +275,8 @@ export function createImportOwnersRule(project: Project): Rule {
         return {}
       }
 
+      // The closures below keep the narrowed root.
+      const projectRoot = root
       const relative = posix.relative(root, importer)
 
       const restricted = readImportOwners(context.options).filter(
@@ -224,8 +315,21 @@ export function createImportOwnersRule(project: Project): Rule {
         })
       }
 
+      const matchesFile = restricted.some((entry) => MODULE_MATCHES[entry.kind].file)
+
       function findRestricted(source: ESTree.StringLiteral) {
-        return restricted.filter((entry) => isImportOf(entry.import, source.value))
+        // A project module can match only an import that resolves to a file of the project.
+        const resolved = matchesFile ? project.resolve(importer, source.value) : undefined
+        const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
+
+        return restricted.filter((entry) => {
+          const matches = MODULE_MATCHES[entry.kind]
+
+          return (
+            (matches.text && isImportOf(entry.import, source.value))
+            || (matches.file && file !== undefined && covers(entry, projectRoot, file))
+          )
+        })
       }
 
       /**

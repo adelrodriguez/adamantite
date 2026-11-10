@@ -76,19 +76,36 @@ const testPath = Flag.String("path").pipe(
   Flag.withDescription("The test file path, relative to the current directory")
 )
 
-const addCommand = Command.make("add", { name: ruleName }).pipe(Command.withSharedFlags({ dir }))
+const add = Command.make("add", { dir, name: ruleName }).pipe(
+  Command.withDescription(
+    "Create a custom rule file. See the Adamantite skill for authoring instructions"
+  ),
+  Command.withHandler(({ dir, name }) =>
+    Effect.gen(function* () {
+      const prompter = yield* Prompter
+      const path = yield* Path.Path
+      const cwd = process.cwd()
+      const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
-const addTest = Command.make("test", {
+      yield* prompter.log.success(`Wrote ${path.relative(cwd, rulePath)}.`)
+      yield* prompter.log.info(
+        `\`custom()\` from \`adamantite/rules\` loads the rule. Run \`adamantite doctor\` to check the wiring. The "${CUSTOM_RULES_SECTION}" section of the Adamantite skill tells agents how to verify the rule with temporary cases.`
+      )
+    })
+  )
+)
+
+const addTest = Command.make("add", {
+  dir,
   name: ruleName.pipe(Argument.optional),
   path: testPath,
 }).pipe(
   Command.withDescription("Create a test for an existing rule. Omit the name to choose a rule"),
-  Command.withHandler(({ name, path: target }) =>
+  Command.withHandler(({ dir, name, path: target }) =>
     Effect.gen(function* () {
       const prompter = yield* Prompter
       const path = yield* Path.Path
       const terminal = yield* TerminalCapabilities
-      const { dir } = yield* addCommand
       const directory = Option.getOrElse(dir, () => CUSTOM_RULES_DIRECTORY)
       const cwd = process.cwd()
       let selected = Option.getOrUndefined(name)
@@ -107,7 +124,7 @@ const addTest = Command.make("test", {
           yield* prompter.message(names.join("\n"))
 
           return yield* prompter.log.info(
-            "Pass a rule name with `adamantite rule add test <name>`."
+            "Pass a rule name with `adamantite rule test add <name>`."
           )
         }
 
@@ -133,26 +150,6 @@ const addTest = Command.make("test", {
       )
     })
   )
-)
-
-const add = addCommand.pipe(
-  Command.withDescription(
-    "Create a custom rule file. See the Adamantite skill for authoring instructions"
-  ),
-  Command.withHandler(({ dir, name }) =>
-    Effect.gen(function* () {
-      const prompter = yield* Prompter
-      const path = yield* Path.Path
-      const cwd = process.cwd()
-      const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
-
-      yield* prompter.log.success(`Wrote ${path.relative(cwd, rulePath)}.`)
-      yield* prompter.log.info(
-        `\`custom()\` from \`adamantite/rules\` loads the rule. Run \`adamantite doctor\` to check the wiring. The "${CUSTOM_RULES_SECTION}" section of the Adamantite skill tells agents how to verify the rule with temporary cases.`
-      )
-    })
-  ),
-  Command.withSubcommands([addTest])
 )
 
 const test = Command.make("test", { path: testPath }).pipe(
@@ -192,13 +189,14 @@ const test = Command.make("test", { path: testPath }).pipe(
 
       if (Option.isNone(command)) {
         return yield* prompter.log.info(
-          "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test."
+          "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test."
         )
       }
 
       yield* runner.run({ ...command.value, title: "🧪 Testing custom rules" })
     })
-  )
+  ),
+  Command.withSubcommands([addTest])
 )
 
 const trialRule = Argument.String("rule").pipe(

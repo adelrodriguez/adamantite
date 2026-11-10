@@ -280,7 +280,7 @@ command.
 
 ### `adamantite rule`
 
-Write and inspect [custom rules](#custom-rules):
+Write, try, and inspect [custom rules](#custom-rules) and other Oxlint rules:
 
 ```sh
 adamantite rule add no-process-env
@@ -290,6 +290,9 @@ adamantite rule add test no-process-env
 adamantite rule add test no-process-env --path tests/no-process-env.test.ts
 adamantite rule test
 adamantite rule test --path tests/no-process-env.test.ts
+adamantite rule try no-console --report src/debug.ts --accept src/index.ts
+adamantite rule try no-restricted-imports --options '[{"paths":["node:fs"]}]' --report src/new.ts=draft.ts
+adamantite rule try project/no-process-env --current --report src/env.ts
 adamantite rule ast src/index.ts
 ```
 
@@ -305,6 +308,25 @@ valid and invalid cases to the rule before running them.
 automatically. Agents remove their temporary verification cases before they finish.
 During harden, agents can use `rule add test` to prepare those temporary cases and
 `rule test --path <file>` to run them. They preserve user-owned saved tests.
+
+`rule try` runs a trial. It lints cases with one rule and shows whether the rule reports or
+accepts each case. Give the full rule name, such as `no-console`, `typescript/no-explicit-any`,
+or `project/no-process-env`. Each `--report` adds a case that the rule must report, and each
+`--accept` adds a case that the rule must accept. A trial needs at least one `--report` case.
+Repeat either flag to add more cases.
+
+Run `rule try` from the project root. A case is a file path relative to the project root. Use
+`<path>=<file>` to lint the content of `<file>` as if it were at `<path>`. This form lets you try
+code that is not in the project yet, and code in files that git ignores.
+
+By default, the trial sets the rule to `error` with no options. `--options` gives the options
+that come after the severity, as a JSON array. `--current` uses the rule setting from the
+project config instead. You cannot use `--options` and `--current` together.
+
+The trial lints a copy of the project in a temporary folder, so it does not change the project.
+It exits 0 when every case gives the expected result, 1 when a case does not, and 2 when the
+trial cannot check the cases, such as for a rule that does not exist.
+
 `rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
 real code.
 

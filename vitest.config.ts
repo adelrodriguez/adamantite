@@ -51,6 +51,10 @@ export default defineConfig({
         test: {
           include: PROCESS_RUN_TESTS,
           name: "presets",
+          // A real Oxlint or Vitest run takes up to 3.4 seconds alone and more than 5 seconds
+          // while the other test files run, so the default timeout fails these tests at random.
+          // The longer timeout still stops a process that hangs.
+          testTimeout: 30_000,
         },
       },
     ],

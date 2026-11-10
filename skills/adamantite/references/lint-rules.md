@@ -113,8 +113,10 @@ An owner folder covers every file below it. A package name covers its subpaths.
 Use `names` to restrict selected exports. Namespace imports and `export *` are also reported
 when names are restricted. An `import` that starts with `#`, `.`, or `/` names a file or folder of
 the project, resolved from the same root as the owners. The rule resolves each import of a linted
-file, so a relative path or another alias to that module counts too. Use layer maps for the
-dependencies between folders.
+file, so a relative path or another alias to that module counts too. An import that names a `#`
+module as the option states it also counts, as for a package. In a monorepo, a `#` option restricts
+that alias in every package. To restrict a folder of one package, name its path from the workspace
+root, such as `./apps/web/src/lib/db`. Use layer maps for the dependencies between folders.
 
 Repair a report by using what the owner exports or moving the code to its layer or owner.
 Adding an owner, layer dependency, or `ignore` glob only to pass the check weakens the standard.

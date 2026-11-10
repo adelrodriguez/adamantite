@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "imports": {
-    "#lib/*": "./src/lib/*.ts"
+    "#lib/*": "./src/lib/*.ts",
+    "#types/*": "./src/types/*.d.ts"
   }
 }

@@ -52,3 +52,8 @@ root is where a root Oxlint config states its `files` globs. A `pnpm-workspace.y
 - An option for a project module resolves the imports of each linted file that it applies to.
   An alias from `tsconfig.json` `paths` that does not start with `#`, `.`, or `/`, such as `@/db`,
   is still matched as written.
+- A `#` option also matches an import as written, as a package does. In a monorepo, an alias that a
+  workspace package declares in its own `package.json` does not resolve from the workspace root,
+  so only that text match finds it, and a relative path to the same file is not reported. The
+  text match also restricts the same alias in every other package, as a package option does. A
+  path option, such as `./apps/web/src/lib/db`, names the folder of one package.

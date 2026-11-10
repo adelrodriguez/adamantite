@@ -1,0 +1,9 @@
+{
+  "rules": {
+    "adamantite/import-owners": [
+      "error",
+      { "import": "#lib/db", "owners": ["apps/web/src/owner.ts"] },
+      { "import": "./apps/web/src/lib/cache", "owners": ["apps/web/src/owner.ts"] }
+    ]
+  }
+}

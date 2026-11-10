@@ -19,11 +19,9 @@ export interface ImportOwner {
    */
   readonly import: string
   /**
-   * Whether the module is a file or folder of the project: an import that starts with `#`, `.`, or
-   * `/`. A project module is reached through any spelling that resolves to it, such as a relative
-   * path, so the rule compares resolved files. A package is matched as the import states it.
+   * How the option names the module, which sets how the rule matches an import of it.
    */
-  readonly local: boolean
+  readonly kind: ModuleKind
   /**
    * The exports that the owners own. Undefined when they own the whole module.
    */
@@ -36,6 +34,35 @@ export interface ImportOwner {
    * A pattern for each owner that matches the owner file, or each file below the owner folder.
    */
   readonly patterns: readonly RegExp[]
+}
+
+/**
+ * How an option names its module, by the start of `import`:
+ *
+ * - `package`, such as `giget`: the rule matches the import as written.
+ * - `alias`, such as `#lib/db`: a module of the project. The rule matches the import as written, and
+ *   also any import that resolves to the module, such as a relative path. The alias resolves from
+ *   the root, so the text match keeps an alias that a workspace package declares.
+ * - `path`, such as `./src/lib/db` or `/src/lib/db`: a module of the project that the rule matches
+ *   only by the resolved file, because the text of a relative import depends on its file.
+ */
+export type ModuleKind = "alias" | "package" | "path"
+
+/**
+ * Whether an import of each kind of module matches by its text, and by its resolved file.
+ */
+const MODULE_MATCHES = {
+  alias: { file: true, text: true },
+  package: { file: false, text: true },
+  path: { file: true, text: false },
+} as const satisfies Record<ModuleKind, { readonly file: boolean; readonly text: boolean }>
+
+function readModuleKind(specifier: string): ModuleKind {
+  if (specifier.startsWith("#")) {
+    return "alias"
+  }
+
+  return /^[./]/.test(specifier) ? "path" : "package"
 }
 
 /**
@@ -84,7 +111,7 @@ function readImportOwner(option: Options[number]): ImportOwner | undefined {
 
   return {
     import: specifier,
-    local: /^[#./]/.test(specifier),
+    kind: readModuleKind(specifier),
     names: names === undefined ? undefined : new Set(names),
     owners,
     patterns: owners.flatMap((owner) => [
@@ -196,7 +223,8 @@ const project: Project = {
  * an alias that adds `/index.ts` after the name.
  */
 function listAliasNames(path: string) {
-  const bare = path.slice(0, path.length - posix.extname(path).length)
+  // A declaration file such as `rows.d.ts` has a two-part extension.
+  const bare = path.replace(/(\.d)?\.[^./]+$/, "")
   const folder = posix.basename(bare) === "index" ? posix.dirname(bare) : bare
 
   return [...new Set([path, bare, folder])].filter((name) => name !== ".")
@@ -283,18 +311,21 @@ export function createImportOwnersRule(project: Project): Rule {
         })
       }
 
-      const hasProjectModule = restricted.some((entry) => entry.local)
+      const matchesFile = restricted.some((entry) => MODULE_MATCHES[entry.kind].file)
 
       function findRestricted(source: ESTree.StringLiteral) {
         // A project module can match only an import that resolves to a file of the project.
-        const resolved = hasProjectModule ? project.resolve(importer, source.value) : undefined
+        const resolved = matchesFile ? project.resolve(importer, source.value) : undefined
         const file = resolved?.includes("/node_modules/") === false ? resolved : undefined
 
-        return restricted.filter((entry) =>
-          entry.local
-            ? file !== undefined && covers(entry, projectRoot, file)
-            : isImportOf(entry.import, source.value)
-        )
+        return restricted.filter((entry) => {
+          const matches = MODULE_MATCHES[entry.kind]
+
+          return (
+            (matches.text && isImportOf(entry.import, source.value))
+            || (matches.file && file !== undefined && covers(entry, projectRoot, file))
+          )
+        })
       }
 
       /**

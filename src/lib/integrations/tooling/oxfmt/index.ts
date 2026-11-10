@@ -17,22 +17,6 @@ export default {
       legacyConfigs: [".oxfmtrc.json", ".oxfmtrc.jsonc"],
     },
     inspectConfig: inspectRequiredOxfmtConfig,
-    legacyFindings: (packageJson) =>
-      packageJson.scripts?.format === "adamantite format"
-        ? [
-            {
-              currentState: "The legacy managed `format` script is present in `package.json`.",
-              goal: ["Remove the `format` script from `package.json`."],
-              id: "legacy-format-script",
-              integration: "oxfmt",
-              notes: [
-                "The managed `check` script verifies formatting and the managed `fix` script applies it.",
-                "Doctor checks that `AGENTS.md` exists but does not review its contents. Remove the `format` line from its Adamantite section.",
-              ],
-              title: "Legacy format script",
-            },
-          ]
-        : [],
     name: "oxfmt",
     purpose: "the managed `check` and `fix` scripts",
     scripts: getScriptsThatRun("oxfmt"),

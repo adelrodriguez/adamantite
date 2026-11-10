@@ -170,8 +170,6 @@ writing files. See ADR 0023.
   whose copy differs from the bundled skill in any file, removes the `adamantite` entry from
   `skills-lock.json`, then emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
   not need it.
-- `prepare` does nothing. It patched Oxlint for the effect preset before the Oxlint proxy,
-  and existing `prepare` scripts still run it. #444 removes it.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit.
   Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
   Temporary verification cases do not stay in the target project. Users can opt in to saved
@@ -269,8 +267,8 @@ prompt moves the config to `react-strict`, keeps one extends entry when both pre
 present, and preserves project settings and `react-doctor/*` overrides. Assessment does not
 write the config.
 
-The Effect definition also assesses the language service entry in `tsconfig.json` and the
-legacy `prepare` script, and its `update` method writes the language service entry for init.
+The Effect definition also assesses the language service entry in `tsconfig.json`, and its
+`update` method writes the language service entry for init.
 Its runtime resolver, in `plugins/effect-tsgo/runtime.ts`, returns binding and backend
 overrides when the target project installs `@effect/tsgo`. The installed package turns the
 Effect builds on, so nested configs and relative preset imports get them too. The managed

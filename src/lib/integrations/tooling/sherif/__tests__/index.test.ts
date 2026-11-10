@@ -1,4 +1,3 @@
-import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
@@ -23,10 +22,6 @@ function runAssess(files: FileSystemTestContext) {
     Effect.flatMap((project) => sherif.assess(project)),
     provideFiles(files)
   )
-}
-
-function makePackageJson(manifest: PackageJson) {
-  return JSON.stringify({ name: "test-project", version: "1.0.0", ...manifest }, null, 2)
 }
 
 describe("sherif", () => {
@@ -104,133 +99,6 @@ describe("sherif", () => {
         const result = yield* runAssess(files)
 
         expect(result).toStrictEqual({ applicable: false })
-      })
-    )
-
-    it.effect("report a script with another name that runs adamantite monorepo", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({
-            devDependencies: { sherif: sherif.version },
-            scripts: {
-              analyze: "adamantite analyze",
-              "lint:workspace": "adamantite monorepo --fix -- --select=highest",
-              // Only a command that starts with `adamantite monorepo` is a legacy script.
-              verify: "pnpm run check && adamantite monorepo",
-            },
-            workspaces: ["packages/*"],
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          findings: [
-            {
-              goal: [
-                'Set `sherif.select` to `"highest"` in the root `package.json`.',
-                "Remove the `lint:workspace` script from `package.json`.",
-              ],
-              id: "legacy-monorepo-scripts",
-            },
-          ],
-        })
-      })
-    )
-
-    it.effect("tell the reader where each custom Sherif flag goes", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({
-            devDependencies: { sherif: sherif.version },
-            scripts: {
-              analyze: "adamantite analyze",
-              "check:monorepo":
-                "adamantite monorepo -- -i react --ignore-rule root-package-manager-field --fail-on-warnings",
-            },
-            workspaces: ["packages/*"],
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          findings: [
-            {
-              currentState: expect.stringContaining("`adamantite monorepo -- -i react"),
-              goal: [
-                'Add `"react"` to the `sherif.ignoreDependency` array in the root `package.json`.',
-                'Add `"root-package-manager-field"` to the `sherif.ignoreRule` array in the root `package.json`.',
-                "Set `sherif.failOnWarnings` to `true` in the root `package.json`.",
-                "Remove the `check:monorepo` script from `package.json`.",
-              ],
-            },
-          ],
-        })
-      })
-    )
-
-    it.effect("report a flag that both paired scripts carry once", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({
-            devDependencies: { sherif: sherif.version },
-            scripts: {
-              analyze: "adamantite analyze",
-              "check:monorepo": "adamantite monorepo -- -i react",
-              "fix:monorepo": "adamantite monorepo --fix -- -i react",
-            },
-            workspaces: ["packages/*"],
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          findings: [
-            {
-              goal: [
-                'Add `"react"` to the `sherif.ignoreDependency` array in the root `package.json`.',
-                "Remove the `check:monorepo` script from `package.json`.",
-                "Remove the `fix:monorepo` script from `package.json`.",
-              ],
-              notes: expect.arrayContaining([
-                expect.stringContaining(
-                  "`adamantite analyze --only monorepo --fix` replaces `fix:monorepo`"
-                ),
-              ]),
-            },
-          ],
-        })
-      })
-    )
-
-    it.effect("tell a project without analyze to adopt it", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": makePackageJson({
-            scripts: { "check:monorepo": "sherif --ignore-dependency tailwindcss" },
-            workspaces: ["packages/*"],
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState: expect.stringContaining("no managed `analyze` script"),
-              goal: [
-                expect.stringContaining("adamantite init --non-interactive --script analyze"),
-                'Add `"tailwindcss"` to the `sherif.ignoreDependency` array in the root `package.json`.',
-                "Remove the `check:monorepo` script from `package.json`.",
-              ],
-            },
-          ],
-          // Sherif is not managed until the project adopts `analyze`.
-          packageActions: [],
-        })
       })
     )
   })

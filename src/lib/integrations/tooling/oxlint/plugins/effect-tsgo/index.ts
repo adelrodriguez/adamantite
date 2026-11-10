@@ -1,7 +1,6 @@
 import * as Effect from "effect/Effect"
 import type { Project } from "#lib/workspace/project.ts"
 import { defineOxlintPlugin, NativeRuntime } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
-import { assessPrepareScript } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/prepare-script.ts"
 import { resolveEffectRuntime } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/runtime.ts"
 import {
   assessTsconfigPlugin,
@@ -16,7 +15,7 @@ export default defineOxlintPlugin({
       const tsconfig = yield* assessTsconfigPlugin(project, NAME)
 
       return {
-        findings: [...assessPrepareScript(project.packageJson, NAME), ...tsconfig.findings],
+        findings: tsconfig.findings,
         warnings: tsconfig.warnings,
       }
     }),

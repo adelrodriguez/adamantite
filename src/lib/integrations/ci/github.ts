@@ -8,11 +8,7 @@ import * as Schema from "effect/Schema"
 import { runScriptCommand } from "nypm"
 import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
 import type { Project } from "#lib/workspace/project.ts"
-import {
-  defineIntegration,
-  type Finding,
-  type IntegrationAssessment,
-} from "#lib/integrations/base.ts"
+import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { getWorkflowTemplate } from "#lib/integrations/ci/github-workflow.macro.ts" with { type: "macro" }
 import { FailedToParseYaml } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
@@ -49,14 +45,6 @@ function makeScriptCommandPattern(script: string) {
 }
 
 const CHECK_COMMAND_REGEX = new RegExp(String.raw`\b(?:${makeScriptCommandPattern("check")})\b`)
-
-const FORMAT_CHECK_COMMAND_REGEX = new RegExp(
-  String.raw`\b(?:${makeScriptCommandPattern("format")})(?:\s+--)?\s+--check\b`
-)
-
-const MONOREPO_COMMAND_REGEX = new RegExp(
-  String.raw`\b(?:${makeScriptCommandPattern("(?:check|fix):monorepo")}|adamantite\s+monorepo)(?=\s|$)`
-)
 
 const workflowTemplate = getWorkflowTemplate()
 
@@ -225,29 +213,6 @@ function checkIsGeneratedWorkflow(content: string) {
   )
 }
 
-const legacyFormatStepFinding: Finding = {
-  currentState: "The workflow still runs the legacy `format` script with `--check`.",
-  goal: ["Remove the workflow step or matrix entry that runs the `format` script with `--check`."],
-  id: "legacy-format-workflow-step",
-  integration: "github",
-  notes: [
-    "The managed `check` script verifies formatting. Preserve unrelated workflow jobs and project-specific settings.",
-  ],
-  title: "Legacy format workflow step",
-}
-
-const legacyMonorepoStepFinding: Finding = {
-  currentState: "The workflow still runs a legacy monorepo script or `adamantite monorepo`.",
-  goal: [
-    "Remove the workflow step or matrix entry that runs `check:monorepo`, `fix:monorepo`, or `adamantite monorepo`.",
-    "Make the workflow run the managed `analyze` script. It runs Sherif in a detected monorepo.",
-  ],
-  id: "legacy-monorepo-workflow-step",
-  integration: "github",
-  notes: ["Preserve unrelated workflow jobs and project-specific settings."],
-  title: "Legacy monorepo workflow step",
-}
-
 const files = [{ path: ".github/workflows/adamantite.yml", type: "ci" }] as const
 
 const writeWorkflow = (cwd: string, options: WorkflowOptions) =>
@@ -280,24 +245,18 @@ export default defineIntegration({
       const managedScripts = getManagedScripts(packageJson)
       const workflow = yield* readWorkflow(content.value, workflowPath)
 
-      const runs = (commandRegex: RegExp) =>
-        workflow.commands.some((command) => commandRegex.test(command))
-
       const hasHardcodedNodeVersion = workflow.nodeVersions.some((version) =>
         /^\d/.test(String(version))
       )
 
-      const isMissingCheckCommand = managedScripts.includes("check") && !runs(CHECK_COMMAND_REGEX)
-
-      const legacyFindings = [
-        ...(runs(FORMAT_CHECK_COMMAND_REGEX) ? [legacyFormatStepFinding] : []),
-        ...(runs(MONOREPO_COMMAND_REGEX) ? [legacyMonorepoStepFinding] : []),
-      ]
+      const isMissingCheckCommand =
+        managedScripts.includes("check")
+        && !workflow.commands.some((command) => CHECK_COMMAND_REGEX.test(command))
 
       if (!hasHardcodedNodeVersion && !isMissingCheckCommand) {
         return {
           applicable: true,
-          findings: legacyFindings,
+          findings: [],
           packageActions: [],
           warnings: [],
         } satisfies IntegrationAssessment
@@ -306,7 +265,7 @@ export default defineIntegration({
       if (!hasCICompatibleScripts(managedScripts)) {
         return {
           applicable: true,
-          findings: legacyFindings,
+          findings: [],
           packageActions: [],
           warnings: [
             "No CI-compatible managed scripts were found, so the GitHub Actions workflow cannot be regenerated.",
@@ -320,7 +279,7 @@ export default defineIntegration({
       if (!detectedPackageManager) {
         return {
           applicable: true,
-          findings: legacyFindings,
+          findings: [],
           packageActions: [],
           warnings: [
             "Could not detect a package manager, so the GitHub Actions workflow cannot be regenerated.",
@@ -331,7 +290,7 @@ export default defineIntegration({
       if (!checkIsSupportedPackageManager(detectedPackageManager.name)) {
         return {
           applicable: true,
-          findings: legacyFindings,
+          findings: [],
           packageActions: [],
           warnings: [
             `\`${detectedPackageManager.name}\` is not a supported package manager for CI workflow generation, so the GitHub Actions workflow cannot be regenerated.`,
@@ -364,7 +323,6 @@ export default defineIntegration({
             ],
             title: "Outdated Adamantite workflow",
           },
-          ...legacyFindings,
         ],
         packageActions: [],
         warnings: [],

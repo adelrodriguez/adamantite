@@ -34,7 +34,7 @@ console.info(`Verified the Oxlint entry: dist/${OXLINT_ENTRY_FILE}`)
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-cli-"))
 
 try {
-  for (const command of ["format", "monorepo"]) {
+  for (const command of ["format", "monorepo", "prepare"]) {
     const result = spawnSync(process.execPath, [cliPath, command], {
       cwd: fixture,
       encoding: "utf8",

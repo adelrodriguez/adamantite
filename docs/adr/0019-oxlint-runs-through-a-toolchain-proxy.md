@@ -64,8 +64,8 @@ these builds on its own.
 
 ## Consequences
 
-- A target project needs no `prepare` script. `adamantite prepare` does nothing until #444
-  removes it, and Doctor reports a `prepare` script that still runs it.
+- A target project needs no `prepare` script. `adamantite prepare` did nothing until #444
+  removed it, and Doctor reported a `prepare` script that still ran it until then.
 - A plain `oxlint` call in a project with the `effect` preset stops with
   `Unknown plugin: 'effecttsgo'`. Run `adamantite check` instead.
 - The entry depends on two internal files of Oxlint, `dist/bindings.js` and `dist/cli.js`. The

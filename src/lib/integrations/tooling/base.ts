@@ -414,8 +414,8 @@ function checkHasManagedScript(packageJson: PackageJson, scripts: readonly Scrip
  */
 export function definePackageTooling(options: {
   /**
-   * Findings for retired managed scripts or packages. While any exist, the integration stays
-   * applicable and reports them so the scripts get removed.
+   * Findings for retired managed packages. While any exist, the integration stays applicable and
+   * reports them so the packages get removed.
    */
   readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   /**
@@ -506,11 +506,6 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
   readonly configContent: (workspace: Workspace) => string
   readonly configFiles: ToolingConfigFiles
   readonly inspectConfig: (content: string, workspace: Workspace) => RequiredConfigInspection
-  /**
-   * Findings for retired managed scripts or packages. While any exist, the integration stays
-   * applicable and reports them so the scripts get removed.
-   */
-  readonly legacyFindings?: (packageJson: PackageJson) => readonly Finding[]
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
@@ -539,19 +534,8 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
           workspace: { isMonorepo },
         } = project
 
-        const legacyFindings = options.legacyFindings?.(packageJson) ?? []
-
         if (!checkHasManagedScript(packageJson, options.scripts)) {
-          return legacyFindings.length > 0
-            ? ({
-                applicable: true,
-                findings: legacyFindings,
-                packageActions: [],
-                warnings: [],
-              } satisfies IntegrationAssessment)
-            : ({
-                applicable: false,
-              } satisfies IntegrationAssessment)
+          return { applicable: false } satisfies IntegrationAssessment
         }
 
         const state = yield* detect(cwd)
@@ -574,7 +558,6 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
               inspection,
               toolName: options.name,
             }),
-            ...legacyFindings,
           ],
           packageActions: pkg.packageActions,
           warnings: [...pkg.warnings, ...state.warnings],

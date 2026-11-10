@@ -25,17 +25,6 @@ function getHeadings(markdown: string) {
   return markdown.match(/^#{1,2} .+$/gm) ?? []
 }
 
-// Doctor reports no finding for format guidance in AGENTS.md, only for the script and the workflow
-// step.
-const LEGACY_FORMAT_AGENTS_GUIDANCE = [
-  "# AGENTS.md",
-  "",
-  "## Adamantite",
-  "",
-  "- Run `pnpm run format` after editing files. Direct command: `adamantite format`.",
-  "",
-].join("\n")
-
 const claudeAgent = agentByCommand("claude")
 const codexAgent = agentByCommand("codex")
 const geminiAgent = agentByCommand("gemini")
@@ -314,44 +303,6 @@ describe("doctor", () => {
         ],
         outros: [],
       })
-    })
-  )
-
-  it.effect("report the legacy format script and workflow step", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
-          ".github/workflows/adamantite.yml": [
-            "on: push",
-            "jobs:",
-            "  verify:",
-            "    runs-on: ubuntu-latest",
-            "    steps:",
-            "      - run: pnpm run format --check",
-            "",
-          ].join("\n"),
-          "AGENTS.md": LEGACY_FORMAT_AGENTS_GUIDANCE,
-          "package.json": manifest({
-            devDependencies: { adamantite: "1.0.0" },
-            scripts: { format: "adamantite format" },
-          }),
-        },
-      })
-
-      const prompter = createPrompterTestContext()
-
-      const exit = yield* runCommand(doctorCommand, [], { files, layers: [prompter.layer] })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.messages.map(getHeadings)).toStrictEqual([
-        [
-          "# Adamantite doctor findings",
-          "## 1. Legacy format script",
-          "## 2. Legacy format workflow step",
-          "## Verify",
-          "## Check the repair",
-        ],
-      ])
     })
   )
 

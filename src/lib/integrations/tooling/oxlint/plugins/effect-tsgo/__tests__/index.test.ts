@@ -12,7 +12,6 @@ import { readProject } from "#lib/workspace/project.ts"
 const effectTsgo = managedPlugin("@effect/tsgo")
 
 const ROOT = "/project"
-const PREPARE = "adamantite prepare"
 
 const CONFIGURED_TSCONFIG = JSON.stringify({
   compilerOptions: { plugins: [{ diagnostics: true, name: "@effect/language-service" }] },
@@ -103,21 +102,6 @@ describe("effect-tsgo", () => {
           ],
           packageActions: [{ package: "@effect/tsgo", type: "install_package" }],
         })
-      })
-    )
-
-    it.effect("report a prepare script that still runs adamantite prepare", () =>
-      Effect.gen(function* () {
-        const files = makeConfiguredFiles({
-          "package.json": makePackageJson({
-            devDependencies: { "@effect/tsgo": effectTsgo.version },
-            scripts: { check: "adamantite check", prepare: `${PREPARE} && (husky)` },
-          }),
-        })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({ findings: [{ id: "legacy-adamantite-prepare" }] })
       })
     )
 

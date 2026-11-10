@@ -32,7 +32,6 @@
     "!skills/_artifacts"
   ],
   "type": "module",
-  "main": "dist/presets/lint/core.js",
   "imports": {
     "#*": "./src/*",
     "#presets/*": "./presets/*"
@@ -50,9 +49,53 @@
       "types": "./dist/presets/lint/core.d.ts",
       "default": "./dist/presets/lint/core.js"
     },
-    "./lint/*": {
-      "types": "./dist/presets/lint/*.d.ts",
-      "default": "./dist/presets/lint/*.js"
+    "./lint/architecture": {
+      "types": "./dist/presets/lint/architecture.d.ts",
+      "default": "./dist/presets/lint/architecture.js"
+    },
+    "./lint/effect": {
+      "types": "./dist/presets/lint/effect.d.ts",
+      "default": "./dist/presets/lint/effect.js"
+    },
+    "./lint/jest": {
+      "types": "./dist/presets/lint/jest.d.ts",
+      "default": "./dist/presets/lint/jest.js"
+    },
+    "./lint/nextjs": {
+      "types": "./dist/presets/lint/nextjs.d.ts",
+      "default": "./dist/presets/lint/nextjs.js"
+    },
+    "./lint/node": {
+      "types": "./dist/presets/lint/node.d.ts",
+      "default": "./dist/presets/lint/node.js"
+    },
+    "./lint/react": {
+      "types": "./dist/presets/lint/react.d.ts",
+      "default": "./dist/presets/lint/react.js"
+    },
+    "./lint/react-strict": {
+      "types": "./dist/presets/lint/react-strict.d.ts",
+      "default": "./dist/presets/lint/react-strict.js"
+    },
+    "./lint/strict": {
+      "types": "./dist/presets/lint/strict.d.ts",
+      "default": "./dist/presets/lint/strict.js"
+    },
+    "./lint/tailwind": {
+      "types": "./dist/presets/lint/tailwind.d.ts",
+      "default": "./dist/presets/lint/tailwind.js"
+    },
+    "./lint/tanstack": {
+      "types": "./dist/presets/lint/tanstack.d.ts",
+      "default": "./dist/presets/lint/tanstack.js"
+    },
+    "./lint/vitest": {
+      "types": "./dist/presets/lint/vitest.d.ts",
+      "default": "./dist/presets/lint/vitest.js"
+    },
+    "./lint/vue": {
+      "types": "./dist/presets/lint/vue.d.ts",
+      "default": "./dist/presets/lint/vue.js"
     },
     "./rules": {
       "types": "./dist/presets/rules/index.d.ts",

@@ -1,9 +1,21 @@
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
+import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
-import { delimiter, join } from "node:path"
+import { delimiter, join, sep } from "node:path"
 import process from "node:process"
+import { pathToFileURL } from "node:url"
+import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 
 const repoRoot = join(import.meta.dirname, "..")
 const cliPath = join(repoRoot, "bin", "adamantite")
@@ -187,6 +199,76 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
   } finally {
     rmSync(customTest)
   }
+}
+
+const InstalledManifest = Schema.Struct({
+  exports: Schema.Record(
+    Schema.String,
+    Schema.Union([Schema.String, Schema.Struct({ default: Schema.String, types: Schema.String })])
+  ),
+})
+
+const decodeInstalledManifest = Schema.decodeUnknownSync(Schema.fromJsonString(InstalledManifest))
+
+/**
+ * Load each public import of the installed package from the project, and check its declaration
+ * file. Every other built module, such as a lint plugin helper or the custom-rule loader, must stay
+ * private, so a new file in the build never becomes a public import by accident.
+ */
+async function verifyPackageExports(cwd: string) {
+  const packageRoot = join(cwd, "node_modules", "adamantite")
+
+  const { exports } = decodeInstalledManifest(
+    readFileSync(join(packageRoot, "package.json"), "utf8")
+  )
+
+  for (const [subpath, target] of Object.entries(exports)) {
+    if (!Predicate.isString(target) && !existsSync(join(packageRoot, target.types))) {
+      throw new Error(`The export ${subpath} names the missing declaration file ${target.types}`)
+    }
+  }
+
+  const projectRequire = createRequire(join(cwd, "package.json"))
+
+  const publicImports = new Set(
+    Object.keys(exports).map((subpath) => `adamantite${subpath.slice(1)}`)
+  )
+
+  await Promise.all(
+    [...publicImports].flatMap((specifier) => {
+      const path = projectRequire.resolve(specifier)
+
+      return path.endsWith(".js") ? [import(pathToFileURL(path).href)] : []
+    })
+  )
+
+  const privateImports = [
+    "adamantite",
+    ...readdirSync(join(packageRoot, "dist", "presets"), {
+      encoding: "utf8",
+      recursive: true,
+    }).flatMap((file) => {
+      const specifier = `adamantite/${file.slice(0, -".js".length).split(sep).join("/")}`
+
+      return file.endsWith(".js") && !publicImports.has(specifier) ? [specifier] : []
+    }),
+  ]
+
+  for (const specifier of privateImports) {
+    try {
+      projectRequire.resolve(specifier)
+    } catch (error) {
+      if (Predicate.hasProperty(error, "code") && error.code === "ERR_PACKAGE_PATH_NOT_EXPORTED") {
+        continue
+      }
+
+      throw error
+    }
+
+    throw new Error(`Expected the package to keep ${specifier} private`)
+  }
+
+  return privateImports
 }
 
 // The fixture uses npm and the monorepo fixture uses pnpm, so the smoke test covers both
@@ -433,6 +515,20 @@ try {
   assertFileContains(join(fixture, ".github", "workflows", "adamantite.yml"), "runs-on")
   assertFileContains(join(fixture, "package.json"), '"check": "adamantite check"')
   assertFileContains(join(fixture, "package.json"), '"analyze": "adamantite analyze"')
+
+  console.info("Checking the public and private imports of the installed package...")
+  const privateImports = await verifyPackageExports(fixture)
+
+  for (const specifier of [
+    "adamantite/lint/core",
+    "adamantite/lint/plugin/options",
+    "adamantite/lint/plugin/rules/layers",
+    "adamantite/rules/load",
+  ]) {
+    if (!privateImports.includes(specifier)) {
+      throw new Error(`Expected the private import check to cover ${specifier}`)
+    }
+  }
 
   // The commands resolve tool binaries through PATH, matching how package scripts run them.
   const fixtureEnv = {

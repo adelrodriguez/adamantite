@@ -330,7 +330,8 @@ underlying CLI.
 
 ## Presets
 
-Adamantite publishes configuration that can also be consumed directly:
+Adamantite publishes configuration that can also be consumed directly. The package exports only
+the imports in this table, and Node.js rejects any other path in the package:
 
 | Export                         | Purpose                                                                                                                                                                                                                                                                                    |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

@@ -234,6 +234,12 @@ its required-preset additions, and its `--preset` check from the list. `describe
 appends the plugin package and the required presets to the hint, so a written hint holds no
 setup text. A test fails when the list and the preset files in `presets/lint/` disagree.
 
+`package.json` exports core as `adamantite/lint` and each preset in the list as
+`adamantite/lint/<name>`. It has no wildcard export, so the first-party plugin, its rules, and
+other modules below `presets/lint/` stay private. A new preset needs its own export entry. A test
+fails when the export map, the README import table, and `lintPresets` disagree, and the smoke
+test rejects each built module that the export map does not list.
+
 ## Managed plugins
 
 A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`

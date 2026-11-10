@@ -240,6 +240,13 @@ other modules below `presets/lint/` stay private. A new preset needs its own exp
 fails when the export map, the README import table, and `lintPresets` disagree, and the smoke
 test rejects each built module that the export map does not list.
 
+CLI code that writes, resolves, or compares a public import gets it from `publicImport()` in
+`src/lib/shared/package-exports.ts`, such as `publicImport("./format")`. Its parameter type is the
+set of keys in the export map, so the type checker rejects a private or removed subpath. Prose in
+findings and prompts keeps literal imports. A removed import, such as `adamantite/lint/custom`,
+stays a constant in the module that reports its migration, and a test keeps it out of the export
+map.
+
 ## Managed plugins
 
 A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`
@@ -380,8 +387,8 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   all authoring types from `@oxlint/plugins`. `presets/rules/folder.ts` says what a rules folder
   holds: the default folder and plugin name, and which files are rules. Both `custom()` and
   `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
-  `adamantite/rules/testing`. It re-exports `RuleTester` and the test types from
-  `oxlint/plugins-dev`, connected to `node:test`.
+  `adamantite/rules/testing`. It re-exports `RuleTester` by name from `oxlint/plugins-dev`, with
+  the test types in its namespace, connected to `node:test`.
 - `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
   `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
   finds the Oxlint configs and follows their imports to the `custom()` calls. It also records

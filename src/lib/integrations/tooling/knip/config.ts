@@ -6,6 +6,7 @@ import type {
 } from "#lib/integrations/tooling/base.ts"
 import { checkImportsLintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
 import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
 
 export interface KnipWorkspace extends ToolingWorkspace {
   /**
@@ -102,7 +103,7 @@ export function inspectRequiredKnipConfig(
   workspace: KnipWorkspace
 ): RequiredConfigInspection {
   const inspection = inspectRequiredPresetConfig(content, {
-    moduleName: "adamantite/analyze",
+    moduleName: publicImport("./analyze"),
     presetName: "Adamantite analyze",
   })
 
@@ -132,8 +133,8 @@ export function toKnipTsConfigContent(workspace: KnipWorkspace = DEFAULT_WORKSPA
   return [
     'import type { KnipConfig } from "knip"',
     lists.length > 0
-      ? 'import analyze, { ignoreDependencies } from "adamantite/analyze"'
-      : 'import analyze from "adamantite/analyze"',
+      ? `import analyze, { ignoreDependencies } from "${publicImport("./analyze")}"`
+      : `import analyze from "${publicImport("./analyze")}"`,
     "",
     ...(lists.length > 0
       ? [

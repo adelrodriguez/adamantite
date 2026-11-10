@@ -12,6 +12,8 @@ import {
 } from "oxc-parser"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 import type { LintPreset, RetiredLintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
+import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/workspace/custom-rules/inspect.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",
@@ -54,9 +56,9 @@ export function toOxlintTsConfigContent(presets: readonly LintPreset[] = []) {
     'import { defineConfig } from "oxlint"',
     ...presetNames.map(
       (preset) =>
-        `import ${getImportName(preset)} from "${preset === "core" ? "adamantite/lint" : `adamantite/lint/${preset}`}"`
+        `import ${getImportName(preset)} from "${publicImport(preset === "core" ? "./lint" : `./lint/${preset}`)}"`
     ),
-    'import custom from "adamantite/rules"',
+    `import custom from "${publicImport("./rules")}"`,
     "",
     "export default defineConfig({",
     `  extends: [${[...presetNames.map((preset) => getImportName(preset)), "custom()"].join(", ")}],`,
@@ -85,12 +87,7 @@ function parse(content: string) {
   )
 }
 
-const LINT_PRESET_PREFIX = "adamantite/lint/"
-
-/**
- * The removed custom-rules module. Doctor handles its migration separately from lint presets.
- */
-const CUSTOM_RULES_MODULE = `${LINT_PRESET_PREFIX}custom`
+const LINT_PRESET_PREFIX = `${publicImport("./lint")}/`
 
 /**
  * The Adamantite lint presets that an `oxlint.config.ts` imports, such as `react` for
@@ -104,7 +101,7 @@ export function getImportedLintPresets(content: string): string[] {
       ast.body.flatMap((statement) =>
         statement.type === "ImportDeclaration"
         && statement.source.value.startsWith(LINT_PRESET_PREFIX)
-        && statement.source.value !== CUSTOM_RULES_MODULE
+        && statement.source.value !== LEGACY_CUSTOM_RULES_MODULE
           ? [statement.source.value.slice(LINT_PRESET_PREFIX.length)]
           : []
       )

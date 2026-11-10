@@ -14,8 +14,15 @@ import {
   type TSModuleDeclaration,
   Visitor,
 } from "oxc-parser"
+import { publicImport } from "#lib/shared/package-exports.ts"
 
-export const CUSTOM_RULES_MODULE = "adamantite/rules"
+export const CUSTOM_RULES_MODULE = publicImport("./rules")
+
+/**
+ * The removed custom-rules module. Doctor asks a project that still imports it to migrate. A test
+ * keeps it out of the export map.
+ */
+export const LEGACY_CUSTOM_RULES_MODULE = "adamantite/lint/custom"
 
 const DEFAULT_PLUGIN_NAME = "project"
 
@@ -101,7 +108,7 @@ export function hasLegacyRuleImports(file: string, content: string): boolean {
   return parsed.program.body.some((statement) => {
     if (statement.type === "ImportDeclaration") {
       return (
-        statement.source.value === "adamantite/lint/custom"
+        statement.source.value === LEGACY_CUSTOM_RULES_MODULE
         || (statement.source.value === CUSTOM_RULES_MODULE
           && statement.specifiers.some(
             (specifier) =>
@@ -115,7 +122,7 @@ export function hasLegacyRuleImports(file: string, content: string): boolean {
 
     if (statement.type === "ExportNamedDeclaration" && statement.source !== null) {
       return (
-        statement.source.value === "adamantite/lint/custom"
+        statement.source.value === LEGACY_CUSTOM_RULES_MODULE
         || (statement.source.value === CUSTOM_RULES_MODULE
           && statement.specifiers.some((specifier) => {
             const name =
@@ -128,7 +135,7 @@ export function hasLegacyRuleImports(file: string, content: string): boolean {
 
     return (
       statement.type === "ExportAllDeclaration"
-      && statement.source.value === "adamantite/lint/custom"
+      && statement.source.value === LEGACY_CUSTOM_RULES_MODULE
     )
   })
 }

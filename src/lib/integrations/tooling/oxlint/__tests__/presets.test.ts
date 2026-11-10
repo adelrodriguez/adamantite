@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { basename, join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
@@ -10,9 +10,29 @@ import {
   LINT_PRESETS,
   lintPresets,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
+import packageJson from "../../../../../../package.json" with { type: "json" }
 
-const PRESET_FILES_DIR = join(import.meta.dirname, "../../../../../../presets/lint")
+const REPO_ROOT = join(import.meta.dirname, "../../../../../..")
+const PRESET_FILES_DIR = join(REPO_ROOT, "presets/lint")
 const presetsWithPlugins = lintPresets.flatMap((preset) => ("plugin" in preset ? [preset] : []))
+
+function isLintExport([subpath]: readonly [string, unknown]) {
+  return subpath === "./lint" || subpath.startsWith("./lint/")
+}
+
+function presetExport(file: string) {
+  return { default: `./dist/presets/lint/${file}.js`, types: `./dist/presets/lint/${file}.d.ts` }
+}
+
+/**
+ * The preset names in the README table of public imports, such as `react` for
+ * `adamantite/lint/react`.
+ */
+function readDocumentedPresets() {
+  return readFileSync(join(REPO_ROOT, "README.md"), "utf8")
+    .split("\n")
+    .flatMap((line) => /^\| `adamantite\/lint\/([\w-]+)`/.exec(line)?.[1] ?? [])
+}
 
 function getPreset(name: string) {
   return Option.getOrThrow(Array.findFirst(lintPresets, (preset) => preset.name === name))
@@ -26,6 +46,23 @@ describe("lintPresets", () => {
       .filter((name) => name !== "core")
 
     expect(Array.sort(LINT_PRESETS, Order.String)).toStrictEqual(Array.sort(files, Order.String))
+  })
+
+  it("publish core and each preset at its own subpath, so no other preset file becomes public", () => {
+    expect(
+      Object.fromEntries(Object.entries(packageJson.exports).filter(isLintExport))
+    ).toStrictEqual(
+      Object.fromEntries([
+        ["./lint", presetExport("core")],
+        ...LINT_PRESETS.map((name) => [`./lint/${name}`, presetExport(name)]),
+      ])
+    )
+  })
+
+  it("document each preset in the README import table", () => {
+    expect(Array.sort(readDocumentedPresets(), Order.String)).toStrictEqual(
+      Array.sort(LINT_PRESETS, Order.String)
+    )
   })
 
   it("keep setup out of the written hints, so describeLintPreset adds it once", () => {

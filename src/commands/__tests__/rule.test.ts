@@ -125,11 +125,42 @@ describe("rule add", () => {
       expect(files.exists(".adamantite")).toBe(false)
     })
   )
+
+  it.effect("create a rule named test, because test is not a subcommand of add", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext()
+
+      const exit = yield* runCommand(ruleCommand, ["add", "test"], {
+        files,
+        layers: [createPrompterTestContext().layer],
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read(".adamantite/lint/test.ts")).toBe(toCustomRuleStub("test"))
+      expect(files.list()).toStrictEqual([".adamantite/lint/test.ts"])
+    })
+  )
+
+  it.effect("reject the former route that created a test", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
+      })
+
+      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
+        files,
+        layers: [createPrompterTestContext().layer],
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(files.list()).toStrictEqual([".adamantite/lint/no-debugger.ts"])
+    })
+  )
 })
 
 const PACKAGE_JSON = JSON.stringify({ name: "app" })
 
-describe("rule add test", () => {
+describe("rule test add", () => {
   it.effect("list existing rules for selection when no name is given", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -143,7 +174,7 @@ describe("rule add test", () => {
 
       const prompter = createPrompterTestContext({ selectResponses: ["no-debugger"] })
 
-      const exit = yield* runCommand(ruleCommand, ["add", "test"], {
+      const exit = yield* runCommand(ruleCommand, ["test", "add"], {
         files,
         layers: [prompter.layer, interactiveTerminalLayer],
       })
@@ -173,13 +204,16 @@ describe("rule add test", () => {
 
       const prompter = createPrompterTestContext()
 
-      const exit = yield* runCommand(ruleCommand, ["add", "test"], {
+      const exit = yield* runCommand(ruleCommand, ["test", "add"], {
         files,
         layers: [prompter.layer],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(prompter.messages).toStrictEqual(["no-debugger"])
+      expect(prompter.logs).toStrictEqual([
+        { level: "info", message: "Pass a rule name with `adamantite rule test add <name>`." },
+      ])
       expect(prompter.selectCalls).toStrictEqual([])
       expect(files.list()).toStrictEqual([".adamantite/lint/no-debugger.ts"])
     })
@@ -193,7 +227,7 @@ describe("rule add test", () => {
 
       const exit = yield* runCommand(
         ruleCommand,
-        ["add", "test", "no-debugger", "--path", "tests/lint/no-debugger.test.ts"],
+        ["test", "add", "no-debugger", "--path", "tests/lint/no-debugger.test.ts"],
         { files, layers: [createPrompterTestContext().layer] }
       )
 
@@ -214,7 +248,7 @@ describe("rule add test", () => {
       const prompter = createPrompterTestContext()
       const runner = createRunnerTestContext()
 
-      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
+      const exit = yield* runCommand(ruleCommand, ["test", "add", "no-debugger"], {
         files,
         layers: [prompter.layer, runner.layer],
       })
@@ -235,7 +269,7 @@ describe("rule add test", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext()
 
-      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
+      const exit = yield* runCommand(ruleCommand, ["test", "add", "no-debugger"], {
         files,
         layers: [createPrompterTestContext().layer],
       })
@@ -257,7 +291,7 @@ describe("rule add test", () => {
         },
       })
 
-      const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
+      const exit = yield* runCommand(ruleCommand, ["test", "add", "no-debugger"], {
         files,
         layers: [createPrompterTestContext().layer],
       })
@@ -278,7 +312,7 @@ describe("rule add test", () => {
 
       const exit = yield* runCommand(
         ruleCommand,
-        ["add", "test", "no-window", "--dir", "tooling/lint"],
+        ["test", "add", "no-window", "--dir", "tooling/lint"],
         { files, layers: [createPrompterTestContext().layer] }
       )
 
@@ -287,6 +321,43 @@ describe("rule add test", () => {
         'import rule from "./no-window.mjs"'
       )
       expect(files.exists(".adamantite")).toBe(false)
+    })
+  )
+
+  it.effect("read --dir and --path before the name, and tell how to run the test", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "tooling/lint/no-window.ts": "// rule\n" },
+      })
+
+      const prompter = createPrompterTestContext()
+      const runner = createRunnerTestContext()
+
+      const exit = yield* runCommand(
+        ruleCommand,
+        ["test", "add", "--dir", "tooling/lint", "--path", "tests/no-window.test.ts", "no-window"],
+        { files, layers: [prompter.layer, runner.layer] }
+      )
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(files.read("tests/no-window.test.ts")).toContain(
+        'import rule from "../tooling/lint/no-window.ts"'
+      )
+      expect(files.list()).toStrictEqual(["tests/no-window.test.ts", "tooling/lint/no-window.ts"])
+      expect(runner.invocations).toStrictEqual([])
+      expect(prompter.logs).toStrictEqual([
+        { level: "success", message: "Wrote tests/no-window.test.ts." },
+        {
+          level: "info",
+          message:
+            "Adapt the valid and invalid cases to the rule, then run `adamantite rule test` with `--path` and the test file path.",
+        },
+        {
+          level: "info",
+          message:
+            "RuleTester uses node:test. Exclude this test from Vitest and Jest discovery. See Custom rules in the Adamantite README.",
+        },
+      ])
     })
   )
 })
@@ -477,7 +548,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test.",
+            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
         },
       ])
     })
@@ -510,7 +581,7 @@ describe("rule test", () => {
         {
           level: "info",
           message:
-            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule add test` to add a test.",
+            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
         },
       ])
     })

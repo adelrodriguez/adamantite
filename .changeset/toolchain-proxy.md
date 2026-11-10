@@ -4,7 +4,7 @@
 
 Run Oxlint with the Effect builds of `@effect/tsgo` without patching `node_modules`
 
-`adamantite check`, `fix`, and `harden` now start Oxlint through `node_modules/adamantite/dist/oxlint.js`. When the project installs `@effect/tsgo`, this entry loads the Effect builds of the Oxlint binding and oxlint-tsgolint for the installed versions. Nothing patches `node_modules` anymore, so the effect preset works after any install, also with a read-only package store, and a production-only install no longer fails at the `prepare` script.
+`adamantite check` and `fix` now start Oxlint through `node_modules/adamantite/dist/oxlint.js`. When the project installs `@effect/tsgo`, this entry loads the Effect build of the Oxlint binding for the installed Oxlint version. Nothing patches `node_modules` anymore, so the effect preset works after any install, also with a read-only package store, and a production-only install no longer fails at the `prepare` script.
 
 `adamantite init` and `adamantite update` no longer run `effect-tsgo patch`, and `init` no longer writes a `prepare` script. The `adamantite prepare` command is removed. The VS Code integration sets `oxc.path.oxlint`, and the Zed integration sets `lsp.oxlint.binary`, so editors start the same entry.
 

@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs"
+import { readdirSync } from "node:fs"
 import { basename, join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
@@ -11,9 +11,9 @@ import {
   lintPresets,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
 import packageJson from "../../../../../../package.json" with { type: "json" }
+import readme from "../../../../../../README.md?raw"
 
-const REPO_ROOT = join(import.meta.dirname, "../../../../../..")
-const PRESET_FILES_DIR = join(REPO_ROOT, "presets/lint")
+const PRESET_FILES_DIR = join(import.meta.dirname, "../../../../../../presets/lint")
 const presetsWithPlugins = lintPresets.flatMap((preset) => ("plugin" in preset ? [preset] : []))
 
 function isLintExport([subpath]: readonly [string, unknown]) {
@@ -29,7 +29,7 @@ function presetExport(file: string) {
  * `adamantite/lint/react`.
  */
 function readDocumentedPresets() {
-  return readFileSync(join(REPO_ROOT, "README.md"), "utf8")
+  return readme
     .split("\n")
     .flatMap((line) => /^\| `adamantite\/lint\/([\w-]+)`/.exec(line)?.[1] ?? [])
 }

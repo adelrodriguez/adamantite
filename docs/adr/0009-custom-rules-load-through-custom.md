@@ -76,7 +76,7 @@ CI generation adds no custom-rule test step. Users can keep saved tests and run
   that fails before the fix and passes after it.
 - RuleTester verification runs with Node.js, also in a Bun project. The cases run from stdin
   or a temporary file by default. Users can add a saved `.test.ts` beside an existing rule
-  with `adamantite rule add test [name]`. Without a name, it lists existing rules for selection.
+  with `adamantite rule test add [name]`. Without a name, it lists existing rules for selection.
   `--path` selects another test file path. Run saved tests explicitly with
   `adamantite rule test`, or give it `--path` for a file outside the rules folder.
 - After a harden handoff, Adamantite runs `check` and the Doctor assessment. The agent does

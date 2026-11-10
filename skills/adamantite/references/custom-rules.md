@@ -71,7 +71,7 @@ JS
 ```
 
 Adapt the cases to the completed rule. Verify a helper directly only when its cases are too
-many for RuleTester. During harden, use `adamantite rule add test <name>` to prepare temporary
+many for RuleTester. During harden, use `adamantite rule test add <name>` to prepare temporary
 cases, adapt them, and run `adamantite rule test --path <test-file>`.
 If a saved test already exists, preserve it and use stdin for additional temporary cases.
 
@@ -83,7 +83,7 @@ Continue when every valid and invalid case passes and lint output contains no ru
 
 ## Keep saved tests when requested
 
-If the user requests new saved tests, run `adamantite rule add test <name>` and adapt its
+If the user requests new saved tests, run `adamantite rule test add <name>` and adapt its
 valid and invalid cases. Use `--dir` for another rules folder or `--path` for another test location.
 Keep `.test.ts` for tests beside rules, so the plugin does not load them as rules.
 Run saved tests with `adamantite rule test`, or `adamantite rule test --path <file>` for a test elsewhere.

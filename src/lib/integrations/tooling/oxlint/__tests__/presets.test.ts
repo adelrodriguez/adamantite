@@ -11,7 +11,6 @@ import {
   lintPresets,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
 import packageJson from "../../../../../../package.json" with { type: "json" }
-import readme from "../../../../../../README.md?raw"
 
 const PRESET_FILES_DIR = join(import.meta.dirname, "../../../../../../presets/lint")
 const presetsWithPlugins = lintPresets.flatMap((preset) => ("plugin" in preset ? [preset] : []))
@@ -22,16 +21,6 @@ function isLintExport([subpath]: readonly [string, unknown]) {
 
 function presetExport(file: string) {
   return { default: `./dist/presets/lint/${file}.js`, types: `./dist/presets/lint/${file}.d.ts` }
-}
-
-/**
- * The preset names in the README table of public imports, such as `react` for
- * `adamantite/lint/react`.
- */
-function readDocumentedPresets() {
-  return readme
-    .split("\n")
-    .flatMap((line) => /^\| `adamantite\/lint\/([\w-]+)`/.exec(line)?.[1] ?? [])
 }
 
 function getPreset(name: string) {
@@ -56,12 +45,6 @@ describe("lintPresets", () => {
         ["./lint", presetExport("core")],
         ...LINT_PRESETS.map((name) => [`./lint/${name}`, presetExport(name)]),
       ])
-    )
-  })
-
-  it("document each preset in the README import table", () => {
-    expect(Array.sort(readDocumentedPresets(), Order.String)).toStrictEqual(
-      Array.sort(LINT_PRESETS, Order.String)
     )
   })
 

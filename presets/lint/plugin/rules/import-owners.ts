@@ -220,14 +220,18 @@ const project: Project = {
 /**
  * The names that an alias can give the file at `path`: the path itself, the path without its
  * extension for an alias such as `"#lib/*": "./src/lib/*.ts"`, and the folder of an index file for
- * an alias that adds `/index.ts` after the name.
+ * an alias that adds `/index.ts` after the name. A declaration file such as `rows.d.ts` has two
+ * names without its extension: `rows.d` for an alias that adds `.ts`, and `rows` for an alias that
+ * adds `.d.ts`.
  */
 function listAliasNames(path: string) {
-  // A declaration file such as `rows.d.ts` has a two-part extension.
-  const bare = path.replace(/(\.d)?\.[^./]+$/, "")
-  const folder = posix.basename(bare) === "index" ? posix.dirname(bare) : bare
+  const bareNames = [path.replace(/\.[^./]+$/, ""), path.replace(/\.d\.[^./]+$/, "")]
 
-  return [...new Set([path, bare, folder])].filter((name) => name !== ".")
+  const folders = bareNames.flatMap((name) =>
+    posix.basename(name) === "index" ? [posix.dirname(name)] : []
+  )
+
+  return [...new Set([path, ...bareNames, ...folders])].filter((name) => name !== ".")
 }
 
 export function createImportOwnersRule(project: Project): Rule {

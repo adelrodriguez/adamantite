@@ -10,10 +10,11 @@ import { defineIntegration, type IntegrationAssessment } from "#lib/integrations
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { formatJson, mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
 import { getManagedScripts, checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
-const PRESET_EXTENDS = "adamantite/typescript"
+const PRESET_EXTENDS = publicImport("./typescript")
 const CONFIG = { extends: PRESET_EXTENDS }
 
 export const MONOREPO_GUIDANCE = [

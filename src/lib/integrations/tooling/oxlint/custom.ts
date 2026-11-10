@@ -9,6 +9,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
 import { isDiscoveryComplete } from "#lib/workspace/custom-rules/discover.ts"
 import {
   CUSTOM_RULES_DIRECTORY,
@@ -25,8 +26,8 @@ interface RulesFolder {
 }
 
 const CONFIG_REFERENCE = `import { defineConfig } from "oxlint"
-import core from "adamantite/lint"
-import custom from "adamantite/rules"
+import core from "${publicImport("./lint")}"
+import custom from "${publicImport("./rules")}"
 
 export default defineConfig({
   extends: [core, custom()],

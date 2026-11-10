@@ -27,6 +27,7 @@ import {
   FailedToReadFile,
   ScopeOutsideProject,
 } from "#lib/shared/errors.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Toolchain from "#lib/toolchain/index.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
@@ -67,7 +68,7 @@ function getLinkKey(link: BrokenLink) {
 const readInstalledVersion = Effect.fn("readInstalledVersion")(function* (cwd: string) {
   const path = yield* Path.Path
   const resolver = yield* ModuleResolver
-  const entry = yield* resolver.resolve(cwd, "adamantite/lint")
+  const entry = yield* resolver.resolve(cwd, publicImport("./lint"))
 
   if (Option.isNone(entry)) {
     return Option.none<string>()

@@ -285,16 +285,16 @@ Write and inspect [custom rules](#custom-rules):
 ```sh
 adamantite rule add no-process-env
 adamantite rule add no-window --dir tooling/lint/rules
-adamantite rule add test
-adamantite rule add test no-process-env
-adamantite rule add test no-process-env --path tests/no-process-env.test.ts
+adamantite rule test add
+adamantite rule test add no-process-env
+adamantite rule test add no-process-env --path tests/no-process-env.test.ts
 adamantite rule test
 adamantite rule test --path tests/no-process-env.test.ts
 adamantite rule ast src/index.ts
 ```
 
 `rule add` writes only a rule stub to `.adamantite/lint/`, or to the folder that `--dir` names.
-Agents verify it with temporary `RuleTester` cases by default. `rule add test` lists existing
+Agents verify it with temporary `RuleTester` cases by default. `rule test add` lists existing
 rules for selection. Pass a rule name to skip the list; the command fails if the rule does not
 exist. It writes an optional `<name>.test.ts` beside the rule, or at the file path that `--path`
 names. `--dir` selects another rules folder. It preserves existing files. Adapt the generated
@@ -303,7 +303,7 @@ valid and invalid cases to the rule before running them.
 `rule test` runs saved `.test.*` files beside the rules that `custom()` loads. Use
 `rule test --path <file>` for a test saved elsewhere. CI and harden do not run saved tests
 automatically. Agents remove their temporary verification cases before they finish.
-During harden, agents can use `rule add test` to prepare those temporary cases and
+During harden, agents can use `rule test add` to prepare those temporary cases and
 `rule test --path <file>` to run them. They preserve user-owned saved tests.
 `rule ast` prints the ESTree-shaped AST that Oxlint rules visit, so you can read node names off
 real code.

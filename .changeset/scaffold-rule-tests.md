@@ -10,7 +10,7 @@ By default, the target project keeps only the rules, their runtime helpers, and 
 `RuleTester` connects to `node:test`, so a failed case makes the verification command fail,
 also in a Bun project that runs the command with Node.js. `oxlint` is an optional peer dependency.
 
-`rule add` writes only a rule stub. Users can opt in with `adamantite rule add test [name]`.
+`rule add` writes only a rule stub. Users can opt in with `adamantite rule test add [name]`.
 Without a name, it lists existing rules for selection. A named rule must already exist.
 The command writes `<name>.test.ts` beside the rule; `--path <file>` chooses another test path.
 Run saved tests explicitly with `adamantite rule test`, or give it `--path` for a test saved

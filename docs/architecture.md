@@ -175,7 +175,7 @@ writing files. See ADR 0023.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit.
   Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
   Temporary verification cases do not stay in the target project. Users can opt in to saved
-  `.test.*` files beside their rules, add them with `rule add test [name]`, and run them explicitly
+  `.test.*` files beside their rules, add them with `rule test add [name]`, and run them explicitly
   with `rule test`. `--path` selects another test location. Init, CI,
   and harden do not run them by default. See ADR 0009.
 - `rule try` runs a trial: `hardening/trial.ts` copies the files that git lists to a temporary
@@ -388,7 +388,7 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   copy of the rule file test and the defaults, and a unit test keeps them equal to
   `presets/rules/folder.ts`.
   `index.ts` writes only the rule stub for `adamantite rule add`, from the template beside it.
-  It also lists existing rules for `rule add test`, writes an optional sibling `<name>.test.ts`
+  It also lists existing rules for `rule test add`, writes an optional sibling `<name>.test.ts`
   or the file that `--path` names, and finds `.test.*` files in each loaded rules folder for
   `adamantite rule test`. The command accepts `--path` to run a test saved elsewhere.
   The shipped skill tells the agent how to run temporary

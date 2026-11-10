@@ -9,7 +9,7 @@ export function getStubTemplate(): string {
 }
 
 /**
- * Inline the optional test template. Only `rule add test` writes it.
+ * Inline the optional test template. Only `rule test add` writes it.
  */
 export function getTestStubTemplate(): string {
   return readFileSync(new URL("stub.test.ts.template", import.meta.url), "utf8")

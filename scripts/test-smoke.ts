@@ -158,12 +158,12 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
 
   // Add a saved test only on request. It must stay out of the runtime plugin.
   assertIncludes(
-    runExpectingFailure(process.execPath, [cliPath, "rule", "add", "test", "missing"], { cwd, env })
+    runExpectingFailure(process.execPath, [cliPath, "rule", "test", "add", "missing"], { cwd, env })
       .output,
     "does not exist"
   )
   const testPath = join(cwd, ".adamantite", "lint", "no-smoke.test.ts")
-  run(process.execPath, [cliPath, "rule", "add", "test", "no-smoke"], { cwd, env })
+  run(process.execPath, [cliPath, "rule", "test", "add", "no-smoke"], { cwd, env })
 
   try {
     assertIncludes(run(process.execPath, [cliPath, "rule", "test"], { cwd, env }), "✔ debugger")
@@ -174,7 +174,7 @@ function addRuleAndVerify(cwd: string, env: NodeJS.ProcessEnv) {
   }
 
   const customTest = join(cwd, "tests", "no-smoke.test.ts")
-  run(process.execPath, [cliPath, "rule", "add", "test", "no-smoke", "--path", customTest], {
+  run(process.execPath, [cliPath, "rule", "test", "add", "no-smoke", "--path", customTest], {
     cwd,
     env,
   })

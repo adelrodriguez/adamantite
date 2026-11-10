@@ -6,7 +6,7 @@ Add `adamantite/rules/plugin` for the Oxlint authoring API and use `.adamantite/
 
 Import `definePlugin`, `defineRule`, `eslintCompatPlugin`, and the Oxlint authoring types from
 `adamantite/rules/plugin`. Import the rules-folder preset as `import custom from "adamantite/rules"`.
-The helpers come from Adamantite's pinned `@oxlint/plugins` dependency. `RuleTester` stays at
+The helpers come from Adamantite's pinned `@oxlint/plugins` dependency. `RuleTester` is at
 `adamantite/rules/testing`, which also exports the upstream test types.
 
 Move an existing `.adamantite/rules` folder to `.adamantite/lint`, or keep it with

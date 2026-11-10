@@ -2,9 +2,9 @@
 "adamantite": minor
 ---
 
-Update the managed tooling versions: Oxlint 1.91.0, oxlint-tsgolint 7.0.2005, and oxfmt 0.76.0. Also update the runtime dependency `@oxlint/plugins` to 1.91.0.
+Update Oxlint to 1.91.0 and oxfmt to 0.76.0
 
-Oxlint 1.90.0 and later need oxlint-tsgolint 7.0.2005 or later, so the two versions move together.
+The runtime dependency `@oxlint/plugins` moves to 1.91.0 with Oxlint.
 
 To upgrade an existing project:
 

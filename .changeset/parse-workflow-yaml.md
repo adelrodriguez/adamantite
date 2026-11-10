@@ -2,6 +2,8 @@
 "adamantite": patch
 ---
 
+Read the GitHub Actions workflow and `pnpm-workspace.yaml` with a YAML parser
+
 Doctor now parses the Adamantite GitHub Actions workflow as YAML. It reads the `run` of each job
 step, the `command` of each matrix `include` entry, and the `node-version` input of each step, so
 it also finds a step in flow style, such as `- { name: Check, run: pnpm run check }`, and it

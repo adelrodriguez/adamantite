@@ -30,5 +30,5 @@ To upgrade an existing project:
 
 - Run `adamantite update` to install the new version.
 - Expect `adamantite check` to report the code that these rules describe.
-- `@effect/tsgo` 0.67.3 has Effect builds for Oxlint 1.88.0, 1.89.0, 1.90.0, and 1.91.0, and for oxlint-tsgolint 7.0.2004 and 7.0.2005.
+- `@effect/tsgo` 0.67.3 has Effect builds for Oxlint 1.88.0, 1.89.0, 1.90.0, and 1.91.0.
 - For Effect editor features, run `adamantite init --non-interactive --script check --preset effect --editor vscode --editor zed`. The editor setup uses the installed Effect compiler without a TypeScript patch.

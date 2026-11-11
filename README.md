@@ -399,10 +399,7 @@ to the same options, so built-in APIs return safer types. For example, `JSON.par
 `includes()` on a literal array accepts a wider value. The project needs no `reset.d.ts` file and
 no ts-reset dependency, because the preset loads the declarations from the Adamantite package.
 
-ts-reset is a project by [Matt Pocock](https://github.com/mattpocock) of
-[Total TypeScript](https://www.totaltypescript.com/ts-reset). Adamantite ships a copy of its
-declarations from the [upstream repository](https://github.com/total-typescript/ts-reset) under
-the MIT license, and the copy includes that license.
+ts-reset is by Matt Pocock. See [credits](#credits).
 
 ```json
 { "extends": "adamantite/typescript" }
@@ -995,6 +992,36 @@ set `skills.dirs`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the repository workflow. Contributors should
 also read the [domain glossary](GLOSSARY.md) and [architecture reference](docs/architecture.md).
+
+## Credits
+
+Adamantite builds on the work of these people and projects.
+
+Adamantite ships copies of this code, each with its MIT license:
+
+- [ts-reset](https://github.com/total-typescript/ts-reset) by
+  [Matt Pocock](https://github.com/mattpocock) of
+  [Total TypeScript](https://www.totaltypescript.com/ts-reset), in `adamantite/typescript`.
+- [anti-slop](https://github.com/dmmulroy/anti-slop) by
+  [Dillon Mulroy](https://github.com/dmmulroy), in `adamantite/lint/strict` and
+  `adamantite/lint/effect`.
+
+Adamantite configures and runs these tools:
+
+- [Oxlint, Oxfmt, and tsrs](https://github.com/oxc-project) by
+  [Boshen](https://github.com/Boshen) and the Oxc contributors.
+- [Knip](https://github.com/webpro-nl/knip) by [Lars Kappert](https://github.com/webpro).
+- [Sherif](https://github.com/QuiiBz/sherif) by [Tom Lienard](https://github.com/QuiiBz).
+- [@effect/tsgo](https://github.com/Effect-TS/tsgo) by
+  [Mattia Manzati](https://github.com/mattiamanzati) and the
+  [Effect](https://github.com/Effect-TS) team.
+- [React Doctor](https://github.com/millionco/react-doctor) by
+  [Aiden Bai](https://github.com/aidenybai) of [Million](https://github.com/millionco).
+- [@shadcn/lint](https://github.com/shadcn-ui/lint) by [shadcn](https://github.com/shadcn).
+- [TypeScript](https://github.com/microsoft/TypeScript) by Microsoft.
+
+The terminal interface uses [Clack](https://github.com/bombshell-dev/clack) by
+[Nate Moore](https://github.com/natemoo-re).
 
 ## License
 

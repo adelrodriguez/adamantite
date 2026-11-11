@@ -39,7 +39,7 @@ function findLanguageServicePlugin(plugins: JsonValue | undefined) {
 
 /**
  * A finding when the root `tsconfig.json` lacks the language service entry, or the entry reports no
- * diagnostics. A monorepo gets guidance instead, as the tsconfig integration does.
+ * diagnostics. A monorepo gets guidance instead.
  */
 export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* (
   { cwd, workspace }: Project,

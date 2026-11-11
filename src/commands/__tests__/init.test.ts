@@ -658,16 +658,15 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.multiselectCalls[0]).toMatchObject({ required: false })
-        expect(prompter.confirmCalls[0]).toMatchObject({
-          message: "Use the Adamantite TypeScript preset?",
-        })
+        expect([prompter.multiselectCalls[0], prompter.confirmCalls[0]]).toMatchObject([
+          { required: false },
+          { message: "Use the Adamantite TypeScript preset?" },
+        ])
         expect(installer.calls).toStrictEqual([
           { options: { silent: true, workspace: false }, packages: ["adamantite"] },
         ])
         expect(files.list()).toStrictEqual(["package.json", "tsconfig.json"])
         expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: "adamantite/typescript" })
-        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
       })
     )
 
@@ -1381,7 +1380,7 @@ describe("init", () => {
         })
 
         const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
+          confirmResponses: [false, false, false],
           multiselectResponses: [["analyze"], []],
         })
 

@@ -25,17 +25,26 @@ describe("tsconfig", () => {
   describe("assess", () => {
     const packageJson = { name: "project" }
 
-    it.effect.each([
-      { config: undefined, name: "no tsconfig.json" },
-      { config: { compilerOptions: { strict: true } }, name: "no extends" },
-      { config: { extends: "@company/tsconfig" }, name: "another base config" },
-      { config: { extends: ["./base.json"] }, name: "an extends array without the preset" },
-    ])("skip a project with $name, whatever its scripts", ({ config }) =>
+    it.effect.each<{ readonly configFiles: Record<string, string>; readonly name: string }>([
+      { configFiles: {}, name: "no tsconfig.json" },
+      {
+        configFiles: { "tsconfig.json": JSON.stringify({ compilerOptions: { strict: true } }) },
+        name: "no extends",
+      },
+      {
+        configFiles: { "tsconfig.json": JSON.stringify({ extends: "@company/tsconfig" }) },
+        name: "another base config",
+      },
+      {
+        configFiles: { "tsconfig.json": JSON.stringify({ extends: ["./base.json"] }) },
+        name: "an extends array without the preset",
+      },
+    ])("skip a project with $name, whatever its scripts", ({ configFiles }) =>
       Effect.gen(function* () {
         for (const scripts of [undefined, { check: "adamantite check" }]) {
           const files = makeFiles({
             "package.json": yield* stringifyJson({ ...packageJson, scripts }),
-            ...(config === undefined ? {} : { "tsconfig.json": yield* stringifyJson(config) }),
+            ...configFiles,
           })
 
           const result = yield* readProject(ROOT).pipe(

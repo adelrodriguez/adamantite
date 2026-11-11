@@ -73,6 +73,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         value: "analyze",
       },
     ],
+    required: false,
   })
 
   const packageJson = yield* readPackageJson(cwd)
@@ -96,14 +97,12 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const hasOxlint = checkRunsTool(selectedScripts, "oxlint")
   const selectedPresets = hasOxlint ? yield* promptPresets : []
 
-  const shouldSetupTypescript = hasOxlint
-    ? yield* prompter.confirm({
-        initialValue: true,
-        message: isMonorepo
-          ? "Show how to use the TypeScript preset in each workspace package?"
-          : "Use the Adamantite TypeScript preset?",
-      })
-    : false
+  const shouldSetupTypescript = yield* prompter.confirm({
+    initialValue: true,
+    message: isMonorepo
+      ? "Show how to use the TypeScript preset in each workspace package?"
+      : "Use the Adamantite TypeScript preset?",
+  })
 
   const selectedEditors = yield* prompter.multiselect({
     message: "Which editors should Adamantite configure?",

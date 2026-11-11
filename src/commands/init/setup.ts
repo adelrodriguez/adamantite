@@ -104,6 +104,11 @@ export const addScripts = (
   Effect.gen(function* () {
     const prompter = yield* Prompter
     const packageJson = yield* readPackageJson(cwd)
+
+    if (scripts.length === 0) {
+      return getManagedScripts(packageJson)
+    }
+
     const conflicts = options.overwriteScripts ? [] : getConflictingScripts(packageJson, scripts)
     const conflictingNames = new Set(conflicts.map((conflict) => conflict.script))
     const writtenScripts = scripts.filter((script) => !conflictingNames.has(script))

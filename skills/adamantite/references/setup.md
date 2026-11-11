@@ -3,7 +3,7 @@
 ## Select the setup
 
 Read `adamantite init --help` for the available scripts, presets, and editors.
-Use explicit `--non-interactive` setup as an agent. Include at least one `--script`.
+Use explicit `--non-interactive` setup as an agent. Include at least one `--script` or `--typescript`.
 For example, to configure checks, fixes, TypeScript, and agent instructions, run:
 
 ```sh

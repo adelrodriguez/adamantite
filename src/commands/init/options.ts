@@ -57,10 +57,13 @@ export interface InitOptions {
    */
   readonly lint: Option.Option<{
     readonly presets: readonly LintPreset[]
-    readonly typescript: boolean
   }>
   readonly overwriteScripts: boolean
   readonly scripts: readonly Script[]
+  /**
+   * Extend `adamantite/typescript` in `tsconfig.json`. It needs no script.
+   */
+  readonly typescript: boolean
 }
 
 export interface InitOptionsInput {
@@ -92,12 +95,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     typescript: input.typescript,
   }
 
-  if (options.scripts.length === 0) {
-    return yield* new InvalidInitOptions({
-      reason: "Select at least one script with `--script <name>`.",
-    })
-  }
-
   const hasOxlint = checkRunsTool(options.scripts, "oxlint")
 
   if (options.presets.length > 0 && !hasOxlint) {
@@ -113,12 +110,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
 
     return yield* new InvalidInitOptions({
       reason: `\`--preset ${requiredBy}\` requires \`--preset ${required}\`.`,
-    })
-  }
-
-  if (options.typescript && !hasOxlint) {
-    return yield* new InvalidInitOptions({
-      reason: "`--typescript` requires the `check` or `fix` script.",
     })
   }
 
@@ -148,24 +139,21 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     githubActions: options.githubActions
       ? Option.liftPredicate(packageManager, checkIsSupportedPackageManager)
       : Option.none(),
-    lint: hasOxlint
-      ? Option.some({ presets: options.presets, typescript: options.typescript })
-      : Option.none(),
+    lint: hasOxlint ? Option.some({ presets: options.presets }) : Option.none(),
     overwriteScripts: options.overwriteScripts,
     scripts: options.scripts,
+    typescript: options.typescript,
   } satisfies InitOptions
 })
 
 const nonInteractive = Flag.Boolean(INIT_FLAGS.nonInteractive).pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Configure without prompts. Select at least one --script")
+  Flag.withDescription("Configure without prompts. Select at least one --script or --typescript")
 )
 
 const scripts = Flag.Literals(INIT_FLAGS.script, SCRIPT_ORDER).pipe(
   Flag.atMost(SCRIPT_ORDER.length),
-  Flag.withDescription(
-    "Add a package script. Repeat --script to add more. Required with --non-interactive"
-  )
+  Flag.withDescription("Add a package script. Repeat --script to add more")
 )
 
 const presets = Flag.Literals(INIT_FLAGS.preset, LINT_PRESETS).pipe(
@@ -182,7 +170,7 @@ const editors = Flag.Literals(INIT_FLAGS.editor, INIT_EDITORS).pipe(
 
 const typescript = Flag.Boolean("typescript").pipe(
   Flag.withDefault(false),
-  Flag.withDescription("Use the TypeScript preset. Requires --script check or --script fix")
+  Flag.withDescription("Use the TypeScript preset")
 )
 
 const installExtensions = Flag.Boolean("install-extensions").pipe(

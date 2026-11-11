@@ -72,7 +72,7 @@ adamantite analyze
 ## Non-interactive setup
 
 Use `--non-interactive` to configure a project entirely from flags. Specify at least one
-`--script`. Repeat `--script`, `--preset`, and `--editor` to select multiple values.
+`--script` or `--typescript`. Repeat `--script`, `--preset`, and `--editor` to select multiple values.
 
 ```sh
 npx adamantite init \
@@ -96,7 +96,7 @@ Available setup values:
   `jest`, `vitest`, `node`, `architecture`, `strict`, and `tailwind`. `react-strict` requires `react`.
 - Editors: `vscode` and `zed`.
 
-Presets and TypeScript require the `check` or `fix` script. Editor extension installation
+Presets require the `check` or `fix` script. Editor extension installation
 requires an editor. GitHub Actions requires a compatible script and a supported package
 manager. Omitted boolean flags are disabled.
 

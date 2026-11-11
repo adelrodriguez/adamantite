@@ -372,6 +372,7 @@ describe("assessProject", () => {
           }),
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
           "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+          "tsconfig.json": yield* stringifyJson({ extends: "adamantite/typescript" }),
         },
         root: ROOT,
       })

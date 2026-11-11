@@ -246,7 +246,7 @@ describe("doctor", () => {
       const files = createFileSystemTestContext({
         files: {
           "package.json": manifest({
-            devDependencies: { adamantite: "1.0.0", knip: knip.version },
+            devDependencies: { adamantite: "1.0.0", knip: "github:webpro-nl/knip" },
             scripts: { analyze: "adamantite analyze", check: "adamantite check" },
             workspaces: ["packages/*"],
           }),
@@ -262,7 +262,7 @@ describe("doctor", () => {
         logs: [],
         messages: [
           expect.stringMatching(
-            /^# Adamantite doctor findings\n[\s\S]*Adamantite leaves the root `tsconfig\.json` unchanged/
+            /^# Adamantite doctor findings\n[\s\S]*`knip` is declared as `github:webpro-nl\/knip`/
           ),
         ],
         outros: [],

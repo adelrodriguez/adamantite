@@ -103,11 +103,32 @@ export default Command.make("init", initCommandOptions).pipe(
         })
       }
 
+      if (options.nonInteractive && options.scripts.length === 0 && !options.typescript) {
+        return yield* new InvalidInitOptions({
+          reason:
+            "Select at least one script with `--script <name>`, or the TypeScript preset with `--typescript`.",
+        })
+      }
+
       const input = options.nonInteractive
         ? options
         : yield* collectInteractiveInitOptions(cwd, isMonorepo, packageManager.name)
 
       const initOptions = yield* validateInitOptions(input, packageManager.name)
+
+      // GitHub Actions needs a script, so a run without scripts, TypeScript, editors, and agent
+      // guidance selects no setup at all.
+      if (
+        initOptions.scripts.length === 0
+        && !initOptions.typescript
+        && Option.isNone(initOptions.editors)
+        && !initOptions.agents
+      ) {
+        yield* prompter.outro("💠 No setup selected, so Adamantite made no changes.")
+
+        return
+      }
+
       const selectedScripts = [...initOptions.scripts]
       const { lint } = initOptions
 
@@ -170,7 +191,7 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupSkill(cwd)
       }
 
-      if (Option.exists(lint, (setup) => setup.typescript)) {
+      if (initOptions.typescript) {
         yield* setupTypescript(cwd, isMonorepo)
       }
 

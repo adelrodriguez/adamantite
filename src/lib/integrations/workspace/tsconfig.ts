@@ -9,9 +9,8 @@ import type { Project } from "#lib/workspace/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { formatJson, mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
+import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
-import { getManagedScripts, checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
 const PRESET_EXTENDS = publicImport("./typescript")
@@ -37,77 +36,34 @@ function mergeExtends(existing: JsonValue | undefined) {
   return PRESET_EXTENDS
 }
 
+// Doctor checks only a project that chose the preset, so a project that declined it in init gets
+// no finding. Oxlint's type check runs without a `tsconfig.json`.
+function checkExtendsPreset(config: JsonValue) {
+  return (
+    Predicate.isObject(config)
+    && (config.extends === PRESET_EXTENDS
+      || (Array.isArray(config.extends) && config.extends.includes(PRESET_EXTENDS)))
+  )
+}
+
 export default defineIntegration({
-  assess: ({ cwd, packageJson, workspace }: Project) =>
+  assess: ({ cwd }: Project) =>
     Effect.gen(function* () {
-      const managedScripts = getManagedScripts(packageJson)
-
-      if (!checkRunsTool(managedScripts, "oxlint")) {
-        return { applicable: false } satisfies IntegrationAssessment
-      }
-
-      if (workspace.isMonorepo) {
-        return {
-          applicable: true,
-          findings: [],
-          packageActions: [],
-          warnings: MONOREPO_GUIDANCE,
-        } satisfies IntegrationAssessment
-      }
-
       const path = yield* Path.Path
       const configPath = path.join(cwd, files[0].path)
       const content = yield* readFileIfExists(configPath)
 
       if (Option.isNone(content)) {
-        return {
-          applicable: true,
-          findings: [
-            {
-              currentState: "`tsconfig.json` is missing.",
-              goal: [
-                "Create `tsconfig.json` and set `extends` to include `adamantite/typescript`.",
-              ],
-              id: "missing-tsconfig",
-              integration: "tsconfig",
-              reference: {
-                content: `${yield* formatJson(CONFIG)}\n`,
-                language: "json",
-              },
-              title: "Missing TypeScript configuration",
-            },
-          ],
-          packageActions: [],
-          warnings: [],
-        } satisfies IntegrationAssessment
+        return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const config = yield* parseJson(content.value, configPath)
-
-      const configured =
-        Predicate.isObject(config)
-        && (config.extends === PRESET_EXTENDS
-          || (Array.isArray(config.extends) && config.extends.includes(PRESET_EXTENDS)))
+      if (!checkExtendsPreset(yield* parseJson(content.value, configPath))) {
+        return { applicable: false } satisfies IntegrationAssessment
+      }
 
       return {
         applicable: true,
-        findings: configured
-          ? []
-          : [
-              {
-                currentState: "`tsconfig.json` does not extend `adamantite/typescript`.",
-                goal: [
-                  "Add `adamantite/typescript` to `extends`. Preserve every existing TypeScript option and existing base config.",
-                ],
-                id: "missing-adamantite-tsconfig-extends",
-                integration: "tsconfig",
-                reference: {
-                  content: `${yield* formatJson(CONFIG)}\n`,
-                  language: "json",
-                },
-                title: "TypeScript preset is not configured",
-              },
-            ],
+        findings: [],
         packageActions: [],
         warnings: [],
       } satisfies IntegrationAssessment

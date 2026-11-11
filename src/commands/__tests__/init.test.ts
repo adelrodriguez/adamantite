@@ -640,6 +640,65 @@ describe("init", () => {
     )
   })
 
+  describe("setup without scripts", () => {
+    it.effect("accept no scripts and still ask about the TypeScript preset", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+
+        const prompter = createPrompterTestContext({
+          confirmResponses: [true, false],
+          multiselectResponses: [[], []],
+        })
+
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.multiselectCalls[0]).toMatchObject({ required: false })
+        expect(prompter.confirmCalls[0]).toMatchObject({
+          message: "Use the Adamantite TypeScript preset?",
+        })
+        expect(installer.calls).toStrictEqual([
+          { options: { silent: true, workspace: false }, packages: ["adamantite"] },
+        ])
+        expect(files.list()).toStrictEqual(["package.json", "tsconfig.json"])
+        expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: "adamantite/typescript" })
+        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
+      })
+    )
+
+    it.effect("change nothing when the user selects no setup", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const originalPackageJson = files.read("package.json")
+
+        const prompter = createPrompterTestContext({
+          confirmResponses: [false, false],
+          multiselectResponses: [[], []],
+        })
+
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(installer.calls).toStrictEqual([])
+        expect(files.list()).toStrictEqual(["package.json"])
+        expect(files.read("package.json")).toBe(originalPackageJson)
+        expect(prompter.outros).toStrictEqual([
+          "💠 No setup selected, so Adamantite made no changes.",
+        ])
+      })
+    )
+  })
+
   describe("non-interactive setup", () => {
     it.effect.each(["dependencies", "devDependencies"])(
       "keep the adamantite version in $0 and install only the tools",
@@ -733,6 +792,31 @@ describe("init", () => {
       })
     )
 
+    it.effect.each([
+      { args: ["--non-interactive", "--typescript"], name: "no script", scripts: undefined },
+      {
+        args: ["--non-interactive", "--script", "analyze", "--typescript"],
+        name: "a script without linting",
+        scripts: { analyze: "adamantite analyze" },
+      },
+    ])("set up the TypeScript preset with $name", ({ args, scripts }) =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, args, {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: "adamantite/typescript" })
+        expect(readJson(files, "package.json").scripts).toStrictEqual(scripts)
+        expect(files.exists("oxlint.config.ts")).toBe(false)
+      })
+    )
+
     it.effect("deduplicate a repeated preset", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
@@ -753,8 +837,9 @@ describe("init", () => {
     it.effect.each([
       {
         args: ["--non-interactive"],
-        name: "a missing script",
-        reason: "Select at least one script with `--script <name>`.",
+        name: "neither a script nor TypeScript",
+        reason:
+          "Select at least one script with `--script <name>`, or the TypeScript preset with `--typescript`.",
       },
       {
         args: ["--non-interactive", "--script", "analyze", "--preset", "react"],
@@ -765,11 +850,6 @@ describe("init", () => {
         args: ["--non-interactive", "--script", "check", "--preset", "react-strict"],
         name: "react-strict without the react preset",
         reason: "`--preset react-strict` requires `--preset react`.",
-      },
-      {
-        args: ["--non-interactive", "--script", "analyze", "--typescript"],
-        name: "TypeScript without linting",
-        reason: "`--typescript` requires the `check` or `fix` script.",
       },
       {
         args: ["--non-interactive", "--script", "analyze", "--install-extensions"],

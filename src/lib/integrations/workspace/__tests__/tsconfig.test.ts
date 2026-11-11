@@ -23,50 +23,32 @@ function provideFiles(files: FileSystemTestContext) {
 
 describe("tsconfig", () => {
   describe("assess", () => {
-    const packageJson = {
-      scripts: { check: "adamantite check" },
-    }
-
-    it.effect("report a missing root config outside a monorepo", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
-
-        const result = yield* readProject(ROOT).pipe(
-          Effect.flatMap((project) => tsconfig.assess(project)),
-          provideFiles(files)
-        )
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [{ id: "missing-tsconfig" }],
-        })
-      })
-    )
+    const packageJson = { name: "project" }
 
     it.effect.each([
+      { config: undefined, name: "no tsconfig.json" },
       { config: { compilerOptions: { strict: true } }, name: "no extends" },
       { config: { extends: "@company/tsconfig" }, name: "another base config" },
       { config: { extends: ["./base.json"] }, name: "an extends array without the preset" },
-    ])("report a config with $name", ({ config }) =>
+    ])("skip a project with $name, whatever its scripts", ({ config }) =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          "package.json": yield* stringifyJson(packageJson),
-          "tsconfig.json": yield* stringifyJson(config),
-        })
+        for (const scripts of [undefined, { check: "adamantite check" }]) {
+          const files = makeFiles({
+            "package.json": yield* stringifyJson({ ...packageJson, scripts }),
+            ...(config === undefined ? {} : { "tsconfig.json": yield* stringifyJson(config) }),
+          })
 
-        const result = yield* readProject(ROOT).pipe(
-          Effect.flatMap((project) => tsconfig.assess(project)),
-          provideFiles(files)
-        )
+          const result = yield* readProject(ROOT).pipe(
+            Effect.flatMap((project) => tsconfig.assess(project)),
+            provideFiles(files)
+          )
 
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [{ id: "missing-adamantite-tsconfig-extends" }],
-        })
+          expect(result).toStrictEqual({ applicable: false })
+        }
       })
     )
 
-    it.effect("accept string or array preset extends", () =>
+    it.effect("accept string or array preset extends without any script", () =>
       Effect.gen(function* () {
         for (const preset of ["adamantite/typescript", ["./base.json", "adamantite/typescript"]]) {
           const files = makeFiles({
@@ -79,26 +61,13 @@ describe("tsconfig", () => {
             provideFiles(files)
           )
 
-          expect(result).toMatchObject({ applicable: true, findings: [] })
+          expect(result).toStrictEqual({
+            applicable: true,
+            findings: [],
+            packageActions: [],
+            warnings: [],
+          })
         }
-      })
-    )
-
-    it.effect("return monorepo guidance instead of a root finding", () =>
-      Effect.gen(function* () {
-        const monorepoPackageJson = { ...packageJson, workspaces: ["packages/*"] }
-        const files = makeFiles({ "package.json": yield* stringifyJson(monorepoPackageJson) })
-
-        const result = yield* readProject(ROOT).pipe(
-          Effect.flatMap((project) => tsconfig.assess(project)),
-          provideFiles(files)
-        )
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [],
-          warnings: expect.arrayContaining([expect.stringContaining("monorepo")]),
-        })
       })
     )
   })
@@ -106,8 +75,7 @@ describe("tsconfig", () => {
   describe("create", () => {
     it.effect("create a config that assess accepts", () =>
       Effect.gen(function* () {
-        const packageJson = { scripts: { check: "adamantite check" } }
-        const files = makeFiles({ "package.json": yield* stringifyJson(packageJson) })
+        const files = makeFiles({ "package.json": yield* stringifyJson({ name: "project" }) })
 
         yield* tsconfig.create(ROOT).pipe(provideFiles(files))
 

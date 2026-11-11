@@ -11,6 +11,8 @@ export default defineConfig({
     ...ignorePatterns,
     // Vendored plugin bundles are entirely generated; see scripts/vendor-plugins.ts.
     "presets/lint/vendor/",
+    // The vendored ts-reset declarations are generated; see scripts/vendor-ts-reset.ts.
+    "presets/typescript/vendor/",
     // Rule fixtures break rules on purpose; see src/__tests__/presets/rule-fixtures.ts.
     "src/__tests__/presets/fixtures/",
   ],

@@ -1,0 +1,18 @@
+---
+"adamantite": minor
+---
+
+Add the ts-reset types to `adamantite/typescript`, and add `adamantite/tsconfig` for libraries
+
+`adamantite/typescript` now applies the [ts-reset](https://github.com/total-typescript/ts-reset) types from a copy in the package. `JSON.parse()`, `response.json()`, and property reads on `localStorage` return `unknown` instead of `any`, `includes()` on a literal array accepts a wider value, and `.filter(Boolean)` removes falsy types. The copy is ts-reset 0.7.0 from its repository, which npm does not have yet. `adamantite/tsconfig` has the same strict options without the ts-reset types.
+
+`init` asks "Use an Adamantite TypeScript preset?" and then which preset to use. `--typescript` now takes a value: `--typescript typescript` or `--typescript tsconfig`. Doctor reports a package that extends `adamantite/typescript`, is not private, and declares `exports` or `types`, because its declaration files can name ts-reset types that consumers do not have.
+
+To migrate:
+
+1. Fix the new type errors. Most are values from `JSON.parse()` or `response.json()` that the code used as a specific type. Parse them with a schema, or narrow them.
+2. In a library that publishes declaration files, replace `adamantite/typescript` with `adamantite/tsconfig` in `extends`.
+3. If the project already set up ts-reset, delete its `reset.d.ts` files, their `include` entries, and the `@total-typescript/ts-reset` dependency.
+4. Replace `--typescript` with `--typescript typescript` in scripts that run `adamantite init`.
+
+To keep the strict options without the ts-reset types, extend `adamantite/tsconfig`. To turn the types off in one project that extends `adamantite/typescript`, set `"files": []`. A `files` list in your `tsconfig.json` replaces the preset's list, so list your files in `include`.

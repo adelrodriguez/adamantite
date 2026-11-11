@@ -1,10 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
+import { parse as parseJsonc } from "jsonc-parser"
 import packageJson from "../package.json" with { type: "json" }
 import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/tooling/oxlint/entry.ts"
 
@@ -97,3 +98,20 @@ for (const { file, module } of presets) {
 }
 
 console.info("Verified the plugin files of the built lint presets")
+
+// The TypeScript preset lists the vendored ts-reset declarations in `files`, by paths next to
+// itself, so the build must copy each of them.
+const TypeScriptPreset = Schema.Struct({ files: Schema.Array(Schema.String) })
+const typescriptPresetPath = join(import.meta.dirname, "..", "dist", "presets", "typescript.json")
+
+const typescriptPreset = Schema.decodeUnknownSync(TypeScriptPreset)(
+  parseJsonc(readFileSync(typescriptPresetPath, "utf8"))
+)
+
+for (const file of typescriptPreset.files) {
+  if (!existsSync(join(dirname(typescriptPresetPath), file))) {
+    throw new Error(`The built TypeScript preset lists ${file}, which the build did not copy`)
+  }
+}
+
+console.info("Verified the ts-reset declarations of the built TypeScript preset")

@@ -383,6 +383,7 @@ try {
       "--preset",
       "effect",
       "--typescript",
+      "typescript",
       "--agents",
       "--editor",
       "vscode",
@@ -496,6 +497,7 @@ try {
       "--preset",
       "architecture",
       "--typescript",
+      "typescript",
       "--agents",
       "--github-actions",
     ],
@@ -544,6 +546,24 @@ try {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
+
+  // `adamantite/typescript` loads the vendored ts-reset declarations by a path inside the installed
+  // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
+  console.info("Checking the ts-reset types of the installed TypeScript preset...")
+  const resetProbe = join(fixture, "src", "reset-probe.ts")
+  writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
+
+  for (const [command, args] of [
+    ["tsc", ["--noEmit", "--project", "tsconfig.json"]],
+    [process.execPath, [cliPath, "check", "--only", "lint"]],
+  ] as const) {
+    assertIncludes(
+      runExpectingFailure(command, [...args], { cwd: fixture, env: fixtureEnv }).output,
+      "Type 'unknown' is not assignable to type '{ a: number; }'"
+    )
+  }
+
+  rmSync(resetProbe)
 
   // Init installs at the workspace root in a monorepo, and pnpm-workspace.yaml marks the
   // fixture as one.

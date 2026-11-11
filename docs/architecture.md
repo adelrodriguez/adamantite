@@ -197,7 +197,10 @@ presets/
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
-  tsconfig.json     published TypeScript preset
+  tsconfig.json     published TypeScript preset with strict options
+  typescript.json   published TypeScript preset with strict options and ts-reset types
+  typescript/
+    vendor/         vendored ts-reset declarations
 src/
   commands/         CLI workflows
   lib/
@@ -318,6 +321,14 @@ fixture only when the upstream change is accepted.
 A bundle has no tests for each rule. Adamantite does not change vendored rules, so their message
 ids, placeholder data, and report positions are upstream behaviour, and the fixture run already
 covers each rule as the preset configures it.
+
+The `adamantite/typescript` preset ships the ts-reset declarations in
+`presets/typescript/vendor/ts-reset/`. `scripts/vendor-ts-reset.ts` copies the entry points that
+it lists, and each file that they reference, from a pinned upstream commit with no build step. The
+preset lists the entry points in `files`. The build copies the folder into `dist`, and
+`scripts/test-build.ts` fails when the built preset lists a file that the build did not copy. The
+TypeScript preset tests in `src/__tests__/presets/typescript.test.ts` check the types. See
+ADR 0026.
 
 ## First-party plugin
 

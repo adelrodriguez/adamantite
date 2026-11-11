@@ -57,9 +57,14 @@ describe("tsconfig", () => {
       })
     )
 
-    it.effect("accept string or array preset extends without any script", () =>
+    it.effect("accept either preset as a string or in an array, without any script", () =>
       Effect.gen(function* () {
-        for (const preset of ["adamantite/typescript", ["./base.json", "adamantite/typescript"]]) {
+        for (const preset of [
+          "adamantite/typescript",
+          ["./base.json", "adamantite/typescript"],
+          "adamantite/tsconfig",
+          ["./base.json", "adamantite/tsconfig"],
+        ]) {
           const files = makeFiles({
             "package.json": yield* stringifyJson(packageJson),
             "tsconfig.json": yield* stringifyJson({ extends: preset }),
@@ -79,27 +84,111 @@ describe("tsconfig", () => {
         }
       })
     )
+
+    it.effect.each([
+      {
+        expected: [{ id: "typescript-preset-in-library" }],
+        manifest: { exports: "./dist/index.js", name: "library" },
+        name: "report a library with exports that extends",
+        preset: "adamantite/typescript",
+      },
+      {
+        expected: [{ id: "typescript-preset-in-library" }],
+        manifest: { name: "library", types: "./dist/index.d.ts" },
+        name: "report a library with types that extends",
+        preset: "adamantite/typescript",
+      },
+      {
+        expected: [],
+        manifest: { exports: "./dist/index.js", name: "app", private: true },
+        name: "accept a private package that extends",
+        preset: "adamantite/typescript",
+      },
+      {
+        expected: [],
+        manifest: { name: "app" },
+        name: "accept a package without exports or types that extends",
+        preset: "adamantite/typescript",
+      },
+      {
+        expected: [],
+        manifest: { exports: "./dist/index.js", name: "library" },
+        name: "accept a library that extends",
+        preset: "adamantite/tsconfig",
+      },
+    ])("$name $preset", ({ expected, manifest, preset }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": yield* stringifyJson(manifest),
+          "tsconfig.json": yield* stringifyJson({ extends: preset }),
+        })
+
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          provideFiles(files)
+        )
+
+        expect(result).toMatchObject({ applicable: true, findings: expected })
+      })
+    )
+
+    it.effect("report a workspace library that extends adamantite/typescript", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "package.json": yield* stringifyJson({ name: "root", private: true }),
+          "packages/app/package.json": yield* stringifyJson({ name: "app", private: true }),
+          "packages/app/tsconfig.json": yield* stringifyJson({ extends: "adamantite/typescript" }),
+          "packages/library/package.json": yield* stringifyJson({
+            exports: "./dist/index.js",
+            name: "library",
+          }),
+          "packages/library/tsconfig.json": yield* stringifyJson({
+            extends: "adamantite/typescript",
+          }),
+          "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+        })
+
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          provideFiles(files)
+        )
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("`packages/library/tsconfig.json`"),
+              id: "typescript-preset-in-library",
+            },
+          ],
+        })
+      })
+    )
   })
 
   describe("create", () => {
-    it.effect("create a config that assess accepts", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({ "package.json": yield* stringifyJson({ name: "project" }) })
+    it.effect.each(["typescript", "tsconfig"] as const)(
+      "create a config for the %s preset that assess accepts",
+      (preset) =>
+        Effect.gen(function* () {
+          const files = makeFiles({ "package.json": yield* stringifyJson({ name: "project" }) })
 
-        yield* tsconfig.create(ROOT).pipe(provideFiles(files))
+          yield* tsconfig.create(ROOT, preset).pipe(provideFiles(files))
 
-        expect(
-          yield* readProject(ROOT).pipe(
-            Effect.flatMap((project) => tsconfig.assess(project)),
-            provideFiles(files)
-          )
-        ).toStrictEqual({
-          applicable: true,
-          findings: [],
-          packageActions: [],
-          warnings: [],
+          expect(readTsConfig(files)).toStrictEqual({ extends: `adamantite/${preset}` })
+
+          expect(
+            yield* readProject(ROOT).pipe(
+              Effect.flatMap((project) => tsconfig.assess(project)),
+              provideFiles(files)
+            )
+          ).toStrictEqual({
+            applicable: true,
+            findings: [],
+            packageActions: [],
+            warnings: [],
+          })
         })
-      })
     )
   })
 
@@ -125,11 +214,21 @@ describe("tsconfig", () => {
         input: ["adamantite/typescript", "@company/tsconfig"],
         name: "leave an extends array unchanged when it already contains the preset",
       },
+      {
+        expected: "adamantite/typescript",
+        input: "adamantite/tsconfig",
+        name: "replace the other Adamantite preset in an extends string",
+      },
+      {
+        expected: ["@company/tsconfig", "adamantite/typescript"],
+        input: ["adamantite/tsconfig", "@company/tsconfig"],
+        name: "replace the other Adamantite preset in an extends array",
+      },
     ])("$name", ({ expected, input }) =>
       Effect.gen(function* () {
         const files = makeFiles({ "tsconfig.json": yield* formatJson({ extends: input }) })
 
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+        yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
 
         expect(readTsConfig(files).extends).toStrictEqual(expected)
       })
@@ -148,7 +247,7 @@ describe("tsconfig", () => {
 `,
         })
 
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+        yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
 
         expect(files.read("tsconfig.json")).toBe(`{
   // Shared base
@@ -168,7 +267,10 @@ describe("tsconfig", () => {
       Effect.gen(function* () {
         const files = makeFiles({ "tsconfig.json": "true" })
 
-        const result = yield* Effect.result(tsconfig.update(ROOT).pipe(provideFiles(files)))
+        const result = yield* Effect.result(
+          tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
+        )
+
         expect(Result.isFailure(result)).toBe(true)
 
         if (Result.isFailure(result)) {
@@ -193,13 +295,20 @@ function readExtends(files: FileSystemTestContext): string[] {
 
 describe("tsconfig update properties", () => {
   const PRESET = "adamantite/typescript"
+  const OTHER_PRESET = "adamantite/tsconfig"
 
   const userExtends = Schema.Union([
     Schema.Null,
-    Schema.Literals([PRESET, "@tsconfig/node22/tsconfig.json", "./base.json"]),
+    Schema.Literals([PRESET, OTHER_PRESET, "@tsconfig/node22/tsconfig.json", "./base.json"]),
     Schema.mutable(
       Schema.UniqueArray(
-        Schema.Literals(["@tsconfig/node22/tsconfig.json", "./base.json", PRESET, "./other.json"])
+        Schema.Literals([
+          "@tsconfig/node22/tsconfig.json",
+          "./base.json",
+          PRESET,
+          OTHER_PRESET,
+          "./other.json",
+        ])
       ).check(Schema.isMaxLength(4))
     ),
   ])
@@ -217,14 +326,14 @@ describe("tsconfig update properties", () => {
   })
 
   it.effect.prop(
-    "keep user extends entries in order and add the preset exactly once",
+    "keep user extends entries in order, add the preset exactly once, and drop the other preset",
     { config: userConfig, extendsValue: userExtends },
     ({ config, extendsValue }) =>
       Effect.gen(function* () {
         const original = extendsValue === null ? config : { ...config, extends: extendsValue }
         const files = makeFiles({ "tsconfig.json": yield* stringifyJson(original) })
 
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+        yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
 
         const mergedExtends = readExtends(files)
         expect(mergedExtends.filter((entry) => entry === PRESET)).toHaveLength(1)
@@ -233,7 +342,7 @@ describe("tsconfig update properties", () => {
           extendsValue === null
             ? []
             : (Array.isArray(extendsValue) ? extendsValue : [extendsValue]).filter(
-                (entry) => entry !== PRESET
+                (entry) => entry !== PRESET && entry !== OTHER_PRESET
               )
 
         expect(mergedExtends.filter((entry) => entry !== PRESET)).toStrictEqual(userEntries)
@@ -253,10 +362,10 @@ describe("tsconfig update properties", () => {
         const original = extendsValue === null ? config : { ...config, extends: extendsValue }
         const files = makeFiles({ "tsconfig.json": yield* stringifyJson(original) })
 
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+        yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
         const afterFirst = files.read("tsconfig.json")
 
-        yield* tsconfig.update(ROOT).pipe(provideFiles(files))
+        yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
         expect(files.read("tsconfig.json")).toBe(afterFirst)
       }),
     { arbitrary: { runs: 150 } }

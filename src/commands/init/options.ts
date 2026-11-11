@@ -8,6 +8,10 @@ import {
   LINT_PRESETS,
   type LintPreset,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
+import {
+  TYPESCRIPT_PRESET_NAMES,
+  type TypeScriptPreset,
+} from "#lib/integrations/workspace/tsconfig.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { INIT_FLAGS } from "#lib/workspace/init-command.ts"
@@ -61,9 +65,9 @@ export interface InitOptions {
   readonly overwriteScripts: boolean
   readonly scripts: readonly Script[]
   /**
-   * Extend `adamantite/typescript` in `tsconfig.json`. It needs no script.
+   * The TypeScript preset that `tsconfig.json` extends. It needs no script.
    */
-  readonly typescript: boolean
+  readonly typescript: Option.Option<TypeScriptPreset>
 }
 
 export interface InitOptionsInput {
@@ -74,7 +78,7 @@ export interface InitOptionsInput {
   readonly overwriteScripts: boolean
   readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
-  readonly typescript: boolean
+  readonly typescript: Option.Option<TypeScriptPreset>
 }
 
 /**
@@ -168,9 +172,11 @@ const editors = Flag.Literals(INIT_FLAGS.editor, INIT_EDITORS).pipe(
   Flag.withDescription("Configure an editor. Repeat --editor to add more")
 )
 
-const typescript = Flag.Boolean("typescript").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Use the TypeScript preset")
+const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
+  Flag.optional,
+  Flag.withDescription(
+    "Use a TypeScript preset: typescript for strict types, tsconfig for strict config"
+  )
 )
 
 const installExtensions = Flag.Boolean("install-extensions").pipe(

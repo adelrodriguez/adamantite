@@ -12,14 +12,21 @@ const PRESETS = {
 } as const
 
 /**
- * Type check one file in a project that extends a TypeScript preset, and return the TypeScript
- * output. `config` adds top-level settings to the project's `tsconfig.json`.
+ * The settings that a test adds to the `tsconfig.json` of the project.
  */
-function check(
-  preset: keyof typeof PRESETS,
-  source: string,
-  config: Record<string, unknown> = { include: ["index.ts"] }
-) {
+interface ProjectConfig {
+  readonly compilerOptions?: { readonly lib: readonly string[] }
+  readonly files?: readonly string[]
+  readonly include?: readonly string[]
+}
+
+const INCLUDE_INDEX: ProjectConfig = { include: ["index.ts"] }
+
+/**
+ * Type check one file in a project that extends a TypeScript preset, and return the TypeScript
+ * output.
+ */
+function check(preset: keyof typeof PRESETS, source: string, config = INCLUDE_INDEX) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-typescript-preset-"))
 
   try {
@@ -49,7 +56,8 @@ const PASSED = { output: "", status: 0 }
 const PARSED_JSON = 'export const value: { a: number } = JSON.parse("{}")\n'
 
 const PARSED_JSON_ERROR = {
-  output: "index.ts(1,14): error TS2322: Type 'unknown' is not assignable to type '{ a: number; }'.\n",
+  output:
+    "index.ts(1,14): error TS2322: Type 'unknown' is not assignable to type '{ a: number; }'.\n",
   status: 1,
 }
 

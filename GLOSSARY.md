@@ -11,8 +11,10 @@ or TypeScript.
 _Avoid_: Plugin, template
 
 **Vendored bundle**:
-Third-party code that Adamantite builds into the package at a pinned upstream commit
-because upstream does not publish to npm. Bundles ship inside the preset that owns them.
+Third-party code that Adamantite builds or copies into the package at a pinned upstream commit,
+because upstream does not publish it to npm. Bundles ship inside the preset that owns them. The
+ts-reset declarations are the one exception to the npm condition: npm has an older release. See
+ADR 0026.
 _Avoid_: Plugin, dependency
 
 **First-party plugin**:

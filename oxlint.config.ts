@@ -39,15 +39,20 @@ export default defineConfig({
     // A type reset merges a declaration into a built-in global, such as `interface Array<T>`. Only
     // a script file can declare globals without `declare global`, so the resets reference each
     // other by path instead of an import, redeclare built-in names, and keep interfaces with call
-    // signatures. They declare built-in contracts that take or return `unknown` on purpose.
+    // signatures. They declare built-in contracts that take or return `unknown` on purpose, and
+    // restate library parameters, such as `{}`, `object`, and `Function`. A narrower parameter would
+    // send some calls to the library overload that returns `any`.
     {
       files: ["presets/typescript/resets/*.d.ts"],
       rules: {
+        "anti-slop/no-object-parameters": "off",
         "anti-slop/no-unknown-parameters": "off",
         "anti-slop/no-unknown-returns": "off",
         "anti-slop/no-unsafe-dictionary-type": "off",
         "eslint/no-redeclare": ["error", { builtinGlobals: false }],
         "import/unambiguous": "off",
+        "typescript/no-empty-object-type": ["error", { allowObjectTypes: "always" }],
+        "typescript/no-unsafe-function-type": "off",
         "typescript/prefer-function-type": "off",
         "typescript/triple-slash-reference": ["error", { path: "always" }],
       },

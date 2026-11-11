@@ -13,3 +13,7 @@
 /// <reference path="map-groupby.d.ts" />
 /// <reference path="object-groupby.d.ts" />
 /// <reference path="storage.d.ts" />
+/// <reference path="object-values.d.ts" />
+/// <reference path="object-assign.d.ts" />
+/// <reference path="object-get-prototype-of.d.ts" />
+/// <reference path="reflect.d.ts" />

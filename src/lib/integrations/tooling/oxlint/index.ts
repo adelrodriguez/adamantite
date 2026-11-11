@@ -20,7 +20,6 @@ import {
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
-import { assessLayerMaps } from "#lib/integrations/tooling/oxlint/layers.ts"
 import {
   type LintPreset,
   RETIRED_LINT_PRESETS,
@@ -97,17 +96,9 @@ export default defineIntegration({
     Effect.gen(function* () {
       const { cwd, lintConfig, packageJson } = project
       const managedScripts = getManagedScripts(packageJson)
-      const layerFindings = yield* assessLayerMaps(project)
 
       if (!checkRunsTool(managedScripts, "oxlint")) {
-        return layerFindings.length === 0
-          ? ({ applicable: false } satisfies IntegrationAssessment)
-          : ({
-              applicable: true,
-              findings: layerFindings,
-              packageActions: [],
-              warnings: [],
-            } satisfies IntegrationAssessment)
+        return { applicable: false } satisfies IntegrationAssessment
       }
 
       const state = yield* detect(cwd)
@@ -141,7 +132,6 @@ export default defineIntegration({
           ...pkg.findings,
           ...runtimeFindings,
           ...retiredPresetFindings,
-          ...layerFindings,
           ...getConfigFindings(state, {
             configContent,
             configFile: CONFIG_FILE,

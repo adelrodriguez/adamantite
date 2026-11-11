@@ -15,6 +15,4 @@ One concrete scope has one declaration. Distinct roots can remain separate when 
 would require a new intermediate scope.
 
 Oxlint validates the recursive option schema and fails on old or malformed declarations.
-Doctor detects old declarations in the source modules that config discovery reads and
-gives migration instructions. Doctor does not write files. The migration preserves all
-dependencies, scopes, and map-local settings before the separate child option is removed.
+No release shipped the array-valued shape, so Doctor gives no migration instructions for it.

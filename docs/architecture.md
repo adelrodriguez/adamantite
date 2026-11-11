@@ -356,9 +356,7 @@ takes what the rule reads from the file system, so its `RuleTester` test passes 
 Nested maps activate from the concrete matched parent folder before any parent exemption.
 Each active map checks imports with its own entries, ignores, isolation, type-import policy,
 and resolver conditions. A duplicate concrete scope fails lint. Diagnostics name the concrete
-root and the declaration path. The Oxlint assessment reads the source snapshot from config
-discovery to detect old array-valued declarations and give Doctor migration instructions.
-Doctor does not change the config. See ADR 0024.
+root and the declaration path. See ADR 0024.
 
 `adamantite/import-owners` also needs options from the target project. It matches each import
 as written, so it reads no module, but it reads `package.json` and `pnpm-workspace.yaml` files to

@@ -164,6 +164,63 @@ describe("tsconfig", () => {
         })
       })
     )
+
+    it.effect("report workspace libraries that reach adamantite/typescript through a base", () =>
+      Effect.gen(function* () {
+        const library = { exports: "./dist/index.js" }
+
+        const files = makeFiles({
+          "package.json": yield* stringifyJson({ name: "root", private: true }),
+          "packages/package-base/package.json": yield* stringifyJson({ ...library, name: "a" }),
+          "packages/package-base/tsconfig.json": yield* stringifyJson({
+            extends: "@tooling/tsconfig/base.json",
+          }),
+          "packages/relative-base/package.json": yield* stringifyJson({ ...library, name: "b" }),
+          "packages/relative-base/tsconfig.json": yield* stringifyJson({
+            extends: ["./local.json", "../../tsconfig.base"],
+          }),
+          "pnpm-workspace.yaml": "packages:\n  - packages/*\n",
+          "tooling/tsconfig/base.json": yield* stringifyJson({ extends: "adamantite/typescript" }),
+          "tsconfig.base.json": yield* stringifyJson({ extends: "adamantite/typescript" }),
+        })
+
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          Effect.provide([
+            files.layer,
+            Path.layer,
+            makeModuleResolverLayer(ROOT, {
+              "@tooling/tsconfig/base.json": "tooling/tsconfig/base.json",
+            }),
+          ])
+        )
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [
+            { currentState: expect.stringContaining("`packages/package-base/tsconfig.json`") },
+            { currentState: expect.stringContaining("`packages/relative-base/tsconfig.json`") },
+          ],
+        })
+      })
+    )
+
+    it.effect("stop at an extends cycle without a preset", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "base.json": yield* stringifyJson({ extends: "./tsconfig.json" }),
+          "package.json": yield* stringifyJson({ name: "project" }),
+          "tsconfig.json": yield* stringifyJson({ extends: "./base.json" }),
+        })
+
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          provideFiles(files)
+        )
+
+        expect(result).toStrictEqual({ applicable: false })
+      })
+    )
   })
 
   describe("create", () => {

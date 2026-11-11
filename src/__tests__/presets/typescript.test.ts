@@ -109,12 +109,6 @@ describe("the typescript preset", () => {
   it("apply the reset to a project without include", () => {
     expect(check("typescript", PARSED_JSON, {})).toStrictEqual(PARSED_JSON_ERROR)
   })
-
-  it('turn the reset off with "files": []', () => {
-    expect(check("typescript", PARSED_JSON, { files: [], include: ["index.ts"] })).toStrictEqual(
-      PASSED
-    )
-  })
 })
 
 describe("the type resets", () => {

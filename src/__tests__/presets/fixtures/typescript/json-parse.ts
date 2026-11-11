@@ -25,3 +25,16 @@ doNotExecute(() => {
     return value;
   });
 });
+
+// An annotated reviver also gives an unknown result, not the library's any.
+doNotExecute(() => {
+  const annotated = JSON.parse('{"x":1}', (_key, value: number) => value);
+  const annotatedThis = JSON.parse('{"x":1}', function (this: { x: number }, _key, value) {
+    return value;
+  });
+
+  type tests = [
+    Expect<Equal<typeof annotated, unknown>>,
+    Expect<Equal<typeof annotatedThis, unknown>>,
+  ];
+});

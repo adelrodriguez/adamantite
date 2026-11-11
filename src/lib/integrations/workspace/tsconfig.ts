@@ -15,7 +15,7 @@ import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
+import { ModuleResolver, resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
@@ -79,22 +79,15 @@ function mergeExtends(existing: JsonValue | undefined, preset: TypeScriptPreset)
 }
 
 /**
- * The config file that a relative path or a package specifier in `extends` names. As TypeScript
- * does, a specifier without `.json` also matches the file with `.json` added.
+ * The first of `file` and `file` with `.json` added that exists, as TypeScript looks up a config.
  */
-const resolveExtends = Effect.fn("resolveExtends")(function* (
-  directory: string,
-  specifier: string
-) {
+const findConfigFile = Effect.fn("findConfigFile")(function* (file: string) {
   const fs = yield* FileSystem.FileSystem
-  const resolver = yield* ModuleResolver
-  const candidates = specifier.endsWith(".json") ? [specifier] : [specifier, `${specifier}.json`]
+  const candidates = file.endsWith(".json") ? [file] : [file, `${file}.json`]
 
   for (const candidate of candidates) {
-    const resolved = yield* resolver.resolve(directory, candidate)
-
-    if (Option.isSome(resolved) && (yield* fs.exists(resolved.value))) {
-      return resolved
+    if (yield* fs.exists(candidate)) {
+      return Option.some(candidate)
     }
   }
 
@@ -102,13 +95,73 @@ const resolveExtends = Effect.fn("resolveExtends")(function* (
 })
 
 /**
+ * The config file that an `extends` entry names, by TypeScript's rules rather than the runtime
+ * resolver's, which would pick a `.js` file or a package's `main` entry. A path is used as written,
+ * then with `.json` added. A bare package name means the package's `tsconfig` field, or its
+ * `tsconfig.json`. A package subpath goes through the package's exports only when they map it to a
+ * `.json` file, and otherwise names a file in the package.
+ */
+const resolveExtends = Effect.fn("resolveExtends")(function* (
+  directory: string,
+  specifier: string
+) {
+  const path = yield* Path.Path
+
+  if (specifier.startsWith(".") || path.isAbsolute(specifier)) {
+    return yield* findConfigFile(path.resolve(directory, specifier))
+  }
+
+  const parts = specifier.split("/")
+  const nameLength = specifier.startsWith("@") ? 2 : 1
+  const subpath = parts.slice(nameLength).join("/")
+
+  if (subpath !== "") {
+    const resolver = yield* ModuleResolver
+    const exported = yield* resolver.resolve(directory, specifier)
+
+    if (Option.isSome(exported) && exported.value.endsWith(".json")) {
+      return exported
+    }
+  }
+
+  const packageDirectory = yield* resolvePackageDirectory(
+    directory,
+    parts.slice(0, nameLength).join("/")
+  )
+
+  if (Option.isNone(packageDirectory)) {
+    return Option.none<string>()
+  }
+
+  if (subpath !== "") {
+    return yield* findConfigFile(path.join(packageDirectory.value, subpath))
+  }
+
+  const manifest = yield* readPackageJson(packageDirectory.value)
+  const entry = Predicate.isString(manifest.tsconfig) ? manifest.tsconfig : "tsconfig.json"
+
+  return yield* findConfigFile(path.join(packageDirectory.value, entry))
+})
+
+/**
+ * An Adamantite preset that a config reaches, and the config file that names it.
+ */
+interface PresetSource {
+  readonly preset: TypeScriptPreset
+  readonly source: string
+}
+
+/**
  * The Adamantite preset that a `tsconfig.json` reaches through `extends`, directly or through base
- * configs, and the config file that names it.
+ * configs, and the config file that names it. `adamantite/typescript` counts when any branch of the
+ * inheritance reaches it, because it adds the type resets, so the search goes on after it finds
+ * `adamantite/tsconfig`.
  */
 const readPreset = Effect.fn("readPreset")(function* (configPath: string) {
   const path = yield* Path.Path
   const visited = new Set<string>()
   const pending = [configPath]
+  let plainSource = Option.none<string>()
 
   for (let current = pending.shift(); current !== undefined; current = pending.shift()) {
     if (visited.has(current)) {
@@ -132,15 +185,15 @@ const readPreset = Effect.fn("readPreset")(function* (configPath: string) {
       Predicate.isString
     )
 
-    const preset = Array.findFirst(TYPESCRIPT_PRESET_NAMES, (name) =>
-      entries.includes(TYPESCRIPT_PRESETS[name])
-    )
-
-    if (Option.isSome(preset)) {
-      return Option.some({ preset: preset.value, source: current })
+    if (entries.includes(TYPESCRIPT_PRESETS.typescript)) {
+      return Option.some<PresetSource>({ preset: "typescript", source: current })
     }
 
-    for (const entry of entries) {
+    if (Option.isNone(plainSource) && entries.includes(TYPESCRIPT_PRESETS.tsconfig)) {
+      plainSource = Option.some(current)
+    }
+
+    for (const entry of entries.filter((name) => !PRESET_IMPORTS.includes(name))) {
       const base = yield* resolveExtends(path.dirname(current), entry)
 
       if (Option.isSome(base)) {
@@ -149,7 +202,7 @@ const readPreset = Effect.fn("readPreset")(function* (configPath: string) {
     }
   }
 
-  return Option.none<{ readonly preset: TypeScriptPreset; readonly source: string }>()
+  return Option.map(plainSource, (source): PresetSource => ({ preset: "tsconfig", source }))
 })
 
 // Another project imports a package that is not private and declares `exports` or `types`, so it

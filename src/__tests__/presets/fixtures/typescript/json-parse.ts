@@ -12,3 +12,16 @@ doNotExecute(() => {
   // @ts-expect-error
   const result = JSON.parse<string>("{}");
 });
+
+// A reviver gets unknown values, not any.
+doNotExecute(() => {
+  JSON.parse("{}", function (key, value) {
+    type tests = [
+      Expect<Equal<typeof key, string>>,
+      Expect<Equal<typeof value, unknown>>,
+      Expect<Equal<typeof this, unknown>>,
+    ];
+
+    return value;
+  });
+});

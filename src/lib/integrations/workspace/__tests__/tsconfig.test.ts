@@ -205,6 +205,63 @@ describe("tsconfig", () => {
       })
     )
 
+    it.effect.each<{
+      readonly extends: string | readonly string[]
+      readonly files: Record<string, string>
+      readonly name: string
+      readonly resolutions: Record<string, string>
+    }>([
+      {
+        extends: "./base",
+        files: { "base.js": "export default {}\n" },
+        name: "read base.json for ./base, as TypeScript does, when a runtime resolver finds base.js",
+        resolutions: { "./base": "base.js" },
+      },
+      {
+        extends: "shared-config",
+        files: {
+          "node_modules/shared-config/index.js": "export default {}\n",
+          "node_modules/shared-config/package.json": JSON.stringify({
+            main: "./index.js",
+            tsconfig: "./base.json",
+          }),
+        },
+        name: "read the tsconfig field of a package, not its main entry",
+        resolutions: {
+          "shared-config": "node_modules/shared-config/index.js",
+          "shared-config/package.json": "node_modules/shared-config/package.json",
+        },
+      },
+      {
+        extends: ["adamantite/tsconfig", "./base.json"],
+        files: {},
+        name: "keep looking for adamantite/typescript after adamantite/tsconfig",
+        resolutions: {},
+      },
+    ])("$name", ({ extends: extendsValue, files: extraFiles, resolutions }) =>
+      Effect.gen(function* () {
+        const reset = yield* stringifyJson({ extends: "adamantite/typescript" })
+
+        const files = makeFiles({
+          "base.json": reset,
+          "node_modules/shared-config/base.json": reset,
+          "package.json": yield* stringifyJson({ name: "library", types: "./dist/index.d.ts" }),
+          "tsconfig.json": yield* stringifyJson({ extends: extendsValue }),
+          ...extraFiles,
+        })
+
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => tsconfig.assess(project)),
+          Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, resolutions)])
+        )
+
+        expect(result).toMatchObject({
+          applicable: true,
+          findings: [{ id: "typescript-preset-in-library" }],
+        })
+      })
+    )
+
     it.effect("stop at an extends cycle without a preset", () =>
       Effect.gen(function* () {
         const files = makeFiles({

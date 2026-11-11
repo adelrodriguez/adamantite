@@ -15,4 +15,4 @@ To migrate:
 3. If the project already set up ts-reset, delete its `reset.d.ts` files, their `include` entries, and the `@total-typescript/ts-reset` dependency.
 4. Replace `--typescript` with `--typescript typescript` in scripts that run `adamantite init`.
 
-To keep the strict options without the resets, extend `adamantite/tsconfig`. To turn the resets off in one project that extends `adamantite/typescript`, set `"files": []`. A `files` list in your `tsconfig.json` replaces the preset's list, so list your files in `include`.
+To keep the strict options without the resets, extend `adamantite/tsconfig`. List your files in `include`. A `files` list in your `tsconfig.json` replaces the preset's list and drops the resets, and the config still inherits the preset's `include` of every file below it. A solution config with `"files": []` and `references` that extends `adamantite/typescript` must also set `"include": []`, or extend `adamantite/tsconfig`.

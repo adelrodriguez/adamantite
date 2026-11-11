@@ -14,8 +14,13 @@ the same strict options without them.
 `files`, and sets `"include": ["${configDir}/**/*"]`. A preset `files` list empties the default
 include, so the preset must include the extending project's files again. A project that sets its
 own `include` keeps the resets. A project that sets its own `files` replaces the preset's list and
-loses them, and `"files": []` turns them off. TypeScript 7.0.2 and tsrs both read the inherited
-`files`.
+loses them, but it still inherits the preset's `include`, because TypeScript inherits each of the
+two keys on its own. A solution config with `"files": []` and `references` must therefore set
+`"include": []` too, or extend `adamantite/tsconfig`. A project without the resets extends
+`adamantite/tsconfig`. TypeScript 7.0.2 and tsrs both read the inherited `files`.
+
+Doctor follows `extends` through relative paths and package specifiers, so it also reports a
+library that reaches `adamantite/typescript` through a shared base config.
 
 Each reset is a script declaration file that merges into a built-in interface, such as
 `interface JSON`. TypeScript places the overloads of a merged declaration before the library's

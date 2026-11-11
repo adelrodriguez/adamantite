@@ -414,11 +414,16 @@ default type parameter by declaration merging, so `PromiseRejectedResult.reason`
 Use `adamantite/tsconfig` in a library that publishes declaration files. A declaration file that
 TypeScript emits with the type resets can name the global `AdamantiteTypeScript` helper types,
 which a consumer without the resets does not have. Doctor reports a package that extends
-`adamantite/typescript`, is not private, and declares `exports` or `types`.
+`adamantite/typescript`, directly or through a base config, is not private, and declares `exports`
+or `types`.
 
-The preset adds the type resets through `files`. A `files` list in your `tsconfig.json`
-replaces the preset's list, so list your files in `include` instead. To turn the type resets off
-in one project, set `"files": []`.
+The preset adds the type resets through `files`, and includes every file below your
+`tsconfig.json` through `include`. List your files in `include`, which keeps the resets. A `files`
+list in your `tsconfig.json` replaces the preset's list, so it drops the resets, and the config
+still inherits the preset's `include`. A config that must check only its `files`, such as a
+solution config with `"files": []` and `references`, sets `"include": []` too, or extends
+`adamantite/tsconfig`. To use the strict options without the type resets, extend
+`adamantite/tsconfig`.
 
 ### The jest and vitest presets
 

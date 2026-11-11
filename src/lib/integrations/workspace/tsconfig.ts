@@ -15,6 +15,7 @@ import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
+import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
@@ -78,28 +79,77 @@ function mergeExtends(existing: JsonValue | undefined, preset: TypeScriptPreset)
 }
 
 /**
- * The Adamantite preset that a `tsconfig.json` extends, if any.
+ * The config file that a relative path or a package specifier in `extends` names. As TypeScript
+ * does, a specifier without `.json` also matches the file with `.json` added.
+ */
+const resolveExtends = Effect.fn("resolveExtends")(function* (
+  directory: string,
+  specifier: string
+) {
+  const fs = yield* FileSystem.FileSystem
+  const resolver = yield* ModuleResolver
+  const candidates = specifier.endsWith(".json") ? [specifier] : [specifier, `${specifier}.json`]
+
+  for (const candidate of candidates) {
+    const resolved = yield* resolver.resolve(directory, candidate)
+
+    if (Option.isSome(resolved) && (yield* fs.exists(resolved.value))) {
+      return resolved
+    }
+  }
+
+  return Option.none<string>()
+})
+
+/**
+ * The Adamantite preset that a `tsconfig.json` reaches through `extends`, directly or through base
+ * configs, and the config file that names it.
  */
 const readPreset = Effect.fn("readPreset")(function* (configPath: string) {
-  const content = yield* readFileIfExists(configPath)
+  const path = yield* Path.Path
+  const visited = new Set<string>()
+  const pending = [configPath]
 
-  if (Option.isNone(content)) {
-    return Option.none<TypeScriptPreset>()
+  for (let current = pending.shift(); current !== undefined; current = pending.shift()) {
+    if (visited.has(current)) {
+      continue
+    }
+
+    visited.add(current)
+    const content = yield* readFileIfExists(current)
+
+    if (Option.isNone(content)) {
+      continue
+    }
+
+    const config = yield* parseJson(content.value, current)
+
+    if (!Predicate.isObject(config)) {
+      continue
+    }
+
+    const entries = (Array.isArray(config.extends) ? config.extends : [config.extends]).filter(
+      Predicate.isString
+    )
+
+    const preset = Array.findFirst(TYPESCRIPT_PRESET_NAMES, (name) =>
+      entries.includes(TYPESCRIPT_PRESETS[name])
+    )
+
+    if (Option.isSome(preset)) {
+      return Option.some({ preset: preset.value, source: current })
+    }
+
+    for (const entry of entries) {
+      const base = yield* resolveExtends(path.dirname(current), entry)
+
+      if (Option.isSome(base)) {
+        pending.push(base.value)
+      }
+    }
   }
 
-  const config = yield* parseJson(content.value, configPath)
-
-  if (!Predicate.isObject(config)) {
-    return Option.none<TypeScriptPreset>()
-  }
-
-  const entries: readonly JsonValue[] = Array.isArray(config.extends)
-    ? config.extends
-    : [config.extends ?? null]
-
-  return Array.findFirst(TYPESCRIPT_PRESET_NAMES, (preset) =>
-    entries.includes(TYPESCRIPT_PRESETS[preset])
-  )
+  return Option.none<{ readonly preset: TypeScriptPreset; readonly source: string }>()
 })
 
 // Another project imports a package that is not private and declares `exports` or `types`, so it
@@ -111,11 +161,22 @@ function checkPublishesTypes(packageJson: PackageJson) {
   )
 }
 
-function toLibraryFinding(configPath: string): Finding {
+/**
+ * `configPath` is the library's config, and `source` is the config that names the preset: the same
+ * file, or a base config that it extends.
+ */
+function toLibraryFinding(configPath: string, source: string): Finding {
+  const reached =
+    source === configPath
+      ? `extends \`${TYPESCRIPT_PRESETS.typescript}\``
+      : `extends \`${TYPESCRIPT_PRESETS.typescript}\` through \`${source}\``
+
   return {
-    currentState: `\`${configPath}\` extends \`${TYPESCRIPT_PRESETS.typescript}\`, and its \`package.json\` is not private and declares \`exports\` or \`types\`.`,
+    currentState: `\`${configPath}\` ${reached}, and its \`package.json\` is not private and declares \`exports\` or \`types\`.`,
     goal: [
-      `Replace \`${TYPESCRIPT_PRESETS.typescript}\` with \`${TYPESCRIPT_PRESETS.tsconfig}\` in the \`extends\` of \`${configPath}\`. Preserve every other setting.`,
+      source === configPath
+        ? `Replace \`${TYPESCRIPT_PRESETS.typescript}\` with \`${TYPESCRIPT_PRESETS.tsconfig}\` in the \`extends\` of \`${configPath}\`. Preserve every other setting.`
+        : `Make \`${configPath}\` extend \`${TYPESCRIPT_PRESETS.tsconfig}\` instead of reaching \`${TYPESCRIPT_PRESETS.typescript}\` through \`${source}\`, such as through a base config for libraries. Keep \`${source}\` for the packages that use it, and preserve every other setting.`,
     ],
     id: "typescript-preset-in-library",
     integration: "tsconfig",
@@ -145,16 +206,21 @@ export default defineIntegration({
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const findings = yield* Effect.forEach(
-        configured.filter(({ preset }) => Option.contains(preset, "typescript")),
-        ({ directory }) =>
-          (directory === cwd ? Effect.succeed(packageJson) : readPackageJson(directory)).pipe(
-            Effect.map((manifest) =>
-              checkPublishesTypes(manifest)
-                ? [toLibraryFinding(path.relative(cwd, path.join(directory, files[0].path)))]
-                : []
+      const findings = yield* Effect.forEach(configured, ({ directory, preset }) =>
+        Option.isSome(preset) && preset.value.preset === "typescript"
+          ? (directory === cwd ? Effect.succeed(packageJson) : readPackageJson(directory)).pipe(
+              Effect.map((manifest) =>
+                checkPublishesTypes(manifest)
+                  ? [
+                      toLibraryFinding(
+                        path.relative(cwd, path.join(directory, files[0].path)),
+                        path.relative(cwd, preset.value.source)
+                      ),
+                    ]
+                  : []
+              )
             )
-          )
+          : Effect.succeed([])
       )
 
       return {

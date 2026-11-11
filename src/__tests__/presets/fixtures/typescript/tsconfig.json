@@ -1,0 +1,5 @@
+{
+  "extends": "../../../../../presets/typescript.json",
+  "compilerOptions": { "lib": ["esnext", "dom", "dom.iterable"] },
+  "include": ["*.ts"]
+}

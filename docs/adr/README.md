@@ -25,4 +25,4 @@
 - [ADR 0023: Effect editors use unpatched compilers](0023-effect-editors-use-unpatched-compilers.md)
 - [ADR 0024: Layer maps nest with explicit imports](0024-layer-maps-nest-with-explicit-imports.md)
 - [ADR 0025: The strict preset absorbs the anti-slop rules](0025-strict-absorbs-anti-slop.md)
-- [ADR 0026: The TypeScript preset vendors ts-reset](0026-typescript-preset-vendors-ts-reset.md)
+- [ADR 0026: The TypeScript preset owns its type resets](0026-typescript-preset-owns-type-resets.md)

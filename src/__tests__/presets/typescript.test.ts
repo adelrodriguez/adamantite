@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
@@ -10,6 +10,26 @@ const PRESETS = {
   tsconfig: join(REPO_ROOT, "presets/tsconfig.json"),
   typescript: join(REPO_ROOT, "presets/typescript.json"),
 } as const
+
+const RESETS = join(REPO_ROOT, "presets/typescript/resets")
+
+const FIXTURES = join(REPO_ROOT, "src/__tests__/presets/fixtures/typescript")
+
+/**
+ * Type check the fixture project with the given config, and return the TypeScript output.
+ */
+function checkFixtures(config: "tsconfig.json" | "tsconfig.without-resets.json") {
+  const result = spawnSync(join(REPO_ROOT, "node_modules/.bin/tsc"), ["-p", config], {
+    cwd: FIXTURES,
+    encoding: "utf8",
+  })
+
+  if (result.error) {
+    throw result.error
+  }
+
+  return { output: result.stdout, status: result.status }
+}
 
 /**
  * The settings that a test adds to the `tsconfig.json` of the project.
@@ -86,27 +106,6 @@ describe("the typescript preset", () => {
     expect(check("typescript", PARSED_JSON)).toStrictEqual(PARSED_JSON_ERROR)
   })
 
-  it("return unknown from a property read on localStorage", () => {
-    expect(
-      check("typescript", "export const theme: string = localStorage.theme\n", {
-        compilerOptions: { lib: ["esnext", "dom"] },
-        include: ["index.ts"],
-      })
-    ).toStrictEqual({
-      output: "index.ts(1,14): error TS2322: Type 'unknown' is not assignable to type 'string'.\n",
-      status: 1,
-    })
-  })
-
-  it("accept a wider value in includes() on a literal array", () => {
-    expect(
-      check(
-        "typescript",
-        'const kinds = ["a", "b"] as const\n\nexport const has = (value: string) => kinds.includes(value)\n'
-      )
-    ).toStrictEqual(PASSED)
-  })
-
   it("apply the reset to a project without include", () => {
     expect(check("typescript", PARSED_JSON, {})).toStrictEqual(PARSED_JSON_ERROR)
   })
@@ -115,5 +114,43 @@ describe("the typescript preset", () => {
     expect(check("typescript", PARSED_JSON, { files: [], include: ["index.ts"] })).toStrictEqual(
       PASSED
     )
+  })
+})
+
+describe("the type resets", () => {
+  const resets = readdirSync(RESETS)
+    .filter((file) => file.endsWith(".d.ts") && file !== "index.d.ts" && file !== "helpers.d.ts")
+    .map((file) => file.slice(0, -".d.ts".length))
+
+  const fixtures = readdirSync(FIXTURES).filter(
+    (file) => file.endsWith(".ts") && file !== "utils.ts"
+  )
+
+  it("load every reset from index.d.ts", () => {
+    const references = [
+      ...readFileSync(join(RESETS, "index.d.ts"), "utf8").matchAll(
+        /^\/\/\/ <reference path="(?<file>[^"]+)\.d\.ts" \/>$/gmu
+      ),
+    ].map((match) => match.groups?.file)
+
+    expect(new Set(references)).toStrictEqual(new Set(resets))
+  })
+
+  it("have a fixture for every reset", () => {
+    expect(resets.filter((reset) => !fixtures.includes(`${reset}.ts`))).toStrictEqual([])
+  })
+
+  it("pass every fixture with the typescript preset", () => {
+    expect(checkFixtures("tsconfig.json")).toStrictEqual(PASSED)
+  })
+
+  it("fail every fixture without the resets, so each fixture tests a reset", () => {
+    const { output } = checkFixtures("tsconfig.without-resets.json")
+
+    const failing = new Set(
+      [...output.matchAll(/^(?<file>[\w-]+\.ts)\(/gmu)].map((match) => match.groups?.file)
+    )
+
+    expect(failing).toStrictEqual(new Set(fixtures))
   })
 })

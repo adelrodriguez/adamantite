@@ -200,7 +200,7 @@ presets/
   tsconfig.json     published TypeScript preset with strict options
   typescript.json   published TypeScript preset with strict options and ts-reset types
   typescript/
-    vendor/         vendored ts-reset declarations
+    resets/         first-party type resets
 src/
   commands/         CLI workflows
   lib/
@@ -322,13 +322,19 @@ A bundle has no tests for each rule. Adamantite does not change vendored rules, 
 ids, placeholder data, and report positions are upstream behaviour, and the fixture run already
 covers each rule as the preset configures it.
 
-The `adamantite/typescript` preset ships the ts-reset declarations in
-`presets/typescript/vendor/ts-reset/`. `scripts/vendor-ts-reset.ts` copies the entry points that
-it lists, and each file that they reference, from a pinned upstream commit with no build step. The
-preset lists the entry points in `files`. The build copies the folder into `dist`, and
-`scripts/test-build.ts` fails when the built preset lists a file that the build did not copy. The
-TypeScript preset tests in `src/__tests__/presets/typescript.test.ts` check the types. See
-ADR 0026.
+## Type resets
+
+`adamantite/typescript` loads the type resets in `presets/typescript/resets/`. Each file merges a
+declaration into one built-in interface, and `index.d.ts` references every file. The preset lists
+`index.d.ts` in `files`. The build copies the folder into `dist`, and `scripts/test-build.ts` fails
+when a file that the built preset loads is missing.
+
+The fixtures in `src/__tests__/presets/fixtures/typescript/` hold one file of type tests for each
+reset. `src/__tests__/presets/typescript.test.ts` type checks them in one run with
+`adamantite/typescript`, where they must pass, and in one run with `adamantite/tsconfig`, where
+every fixture must fail. The second run proves that each fixture tests a reset. The tests also
+fail when a reset has no fixture or `index.d.ts` does not reference it. The resets and the
+fixtures started from ts-reset, so `license.md` keeps its MIT notice. See ADR 0026.
 
 ## First-party plugin
 

@@ -1,14 +1,12 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  // The strict options of the tsconfig preset, and the vendored ts-reset types. JSON.parse(),
+  // The strict options of the tsconfig preset, and Adamantite's type resets. JSON.parse(),
   // response.json(), and property reads on localStorage return `unknown` instead of `any`.
   // Libraries should extend `adamantite/tsconfig`, because their declaration files can name the
-  // `TSReset` helper types that consumers do not have. Set "files": [] to turn the reset off.
+  // `AdamantiteTypeScript` helper types that consumers do not have. Set "files": [] to turn the
+  // resets off.
   "extends": "./tsconfig.json",
-  "files": [
-    "./typescript/vendor/ts-reset/recommended.d.ts",
-    "./typescript/vendor/ts-reset/storage.d.ts"
-  ],
+  "files": ["./typescript/resets/index.d.ts"],
   // A `files` list empties the default include, so include the extending project's files again.
   "include": ["${configDir}/**/*"]
 }

@@ -20,8 +20,8 @@ import { readPackageJson } from "#lib/workspace/package-json.ts"
 const files = [{ path: "tsconfig.json", type: "config" }] as const
 
 /**
- * The values of `--typescript`. `typescript` adds the vendored ts-reset types to the strict options
- * of `tsconfig`, so a config that extends both counts as `typescript`.
+ * The values of `--typescript`. `typescript` adds the type resets to the strict options of
+ * `tsconfig`, so a config that extends both counts as `typescript`.
  */
 export const TYPESCRIPT_PRESET_NAMES = ["typescript", "tsconfig"] as const
 
@@ -120,9 +120,9 @@ function toLibraryFinding(configPath: string): Finding {
     id: "typescript-preset-in-library",
     integration: "tsconfig",
     notes: [
-      `\`${TYPESCRIPT_PRESETS.typescript}\` adds the ts-reset types. A declaration file that the library emits can name the global \`TSReset\` helper types, which projects without ts-reset do not have.`,
+      `\`${TYPESCRIPT_PRESETS.typescript}\` adds the type resets. A declaration file that the library emits can name the global \`AdamantiteTypeScript\` helper types, which projects without the resets do not have.`,
     ],
-    title: "ts-reset types in a library",
+    title: "Type resets in a library",
   }
 }
 

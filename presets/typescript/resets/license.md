@@ -1,7 +1,7 @@
-# ts-reset license
+# Type reset license
 
-The declaration files in this folder are copies of
-[ts-reset](https://github.com/total-typescript/ts-reset) at commit f36610ba441b8ea1c7cf7349dd71bee26c2e6a3b.
+Adamantite's type resets started from [ts-reset](https://github.com/total-typescript/ts-reset) at
+commit f36610ba441b8ea1c7cf7349dd71bee26c2e6a3b. The files that come from ts-reset keep its license:
 
 Copyright 2023 Matthew Pocock
 

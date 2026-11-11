@@ -11,11 +11,14 @@ or TypeScript.
 _Avoid_: Plugin, template
 
 **Vendored bundle**:
-Third-party code that Adamantite builds or copies into the package at a pinned upstream commit,
-because upstream does not publish it to npm. Bundles ship inside the preset that owns them. The
-ts-reset declarations are the one exception to the npm condition: npm has an older release. See
-ADR 0026.
+Third-party code that Adamantite builds into the package at a pinned upstream commit
+because upstream does not publish to npm. Bundles ship inside the preset that owns them.
 _Avoid_: Plugin, dependency
+
+**Type reset**:
+A first-party declaration that `adamantite/typescript` loads to replace the type of a built-in API,
+such as `JSON.parse()` returning `unknown`. The type resets started from ts-reset.
+_Avoid_: Vendored bundle, patch, override
 
 **First-party plugin**:
 Adamantite's own Oxlint plugin, under the `adamantite/*` rule namespace. It ships inside the

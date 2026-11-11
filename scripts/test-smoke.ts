@@ -547,9 +547,9 @@ try {
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
 
-  // `adamantite/typescript` loads the vendored ts-reset declarations by a path inside the installed
+  // `adamantite/typescript` loads the type resets by a path inside the installed
   // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
-  console.info("Checking the ts-reset types of the installed TypeScript preset...")
+  console.info("Checking the type resets of the installed TypeScript preset...")
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
 

@@ -49,11 +49,13 @@ export default defineConfig({
       {
         extends: true,
         test: {
+          // A real Oxlint or Vitest run takes up to 3.4 seconds alone and more than 5 seconds
+          // while the other test files run, so the default timeouts fail these tests at random.
+          // Fixture tests lint in a `beforeAll` hook, so hooks get the same limit as tests. The
+          // longer timeouts still stop a process that hangs.
+          hookTimeout: 30_000,
           include: PROCESS_RUN_TESTS,
           name: "presets",
-          // A real Oxlint or Vitest run takes up to 3.4 seconds alone and more than 5 seconds
-          // while the other test files run, so the default timeout fails these tests at random.
-          // The longer timeout still stops a process that hangs.
           testTimeout: 30_000,
         },
       },

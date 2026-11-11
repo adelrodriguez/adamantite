@@ -399,6 +399,11 @@ to the same options, so built-in APIs return safer types. For example, `JSON.par
 `includes()` on a literal array accepts a wider value. The project needs no `reset.d.ts` file and
 no ts-reset dependency, because the preset loads the declarations from the Adamantite package.
 
+ts-reset is a project by [Matt Pocock](https://github.com/mattpocock) of
+[Total TypeScript](https://www.totaltypescript.com/ts-reset). Adamantite ships a copy of its
+declarations from the [upstream repository](https://github.com/total-typescript/ts-reset) under
+the MIT license, and the copy includes that license.
+
 ```json
 { "extends": "adamantite/typescript" }
 ```

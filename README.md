@@ -402,8 +402,8 @@ Adamantite package. The resets started from
 
 The resets also cover built-in APIs that ts-reset leaves as `any`. `Object.values()` and
 `Object.entries()` on a type without an index signature, `Object.assign()` with more than three
-sources, `Object.getPrototypeOf()`, `Reflect.apply()`, `Reflect.construct()`, and the values of a
-`JSON.parse()` reviver return or take `unknown`. TypeScript cannot change a property type or a
+sources, `Object.getPrototypeOf()`, `Reflect.apply()`, `Reflect.construct()`, `eval()`, and the
+values of a `JSON.parse()` reviver return or take `unknown`. TypeScript cannot change a property type or a
 default type parameter by declaration merging, so `PromiseRejectedResult.reason` and
 `MessageEvent` data stay `any`.
 

@@ -57,6 +57,15 @@ export default defineConfig({
         "typescript/triple-slash-reference": ["error", { path: "always" }],
       },
     },
+    // The eval() reset redeclares `eval` to merge an overload into the built-in function. Core lint
+    // reports eval() calls, but `adamantite/typescript` also works without the lint presets.
+    {
+      files: ["presets/typescript/resets/eval.d.ts"],
+      rules: {
+        "eslint/no-implicit-globals": "off",
+        "eslint/no-shadow-restricted-names": "off",
+      },
+    },
     // A wildcard module declaration is valid only in a script file. The override is temporary:
     // inline disable comments do not suppress file-scope rules (oxc-project/oxc#21072).
     {

@@ -17,3 +17,4 @@
 /// <reference path="object-assign.d.ts" />
 /// <reference path="object-get-prototype-of.d.ts" />
 /// <reference path="reflect.d.ts" />
+/// <reference path="eval.d.ts" />

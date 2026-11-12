@@ -130,15 +130,52 @@ class MalformedWorkflow extends Data.TaggedClass("Malformed")<{
   readonly reason: string
 }> {}
 
-const parseJobs = (content: string, path: string) =>
+const parseYaml = (content: string, path: string) =>
   Effect.try({
     catch: (cause) => new FailedToParseYaml({ cause, path }),
     try: () => Yaml.parse(content),
-  }).pipe(
+  })
+
+const parseJobs = (content: string, path: string) =>
+  parseYaml(content, path).pipe(
     Effect.flatMap((parsed) => Schema.decodeUnknownEffect(Workflow)(parsed)),
     Effect.map(({ jobs }) => Object.values(jobs)),
     Effect.option
   )
+
+// The jobs of a workflow by name, also of a workflow whose `jobs` key has no jobs yet.
+const JobNames = Schema.Struct({
+  jobs: Schema.NullOr(Schema.Record(Schema.String, Schema.Unknown)),
+})
+
+const readJobsByName = (content: string, path: string) =>
+  parseYaml(content, path).pipe(
+    Effect.flatMap((parsed) => Schema.decodeUnknownEffect(JobNames)(parsed)),
+    Effect.map(({ jobs }) => jobs ?? {})
+  )
+
+/**
+ * The jobs in a managed block. The text up to the end of the block parses with the anchors that the
+ * jobs can use, and the jobs that the text before the block does not have are the managed jobs.
+ */
+const parseBlockJobs = (block: Block, path: string) =>
+  Effect.gen(function* () {
+    const before = block.before.replaceAll("\r", "")
+
+    const jobsBefore = yield* readJobsByName(before, path)
+
+    const jobsWithBlock = yield* readJobsByName(
+      `${before}\n${block.body.replaceAll("\r", "")}`,
+      path
+    )
+
+    // Only the managed jobs decode, so a project job of another shape does not fail the block.
+    return yield* Schema.decodeUnknownEffect(Schema.Array(Job))(
+      Object.entries(jobsWithBlock).flatMap(([name, job]) =>
+        Record.has(jobsBefore, name) ? [] : [job]
+      )
+    )
+  }).pipe(Effect.option)
 
 /**
  * The workflow files in `.github/workflows` that hold managed jobs. A project has one managed
@@ -190,11 +227,7 @@ const readWorkflowState = (cwd: string) =>
     const [managed] = blocks
 
     if (managed) {
-      // The body holds job keys, so it parses as the jobs of a workflow.
-      const jobs = yield* parseJobs(
-        `jobs:\n${managed.block.body.replaceAll("\r", "")}`,
-        path.join(cwd, managed.path)
-      )
+      const jobs = yield* parseBlockJobs(managed.block, path.join(cwd, managed.path))
 
       return Option.match(jobs, {
         onNone: () =>

@@ -334,6 +334,51 @@ describe("github", () => {
       })
     )
 
+    it.effect("read a managed job that uses an anchor from above the managed block", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [RENAMED_WORKFLOW_PATH]: [
+            "on: push",
+            "jobs:",
+            "  lint:",
+            "    runs-on: ubuntu-latest",
+            "    steps: &check_steps",
+            "      - run: pnpm run check",
+            "  # ADAMANTITE:START",
+            "  verify:",
+            "    runs-on: ubuntu-latest",
+            "    steps: *check_steps",
+            "  # ADAMANTITE:END",
+            "",
+          ].join("\n"),
+          "package.json": PACKAGE_JSON,
+        })
+
+        expect(yield* assessFiles(files)).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
+      })
+    )
+
+    it.effect("not count a check command in a job above the managed block", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [RENAMED_WORKFLOW_PATH]: makeBlockWorkflow("- run: pnpm run format").replace(
+            "jobs:\n",
+            "jobs:\n  lint:\n    runs-on: ubuntu-latest\n    steps:\n      - run: pnpm run check\n"
+          ),
+          "package.json": PACKAGE_JSON,
+        })
+
+        expect(yield* assessFiles(files)).toMatchObject({
+          findings: [{ id: "outdated-adamantite-workflow" }],
+        })
+      })
+    )
+
     it.effect("ask to add the markers to a legacy workflow that needs a repair", () =>
       Effect.gen(function* () {
         const files = makeFiles({

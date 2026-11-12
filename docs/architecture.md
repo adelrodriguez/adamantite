@@ -334,7 +334,11 @@ reset. `src/__tests__/presets/typescript.test.ts` type checks them in one run wi
 `adamantite/typescript`, where they must pass, and in one run with `adamantite/tsconfig`, where
 every fixture must fail. The second run proves that each fixture tests a reset. The tests also
 fail when a reset has no fixture or `index.d.ts` does not reference it. The resets and the
-fixtures started from ts-reset, so `license.md` keeps its MIT notice. See ADR 0026.
+fixtures started from ts-reset, so `license.md` keeps its MIT notice.
+
+Doctor's tsconfig integration asks the project's TypeScript which files a config loads. For each
+package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through the
+`ChildProcessSpawner`, and it reports a library that loads the type resets. See ADR 0026.
 
 ## First-party plugin
 

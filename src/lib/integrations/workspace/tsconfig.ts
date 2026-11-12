@@ -5,6 +5,10 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import * as ChildProcess from "effect/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
+import * as Stream from "effect/Stream"
 import type { Project } from "#lib/workspace/project.ts"
 import {
   defineIntegration,
@@ -15,7 +19,7 @@ import { InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
-import { ModuleResolver, resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
+import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
@@ -78,132 +82,85 @@ function mergeExtends(existing: JsonValue | undefined, preset: TypeScriptPreset)
   return presetImport
 }
 
-/**
- * The first of `file` and `file` with `.json` added that exists, as TypeScript looks up a config.
- */
-const findConfigFile = Effect.fn("findConfigFile")(function* (file: string) {
-  const fs = yield* FileSystem.FileSystem
-  const candidates = file.endsWith(".json") ? [file] : [file, `${file}.json`]
+// The type resets that `adamantite/typescript` lists in `files`, at the end of their path in the
+// installed package.
+const RESETS_FILE = "/dist/presets/typescript/resets/index.d.ts"
 
-  for (const candidate of candidates) {
-    if (yield* fs.exists(candidate)) {
-      return Option.some(candidate)
-    }
-  }
-
-  return Option.none<string>()
-})
+const ShowConfig = Schema.Struct({ files: Schema.optional(Schema.Array(Schema.String)) })
+const decodeShowConfig = Schema.decodeUnknownOption(ShowConfig)
 
 /**
- * The config file that an `extends` entry names, by TypeScript's rules rather than the runtime
- * resolver's, which would pick a `.js` file or a package's `main` entry. A path is used as written,
- * then with `.json` added. A bare package name means the package's `tsconfig` field, or its
- * `tsconfig.json`. A package subpath goes through the package's exports only when they map it to a
- * `.json` file, and otherwise names a file in the package.
+ * Whether the `tsconfig.json` in `directory` loads the type resets, by the files that the project's
+ * own TypeScript resolves with `tsc --showConfig`. TypeScript follows `extends` by its own rules,
+ * and a config that sets its own `files` drops the resets. None when TypeScript is not installed or
+ * the command fails.
  */
-const resolveExtends = Effect.fn("resolveExtends")(function* (
-  directory: string,
-  specifier: string
-) {
-  const path = yield* Path.Path
+const readLoadsResets = Effect.fn("readLoadsResets")(
+  function* (directory: string) {
+    const path = yield* Path.Path
+    const typescript = yield* resolvePackageDirectory(directory, "typescript")
 
-  if (specifier.startsWith(".") || path.isAbsolute(specifier)) {
-    return yield* findConfigFile(path.resolve(directory, specifier))
-  }
-
-  const parts = specifier.split("/")
-  const nameLength = specifier.startsWith("@") ? 2 : 1
-  const subpath = parts.slice(nameLength).join("/")
-
-  if (subpath !== "") {
-    const resolver = yield* ModuleResolver
-    const exported = yield* resolver.resolve(directory, specifier)
-
-    if (Option.isSome(exported) && exported.value.endsWith(".json")) {
-      return exported
-    }
-  }
-
-  const packageDirectory = yield* resolvePackageDirectory(
-    directory,
-    parts.slice(0, nameLength).join("/")
-  )
-
-  if (Option.isNone(packageDirectory)) {
-    return Option.none<string>()
-  }
-
-  if (subpath !== "") {
-    return yield* findConfigFile(path.join(packageDirectory.value, subpath))
-  }
-
-  const manifest = yield* readPackageJson(packageDirectory.value)
-  const entry = Predicate.isString(manifest.tsconfig) ? manifest.tsconfig : "tsconfig.json"
-
-  return yield* findConfigFile(path.join(packageDirectory.value, entry))
-})
-
-/**
- * An Adamantite preset that a config reaches, and the config file that names it.
- */
-interface PresetSource {
-  readonly preset: TypeScriptPreset
-  readonly source: string
-}
-
-/**
- * The Adamantite preset that a `tsconfig.json` reaches through `extends`, directly or through base
- * configs, and the config file that names it. `adamantite/typescript` counts when any branch of the
- * inheritance reaches it, because it adds the type resets, so the search goes on after it finds
- * `adamantite/tsconfig`.
- */
-const readPreset = Effect.fn("readPreset")(function* (configPath: string) {
-  const path = yield* Path.Path
-  const visited = new Set<string>()
-  const pending = [configPath]
-  let plainSource = Option.none<string>()
-
-  for (let current = pending.shift(); current !== undefined; current = pending.shift()) {
-    if (visited.has(current)) {
-      continue
+    if (Option.isNone(typescript)) {
+      return Option.none<boolean>()
     }
 
-    visited.add(current)
-    const content = yield* readFileIfExists(current)
+    const manifest = yield* Effect.option(readPackageJson(typescript.value))
 
-    if (Option.isNone(content)) {
-      continue
-    }
-
-    const config = yield* parseJson(content.value, current)
-
-    if (!Predicate.isObject(config)) {
-      continue
-    }
-
-    const entries = (Array.isArray(config.extends) ? config.extends : [config.extends]).filter(
-      Predicate.isString
+    const bin = Option.flatMapNullishOr(manifest, ({ bin: entries }) =>
+      Predicate.isObject(entries) ? entries.tsc : undefined
     )
 
-    if (entries.includes(TYPESCRIPT_PRESETS.typescript)) {
-      return Option.some<PresetSource>({ preset: "typescript", source: current })
+    if (Option.isNone(bin) || !Predicate.isString(bin.value)) {
+      return Option.none<boolean>()
     }
 
-    if (Option.isNone(plainSource) && entries.includes(TYPESCRIPT_PRESETS.tsconfig)) {
-      plainSource = Option.some(current)
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+
+    const handle = yield* spawner.spawn(
+      ChildProcess.make(
+        "node",
+        [path.join(typescript.value, bin.value), "--showConfig", "--project", directory],
+        { cwd: directory, stdin: "ignore" }
+      )
+    )
+
+    const [stdout, , exitCode] = yield* Effect.all(
+      [
+        Stream.mkString(Stream.decodeText(handle.stdout)),
+        Stream.runDrain(handle.stderr),
+        handle.exitCode,
+      ],
+      { concurrency: "unbounded" }
+    )
+
+    if (exitCode !== 0) {
+      return Option.none<boolean>()
     }
 
-    for (const entry of entries.filter((name) => !PRESET_IMPORTS.includes(name))) {
-      const base = yield* resolveExtends(path.dirname(current), entry)
+    const config = yield* Effect.option(parseJson(stdout, path.join(directory, files[0].path)))
 
-      if (Option.isSome(base)) {
-        pending.push(base.value)
-      }
-    }
+    return Option.flatMap(config, (value) =>
+      Option.map(decodeShowConfig(value), (showConfig) =>
+        (showConfig.files ?? []).some((file) => file.endsWith(RESETS_FILE))
+      )
+    )
+  },
+  Effect.scoped,
+  Effect.catchTag("PlatformError", () => Effect.succeed(Option.none<boolean>()))
+)
+
+/**
+ * The `extends` entries of a `tsconfig.json`. None when the file is not a JSON object.
+ */
+function readExtends(config: JsonValue) {
+  if (!Predicate.isObject(config)) {
+    return []
   }
 
-  return Option.map(plainSource, (source): PresetSource => ({ preset: "tsconfig", source }))
-})
+  return (Array.isArray(config.extends) ? config.extends : [config.extends]).filter(
+    Predicate.isString
+  )
+}
 
 // Another project imports a package that is not private and declares `exports` or `types`, so it
 // can read the declaration files that the package emits.
@@ -214,22 +171,11 @@ function checkPublishesTypes(packageJson: PackageJson) {
   )
 }
 
-/**
- * `configPath` is the library's config, and `source` is the config that names the preset: the same
- * file, or a base config that it extends.
- */
-function toLibraryFinding(configPath: string, source: string): Finding {
-  const reached =
-    source === configPath
-      ? `extends \`${TYPESCRIPT_PRESETS.typescript}\``
-      : `extends \`${TYPESCRIPT_PRESETS.typescript}\` through \`${source}\``
-
+function toLibraryFinding(configPath: string): Finding {
   return {
-    currentState: `\`${configPath}\` ${reached}, and its \`package.json\` is not private and declares \`exports\` or \`types\`.`,
+    currentState: `\`${configPath}\` loads the type resets of \`${TYPESCRIPT_PRESETS.typescript}\`, directly or through a base config, and its \`package.json\` is not private and declares \`exports\` or \`types\`.`,
     goal: [
-      source === configPath
-        ? `Replace \`${TYPESCRIPT_PRESETS.typescript}\` with \`${TYPESCRIPT_PRESETS.tsconfig}\` in the \`extends\` of \`${configPath}\`. Preserve every other setting.`
-        : `Make \`${configPath}\` extend \`${TYPESCRIPT_PRESETS.tsconfig}\` instead of reaching \`${TYPESCRIPT_PRESETS.typescript}\` through \`${source}\`, such as through a base config for libraries. Keep \`${source}\` for the packages that use it, and preserve every other setting.`,
+      `Make \`${configPath}\` extend \`${TYPESCRIPT_PRESETS.tsconfig}\` instead of reaching \`${TYPESCRIPT_PRESETS.typescript}\`, directly or through a base config. Keep a shared base for the packages that use it, and preserve every other setting.`,
     ],
     id: "typescript-preset-in-library",
     integration: "tsconfig",
@@ -242,34 +188,52 @@ function toLibraryFinding(configPath: string, source: string): Finding {
 
 export default defineIntegration({
   // Doctor checks only the packages that chose a preset, so a project that declined it in init
-  // gets no finding. Oxlint's type check runs without a `tsconfig.json`.
+  // gets no finding. Oxlint's type check runs without a `tsconfig.json`. A config without
+  // `extends` cannot load the type resets, so Doctor runs TypeScript only for the others.
   assess: ({ cwd, packageJson, workspace }: Project) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
 
-      const packages = yield* Effect.forEach([cwd, ...workspace.packageDirectories], (directory) =>
-        readPreset(path.join(directory, files[0].path)).pipe(
-          Effect.map((preset) => ({ directory, preset }))
-        )
+      const packages = yield* Effect.forEach(
+        [cwd, ...workspace.packageDirectories],
+        (directory) =>
+          Effect.gen(function* () {
+            const content = yield* readFileIfExists(path.join(directory, files[0].path))
+
+            if (Option.isNone(content)) {
+              return []
+            }
+
+            const config = yield* Effect.option(
+              parseJson(content.value, path.join(directory, files[0].path))
+            )
+
+            const entries = Option.match(config, { onNone: () => [], onSome: readExtends })
+
+            const loadsResets =
+              entries.length === 0
+                ? false
+                : Option.getOrElse(yield* readLoadsResets(directory), () => false)
+
+            const namesPreset = entries.some((entry) => PRESET_IMPORTS.includes(entry))
+
+            return namesPreset || loadsResets ? [{ directory, loadsResets }] : []
+          }),
+        { concurrency: 4 }
       )
 
-      const configured = packages.filter(({ preset }) => Option.isSome(preset))
+      const configured = packages.flat()
 
       if (configured.length === 0) {
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const findings = yield* Effect.forEach(configured, ({ directory, preset }) =>
-        Option.isSome(preset) && preset.value.preset === "typescript"
+      const findings = yield* Effect.forEach(configured, ({ directory, loadsResets }) =>
+        loadsResets
           ? (directory === cwd ? Effect.succeed(packageJson) : readPackageJson(directory)).pipe(
               Effect.map((manifest) =>
                 checkPublishesTypes(manifest)
-                  ? [
-                      toLibraryFinding(
-                        path.relative(cwd, path.join(directory, files[0].path)),
-                        path.relative(cwd, preset.value.source)
-                      ),
-                    ]
+                  ? [toLibraryFinding(path.relative(cwd, path.join(directory, files[0].path)))]
                   : []
               )
             )

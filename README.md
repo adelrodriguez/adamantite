@@ -413,9 +413,10 @@ default type parameter by declaration merging, so `PromiseRejectedResult.reason`
 
 Use `adamantite/tsconfig` in a library that publishes declaration files. A declaration file that
 TypeScript emits with the type resets can name the global `AdamantiteTypeScript` helper types,
-which a consumer without the resets does not have. Doctor reports a package that extends
-`adamantite/typescript`, directly or through a base config, is not private, and declares `exports`
-or `types`.
+which a consumer without the resets does not have. Doctor reports a package whose
+`tsconfig.json` loads the type resets, directly or through a base config, when the package is not
+private and declares `exports` or `types`. Doctor asks the project's TypeScript with
+`tsc --showConfig`.
 
 The preset adds the type resets through `files`, and includes every file below your
 `tsconfig.json` through `include`. List your files in `include`, which keeps the resets. A `files`

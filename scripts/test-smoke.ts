@@ -565,6 +565,25 @@ try {
 
   rmSync(resetProbe)
 
+  // Doctor asks the installed TypeScript whether the config loads the type resets, so a public
+  // package that publishes its types gets the library finding. The fixture is private otherwise.
+  console.info("Checking that Doctor reports the type resets in a library...")
+  const fixtureManifest = readFileSync(join(fixture, "package.json"), "utf8")
+
+  const libraryManifest = JSON.stringify({
+    ...JSON.parse(fixtureManifest),
+    private: false,
+    types: "./dist/index.d.ts",
+  })
+
+  writeFileSync(join(fixture, "package.json"), libraryManifest)
+  assertIncludes(
+    runExpectingFailure(process.execPath, [cliPath, "doctor"], { cwd: fixture, env: fixtureEnv })
+      .output,
+    "Type resets in a library"
+  )
+  writeFileSync(join(fixture, "package.json"), fixtureManifest)
+
   // Init installs at the workspace root in a monorepo, and pnpm-workspace.yaml marks the
   // fixture as one.
   const pnpmVersion = run("pnpm", ["--version"], { cwd: repoRoot }).trim()

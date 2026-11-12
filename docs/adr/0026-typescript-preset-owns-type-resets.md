@@ -19,8 +19,12 @@ two keys on its own. A solution config with `"files": []` and `references` must 
 `"include": []` too, or extend `adamantite/tsconfig`. A project without the resets extends
 `adamantite/tsconfig`. TypeScript 7.0.2 and tsrs both read the inherited `files`.
 
-Doctor follows `extends` through relative paths and package specifiers, so it also reports a
-library that reaches `adamantite/typescript` through a shared base config.
+Doctor asks the project's own TypeScript instead of resolving `extends` itself. For each package
+whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` and reports a library whose resolved
+`files` include the type resets. TypeScript resolves `extends` by its own rules, such as package
+exports and a `tsconfig` field, so a library on a shared base config is reported, and a config
+that sets its own `files` is not. A hand-written resolver missed several of these cases. Doctor
+skips a package when TypeScript is not installed or the command fails.
 
 Each reset is a script declaration file that merges into a built-in interface, such as
 `interface JSON`. TypeScript places the overloads of a merged declaration before the library's

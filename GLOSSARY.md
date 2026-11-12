@@ -15,6 +15,11 @@ Third-party code that Adamantite builds into the package at a pinned upstream co
 because upstream does not publish to npm. Bundles ship inside the preset that owns them.
 _Avoid_: Plugin, dependency
 
+**Type reset**:
+A first-party declaration that `adamantite/typescript` loads to replace the type of a built-in API,
+such as `JSON.parse()` returning `unknown`. The type resets started from ts-reset.
+_Avoid_: Vendored bundle, patch, override
+
 **First-party plugin**:
 Adamantite's own Oxlint plugin, under the `adamantite/*` rule namespace. It ships inside the
 package, and presets load it by file URL, so target projects install nothing extra. A rule

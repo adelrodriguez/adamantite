@@ -1,10 +1,11 @@
 import { execFileSync, spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
+import { parse as parseJsonc } from "jsonc-parser"
 import packageJson from "../package.json" with { type: "json" }
 import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/tooling/oxlint/entry.ts"
 
@@ -97,3 +98,47 @@ for (const { file, module } of presets) {
 }
 
 console.info("Verified the plugin files of the built lint presets")
+
+// The TypeScript preset lists the type resets in `files`, by a path next to itself, and each reset
+// file references the others by path. The build must copy every file that the preset loads.
+const TypeScriptPreset = Schema.Struct({ files: Schema.Array(Schema.String) })
+const typescriptPresetPath = join(import.meta.dirname, "..", "dist", "presets", "typescript.json")
+
+const typescriptPreset = Schema.decodeUnknownSync(TypeScriptPreset)(
+  parseJsonc(readFileSync(typescriptPresetPath, "utf8"))
+)
+
+/**
+ * Returns the given declaration files and every file that they reference by path.
+ */
+function collectLoadedFiles(
+  pending: readonly string[],
+  loaded: ReadonlySet<string>
+): ReadonlySet<string> {
+  const unread = pending.filter((file) => !loaded.has(file))
+
+  if (unread.length === 0) {
+    return loaded
+  }
+
+  const references = unread.flatMap((file) => {
+    if (!existsSync(file)) {
+      throw new Error(`The built TypeScript preset loads ${file}, which the build did not copy`)
+    }
+
+    return [
+      ...readFileSync(file, "utf8").matchAll(/^\/\/\/ <reference path="(?<path>[^"]+)" \/>$/gmu),
+    ]
+      .flatMap((match) => match.groups?.path ?? [])
+      .map((path) => join(dirname(file), path))
+  })
+
+  return collectLoadedFiles(references, new Set([...loaded, ...unread]))
+}
+
+const loadedFiles = collectLoadedFiles(
+  typescriptPreset.files.map((file) => join(dirname(typescriptPresetPath), file)),
+  new Set()
+)
+
+console.info(`Verified the ${loadedFiles.size} type reset files of the built TypeScript preset`)

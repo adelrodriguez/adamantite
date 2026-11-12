@@ -1,5 +1,7 @@
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
+import type { TypeScriptPreset } from "#lib/integrations/workspace/tsconfig.ts"
 import {
   describeLintPreset,
   findMissingRequiredPresets,
@@ -99,10 +101,28 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
 
   const shouldSetupTypescript = yield* prompter.confirm({
     initialValue: true,
-    message: isMonorepo
-      ? "Show how to use the TypeScript preset in each workspace package?"
-      : "Use the Adamantite TypeScript preset?",
+    message: "Use an Adamantite TypeScript preset?",
   })
+
+  const typescriptPreset = shouldSetupTypescript
+    ? Option.some(
+        yield* prompter.select<TypeScriptPreset>({
+          message: "Which TypeScript preset should Adamantite use?",
+          options: [
+            {
+              hint: "JSON.parse() returns unknown, not any. Avoid in libraries.",
+              label: "Strict types",
+              value: "typescript",
+            },
+            {
+              hint: "No changes to built-in types. Use for libraries.",
+              label: "Strict config",
+              value: "tsconfig",
+            },
+          ],
+        })
+      )
+    : Option.none()
 
   const selectedEditors = yield* prompter.multiselect({
     message: "Which editors should Adamantite configure?",
@@ -152,6 +172,6 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,
-    typescript: shouldSetupTypescript,
+    typescript: typescriptPreset,
   } satisfies InitOptionsInput
 })

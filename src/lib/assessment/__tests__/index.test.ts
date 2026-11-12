@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import {
@@ -17,6 +18,11 @@ import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
+
+// These assessments resolve no TypeScript package, so the tsconfig integration starts no process.
+const noProcessLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
+  ChildProcessSpawner.make(() => Effect.die("Assessment tests must not spawn processes"))
+)
 
 function makeAssessment(value: Partial<ProjectAssessment>): ProjectAssessment {
   return {
@@ -332,6 +338,7 @@ describe("assessProject", () => {
           files.layer,
           Path.layer,
           makeModuleResolverLayer(ROOT),
+          noProcessLayer,
           Layer.succeed(DependencyInstaller)({
             addDevDependencies: () => Effect.void,
             detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
@@ -407,6 +414,7 @@ describe("assessProject", () => {
               discoveries.push("discovery")
             })
           ),
+          noProcessLayer,
           Layer.succeed(DependencyInstaller)({
             addDevDependencies: () => Effect.void,
             detectPackageManager: () => Effect.succeed({ name: "pnpm" }),

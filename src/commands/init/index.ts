@@ -43,7 +43,7 @@ export default Command.make("init", initCommandOptions).pipe(
     },
     {
       command:
-        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript --install-extensions --github-actions --agents",
+        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript typescript --install-extensions --github-actions --agents",
       description:
         "Configure a React project with VS Code, TypeScript, CI, agent guidance, and the Adamantite skill",
     },
@@ -89,7 +89,7 @@ export default Command.make("init", initCommandOptions).pipe(
             options.scripts.length > 0,
             options.presets.length > 0,
             options.editors.length > 0,
-            options.typescript,
+            Option.isSome(options.typescript),
             options.installExtensions,
             options.githubActions,
             options.agents,
@@ -103,10 +103,14 @@ export default Command.make("init", initCommandOptions).pipe(
         })
       }
 
-      if (options.nonInteractive && options.scripts.length === 0 && !options.typescript) {
+      if (
+        options.nonInteractive
+        && options.scripts.length === 0
+        && Option.isNone(options.typescript)
+      ) {
         return yield* new InvalidInitOptions({
           reason:
-            "Select at least one script with `--script <name>`, or the TypeScript preset with `--typescript`.",
+            "Select at least one script with `--script <name>`, or a TypeScript preset with `--typescript <preset>`.",
         })
       }
 
@@ -120,7 +124,7 @@ export default Command.make("init", initCommandOptions).pipe(
       // guidance selects no setup at all.
       if (
         initOptions.scripts.length === 0
-        && !initOptions.typescript
+        && Option.isNone(initOptions.typescript)
         && Option.isNone(initOptions.editors)
         && !initOptions.agents
       ) {
@@ -191,8 +195,8 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupSkill(cwd)
       }
 
-      if (initOptions.typescript) {
-        yield* setupTypescript(cwd, isMonorepo)
+      if (Option.isSome(initOptions.typescript)) {
+        yield* setupTypescript(cwd, isMonorepo, initOptions.typescript.value)
       }
 
       // After the TypeScript setup, so a `tsconfig.json` that init creates gets the plugin entry.

@@ -197,7 +197,10 @@ presets/
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
-  tsconfig.json     published TypeScript preset
+  tsconfig.json     published TypeScript preset with strict options
+  typescript.json   published TypeScript preset with strict options and ts-reset types
+  typescript/
+    resets/         first-party type resets
 src/
   commands/         CLI workflows
   lib/
@@ -318,6 +321,24 @@ fixture only when the upstream change is accepted.
 A bundle has no tests for each rule. Adamantite does not change vendored rules, so their message
 ids, placeholder data, and report positions are upstream behaviour, and the fixture run already
 covers each rule as the preset configures it.
+
+## Type resets
+
+`adamantite/typescript` loads the type resets in `presets/typescript/resets/`. Each file merges a
+declaration into one built-in interface, and `index.d.ts` references every file. The preset lists
+`index.d.ts` in `files`. The build copies the folder into `dist`, and `scripts/test-build.ts` fails
+when a file that the built preset loads is missing.
+
+The fixtures in `src/__tests__/presets/fixtures/typescript/` hold one file of type tests for each
+reset. `src/__tests__/presets/typescript.test.ts` type checks them in one run with
+`adamantite/typescript`, where they must pass, and in one run with `adamantite/tsconfig`, where
+every fixture must fail. The second run proves that each fixture tests a reset. The tests also
+fail when a reset has no fixture or `index.d.ts` does not reference it. The resets and the
+fixtures started from ts-reset, so `license.md` keeps its MIT notice.
+
+Doctor's tsconfig integration asks the project's TypeScript which files a config loads. For each
+package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through the
+`ChildProcessSpawner`, and it reports a library that loads the type resets. See ADR 0026.
 
 ## First-party plugin
 

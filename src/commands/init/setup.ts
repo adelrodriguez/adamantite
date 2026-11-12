@@ -15,7 +15,11 @@ import {
   type ToolingConfigState,
 } from "#lib/integrations/tooling/base.ts"
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
-import tsconfig, { MONOREPO_GUIDANCE } from "#lib/integrations/workspace/tsconfig.ts"
+import tsconfig, {
+  getMonorepoGuidance,
+  TYPESCRIPT_PRESETS,
+  type TypeScriptPreset,
+} from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
@@ -161,13 +165,13 @@ export const addScripts = (
     return getManagedScripts(packageJson)
   })
 
-export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
+export const setupTypescript = (cwd: string, isMonorepo: boolean, preset: TypeScriptPreset) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
 
     if (isMonorepo) {
       yield* pipe(
-        MONOREPO_GUIDANCE,
+        getMonorepoGuidance(preset),
         Effect.forEach((line) => prompter.log.info(line))
       )
 
@@ -181,13 +185,13 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
 
           if (typescriptExists) {
             yield* spinner.message(`\`${tsconfig.config}\` found, updating...`)
-            yield* tsconfig.update(cwd)
+            yield* tsconfig.update(cwd, preset)
 
             return false
           }
 
           yield* spinner.message(`\`${tsconfig.config}\` not found, creating...`)
-          yield* tsconfig.create(cwd)
+          yield* tsconfig.create(cwd, preset)
 
           return true
         }),
@@ -195,7 +199,7 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean) =>
         failure: "Failed to set up TypeScript config.",
         start: "Setting up TypeScript config...",
         success: (created) =>
-          created ? `\`${tsconfig.config}\` created.` : `\`${tsconfig.config}\` updated.`,
+          `\`${tsconfig.config}\` ${created ? "created" : "updated"} with \`${TYPESCRIPT_PRESETS[preset]}\`.`,
       }
     )
   })

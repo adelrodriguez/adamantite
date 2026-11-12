@@ -109,7 +109,8 @@
       "types": "./dist/presets/rules/testing.d.ts",
       "default": "./dist/presets/rules/testing.js"
     },
-    "./typescript": "./dist/presets/tsconfig.json"
+    "./tsconfig": "./dist/presets/tsconfig.json",
+    "./typescript": "./dist/presets/typescript.json"
   },
   "scripts": {
     "analyze": "knip",

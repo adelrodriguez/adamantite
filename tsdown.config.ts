@@ -18,7 +18,8 @@ export default defineConfig([
   },
   {
     copy: [
-      { from: "presets/tsconfig.json", to: "dist/presets" },
+      { from: ["presets/tsconfig.json", "presets/typescript.json"], to: "dist/presets" },
+      { from: "presets/typescript/resets/*", to: "dist/presets/typescript/resets" },
       {
         from: [
           "presets/lint/vendor/antislop/plugin.mjs",
@@ -41,7 +42,8 @@ export default defineConfig([
     // layers rule loads oxc-resolver's native bindings at runtime, so it stays external too.
     deps: { neverBundle: ["@oxlint/plugins", "knip", "oxc-resolver", "oxfmt", "oxlint"] },
     dts: { generator: "oxc" },
-    entry: ["presets/**/*.ts"],
+    // The type resets are declaration files that the build copies.
+    entry: ["presets/**/*.ts", "!presets/**/*.d.ts"],
     fixedExtension: false,
     outDir: "dist/presets",
   },

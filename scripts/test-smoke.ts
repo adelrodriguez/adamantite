@@ -383,6 +383,7 @@ try {
       "--preset",
       "effect",
       "--typescript",
+      "typescript",
       "--agents",
       "--editor",
       "vscode",
@@ -496,6 +497,7 @@ try {
       "--preset",
       "architecture",
       "--typescript",
+      "typescript",
       "--agents",
       "--github-actions",
     ],
@@ -544,6 +546,43 @@ try {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)
     run(process.execPath, [cliPath, command], { cwd: fixture, env: fixtureEnv })
   }
+
+  // `adamantite/typescript` loads the type resets by a path inside the installed
+  // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
+  console.info("Checking the type resets of the installed TypeScript preset...")
+  const resetProbe = join(fixture, "src", "reset-probe.ts")
+  writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
+
+  for (const [command, args] of [
+    ["tsc", ["--noEmit", "--project", "tsconfig.json"]],
+    [process.execPath, [cliPath, "check", "--only", "lint"]],
+  ] as const) {
+    assertIncludes(
+      runExpectingFailure(command, [...args], { cwd: fixture, env: fixtureEnv }).output,
+      "Type 'unknown' is not assignable to type '{ a: number; }'"
+    )
+  }
+
+  rmSync(resetProbe)
+
+  // Doctor asks the installed TypeScript whether the config loads the type resets, so a public
+  // package that publishes its types gets the library finding. The fixture is private otherwise.
+  console.info("Checking that Doctor reports the type resets in a library...")
+  const fixtureManifest = readFileSync(join(fixture, "package.json"), "utf8")
+
+  const libraryManifest = JSON.stringify({
+    ...JSON.parse(fixtureManifest),
+    private: false,
+    types: "./dist/index.d.ts",
+  })
+
+  writeFileSync(join(fixture, "package.json"), libraryManifest)
+  assertIncludes(
+    runExpectingFailure(process.execPath, [cliPath, "doctor"], { cwd: fixture, env: fixtureEnv })
+      .output,
+    "Type resets in a library"
+  )
+  writeFileSync(join(fixture, "package.json"), fixtureManifest)
 
   // Init installs at the workspace root in a monorepo, and pnpm-workspace.yaml marks the
   // fixture as one.

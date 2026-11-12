@@ -7,8 +7,14 @@ Use explicit `--non-interactive` setup as an agent. Include at least one `--scri
 For example, to configure checks, fixes, TypeScript, and agent instructions, run:
 
 ```sh
-npx adamantite init --non-interactive --script check --script fix --typescript --agents
+npx adamantite init --non-interactive --script check --script fix --typescript typescript --agents
 ```
+
+`--typescript typescript` writes `adamantite/typescript`, which adds type resets, so
+`JSON.parse()` returns `unknown`. Use `--typescript tsconfig` for a library that publishes
+declaration files, because those files can name reset helper types that consumers do not have.
+A project that already has ts-reset can delete its `reset.d.ts` files and the
+`@total-typescript/ts-reset` dependency after it extends `adamantite/typescript`.
 
 Adapt the selected options to the request. Omitted boolean flags are disabled.
 `--agents` adds instructions to `AGENTS.md` and writes this skill to `.agents/skills`, and

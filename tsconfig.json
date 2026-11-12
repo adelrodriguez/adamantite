@@ -31,5 +31,12 @@
     ]
   },
   "include": ["src", "presets/**/*.ts", "scripts", "*.config.ts"],
-  "exclude": [".packref", "dist", "node_modules", "src/__tests__/presets/fixtures"]
+  // Adamantite publishes declaration files, so it extends the plain preset without the type resets.
+  "exclude": [
+    ".packref",
+    "dist",
+    "node_modules",
+    "presets/typescript/resets",
+    "src/__tests__/presets/fixtures"
+  ]
 }

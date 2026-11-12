@@ -90,6 +90,7 @@ function runFreshSetup() {
     const prompter = createPrompterTestContext({
       confirmResponses: [true, false, false, false],
       multiselectResponses: [["check", "analyze"], ["react"], ["vscode"]],
+      selectResponses: ["typescript"],
     })
 
     const installer = createDependencyInstallerTestContext()
@@ -113,7 +114,15 @@ function runEffectSetup() {
 
     const exit = yield* runCommand(
       initCommand,
-      ["--non-interactive", "--script", "check", "--preset", "effect", "--typescript"],
+      [
+        "--non-interactive",
+        "--script",
+        "check",
+        "--preset",
+        "effect",
+        "--typescript",
+        "typescript",
+      ],
       { files, layers: [prompter.layer, installer.layer, runner.layer] }
     )
 
@@ -523,7 +532,7 @@ describe("init", () => {
 
         const exit = yield* runCommand(
           initCommand,
-          ["--non-interactive", "--script", "check", "--typescript"],
+          ["--non-interactive", "--script", "check", "--typescript", "typescript"],
           { files, layers: [prompter.layer, installer.layer] }
         )
 
@@ -538,7 +547,11 @@ describe("init", () => {
             {
               level: "info",
               message:
-                'To use the TypeScript preset, add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
+                'Add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
+            },
+            {
+              level: "info",
+              message: "In a library package, extend `adamantite/tsconfig` instead.",
             },
           ])
         )
@@ -575,6 +588,7 @@ describe("init", () => {
         const prompter = createPrompterTestContext({
           confirmResponses: [true, false, false, false],
           multiselectResponses: [["check"], [], ["vscode"]],
+          selectResponses: ["typescript"],
         })
 
         const installer = createDependencyInstallerTestContext()
@@ -648,6 +662,7 @@ describe("init", () => {
         const prompter = createPrompterTestContext({
           confirmResponses: [true, false],
           multiselectResponses: [[], []],
+          selectResponses: ["tsconfig"],
         })
 
         const installer = createDependencyInstallerTestContext()
@@ -658,15 +673,34 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect([prompter.multiselectCalls[0], prompter.confirmCalls[0]]).toMatchObject([
+        expect([
+          prompter.multiselectCalls[0],
+          prompter.confirmCalls[0],
+          prompter.selectCalls[0],
+        ]).toMatchObject([
           { required: false },
-          { message: "Use the Adamantite TypeScript preset?" },
+          { message: "Use an Adamantite TypeScript preset?" },
+          {
+            message: "Which TypeScript preset should Adamantite use?",
+            options: [
+              {
+                hint: "JSON.parse() returns unknown, not any. Avoid in libraries.",
+                label: "Strict types",
+                value: "typescript",
+              },
+              {
+                hint: "No changes to built-in types. Use for libraries.",
+                label: "Strict config",
+                value: "tsconfig",
+              },
+            ],
+          },
         ])
         expect(installer.calls).toStrictEqual([
           { options: { silent: true, workspace: false }, packages: ["adamantite"] },
         ])
         expect(files.list()).toStrictEqual(["package.json", "tsconfig.json"])
-        expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: "adamantite/typescript" })
+        expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: "adamantite/tsconfig" })
       })
     )
 
@@ -752,6 +786,7 @@ describe("init", () => {
             "--editor",
             "zed",
             "--typescript",
+            "typescript",
             "--install-extensions",
             "--github-actions",
             "--agents",
@@ -792,13 +827,19 @@ describe("init", () => {
     )
 
     it.effect.each([
-      { args: ["--non-interactive", "--typescript"], name: "no script", scripts: undefined },
       {
-        args: ["--non-interactive", "--script", "analyze", "--typescript"],
+        args: ["--non-interactive", "--typescript", "typescript"],
+        name: "no script",
+        preset: "typescript",
+        scripts: undefined,
+      },
+      {
+        args: ["--non-interactive", "--script", "analyze", "--typescript", "tsconfig"],
         name: "a script without linting",
+        preset: "tsconfig",
         scripts: { analyze: "adamantite analyze" },
       },
-    ])("set up the TypeScript preset with $name", ({ args, scripts }) =>
+    ])("set up the $preset preset with $name", ({ args, preset, scripts }) =>
       Effect.gen(function* () {
         const files = createInitTestContext()
         const prompter = createPrompterTestContext()
@@ -810,9 +851,14 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: "adamantite/typescript" })
+        expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: `adamantite/${preset}` })
         expect(readJson(files, "package.json").scripts).toStrictEqual(scripts)
         expect(files.exists("oxlint.config.ts")).toBe(false)
+        expect(prompter.spinnerEntries).toContainEqual(
+          expect.objectContaining({
+            message: `\`tsconfig.json\` created with \`adamantite/${preset}\`.`,
+          })
+        )
       })
     )
 
@@ -838,7 +884,7 @@ describe("init", () => {
         args: ["--non-interactive"],
         name: "neither a script nor TypeScript",
         reason:
-          "Select at least one script with `--script <name>`, or the TypeScript preset with `--typescript`.",
+          "Select at least one script with `--script <name>`, or a TypeScript preset with `--typescript <preset>`.",
       },
       {
         args: ["--non-interactive", "--script", "analyze", "--preset", "react"],
@@ -1430,6 +1476,7 @@ describe("init", () => {
         const prompter = createPrompterTestContext({
           confirmResponses: [true, true, true, false],
           multiselectResponses: [["check"], ["react"], ["zed"]],
+          selectResponses: ["typescript"],
         })
 
         const installer = createDependencyInstallerTestContext()

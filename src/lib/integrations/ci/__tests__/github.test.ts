@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema"
 import * as Struct from "effect/Struct"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { Block, readBlock } from "#lib/integrations/ci/github-block.ts"
 import github from "#lib/integrations/ci/github.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
@@ -117,6 +118,41 @@ function makeMatrixWorkflow(...entries: Array<{ command: string; name: string }>
   ].join("\n")
 }
 
+// A workflow with a renamed file, as a project can keep it.
+const RENAMED_WORKFLOW_PATH = ".github/workflows/checks.yml"
+
+// A job that the project added after the managed block, with a Node.js version that it chose.
+const PROJECT_JOB = [
+  "  e2e:",
+  "    runs-on: ubuntu-latest",
+  "    steps:",
+  "      - uses: actions/setup-node@v7",
+  "        with:",
+  '          node-version: "22"',
+  "      - run: pnpm run test:e2e",
+  "",
+].join("\n")
+
+// The project's name for the workflow, outside the managed block.
+function renameWorkflow(workflow: string) {
+  return workflow.replace("name: adamantite", "name: checks")
+}
+
+// A workflow whose managed block holds one job that runs these steps.
+function makeBlockWorkflow(...steps: string[]) {
+  return [
+    "on: push",
+    "jobs:",
+    "  # ADAMANTITE:START",
+    "  verify:",
+    "    runs-on: ubuntu-latest",
+    "    steps:",
+    ...steps.map((line) => `      ${line}`),
+    "  # ADAMANTITE:END",
+    "",
+  ].join("\n")
+}
+
 const GeneratedWorkflow = Schema.Struct({
   jobs: Schema.Struct({
     verify: Schema.Struct({
@@ -148,6 +184,24 @@ function getMatrixJobs(files: FileSystemTestContext) {
 
 function getSetupNodeInputs(files: FileSystemTestContext) {
   return readGeneratedWorkflow(files).steps.find((step) => step.name === "Setup Node.js")?.with
+}
+
+// The workflow that `create` writes for pnpm and these scripts.
+function generateWorkflow(scripts: Array<"analyze" | "check">) {
+  return Effect.gen(function* () {
+    const files = makeFiles()
+
+    yield* github.create(ROOT, { packageManager: "pnpm", scripts }).pipe(provideFallback(files))
+
+    return files.read(WORKFLOW_PATH)
+  })
+}
+
+function assessFiles(files: FileSystemTestContext) {
+  return readProject(ROOT).pipe(
+    Effect.flatMap((project) => github.assess(project)),
+    provideAssessment(files)
+  )
 }
 
 function provideFileResolver(files: FileSystemTestContext) {
@@ -235,6 +289,131 @@ describe("github", () => {
       })
     )
 
+    it.effect("check only the jobs in the managed block of a renamed workflow", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [RENAMED_WORKFLOW_PATH]: `${makeBlockWorkflow("- run: pnpm run check")}${PROJECT_JOB}`,
+          "package.json": PACKAGE_JSON,
+        })
+
+        expect(yield* assessFiles(files)).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
+      })
+    )
+
+    it.effect("not count a check command in a job outside the managed block", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [RENAMED_WORKFLOW_PATH]: [
+            makeBlockWorkflow("- run: pnpm run format"),
+            "  lint:",
+            "    runs-on: ubuntu-latest",
+            "    steps:",
+            "      - run: pnpm run check",
+            "",
+          ].join("\n"),
+          "package.json": PACKAGE_JSON,
+        })
+
+        expect(yield* assessFiles(files)).toMatchObject({
+          findings: [
+            {
+              currentState:
+                "The managed jobs in `.github/workflows/checks.yml` do not run the managed `check` script.",
+              id: "outdated-adamantite-workflow",
+              notes: expect.arrayContaining([
+                expect.stringContaining("checks only the jobs between `# ADAMANTITE:START`"),
+              ]),
+            },
+          ],
+        })
+      })
+    )
+
+    it.effect("ask to add the markers to a legacy workflow that needs a repair", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [WORKFLOW_PATH]: makeWorkflow("- run: pnpm format"),
+          "package.json": PACKAGE_JSON,
+        })
+
+        expect(yield* assessFiles(files)).toMatchObject({
+          findings: [
+            {
+              notes: expect.arrayContaining([
+                expect.stringContaining("so Adamantite checks all its jobs"),
+              ]),
+            },
+          ],
+        })
+      })
+    )
+
+    it.effect("not manage a renamed workflow without markers", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [RENAMED_WORKFLOW_PATH]: makeWorkflow("- run: pnpm format"),
+          "package.json": PACKAGE_JSON,
+        })
+
+        expect(yield* assessFiles(files)).toStrictEqual({ applicable: false })
+      })
+    )
+
+    it.effect.each<{
+      readonly currentState: string
+      readonly files: Readonly<Record<string, string>>
+      readonly name: string
+    }>([
+      {
+        currentState:
+          "Adamantite cannot read the managed block in `.github/workflows/checks.yml`. It has `# ADAMANTITE:START` without `# ADAMANTITE:END` after it.",
+        files: {
+          [RENAMED_WORKFLOW_PATH]: makeBlockWorkflow("- run: pnpm run check").replace(
+            "  # ADAMANTITE:END\n",
+            ""
+          ),
+        },
+        name: "a start marker without an end marker",
+      },
+      {
+        currentState:
+          "Adamantite cannot read the managed block in `.github/workflows/adamantite.yml`, `.github/workflows/checks.yml`. More than one workflow file has a managed block.",
+        files: {
+          [RENAMED_WORKFLOW_PATH]: makeBlockWorkflow("- run: pnpm run check"),
+          [WORKFLOW_PATH]: makeBlockWorkflow("- run: pnpm run check"),
+        },
+        name: "a managed block in two workflow files",
+      },
+      {
+        currentState:
+          "Adamantite cannot read the managed block in `.github/workflows/checks.yml`. The jobs between the markers do not parse as workflow jobs.",
+        files: {
+          [RENAMED_WORKFLOW_PATH]: [
+            "on: push",
+            "jobs:",
+            "  # ADAMANTITE:START",
+            "  verify: [",
+            "  # ADAMANTITE:END",
+            "",
+          ].join("\n"),
+        },
+        name: "a managed block that does not parse",
+      },
+    ])("report $name", ({ currentState, files: workflows }) =>
+      Effect.gen(function* () {
+        const files = makeFiles({ ...workflows, "package.json": PACKAGE_JSON })
+
+        expect(yield* assessFiles(files)).toMatchObject({
+          findings: [{ currentState, id: "malformed-adamantite-workflow" }],
+        })
+      })
+    )
+
     it.effect("ignore check text that is not a workflow command", () =>
       Effect.gen(function* () {
         const files = makeFiles({
@@ -260,7 +439,7 @@ describe("github", () => {
         expect(result).toMatchObject({
           findings: [
             {
-              currentState: expect.stringContaining("does not run the managed `check` script"),
+              currentState: expect.stringContaining("do not run the managed `check` script"),
               id: "outdated-adamantite-workflow",
             },
           ],
@@ -476,7 +655,12 @@ describe("github", () => {
         )
 
         expect(result).toMatchObject({
-          findings: [{ currentState: "The workflow contains a hard-coded Node.js version." }],
+          findings: [
+            {
+              currentState:
+                "The managed jobs in `.github/workflows/adamantite.yml` contain a hard-coded Node.js version.",
+            },
+          ],
         })
         expect(yield* stringifyJson(result)).not.toContain("rule test")
       })
@@ -528,7 +712,8 @@ describe("github", () => {
         expect(result).toMatchObject({
           findings: [
             {
-              currentState: "The workflow does not run the managed `check` script.",
+              currentState:
+                "The managed jobs in `.github/workflows/adamantite.yml` do not run the managed `check` script.",
               id: "outdated-adamantite-workflow",
             },
           ],
@@ -650,6 +835,16 @@ describe("github", () => {
           ],
           steps: [...steps, { name: `Run \${{ matrix.name }}`, run: `\${{ matrix.command }}` }],
         })
+      })
+    )
+
+    it.effect("put the generated job in the managed block", () =>
+      Effect.gen(function* () {
+        const workflow = yield* generateWorkflow(["check"])
+
+        expect(readBlock(workflow)).toBeInstanceOf(Block)
+        expect(workflow).toContain("\njobs:\n  # ADAMANTITE:START\n  verify:\n")
+        expect(workflow.endsWith(`run: \${{ matrix.command }}\n  # ADAMANTITE:END\n`)).toBe(true)
       })
     )
 
@@ -810,7 +1005,7 @@ describe("github", () => {
           .pipe(provideFallback(files))
 
         const exists = yield* github.detect(ROOT).pipe(provideFallback(files))
-        expect(exists).toBe(false)
+        expect(exists._tag).toBe("Missing")
       })
     )
 
@@ -888,6 +1083,59 @@ describe("github", () => {
       })
     )
 
+    it.effect(
+      "rewrite only the managed block of a workflow that the project changed outside it",
+      () =>
+        Effect.gen(function* () {
+          const files = makeFiles({
+            [RENAMED_WORKFLOW_PATH]: `${renameWorkflow(yield* generateWorkflow(["check"]))}${PROJECT_JOB}`,
+          })
+
+          const result = yield* github
+            .update(ROOT, { packageManager: "pnpm", scripts: ["check", "analyze"] })
+            .pipe(provideFallback(files))
+
+          expect(result).toBe("updated")
+          expect(files.read(RENAMED_WORKFLOW_PATH)).toBe(
+            `${renameWorkflow(yield* generateWorkflow(["check", "analyze"]))}${PROJECT_JOB}`
+          )
+          expect(files.exists(WORKFLOW_PATH)).toBe(false)
+        })
+    )
+
+    it.effect("add the markers to a workflow that a release before the block generated", () =>
+      Effect.gen(function* () {
+        const generated = yield* generateWorkflow(["check"])
+
+        const files = makeFiles({
+          [WORKFLOW_PATH]: generated
+            .replace("  # ADAMANTITE:START\n", "")
+            .replace("  # ADAMANTITE:END\n", ""),
+        })
+
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check"] })
+          .pipe(provideFallback(files))
+
+        expect(result).toBe("updated")
+        expect(files.read(WORKFLOW_PATH)).toBe(generated)
+      })
+    )
+
+    it.effect("keep a workflow whose markers do not make one block", () =>
+      Effect.gen(function* () {
+        const workflow = (yield* generateWorkflow(["check"])).replace("  # ADAMANTITE:END\n", "")
+        const files = makeFiles({ [WORKFLOW_PATH]: workflow })
+
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check", "analyze"] })
+          .pipe(provideFallback(files))
+
+        expect(result).toBe("kept")
+        expect(files.read(WORKFLOW_PATH)).toBe(workflow)
+      })
+    )
+
     it.effect("keep a generated workflow that the project changed", () =>
       Effect.gen(function* () {
         const files = makeFiles()
@@ -952,6 +1200,10 @@ describe("github", () => {
           .pipe(provideFallback(files))
 
         expect(result).toBe("updated")
+        // The rewrite of the block keeps the line endings of the file.
+        expect(files.read(WORKFLOW_PATH)).toBe(
+          `${(yield* generateWorkflow(["check", "analyze"])).replaceAll("\n", "\r\n")}\r\n`
+        )
       })
     )
 

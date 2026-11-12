@@ -1590,6 +1590,31 @@ describe("init", () => {
       })
     )
 
+    it.effect("keep a GitHub Actions workflow whose managed block is malformed", () =>
+      Effect.gen(function* () {
+        const workflowPath = ".github/workflows/checks.yml"
+        const workflow = "jobs:\n  # ADAMANTITE:START\n  verify:\n    runs-on: ubuntu-latest\n"
+        const files = createInitTestContext({ [workflowPath]: workflow })
+        const prompter = createPrompterTestContext()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "check", "--github-actions"],
+          { files, layers: [prompter.layer, installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(files.read(workflowPath)).toBe(workflow)
+        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
+        expect(prompter.logs).toContainEqual({
+          level: "warning",
+          message:
+            "Adamantite cannot read the managed block in `.github/workflows/checks.yml`, so `adamantite init` kept the workflow. It has `# ADAMANTITE:START` without `# ADAMANTITE:END` after it. Run `adamantite doctor` for the repair.",
+        })
+      })
+    )
+
     it.effect("not offer GitHub Actions when no selected script runs in CI", () =>
       Effect.gen(function* () {
         // `check` is managed already, but init validates the workflow against the selected scripts.

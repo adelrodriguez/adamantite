@@ -159,18 +159,18 @@ Effect.gen(function* () {
   yield* writeWorkflow(cwd, options)
 })
 
-// Prefer: github.update rewrites only a workflow that Adamantite generated.
+// Prefer: github.update rewrites only a managed block that Adamantite generated.
 Effect.gen(function* () {
-  if (Option.isSome(content) && !checkIsGeneratedWorkflow(content.value, source)) {
-    return "kept"
+  if (!checkIsGeneratedBody(state.block.body)) {
+    return "kept" as const
   }
-  yield* writeWorkflow(cwd, options)
-  return "updated"
+  yield* writeFile(path.join(cwd, state.path), replaceBlock(state.block, body))
+  return "updated" as const
 })
 ```
 
-The [GitHub integration](src/lib/integrations/ci/github.ts) keeps any workflow that differs from
-every workflow it can generate, and `init` points to `adamantite doctor`.
+The [GitHub integration](src/lib/integrations/ci/github.ts) keeps any managed block that differs
+from every block it can generate, and `init` points to `adamantite doctor`.
 [PR #636](https://github.com/adelrodriguez/adamantite/pull/636) fixed the repeated-init path after
 review found that it removed the optional test step. A later audit found that the fix matched only
 the literal `adamantite rule test` command, so other edits were still lost.

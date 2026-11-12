@@ -65,7 +65,9 @@ const VENDORED_PLUGINS: VendoredPlugin[] = [
     entry: "src/index.ts",
     name: "anti-slop",
     outDir: "presets/lint/vendor/antislop",
-    patches: [],
+    // no-unknown-parameters reports the `unknown` rejection reason of a `.catch()` or `.then()`
+    // callback, which `typescript/use-unknown-in-catch-callback-variable` asks for.
+    patches: ["no-unknown-parameters-rejection-callback.patch"],
     pinnedRef: "13909c9e07590f5a85d93c62712259fe14a883f7",
     repoUrl: "https://github.com/dmmulroy/anti-slop.git",
   },

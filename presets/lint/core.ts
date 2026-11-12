@@ -473,7 +473,9 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "unicorn/no-useless-switch-case": "error",
     "unicorn/no-useless-undefined": "error",
     "unicorn/no-zero-fractions": "error",
-    "unicorn/number-literal-case": "error",
+    // This rule requires uppercase hex digits, and Oxfmt always writes them in lowercase. Oxfmt
+    // also writes the prefix and the exponent in lowercase, so the formatter covers the rest of it.
+    "unicorn/number-literal-case": "off",
     "unicorn/numeric-separators-style": "error",
     "unicorn/prefer-add-event-listener": "error",
     "unicorn/prefer-array-find": "error",

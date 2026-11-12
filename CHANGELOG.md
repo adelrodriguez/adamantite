@@ -1,5 +1,53 @@
 # adamantite
 
+## 0.47.0
+
+### Minor Changes
+
+- [#737](https://github.com/adelrodriguez/adamantite/pull/737) [`3707e0b`](https://github.com/adelrodriguez/adamantite/commit/3707e0bf0795c90b7c15da8bc37a4e4c5dc71617) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Keep the Adamantite job of the GitHub Actions workflow in a managed block
+
+  The generated workflow now puts its job between `# ADAMANTITE:START` and `# ADAMANTITE:END` comments. Adamantite owns the jobs between the comments, and the project owns the rest of the workflow. You can rename the workflow file, such as to `checks.yml`, and add your own jobs outside the comments.
+
+  - Doctor checks only the jobs in the managed block, in any file in `.github/workflows`.
+  - Init updates the managed block when you did not change it, and keeps the rest of the file as you wrote it.
+  - Doctor reports markers that do not make one block, such as a start comment without an end comment, or a managed block in more than one file.
+  - A `.github/workflows/adamantite.yml` without the comments is still checked as a whole. Init adds the comments when the file is as an earlier release generated it.
+
+- [#735](https://github.com/adelrodriguez/adamantite/pull/735) [`58f1f11`](https://github.com/adelrodriguez/adamantite/commit/58f1f11933c39f850858954f67f7f808a3f14f81) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Add type resets to `adamantite/typescript`, and add `adamantite/tsconfig` for libraries
+
+  `adamantite/typescript` now loads type resets that ship in the package. `JSON.parse()`, `response.json()`, and property reads on `localStorage` return `unknown` instead of `any`, `includes()` on a literal array accepts a wider value, and `.filter(Boolean)` removes falsy types. The resets started from [ts-reset](https://github.com/total-typescript/ts-reset) 0.7.0, which npm does not have yet. They also cover APIs that ts-reset leaves as `any`: `Object.values()` and `Object.entries()` on a type without an index signature, `Object.assign()` with more than three sources, `Object.getPrototypeOf()`, `Reflect.apply()`, `Reflect.construct()`, `eval()`, and the values of a `JSON.parse()` reviver. `adamantite/tsconfig` has the same strict options without the resets.
+
+  `init` asks "Use an Adamantite TypeScript preset?" and then which preset to use. `--typescript` now takes a value: `--typescript typescript` or `--typescript tsconfig`. Doctor reports a package that extends `adamantite/typescript`, is not private, and declares `exports` or `types`, because its declaration files can name reset helper types that consumers do not have.
+
+  To migrate:
+
+  1. Fix the new type errors. Most are values from `JSON.parse()` or `response.json()` that the code used as a specific type. Parse them with a schema, or narrow them.
+  2. In a library that publishes declaration files, replace `adamantite/typescript` with `adamantite/tsconfig` in `extends`.
+  3. If the project already set up ts-reset, delete its `reset.d.ts` files, their `include` entries, and the `@total-typescript/ts-reset` dependency.
+  4. Replace `--typescript` with `--typescript typescript` in scripts that run `adamantite init`.
+
+  To keep the strict options without the resets, extend `adamantite/tsconfig`. List your files in `include`. A `files` list in your `tsconfig.json` replaces the preset's list and drops the resets, and the config still inherits the preset's `include` of every file below it. A solution config with `"files": []` and `references` that extends `adamantite/typescript` must also set `"include": []`, or extend `adamantite/tsconfig`.
+
+- [#734](https://github.com/adelrodriguez/adamantite/pull/734) [`1faf7a4`](https://github.com/adelrodriguez/adamantite/commit/1faf7a4723bad828f42af08c5a2c59aceeea7979) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Set up the TypeScript preset without the `check` or `fix` script
+
+  `init` now asks about the TypeScript preset whatever scripts you select, and the scripts question accepts no selection. `adamantite init --non-interactive --typescript` sets up only the preset. A non-interactive run needs at least one `--script` or `--typescript`. When you select no setup in an interactive run, `init` makes no changes.
+
+  Doctor now checks `tsconfig.json` only when it extends `adamantite/typescript`. It no longer reports a missing `tsconfig.json` or a config that does not extend the preset, so a project that declined the preset gets no finding. Oxlint's type check runs without a `tsconfig.json`.
+
+### Patch Changes
+
+- [#739](https://github.com/adelrodriguez/adamantite/pull/739) [`5b12415`](https://github.com/adelrodriguez/adamantite/commit/5b12415bf8a347a6aa37f1ef5575e2c4394fc2ec) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let a promise rejection callback take `error: unknown` in the strict preset
+
+  `anti-slop/no-unknown-parameters` no longer reports the first parameter of a `.catch()` callback or of the rejection callback of `.then()`. A project that extends the core and strict presets can now write `.catch((error: unknown) => ...)`, which `typescript/use-unknown-in-catch-callback-variable` asks for. Before, every way to write the parameter got a report from one of the three rules.
+
+- [#717](https://github.com/adelrodriguez/adamantite/pull/717) [`e68edd8`](https://github.com/adelrodriguez/adamantite/commit/e68edd850b7e513dca07cf1d1f666bfcdbf917a8) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove the Doctor finding for array-valued `adamantite/layers` declarations
+
+  No release accepted a layer as an array, such as `workspace: ["shared"]`, so the finding and its migration instructions could not apply to a working config. Doctor no longer parses the Oxlint config files to look for them. The README and the Adamantite skill no longer mention the migration.
+
+- [#738](https://github.com/adelrodriguez/adamantite/pull/738) [`080f560`](https://github.com/adelrodriguez/adamantite/commit/080f560f12e4d26bf328a6fc2914dcb3a2e051f7) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept the lowercase hex literals that `adamantite fix` writes
+
+  The core lint preset no longer enables `unicorn/number-literal-case`. The rule requires uppercase hex digits, such as `0xFF`, and Oxfmt always writes them in lowercase, such as `0xff`. A hex literal now passes both `adamantite fix` and `adamantite check`. Oxfmt still writes the `0x` prefix and the exponent in lowercase.
+
 ## 0.46.0
 
 ### Minor Changes

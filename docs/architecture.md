@@ -430,6 +430,14 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
 - The `github` integration in `src/lib/integrations/ci/github.ts` writes only the selected
   managed check and analyze scripts into the workflow. It does not add or require a rule-test
   step. Users can add one themselves, and Doctor preserves it.
+- The generated job sits in a managed block, between `# ADAMANTITE:START` and
+  `# ADAMANTITE:END`. `github-block.ts` finds the block in the text, because the YAML parser
+  drops comments. `github.ts` looks for the block in every file in `.github/workflows`, and
+  `detect` returns one of four states: `Missing`, `Managed`, `Legacy`, or `Malformed`. Assess
+  reads only the jobs in the block, and `update` replaces only the block, when Adamantite
+  generated it. A project has one block. Markers that do not make one block are `Malformed`,
+  and Doctor reports them. An `adamantite.yml` without markers is `Legacy`, from a release
+  before the block, and all its jobs count as managed.
 
 The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`

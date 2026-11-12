@@ -4,6 +4,7 @@ import type * as PlatformError from "effect/PlatformError"
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
+import * as Match from "effect/Match"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
@@ -332,7 +333,6 @@ export const setupGitHubActions = (
 ) =>
   Effect.gen(function* () {
     const prompter = yield* Prompter
-    const workflowPath = github.files[0].path
 
     // A conflicting script that init kept is not managed, so it can leave no script to run in CI.
     if (!hasCICompatibleScripts(scripts)) {
@@ -341,22 +341,28 @@ export const setupGitHubActions = (
       )
     }
 
+    const state = yield* github.detect(cwd)
+
     const result = yield* prompter.withSpinner(
-      (spinner) =>
-        Effect.gen(function* () {
-          const exists = yield* github.detect(cwd)
-          yield* spinner.message(
-            exists ? `\`${workflowPath}\` found, updating...` : `Creating \`${workflowPath}\`...`
-          )
+      (spinner) => {
+        const update = ({ path }: { readonly path: string }) =>
+          spinner
+            .message(`\`${path}\` found, updating...`)
+            .pipe(Effect.andThen(github.update(cwd, { packageManager, scripts })))
 
-          if (exists) {
-            return yield* github.update(cwd, { packageManager, scripts })
-          }
-
-          yield* github.create(cwd, { packageManager, scripts })
-
-          return "created" as const
-        }),
+        return Match.valueTags(state, {
+          Legacy: update,
+          Malformed: () => Effect.succeed("kept" as const),
+          Managed: update,
+          Missing: () =>
+            spinner
+              .message(`Creating \`${github.files[0].path}\`...`)
+              .pipe(
+                Effect.andThen(github.create(cwd, { packageManager, scripts })),
+                Effect.as("created" as const)
+              ),
+        })
+      },
       {
         failure: "Failed to set up GitHub Actions workflow.",
         start: "Setting up GitHub Actions workflow...",
@@ -364,23 +370,28 @@ export const setupGitHubActions = (
       }
     )
 
-    if (result === "kept") {
-      yield* prompter.log.info(
-        `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
-      )
-    }
+    const reportKept = (workflowPath: string) =>
+      result === "kept"
+        ? prompter.log.info(
+            `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
+          )
+        : Effect.void
+
+    yield* Match.valueTags(state, {
+      Legacy: ({ path }) => reportKept(path),
+      Malformed: ({ paths, reason }) =>
+        prompter.log.warning(
+          `Adamantite cannot read the managed block in ${paths.map((workflowPath) => `\`${workflowPath}\``).join(", ")}, so \`adamantite init\` kept the workflow. ${reason} Run \`adamantite doctor\` for the repair.`
+        ),
+      Managed: ({ path }) => reportKept(path),
+      Missing: () => Effect.void,
+    })
   }).pipe(
     // GitHub Actions setup is optional, so initialization continues; the failure must still
     // reach the user instead of disappearing. Named tags keep a future error type from
     // degrading to a warning without an explicit decision.
     Effect.catchTag(
-      [
-        "FailedToCreateDirectory",
-        "FailedToParseFile",
-        "FailedToReadFile",
-        "FailedToWriteFile",
-        "PlatformError",
-      ],
+      ["FailedToCreateDirectory", "FailedToParseFile", "FailedToReadFile", "FailedToWriteFile"],
       (error) =>
         Effect.gen(function* () {
           const prompter = yield* Prompter

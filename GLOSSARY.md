@@ -95,6 +95,12 @@ _Avoid_: Toolchain, patch, setup
 A `package.json` script whose command is owned by Adamantite.
 _Avoid_: User script, package command
 
+**Managed block**:
+The jobs of a GitHub Actions workflow between the `# ADAMANTITE:START` and `# ADAMANTITE:END`
+comments. Adamantite owns the jobs in it, and the target project owns the rest of the workflow.
+A target project has one managed block.
+_Avoid_: Managed workflow, Adamantite job
+
 **Assessment**:
 A read-only classification of a managed integration against its latest supported state.
 _Avoid_: Check result, diagnostic

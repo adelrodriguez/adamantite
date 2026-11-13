@@ -48,6 +48,10 @@ tester.run(
         code: "const EMPTY = {}; const result = { ...(condition ? { name } : EMPTY) };",
         errors: [error],
       },
+      {
+        code: "const EMPTY = {}; const a = { ...(ok ? { name } : EMPTY) }; const b = { ...(ok ? (EMPTY as Options) : { id }) }; const c = { ...EMPTY };",
+        errors: [error, error],
+      },
       // A JSX spread attribute omits an attribute the same way.
       { code: "const element = <div {...(ok ? { title } : {})} />;", errors: [error], ...jsx },
       { code: "const element = <div {...(title && { title })} />;", errors: [error], ...jsx },
@@ -63,6 +67,10 @@ tester.run(
       "const result = [...(condition ? items : [])];",
       "const DEFAULTS = { id: 1 }; const result = { ...(condition ? { name } : DEFAULTS) };",
       "let empty = {}; empty = { id: 1 }; const result = { ...(condition ? { name } : empty) };",
+      // Code can fill a constant that holds `{}` before the spread reads it.
+      'const fallback: { id?: number } = {}; fallback.id = 1; const result = { ...(ok ? { name: "x" } : fallback) };',
+      'const fallback: { id?: number } = {}; Object.assign(fallback, { id: 1 }); const result = { ...(ok ? { name: "x" } : fallback) };',
+      "const fallback = {}; fill(fallback); const result = { ...(ok ? { name } : fallback) };",
       "function build(undefined: Options) { return { ...(condition ? { name } : undefined) }; }",
       { code: "const element = <div {...props} />;", ...jsx },
       { code: "const element = <div title={ok ? title : undefined} />;", ...jsx },

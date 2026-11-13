@@ -26,6 +26,36 @@ tester.run("no-module-mocking", plugin.rules["no-module-mocking"], {
       code: "import { jest } from '@jest/globals'; jest.mock('./user-store');",
       errors: [error],
     },
+    {
+      code: "import * as vitest from 'vitest'; vitest.vi.mock('./user-store');",
+      errors: [error],
+      name: "vi read from a namespace import of vitest",
+    },
+    {
+      code: "import * as globals from '@jest/globals'; globals.jest.mock('./user-store');",
+      errors: [error],
+      name: "jest read from a namespace import of @jest/globals",
+    },
+    {
+      code: "import * as vitest from 'vitest'; vitest['vi'].doMock('./user-store');",
+      errors: [error],
+      name: "vi read with a computed key from a namespace import",
+    },
+    {
+      code: "const { doMock } = vi; doMock('./user-store', () => ({}));",
+      errors: [error],
+      name: "method destructured from the vi global",
+    },
+    {
+      code: "import { vi } from 'vitest'; const { mock: mockModule } = vi; mockModule('./user-store');",
+      errors: [error],
+      name: "method destructured from an import under another name",
+    },
+    {
+      code: "import * as vitest from 'vitest'; const { mock } = vitest.vi; mock('./user-store');",
+      errors: [error],
+      name: "method destructured from a namespace import",
+    },
   ],
   valid: [
     "const store = new InMemoryUserStore();",
@@ -33,5 +63,29 @@ tester.run("no-module-mocking", plugin.rules["no-module-mocking"], {
     "const vi = { mock() {} }; vi.mock();",
     "function test(jest: { mock(): void }) { jest.mock(); }",
     "import { vi as localVi } from './helpers'; localVi.mock('./module');",
+    {
+      code: "import * as helpers from './helpers'; helpers.vi.mock('./module');",
+      name: "namespace import of a local module",
+    },
+    {
+      code: "import * as vitest from 'vitest'; vitest.vi.spyOn(store, 'save');",
+      name: "spy through a namespace import",
+    },
+    {
+      code: "const { spyOn } = vi; spyOn(store, 'save');",
+      name: "spy destructured from vi",
+    },
+    {
+      code: "const { doMock } = registry; doMock('./module');",
+      name: "method destructured from another object",
+    },
+    {
+      code: "const { doMock } = vi; function run(doMock) { doMock('./module'); }",
+      name: "parameter that shadows the destructured method",
+    },
+    {
+      code: "let { mock } = vi; mock = registry.mock; mock('./module');",
+      name: "variable that the code reassigns",
+    },
   ],
 })

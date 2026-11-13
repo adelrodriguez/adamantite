@@ -64,10 +64,9 @@ export const check = Effect.fn("Toolchain.check")(function* ({
 })
 
 /**
- * Formats with Oxfmt, fixes lint issues with Oxlint, then formats again. The first format shows no
- * output. The lint and last format stages both run, and the operation fails with the first failure.
- * The forwarded arguments go to the lint stage, or to the stage that `only` selects, which runs
- * once.
+ * Fixes lint issues with Oxlint, then formats with Oxfmt. Both stages run, and the operation fails
+ * with the first failure. The forwarded arguments go to the lint stage, or to the stage that `only`
+ * selects.
  */
 export const fix = Effect.fn("Toolchain.fix")(function* ({
   cwd,
@@ -107,16 +106,10 @@ export const fix = Effect.fn("Toolchain.fix")(function* ({
     }),
   }
 
-  // Spacing rules decide blank lines from line breaks, and Oxfmt can wrap a line, so the lint stage
-  // reads formatted code. The last format stage reports the same problems, so this one is quiet.
-  // Oxlint applies one pass of fixes, so a fix that causes a new report still needs a second `fix`
-  // until Oxlint repeats its passes: https://github.com/oxc-project/oxc/issues/16118
-  if (only === undefined) {
-    yield* runner
-      .exitCode({ ...stages.format, stderr: "ignore", stdout: "ignore" })
-      .pipe(Effect.ignore)
-  }
-
+  // Lint runs before Oxfmt wraps long lines, so `anti-slop/require-readable-spacing` counts a line
+  // past the print width as multiline. Oxlint applies one pass of fixes, so a fix that causes a new
+  // report still needs a second `fix` until Oxlint repeats its passes:
+  // https://github.com/oxc-project/oxc/issues/16118
   yield* runner.runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])
 })
 

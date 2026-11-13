@@ -29,34 +29,6 @@ describe("Toolchain", () => {
     })
   )
 
-  it.effect("format without output before the lint stage", () =>
-    Effect.gen(function* () {
-      const invocations: CommandRunOptions[] = []
-
-      const runner = CommandRunner.make((options) => {
-        invocations.push(options)
-
-        // The first format fails, and the fix still runs the other stages and succeeds.
-        return Effect.succeed(ChildProcessSpawner.ExitCode(invocations.length === 1 ? 2 : 0))
-      })
-
-      yield* Toolchain.fix({ cwd: "/target", files: ["index.ts"] }).pipe(
-        Effect.provideService(CommandRunner, runner)
-      )
-
-      expect(invocations).toMatchObject([
-        { args: ["--write", "index.ts"], command: "oxfmt", stderr: "ignore", stdout: "ignore" },
-        { args: [expect.any(String), "--fix", "index.ts"], command: "node" },
-        { args: ["--write", "index.ts"], command: "oxfmt" },
-      ])
-      // The lint and last format stages print their output.
-      expect(invocations.slice(1).map((options) => options.stdout)).toStrictEqual([
-        undefined,
-        undefined,
-      ])
-    })
-  )
-
   it("keep stage names specific to each operation", () => {
     expectTypeOf<Parameters<typeof Toolchain.check>[0]["only"]>().toEqualTypeOf<
       "format" | "lint" | undefined

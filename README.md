@@ -149,9 +149,8 @@ adamantite check --only format
 
 ### `adamantite fix`
 
-Format the files with Oxfmt, apply safe Oxlint fixes, then format again. Lint runs on formatted
-code, so a rule that reads line breaks sees the lines that Oxfmt writes. The first format shows no
-output. Suggested and dangerous fixes require explicit flags:
+Apply safe Oxlint fixes, then format the files with Oxfmt. Suggested and dangerous fixes require
+explicit flags:
 
 ```sh
 adamantite fix

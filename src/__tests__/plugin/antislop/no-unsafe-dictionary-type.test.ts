@@ -138,6 +138,11 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     },
     { code: "type A = Record<string, globalThis.Readonly<unknown>>;", errors: [error] },
     { code: "class Bag<T = unknown> implements Record<string, T> { [key: string]: T }", errors: 2 },
+    // A key set that can be open stays a dictionary.
+    { code: "type A = Record<string | 'a', unknown>;", errors: [error] },
+    { code: "type Key = string; type A = Record<Key, unknown>;", errors: [error] },
+    { code: 'import type { Key } from "./key"; type A = Record<Key, unknown>;', errors: [error] },
+    { code: "type A<K extends string> = { [P in K]: unknown };", errors: [error] },
   ],
   valid: [
     "type Commands = Record<string, Command>;",
@@ -180,6 +185,10 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     "type Bag<T = Command> = Record<string, T>; const a: Bag = {};",
     "interface Bag<T = Command> { [key: string]: T }",
     "type A = globalThis.Record<string, Command>;",
+    // A finite literal key set is a closed object, like `{ a: unknown; b: unknown }`.
+    "type A = Record<'a' | 'b', unknown>;",
+    "type Kind = 'a' | 'b'; type A = { [K in Kind]: unknown };",
+    "type A = Partial<Record<'a', unknown>>;",
     "interface Bag<T = unknown> { read<T>(input: Record<string, T>): T }",
     "export type Plain<T> = globalThis.Extract<T, Record<string, unknown>>;",
   ],

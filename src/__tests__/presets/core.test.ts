@@ -150,4 +150,27 @@ describe("core preset", () => {
     expect(lint("names.mjs", source)).toStrictEqual([])
     expect(lint("names.ts", source)).toContain("jsdoc(check-tag-names)")
   })
+
+  // A spread in a `map` callback is the usual way to copy an item with a change, as a React state
+  // update does. `prefer-object-spread` rewrites `Object.assign({}, …)` to this spread.
+  it("accept a spread copy of an item in a map callback", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "interface Todo {",
+        "  readonly done: boolean",
+        "  readonly id: string",
+        "}",
+        "",
+        "declare function loadTodos(): Todo[]",
+        "",
+        "export function toggle(id: string): Todo[] {",
+        "  return loadTodos().map((todo) => (todo.id === id ? { ...todo, done: !todo.done } : todo))",
+        "}",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
 })

@@ -289,7 +289,10 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "oxc/no-accumulating-spread": "error",
     "oxc/no-barrel-file": "error",
     "oxc/no-const-enum": "error",
-    "oxc/no-map-spread": "error",
+    // A spread in a `map` callback is the usual immutable copy of an item, as in a React state
+    // update. This rule tells the author to change the item in place instead, and
+    // `prefer-object-spread` reports the `Object.assign({}, …)` form, so no copy passes core.
+    "oxc/no-map-spread": "off",
     "oxc/no-this-in-exported-function": "error",
     "oxc/number-arg-out-of-range": "error",
     "oxc/only-used-in-recursion": "error",

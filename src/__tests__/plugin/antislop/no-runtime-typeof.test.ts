@@ -129,6 +129,42 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
       code: 'class Store<T> { has(value: T) { return typeof value === "string"; } }',
       errors: [error],
     },
+    {
+      code: 'type Data = unknown; export function f(value: Data) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Raw = unknown; type Data = Raw | null; function f(value: Data) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Loose = Record<string, any>; function f(value: Loose) { return typeof value.name === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Box<T> = T; function f(value: Box<unknown>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Box<T> = T; type Data = unknown; function f(value: Box<Data>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Payload<T> = { data: T; meta: unknown }; function f(value: Payload<string>) { return typeof value.data === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Options = { retry: unknown }; function f(options: Options) { const { retry } = options; return typeof retry === "number"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Same<X> = X; function f<T>(value: Same<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Data = unknown; function f<T extends Data>(value: T) { return typeof value === "string"; }',
+      errors: [error],
+    },
   ],
   valid: [
     'function f<T extends string | number>(value: T) { return typeof value === "string"; }',
@@ -153,6 +189,12 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     'function resolve(retry: number | RetryPolicy = 3) { return typeof retry === "number"; }',
     'class AsyncRun<T> { constructor(input: AsyncRunInput<T>) { this.run = typeof input === "function" ? input : input.try; } }',
     'declare const input: string | number; export const isText = typeof input === "string";',
+    'type Input = string | (() => string); function f(value: Input) { return typeof value === "string" ? value : value(); }',
+    'type Box<T> = T; function f(value: Box<string | number>) { return typeof value === "string"; }',
+    'type Same<X> = X; function f<T extends string | number>(value: Same<T>) { return typeof value === "string"; }',
+    'type Data = unknown; namespace Local { type Data = string | number; export function f(value: Data) { return typeof value === "string"; } }',
+    // An imported alias has no declaration in the file, so the rule cannot see its body.
+    'import type { Data } from "./data"; function f(value: Data) { return typeof value === "string"; }',
     {
       code: 'function isString(value: unknown): value is string { return typeof value === "string"; }',
       options: allowInTypeGuards,

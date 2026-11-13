@@ -1,5 +1,5 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
-import { isStringLiteral } from "./literals.ts"
+import { staticKeyName } from "./literals.ts"
 import { constBinding } from "./scope.ts"
 import { namedTypeReference } from "./type-alias-resolution.ts"
 
@@ -56,7 +56,8 @@ export function constInitializer(variable: Variable): ESTree.Expression | null {
 }
 
 /**
- * Read static method names, including computed string literals, without evaluating expressions.
+ * Read static method names, such as `filter` in `items.filter`, ``items[`filter`]``, or
+ * `items["filter"]`, without evaluating expressions.
  */
 export function arrayMethodTarget(
   callee: ESTree.Node
@@ -64,17 +65,9 @@ export function arrayMethodTarget(
   const node = unwrapArrayExpression(callee)
 
   if (node.type !== "MemberExpression") return null
-  const property = node.property
+  const name = staticKeyName(node.property, node.computed)
 
-  if (!node.computed && property.type === "Identifier") {
-    return { name: property.name, object: node.object }
-  }
-
-  if (node.computed && isStringLiteral(property)) {
-    return { name: property.value, object: node.object }
-  }
-
-  return null
+  return name === null ? null : { name, object: node.object }
 }
 
 const ARRAY_TYPES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"])

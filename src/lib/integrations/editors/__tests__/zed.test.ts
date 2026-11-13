@@ -237,6 +237,24 @@ describe("zed", () => {
         })
       })
     )
+
+    // Without the setting, the Oxlint language server reports unused directives with the severity
+    // of `options.reportUnusedDisableDirectives`, which the core preset sets for check and fix.
+    it.effect("leave the report of unused directives to the Oxlint config", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+
+        yield* zed.create(ROOT).pipe(provideFiles(files))
+
+        expect(yield* parseJson(files.read(SETTINGS_PATH))).not.toHaveProperty([
+          "lsp",
+          "oxlint",
+          "initialization_options",
+          "settings",
+          "unusedDisableDirectives",
+        ])
+      })
+    )
   })
 
   describe("update", () => {

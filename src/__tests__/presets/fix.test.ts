@@ -129,14 +129,32 @@ describe("fix with the strict preset", () => {
     fixThenCheck("unbreakable.ts")
   )
 
-  // Oxlint 1.93 and later remove an unused `oxlint-disable` directive with `--fix`, but only when
-  // the run reports unused directives. Fix and check do not report them, so the suppression stays,
-  // and adamantite/require-suppression-reason accepts its reason.
-  it.live("keep an unused suppression that has a reason in a state that check accepts", () =>
+  // The core preset reports unused directives, so check fails on a suppression that suppresses
+  // nothing.
+  it.live("fail check on an unused suppression", () =>
+    Effect.gen(function* () {
+      const checked = yield* Effect.exit(
+        Toolchain.check({ cwd: project, files: ["suppressed.ts"] })
+      )
+
+      expect(Exit.isFailure(checked)).toBe(true)
+    }).pipe(Effect.provide(SOURCE_RUNNER))
+  )
+
+  // Oxlint 1.93 and later remove an unused `oxlint-disable` directive with `--fix` when the run
+  // reports unused directives.
+  it.live("remove an unused suppression in a state that check accepts", () =>
     Effect.gen(function* () {
       yield* fixThenCheck("suppressed.ts")
 
-      expect(readFileSync(join(project, "suppressed.ts"), "utf8")).toBe(CASES["suppressed.ts"])
+      expect(readFileSync(join(project, "suppressed.ts"), "utf8")).toBe(
+        [
+          "export function add(left: number, right: number): number {",
+          "  return left + right",
+          "}",
+          "",
+        ].join("\n")
+      )
     })
   )
 

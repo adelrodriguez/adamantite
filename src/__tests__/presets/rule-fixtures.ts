@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process"
-import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import process from "node:process"
@@ -9,6 +17,14 @@ import * as Schema from "effect/Schema"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const FIXTURES_DIRECTORY = "fixtures"
+
+/**
+ * The variable that names an Oxlint package folder, such as `<folder>/node_modules/oxlint`, that
+ * replaces the Oxlint of the repository in the fixture runs. `vitest.config.ts` reads the same
+ * variable for the RuleTester tests. CI sets it to test the rules with the minimum Oxlint version
+ * that `peerDependencies` allows.
+ */
+const OXLINT_VARIABLE = "ADAMANTITE_TEST_OXLINT"
 
 /**
  * A preset's rule fixtures live in one directory, with one directory for each plugin namespace,
@@ -87,7 +103,22 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-rule-fixtures-"))
 
   try {
-    symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
+    const oxlint = process.env[OXLINT_VARIABLE]
+
+    if (oxlint === undefined || oxlint === "") {
+      symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
+    } else {
+      // Link each package of the repository, but take Oxlint from the named folder.
+      mkdirSync(join(tempDir, "node_modules"))
+
+      for (const name of readdirSync(join(REPO_ROOT, "node_modules"))) {
+        symlinkSync(
+          name === "oxlint" ? oxlint : join(REPO_ROOT, "node_modules", name),
+          join(tempDir, "node_modules", name)
+        )
+      }
+    }
+
     cpSync(options.fixturesDir, join(tempDir, FIXTURES_DIRECTORY), { recursive: true })
     writeFileSync(
       join(tempDir, "oxlint.config.ts"),

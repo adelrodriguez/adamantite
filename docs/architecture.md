@@ -375,8 +375,9 @@ they keep the plugin name `anti-slop`, so project settings and suppressions that
 `anti-slop/*` rules keep working. Their rules follow the same conventions as the `adamantite`
 rules. Their RuleTester tests sit in `src/__tests__/plugin/antislop/`, and
 `src/__tests__/presets/require-readable-spacing.test.ts` runs the spacing fix through the Oxlint
-CLI twice. `license.md` and `stylistic/license.md` keep the MIT notices of the copied code, and the
-build copies them. See ADR 0027.
+CLI twice. `license.md` and `stylistic/license.md` keep the MIT notices of the copied code. The
+build copies each `license.md` under `presets/lint/plugin/` to the same path in `dist/presets/`, and
+`scripts/test-build.ts` fails when a license file under `presets/` does not ship. See ADR 0027.
 
 The `architecture` preset loads the first-party plugin without enabling rules. Init offers it
 for projects that configure layer maps and import owners without the other rules of `strict`.

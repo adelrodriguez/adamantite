@@ -20,12 +20,9 @@ export default defineConfig([
     copy: [
       { from: ["presets/tsconfig.json", "presets/typescript.json"], to: "dist/presets" },
       { from: "presets/typescript/resets/*", to: "dist/presets/typescript/resets" },
-      // The anti-slop rules started as copies of MIT-licensed code, so their notices ship with them.
-      { from: "presets/lint/plugin/antislop/license.md", to: "dist/presets/lint/plugin/antislop" },
-      {
-        from: "presets/lint/plugin/antislop/stylistic/license.md",
-        to: "dist/presets/lint/plugin/antislop/stylistic",
-      },
+      // Some plugin rules started as copies of MIT-licensed code, so each license notice ships at
+      // its own path. `scripts/test-build.ts` checks that every notice under presets ships.
+      { flatten: false, from: "presets/lint/plugin/**/license.md", to: "dist/presets" },
       {
         from: [
           "presets/lint/vendor/antislop-effect/plugin.mjs",

@@ -1,6 +1,13 @@
+import { join } from "node:path"
 import process from "node:process"
 import { Macros } from "unplugin-macros"
 import { defineConfig } from "vitest/config"
+
+// An Oxlint package folder, such as `<folder>/node_modules/oxlint`, that replaces the Oxlint of the
+// repository. CI sets it to test the rules with the minimum Oxlint version that `peerDependencies`
+// allows. The RuleTester tests import `oxlint/plugins-dev` from it, and
+// `src/__tests__/presets/rule-fixtures.ts` lints the preset fixtures with it.
+const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
 
 // These tests start real processes: Oxlint runs that lint files, rule trials in a copy of a
 // project, and Vitest runs that check the module cache. They touch the host filesystem, so they
@@ -30,6 +37,12 @@ export default defineConfig({
       name: "adamantite:macro-module-cache",
     },
   ],
+  resolve: {
+    alias:
+      TEST_OXLINT === undefined || TEST_OXLINT === ""
+        ? {}
+        : { "oxlint/plugins-dev": join(TEST_OXLINT, "dist/plugins-dev.js") },
+  },
   test: {
     coverage: {
       provider: "v8",

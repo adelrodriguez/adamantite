@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process"
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
@@ -142,3 +142,23 @@ const loadedFiles = collectLoadedFiles(
 )
 
 console.info(`Verified the ${loadedFiles.size} type reset files of the built TypeScript preset`)
+
+// Copied code keeps the license notice of its source, so every license file under `presets/` must
+// ship at the same path under `dist/presets/`.
+const sourcePresetDirectory = join(import.meta.dirname, "..", "presets")
+const builtPresetDirectory = join(import.meta.dirname, "..", "dist", "presets")
+
+const licenseFiles = readdirSync(sourcePresetDirectory, {
+  encoding: "utf8",
+  recursive: true,
+}).filter((file) => /^license(?:\.md)?$/iu.test(basename(file)))
+
+for (const file of licenseFiles) {
+  if (!existsSync(join(builtPresetDirectory, file))) {
+    throw new Error(
+      `The source has the license notice presets/${file}, which the build did not copy`
+    )
+  }
+}
+
+console.info(`Verified the ${licenseFiles.length} license notices of the built presets`)

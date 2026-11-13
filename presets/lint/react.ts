@@ -72,7 +72,6 @@ const config: OxlintConfig = {
     "react/jsx-fragments": ["error", "syntax"],
     "react/jsx-key": "error",
     "react/jsx-no-comment-textnodes": "error",
-    "react/jsx-no-constructed-context-values": "error",
     "react/jsx-no-duplicate-props": "error",
     "react/jsx-no-script-url": "error",
     "react/jsx-no-target-blank": "error",

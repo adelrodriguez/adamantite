@@ -1,25 +1,10 @@
-import type { CommandRunOptions } from "#lib/execution/command-runner.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
+import * as commands from "#lib/integrations/tooling/sherif/command.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
-function analyze(options: {
-  readonly cwd: string
-  readonly fix: boolean
-  readonly forwardedArguments: readonly string[]
-}): CommandRunOptions {
-  return {
-    args: [...(options.fix ? ["--fix"] : []), ...options.forwardedArguments],
-    command: "sherif",
-    cwd: options.cwd,
-    // Sherif prompts for a version when a fix has more than one candidate.
-    stdin: "inherit",
-    title: "📦 Analyzing the monorepo",
-  }
-}
-
 export default {
-  analyze,
+  analyze: commands.analyze,
   ...definePackageTooling({
     monorepoOnly: true,
     name: "sherif",

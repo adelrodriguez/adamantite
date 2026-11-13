@@ -122,6 +122,10 @@ catch-all root config makes TypeScript treat all packages as one project. Adaman
 prints guidance instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
 in a library, to each package's `tsconfig.json` or to a shared base config.
 
+Init rewrites an existing `tsconfig.json`, `.vscode/settings.json`, or `.zed/settings.json` only
+when the file is plain JSON. A file with comments or trailing commas stays as it is, and init
+prints the change to make by hand.
+
 ## Commands
 
 Run `adamantite --help` or `adamantite <command> --help` for the complete CLI reference.

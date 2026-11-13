@@ -84,7 +84,8 @@ bump of one of those pins fails until a compatible `@effect/tsgo` release is pin
    Effect code, `Clock`, `Random`, and `Config` let tests control time, randomness, and
    configuration, and `global-json-in-effect` turns a `JSON.parse` or `JSON.stringify` that
    throws into a typed failure. Adamantite encodes JSON with `stringifyJson` and `formatJson` from
-   `src/lib/shared/json.ts`, and parses it with `parseJson`.
+   `src/lib/shared/json.ts`, and parses it with `Jsonc.parse` or `Json5.parse` from
+   `effect/encoding`. See ADR 0029.
 2. No rule that Adamantite already enables reports the same defect. `unnecessary-arrow-block`
    repeats `arrow-body-style`. `strict-boolean-expressions` is a general TypeScript rule, so
    the core or strict preset decides it.

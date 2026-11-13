@@ -165,6 +165,12 @@ const config: OxlintConfig = {
     "anti-slop-effect/no-service-constructor-imports": "error",
     "anti-slop-effect/prefer-effect-match": "error",
 
+    // Core turns on these promise rules, which match `catch` by its name only. They cannot prove
+    // that the `Effect` of an import is not a promise, so they read `Effect.catch` as
+    // `Promise.prototype.catch`. Oxlint gives the rules no option to ignore a receiver, so an Effect
+    // project turns them off. TypeScript still checks the arguments of a promise method.
+    "promise/valid-params": "off",
+
     // Core turns on these unicorn rules, which match an array method by its name only. They read
     // `Option.some(value)` as `Array.prototype.some` with a callback, and the data-first
     // `Array.findLast(values, predicate)` as an array method with a `thisArg`. Oxlint gives the

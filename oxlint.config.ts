@@ -156,6 +156,18 @@ export default defineConfig({
         },
         root: "src",
       },
+      // Each plugin uses the plugin-wide helpers in `shared`, and no plugin imports another
+      // plugin's code. `shared` imports no plugin. `index.ts` registers the adamantite plugin.
+      {
+        entries: ["index.ts"],
+        layers: {
+          antislop: { imports: ["shared"] },
+          "antislop-effect": { imports: ["shared"] },
+          rules: { imports: ["shared"] },
+          shared: { imports: [] },
+        },
+        root: "presets/lint/plugin",
+      },
     ],
     // Repository suppressions use `@ts-expect-error - reason`, so the format belongs in the check.
     "typescript/ban-ts-comment": [

@@ -16,16 +16,23 @@ import type { OxlintConfig } from "oxlint"
 // The preset enables only the @effect/tsgo rules that report Effect code. It does not ban platform
 // APIs in code that is not Effect code. See ADR 0007 for the criteria.
 //
-// The preset also loads the anti-slop-effect plugin (https://github.com/dmmulroy/anti-slop), which
-// reports tagged values that code handles by hand instead of with Effect's tagged constructors,
-// `Match`, and `catchTag`. Upstream is not published to npm, so Adamantite ships a bundled build in
-// vendor/antislop-effect/. scripts/vendor-plugins.ts regenerates it. The preset targets Effect
-// codebases, so it enables every rule of the bundle.
+// The preset also loads the anti-slop-effect plugin, which reports tagged values that code handles
+// by hand instead of with Effect's tagged constructors, `Match`, and `catchTag`. Its rules started
+// as a copy of the Effect rules of https://github.com/dmmulroy/anti-slop and now live in
+// plugin/antislop-effect/ as first-party code. They keep the `anti-slop-effect` namespace, so
+// project settings and suppressions keep working. The preset targets Effect codebases, so it
+// enables every rule of the plugin.
+//
+// The source tree holds `plugin/antislop-effect/index.ts` and the dist tree holds
+// `plugin/antislop-effect/index.js`, so the plugin extension follows the extension of this module.
+// Oxlint loads a TypeScript plugin only in the source tree, where Node.js strips the types.
+const PLUGIN_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
+
 const config: OxlintConfig = {
   jsPlugins: [
     {
       name: "anti-slop-effect",
-      specifier: new URL("vendor/antislop-effect/plugin.mjs", import.meta.url).href,
+      specifier: new URL(`plugin/antislop-effect/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
     },
   ],
   options: {

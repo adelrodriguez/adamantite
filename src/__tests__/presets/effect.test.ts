@@ -9,7 +9,7 @@ import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import effect from "#presets/lint/effect.ts"
-import antislopEffectPlugin from "#presets/lint/vendor/antislop-effect/plugin.mjs"
+import antislopEffectPlugin from "#presets/lint/plugin/antislop-effect/index.ts"
 import {
   lintRuleFixtures,
   listFixtureRules,
@@ -286,7 +286,7 @@ describe("effect preset", () => {
 })
 
 describe("effect preset anti-slop rules", () => {
-  it("enable exactly the rules the vendored plugin defines", () => {
+  it("enable exactly the rules the anti-slop-effect plugin defines", () => {
     expect(new Set(antislopPresetRules)).toStrictEqual(
       new Set(Object.keys(antislopEffectPlugin.rules))
     )

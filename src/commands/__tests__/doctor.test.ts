@@ -322,6 +322,28 @@ describe("doctor", () => {
     })
   )
 
+  // The agent sets its own terminal mode, so the menu's input must close before the agent starts.
+  it.effect("release the terminal input before the agent starts", () =>
+    Effect.gen(function* () {
+      const terminal = createTerminalTestContext(["enter", "n"])
+      const releasesAtStart: number[] = []
+
+      const runner = makeHandoffRunner({
+        onAgentRun: () => {
+          releasesAtStart.push(terminal.releases())
+        },
+      })
+
+      yield* runCommand(doctorCommand, [], {
+        files: makeFindingsFixture(),
+        layers: [runner.layer, promptingLayer],
+        terminal,
+      })
+
+      expect(releasesAtStart).toStrictEqual([1])
+    })
+  )
+
   it.effect("hand off to an agent and succeed when reassessment finds no issues", () =>
     Effect.gen(function* () {
       const files = makeFindingsFixture()

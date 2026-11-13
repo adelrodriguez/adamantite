@@ -6,6 +6,7 @@ import * as Fiber from "effect/Fiber"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { TerminalInput } from "#terminal/input.ts"
 import * as NodeTerminal from "#terminal/node-terminal.ts"
 
 // Replaces one property for the scope, and restores its descriptor when the scope closes.
@@ -49,36 +50,48 @@ const fakeTerminalStreams = Effect.gen(function* () {
   return { rawModes }
 })
 
+// Answers one confirm prompt through the CLI's terminal with a return key.
+const confirm = Effect.gen(function* () {
+  const fiber = yield* Prompt.run(
+    Prompt.Confirm({ initial: true, message: "Hand off to Claude Code?" })
+  ).pipe(Effect.forkChild)
+
+  yield* Effect.yieldNow
+  process.stdin.emit("keypress", "\r", { ctrl: false, meta: false, name: "return", shift: false })
+
+  return yield* Fiber.join(fiber)
+})
+
+// The terminal outlives each prompt, as in the CLI. The test clock stays paused, so Effect's 10 ms
+// release between prompts never runs on its own.
+const provideTerminal = Effect.provide([
+  NodeTerminal.layer,
+  FileSystem.layerNoop({}),
+  Path.layer,
+  Layer.succeed(Prompt.Theme)(Prompt.makeTheme({ colors: false })),
+])
+
 describe("NodeTerminal.layer", () => {
-  // A coding agent starts right after the resolution menu, so a late release would turn off the
-  // raw mode that the agent sets for itself. The terminal outlives the prompt, as in the CLI.
-  it.effect("turn raw mode off before the prompt returns", () =>
+  // Effect keeps raw mode between adjacent prompts, because a quick toggle can hang a Windows TTY.
+  it.effect("keep raw mode on between adjacent prompts", () =>
     Effect.gen(function* () {
       const { rawModes } = yield* fakeTerminalStreams
+      const answers = [yield* confirm, yield* confirm]
 
-      const fiber = yield* Prompt.run(
-        Prompt.Confirm({ initial: true, message: "Hand off to Claude Code?" })
-      ).pipe(Effect.forkChild)
+      expect({ answers, rawModes }).toStrictEqual({ answers: [true, true], rawModes: [true] })
+    }).pipe(Effect.scoped, provideTerminal)
+  )
 
-      yield* Effect.yieldNow
-      process.stdin.emit("keypress", "\r", {
-        ctrl: false,
-        meta: false,
-        name: "return",
-        shift: false,
-      })
+  // A coding agent sets its own terminal mode, so the release must happen before it starts.
+  it.effect("turn raw mode off at once when the input is released", () =>
+    Effect.gen(function* () {
+      const { rawModes } = yield* fakeTerminalStreams
+      const input = yield* TerminalInput
 
-      const answer = yield* Fiber.join(fiber)
+      yield* confirm
+      yield* input.release
 
-      expect({ answer, rawModes }).toStrictEqual({ answer: true, rawModes: [true, false] })
-    }).pipe(
-      Effect.scoped,
-      Effect.provide([
-        NodeTerminal.layer,
-        FileSystem.layerNoop({}),
-        Path.layer,
-        Layer.succeed(Prompt.Theme)(Prompt.makeTheme({ colors: false })),
-      ])
-    )
+      expect(rawModes).toStrictEqual([true, false])
+    }).pipe(Effect.scoped, provideTerminal)
   )
 })

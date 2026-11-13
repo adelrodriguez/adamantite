@@ -54,7 +54,7 @@ export const makeAppLayer = (
 ) =>
   Layer.mergeAll(
     NodeServices.layer,
-    // Replaces the terminal of `NodeServices`, so each prompt turns raw mode off when it ends.
+    // Replaces the terminal of `NodeServices` with one whose input closes before an agent handoff.
     NodeTerminal.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,

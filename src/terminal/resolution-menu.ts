@@ -4,6 +4,7 @@ import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Terminal from "effect/Terminal"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
+import { TerminalInput } from "#terminal/input.ts"
 import * as Output from "#terminal/output.ts"
 
 interface ResolutionMenuOptions {
@@ -73,6 +74,7 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   options: ResolutionMenuOptions
 ) {
   const agents = yield* CodingAgents
+  const input = yield* TerminalInput
   const installedAgents = yield* agents.detectInstalled(options.cwd)
 
   // The menu names each installed agent, so only an empty result needs a line.
@@ -108,6 +110,9 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   yield* Output.info(
     `Handing the terminal to ${agent.name}. Exit the agent to return to ${options.command}.`
   )
+
+  // The agent sets its own terminal mode, so the menu's input must close before the agent starts.
+  yield* input.release
 
   const started = yield* agents.handoff({ agent, cwd: options.cwd, prompt: options.prompt }).pipe(
     Effect.as(true),

@@ -10,6 +10,7 @@ import {
 import {
   hasVisibleTypeBinding,
   namedTypeReference,
+  visibleInterfaces,
   visibleTypeAlias,
 } from "../shared/type-alias-resolution.ts"
 
@@ -74,14 +75,19 @@ function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
   return false
 }
 
-function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
+/**
+ * Return whether a node is a plain use of a local alias or interface, as `Bag` in `const a: Bag`.
+ * The declaration reports its own unsafe dictionary, so its plain uses do not report again.
+ */
+function isPlainNamedConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false
   const reference = namedTypeReference(node)
 
   return (
     reference !== null
     && !reference.global
-    && visibleTypeAlias(reference.name, node, environment.typeAliases) !== null
+    && (visibleTypeAlias(reference.name, node, environment.typeAliases) !== null
+      || visibleInterfaces(reference.name, node, environment.typeAliases).length > 0)
     && !isInsideTypeAliasDeclaration(node)
   )
 }
@@ -133,7 +139,7 @@ function isInsideTypeTest(node: ESTree.TSType, environment: TypeEnvironment): bo
 function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (isInsideTypeTest(node, environment)) return false
 
-  if (isPlainAliasConsumerUse(node, environment)) return false
+  if (isPlainNamedConsumerUse(node, environment)) return false
 
   if (classifyUnsafeDictionary(node, environment) === null) return false
   let current: ESTree.Node = node.parent

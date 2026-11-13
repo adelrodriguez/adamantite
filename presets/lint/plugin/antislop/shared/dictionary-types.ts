@@ -459,16 +459,58 @@ function referenceValueTypes(
       : dictionaryValueTypes(source, environment, substitutions, resolvingAliases)
   }
 
-  const alias = localAlias(reference, environment)
-
-  if (alias === null || resolvingAliases.has(name)) return []
-  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
-
-  if (nextSubstitutions === null) return []
+  if (resolvingAliases.has(name)) return []
   const nextResolving = new Set(resolvingAliases)
   nextResolving.add(name)
+  const alias = localAlias(reference, environment)
 
-  return dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving)
+  if (alias === null) {
+    return localInterfaces(reference, environment).flatMap((declaration) =>
+      interfaceValueTypes(declaration, reference, environment, substitutions, nextResolving)
+    )
+  }
+
+  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
+
+  return nextSubstitutions === null
+    ? []
+    : dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving)
+}
+
+/**
+ * Return the value types of an interface's index signatures and of the types it extends. They see
+ * the type arguments of the use, as an alias body does.
+ */
+function interfaceValueTypes(
+  declaration: ESTree.TSInterfaceDeclaration,
+  reference: NamedTypeReference,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment,
+  resolvingAliases: ReadonlySet<string>
+): readonly ResolvedType[] {
+  const nextSubstitutions = typeArgumentSubstitution(
+    declaration,
+    reference.typeArguments,
+    substitutions
+  )
+
+  if (nextSubstitutions === null) return []
+
+  const indexValues = declaration.body.body.flatMap((member): readonly ResolvedType[] =>
+    member.type === "TSIndexSignature"
+      ? [{ substitutions: nextSubstitutions, type: member.typeAnnotation.typeAnnotation }]
+      : []
+  )
+
+  const heritageValues = declaration.extends.flatMap((heritage) => {
+    const base = namedTypeReference(heritage)
+
+    return base === null
+      ? []
+      : referenceValueTypes(base, environment, nextSubstitutions, resolvingAliases)
+  })
+
+  return [...indexValues, ...heritageValues]
 }
 
 type GenericDeclaration =

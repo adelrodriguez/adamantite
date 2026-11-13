@@ -27,4 +27,4 @@
 - [ADR 0025: The strict preset absorbs the anti-slop rules](0025-strict-absorbs-anti-slop.md)
 - [ADR 0026: The TypeScript preset owns its type resets](0026-typescript-preset-owns-type-resets.md)
 - [ADR 0027: Adamantite owns the anti-slop rules](0027-adamantite-owns-the-anti-slop-rules.md)
-- [ADR 0028: Oxfmt formats Astro files for Astro 7 and later](0028-oxfmt-formats-astro-7.md)
+- [ADR 0028: Oxfmt formats the plugin languages: Astro 7 and Svelte 5](0028-oxfmt-formats-plugin-languages.md)

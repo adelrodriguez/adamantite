@@ -2,7 +2,7 @@
 "adamantite": minor
 ---
 
-Update the managed tooling versions: Oxlint 1.93.0, Oxfmt 0.78.0, tsrs 0.25.0-ts7.1.0-beta, Knip 6.45.1, and `@effect/tsgo` 0.69.0. Also update the runtime dependencies `@oxlint/plugins` to 1.93.0 and `@clack/prompts` to 1.9.0.
+Update the managed tooling versions: Oxlint 1.93.0, Oxfmt 0.78.0, tsrs 0.25.0-ts7.1.0-beta, Knip 6.45.1, and `@effect/tsgo` 0.69.0. Also update the runtime dependencies `@oxlint/plugins` to 1.93.0 and `@clack/prompts` to 1.9.0, and add `semver` 7.8.6, which Doctor uses to compare the version of a package with the range that Oxfmt supports.
 
 The type-aware rules now have builds for Windows ARM64: tsrs 0.25.0 publishes `@tsrs/win32-arm64`, and `@effect/tsgo` 0.69.0 ships a Windows ARM64 build of tsrs.
 
@@ -20,4 +20,4 @@ To upgrade an existing project:
 - Run `adamantite update` to install the new versions.
 - In a project with the effect preset, expect `adamantite check` to report `Effect.all` and `Effect.forEach` calls without a `concurrency` option. Add `{ concurrency: 1 }` to keep the current order, or set the concurrency that the code needs.
 - In a Vue project, expect `adamantite fix` to format `.vue` files differently. Oxfmt 0.77.0 formats them with its own formatter instead of Prettier (oxc-project/oxc#28848).
-- In an Astro project, expect `adamantite fix` to format `.astro` files. The format preset turns on Oxfmt's `astro` option, and Zed and VS Code format Astro files with Oxfmt. Oxfmt needs `@astrojs/compiler-rs`, which Astro 7 and later install. In an Astro 5 or 6 project, Oxfmt fails on `.astro` files, and Doctor reports it. Update Astro to 7. Run `adamantite init` with your editors to move Zed's Astro setup from Prettier to Oxfmt.
+- In an Astro or Svelte project, expect `adamantite fix` to format `.astro` and `.svelte` files. The format preset turns on Oxfmt's `astro` and `svelte` options, and Zed and VS Code format both languages with Oxfmt. Oxfmt needs a package from the project: `@astrojs/compiler-rs`, which Astro 7 and later install, and `svelte` 5 or later. In an Astro 5 or 6 project, or a Svelte 3 or 4 project, Oxfmt fails on those files, and Doctor reports it. Run `adamantite init` with your editors to move Zed's Astro setup from Prettier to Oxfmt.

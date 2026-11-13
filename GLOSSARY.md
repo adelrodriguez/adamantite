@@ -99,6 +99,12 @@ one target project. Each native part is the installed one, or a replacement that
 plugin ships, such as the Effect build from `@effect/tsgo`.
 _Avoid_: Toolchain, patch, setup
 
+**Plugin language**:
+A language that Oxfmt formats only through a bundled Prettier plugin, which imports a package from
+the target project, such as Astro and Svelte. The format preset turns each one on, and Doctor
+reports a project that does not install a version of the package that Oxfmt supports.
+_Avoid_: Framework language, plugin format
+
 **Managed script**:
 A `package.json` script whose command is owned by Adamantite.
 _Avoid_: User script, package command

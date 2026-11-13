@@ -203,7 +203,9 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "no-sparse-arrays": "error",
     "no-template-curly-in-string": "error",
     "no-this-before-super": "error",
-    "no-throw-literal": "error",
+    // `typescript/only-throw-error` reads the type of the thrown value, so it reports every throw
+    // that this rule reports. With both rules on, one throw needs two suppressions.
+    "no-throw-literal": "off",
     "no-unassigned-vars": "error",
     "no-unexpected-multiline": "error",
     "no-unmodified-loop-condition": "error",

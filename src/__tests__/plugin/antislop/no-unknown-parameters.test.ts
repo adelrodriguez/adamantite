@@ -43,6 +43,50 @@ tester.run("no-unknown-parameters", plugin.rules["no-unknown-parameters"], {
       code: "export function parse({ value }: unknown = {}): void {}",
       errors: [{ ...error, data: { parameter: "{ value }" } }],
     },
+    {
+      code: "function read(value: unknown): string { return value.id; }",
+      errors: [{ ...error, data: { parameter: "value" } }],
+    },
+    {
+      code: "function read(value: unknown): void { schema.parse(value); return send(value); }",
+      errors: [{ ...error, data: { parameter: "value" } }],
+    },
+    {
+      code: "function read({ value }: unknown): User { return schema.parse(value); }",
+      errors: [{ ...error, data: { parameter: "{ value }" } }],
+    },
+    {
+      code: 'function read(value: unknown): User { return schema["parse"](value); }',
+      errors: [{ ...error, data: { parameter: "value" } }],
+    },
+    {
+      code: "function read(value: unknown): User { return parse(value); }",
+      errors: [{ ...error, data: { parameter: "value" } }],
+    },
+    {
+      code: "function read(value: unknown): User { return Schema.decodeUnknownSync(value)(User); }",
+      errors: [{ ...error, data: { parameter: "value" } }],
+    },
+    {
+      code: "let decode = Schema.decodeUnknownSync(User);\nfunction read(input: unknown): User { return decode(input); }",
+      errors: [{ ...error, data: { parameter: "input" } }],
+    },
+    {
+      code: "const decode = makeDecoder(User);\nfunction read(input: unknown): User { return decode(input); }",
+      errors: [{ ...error, data: { parameter: "input" } }],
+    },
+    {
+      code: "function read(value: unknown): User { value = fallback; return schema.parse(value); }",
+      errors: [{ ...error, data: { parameter: "value" } }],
+    },
+    {
+      code: "function toError(error: unknown): Error { return error instanceof Error ? error : send(error); }",
+      errors: [{ ...error, data: { parameter: "error" } }],
+    },
+    {
+      code: "function toError(error: unknown): string { return error instanceof Error ? String(error) : error.message; }",
+      errors: [{ ...error, data: { parameter: "error" } }],
+    },
   ],
   valid: [
     "function enrich(cause: unknown): void {}",
@@ -58,5 +102,18 @@ tester.run("no-unknown-parameters", plugin.rules["no-unknown-parameters"], {
     "task.catch(function describe(error: unknown) { return String(error); });",
     "task?.catch((error: unknown) => String(error));",
     "task.then((value) => value, (error: unknown) => String(error));",
+    `export function addressChannel<Channel extends ChannelName>(channel: Channel, params: unknown) {
+      const parsed = z.safeParse(getChannel(channel).params, params)
+      if (!parsed.success) return { error: parsed.error }
+      return { key: \`\${channel}:\${JSON.stringify(sortKeys(parsed.data))}\`, params: parsed.data }
+    }`,
+    "function read(value: unknown): User { return schema.parse(value); }",
+    "const read = async (value: unknown) => schema.safeParseAsync(value);",
+    "function read(value: unknown): boolean { return ajv.validate(schema, value); }",
+    "function read(value: unknown): User { return Schema.decodeUnknownSync(User)(value); }",
+    "function check(value: unknown): boolean { return Schema.is(User)(value); }",
+    "const decode = Schema.decodeUnknownSync(User);\nfunction read(input: unknown): User { return decode(input); }",
+    "function read(value: unknown): User { return value instanceof User ? value : schema.parse(value); }",
+    "function toError(error: unknown): Error { return error instanceof Error ? error : new Error(String(error)); }",
   ],
 })

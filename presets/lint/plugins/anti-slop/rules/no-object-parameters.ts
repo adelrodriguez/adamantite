@@ -121,7 +121,7 @@ const rule: Rule = {
     },
     messages: {
       objectParameter:
-        "Parameter `{{parameter}}` uses the broad `object` type. Use a named domain type, `WeakKey` for a WeakMap or WeakSet key, or a generic `<T extends object>` that keeps the caller's type.",
+        "Parameter `{{parameter}}` uses the broad `object` type. Use a named domain type, `WeakKey` for a WeakMap or WeakSet key, or a generic `<T extends object>` that the signature uses again, such as in the return type, so the caller keeps its type.",
     },
     type: "problem",
   },

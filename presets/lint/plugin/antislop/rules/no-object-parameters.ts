@@ -76,7 +76,7 @@ const rule: Rule = {
     },
     messages: {
       objectParameter:
-        "Parameter `{{parameter}}` uses the broad `object` type. Accept a named owner type; parse external input at its boundary before calling this function.",
+        "Parameter `{{parameter}}` uses the broad `object` type. Use a named domain type, `WeakKey` for a WeakMap or WeakSet key, or a generic `<T extends object>` that keeps the caller's type.",
     },
     type: "problem",
   },

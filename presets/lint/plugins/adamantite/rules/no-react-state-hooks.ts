@@ -21,13 +21,14 @@ const HOOK_MESSAGES: ReadonlyMap<string, MessageId> = new Map([
 const DEFAULT_HOOKS: readonly string[] = [...HOOK_MESSAGES.keys()]
 
 /**
- * Modules where hooks are permitted: hook modules such as `useCart.ts` or `use-cart.ts`, and
- * everything under a `hooks` directory. Everything else is feature code, including files such as
- * `userProfile.tsx`.
+ * Modules where hooks are permitted: hook modules such as `useCart.ts`, `use-cart.ts`, or
+ * `hooks.ts`, and everything under a `hooks` directory. Everything else is feature code, including
+ * files such as `userProfile.tsx`.
  */
 const DEFAULT_ALLOW: readonly string[] = [
   "**/use[A-Z]*.{ts,tsx}",
   "**/use-*.{ts,tsx}",
+  "**/hooks.{ts,tsx}",
   "**/hooks/**",
 ]
 

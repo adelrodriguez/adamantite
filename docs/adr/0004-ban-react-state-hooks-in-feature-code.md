@@ -1,5 +1,8 @@
 # Ban React state, effect, and memoization hooks in feature code
 
+The default hook modules now also include `**/hooks.{ts,tsx}`, for a feature that keeps its hooks
+in one `hooks.ts` file.
+
 The `react-strict` preset takes a position on where React state and side effects belong. We
 decided (2026-09-29, issue #405) that `adamantite/no-react-state-hooks` reports `useState`,
 `useReducer`, `useEffect`, `useLayoutEffect`, `useSyncExternalStore`, `useMemo`, and

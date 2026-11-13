@@ -40,7 +40,7 @@ const REJECTION_CALLBACK_INDEX = new Map([
 function isRejectionCallback(owner: ParameterOwner): boolean {
   const call = owner.parent
 
-  if (call?.type !== "CallExpression") return false
+  if (call.type !== "CallExpression") return false
   const callee = call.callee
 
   if (callee.type !== "MemberExpression" || callee.computed) return false

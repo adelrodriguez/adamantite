@@ -1,12 +1,5 @@
 import type { ESTree } from "@oxlint/plugins"
-
-type VisitorKeys = Readonly<Record<string, readonly string[]>>
-
-function isNode(value: unknown): value is ESTree.Node {
-  return (
-    typeof value === "object" && value !== null && "type" in value && typeof value.type === "string"
-  )
-}
+import { childNodes, type VisitorKeys } from "./child-nodes.ts"
 
 function collectInferTypeParameterNames(
   node: ESTree.Node,
@@ -14,21 +7,9 @@ function collectInferTypeParameterNames(
   names: Set<string>
 ): void {
   if (node.type === "TSInferType") names.add(node.typeParameter.name.name)
-  const record = node as unknown as Readonly<Record<string, unknown>>
 
-  for (const key of visitorKeys[node.type] ?? []) {
-    const value = record[key]
-
-    if (isNode(value)) {
-      collectInferTypeParameterNames(value, visitorKeys, names)
-      continue
-    }
-
-    if (!Array.isArray(value)) continue
-
-    for (const child of value) {
-      if (isNode(child)) collectInferTypeParameterNames(child, visitorKeys, names)
-    }
+  for (const child of childNodes(node, visitorKeys)) {
+    collectInferTypeParameterNames(child, visitorKeys, names)
   }
 }
 
@@ -41,9 +22,9 @@ export function lexicalTypeParameterNames(
 ): ReadonlySet<string> {
   const names = new Set<string>()
   let descendant: ESTree.Node = node
-  let current: ESTree.Node | null = node
+  let current: ESTree.Node = node
 
-  while (current !== null && current.type !== "Program") {
+  while (current.type !== "Program") {
     if ("typeParameters" in current) {
       for (const parameter of current.typeParameters?.params ?? []) {
         names.add(parameter.name.name)

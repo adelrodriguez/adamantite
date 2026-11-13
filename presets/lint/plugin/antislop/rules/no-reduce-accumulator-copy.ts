@@ -78,8 +78,8 @@ function referencesAccumulator(
   return false
 }
 
-function isGlobalCopyOwner(sourceCode: SourceCode, node: ESTree.Node, name: string): boolean {
-  node = unwrapArrayExpression(node)
+function isGlobalCopyOwner(sourceCode: SourceCode, expression: ESTree.Node, name: string): boolean {
+  const node = unwrapArrayExpression(expression)
 
   if (node.type !== "Identifier" || node.name !== name) return false
   const variable = resolveArrayBinding(sourceCode, node)

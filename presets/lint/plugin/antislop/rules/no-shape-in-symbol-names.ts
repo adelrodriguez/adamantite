@@ -12,7 +12,7 @@ function containsForbiddenSymbolName(name: string): boolean {
 function isBorrowedMemberName(node: ESTree.Node): boolean {
   const parent = node.parent
 
-  if (parent === null || parent.type !== "MemberExpression") return false
+  if (parent?.type !== "MemberExpression") return false
 
   return parent.property === node && !parent.computed
 }

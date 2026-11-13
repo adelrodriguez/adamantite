@@ -3,7 +3,9 @@ import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
 /**
  * Unwrap syntax-only wrappers when inspecting array methods and accumulator references.
  */
-export function unwrapArrayExpression(node: ESTree.Node): ESTree.Node {
+export function unwrapArrayExpression(expression: ESTree.Node): ESTree.Node {
+  let node = expression
+
   while (
     node.type === "ParenthesizedExpression"
     || node.type === "ChainExpression"
@@ -21,8 +23,11 @@ export function unwrapArrayExpression(node: ESTree.Node): ESTree.Node {
 /**
  * Resolve a local binding by scope, not by identifier spelling.
  */
-export function resolveArrayBinding(sourceCode: SourceCode, node: ESTree.Node): Variable | null {
-  node = unwrapArrayExpression(node)
+export function resolveArrayBinding(
+  sourceCode: SourceCode,
+  expression: ESTree.Node
+): Variable | null {
+  const node = unwrapArrayExpression(expression)
 
   if (node.type !== "Identifier") return null
   let scope: Scope | null = sourceCode.getScope(node)
@@ -37,13 +42,17 @@ export function resolveArrayBinding(sourceCode: SourceCode, node: ESTree.Node): 
   return null
 }
 
+function isStringLiteral(node: ESTree.Node): node is ESTree.StringLiteral {
+  return node.type === "Literal" && typeof node.value === "string"
+}
+
 /**
  * Read static method names, including computed string literals, without evaluating expressions.
  */
 export function arrayMethodTarget(
-  node: ESTree.Node
+  callee: ESTree.Node
 ): { readonly name: string; readonly object: ESTree.Node } | null {
-  node = unwrapArrayExpression(node)
+  const node = unwrapArrayExpression(callee)
 
   if (node.type !== "MemberExpression") return null
   const property = node.property
@@ -52,7 +61,7 @@ export function arrayMethodTarget(
     return { name: property.name, object: node.object }
   }
 
-  if (node.computed && property.type === "Literal" && typeof property.value === "string") {
+  if (node.computed && isStringLiteral(property)) {
     return { name: property.value, object: node.object }
   }
 
@@ -81,10 +90,10 @@ function isArrayAnnotation(type: ESTree.TSType): boolean {
  */
 export function isKnownArrayExpression(
   sourceCode: SourceCode,
-  node: ESTree.Node,
+  expression: ESTree.Node,
   visited = new Set<Variable>()
 ): boolean {
-  node = unwrapArrayExpression(node)
+  const node = unwrapArrayExpression(expression)
 
   if (node.type === "ArrayExpression") return true
 

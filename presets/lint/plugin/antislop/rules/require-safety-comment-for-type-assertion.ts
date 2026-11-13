@@ -1,4 +1,5 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
+import { readStringArrayOption } from "../../options.ts"
 
 type TypeAssertion = ESTree.TSAsExpression | ESTree.TSTypeAssertion
 
@@ -20,18 +21,8 @@ function isConstAssertion(node: TypeAssertion): boolean {
   )
 }
 
-function configuredSafetyMarkers(option: unknown): readonly string[] {
-  if (typeof option !== "object" || option === null || !("markers" in option)) {
-    return DEFAULT_SAFETY_MARKERS
-  }
-
-  const configured = option.markers
-
-  if (!Array.isArray(configured)) return DEFAULT_SAFETY_MARKERS
-
-  const markers = configured.flatMap((marker) =>
-    typeof marker === "string" && marker.trim().length > 0 ? [marker.trim()] : []
-  )
+function configuredSafetyMarkers(configured: readonly string[] = []): readonly string[] {
+  const markers = configured.flatMap((marker) => (marker.trim().length > 0 ? [marker.trim()] : []))
 
   return markers.length > 0 ? markers : DEFAULT_SAFETY_MARKERS
 }
@@ -58,22 +49,21 @@ function hasSafetyJustificationBefore(
 function hasSafetyComment(sourceCode: SourceCode, node: TypeAssertion, pattern: RegExp): boolean {
   let current: ESTree.Node = node
 
-  while (true) {
+  while (!commentOwnerKinds.has(current.type)) {
     if (hasSafetyJustificationBefore(sourceCode, current, node, pattern)) return true
-
-    if (commentOwnerKinds.has(current.type)) {
-      const exportDeclaration = current.parent
-
-      return (
-        exportDeclaration.type === "ExportNamedDeclaration"
-        && exportDeclaration.declaration === current
-        && hasSafetyJustificationBefore(sourceCode, exportDeclaration, node, pattern)
-      )
-    }
 
     if (current.parent.type === "Program") return false
     current = current.parent
   }
+
+  if (hasSafetyJustificationBefore(sourceCode, current, node, pattern)) return true
+  const exportDeclaration = current.parent
+
+  return (
+    exportDeclaration.type === "ExportNamedDeclaration"
+    && exportDeclaration.declaration === current
+    && hasSafetyJustificationBefore(sourceCode, exportDeclaration, node, pattern)
+  )
 }
 
 /**
@@ -85,7 +75,7 @@ const rule: Rule = {
 
     const checkAssertion = (node: TypeAssertion) => {
       if (isConstAssertion(node)) return
-      const markers = configuredSafetyMarkers(context.options?.[0])
+      const markers = configuredSafetyMarkers(readStringArrayOption(context.options, "markers"))
       const patternKey = markers.join("\u0000")
       const pattern = patterns.get(patternKey) ?? markerPattern(markers)
       patterns.set(patternKey, pattern)

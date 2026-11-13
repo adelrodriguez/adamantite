@@ -9,7 +9,7 @@ import noReduceAccumulatorCopy from "./rules/no-reduce-accumulator-copy.ts"
 import noReflectApply from "./rules/no-reflect-apply.ts"
 import noReflectGet from "./rules/no-reflect-get.ts"
 import noRuntimeTypeof from "./rules/no-runtime-typeof.ts"
-import noShapeInSymbolNames from "./rules/no-shape-in-symbol-names.ts"
+import noForbiddenTermInSymbolNames from "./rules/no-shape-in-symbol-names.ts"
 import noUnknownParameters from "./rules/no-unknown-parameters.ts"
 import noUnknownReturns from "./rules/no-unknown-returns.ts"
 import noUnknownTypeAliases from "./rules/no-unknown-type-aliases.ts"
@@ -59,7 +59,7 @@ const plugin: AntiSlopPlugin = {
     "no-reflect-apply": noReflectApply,
     "no-reflect-get": noReflectGet,
     "no-runtime-typeof": noRuntimeTypeof,
-    "no-shape-in-symbol-names": noShapeInSymbolNames,
+    "no-shape-in-symbol-names": noForbiddenTermInSymbolNames,
     "no-unknown-parameters": noUnknownParameters,
     "no-unknown-returns": noUnknownReturns,
     "no-unknown-type-aliases": noUnknownTypeAliases,

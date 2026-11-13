@@ -1,14 +1,13 @@
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, it } from "vitest"
 import plugin from "#presets/lint/plugin/antislop/index.ts"
+import createPaddingLineRule from "#presets/lint/plugin/antislop/stylistic/padding-line-between-statements.ts"
 
 RuleTester.describe = describe
 
 RuleTester.it = it
 
 RuleTester.itOnly = it.only
-
-import createPaddingLineRule from "#presets/lint/plugin/antislop/stylistic/padding-line-between-statements.ts"
 
 const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
 const error = { messageId: "expectedBlankLine" }

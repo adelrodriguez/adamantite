@@ -1,4 +1,5 @@
 import type { ESTree, Rule } from "@oxlint/plugins"
+import { readBooleanOption } from "../../options.ts"
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function
 
@@ -45,13 +46,7 @@ const rule: Rule = {
   createOnce(context) {
     return {
       UnaryExpression(node) {
-        const option = context.options?.[0]
-
-        const allowInTypeGuards =
-          typeof option === "object"
-          && option !== null
-          && !Array.isArray(option)
-          && option.allowInTypeGuards === true
+        const allowInTypeGuards = readBooleanOption(context.options, "allowInTypeGuards") === true
 
         if (
           node.operator === "typeof"

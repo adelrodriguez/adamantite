@@ -80,9 +80,9 @@ function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironme
 
 function isInsideTypeParameterConstraint(node: ESTree.TSType): boolean {
   let child: ESTree.Node = node
-  let parent: ESTree.Node | null = child.parent
+  let parent: ESTree.Node = child.parent
 
-  while (parent !== null && parent.type !== "Program") {
+  while (parent.type !== "Program") {
     if (parent.type === "TSTypeParameter" && parent.constraint === child) return true
     child = parent
     parent = child.parent
@@ -97,9 +97,9 @@ function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): bo
   if (isPlainAliasConsumerUse(node, environment)) return false
 
   if (classifyUnsafeDictionary(node, environment) === null) return false
-  let current: ESTree.Node | null = node.parent
+  let current: ESTree.Node = node.parent
 
-  while (current !== null && current.type !== "Program") {
+  while (current.type !== "Program") {
     if (isTypeNode(current) && classifyUnsafeDictionary(current, environment) !== null) return false
     current = current.parent
   }
@@ -131,12 +131,7 @@ const rule: Rule = {
         environment = createTypeEnvironment(node, context.sourceCode.visitorKeys)
       },
       TSIndexSignature(node) {
-        if (
-          environment === null
-          || node.typeAnnotation === null
-          || node.parent.type === "TSTypeLiteral"
-        )
-          return
+        if (environment === null || node.parent.type === "TSTypeLiteral") return
 
         const unsafe = classifyUnsafeDictionaryValue(
           node.typeAnnotation.typeAnnotation,

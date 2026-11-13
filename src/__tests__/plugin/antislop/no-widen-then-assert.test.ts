@@ -37,6 +37,21 @@ tester.run("no-widen-then-assert", plugin.rules["no-widen-then-assert"], {
       errors: [error],
       name: "module binding asserted two functions deep",
     },
+    {
+      code: "const widened: globalThis.Record<string, unknown> = { id: 'first' }; const parsed = widened as { readonly id: string };",
+      errors: [error],
+      name: "binding widened to globalThis.Record",
+    },
+    {
+      code: "const widened: globalThis.Readonly<Record<globalThis.PropertyKey, unknown>> = { id: 'first' }; const parsed = widened as Record<string, string>;",
+      errors: [error],
+      name: "binding widened to globalThis.Readonly with a globalThis.PropertyKey key",
+    },
+    {
+      code: "const widened: Record<string, unknown> = { id: 'first' }; const parsed = widened as globalThis.Record<string, string>;",
+      errors: [error],
+      name: "binding asserted to globalThis.Record with a narrower value",
+    },
   ],
   valid: [
     "const source = { id: 'first' }; const widened: unknown = source;",
@@ -52,6 +67,14 @@ tester.run("no-widen-then-assert", plugin.rules["no-widen-then-assert"], {
     {
       code: "let source = { id: 'first' }; source = { id: 'second' }; const widened: unknown = source; function read() { return widened as { readonly id: string }; }",
       name: "widened from a reassigned binding",
+    },
+    {
+      code: "const source = { id: 'first' }; const widened: unknown = source; const parsed = widened as globalThis.Record<string, unknown>;",
+      name: "assertion to globalThis.Record of unknown, which is not narrower",
+    },
+    {
+      code: "const widened: Lib.Record<string, unknown> = { id: 'first' }; const parsed = widened as { readonly id: string };",
+      name: "binding annotated with a namespace type that is not globalThis",
     },
   ],
 })

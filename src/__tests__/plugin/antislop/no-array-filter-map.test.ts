@@ -39,6 +39,14 @@ tester.run("no-array-filter-map", plugin.rules["no-array-filter-map"], {
       code: "function collect(users: Array<User>) { return users.filter(active).map(email); }",
       errors: [error],
     },
+    {
+      code: "function collect(users: globalThis.Array<User>) { return users.filter(active).map(email); }",
+      errors: [error],
+    },
+    {
+      code: "function collect(users: globalThis.ReadonlyArray<User>) { return users.map(email).filter(present); }",
+      errors: [error],
+    },
     { code: "const users = [] as const; users['filter'](active)['map'](email);", errors: [error] },
     { code: "const users = []; (users.filter(active)!).map(email);", errors: [error] },
     { code: "const users = []; users?.filter(active)?.map(email);", errors: [error] },
@@ -77,6 +85,7 @@ tester.run("no-array-filter-map", plugin.rules["no-array-filter-map"], {
       name: "reassigned variable with an annotation that is not an array",
     },
     "const users = []; users[method](active).map(email);",
+    "function collect(users: Lib.Array<User>) { return users.filter(active).map(email); }",
     "const first = second; const second = first; first.filter(active).map(email);",
   ],
 })

@@ -404,7 +404,7 @@ const rule: Rule = {
     },
     messages: {
       widenThenAssert:
-        'Binding "{{name}}" discards type evidence and later recreates it with an assertion. Keep the precise type from initialization through use; parse boundary input once.',
+        'Binding "{{name}}" discards type evidence and later recreates it with an assertion. Keep the precise type from initialization through use, and parse boundary input once. If a test passes input of the wrong type on purpose, pass it without an assertion and put `// @ts-expect-error -- reason` above the call.',
     },
     type: "problem",
   },

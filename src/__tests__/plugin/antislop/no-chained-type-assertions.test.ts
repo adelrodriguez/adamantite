@@ -15,6 +15,11 @@ tester.run("no-chained-type-assertions", plugin.rules["no-chained-type-assertion
   invalid: [
     { code: "const value = input as unknown as User;", errors: [error], name: "as chain" },
     {
+      code: 'parsePort("abc" as unknown as number);',
+      errors: [/`\/\/ @ts-expect-error -- reason`/u],
+      name: "invalid input on purpose names the expect-error escape",
+    },
+    {
       code: "const value = (input as unknown) as User;",
       errors: [error],
       name: "parenthesized chain",

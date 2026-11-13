@@ -17,6 +17,11 @@ tester.run("no-widen-then-assert", plugin.rules["no-widen-then-assert"], {
       code: "const source = { id: 'second' }; const widened: unknown = source; const parsed = widened as { readonly id: string };",
       errors: [error],
     },
+    {
+      code: 'const raw: unknown = "abc"; parsePort(raw as number);',
+      errors: [/`\/\/ @ts-expect-error -- reason`/u],
+      name: "invalid input on purpose names the expect-error escape",
+    },
   ],
   valid: [
     "const source = { id: 'first' }; const widened: unknown = source;",

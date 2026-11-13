@@ -5,13 +5,22 @@ type TypeAssertion = ESTree.TSAsExpression | ESTree.TSTypeAssertion
 
 const DEFAULT_SAFETY_MARKERS = ["SAFETY"] as const
 
-const commentOwnerKinds = new Set([
-  "ExpressionStatement",
-  "PropertyDefinition",
-  "ReturnStatement",
-  "ThrowStatement",
-  "VariableDeclaration",
-])
+// Node kinds that own a comment like a statement does, although their names do not end in
+// `Statement` or `Declaration`.
+const statementLikeKinds = new Set(["AccessorProperty", "PropertyDefinition", "TSExportAssignment"])
+
+// A declaration in one of these heads is part of the loop statement, so the comment above the loop
+// covers it.
+const loopHeadKinds = new Set(["ForInStatement", "ForOfStatement", "ForStatement"])
+
+/**
+ * Reports whether a node is the statement that owns the comments above an assertion.
+ */
+function isCommentOwner(node: ESTree.Node): boolean {
+  if (node.type === "VariableDeclaration" && loopHeadKinds.has(node.parent.type)) return false
+
+  return statementLikeKinds.has(node.type) || /(?:Declaration|Statement)$/u.test(node.type)
+}
 
 function isConstAssertion(node: TypeAssertion): boolean {
   return (
@@ -35,34 +44,49 @@ function markerPattern(markers: readonly string[]): RegExp {
   return new RegExp(String.raw`(?:^|[^\p{L}\p{N}_])(?:${alternation})\s*:\s*\S`, "u")
 }
 
-function hasSafetyJustificationBefore(
+/**
+ * Reports whether a comment before the statement ends a line of earlier code, such as `const a = 1
+ * // SAFETY: ...`. That comment describes the earlier code.
+ */
+function isTrailingComment(
   sourceCode: SourceCode,
-  owner: ESTree.Node,
-  assertion: TypeAssertion,
-  pattern: RegExp
+  comment: ESTree.Comment,
+  statement: ESTree.Node
 ): boolean {
-  return sourceCode
-    .getCommentsBefore(owner)
-    .some((comment) => comment.end <= assertion.start && pattern.test(comment.value))
+  if (comment.start >= statement.start) return false
+  const previous = sourceCode.getTokenBefore(comment)
+
+  return previous !== null && previous.loc.end.line === comment.loc.start.line
 }
 
 function hasSafetyComment(sourceCode: SourceCode, node: TypeAssertion, pattern: RegExp): boolean {
-  let current: ESTree.Node = node
+  const owners: ESTree.Node[] = [node]
+  let statement: ESTree.Node = node
 
-  while (!commentOwnerKinds.has(current.type)) {
-    if (hasSafetyJustificationBefore(sourceCode, current, node, pattern)) return true
-
-    if (current.parent.type === "Program") return false
-    current = current.parent
+  while (!isCommentOwner(statement) && statement.parent.type !== "Program") {
+    statement = statement.parent
+    owners.push(statement)
   }
 
-  if (hasSafetyJustificationBefore(sourceCode, current, node, pattern)) return true
-  const exportDeclaration = current.parent
+  const exportDeclaration = statement.parent
 
-  return (
+  if (
     exportDeclaration.type === "ExportNamedDeclaration"
-    && exportDeclaration.declaration === current
-    && hasSafetyJustificationBefore(sourceCode, exportDeclaration, node, pattern)
+    && exportDeclaration.declaration === statement
+  ) {
+    statement = exportDeclaration
+    owners.push(statement)
+  }
+
+  return owners.some((owner) =>
+    sourceCode
+      .getCommentsBefore(owner)
+      .some(
+        (comment) =>
+          comment.end <= node.start
+          && pattern.test(comment.value)
+          && !isTrailingComment(sourceCode, comment, statement)
+      )
   )
 }
 

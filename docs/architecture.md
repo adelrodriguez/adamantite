@@ -143,6 +143,12 @@ writing files. See ADR 0023.
   the entry `dist/oxlint.js` with `node`, so Oxlint runs with the project's Oxlint runtime.
   `check` fails on Oxlint warnings unless `--allow-warnings` is set. See ADR 0018, ADR 0019,
   and ADR 0022.
+- `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
+  `anti-slop/require-readable-spacing` counts a line past its `printWidth` option as multiline and
+  adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
+  one pass of fixes, so a fix that causes a new fixable report still needs a second `fix`.
+  `src/__tests__/presets/fix.test.ts` marks that case as an expected failure until Oxlint repeats
+  its passes ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
 - `init` creates selected integrations and managed scripts. When the user sets up coding agents, it

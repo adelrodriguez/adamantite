@@ -6,7 +6,7 @@ import {
   createTypeEnvironment,
   type TypeEnvironment,
 } from "../shared/dictionary-types.ts"
-import { visibleTypeAlias } from "../shared/type-alias-resolution.ts"
+import { hasVisibleTypeBinding, visibleTypeAlias } from "../shared/type-alias-resolution.ts"
 
 const typeNodeKinds: ReadonlySet<string> = new Set([
   "JSDocNonNullableType",
@@ -78,12 +78,43 @@ function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironme
   )
 }
 
-function isInsideTypeParameterConstraint(node: ESTree.TSType): boolean {
+// The second type argument of these built-ins filters a union, like a conditional type test.
+const typeFilters: ReadonlySet<string> = new Set(["Exclude", "Extract"])
+
+function isTypeFilterArgument(
+  child: ESTree.Node,
+  parent: ESTree.Node,
+  environment: TypeEnvironment
+): boolean {
+  if (parent.type !== "TSTypeParameterInstantiation" || parent.params[1] !== child) return false
+  const reference = parent.parent
+
+  if (reference.type !== "TSTypeReference") return false
+  const name = typeReferenceName(reference)
+
+  return (
+    name !== null
+    && typeFilters.has(name)
+    && !hasVisibleTypeBinding(name, reference, environment.typeAliases)
+  )
+}
+
+// A constraint, a conditional type test, and a filter compare a type with a dictionary. `object`
+// also matches interfaces and arrays, so it does not replace the dictionary there.
+function isTypeTest(child: ESTree.Node, parent: ESTree.Node, environment: TypeEnvironment) {
+  return (
+    (parent.type === "TSTypeParameter" && parent.constraint === child)
+    || (parent.type === "TSConditionalType" && parent.extendsType === child)
+    || isTypeFilterArgument(child, parent, environment)
+  )
+}
+
+function isInsideTypeTest(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   let child: ESTree.Node = node
   let parent: ESTree.Node = child.parent
 
   while (parent.type !== "Program") {
-    if (parent.type === "TSTypeParameter" && parent.constraint === child) return true
+    if (isTypeTest(child, parent, environment)) return true
     child = parent
     parent = child.parent
   }
@@ -92,7 +123,7 @@ function isInsideTypeParameterConstraint(node: ESTree.TSType): boolean {
 }
 
 function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
-  if (isInsideTypeParameterConstraint(node)) return false
+  if (isInsideTypeTest(node, environment)) return false
 
   if (isPlainAliasConsumerUse(node, environment)) return false
 

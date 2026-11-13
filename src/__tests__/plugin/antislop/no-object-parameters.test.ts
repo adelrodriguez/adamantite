@@ -14,6 +14,16 @@ const error = { messageId: "objectParameter" }
 tester.run("no-object-parameters", plugin.rules["no-object-parameters"], {
   invalid: [
     { code: "function f(value: object) {}", errors: [error] },
+    // The message names the fixes that work, such as `WeakKey` for a weak collection key.
+    {
+      code: "declare const records: WeakMap<object, string>; function getEvaluatorRecord(evaluator: object) { return records.get(evaluator); }",
+      errors: [
+        {
+          message:
+            "Parameter `evaluator` uses the broad `object` type. Use a named domain type, `WeakKey` for a WeakMap or WeakSet key, or a generic `<T extends object>` that keeps the caller's type.",
+        },
+      ],
+    },
     { code: "type Alias = object; function f(value: Alias) {}", errors: [error] },
     { code: "type Alias = (object); function f(value: Alias) {}", errors: [error] },
     {
@@ -50,6 +60,7 @@ tester.run("no-object-parameters", plugin.rules["no-object-parameters"], {
     },
   ],
   valid: [
+    "declare const records: WeakMap<WeakKey, string>; function getEvaluatorRecord(evaluator: WeakKey) { return records.get(evaluator); }",
     "type Alias = object;",
     "function f(value: Alias) {}",
     "interface Owner { readonly id: string } function f(value: Owner) {}",

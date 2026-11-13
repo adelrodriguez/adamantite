@@ -1207,6 +1207,7 @@ describe("init", () => {
       () =>
         Effect.gen(function* () {
           const existingAgents = `# Existing Instructions\n\n${ADAMANTITE_AGENTS_START_MARKER}\nmanual content\n`
+
           const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
           const prompter = createPrompterTestContext({

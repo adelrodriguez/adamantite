@@ -20,7 +20,11 @@ const BUILT_INS = new Set([
 
 const TRANSPARENT_WRAPPERS = new Set(["Readonly", "Partial", "Required", "NonNullable"])
 
-type TypeAliasEnvironment = ReadonlyMap<string, ESTree.TSType>
+/**
+ * The type argument bound to each type parameter, with the substitutions of the place that wrote
+ * it.
+ */
+type TypeAliasEnvironment = ReadonlyMap<string, ResolvedType>
 
 type ResolvedType = {
   readonly type: ESTree.TSType
@@ -84,16 +88,6 @@ function isBuiltIn(name: string, use: ESTree.Node, environment: TypeEnvironment)
   return BUILT_INS.has(name) && !hasVisibleTypeBinding(name, use, environment.typeAliases)
 }
 
-function isUnappliedReferenceTo(type: ESTree.TSType, name: string): boolean {
-  const unwrapped = unwrapTransparentType(type)
-
-  return (
-    unwrapped.type === "TSTypeReference"
-    && typeReferenceName(unwrapped) === name
-    && (unwrapped.typeArguments === null || unwrapped.typeArguments.params.length === 0)
-  )
-}
-
 function unwrapTransparentType(type: ESTree.TSType): ESTree.TSType {
   let current = type
 
@@ -136,26 +130,11 @@ function isEffectivelyEmptyInterface(
   )
 }
 
-function resolvedSubstitutionArgument(
-  type: ESTree.TSType,
-  base: TypeAliasEnvironment,
-  resolving: ReadonlySet<string> = new Set()
-): ESTree.TSType {
-  const unwrapped = unwrapTransparentType(type)
-
-  if (unwrapped.type !== "TSTypeReference") return type
-  const name = typeReferenceName(unwrapped)
-
-  if (name === null || resolving.has(name)) return type
-  const substitution = base.get(name)
-
-  if (substitution === undefined) return type
-  const nextResolving = new Set(resolving)
-  nextResolving.add(name)
-
-  return resolvedSubstitutionArgument(substitution, base, nextResolving)
-}
-
+/**
+ * Bind an alias's type parameters for its body. The body sees only these parameters, because the
+ * type parameters of the alias that refers to it are not in scope there. Each explicit argument
+ * keeps the substitutions of the place that wrote it, and a default sees the parameters before it.
+ */
 function aliasSubstitution(
   alias: ESTree.TSTypeAliasDeclaration,
   type: ESTree.TSTypeReference,
@@ -163,13 +142,17 @@ function aliasSubstitution(
 ): TypeAliasEnvironment | null {
   const parameters = alias.typeParameters?.params ?? []
   const arguments_ = type.typeArguments?.params ?? []
-  const next = new Map(base)
+  const next = new Map<string, ResolvedType>()
 
   for (const [index, parameter] of parameters.entries()) {
-    const argument = arguments_[index] ?? parameter.default
+    const explicitArgument = arguments_[index]
+    const argument = explicitArgument ?? parameter.default
 
     if (argument === null) return null
-    next.set(parameter.name.name, resolvedSubstitutionArgument(argument, next))
+    next.set(parameter.name.name, {
+      substitutions: explicitArgument === undefined ? new Map(next) : base,
+      type: argument,
+    })
   }
 
   return next
@@ -228,9 +211,12 @@ function unsafeDirectValue(
   const substitution = substitutions.get(name)
 
   if (substitution !== undefined) {
-    return isUnappliedReferenceTo(substitution, name)
-      ? null
-      : unsafeDirectValue(substitution, environment, substitutions, resolvingAliases)
+    return unsafeDirectValue(
+      substitution.type,
+      environment,
+      substitution.substitutions,
+      resolvingAliases
+    )
   }
 
   const interfaceDeclarations = environment.interfaces.get(name)
@@ -281,9 +267,12 @@ function dictionaryValueTypes(
   const substitution = substitutions.get(name)
 
   if (substitution !== undefined) {
-    return isUnappliedReferenceTo(substitution, name)
-      ? []
-      : dictionaryValueTypes(substitution, environment, substitutions, resolvingAliases)
+    return dictionaryValueTypes(
+      substitution.type,
+      environment,
+      substitution.substitutions,
+      resolvingAliases
+    )
   }
 
   if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
@@ -454,8 +443,13 @@ function isBroadMappedKey(
   if (name === null) return false
   const substitution = substitutions.get(name)
 
-  if (substitution !== undefined && !isUnappliedReferenceTo(substitution, name)) {
-    return isBroadMappedKey(substitution, environment, substitutions, visitedAliases)
+  if (substitution !== undefined) {
+    return isBroadMappedKey(
+      substitution.type,
+      environment,
+      substitution.substitutions,
+      visitedAliases
+    )
   }
 
   if (name === "PropertyKey" && isBuiltIn(name, unwrapped, environment)) return true
@@ -472,7 +466,7 @@ function isBroadMappedKey(
   const nextVisited = new Set(visitedAliases)
   nextVisited.add(name)
 
-  return isBroadMappedKey(alias.typeAnnotation, environment, substitutions, nextVisited)
+  return isBroadMappedKey(alias.typeAnnotation, environment, new Map(), nextVisited)
 }
 
 function classifyAliasBroadTarget(
@@ -506,9 +500,12 @@ function classifyAliasBroadTarget(
   const substitution = substitutions.get(name)
 
   if (substitution !== undefined) {
-    return isUnappliedReferenceTo(substitution, name)
-      ? null
-      : classifyAliasBroadTarget(substitution, environment, substitutions, resolvingAliases)
+    return classifyAliasBroadTarget(
+      substitution.type,
+      environment,
+      substitution.substitutions,
+      resolvingAliases
+    )
   }
 
   if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {

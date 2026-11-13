@@ -106,6 +106,10 @@ export const fix = Effect.fn("Toolchain.fix")(function* ({
     }),
   }
 
+  // Lint runs before Oxfmt wraps long lines, so `anti-slop/require-readable-spacing` counts a line
+  // past the print width as multiline. Oxlint applies one pass of fixes, so a fix that causes a new
+  // report still needs a second `fix` until Oxlint repeats its passes:
+  // https://github.com/oxc-project/oxc/issues/16118
   yield* runner.runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])
 })
 

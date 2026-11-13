@@ -33,11 +33,14 @@ tester.run("no-unknown-type-aliases", plugin.rules["no-unknown-type-aliases"], {
       code: "function outer() { type Payload = unknown; }",
       errors: [error],
     },
+    { code: "type Box<T> = T; type Payload = Box<unknown>;", errors: [error] },
+    { code: "type Second<A, B = A> = B; type Payload = Second<unknown>;", errors: [error] },
   ],
   valid: [
     "type User = { readonly id: string };",
     "type Alias = string; type UserId = Alias;",
     "type Payload = string | number;",
     "type Box<T> = { readonly value: T }; type Payload = Box<unknown>;",
+    'import type { Payload } from "./payload"; type Envelope = { kind: "empty" } | Payload; type Reply<Payload> = Envelope | Payload[]; type BatchReply = Reply<unknown>;',
   ],
 })

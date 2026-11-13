@@ -1,7 +1,6 @@
 import type { ESTree, Rule, SourceCode, Variable } from "@oxlint/plugins"
 
 import {
-  classifyUnsafeDictionaryValue,
   classifyWideningTarget,
   createTypeEnvironment,
   isKnownEvidenceExpression,
@@ -113,94 +112,6 @@ function localFunctionForCall(
   const unwrappedInitializer = unwrapExpression(initializer)
 
   return isFunctionExpression(unwrappedInitializer) ? unwrappedInitializer : null
-}
-
-function variableTypeAnnotation(
-  sourceCode: SourceCode,
-  variable: Variable
-): ESTree.TSTypeAnnotation | null {
-  if (variable.defs.length !== 1) return null
-  const [definition] = variable.defs
-
-  if (definition === undefined) return null
-
-  if (
-    definition.type === "Variable"
-    && definition.node.type === "VariableDeclarator"
-    && definition.node.id.type === "Identifier"
-  ) {
-    return definition.node.id.typeAnnotation ?? null
-  }
-
-  if (definition.type !== "Parameter" || !isFunctionExpression(definition.node)) {
-    return null
-  }
-
-  const parameter = definition.node.params.find(
-    (candidate) => functionParameterBindingName(candidate, sourceCode) === variable.name
-  )
-
-  return parameter === undefined ? null : (functionParameterTypeAnnotation(parameter) ?? null)
-}
-
-function hasInformativeType(type: ESTree.TSType, environment: TypeEnvironment): boolean {
-  return classifyUnsafeDictionaryValue(type, environment) === null
-}
-
-function hasKnownCallArgumentEvidence(
-  sourceCode: SourceCode,
-  expression: ESTree.Expression,
-  environment: TypeEnvironment,
-  visitedVariables = new Set<Variable>()
-): boolean {
-  if (expression.type === "ParenthesizedExpression" || expression.type === "TSNonNullExpression") {
-    return hasKnownCallArgumentEvidence(
-      sourceCode,
-      expression.expression,
-      environment,
-      visitedVariables
-    )
-  }
-
-  if (expression.type === "TSAsExpression" || expression.type === "TSTypeAssertion") {
-    return hasInformativeType(expression.typeAnnotation, environment)
-  }
-
-  if (expression.type === "TSSatisfiesExpression") {
-    return hasKnownCallArgumentEvidence(
-      sourceCode,
-      expression.expression,
-      environment,
-      visitedVariables
-    )
-  }
-
-  if (expression.type === "CallExpression") {
-    const owner = localFunctionForCall(sourceCode, expression.callee)
-    const returnType = owner?.returnType?.typeAnnotation
-
-    return returnType !== undefined && hasInformativeType(returnType, environment)
-  }
-
-  if (expression.type !== "Identifier") return isKnownEvidenceExpression(expression)
-  const variable = resolveVariable(sourceCode, expression)
-
-  if (variable === null || visitedVariables.has(variable)) return false
-  const annotation = variableTypeAnnotation(sourceCode, variable)
-
-  if (annotation !== null) {
-    return hasInformativeType(annotation.typeAnnotation, environment)
-  }
-
-  const declarator = variableDeclarator(variable)
-
-  if (!declarator?.init || !isStableConstVariable(variable, declarator)) {
-    return false
-  }
-
-  visitedVariables.add(variable)
-
-  return hasKnownCallArgumentEvidence(sourceCode, declarator.init, environment, visitedVariables)
 }
 
 function typePredicateSubjectIndex(
@@ -345,7 +256,6 @@ const rule: Rule = {
         )
       },
       CallExpression(node) {
-        if (environment === null) return
         const owner = localFunctionForCall(context.sourceCode, node.callee)
 
         if (owner === null) return
@@ -373,9 +283,9 @@ const rule: Rule = {
           return
         }
 
-        if (!hasKnownCallArgumentEvidence(context.sourceCode, argument, environment)) {
-          return
-        }
+        // TypeScript narrows the caller's binding at a guard call, so a declared type, such as
+        // a union, is not evidence. Only a literal or object value makes the guard pointless.
+        if (!hasKnownEvidence(context.sourceCode, argument)) return
 
         context.report({
           data: {

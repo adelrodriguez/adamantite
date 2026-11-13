@@ -44,6 +44,29 @@ export function resolveArrayBinding(
 }
 
 /**
+ * Return the initial value of a `const` binding that no code reassigns, or null for any other
+ * binding.
+ */
+export function constInitializer(variable: Variable): ESTree.Expression | null {
+  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return null
+
+  for (const definition of variable.defs) {
+    if (
+      definition.type === "Variable"
+      && definition.node.type === "VariableDeclarator"
+      && definition.node.id.type === "Identifier"
+      && definition.node.init !== null
+      && definition.node.parent.type === "VariableDeclaration"
+      && definition.node.parent.kind === "const"
+    ) {
+      return definition.node.init
+    }
+  }
+
+  return null
+}
+
+/**
  * Read static method names, including computed string literals, without evaluating expressions.
  */
 export function arrayMethodTarget(
@@ -134,18 +157,7 @@ function isKnownArrayExpressionFrom(
     if (annotation !== undefined) return isArrayAnnotation(annotation)
   }
 
-  for (const definition of variable.defs) {
-    if (
-      definition.type === "Variable"
-      && definition.node.type === "VariableDeclarator"
-      && definition.node.id.type === "Identifier"
-      && definition.node.init !== null
-      && definition.node.parent.type === "VariableDeclaration"
-      && definition.node.parent.kind === "const"
-    ) {
-      return isKnownArrayExpressionFrom(sourceCode, definition.node.init, visited)
-    }
-  }
+  const initializer = constInitializer(variable)
 
-  return false
+  return initializer !== null && isKnownArrayExpressionFrom(sourceCode, initializer, visited)
 }

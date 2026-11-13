@@ -17,9 +17,13 @@ const TSRS_VERSION = "0.21.0-ts7.1.0-beta"
 const TSRS = process.platform === "win32" ? "tsrs.exe" : "tsrs"
 const ARTIFACTS = `node_modules/${PLATFORM_PACKAGE}/artifacts`
 const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }
+
 const STOCK_TARGET = `${process.platform}-${process.arch}${BINDING_SUFFIXES[process.platform] ?? ""}`
+
 const STOCK_BINDING = `node_modules/oxlint/dist/oxlint.${STOCK_TARGET}.node`
+
 const STOCK_TSRS_PACKAGE = `@tsrs/${process.platform}-${process.arch}${process.platform === "linux" ? "-gnu" : ""}`
+
 const STOCK_BACKEND = `node_modules/${STOCK_TSRS_PACKAGE}/${TSRS}`
 
 const STOCK_PACKAGES = {

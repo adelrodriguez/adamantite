@@ -1,16 +1,29 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
+import { readPositiveIntegerOption } from "../../options.ts"
+import { fitsOnOneLine } from "../stylistic/padding-line-ast.ts"
 import createPaddingLineRule from "../stylistic/padding-line-between-statements.ts"
 
 import type { NodeTestObject } from "../stylistic/padding-line-between-statements.ts"
 
 /**
- * A `const`/`let`/`var`/`using` declaration, optionally exported, written on one line.
+ * The `printWidth` of Oxfmt and of the format preset.
  */
-function isSinglelineBinding(node: ESTree.Node): boolean {
+export const DEFAULT_PRINT_WIDTH = 100
+
+/**
+ * A `const`/`let`/`var`/`using` declaration, optionally exported, that stays on one line after
+ * formatting. The semicolon-less style's semicolon on the next line, as in `;[a, b].forEach(f)`,
+ * does not count.
+ */
+function isSinglelineBinding(
+  node: ESTree.Node,
+  sourceCode: SourceCode,
+  printWidth: number
+): boolean {
   const declaration = node.type === "ExportNamedDeclaration" ? node.declaration : node
 
-  return declaration?.type === "VariableDeclaration" && node.loc.start.line === node.loc.end.line
+  return declaration?.type === "VariableDeclaration" && fitsOnOneLine(node, sourceCode, printWidth)
 }
 
 /**
@@ -25,11 +38,12 @@ function hasLeadingComment(node: ESTree.Node, sourceCode: SourceCode): boolean {
 }
 
 const singlelineBinding: NodeTestObject = {
-  test: (node) => isSinglelineBinding(node),
+  test: (node, sourceCode, printWidth) => isSinglelineBinding(node, sourceCode, printWidth),
 }
 
 const undocumentedSinglelineBinding: NodeTestObject = {
-  test: (node, sourceCode) => isSinglelineBinding(node) && !hasLeadingComment(node, sourceCode),
+  test: (node, sourceCode, printWidth) =>
+    isSinglelineBinding(node, sourceCode, printWidth) && !hasLeadingComment(node, sourceCode),
 }
 
 const paddingRule = createPaddingLineRule(
@@ -74,12 +88,20 @@ const paddingRule = createPaddingLineRule(
   {
     "singleline-binding": singlelineBinding,
     "undocumented-singleline-binding": undocumentedSinglelineBinding,
-  }
+  },
+  (context) => readPositiveIntegerOption(context.options, "printWidth") ?? DEFAULT_PRINT_WIDTH
 )
 
 /**
  * Restore structural blank lines with whitespace-only fixes; keep single-line binding groups and
  * overloads grouped.
+ *
+ * `fix` runs lint before Oxfmt, so the rule predicts the lines that Oxfmt writes. A statement on
+ * one line that ends past `printWidth` counts as multiline, because Oxfmt wraps it. If Oxfmt keeps
+ * that line, as for a long template literal, the statement only gets blank lines that the policy
+ * allows. The rule measures the line as written, so it can still miss a wrap when Oxfmt makes the
+ * line longer, for example when it changes `{a:1}` to `{ a: 1 }`, indents the line deeper, or
+ * expands tabs.
  */
 const rule: Rule = {
   ...paddingRule,
@@ -88,7 +110,15 @@ const rule: Rule = {
     docs: {
       description: "Require readable spacing between declarations and logical statement groups.",
     },
-    schema: [],
+    schema: [
+      {
+        additionalProperties: false,
+        properties: {
+          printWidth: { minimum: 1, type: "integer" },
+        },
+        type: "object",
+      },
+    ],
   },
 }
 

@@ -143,6 +143,10 @@ writing files. See ADR 0023.
   the entry `dist/oxlint.js` with `node`, so Oxlint runs with the project's Oxlint runtime.
   `check` fails on Oxlint warnings unless `--allow-warnings` is set. See ADR 0018, ADR 0019,
   and ADR 0022.
+- `fix` runs Oxlint and Oxfmt in two rounds. Oxlint applies one pass of fixes, and the spacing
+  rules read the line breaks that Oxfmt writes, so one round can leave a report that `check`
+  rejects. The first round formats, fixes, and formats again without output. The second round
+  fixes and formats with output, and its exit code is the result. `--only` runs one stage once.
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
 - `init` creates selected integrations and managed scripts. When the user sets up coding agents, it

@@ -158,6 +158,11 @@ adamantite fix --dangerous
 adamantite fix --all
 ```
 
+`fix` runs the two stages in two rounds, because one fix can cause a new report. For example,
+Oxfmt can wrap a line, and the line then needs a blank line before it. The first round shows no
+output. The second round shows the reports that remain. After one `fix`, `adamantite check`
+reports only the problems that `fix` cannot repair.
+
 Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
 both run:
 

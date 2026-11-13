@@ -64,9 +64,11 @@ export const check = Effect.fn("Toolchain.check")(function* ({
 })
 
 /**
- * Fixes lint issues with Oxlint, then formats with Oxfmt. Both stages run, and the operation fails
- * with the first failure. The forwarded arguments go to the lint stage, or to the stage that `only`
- * selects.
+ * Fixes lint issues with Oxlint, then formats with Oxfmt, in two rounds. The first round formats,
+ * fixes, and formats again without output. The second round fixes and formats, and its result is
+ * the result of the operation: both stages run, and the operation fails with the first failure. The
+ * forwarded arguments go to the lint stage, or to the stage that `only` selects, which runs one
+ * time.
  */
 export const fix = Effect.fn("Toolchain.fix")(function* ({
   cwd,
@@ -104,6 +106,19 @@ export const fix = Effect.fn("Toolchain.fix")(function* ({
       forwardedArguments: forwardedStage === "lint" ? forwardedArguments : [],
       level,
     }),
+  }
+
+  // Oxlint applies one pass of fixes, and spacing rules read the line breaks that Oxfmt writes. So
+  // one fix can cause a report that only a second pass sees, such as a blank line that is missing
+  // after `no-else-return` moves a statement, or after Oxfmt wraps a line. The second round reports
+  // the same failures, so the first round ignores its own.
+  if (only === undefined) {
+    yield* Effect.forEach(
+      [stages.format, stages.lint, stages.format],
+      (stage) =>
+        runner.exitCode({ ...stage, stderr: "ignore", stdout: "ignore" }).pipe(Effect.ignore),
+      { discard: true }
+    )
   }
 
   yield* runner.runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])

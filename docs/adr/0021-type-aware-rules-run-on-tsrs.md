@@ -59,7 +59,9 @@ gives `tsrs-lint` priority over `tsgolint`. On Windows, they look for `tsrs-lint
 - The entry now looks for the launcher with that search on every platform, as
   `node_modules/.bin/tsrs-lint` outside Windows. Doctor checks the launcher that it finds, so Doctor
   and Oxlint agree on the backend.
-- Outside Windows, the entry sets no variable, and Oxlint finds the launcher. A run on macOS with
+- Outside Windows, the entry sets no variable, and Oxlint finds the launcher. The entry removes an
+  inherited `OXLINT_TSGOLINT_PATH`, such as a path to an old tsgolint, because Oxlint prefers it to
+  its own search. Before this update, the entry replaced that value with the launcher. A run on macOS with
   Oxlint 1.93.0 and tsrs 0.25.0 found it from the project root and from a workspace package. The
   smoke test lints a type error with the real tsrs on Linux in CI and on macOS.
 - On Windows, the entry still sets `OXLINT_TSGOLINT_PATH`. The upstream change was tested only

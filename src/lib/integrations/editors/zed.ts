@@ -319,15 +319,26 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
   return Object.fromEntries([...Object.entries(config), ["languages", languages]])
 }
 
-function removeAstroSettings(config: Schema.JsonObject): Schema.JsonObject {
+/**
+ * The Astro entry that update writes: Adamantite's Oxfmt setup when the project has none or keeps
+ * Adamantite's old Prettier setup, and otherwise the project's own entry as it is. Zed uses an
+ * explicit `formatter` before Prettier, so merging Oxfmt into a changed entry would stop the
+ * project's Prettier plugins.
+ */
+function setAstroSettings(
+  config: Schema.JsonObject,
+  existing: Schema.JsonObject
+): Schema.JsonObject {
+  const current = checkIsJsonObject(existing.languages) ? existing.languages["Astro"] : undefined
+
+  const astro =
+    current === undefined || checkHasPrettierAstro(existing) ? CONFIG.languages.Astro : current
+
   const languages = checkIsJsonObject(config.languages) ? config.languages : {}
 
   return Object.fromEntries([
     ...Object.entries(config),
-    [
-      "languages",
-      Object.fromEntries(Object.entries(languages).filter(([name]) => name !== "Astro")),
-    ],
+    ["languages", Object.fromEntries([...Object.entries(languages), ["Astro", astro]])],
   ])
 }
 
@@ -501,16 +512,14 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      // The project's values win, except an Astro setup that Adamantite wrote itself.
-      // `setOxlintBinary` and `setEffectSettings` then set only the values that the assessment
-      // checks.
-      const preferred = checkHasPrettierAstro(existingConfig)
-        ? removeAstroSettings(existingConfig)
-        : existingConfig
-
-      const mergedConfig = yield* mergeConfig({ fallback: CONFIG, preferred })
+      // The project's values win. `setAstroSettings`, `setOxlintBinary`, and `setEffectSettings`
+      // then set only the values that they own.
+      const mergedConfig = yield* mergeConfig({ fallback: CONFIG, preferred: existingConfig })
       const effect = yield* readEffectEditor(cwd)
-      const base = setOxlintBinary(deduplicateManagedFormatters(mergedConfig))
+
+      const base = setOxlintBinary(
+        deduplicateManagedFormatters(setAstroSettings(mergedConfig, existingConfig))
+      )
 
       const newConfig = Option.isSome(effect)
         ? yield* setEffectSettings(cwd, base, effect.value.rulesCustomization)

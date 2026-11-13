@@ -4,6 +4,8 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import process from "node:process"
 import { promisify } from "node:util"
+import * as EffectArray from "effect/Array"
+import * as Order from "effect/Order"
 import { parseSync } from "oxc-parser"
 
 // Copy the anti-slop rules of the strict preset into the first-party plugin, from the upstream
@@ -47,10 +49,14 @@ interface Edit {
   readonly text: string
 }
 
+// Apply edits from the end of the file, so each edit keeps the offsets of the edits before it.
+const byStartDescending = Order.flip(Order.mapInput(Order.Number, (edit: Edit) => edit.start))
+
 function applyEdits(source: string, edits: readonly Edit[]) {
-  return edits
-    .toSorted((left, right) => right.start - left.start)
-    .reduce((text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end), source)
+  return EffectArray.sort(edits, byStartDescending).reduce(
+    (text, edit) => text.slice(0, edit.start) + edit.text + text.slice(edit.end),
+    source
+  )
 }
 
 /**
@@ -108,7 +114,7 @@ function convertRule(file: string, source: string) {
     })
   }
 
-  const ruleImport = `import type { ${[...typeNames].toSorted().join(", ")} } from "@oxlint/plugins"`
+  const ruleImport = `import type { ${EffectArray.sort(typeNames, Order.String).join(", ")} } from "@oxlint/plugins"`
 
   return applyEdits(source, edits)
     .replace("IMPORT", ruleImport)
@@ -149,55 +155,47 @@ RuleTester.itOnly = it.only
     .replaceAll("padding-line-options.d.ts", "padding-line-options.ts")
 }
 
-async function listFiles(directory: string) {
-  const entries = await readdir(directory)
+async function readFolder(directory: string) {
+  const files = EffectArray.sort(await readdir(directory), Order.String)
 
-  return entries.toSorted()
+  return Promise.all(
+    files.map(async (file) => ({
+      file,
+      source: await readFile(path.join(directory, file), "utf8"),
+    }))
+  )
 }
 
 async function copyUpstream(cloneDir: string) {
   const output = new Map<string, string>()
-  const rulesDir = path.join(cloneDir, "src/rules")
 
-  for (const file of await listFiles(rulesDir)) {
+  for (const { file, source } of await readFolder(path.join(cloneDir, "src/rules"))) {
     const name = file.replace(/(?:\.test)?\.ts$/u, "")
 
     if (selected.size > 0 && !selected.has(name)) {
       continue
     }
 
-    const source = await readFile(path.join(rulesDir, file), "utf8")
-
-    if (file.endsWith(".test.ts")) {
-      if (!SKIPPED_TESTS.has(file)) {
-        output.set(path.join(TEST_DIR, file), convertTest(source))
-      }
-
-      continue
+    if (!file.endsWith(".test.ts")) {
+      output.set(path.join(PLUGIN_DIR, "rules", file), convertRule(file, source))
+    } else if (!SKIPPED_TESTS.has(file)) {
+      output.set(path.join(TEST_DIR, file), convertTest(source))
     }
-
-    output.set(path.join(PLUGIN_DIR, "rules", file), convertRule(file, source))
   }
 
   if (selected.size > 0) {
     return output
   }
 
-  const sharedDir = path.join(cloneDir, "src/shared")
-
-  for (const file of await listFiles(sharedDir)) {
-    output.set(
-      path.join(PLUGIN_DIR, "shared", file),
-      await readFile(path.join(sharedDir, file), "utf8")
-    )
+  for (const { file, source } of await readFolder(path.join(cloneDir, "src/shared"))) {
+    output.set(path.join(PLUGIN_DIR, "shared", file), source)
   }
 
   // The options module is only types, so it becomes a `.ts` module that the build emits with the
   // rule that imports it.
-  const stylisticDir = path.join(cloneDir, "src/vendor/eslint-stylistic")
-
-  for (const file of await listFiles(stylisticDir)) {
-    const source = await readFile(path.join(stylisticDir, file), "utf8")
+  for (const { file, source } of await readFolder(
+    path.join(cloneDir, "src/vendor/eslint-stylistic")
+  )) {
     const target = file === "LICENSE" ? "license.md" : file.replace(/\.d\.ts$/u, ".ts")
 
     output.set(
@@ -233,17 +231,19 @@ try {
 
   const output = await copyUpstream(cloneDir)
 
-  for (const [file, content] of output) {
-    if (write) {
-      await mkdir(path.dirname(file), { recursive: true })
-      await writeFile(file, content)
-    }
+  if (write) {
+    await Promise.all(
+      [...output].map(async ([file, content]) => {
+        await mkdir(path.dirname(file), { recursive: true })
+        await writeFile(file, content)
+      })
+    )
 
-    console.info(`${write ? "wrote" : "would write"} ${path.relative(root, file)}`)
+    await run("node_modules/.bin/oxfmt", [...output.keys()], root)
   }
 
-  if (write) {
-    await run("node_modules/.bin/oxfmt", [...output.keys()], root)
+  for (const file of output.keys()) {
+    console.info(`${write ? "wrote" : "would write"} ${path.relative(root, file)}`)
   }
 } finally {
   await rm(cloneDir, { force: true, recursive: true })

@@ -19,13 +19,15 @@ export function isNumberLiteral(node: ESTree.Node): node is ESTree.NumericLitera
 
 /**
  * Return the name that a property key spells without computing it, such as `get` in `Reflect.get`,
- * `Reflect["get"]`, ``Reflect[`get`]``, or `const { get } = Reflect`. Return null when an
- * expression gives the name.
+ * `Reflect["get"]`, ``Reflect[`get`]``, or `const { get } = Reflect`, and `"0"` in `{ 0: value }`
+ * or `{ [0]: value }`. Return null when an expression gives the name.
  */
 export function staticKeyName(key: ESTree.Node, computed: boolean): string | null {
   if (!computed && key.type === "Identifier") return key.name
 
   if (isStringLiteral(key)) return key.value
+
+  if (isNumberLiteral(key)) return String(key.value)
 
   if (computed && key.type === "TemplateLiteral" && key.expressions.length === 0) {
     return key.quasis[0]?.value.cooked ?? null

@@ -20,3 +20,4 @@ To upgrade an existing project:
 - Run `adamantite update` to install the new versions.
 - In a project with the effect preset, expect `adamantite check` to report `Effect.all` and `Effect.forEach` calls without a `concurrency` option. Add `{ concurrency: 1 }` to keep the current order, or set the concurrency that the code needs.
 - In a Vue project, expect `adamantite fix` to format `.vue` files differently. Oxfmt 0.77.0 formats them with its own formatter instead of Prettier (oxc-project/oxc#28848).
+- In an Astro project, expect `adamantite fix` to format `.astro` files. The format preset turns on Oxfmt's `astro` option, and Zed and VS Code format Astro files with Oxfmt. Oxfmt needs `@astrojs/compiler-rs`, which Astro 7 and later install. In an Astro 5 or 6 project, Oxfmt fails on `.astro` files, and Doctor reports it. Update Astro to 7. Run `adamantite init` with your editors to move Zed's Astro setup from Prettier to Oxfmt.

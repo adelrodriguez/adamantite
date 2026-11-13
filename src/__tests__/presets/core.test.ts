@@ -174,6 +174,24 @@ describe("core preset", () => {
     expect(codes).toStrictEqual([])
   })
 
+  // A copy of a `reduce` accumulator with fixed keys cannot grow. `oxc/no-accumulating-spread`
+  // reports the spread form, so core must accept the `Object.assign({}, …)` form.
+  it("accept an Object.assign copy of a reduce accumulator", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "const items = [{ n: 1 }, { n: 2 }]",
+        "",
+        "export const total = items.reduce((acc, item) => Object.assign({}, acc, { sum: acc.sum + item.n }), {",
+        "  sum: 0,",
+        "})",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
+
   // `eslint/no-empty-function` reports `() => {}`, and `eslint/array-callback-return` and
   // `eslint/no-useless-return` report a bare `return` in a `map` callback. Core must accept the
   // explicit `undefined` that these rules need.

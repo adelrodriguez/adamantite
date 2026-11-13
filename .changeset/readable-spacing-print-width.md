@@ -1,5 +1,5 @@
 ---
-"adamantite": patch
+"adamantite": minor
 ---
 
 Count a line past the print width as multiline in `require-readable-spacing`

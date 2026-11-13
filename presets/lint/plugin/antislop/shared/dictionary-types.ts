@@ -20,9 +20,18 @@ const BUILT_INS = new Set([
   "Omit",
   "PropertyKey",
   "NonNullable",
+  "Uppercase",
+  "Lowercase",
+  "Capitalize",
+  "Uncapitalize",
 ])
 
 const TRANSPARENT_WRAPPERS = new Set(["Readonly", "Partial", "Required", "NonNullable"])
+
+/**
+ * The built-in string types that map each key to one key, so the key set keeps its size.
+ */
+const KEY_CASE_CHANGES = new Set(["Uppercase", "Lowercase", "Capitalize", "Uncapitalize"])
 
 /**
  * The type argument bound to each type parameter, with the substitutions of the place that wrote
@@ -155,11 +164,21 @@ function keyBreadth(
     )
   }
 
+  // A template over finite parts, such as `get${"a" | "b"}`, has finite keys. The rule does not
+  // read the keys of other templates.
+  if (unwrapped.type === "TSTemplateLiteralType") {
+    return unwrapped.types.every(
+      (part) => keyBreadth(part, environment, substitutions, visitedAliases) === "finite"
+    )
+      ? "finite"
+      : "unresolved"
+  }
+
   if (unwrapped.type !== "TSTypeReference") return "unresolved"
   const reference = namedTypeReference(unwrapped)
 
   if (reference === null) return "unresolved"
-  const { name } = reference
+  const { name, typeArguments } = reference
   const substitution = substitutionFor(reference, substitutions)
 
   if (substitution !== undefined) {
@@ -167,6 +186,15 @@ function keyBreadth(
   }
 
   if (isBuiltIn(reference, "PropertyKey", environment)) return "broad"
+
+  if (KEY_CASE_CHANGES.has(name) && isBuiltIn(reference, name, environment)) {
+    const [key] = typeArguments
+
+    return key === undefined
+      ? "unresolved"
+      : keyBreadth(key, environment, substitutions, visitedAliases)
+  }
+
   const alias = localAlias(reference, environment)
 
   if (alias === null || hasTypeParameters(alias) || visitedAliases.has(name)) return "unresolved"
@@ -188,6 +216,23 @@ function recordKeyBreadth(
   const [key] = reference.typeArguments
 
   return key === undefined ? "broad" : keyBreadth(key, environment, substitutions)
+}
+
+/**
+ * Return the breadth of the keys of a mapped type. An `as` clause, as in `[K in Kind as
+ * Uppercase<K>]`, names the keys, and it sees the key parameter as its constraint. The clause can
+ * map each key to any key, so only a finite clause keeps the keys finite.
+ */
+function mappedKeyBreadth(
+  type: ESTree.TSMappedType,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment
+): KeyBreadth {
+  if (type.nameType === null) return keyBreadth(type.constraint, environment, substitutions)
+  const keySubstitutions = new Map(substitutions)
+  keySubstitutions.set(type.key.name, { substitutions, type: type.constraint })
+
+  return keyBreadth(type.nameType, environment, keySubstitutions) === "finite" ? "finite" : "broad"
 }
 
 function unwrapTransparentType(type: ESTree.TSType): ESTree.TSType {
@@ -357,7 +402,7 @@ function dictionaryValueTypes(
 
   if (unwrapped.type === "TSMappedType") {
     return unwrapped.typeAnnotation === null
-      || keyBreadth(unwrapped.constraint, environment, substitutions) === "finite"
+      || mappedKeyBreadth(unwrapped, environment, substitutions) === "finite"
       ? []
       : [{ substitutions, type: unwrapped.typeAnnotation }]
   }
@@ -548,7 +593,7 @@ export function classifyWideningTarget(
   }
 
   if (unwrapped.type === "TSMappedType") {
-    return keyBreadth(unwrapped.constraint, environment, new Map()) === "broad"
+    return mappedKeyBreadth(unwrapped, environment, new Map()) === "broad"
       ? { kind: "open dictionary" }
       : null
   }
@@ -618,7 +663,7 @@ function classifyAliasBroadTarget(
   }
 
   if (unwrapped.type === "TSMappedType") {
-    return keyBreadth(unwrapped.constraint, environment, substitutions) === "broad"
+    return mappedKeyBreadth(unwrapped, environment, substitutions) === "broad"
       ? { kind: "open dictionary" }
       : null
   }

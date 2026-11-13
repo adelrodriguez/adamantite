@@ -1,5 +1,6 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
 import { isStringLiteral } from "./literals.ts"
+import { constBinding } from "./scope.ts"
 
 /**
  * Unwrap syntax-only wrappers when inspecting array methods and accumulator references.
@@ -48,22 +49,9 @@ export function resolveArrayBinding(
  * binding.
  */
 export function constInitializer(variable: Variable): ESTree.Expression | null {
-  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return null
+  const binding = constBinding(variable)
 
-  for (const definition of variable.defs) {
-    if (
-      definition.type === "Variable"
-      && definition.node.type === "VariableDeclarator"
-      && definition.node.id.type === "Identifier"
-      && definition.node.init !== null
-      && definition.node.parent.type === "VariableDeclaration"
-      && definition.node.parent.kind === "const"
-    ) {
-      return definition.node.init
-    }
-  }
-
-  return null
+  return binding?.id.type === "Identifier" ? binding.init : null
 }
 
 /**

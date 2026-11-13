@@ -1,5 +1,7 @@
 import type { ESTree, Rule, Variable } from "@oxlint/plugins"
 
+import { namedTypeReference } from "../shared/type-alias-resolution.ts"
+
 type BroadTypeKind = "top" | "object" | "record"
 
 type KnownValueEvidence = {
@@ -30,8 +32,11 @@ function unwrapTypeParentheses(type: ESTree.TSType): ESTree.TSType {
   return current
 }
 
+/**
+ * Return the name of a type reference, as `Record` in `Record<K, V>` or `globalThis.Record<K, V>`.
+ */
 function typeReferenceName(type: ESTree.TSTypeReference): string | null {
-  return type.typeName.type === "Identifier" ? type.typeName.name : null
+  return namedTypeReference(type)?.name ?? null
 }
 
 function isUnknownOrAnyType(type: ESTree.TSType): boolean {

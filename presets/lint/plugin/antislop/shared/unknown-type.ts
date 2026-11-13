@@ -3,6 +3,7 @@ import type { ESTree } from "@oxlint/plugins"
 import { childNodes, type VisitorKeys } from "./child-nodes.ts"
 import {
   hasVisibleTypeBinding,
+  namedTypeReference,
   resolvedTypeMatches,
   type TypeAliasEnvironment,
 } from "./type-alias-resolution.ts"
@@ -37,16 +38,12 @@ function builtInTypeName(
   type: ESTree.TSTypeReference,
   environment: TypeAliasEnvironment
 ): string | null {
-  const name = type.typeName
+  const reference = namedTypeReference(type)
 
-  if (name.type === "Identifier") {
-    return hasVisibleTypeBinding(name.name, type, environment) ? null : name.name
-  }
+  if (reference === null) return null
 
-  return name.type === "TSQualifiedName"
-    && name.left.type === "Identifier"
-    && name.left.name === "globalThis"
-    ? name.right.name
+  return reference.global || !hasVisibleTypeBinding(reference.name, type, environment)
+    ? reference.name
     : null
 }
 

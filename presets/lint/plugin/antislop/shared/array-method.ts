@@ -1,6 +1,7 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
 import { isStringLiteral } from "./literals.ts"
 import { constBinding } from "./scope.ts"
+import { namedTypeReference } from "./type-alias-resolution.ts"
 
 /**
  * Unwrap syntax-only wrappers when inspecting array methods and accumulator references.
@@ -76,6 +77,8 @@ export function arrayMethodTarget(
   return null
 }
 
+const ARRAY_TYPES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"])
+
 function isArrayAnnotation(type: ESTree.TSType): boolean {
   if (type.type === "TSArrayType" || type.type === "TSTupleType") return true
 
@@ -85,11 +88,10 @@ function isArrayAnnotation(type: ESTree.TSType): boolean {
     return isArrayAnnotation(type.typeAnnotation)
   }
 
-  return (
-    type.type === "TSTypeReference"
-    && type.typeName.type === "Identifier"
-    && (type.typeName.name === "Array" || type.typeName.name === "ReadonlyArray")
-  )
+  if (type.type !== "TSTypeReference") return false
+  const reference = namedTypeReference(type)
+
+  return reference !== null && ARRAY_TYPES.has(reference.name)
 }
 
 /**

@@ -1,0 +1,229 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
+import plugin from "#presets/lint/plugins/anti-slop/index.ts"
+
+RuleTester.describe = describe
+
+RuleTester.it = it
+
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+
+const error = { messageId: "widening" }
+
+const prelude = "type Command = () => void; const startCommand = () => {};"
+
+tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
+  invalid: [
+    { code: "const value: unknown = {};", errors: [error] },
+    { code: "const value: object = {};", errors: [error] },
+    { code: "let value: unknown; value = {};", errors: [error] },
+    { code: "function create(): unknown { return {}; }", errors: [error] },
+    {
+      code: `${prelude} const commands: Record<string, Command> = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const commands: { [key: string]: Command } = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const commands: { [K in string]: Command } = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const commands: { start: Command } = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const commands = { start: startCommand } as Record<string, Command>;`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const commands = ({ start: startCommand } as Record<string, Command>) as object;`,
+      errors: 1,
+    },
+    {
+      code: `${prelude} class Registry { commands: Record<string, Command> = { start: startCommand }; }`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} let commands: Record<string, Command>; commands = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} function create(): Record<string, Command> { return { start: startCommand }; }`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} function create(): { start: Command } { return { start: startCommand }; }`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const source = { start: startCommand }; const commands: Record<string, Command> = source;`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Open = Record<string, Command>; const source = { start: startCommand }; const commands: Open = source;`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Open = { [key: string]: Command }; const source = { start: startCommand }; const commands: Open = source;`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Open = { [key in string]: Command }; const source = { start: startCommand }; const commands: Open = source;`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Open = Readonly<Record<string, Command>>; const source = { start: startCommand }; const commands: Open = source;`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} function outer() { type Open = Record<string, Command>; const commands: Open = { start: startCommand }; }`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Index<T> = Record<string, T>; const commands: Index<Command> = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Identity<T> = T; const commands: Identity<Record<string, Command>> = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Index<T> = Record<string, T>; type CommandsByName = Index<Command>; const commands: CommandsByName = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Index<T = Command> = Record<string, T>; const commands: Index = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} type Key = string; const commands: Record<Key, Command> = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const commands: Record<PropertyKey, Command> = { start: startCommand };`,
+      errors: [error],
+    },
+    {
+      code: `${prelude} const commands: Record<string | 'start', Command> = { start: startCommand };`,
+      errors: [error],
+    },
+    { code: "const value: unknown = 1;", errors: [error] },
+    { code: "const value: object = [];", errors: [error] },
+    {
+      code: "function isString(value: unknown): value is string { return true; } isString('known');",
+      errors: [error],
+    },
+    {
+      code: "function isString(value: unknown): value is string { return true; } const known = 'known'; isString(known);",
+      errors: [error],
+    },
+    {
+      code: "function isString(value: string | unknown): value is string { return true; } isString('known');",
+      errors: [error],
+    },
+    {
+      code: "type User = { readonly id: string }; function isUser(value: unknown): value is User { return true; } isUser({ id: 'known' });",
+      errors: [error],
+    },
+    {
+      code: "function assertDefined(value: unknown): asserts value is NonNullable<unknown> {} assertDefined('known');",
+      errors: [error],
+    },
+    // A named interface with an index signature is as open as a named alias to a dictionary.
+    {
+      code: "interface ScoreMap { [name: string]: number } const scores: ScoreMap = { alice: 1 };",
+      errors: [error],
+    },
+    {
+      code: "interface ScoreMap { readonly [name: string]: number } type Scores = ScoreMap; const scores: Scores = { alice: 1 };",
+      errors: [error],
+    },
+    {
+      code: "interface ScoreMap extends Record<string, number> {} const scores: ScoreMap = { alice: 1 };",
+      errors: [error],
+    },
+    {
+      code: "interface Bag<T> { [key: string]: T } const scores: Bag<number> = { alice: 1 };",
+      errors: [error],
+    },
+    {
+      code: "function outer() { interface ScoreMap { [name: string]: number } const scores: ScoreMap = { alice: 1 }; }",
+      errors: [error],
+    },
+    // A named interface passes its type arguments to the types it extends, as an alias does.
+    {
+      code: "interface Dict<K extends string, V> extends Record<K, V> {} const d: Dict<string, number> = { a: 1 };",
+      errors: [error],
+    },
+    {
+      code: "interface Dict<K extends string = string, V = number> extends Record<K, V> {} const d: Dict = { a: 1 };",
+      errors: [error],
+    },
+    {
+      code: "type Key = string; interface Dict<V, K extends string = Key> extends Readonly<Record<K, V>> {} const d: Dict<number> = { a: 1 };",
+      errors: [error],
+    },
+    // An `as` clause names the keys of a mapped type, so its keys decide whether the type is open.
+    { code: "const scores: { [K in 'seed' as string]: number } = { alice: 1 };", errors: [error] },
+    {
+      code: "type Scores = { [K in 'seed' as string]: number }; const other: Scores = { alice: 1 };",
+      errors: [error],
+    },
+    {
+      code: "import type { Key } from './key'; const scores: { [K in 'seed' as Key]: number } = { alice: 1 };",
+      errors: [error],
+    },
+  ],
+  valid: [
+    `${prelude} const commands: Record<string, Command> = {};`,
+    `${prelude} type Index<T> = Record<string, T>; const commands: Index<Command> = {};`,
+    `${prelude} import type { Key } from "./key"; type Name = Key; type Index<Key> = { [K in Name]: Command }; const commands: Index<string> = { start: startCommand };`,
+    `${prelude} class Registry { commands: Record<string, Command> = {}; }`,
+    `${prelude} class Registry { accessor commands: Record<string, Command> = {}; }`,
+    `${prelude} let commands: Record<string, Command>; commands = {};`,
+    `${prelude} function create(): Record<string, Command> { return {}; }`,
+    `${prelude} const create = (): Record<string, Command> => ({});`,
+    `${prelude} const commands = {} as Record<string, Command>;`,
+    `${prelude} const commands = <Record<string, Command>>{};`,
+    `${prelude} const commands = { start: startCommand };`,
+    `${prelude} const commands = { start: startCommand } as const;`,
+    `${prelude} const commands = { start: startCommand } satisfies Record<string, Command>;`,
+    `${prelude} type Commands = Record<string, Command>; const commands = { start: startCommand } as const satisfies Commands;`,
+    `${prelude} interface Commands { readonly start: Command } const commands: Commands = { start: startCommand };`,
+    `${prelude} type Commands = { readonly start: Command }; const commands: Commands = { start: startCommand };`,
+    `${prelude} type PermissionLevels = { readonly [Level in Permission]: number }; const levels: PermissionLevels = { admin: 1 };`,
+    `${prelude} function create() { return { start: startCommand }; }`,
+    `${prelude} interface Commands { readonly start: Command } function create(): Commands { return { start: startCommand }; }`,
+    `${prelude} declare function make(): Record<string, Command>; const commands: Record<string, Command> = make();`,
+    `${prelude} import { Commands } from './types'; const commands: Commands = { start: startCommand };`,
+    `${prelude} type Diet = 'vegan' | 'omnivore'; const labels: Record<Diet, string> = { vegan: 'V', omnivore: 'O' };`,
+    `${prelude} type Diet = 'vegan' | 'omnivore'; type Labels = Record<Diet, string>; const labels: Labels = { vegan: 'V', omnivore: 'O' };`,
+    `${prelude} type Diet = 'vegan' | 'omnivore'; const labels: Readonly<Record<Diet, string>> = { vegan: 'V', omnivore: 'O' };`,
+    `${prelude} const labels: Record<'a' | 'b', number> = { a: 1, b: 2 };`,
+    // A finite key set makes a mapped type a closed contract, as it does for `Record`.
+    "type Kind = 'a' | 'b'; const counts: { [K in Kind]: number } = { a: 1, b: 2 };",
+    "const counts: { readonly [K in 'a' | 'b']: number } = { a: 1, b: 2 };",
+    `type Kind = 'a' | 'b'; const getters: { [K in Kind as \`get\${K}\`]: number } = { geta: 1, getb: 2 };`,
+    "interface ScoreMap { [name: string]: number } const scores: ScoreMap = {};",
+    "interface Dict<K extends string, V> extends Record<K, V> {} const d: Dict<'a' | 'b', number> = { a: 1, b: 2 };",
+    `${prelude} type Index<Key extends PropertyKey, Value> = Record<Key, Value>; const commands: Index<'start', Command> = { start: startCommand };`,
+    "function isString(value: unknown): value is string { return true; } declare const input: unknown; isString(input);",
+    "function isString(value: string | unknown): value is string { return true; } declare const input: string | unknown; isString(input);",
+    "function isString(value: unknown): value is string { return true; } declare function readInput(): unknown; isString(readInput());",
+    // TypeScript narrows the caller's binding at a guard call, so a declared type is not widened.
+    "function isString(value: unknown): value is string { return typeof value === 'string'; } export function label(input: string | number) { return isString(input) ? input : input.toFixed(2); }",
+    "function assertDefined(value: unknown): asserts value is NonNullable<unknown> {} export function use(input: string | undefined) { assertDefined(input); return input; }",
+    "function isString(value: unknown): value is string { return true; } type Input = string | number; export function label(input: Input) { return isString(input); }",
+    "function assertDefined(value: unknown): asserts value is NonNullable<unknown> {} export function use(input?: string) { assertDefined(input); }",
+    "function isString(value: unknown): value is string { return true; } export function label<T>(input: T) { return isString(input); }",
+    "type Animal = { readonly name: string }; type Dog = Animal & { readonly bark: () => void }; function isDog(value: unknown): value is Dog { return true; } export function check(animal: Animal) { return isDog(animal); }",
+    "function isString(value: unknown): value is string { return true; } function check(known: string): boolean { return isString(known); }",
+    "const isString = (value: unknown): value is string => true; const known: string = getValue(); isString(known);",
+    "type User = { readonly id: string }; function isUser(value: unknown): value is User { return true; } function parse(): User | null { return null; } const user = parse(); isUser(user);",
+  ],
+})

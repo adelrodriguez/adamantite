@@ -19,12 +19,12 @@ import type { OxlintConfig } from "oxlint"
 // The preset also loads the anti-slop-effect plugin, which reports tagged values that code handles
 // by hand instead of with Effect's tagged constructors, `Match`, and `catchTag`. Its rules started
 // as a copy of the Effect rules of https://github.com/dmmulroy/anti-slop and now live in
-// plugin/anti-slop-effect/ as first-party code. They keep the `anti-slop-effect` namespace, so
+// plugins/anti-slop-effect/ as first-party code. They keep the `anti-slop-effect` namespace, so
 // project settings and suppressions keep working. The preset targets Effect codebases, so it
 // enables every rule of the plugin.
 //
-// The source tree holds `plugin/anti-slop-effect/index.ts` and the dist tree holds
-// `plugin/anti-slop-effect/index.js`, so the plugin extension follows the extension of this module.
+// The source tree holds `plugins/anti-slop-effect/index.ts` and the dist tree holds
+// `plugins/anti-slop-effect/index.js`, so the plugin extension follows the extension of this module.
 // Oxlint loads a TypeScript plugin only in the source tree, where Node.js strips the types.
 const PLUGIN_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 
@@ -32,7 +32,8 @@ const config: OxlintConfig = {
   jsPlugins: [
     {
       name: "anti-slop-effect",
-      specifier: new URL(`plugin/anti-slop-effect/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
+      specifier: new URL(`plugins/anti-slop-effect/index.${PLUGIN_EXTENSION}`, import.meta.url)
+        .href,
     },
   ],
   options: {

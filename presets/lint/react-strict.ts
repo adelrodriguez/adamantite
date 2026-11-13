@@ -6,7 +6,7 @@ import type { OxlintConfig } from "oxlint"
 // React Doctor also checks state and effect misuse in hook modules. Its managed package stays
 // in the target project. Init installs the pinned version, and Doctor and update maintain it.
 //
-// The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
+// The source tree holds `plugins/index.ts` and the dist tree holds `plugins/index.js`, so the plugin
 // extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the
 // source tree, where Node.js strips the types.
 const PLUGIN_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
@@ -16,7 +16,7 @@ const config: OxlintConfig = {
     "oxlint-plugin-react-doctor",
     {
       name: "adamantite",
-      specifier: new URL(`plugin/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
+      specifier: new URL(`plugins/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
     },
   ],
   rules: {

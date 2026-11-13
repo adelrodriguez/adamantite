@@ -87,7 +87,7 @@ export default defineConfig({
       },
       {
         import: "oxc-resolver",
-        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/shared/resolver.ts"],
+        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugins/shared/resolver.ts"],
       },
       // Commands run tools through Toolchain. Only the lifecycle commands `init` and `update` use
       // the tooling integrations directly.
@@ -166,7 +166,7 @@ export default defineConfig({
           rules: { imports: ["shared"] },
           shared: { imports: [] },
         },
-        root: "presets/lint/plugin",
+        root: "presets/lint/plugins",
       },
     ],
     // Repository suppressions use `@ts-expect-error - reason`, so the format belongs in the check.

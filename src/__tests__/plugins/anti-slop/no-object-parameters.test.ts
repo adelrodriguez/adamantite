@@ -1,0 +1,94 @@
+import { RuleTester } from "oxlint/plugins-dev"
+import { describe, it } from "vitest"
+import plugin from "#presets/lint/plugins/anti-slop/index.ts"
+
+RuleTester.describe = describe
+
+RuleTester.it = it
+
+RuleTester.itOnly = it.only
+
+const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
+const error = { messageId: "objectParameter" }
+
+tester.run("no-object-parameters", plugin.rules["no-object-parameters"], {
+  invalid: [
+    { code: "function f(value: object) {}", errors: [error] },
+    // The message names the fixes that work, such as `WeakKey` for a weak collection key.
+    {
+      code: "declare const records: WeakMap<object, string>; function getEvaluatorRecord(evaluator: object) { return records.get(evaluator); }",
+      errors: [
+        {
+          message:
+            "Parameter `evaluator` uses the broad `object` type. Use a named domain type, `WeakKey` for a WeakMap or WeakSet key, or a generic `<T extends object>` that keeps the caller's type.",
+        },
+      ],
+    },
+    { code: "type Alias = object; function f(value: Alias) {}", errors: [error] },
+    { code: "type Alias = (object); function f(value: Alias) {}", errors: [error] },
+    {
+      code: "type Item = object; type Fallback<Input> = Input extends infer Item ? string : (value: Item) => void;",
+      errors: [error],
+    },
+    {
+      code: "function consume(value: object = {}): void {}",
+      errors: [{ ...error, data: { parameter: "value" } }],
+    },
+    {
+      code: "function consume({ value }: object = {}): void {}",
+      errors: [{ ...error, data: { parameter: "{ value }" } }],
+    },
+    {
+      code: "type Bag = object; function consume({ value }: Bag): void {}",
+      errors: [{ ...error, data: { parameter: "{ value }" } }],
+    },
+    {
+      code: "function outer() { type Payload = object; function consume(value: Payload) {} }",
+      errors: [error],
+    },
+    {
+      code: "function outer() { function consume(value: Payload) {} type Payload = object; }",
+      errors: [error],
+    },
+    {
+      code: "type Identity<T> = T; function consume(value: Identity<object>) {}",
+      errors: [error],
+    },
+    {
+      code: "type Identity<T> = T; type Wrapped<T> = Identity<T>; function consume(value: Wrapped<object>) {}",
+      errors: [error],
+    },
+    // `Readonly`, `NonNullable`, and an intersection with `{}` leave `object` as broad as before.
+    { code: "function visit(node: Readonly<object>) {}", errors: [error] },
+    { code: "function visit(node: NonNullable<object>) {}", errors: [error] },
+    { code: "function visit(node: globalThis.Readonly<object>) {}", errors: [error] },
+    { code: "function visit(node: Readonly<NonNullable<object>> | null) {}", errors: [error] },
+    { code: "type Node = Readonly<object>; function visit(node: Node) {}", errors: [error] },
+    { code: "function visit(node: object & {}) {}", errors: [error] },
+    { code: "function visit(node: {} & object & {}) {}", errors: [error] },
+    { code: "type Empty = {}; function visit(node: object & Empty) {}", errors: [error] },
+  ],
+  valid: [
+    "declare const records: WeakMap<WeakKey, string>; function getEvaluatorRecord(evaluator: WeakKey) { return records.get(evaluator); }",
+    "type Alias = object;",
+    "function f(value: Alias) {}",
+    "interface Owner { readonly id: string } function f(value: Owner) {}",
+    "function f<Value>(value: Value) {}",
+    "function f<Value extends object>(value: Value) {}",
+    "function f<Value extends Owner, Owner extends { readonly id: string }>(value: Value) {}",
+    "type Owner = { readonly id: string }; function f<Value extends Owner>(value: Value) {}",
+    "type Alias = object; function consume<Alias>(value: Alias) {}",
+    "type Alias = object; type Consumer<Alias> = (value: Alias) => void;",
+    "type Alias = object; interface Consumer<Alias> { consume(value: Alias): void }",
+    "type Key = object; type Mapped<Input> = { [Key in keyof Input]: (value: Key) => void };",
+    "type Item = object; type Unpacked<Input> = Input extends Promise<infer Item> ? (value: Item) => void : never;",
+    "type Payload = object; function outer() { type Payload = { readonly id: string }; function consume(value: Payload) {} }",
+    "type Identity<T> = T; function consume<Identity>(value: Identity) {}",
+    "function one() { type Payload = object; } function two() { function consume(value: Payload) {} }",
+    "type Readonly<T> = { readonly value: T }; function visit(node: Readonly<object>) {}",
+    "interface Owner { readonly id: string } function visit(node: Readonly<Owner>) {}",
+    "interface Owner { readonly id: string } function visit(node: object & Owner) {}",
+    "function visit(node: object & { readonly id: string }) {}",
+    "function visit(node: {} & {}) {}",
+  ],
+})

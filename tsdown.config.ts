@@ -22,7 +22,7 @@ export default defineConfig([
       { from: "presets/typescript/resets/*", to: "dist/presets/typescript/resets" },
       // Some plugin rules started as copies of MIT-licensed code, so each license notice ships at
       // its own path. `scripts/test-build.ts` checks that every notice under presets ships.
-      { flatten: false, from: "presets/lint/plugin/**/license.md", to: "dist/presets" },
+      { flatten: false, from: "presets/lint/plugins/**/license.md", to: "dist/presets" },
     ],
     // The first-party plugin imports only types from @oxlint/plugins. Keeping the package external
     // leaves a type reference in its declarations instead of inlining Oxlint's AST types. The

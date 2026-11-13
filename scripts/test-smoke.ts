@@ -523,8 +523,8 @@ try {
 
   for (const specifier of [
     "adamantite/lint/core",
-    "adamantite/lint/plugin/shared/options",
-    "adamantite/lint/plugin/rules/layers",
+    "adamantite/lint/plugins/shared/options",
+    "adamantite/lint/plugins/rules/layers",
     "adamantite/rules/load",
   ]) {
     if (!privateImports.includes(specifier)) {

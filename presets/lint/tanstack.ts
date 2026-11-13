@@ -3,7 +3,7 @@ import type { OxlintConfig } from "oxlint"
 // Opinions for TanStack Query with route loaders: each query is defined once with `queryOptions()`
 // so a loader can preload it, and query data stays in the query cache.
 //
-// The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
+// The source tree holds `plugins/index.ts` and the dist tree holds `plugins/index.js`, so the plugin
 // extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the
 // source tree, where Node.js strips the types.
 const PLUGIN_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
@@ -12,7 +12,7 @@ const config: OxlintConfig = {
   jsPlugins: [
     {
       name: "adamantite",
-      specifier: new URL(`plugin/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
+      specifier: new URL(`plugins/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
     },
   ],
   rules: {

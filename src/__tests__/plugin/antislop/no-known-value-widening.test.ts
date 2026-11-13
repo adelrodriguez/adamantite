@@ -155,6 +155,16 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
       code: "function outer() { interface ScoreMap { [name: string]: number } const scores: ScoreMap = { alice: 1 }; }",
       errors: [error],
     },
+    // An `as` clause names the keys of a mapped type, so its keys decide whether the type is open.
+    { code: "const scores: { [K in 'seed' as string]: number } = { alice: 1 };", errors: [error] },
+    {
+      code: "type Scores = { [K in 'seed' as string]: number }; const other: Scores = { alice: 1 };",
+      errors: [error],
+    },
+    {
+      code: "import type { Key } from './key'; const scores: { [K in 'seed' as Key]: number } = { alice: 1 };",
+      errors: [error],
+    },
   ],
   valid: [
     `${prelude} const commands: Record<string, Command> = {};`,
@@ -185,6 +195,7 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
     // A finite key set makes a mapped type a closed contract, as it does for `Record`.
     "type Kind = 'a' | 'b'; const counts: { [K in Kind]: number } = { a: 1, b: 2 };",
     "const counts: { readonly [K in 'a' | 'b']: number } = { a: 1, b: 2 };",
+    `type Kind = 'a' | 'b'; const getters: { [K in Kind as \`get\${K}\`]: number } = { geta: 1, getb: 2 };`,
     "interface ScoreMap { [name: string]: number } const scores: ScoreMap = {};",
     `${prelude} type Index<Key extends PropertyKey, Value> = Record<Key, Value>; const commands: Index<'start', Command> = { start: startCommand };`,
     "function isString(value: unknown): value is string { return true; } declare const input: unknown; isString(input);",

@@ -143,6 +143,9 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     { code: "type Key = string; type A = Record<Key, unknown>;", errors: [error] },
     { code: 'import type { Key } from "./key"; type A = Record<Key, unknown>;', errors: [error] },
     { code: "type A<K extends string> = { [P in K]: unknown };", errors: [error] },
+    // An `as` clause names the keys of a mapped type, so its keys decide whether the type is open.
+    { code: "type Bag = { [K in 'seed' as string]: unknown };", errors: [error] },
+    { code: `type Bag = { [K in 'a' | 'b' as \`get\${string}\`]: unknown };`, errors: [error] },
   ],
   valid: [
     "type Commands = Record<string, Command>;",
@@ -188,6 +191,8 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     // A finite literal key set is a closed object, like `{ a: unknown; b: unknown }`.
     "type A = Record<'a' | 'b', unknown>;",
     "type Kind = 'a' | 'b'; type A = { [K in Kind]: unknown };",
+    `type Kind = 'a' | 'b'; type A = { [K in Kind as \`get\${K}\`]: unknown };`,
+    "type A = { [K in 'a' | 'b' as K]: unknown };",
     "type A = Partial<Record<'a', unknown>>;",
     "interface Bag<T = unknown> { read<T>(input: Record<string, T>): T }",
     "export type Plain<T> = globalThis.Extract<T, Record<string, unknown>>;",

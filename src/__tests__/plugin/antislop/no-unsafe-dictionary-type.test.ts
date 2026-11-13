@@ -46,6 +46,18 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     { code: "type Source = Record<string, unknown>; type A = Pick<Source, string>;", errors: 2 },
     { code: "type Source = Record<string, unknown>; type A = Omit<Source, never>;", errors: 2 },
     { code: "type Index<T> = Record<string, T>; type A = Index<unknown>;", errors: 1 },
+    {
+      code: "type Index<T> = Record<string, T>; type Outer<T> = Index<T>; type A = Outer<unknown>;",
+      errors: 1,
+    },
+    {
+      code: "type Index<U> = Record<string, U>; type Outer<T> = Index<T | Command>; type A = Outer<unknown>;",
+      errors: 1,
+    },
+    {
+      code: "type Index<T, U> = Record<string, U>; type Outer<T> = Index<Command, T | Command>; type A = Outer<unknown>;",
+      errors: 1,
+    },
     { code: "interface A { [key: string]: unknown }", errors: [error] },
     { code: "type A = Readonly<Record<string, unknown>>;", errors: 1 },
     { code: "type A = Record<string, Readonly<unknown>>;", errors: [error] },
@@ -100,6 +112,7 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     "type AlsoAllowed = Record<string, Result<Data, unknown>>;",
     "type Index<T> = Record<string, T>; type EntityIndex<T extends Entity> = Record<string, T>;",
     "type Safe = Index<Command>; type Index<T> = Record<string, T>;",
+    'import type { Payload } from "./payload"; type Envelope = Payload; type Replies<Payload> = Record<string, Envelope>; type Batch = Replies<unknown>;',
     "type A = Map<string, unknown>; type B = ReadonlyMap<string, unknown>; type C = WeakMap<object, unknown>;",
     "import { Record } from './local'; type A = Record<string, unknown>;",
     "type Record<K, V> = { key: K; value: V }; type A = Record<string, unknown>;",

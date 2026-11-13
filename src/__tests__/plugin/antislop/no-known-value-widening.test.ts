@@ -142,6 +142,7 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
   valid: [
     `${prelude} const commands: Record<string, Command> = {};`,
     `${prelude} type Index<T> = Record<string, T>; const commands: Index<Command> = {};`,
+    `${prelude} import type { Key } from "./key"; type Name = Key; type Index<Key> = { [K in Name]: Command }; const commands: Index<string> = { start: startCommand };`,
     `${prelude} class Registry { commands: Record<string, Command> = {}; }`,
     `${prelude} class Registry { accessor commands: Record<string, Command> = {}; }`,
     `${prelude} let commands: Record<string, Command>; commands = {};`,

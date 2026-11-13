@@ -55,5 +55,6 @@ tester.run("no-unknown-returns", plugin.rules["no-unknown-returns"], {
     "function load(): Promise<User> { return promise; }",
     "type Identity<T> = T; function load(): Identity<User> { return user; }",
     "type Value = unknown; function outer() { type Value = User; function load(): Value { return user; } }",
+    'import type { Payload } from "./payload"; type Envelope = { kind: "empty" } | Payload; type Reply<Payload> = Envelope | Payload[]; function load(): Reply<unknown> { return reply; }',
   ],
 })

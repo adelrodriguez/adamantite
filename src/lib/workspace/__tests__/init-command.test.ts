@@ -4,7 +4,6 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   createDependencyInstallerTestContext,
-  createPrompterTestContext,
   runCommand,
 } from "#commands/__tests__/command-test-helpers.ts"
 import initCommand from "#commands/init/index.ts"
@@ -20,7 +19,7 @@ describe("formatInitCommand", () => {
     Effect.gen(function* () {
       const command = formatInitCommand(setup)
       const files = createFileSystemTestContext({ files: { "package.json": "{}" } })
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
       expect(command.startsWith("adamantite init ")).toBe(true)
@@ -28,7 +27,7 @@ describe("formatInitCommand", () => {
       const exit = yield* runCommand(
         initCommand,
         command.slice("adamantite init ".length).split(" "),
-        { files, layers: [prompter.layer, installer.layer] }
+        { files, layers: [installer.layer], logLines }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)

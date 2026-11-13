@@ -1,9 +1,10 @@
+import type * as Terminal from "effect/Terminal"
 import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
+import * as Prompt from "effect/cli/Prompt"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import type { TypeScriptPreset } from "#lib/integrations/workspace/tsconfig.ts"
-import type { OperationCancelled } from "#lib/shared/errors.ts"
 import {
   describeLintPreset,
   findExcludedPresets,
@@ -21,7 +22,7 @@ import {
   checkRunsTool,
   listSupportedPackageManagers,
 } from "#lib/workspace/package-json.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 import { INIT_EDITOR_LABELS, INIT_EDITORS, type InitOptionsInput } from "./options.ts"
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
@@ -33,16 +34,14 @@ const describeScriptConflict = (conflict: ScriptConflict) =>
  */
 function keepOneOfExcludedPresets(
   selected: readonly LintPreset[]
-): Effect.Effect<readonly LintPreset[], OperationCancelled, Prompter> {
+): Effect.Effect<readonly LintPreset[], Terminal.QuitError, Prompt.Environment> {
   return Option.match(Array.head(findExcludedPresets(selected)), {
     onNone: () => Effect.succeed(selected),
     onSome: ({ excluded, preset }) =>
       Effect.gen(function* () {
-        const prompter = yield* Prompter
-
-        const kept = yield* prompter.select({
+        const kept = yield* Prompt.Select({
+          choices: [preset, excluded].map((name) => ({ title: name, value: name })),
           message: `The ${preset} and ${excluded} presets report the same defects. Which one should Adamantite use?`,
-          options: [preset, excluded].map((name) => ({ label: name, value: name })),
         })
 
         return yield* keepOneOfExcludedPresets(
@@ -57,16 +56,13 @@ function keepOneOfExcludedPresets(
  * preset that a selected preset requires.
  */
 const promptPresets = Effect.gen(function* () {
-  const prompter = yield* Prompter
-
-  const chosen = yield* prompter.multiselect({
-    message: "Which presets should Adamantite use with the core preset?",
-    options: lintPresets.map((preset) => ({
-      hint: describeLintPreset(preset),
-      label: preset.label,
+  const chosen = yield* Prompt.MultiSelect({
+    choices: lintPresets.map((preset) => ({
+      description: describeLintPreset(preset),
+      title: preset.label,
       value: preset.name,
     })),
-    required: false,
+    message: "Which presets should Adamantite use with the core preset?",
   })
 
   const selected = yield* keepOneOfExcludedPresets(chosen)
@@ -74,7 +70,7 @@ const promptPresets = Effect.gen(function* () {
   const missingPresets = findMissingRequiredPresets(selected)
 
   for (const { required, requiredBy } of missingPresets) {
-    yield* prompter.log.info(`Added the \`${required}\` preset, which \`${requiredBy}\` requires.`)
+    yield* Output.info(`Added the \`${required}\` preset, which \`${requiredBy}\` requires.`)
   }
 
   return [...missingPresets.map(({ required }) => required), ...selected]
@@ -85,42 +81,39 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   isMonorepo: boolean,
   packageManager: PackageManagerName
 ) {
-  const prompter = yield* Prompter
-
-  const selectedScripts = yield* prompter.multiselect({
-    message: "Which scripts should Adamantite add to `package.json`?",
-    options: [
+  const selectedScripts = yield* Prompt.MultiSelect({
+    choices: [
       {
-        hint: "recommended",
-        label: "check - find formatting, lint, and type errors",
+        description: "recommended",
+        title: "check - find formatting, lint, and type errors",
         value: "check",
       },
       {
-        hint: "recommended",
-        label: "fix - apply safe lint fixes and format code",
+        description: "recommended",
+        title: "fix - apply safe lint fixes and format code",
         value: "fix",
       },
       {
-        label: isMonorepo
+        title: isMonorepo
           ? "analyze - find unused code and check monorepo consistency"
           : "analyze - find unused dependencies, exports, and files",
         value: "analyze",
       },
     ],
-    required: false,
+    message: "Which scripts should Adamantite add to `package.json`?",
   })
 
   const packageJson = yield* readPackageJson(cwd)
   const conflicts = getConflictingScripts(packageJson, selectedScripts)
 
   for (const conflict of conflicts) {
-    yield* prompter.log.warning(describeScriptConflict(conflict))
+    yield* Output.warning(describeScriptConflict(conflict))
   }
 
   const shouldOverwriteScripts =
     conflicts.length > 0
-      ? yield* prompter.confirm({
-          initialValue: false,
+      ? yield* Prompt.Confirm({
+          initial: false,
           message:
             conflicts.length === 1
               ? "Replace this script with Adamantite's command?"
@@ -131,41 +124,40 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const hasOxlint = checkRunsTool(selectedScripts, "oxlint")
   const selectedPresets = hasOxlint ? yield* promptPresets : []
 
-  const shouldSetupTypescript = yield* prompter.confirm({
-    initialValue: true,
+  const shouldSetupTypescript = yield* Prompt.Confirm({
+    initial: true,
     message: "Use an Adamantite TypeScript preset?",
   })
 
   const typescriptPreset = shouldSetupTypescript
     ? Option.some(
-        yield* prompter.select<TypeScriptPreset>({
-          message: "Which TypeScript preset should Adamantite use?",
-          options: [
+        yield* Prompt.Select<TypeScriptPreset>({
+          choices: [
             {
-              hint: "JSON.parse() returns unknown, not any. Avoid in libraries.",
-              label: "Strict types",
+              description: "JSON.parse() returns unknown, not any. Avoid in libraries.",
+              title: "Strict types",
               value: "typescript",
             },
             {
-              hint: "No changes to built-in types. Use for libraries.",
-              label: "Strict config",
+              description: "No changes to built-in types. Use for libraries.",
+              title: "Strict config",
               value: "tsconfig",
             },
           ],
+          message: "Which TypeScript preset should Adamantite use?",
         })
       )
     : Option.none()
 
-  const selectedEditors = yield* prompter.multiselect({
+  const selectedEditors = yield* Prompt.MultiSelect({
+    choices: INIT_EDITORS.map((editor) => ({ title: INIT_EDITOR_LABELS[editor], value: editor })),
     message: "Which editors should Adamantite configure?",
-    options: INIT_EDITORS.map((editor) => ({ label: INIT_EDITOR_LABELS[editor], value: editor })),
-    required: false,
   })
 
   const shouldInstallExtensions =
     selectedEditors.length > 0
-      ? yield* prompter.confirm({
-          initialValue: true,
+      ? yield* Prompt.Confirm({
+          initial: true,
           message: "Install the recommended editor extensions?",
         })
       : false
@@ -178,20 +170,21 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   const writtenScripts = selectedScripts.filter((script) => !keptConflicts.includes(script))
 
   if (hasCICompatibleScripts(writtenScripts) && !canEnableGitHubActions) {
-    yield* prompter.log.info(
+    yield* Output.info(
       `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports ${listSupportedPackageManagers("conjunction")}.`
     )
   }
 
   const shouldEnableGitHubActions =
     hasCICompatibleScripts(writtenScripts) && canEnableGitHubActions
-      ? yield* prompter.confirm({
+      ? yield* Prompt.Confirm({
+          initial: true,
           message: "Add a GitHub Actions workflow to run the selected checks?",
         })
       : false
 
-  const shouldSetupAgents = yield* prompter.confirm({
-    initialValue: true,
+  const shouldSetupAgents = yield* Prompt.Confirm({
+    initial: true,
     message:
       "Teach coding agents to use Adamantite? This adds an AGENTS.md section and the Adamantite skill.",
   })

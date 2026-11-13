@@ -1,8 +1,10 @@
+import * as Prompt from "effect/cli/Prompt"
+import * as Console from "effect/Console"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as Terminal from "effect/Terminal"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 
 interface ResolutionMenuOptions {
   /**
@@ -40,21 +42,20 @@ class AgentStartFailed extends Data.TaggedClass("Failed")<{ readonly agent: Codi
 type ResolveAction = CodingAgent | "copy" | "done"
 
 const copyPrompt = Effect.fn("copyPrompt")(function* (prompt: string) {
-  const prompter = yield* Prompter
-  const terminal = yield* TerminalCapabilities
+  const terminal = yield* Terminal.Terminal
 
-  yield* prompter.message(prompt)
-  yield* terminal.copyToClipboard(prompt)
-  yield* prompter.log.success(
-    "The agent prompt is printed above and sent to the terminal clipboard."
-  )
+  yield* Console.log(prompt)
+  // OSC 52 asks the terminal to put the text on the system clipboard. A terminal that cannot write
+  // its own output cannot continue, so a failed write is a defect.
+  yield* terminal
+    .display(`\u001B]52;c;${Buffer.from(prompt).toString("base64")}\u0007`)
+    .pipe(Effect.orDie)
+  yield* Output.success("The agent prompt is printed above and sent to the terminal clipboard.")
 })
 
 export const offerPromptCopy = Effect.fn("offerPromptCopy")(function* (prompt: string) {
-  const prompter = yield* Prompter
-
-  const shouldCopyPrompt = yield* prompter.confirm({
-    initialValue: true,
+  const shouldCopyPrompt = yield* Prompt.Confirm({
+    initial: true,
     message: "Copy the agent prompt?",
   })
 
@@ -72,35 +73,24 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
   options: ResolutionMenuOptions
 ) {
   const agents = yield* CodingAgents
-  const prompter = yield* Prompter
+  const installedAgents = yield* agents.detectInstalled(options.cwd)
 
-  const installedAgents = yield* prompter.withSpinner(() => agents.detectInstalled(options.cwd), {
-    failure: "Could not check for installed coding agents.",
-    start: "Checking for installed coding agents...",
-    success: (detected) =>
-      detected.length === 0
-        ? "No supported coding agent was found on PATH."
-        : `Found ${detected.map((agent) => agent.name).join(", ")}.`,
-  })
-
+  // The menu names each installed agent, so only an empty result needs a line.
   if (installedAgents.length === 0) {
-    yield* prompter.log.info(
-      `${options.command} can hand ${options.subject} off when one of these CLIs is installed: ${codingAgents
+    yield* Output.info(
+      `No supported coding agent was found on PATH. ${options.command} can hand ${options.subject} off when one of these CLIs is installed: ${codingAgents
         .map((agent) => `\`${agent.command}\``)
         .join(", ")}.`
     )
   }
 
-  const action = yield* prompter.select<ResolveAction>({
-    message: options.message,
-    options: [
-      ...installedAgents.map((agent) => ({
-        label: `Hand off to ${agent.name}`,
-        value: agent,
-      })),
-      { label: "Copy the agent prompt", value: "copy" as const },
-      { label: "Finish without an agent", value: "done" as const },
+  const action = yield* Prompt.Select<ResolveAction>({
+    choices: [
+      ...installedAgents.map((agent) => ({ title: `Hand off to ${agent.name}`, value: agent })),
+      { title: "Copy the agent prompt", value: "copy" },
+      { title: "Finish without an agent", value: "done" },
     ],
+    message: options.message,
   })
 
   if (action === "done") {
@@ -115,20 +105,18 @@ export const chooseResolution = Effect.fn("chooseResolution")(function* (
 
   const agent = action
 
-  yield* prompter.log.info(
+  yield* Output.info(
     `Handing the terminal to ${agent.name}. Exit the agent to return to ${options.command}.`
   )
 
   const started = yield* agents.handoff({ agent, cwd: options.cwd, prompt: options.prompt }).pipe(
     Effect.as(true),
     Effect.catchTag("HandoffFailed", (error) =>
-      prompter.log
-        .error(
-          error.reason === "not-found"
-            ? `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
-            : `Failed to start ${agent.name}: ${error.cause.message}`
-        )
-        .pipe(Effect.as(false))
+      Output.error(
+        error.reason === "not-found"
+          ? `\`${agent.command}\` was not found on PATH. Install ${agent.name} or copy the prompt instead.`
+          : `Failed to start ${agent.name}: ${error.cause.message}`
+      ).pipe(Effect.as(false))
     )
   )
 

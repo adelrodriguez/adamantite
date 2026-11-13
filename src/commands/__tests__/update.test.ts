@@ -14,7 +14,6 @@ import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { parseJson } from "#lib/shared/json.ts"
 import {
   createDependencyInstallerTestContext,
-  createPrompterTestContext,
   createRunnerTestContext,
   runCommand,
 } from "./command-test-helpers.ts"
@@ -77,17 +76,21 @@ describe("update", () => {
         files: { "package.json": manifest({ devDependencies: { knip: knip.version } }) },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer],
+        layers: [installer.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toStrictEqual([])
-      expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
+      expect(logLines).toStrictEqual([
+        "💠 adamantite update",
+        "✅ No managed updates were applied.",
+      ])
     })
   )
 
@@ -97,12 +100,13 @@ describe("update", () => {
         files: { "package.json": manifest({ devDependencies: { knip: `^${knip.version}` } }) },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer],
+        layers: [installer.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -122,10 +126,10 @@ describe("update", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
-      yield* runCommand(updateCommand, [], { files, layers: [prompter.layer, installer.layer] })
+      yield* runCommand(updateCommand, [], { files, layers: [installer.layer], logLines })
 
       expect(installer.calls.flatMap((call) => call.packages)).not.toContain(
         `@shadcn/lint@${shadcnLint.version}`
@@ -145,10 +149,10 @@ describe("update", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
-      yield* runCommand(updateCommand, [], { files, layers: [prompter.layer, installer.layer] })
+      yield* runCommand(updateCommand, [], { files, layers: [installer.layer], logLines })
 
       expect(installer.calls.flatMap((call) => call.packages)).toContain(
         `${plugin.name}@${plugin.version}`
@@ -164,18 +168,24 @@ describe("update", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer],
+        layers: [installer.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toHaveLength(1)
       expect(installer.calls[0]?.packages).toStrictEqual([`knip@${knip.version}`])
-      expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+      expect(logLines).toStrictEqual([
+        "💠 adamantite update",
+        "● Packages to install or update:\n    knip: 5.0.0 → 6.45.1",
+        "✔ Dependencies updated.",
+        "✅ Update finished.",
+      ])
     })
   )
 
@@ -190,7 +200,7 @@ describe("update", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
 
       const installer = createDependencyInstallerTestContext({
         detectedPackageManager: { name: "pnpm" },
@@ -198,7 +208,8 @@ describe("update", () => {
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer],
+        layers: [installer.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -215,23 +226,24 @@ describe("update", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer],
+        layers: [installer.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toStrictEqual([])
-      expect(prompter.notes).toContainEqual(expect.objectContaining({ title: "1. Outdated knip" }))
-      expect(prompter.logs).toContainEqual(
-        expect.objectContaining({
-          level: "warning",
-          message: expect.stringContaining("`oxfmt` is declared as `npm:oxfmt@1`"),
-        })
-      )
+      expect(logLines).toStrictEqual([
+        "💠 adamantite update",
+        expect.stringMatching(/^▲ `oxfmt` is declared as `npm:oxfmt@1`/u),
+        expect.stringMatching(/^\n1\. Outdated knip\n/u),
+        "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
+        "✅ Update finished.",
+      ])
     })
   )
 
@@ -246,22 +258,23 @@ describe("update", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer],
+        layers: [installer.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.notes).toContainEqual(
-        expect.objectContaining({ title: "1. Missing knip configuration" })
-      )
-      expect(prompter.logs).toContainEqual({
-        level: "info",
-        message: "Run `adamantite doctor` for the remaining repairs and an agent prompt.",
-      })
+      expect(logLines).toStrictEqual([
+        "💠 adamantite update",
+        expect.stringMatching(/^\n1\. Missing knip configuration\n/u),
+        expect.stringMatching(/^\n2\. Missing AGENTS\.md\n/u),
+        "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
+        "✅ Update finished.",
+      ])
     })
   )
 
@@ -271,7 +284,7 @@ describe("update", () => {
         files: { "package.json": manifest({ devDependencies: { knip: "5.0.0" } }) },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
 
       const installer = createDependencyInstallerTestContext({
         addDevDependenciesError: new FailedToInstallDependency({ packages: ["knip"] }),
@@ -279,24 +292,30 @@ describe("update", () => {
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer],
+        layers: [installer.layer],
+        logLines,
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(prompter.outros).toStrictEqual(["❌ Update failed"])
+      expect(logLines).toStrictEqual([
+        "💠 adamantite update",
+        "● Packages to install or update:\n    knip: 5.0.0 → 6.45.1",
+        "❌ Update failed",
+      ])
     })
   )
 
   it.effect("update the effect preset's tools and run no patch", () =>
     Effect.gen(function* () {
       const files = makeEffectFiles(toOxlintTsConfigContent(["effect"]))
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(updateCommand, [], {
         files,
-        layers: [prompter.layer, installer.layer, runner.layer],
+        layers: [installer.layer, runner.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -317,12 +336,13 @@ describe("update", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -334,23 +354,31 @@ describe("update", () => {
         )
         // A folder without the skill stays without it.
         expect(files.exists(".agents/skills/adamantite")).toBe(false)
-        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+        expect(logLines).toStrictEqual([
+          "💠 adamantite update",
+          "✔ Adamantite skill refreshed.",
+          "✅ Update finished.",
+        ])
       })
     )
 
     it.effect("leave a copy alone when it matches the shipped skill", () =>
       Effect.gen(function* () {
         const files = makeSkillFiles(makeSkillCopy(".agents/skills"))
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
+        expect(logLines).toStrictEqual([
+          "💠 adamantite update",
+          "✅ No managed updates were applied.",
+        ])
       })
     )
 
@@ -361,21 +389,22 @@ describe("update", () => {
           "skills-lock.json": makeSkillsLock({ adamantite: "./node_modules/adamantite" }),
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.exists("skills-lock.json")).toBe(false)
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message: "Removed the `adamantite` entry from `skills-lock.json`.",
-        })
-        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+        expect(logLines).toStrictEqual([
+          "💠 adamantite update",
+          "● Removed the `adamantite` entry from `skills-lock.json`.",
+          "✅ Update finished.",
+        ])
       })
     )
 
@@ -388,12 +417,13 @@ describe("update", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -407,23 +437,22 @@ describe("update", () => {
     it.effect("warn and report no applied updates when the skills lock cannot be parsed", () =>
       Effect.gen(function* () {
         const files = makeSkillFiles({ "skills-lock.json": "{ invalid" })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(installer.calls).toStrictEqual([])
-        expect(prompter.logs).toContainEqual(
-          expect.objectContaining({
-            level: "warning",
-            message: expect.stringContaining("Could not update `skills-lock.json`."),
-          })
-        )
-        expect(prompter.outros).toStrictEqual(["✅ No managed updates were applied."])
+        expect(logLines).toStrictEqual([
+          "💠 adamantite update",
+          expect.stringMatching(/^▲ Could not update `skills-lock\.json`\. Failed to parse /u),
+          "✅ No managed updates were applied.",
+        ])
       })
     )
 
@@ -437,22 +466,21 @@ describe("update", () => {
         })
 
         files.makeReadOnly("skills-lock.json")
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual(
-          expect.objectContaining({
-            level: "warning",
-            message: expect.stringContaining("Could not update `skills-lock.json`."),
-          })
-        )
-        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+        expect(logLines).toStrictEqual([
+          "💠 adamantite update",
+          expect.stringMatching(/^▲ Could not update `skills-lock\.json`\. Could not write /u),
+          "✅ Update finished.",
+        ])
       })
     )
 
@@ -463,22 +491,21 @@ describe("update", () => {
         )
 
         files.makeReadOnly(".claude/skills/adamantite/SKILL.md")
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(updateCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual(
-          expect.objectContaining({
-            level: "warning",
-            message: expect.stringContaining("Could not refresh the Adamantite skill."),
-          })
-        )
-        expect(prompter.outros).toStrictEqual(["✅ Update finished."])
+        expect(logLines).toStrictEqual([
+          "💠 adamantite update",
+          expect.stringMatching(/^▲ Could not refresh the Adamantite skill\. /u),
+          "✅ Update finished.",
+        ])
       })
     )
   })

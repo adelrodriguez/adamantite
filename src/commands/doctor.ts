@@ -1,5 +1,7 @@
 import process from "node:process"
 import * as Command from "effect/cli/Command"
+import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
+import * as Console from "effect/Console"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
@@ -12,9 +14,8 @@ import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { readProject } from "#lib/workspace/project.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 import { AgentSessionEnded, chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
@@ -52,37 +53,35 @@ function doctorFailed() {
   return new CommandFailed({ command: "doctor", exitCode: ChildProcessSpawner.ExitCode(1) })
 }
 
+const finish = (message: string) =>
+  Effect.gen(function* () {
+    yield* Output.success(message)
+    yield* Output.outro("✅ Doctor finished.")
+  })
+
+// The interactive report shows each assessment warning before the outcome.
+const logWarnings = (assessment: ProjectAssessment) =>
+  Effect.forEach(assessment.warnings, (warning) => Output.warning(warning), {
+    concurrency: 1,
+    discard: true,
+  })
+
 export default Command.make("doctor").pipe(
   Command.withDescription("Check Adamantite setup and report what needs repair"),
   Command.withHandler(() =>
     Effect.gen(function* () {
       const cwd = process.cwd()
-      const prompter = yield* Prompter
-      const terminal = yield* TerminalCapabilities
-      const isInteractive = yield* terminal.isInteractive
+      const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities
 
-      if (isInteractive) {
-        yield* prompter.intro("💠 adamantite doctor")
+      if (canPrompt) {
+        yield* Output.intro("💠 adamantite doctor")
       }
 
       const failWithFindings = Effect.gen(function* () {
-        yield* prompter.outro("⚠️ Doctor found issues.")
+        yield* Output.outro("⚠️ Doctor found issues.")
 
         return yield* doctorFailed()
       })
-
-      const finish = (message: string) =>
-        Effect.gen(function* () {
-          yield* prompter.log.success(message)
-          yield* prompter.outro("✅ Doctor finished.")
-        })
-
-      // The interactive report shows each assessment warning before the outcome.
-      const logWarnings = (assessment: ProjectAssessment) =>
-        Effect.forEach(assessment.warnings, (warning) => prompter.log.warning(warning), {
-          concurrency: 1,
-          discard: true,
-        })
 
       const resolveFindings = Effect.fn("resolveFindings")(function* (
         assessment: ProjectAssessment
@@ -109,7 +108,7 @@ export default Command.make("doctor").pipe(
           return yield* finish(`All findings were resolved by ${agent.name}.`)
         }
 
-        yield* prompter.log.warning(
+        yield* Output.warning(
           `Doctor still reports ${after.findings.length.toLocaleString("en-US")} unresolved ${after.findings.length === 1 ? "finding" : "findings"} after the ${agent.name} session.`
         )
         yield* printFindings(after.findings)
@@ -123,7 +122,7 @@ export default Command.make("doctor").pipe(
           logWarnings(assessment).pipe(Effect.andThen(finish("No setup repairs needed."))),
         NeedsRepair: ({ assessment }) => resolveFindings(assessment),
         NotInstalled: () =>
-          prompter.log.warning(NOT_INSTALLED_MESSAGE).pipe(Effect.andThen(failWithFindings)),
+          Output.warning(NOT_INSTALLED_MESSAGE).pipe(Effect.andThen(failWithFindings)),
         Unmanaged: () =>
           finish(
             "No Adamantite-managed setup found. Run `adamantite init` to configure the project."
@@ -134,14 +133,13 @@ export default Command.make("doctor").pipe(
       const reportPlain = matchOutcome({
         Converged: ({ assessment }) =>
           assessment.warnings.length > 0
-            ? prompter.message(renderAssessmentMarkdown(assessment, version))
+            ? Console.log(renderAssessmentMarkdown(assessment, version))
             : Effect.void,
         NeedsRepair: ({ assessment }) =>
-          prompter
-            .message(renderAssessmentMarkdown(assessment, version))
-            .pipe(Effect.andThen(doctorFailed())),
-        NotInstalled: () =>
-          prompter.message(NOT_INSTALLED_MESSAGE).pipe(Effect.andThen(doctorFailed())),
+          Console.log(renderAssessmentMarkdown(assessment, version)).pipe(
+            Effect.andThen(doctorFailed())
+          ),
+        NotInstalled: () => Console.log(NOT_INSTALLED_MESSAGE).pipe(Effect.andThen(doctorFailed())),
         Unmanaged: () => Effect.void,
       })
 
@@ -155,12 +153,11 @@ export default Command.make("doctor").pipe(
           ? classifyAssessment(yield* assessProject(yield* readProject(cwd)))
           : NotInstalled()
 
-      yield* isInteractive ? reportInteractive(outcome) : reportPlain(outcome)
+      yield* canPrompt ? reportInteractive(outcome) : reportPlain(outcome)
     }).pipe(
-      Effect.catchTag("OperationCancelled", () =>
+      Effect.catchTag("QuitError", () =>
         Effect.gen(function* () {
-          const prompter = yield* Prompter
-          yield* prompter.cancel("Doctor was cancelled. The findings remain.")
+          yield* Output.cancel("Doctor was cancelled. The findings remain.")
 
           return yield* doctorFailed()
         })

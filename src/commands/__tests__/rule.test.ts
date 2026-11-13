@@ -194,7 +194,7 @@ describe("rule test add", () => {
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
         new CommandFailed({ command: "rule test add", exitCode: ChildProcessSpawner.ExitCode(1) })
       )
-      expect(logLines).toStrictEqual(["■ No rule test was added."])
+      expect(logLines).toStrictEqual(["\n■ No rule test was added."])
       expect(files.list()).toStrictEqual([".adamantite/lint/no-debugger.ts"])
     })
   )

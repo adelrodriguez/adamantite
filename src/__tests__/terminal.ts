@@ -10,18 +10,26 @@ import * as Queue from "effect/Queue"
 import * as Terminal from "effect/Terminal"
 
 /**
- * A key that a test sends to a prompt, such as `down`, `space`, or `enter`. `ctrl+c` quits the
- * prompt, as Ctrl-C does in a terminal.
+ * A key that a test sends to a prompt, such as `down`, `space`, or `enter`. `y` and `n` answer a
+ * confirm prompt. `ctrl+c` quits the prompt, as Ctrl-C does in a terminal.
  */
-export type TestKey = "ctrl+c" | "down" | "enter" | "space" | "up"
+export type TestKey = "ctrl+c" | "down" | "enter" | "n" | "space" | "up" | "y"
 
 export interface TerminalTestContext {
+  /**
+   * The text of each OSC 52 clipboard write, decoded, in display order. `output` drops these writes
+   * with the other escape codes.
+   */
+  readonly copied: () => string[]
   readonly layer: Layer.Layer<Terminal.Terminal>
   /**
    * Every frame that the prompts displayed, without ANSI escape codes, joined in display order.
    */
   readonly output: () => string
 }
+
+// OSC 52 sets the system clipboard to base64 text. A BEL character ends the sequence.
+const CLIPBOARD_PREFIX = "\u001B]52;c;"
 
 function toUserInput(key: TestKey): Terminal.UserInput {
   return {
@@ -70,6 +78,12 @@ export function createTerminalTestContext(keys: readonly TestKey[] = []): Termin
   )
 
   return {
+    copied: () =>
+      frames.flatMap((frame) =>
+        frame.startsWith(CLIPBOARD_PREFIX)
+          ? [Buffer.from(frame.slice(CLIPBOARD_PREFIX.length, -1), "base64").toString("utf8")]
+          : []
+      ),
     layer,
     output: () => stripVTControlCharacters(frames.join("")),
   }

@@ -32,16 +32,16 @@ describe("Output", () => {
         "✔ Dependencies installed.",
         "▲ Kept the existing `check` script.",
         "✖ VS Code's `code` command was not found on PATH.",
-        "■ Setup was cancelled.",
+        "\n■ Setup was cancelled.",
       ])
     }).pipe(provideCapabilities(false))
   )
 
   it.effect("indent the continuation lines of a status under its text", () =>
     Effect.gen(function* () {
-      yield* Output.warning("First line\nSecond line")
+      yield* Output.warning("First line\n\nThird line")
 
-      expect(yield* TestConsole.logLines).toStrictEqual(["▲ First line\n  Second line"])
+      expect(yield* TestConsole.logLines).toStrictEqual(["▲ First line\n\n  Third line"])
     }).pipe(provideCapabilities(false))
   )
 

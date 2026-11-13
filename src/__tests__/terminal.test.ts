@@ -60,4 +60,20 @@ describe("createTerminalTestContext", () => {
       expect(Exit.hasDies(exit)).toBe(true)
     })
   )
+
+  it.effect("decode each clipboard write", () =>
+    Effect.gen(function* () {
+      const terminal = createTerminalTestContext()
+      const text = "# Prompt\nRun `adamantite doctor` ✅"
+
+      yield* Effect.flatMap(Terminal.Terminal, (service) =>
+        service.display(`\u001B]52;c;${Buffer.from(text).toString("base64")}\u0007`)
+      ).pipe(Effect.provide(terminal.layer))
+
+      expect({ copied: terminal.copied(), output: terminal.output() }).toStrictEqual({
+        copied: [text],
+        output: "",
+      })
+    })
+  )
 })

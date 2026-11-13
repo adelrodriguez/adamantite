@@ -25,11 +25,11 @@ const style = (format: Parameters<typeof styleText>[0], text: string) =>
     canColor ? styleText(format, text, { validateStream: false }) : text
   )
 
-// Continuation lines start under the text, after the symbol and its space.
+// Continuation lines start under the text, after the symbol and its space. A blank line stays empty.
 const renderStatus = (status: Status, message: string) =>
   Effect.map(
     style(STATUSES[status].color, STATUSES[status].symbol),
-    (symbol) => `${symbol} ${message.replaceAll("\n", "\n  ")}`
+    (symbol) => `${symbol} ${message.replaceAll(/\n(?=.)/gu, "\n  ")}`
   )
 
 const log = (status: Status) => (message: string) =>
@@ -44,9 +44,11 @@ export const warning = log("warning")
 export const error = log("error")
 
 /**
- * Reports that the user cancelled the command, such as with Ctrl-C at a prompt.
+ * Reports that the user quit a prompt, such as with Ctrl-C. A quit prompt of `effect/cli/Prompt`
+ * 4.1.2 leaves the cursor at the end of its last line, so the line starts with a line break.
  */
-export const cancel = log("cancel")
+export const cancel = (message: string) =>
+  Effect.flatMap(renderStatus("cancel", message), (line) => Console.log(`\n${line}`))
 
 /**
  * Reports the error that ended the command, on standard error. Every other line goes to standard

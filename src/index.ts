@@ -7,7 +7,7 @@ import * as Stdio from "effect/Stdio"
 import { makeAppLayer, runCli } from "#cli.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 
 const version = getPackageVersion()
 
@@ -20,10 +20,7 @@ const program = Effect.gen(function* () {
   Effect.as(0),
   Effect.catchTag("CommandFailed", (error) => Effect.succeed(error.exitCode)),
   Effect.catch((error) =>
-    Effect.service(Prompter).pipe(
-      Effect.flatMap((prompter) => prompter.log.error(error.message)),
-      Effect.as(ChildProcessSpawner.ExitCode(1))
-    )
+    Output.failure(error.message).pipe(Effect.as(ChildProcessSpawner.ExitCode(1)))
   ),
   Effect.provide(makeAppLayer(CommandRunner.layer))
 )

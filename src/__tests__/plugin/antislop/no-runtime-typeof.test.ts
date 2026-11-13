@@ -118,6 +118,14 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     },
     { code: 'function f<T>(value: T & {}) { return typeof value === "string"; }', errors: [error] },
     {
+      code: 'function f<T>(value: T & ({})) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Empty = {}; function f<T>(value: T & Empty) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
       code: 'function f<T>(value: T & object) { return typeof value === "function"; }',
       errors: [error],
     },

@@ -12,6 +12,7 @@ import type {
 import type { PaddingType, SelectorOption, StatementMatcher } from "./padding-line-options.ts"
 import { isStringLiteral } from "../shared/literals.ts"
 import {
+  fitsOnOneLine,
   getActualLastToken,
   isClosingBraceToken,
   isFunction,
@@ -45,7 +46,11 @@ const CJS_EXPORT = /^(?:module\s*\.\s*)?exports(?:\s*\.|\s*\[|$)/u
  * https://github.com/eslint/eslint/blob/main/lib/rules/padding-line-between-statements.js
  */
 
-type NodeTest = (node: ASTNode, sourceCode: SourceCode) => boolean
+/**
+ * `printWidth` is the line width of the formatter. A statement that ends past it counts as
+ * multiline, because the formatter wraps it.
+ */
+type NodeTest = (node: ASTNode, sourceCode: SourceCode, printWidth: number) => boolean
 
 export interface NodeTestObject {
   test: NodeTest
@@ -521,15 +526,16 @@ const StatementTypes = new Map<string, NodeTestObject>([
       [
         `singleline-${key}`,
         {
-          test: (node, sourceCode) =>
-            value.test(node, sourceCode) && isSingleLine(node, sourceCode),
+          test: (node, sourceCode, printWidth) =>
+            value.test(node, sourceCode, printWidth) && fitsOnOneLine(node, sourceCode, printWidth),
         },
       ],
       [
         `multiline-${key}`,
         {
-          test: (node, sourceCode) =>
-            value.test(node, sourceCode) && !isSingleLine(node, sourceCode),
+          test: (node, sourceCode, printWidth) =>
+            value.test(node, sourceCode, printWidth)
+            && !fitsOnOneLine(node, sourceCode, printWidth),
         },
       ],
     ]
@@ -539,17 +545,20 @@ const StatementTypes = new Map<string, NodeTestObject>([
 /**
  * Build the vendored padding rule with caller-owned, typed policy options. `statementTypes`
  * registers caller-defined statement types, looked up before the upstream table, for syntax the
- * upstream matchers do not distinguish.
+ * upstream matchers do not distinguish. `readPrintWidth` reads the formatter's line width from the
+ * rule context. Without it, only line breaks decide whether a statement is multiline, as upstream.
  */
 export default function createPaddingLineRule<Extra extends string = never>(
   options: PolicyOptions<NoInfer<Extra>>,
-  statementTypes?: Record<Extra, NodeTestObject>
+  statementTypes?: Record<Extra, NodeTestObject>,
+  readPrintWidth: (context: RuleContext) => number = () => Number.POSITIVE_INFINITY
 ): CreateRule {
   const customStatementTypes: Partial<Record<string, NodeTestObject>> = statementTypes ?? {}
 
   return {
     create(context) {
       const sourceCode = context.sourceCode
+      const printWidth = readPrintWidth(context)
 
       const selectorMatchedNodes = new Map<string, Set<ASTNode>>()
       const pendingPairs: Array<{ prevNode: ASTNode; nextNode: ASTNode }> = []
@@ -618,8 +627,10 @@ export default function createPaddingLineRule<Extra extends string = never>(
 
           const lineMode = type.lineMode
 
-          if (lineMode === "singleline") return isSingleLine(innerStatementNode, sourceCode)
-          else if (lineMode === "multiline") return !isSingleLine(innerStatementNode, sourceCode)
+          if (lineMode === "singleline")
+            return fitsOnOneLine(innerStatementNode, sourceCode, printWidth)
+          else if (lineMode === "multiline")
+            return !fitsOnOneLine(innerStatementNode, sourceCode, printWidth)
 
           return true
         }
@@ -629,7 +640,7 @@ export default function createPaddingLineRule<Extra extends string = never>(
         if (statementType === undefined)
           throw new Error(`Padding rule invariant: unsupported statement type ${type}`)
 
-        return statementType.test(innerStatementNode, sourceCode)
+        return statementType.test(innerStatementNode, sourceCode, printWidth)
       }
 
       /**

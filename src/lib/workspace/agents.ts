@@ -87,6 +87,7 @@ export const writeAgentsGuidance = (cwd: string, options: WriteAgentsGuidanceOpt
     if (Option.isSome(markerRange)) {
       const { end, start } = markerRange.value
       const sectionEnd = end + ADAMANTITE_AGENTS_END_MARKER.length
+
       const nextContent = `${existing.slice(0, start)}${section.trimEnd()}${existing.slice(sectionEnd)}`
 
       yield* writeFile(agentsPath, nextContent.endsWith("\n") ? nextContent : `${nextContent}\n`)

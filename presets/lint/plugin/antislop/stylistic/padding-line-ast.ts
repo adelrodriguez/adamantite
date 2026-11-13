@@ -79,6 +79,21 @@ export const isSingleLine = (node: ESTree.Node, sourceCode: SourceCode): boolean
   node.loc.start.line === getActualLastToken(node, sourceCode).loc.end.line
 
 /**
+ * Test whether a statement stays on one line after formatting. It must be on one line, as
+ * `isSingleLine` measures it, and end at or before `printWidth`, because Oxfmt wraps a longer
+ * line.
+ */
+export function fitsOnOneLine(
+  node: ESTree.Node,
+  sourceCode: SourceCode,
+  printWidth: number
+): boolean {
+  const end = getActualLastToken(node, sourceCode).loc.end
+
+  return node.loc.start.line === end.line && end.column <= printWidth
+}
+
+/**
  * Unwrap optional chaining before checking IIFE syntax.
  */
 export const skipChainExpression = (node: ESTree.Node): ESTree.Node =>

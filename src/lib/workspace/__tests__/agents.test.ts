@@ -213,6 +213,7 @@ describe("writeAgentsGuidance", () => {
     ({ isMonorepo, packageManager, prefix, scripts, suffix }) =>
       Effect.gen(function* () {
         const existing = `${prefix}${ADAMANTITE_AGENTS_START_MARKER}\nOLD-CONTENT-SENTINEL\n${ADAMANTITE_AGENTS_END_MARKER}${suffix}`
+
         const files = makeFiles({ "AGENTS.md": existing })
 
         const fresh = makeFiles()

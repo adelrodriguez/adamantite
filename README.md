@@ -748,6 +748,11 @@ same `anti-slop/*` names.
   `typeof` check outside a type predicate, `Reflect.get` and `Reflect.apply`, and Vitest or Jest
   module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
   accumulator, `shape` in symbol names, and a missing blank line between statement groups.
+- `anti-slop/require-readable-spacing` adds blank lines around a statement that spans several
+  lines. `adamantite fix` runs lint before Oxfmt, so the rule also counts a one-line statement
+  that ends past column 100 as multiline, because Oxfmt wraps it. A line that Oxfmt cannot
+  wrap, such as a long template literal, also gets blank lines. If your Oxfmt config sets
+  another `printWidth`, set the rule's `printWidth` option to the same value.
 - In test files, where type assertions are allowed, `anti-slop/require-safety-comment-for-type-assertion`
   requires a `SAFETY:` comment on each assertion, and `anti-slop/no-chained-type-assertions` and
   `anti-slop/no-widen-then-assert` report assertions that hide the source type. Outside tests,
@@ -757,7 +762,8 @@ same `anti-slop/*` names.
 - The preset turns off the core preset's `typescript/consistent-indexed-object-style` and
   `unicorn/no-immediate-mutation`, which conflict with `anti-slop/no-known-value-widening`.
 
-Set `maxDepth` and `maxProperties` to change the destructuring limits:
+Set `maxDepth` and `maxProperties` to change the destructuring limits, and `printWidth` to
+match an Oxfmt `printWidth` other than 100:
 
 ```ts
 import core from "adamantite/lint"
@@ -769,6 +775,7 @@ export default defineConfig({
   ignorePatterns: core.ignorePatterns,
   rules: {
     "adamantite/no-overzealous-destructuring": ["error", { maxDepth: 1, maxProperties: 3 }],
+    "anti-slop/require-readable-spacing": ["error", { printWidth: 120 }],
   },
 })
 ```

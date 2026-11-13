@@ -21,16 +21,11 @@ const HOOK_MESSAGES: ReadonlyMap<string, MessageId> = new Map([
 const DEFAULT_HOOKS: readonly string[] = [...HOOK_MESSAGES.keys()]
 
 /**
- * Modules where hooks are permitted: hook modules such as `useCart.ts`, `use-cart.ts`, or
- * `hooks.ts`, and everything under a `hooks` directory. Everything else is feature code, including
- * files such as `userProfile.tsx`.
+ * Modules where hooks are permitted: hook modules such as `use-cart.ts` or `hooks.ts`, and
+ * everything under a `hooks` directory. Everything else is feature code. Each file name is
+ * kebab-case, which core's `unicorn/filename-case` accepts. So `useCart.ts` is feature code.
  */
-const DEFAULT_ALLOW: readonly string[] = [
-  "**/use[A-Z]*.{ts,tsx}",
-  "**/use-*.{ts,tsx}",
-  "**/hooks.{ts,tsx}",
-  "**/hooks/**",
-]
+const DEFAULT_ALLOW: readonly string[] = ["**/use-*.{ts,tsx}", "**/hooks.{ts,tsx}", "**/hooks/**"]
 
 const REACT_MODULE = "react"
 

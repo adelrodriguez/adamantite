@@ -1,3 +1,3 @@
-import { makeIssueService } from "./issue-service.ts"
+import { makeIssueService } from "../modules/issue-service"
 
-export const service = makeIssueService
+export const service = makeIssueService()

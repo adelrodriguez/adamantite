@@ -1,4 +1,9 @@
-declare const input: string
-export function cause(): { cause: unknown } {
+interface Failure {
+  readonly cause: unknown
+}
+
+declare const input: unknown
+
+export function fail(): Failure {
   return { cause: input }
 }

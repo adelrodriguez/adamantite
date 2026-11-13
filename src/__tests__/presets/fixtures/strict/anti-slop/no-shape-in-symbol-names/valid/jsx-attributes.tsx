@@ -1,6 +1,4 @@
-import Konva from "konva"
-
-import { Button } from "./external"
+import { Button, Konva } from "../modules/components"
 
 export function Toolbar() {
   return (

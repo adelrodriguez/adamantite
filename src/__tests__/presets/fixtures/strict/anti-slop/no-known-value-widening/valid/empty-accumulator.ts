@@ -1,3 +1,3 @@
-type Command = () => void
-const startCommand: Command = () => {}
+type Command = () => string
+
 export const commands: Record<string, Command> = {}

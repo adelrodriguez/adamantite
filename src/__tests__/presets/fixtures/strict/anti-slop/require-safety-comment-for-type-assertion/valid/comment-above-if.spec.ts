@@ -1,9 +1,8 @@
 declare const value: unknown
-declare function it(name: string, run: () => void): void
 
-it('reads a flag', () => {
+export function rejectFlag(): void {
   // SAFETY: The test owns this input.
   if (value as boolean) {
-    throw new Error('unexpected flag')
+    throw new Error("unexpected flag")
   }
-})
+}

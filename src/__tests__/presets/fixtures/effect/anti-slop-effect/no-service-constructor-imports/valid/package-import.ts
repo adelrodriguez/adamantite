@@ -1,3 +1,3 @@
-import { makeExecutionMemo } from "alchemy/Runtime/ExecutionMemo"
+import { makeMemoMapUnsafe } from "effect/Layer"
 
-export const memo = makeExecutionMemo
+export const memoMap = makeMemoMapUnsafe()

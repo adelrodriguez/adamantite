@@ -1,5 +1,7 @@
 declare const value: string
+
 type UserId = string & { readonly brand: 'UserId' }
+
 /* SAFETY:
  * The parser established the exported UserId invariant.
  */

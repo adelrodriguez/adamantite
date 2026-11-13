@@ -1,3 +1,3 @@
 export function settle(task: Promise<number>): Promise<number | string> {
-  return task.catch((error: unknown) => String(error))
+  return task.catch((error: unknown) => `failed: ${String(error)}`)
 }

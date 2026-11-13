@@ -1,2 +1,7 @@
-const vi = { mock() {} }
-vi.mock()
+const vi = {
+  mock(): string {
+    return "local"
+  },
+}
+
+export const mocked = vi.mock()

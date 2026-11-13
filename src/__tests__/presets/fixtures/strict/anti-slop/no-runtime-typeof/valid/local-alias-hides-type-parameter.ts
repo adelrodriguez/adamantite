@@ -3,7 +3,7 @@ export function outer<T>(items: readonly T[]) {
     type T = string | number
 
     function show(value: T) {
-      return typeof value === "string" ? value : value.toFixed(2)
+      return typeof value === "string" ? value : value.toFixed(items.length)
     }
 
     return show

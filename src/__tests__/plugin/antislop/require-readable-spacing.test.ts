@@ -78,6 +78,17 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
       output: "const a = 1\n\n;[1].forEach(f)",
     },
     {
+      code: "const a = 1\nconst b = 2\n;[a, b].forEach(f)",
+      errors: [error],
+      output: "const a = 1\nconst b = 2\n\n;[a, b].forEach(f)",
+    },
+    {
+      code: "function f() {\nconst a = 1\nconst b = 2\nconst c = {\n}\n;[a, b, c].forEach(f)\n}",
+      errors: [error, error],
+      output:
+        "function f() {\nconst a = 1\nconst b = 2\n\nconst c = {\n}\n\n;[a, b, c].forEach(f)\n}",
+    },
+    {
       code: "function f() {\nfoo();\nwhile (ok) go();\n}",
       errors: [error],
       output: "function f() {\nfoo();\n\nwhile (ok) go();\n}",
@@ -103,6 +114,10 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
     "const a = 1; // trailing\nconst b = 2;",
     "/** Heads a group. */\nconst a = 1;\nconst b = 2;",
     "import { a } from 'a';\n\nconst b = a;\nexport const c = b;",
+    // The ASI-guard semicolon belongs to the line of the next statement, so `b` is one line long.
+    "function f() {\nconst a = 1\nconst b = 2\n;[a, b].forEach(f)\n}",
+    "function f() {\nconst a = 1\nconst b = 2\n;(a + b).toFixed()\n}",
+    "const a = 1\nconst b = 2\n\n;[a, b].forEach(f)",
   ],
 })
 

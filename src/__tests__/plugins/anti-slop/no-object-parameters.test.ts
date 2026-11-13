@@ -14,13 +14,15 @@ const error = { messageId: "objectParameter" }
 tester.run("no-object-parameters", plugin.rules["no-object-parameters"], {
   invalid: [
     { code: "function f(value: object) {}", errors: [error] },
-    // The message names the fixes that work, such as `WeakKey` for a weak collection key.
+    // The message names the fixes that pass the core and strict presets, such as `WeakKey` for a
+    // weak collection key. A generic must appear again in the signature, or core's
+    // typescript/no-unnecessary-type-parameters reports it and asks for `object` again (#772).
     {
       code: "declare const records: WeakMap<object, string>; function getEvaluatorRecord(evaluator: object) { return records.get(evaluator); }",
       errors: [
         {
           message:
-            "Parameter `evaluator` uses the broad `object` type. Use a named domain type, `WeakKey` for a WeakMap or WeakSet key, or a generic `<T extends object>` that keeps the caller's type.",
+            "Parameter `evaluator` uses the broad `object` type. Use a named domain type, `WeakKey` for a WeakMap or WeakSet key, or a generic `<T extends object>` that the signature uses again, such as in the return type, so the caller keeps its type.",
         },
       ],
     },

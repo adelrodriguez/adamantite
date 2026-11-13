@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+import * as Array from "effect/Array"
+import * as Order from "effect/Order"
 import { describe, expect, it } from "vitest"
 import * as knipCommands from "#lib/integrations/tooling/knip/command.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -29,7 +31,13 @@ describe("command builders", () => {
       existsSync(join(TOOLING_DIR, folder, "command.ts"))
     )
 
-    expect(tools.map((tool) => tool.name)).toStrictEqual(foldersWithCommands)
+    // `readdirSync` gives the folders in no defined order.
+    expect(
+      Array.sort(
+        tools.map((tool) => tool.name),
+        Order.String
+      )
+    ).toStrictEqual(Array.sort(foldersWithCommands, Order.String))
   })
 
   it.each(toolFolders)("keep the builders of %s out of its index.ts", (folder) => {

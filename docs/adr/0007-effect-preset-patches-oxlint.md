@@ -74,7 +74,7 @@ bump of one of those pins fails until a compatible `@effect/tsgo` release is pin
 ## Curation
 
 `@effect/tsgo` 0.48.0 has 120 rules in four categories, 0.54.0 has 128, 0.63.0 has 134, and
-0.64.1 has 144, and 0.67.1 has 145. A rule is in the preset only when all of these conditions are true:
+0.64.1 has 144, 0.67.1 has 145, and 0.69.0 has 147. A rule is in the preset only when all of these conditions are true:
 
 1. It reports Effect code. It does not ban a platform API in code that is not Effect code,
    such as `async-function`, `new-promise`, `node-builtin-import`, or the variants of

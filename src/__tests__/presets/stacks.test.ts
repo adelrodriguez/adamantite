@@ -104,6 +104,12 @@ const TREES: readonly FixtureTree[] = [
     knownReports: [],
     preset: "tanstack",
   },
+  {
+    // `layer` of @effect/vitest is an unstable API.
+    allowedUnstableApis: ["@effect/vitest"],
+    knownReports: [],
+    preset: "vitest",
+  },
 ]
 
 function sortUnique(values: readonly string[]): string[] {

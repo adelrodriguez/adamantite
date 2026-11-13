@@ -67,7 +67,16 @@ export const ignorePatterns: string[] = [
 
 const config: OxlintConfig & { ignorePatterns: string[] } = {
   ignorePatterns,
+  // A rule in an override applies after the `rules` of the project config. To change one of these
+  // rules for these files, set it in an override of the project config.
   overrides: [
+    {
+      // TypeScript lets a type and a value share a name, as in a schema and the type that it
+      // infers. The rule reads the pair as one name that is declared two times. The type check
+      // reports a name that is declared two times as a value.
+      files: ["**/*.{ts,tsx,mts,cts}"],
+      rules: { "no-redeclare": "off" },
+    },
     {
       // TEMPORARY: Astro, Vue, and Svelte compile a component's script as a module, but
       // `import/unambiguous` reports the script when it has no `import` or `export`. Remove this

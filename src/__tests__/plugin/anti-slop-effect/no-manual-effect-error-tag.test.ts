@@ -1,6 +1,6 @@
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, it } from "vitest"
-import plugin from "#presets/lint/plugin/antislop-effect/index.ts"
+import plugin from "#presets/lint/plugin/anti-slop-effect/index.ts"
 
 RuleTester.describe = describe
 

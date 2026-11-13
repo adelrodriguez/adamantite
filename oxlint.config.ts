@@ -161,8 +161,8 @@ export default defineConfig({
       {
         entries: ["index.ts"],
         layers: {
+          "anti-slop-effect": { imports: ["shared"] },
           antislop: { imports: ["shared"] },
-          "antislop-effect": { imports: ["shared"] },
           rules: { imports: ["shared"] },
           shared: { imports: [] },
         },

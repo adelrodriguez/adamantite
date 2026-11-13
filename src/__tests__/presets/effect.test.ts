@@ -9,7 +9,7 @@ import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import effect from "#presets/lint/effect.ts"
-import antislopEffectPlugin from "#presets/lint/plugin/antislop-effect/index.ts"
+import antislopEffectPlugin from "#presets/lint/plugin/anti-slop-effect/index.ts"
 import {
   lintRuleFixtures,
   listFixtureRules,

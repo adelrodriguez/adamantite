@@ -56,6 +56,21 @@ tester.run("no-module-mocking", plugin.rules["no-module-mocking"], {
       errors: [error],
       name: "method destructured from a namespace import",
     },
+    {
+      code: "const mockModule = vi.mock; mockModule('./user-store');",
+      errors: [error],
+      name: "constant alias of the method",
+    },
+    {
+      code: "const testApi = vi; testApi.mock('./user-store');",
+      errors: [error],
+      name: "constant alias of vi",
+    },
+    {
+      code: "globalThis.vi.mock('./user-store');",
+      errors: [error],
+      name: "vi read from globalThis",
+    },
   ],
   valid: [
     "const store = new InMemoryUserStore();",
@@ -82,6 +97,10 @@ tester.run("no-module-mocking", plugin.rules["no-module-mocking"], {
     {
       code: "const { doMock } = vi; function run(doMock) { doMock('./module'); }",
       name: "parameter that shadows the destructured method",
+    },
+    {
+      code: "const vi = { mock() {} }; const { mock } = vi; mock();",
+      name: "method destructured from a local object named vi",
     },
     {
       code: "let { mock } = vi; mock = registry.mock; mock('./module');",

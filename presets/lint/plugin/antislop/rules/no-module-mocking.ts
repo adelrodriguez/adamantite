@@ -1,64 +1,83 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { resolveVariable } from "../shared/scope.ts"
+import { staticKeyName } from "../shared/literals.ts"
+import {
+  isGlobalObject,
+  matchesThroughAliases,
+  readsProperty,
+  resolveVariable,
+} from "../shared/scope.ts"
 
 const moduleMockMethods = new Set(["doMock", "mock", "unstable_mockModule"])
 
-function importedName(node: ESTree.Node): string | null {
-  if (node.type !== "ImportSpecifier") return null
+/**
+ * The test framework object that each test package exports. Vitest and Jest also make the object a
+ * global.
+ */
+const frameworkExports = new Map([
+  ["@jest/globals", "jest"],
+  ["vitest", "vi"],
+])
 
-  return node.imported.type === "Identifier" ? node.imported.name : node.imported.value
+/**
+ * Return the package and the export name that an identifier imports, with `*` for a namespace
+ * import, or null when the identifier is not an import.
+ */
+function importedBinding(sourceCode: SourceCode, expression: ESTree.Node) {
+  if (expression.type !== "Identifier") return null
+  const definition = resolveVariable(sourceCode, expression)?.defs[0]
+
+  if (definition?.type !== "ImportBinding" || definition.parent?.type !== "ImportDeclaration") {
+    return null
+  }
+
+  const { node } = definition
+  const source = definition.parent.source.value
+
+  if (node.type === "ImportNamespaceSpecifier") return { name: "*", source }
+
+  if (node.type !== "ImportSpecifier") return null
+  const name = staticKeyName(node.imported, false)
+
+  return name === null ? null : { name, source }
 }
 
-function isTestFrameworkObject(
-  sourceCode: SourceCode,
-  expression: ESTree.Expression
-): expression is ESTree.IdentifierReference {
-  if (expression.type !== "Identifier") return false
-
-  if (
-    (expression.name === "vi" || expression.name === "jest")
-    && sourceCode.isGlobalReference(expression)
-  ) {
+/**
+ * Reports whether an expression reads the test framework object: the `vi` or `jest` global, such as
+ * `vi` or `globalThis.vi`, an import of it, or a property of a namespace import, such as
+ * `vitest.vi`.
+ */
+function isTestFrameworkObject(sourceCode: SourceCode, expression: ESTree.Node) {
+  if ([...frameworkExports.values()].some((name) => isGlobalObject(sourceCode, expression, name))) {
     return true
   }
 
-  const variable = resolveVariable(sourceCode, expression)
+  const imported = importedBinding(sourceCode, expression)
 
-  if (variable === null || variable.defs.length === 0) {
-    return expression.name === "vi" || expression.name === "jest"
-  }
+  if (imported !== null) return frameworkExports.get(imported.source) === imported.name
 
-  return variable.defs.some((definition) => {
-    if (definition.type !== "ImportBinding" || definition.parent?.type !== "ImportDeclaration") {
-      return false
-    }
+  if (expression.type !== "MemberExpression") return false
+  const namespace = importedBinding(sourceCode, expression.object)
 
-    const source = definition.parent.source.value
-    const name = importedName(definition.node)
-
-    return (source === "vitest" && name === "vi") || (source === "@jest/globals" && name === "jest")
-  })
+  return (
+    namespace?.name === "*"
+    && frameworkExports.get(namespace.source)
+      === staticKeyName(expression.property, expression.computed)
+  )
 }
 
-function moduleMockCall(sourceCode: SourceCode, callee: ESTree.Expression): boolean {
-  if (!("property" in callee) || !("object" in callee) || !("computed" in callee)) return false
-
-  if (!isTestFrameworkObject(sourceCode, callee.object)) return false
-  const property = callee.property
-
-  const method = callee.computed
-    ? property.type === "Literal"
-      && (property.value === "doMock"
-        || property.value === "mock"
-        || property.value === "unstable_mockModule")
-      ? property.value
-      : null
-    : property.type === "Identifier"
-      ? property.name
-      : null
-
-  return method !== null && moduleMockMethods.has(method)
+/**
+ * Reports whether a call target reads a module mock method of the test framework object, such as
+ * `vi.mock`, `vitest.vi.mock`, or `doMock` after `const { doMock } = vi`.
+ */
+function isModuleMockMethod(sourceCode: SourceCode, callee: ESTree.Node) {
+  return readsProperty(
+    sourceCode,
+    callee,
+    (name) => moduleMockMethods.has(name),
+    (owner) =>
+      matchesThroughAliases(sourceCode, owner, (node) => isTestFrameworkObject(sourceCode, node))
+  )
 }
 
 /**
@@ -68,9 +87,7 @@ const rule: Rule = {
   createOnce(context) {
     return {
       CallExpression(node) {
-        if (node.callee.type === "Super" || node.callee.type === "V8IntrinsicExpression") return
-
-        if (moduleMockCall(context.sourceCode, node.callee)) {
+        if (isModuleMockMethod(context.sourceCode, node.callee)) {
           context.report({ messageId: "moduleMock", node })
         }
       },

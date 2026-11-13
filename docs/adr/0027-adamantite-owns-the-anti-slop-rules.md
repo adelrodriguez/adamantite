@@ -36,7 +36,9 @@ The rules started as MIT-licensed code, so `license.md` keeps the anti-slop noti
 - Adamantite fixes a rule defect with a failing test and a change to the rule, as for a
   first-party rule. Upstream fixes no longer arrive through a version bump, so a maintainer ports
   a relevant upstream fix by hand.
-- The `effect` preset still loads the vendored `anti-slop-effect` bundle until it moves the same
-  way.
-- This record replaces the vendored-bundle decision in ADR 0025 for the `strict` preset. The rule
-  scope in ADR 0025 does not change.
+- The `effect` preset's `anti-slop-effect` rules moved the same way, to
+  `presets/lint/plugin/antislop-effect/`, with `scripts/copy-anti-slop-effect-rules.ts`. They keep
+  the `anti-slop-effect` namespace, and the effect preset fixtures did not change. No vendored
+  bundle remains, so `scripts/vendor-plugins.ts` and its patches are gone.
+- This record replaces the vendored-bundle decision in ADR 0025 for the `strict` preset, and in
+  ADR 0007 for the `effect` preset. The rule scope in those records does not change.

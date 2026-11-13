@@ -1,8 +1,8 @@
 # anti-slop-effect license
 
-The bundled `plugin.mjs` is a build of
-[anti-slop-effect](https://github.com/dmmulroy/anti-slop) at commit 13909c9e07590f5a85d93c62712259fe14a883f7,
-with its dependencies (MIT) inlined.
+The rules in this folder started as a copy of the Effect rules of
+[anti-slop](https://github.com/dmmulroy/anti-slop) at commit 13909c9e07590f5a85d93c62712259fe14a883f7. Adamantite changes
+them as its own code.
 
 MIT License
 

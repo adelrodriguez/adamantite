@@ -23,14 +23,6 @@ export default defineConfig([
       // Some plugin rules started as copies of MIT-licensed code, so each license notice ships at
       // its own path. `scripts/test-build.ts` checks that every notice under presets ships.
       { flatten: false, from: "presets/lint/plugin/**/license.md", to: "dist/presets" },
-      {
-        from: [
-          "presets/lint/vendor/antislop-effect/plugin.mjs",
-          "presets/lint/vendor/antislop-effect/plugin.d.mts",
-          "presets/lint/vendor/antislop-effect/license.md",
-        ],
-        to: "dist/presets/lint/vendor/antislop-effect",
-      },
     ],
     // The first-party plugin imports only types from @oxlint/plugins. Keeping the package external
     // leaves a type reference in its declarations instead of inlining Oxlint's AST types. The

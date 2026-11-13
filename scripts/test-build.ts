@@ -63,7 +63,7 @@ try {
   rmSync(fixture, { force: true, recursive: true })
 }
 
-// A preset loads a vendored bundle or the first-party plugin by a file URL next to itself, so the
+// A preset loads a first-party plugin by a file URL next to itself, so the
 // build must copy each file that a built preset names. A package name, such as `@shadcn/lint`,
 // resolves in the target project instead.
 const PresetModule = Schema.Struct({

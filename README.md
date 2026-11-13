@@ -364,7 +364,7 @@ the imports in this table, and Node.js rejects any other path in the package:
 | `adamantite/lint/tanstack`     | Opinions for [TanStack Query](https://tanstack.com/query) with route loaders: queries defined once with `queryOptions()`, and no query data copied into state. See [the tanstack preset](#the-tanstack-preset).                                                                            |
 | `adamantite/lint/nextjs`       | Next.js rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/vue`          | Vue rules.                                                                                                                                                                                                                                                                                 |
-| `adamantite/lint/effect`       | Curated [@effect/tsgo](https://github.com/Effect-TS/tsgo) rules for Effect misuse, such as effects that never run and unhandled errors, and vendored [anti-slop](https://github.com/dmmulroy/anti-slop) rules for tagged values. See [the effect preset](#the-effect-preset).              |
+| `adamantite/lint/effect`       | Curated [@effect/tsgo](https://github.com/Effect-TS/tsgo) rules for Effect misuse, such as effects that never run and unhandled errors, and [anti-slop](https://github.com/dmmulroy/anti-slop) rules for tagged values. See [the effect preset](#the-effect-preset).                       |
 | `adamantite/lint/node`         | Node.js rules.                                                                                                                                                                                                                                                                             |
 | `adamantite/lint/jest`         | Jest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                                |
 | `adamantite/lint/vitest`       | Vitest rules for test files. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                                                                                                                              |
@@ -578,9 +578,10 @@ simpler replacement (`catch-all-to-map-error`). The rules come from
 [@effect/tsgo](https://github.com/Effect-TS/tsgo), the Effect Language Service for
 TypeScript-Go, and need Oxlint's type-aware mode.
 
-The preset also turns on the rules of the `anti-slop-effect` plugin from
-[anti-slop](https://github.com/dmmulroy/anti-slop). Adamantite ships a build of it, so nothing
-extra needs to be installed. The rules report tagged values that code handles by hand:
+The preset also turns on the rules of the `anti-slop-effect` plugin. The rules started as a copy of
+[anti-slop](https://github.com/dmmulroy/anti-slop), and Adamantite now maintains them under the same
+`anti-slop-effect/*` names, so nothing extra needs to be installed. The rules report tagged values
+that code handles by hand:
 
 - `no-manual-tagged-construction` reports an object literal with a `_tag`. Use a tagged class,
   such as `Data.TaggedClass` or `Data.TaggedError`, or the `make` of a tagged Schema.

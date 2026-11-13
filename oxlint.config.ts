@@ -9,8 +9,6 @@ export default defineConfig({
   extends: [core, node, effect, strict],
   ignorePatterns: [
     ...ignorePatterns,
-    // Vendored plugin bundles are entirely generated; see scripts/vendor-plugins.ts.
-    "presets/lint/vendor/",
     // Rule fixtures break rules on purpose; see src/__tests__/presets/rule-fixtures.ts.
     "src/__tests__/presets/fixtures/",
   ],

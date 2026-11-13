@@ -103,8 +103,109 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
       code: 'const isText: (value: unknown) => value is string = (value) => typeof value === "string";',
       errors: [error],
     },
+    { code: 'function f<T>(value: T) { return typeof value === "string"; }', errors: [error] },
+    {
+      code: 'function f<T>(value: NonNullable<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>(value: NoInfer<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>(value: Awaited<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    { code: 'function f<T>(value: T & {}) { return typeof value === "string"; }', errors: [error] },
+    {
+      code: 'function f<T>(value: T & ({})) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Empty = {}; function f<T>(value: T & Empty) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>(value: T & object) { return typeof value === "function"; }',
+      errors: [error],
+    },
+    { code: 'const f = <T,>(value: T) => typeof value === "string";', errors: [error] },
+    {
+      code: 'function f<T extends unknown>(value: T) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T extends Record<string, any>>(value: T) { return typeof value.id === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>(value: T | null) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T, U extends T>(value: U) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>({ id }: T) { return typeof id === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'class Store<T> { has(value: T) { return typeof value === "string"; } }',
+      errors: [error],
+    },
+    {
+      code: 'type Data = unknown; export function f(value: Data) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Raw = unknown; type Data = Raw | null; function f(value: Data) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Loose = Record<string, any>; function f(value: Loose) { return typeof value.name === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Box<T> = T; function f(value: Box<unknown>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Box<T> = T; type Data = unknown; function f(value: Box<Data>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Payload<T> = { data: T; meta: unknown }; function f(value: Payload<string>) { return typeof value.data === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Options = { retry: unknown }; function f(options: Options) { const { retry } = options; return typeof retry === "number"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Same<X> = X; function f<T>(value: Same<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'type Data = unknown; function f<T extends Data>(value: T) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    // A type parameter hides an outer type with the same name.
+    {
+      code: 'type T = string | number; function f<T>(value: T) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function outer<T extends string>() { function inner() { type T = unknown; function show(value: T) { return typeof value === "string"; } return show; } return inner; }',
+      errors: [error],
+    },
   ],
   valid: [
+    'type NonNullable<X> = string | number; function f<T>(value: NonNullable<T>) { return typeof value === "string"; }',
+    'function f<T>(value: T & RetryOptions) { return typeof value.retry === "number"; }',
+    'function f<T extends string | number>(value: T) { return typeof value === "string"; }',
+    'function f<T extends string, U extends T>(value: U) { return typeof value === "string"; }',
+    'type T = string | number; function f(value: T) { return typeof value === "string"; }',
     'const isServer = typeof document === "undefined";',
     'const hasStorage = typeof localStorage !== "undefined";',
     'if (typeof globalThis.crypto === "undefined") throw new Error("no crypto");',
@@ -124,6 +225,15 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     'function resolve(retry: number | RetryPolicy = 3) { return typeof retry === "number"; }',
     'class AsyncRun<T> { constructor(input: AsyncRunInput<T>) { this.run = typeof input === "function" ? input : input.try; } }',
     'declare const input: string | number; export const isText = typeof input === "string";',
+    'type Input = string | (() => string); function f(value: Input) { return typeof value === "string" ? value : value(); }',
+    'type Box<T> = T; function f(value: Box<string | number>) { return typeof value === "string"; }',
+    'type Same<X> = X; function f<T extends string | number>(value: Same<T>) { return typeof value === "string"; }',
+    'type Data = unknown; namespace Local { type Data = string | number; export function f(value: Data) { return typeof value === "string"; } }',
+    // A nearer type declaration hides an outer type parameter with the same name.
+    'function outer<T>() { function inner() { type T = string | number; function show(value: T) { return typeof value === "string"; } return show; } return inner; }',
+    'function outer<T>() { function inner() { interface T { readonly kind: string } function show(value: T) { return typeof value.kind === "string"; } return show; } return inner; }',
+    // An imported alias has no declaration in the file, so the rule cannot see its body.
+    'import type { Data } from "./data"; function f(value: Data) { return typeof value === "string"; }',
     {
       code: 'function isString(value: unknown): value is string { return typeof value === "string"; }',
       options: allowInTypeGuards,

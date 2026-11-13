@@ -39,13 +39,33 @@ tester.run("no-array-filter-map", plugin.rules["no-array-filter-map"], {
       code: "function collect(users: Array<User>) { return users.filter(active).map(email); }",
       errors: [error],
     },
+    {
+      code: "function collect(users: globalThis.Array<User>) { return users.filter(active).map(email); }",
+      errors: [error],
+    },
+    {
+      code: "function collect(users: globalThis.ReadonlyArray<User>) { return users.map(email).filter(present); }",
+      errors: [error],
+    },
     { code: "const users = [] as const; users['filter'](active)['map'](email);", errors: [error] },
+    { code: "const users = []; users[`filter`](active)[`map`](email);", errors: [error] },
+    { code: "const users = []; users.map(email)[`filter`](Boolean);", errors: [error] },
     { code: "const users = []; (users.filter(active)!).map(email);", errors: [error] },
     { code: "const users = []; users?.filter(active)?.map(email);", errors: [error] },
     { code: "const users = []; users.slice().filter(active).map(email);", errors: [error] },
     {
       code: "const users = []; users.filter(active).map(email).filter(Boolean);",
       errors: [error, error],
+    },
+    {
+      code: "let zs: number[] = []; zs = load(); zs.filter(f).map(g);",
+      errors: [error],
+      name: "reassigned variable with an array annotation",
+    },
+    {
+      code: "let zs: ReadonlyArray<number>; zs = load(); zs.map(g).filter(Boolean);",
+      errors: [error],
+      name: "reassigned variable with a readonly array annotation",
     },
   ],
   valid: [
@@ -62,7 +82,13 @@ tester.run("no-array-filter-map", plugin.rules["no-array-filter-map"], {
     "const users = fetchUsers(); users.filter(active).map(email);",
     "const users = []; function collect(users) { return users.filter(active).map(email); }",
     "let users = []; users = iterator; users.filter(active).map(email);",
+    {
+      code: "let users: Iterable<User> = []; users = iterator; users.filter(active).map(email);",
+      name: "reassigned variable with an annotation that is not an array",
+    },
     "const users = []; users[method](active).map(email);",
+    `const users = []; users[\`\${method}\`](active).map(email);`,
+    "function collect(users: Lib.Array<User>) { return users.filter(active).map(email); }",
     "const first = second; const second = first; first.filter(active).map(email);",
   ],
 })

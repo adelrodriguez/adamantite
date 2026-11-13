@@ -2,14 +2,21 @@ import type { ESTree, Rule } from "@oxlint/plugins"
 
 type TypeAssertionExpression = ESTree.TSAsExpression | ESTree.TSTypeAssertion
 
+// Parentheses and `satisfies` keep the type of their operand, so a chain continues through them.
+type TransparentExpression = ESTree.ParenthesizedExpression | ESTree.TSSatisfiesExpression
+
 function isTypeAssertionExpression(node: ESTree.Node): node is TypeAssertionExpression {
   return node.type === "TSAsExpression" || node.type === "TSTypeAssertion"
 }
 
-function unwrapParenthesizedExpression(expression: ESTree.Expression): ESTree.Expression {
+function isTransparentExpression(node: ESTree.Node): node is TransparentExpression {
+  return node.type === "ParenthesizedExpression" || node.type === "TSSatisfiesExpression"
+}
+
+function unwrapTransparentExpression(expression: ESTree.Expression): ESTree.Expression {
   let current = expression
 
-  while (current.type === "ParenthesizedExpression") {
+  while (isTransparentExpression(current)) {
     current = current.expression
   }
 
@@ -30,7 +37,7 @@ function isOutermostAssertionInChain(node: TypeAssertionExpression): boolean {
   let current: ESTree.Expression = node
   let parent = node.parent
 
-  while (parent.type === "ParenthesizedExpression" && parent.expression === current) {
+  while (isTransparentExpression(parent) && parent.expression === current) {
     current = parent
     parent = parent.parent
   }
@@ -46,7 +53,7 @@ function isForbiddenAssertionChain(node: TypeAssertionExpression): boolean {
   while (isTypeAssertionExpression(current)) {
     assertionCount += 1
     hasNonConstAssertion ||= !isConstAssertion(current)
-    current = unwrapParenthesizedExpression(current.expression)
+    current = unwrapTransparentExpression(current.expression)
   }
 
   return assertionCount > 1 && hasNonConstAssertion
@@ -71,7 +78,7 @@ const rule: Rule = {
   meta: {
     docs: {
       description:
-        "Disallow chained TypeScript as and angle-bracket assertions, including parenthesized chains.",
+        "Disallow chained TypeScript as and angle-bracket assertions, including chains through parentheses or satisfies.",
     },
     messages: {
       chained:

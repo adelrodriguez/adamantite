@@ -78,7 +78,8 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
       code: "type Unsafe = Record<string, unknown>; type AlsoUnsafe = Unsafe; const x: Unsafe = {};",
       errors: 2,
     },
-    { code: "type Index<T = unknown> = Record<string, T>; type A = Index;", errors: 1 },
+    // An unsafe default makes the declaration unsafe, and the alias that uses it reports too.
+    { code: "type Index<T = unknown> = Record<string, T>; type A = Index;", errors: 2 },
     {
       code: "type Index<T, U = T> = Record<string, U>; type A = Index<string, unknown>;",
       errors: 1,
@@ -90,7 +91,7 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     },
     {
       code: "type Marker<T> = { readonly __brand?: never }; type Index<T, U = Marker<T>> = Record<string, U>; type A = Index<Item>;",
-      errors: 1,
+      errors: 2,
     },
     {
       code: "function outer() { type Identity<T> = T; type A = Record<string, Identity<unknown>>; }",
@@ -118,6 +119,70 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
       code: "function outer() { type Exclude<T, U> = { value: T; filter: U }; type A = Exclude<string, Record<string, unknown>>; }",
       errors: [error],
     },
+    // A heritage clause is a dictionary contract too.
+    { code: "interface Bag extends Record<string, unknown> { id: string }", errors: [error] },
+    { code: "interface Bag extends Readonly<Record<string, unknown>> {}", errors: [error] },
+    {
+      code: "class Bag implements Record<string, unknown> { [key: string]: string }",
+      errors: [error],
+    },
+    { code: "interface Bag extends globalThis.Record<string, unknown> {}", errors: [error] },
+    // A default type argument is the value type of every plain use of the alias.
+    { code: "type Bag<T = unknown> = Record<string, T>; const a: Bag = {};", errors: [error] },
+    { code: "interface Bag<T = unknown> { [key: string]: T }", errors: [error] },
+    // `globalThis.Record` names the global type, even where an import shadows `Record`.
+    { code: "type A = globalThis.Record<string, unknown>;", errors: [error] },
+    {
+      code: 'import { Record } from "effect"; type A = globalThis.Record<string, unknown>;',
+      errors: [error],
+    },
+    { code: "type A = Record<string, globalThis.Readonly<unknown>>;", errors: [error] },
+    { code: "class Bag<T = unknown> implements Record<string, T> { [key: string]: T }", errors: 2 },
+    // A key set that can be open stays a dictionary.
+    { code: "type A = Record<string | 'a', unknown>;", errors: [error] },
+    { code: "type Key = string; type A = Record<Key, unknown>;", errors: [error] },
+    { code: 'import type { Key } from "./key"; type A = Record<Key, unknown>;', errors: [error] },
+    { code: "type A<K extends string> = { [P in K]: unknown };", errors: [error] },
+    // An `as` clause names the keys of a mapped type, so its keys decide whether the type is open.
+    { code: "type Bag = { [K in 'seed' as string]: unknown };", errors: [error] },
+    // A named interface passes its type arguments to its index signatures and heritage, as an
+    // alias passes them to its body.
+    {
+      code: "interface Bag<V> extends Record<string, V> {} type A = Bag<unknown>;",
+      errors: [error],
+    },
+    {
+      code: "interface Bag<V> extends Record<string, V> {} function f(bag: Bag<unknown>) {}",
+      errors: [error],
+    },
+    {
+      code: "interface Bag<V> extends Record<string, V> {} const bag: Bag<unknown> = {};",
+      errors: [error],
+    },
+    {
+      code: "interface Bag<K extends string, V> extends Readonly<Record<K, V>> {} type A = Bag<string, any>;",
+      errors: [error],
+    },
+    { code: "interface Bag<T> { [key: string]: T } type A = Bag<unknown>;", errors: [error] },
+    {
+      code: "interface Bag<T> { [key: string]: T } interface Outer<U> extends Bag<U> {} type A = Outer<object>;",
+      errors: [error],
+    },
+    // A plain use of an unsafe interface reports only at the declaration, as a plain alias use does.
+    {
+      code: "interface Bag<T = unknown> { [key: string]: T } const a: Bag = {}; function f(bag: Bag) {}",
+      errors: 1,
+    },
+    {
+      code: "interface Bag extends Record<string, unknown> {} const a: Bag = {}; function f(bag: Bag) {}",
+      errors: 1,
+    },
+    // A nearer alias hides an outer type parameter with the same name.
+    {
+      code: "function outer<T>() { function inner() { type T = unknown; type A = Record<string, T>; } }",
+      errors: [error],
+    },
+    { code: `type Bag = { [K in 'a' | 'b' as \`get\${string}\`]: unknown };`, errors: [error] },
   ],
   valid: [
     "type Commands = Record<string, Command>;",
@@ -154,5 +219,22 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     "export type NotPlain<T> = Exclude<T, Readonly<Record<string, unknown>>>;",
     "type Merge<T> = T; export type Deep<T> = { [K in keyof T]: T[K] extends Record<string, unknown> ? Merge<T[K]> : T[K] };",
     "export type Nested<T> = T extends { readonly data: Record<string, unknown> } ? T['data'] : never;",
+    "interface Owner extends Record<string, Command> { id: string }",
+    "class Store implements Record<string, string> { [key: string]: string }",
+    "interface Record<K, V> { key: K; value: V } interface Bag extends Record<string, unknown> {}",
+    "type Bag<T = Command> = Record<string, T>; const a: Bag = {};",
+    "interface Bag<T = Command> { [key: string]: T }",
+    "type A = globalThis.Record<string, Command>;",
+    // A finite literal key set is a closed object, like `{ a: unknown; b: unknown }`.
+    "type A = Record<'a' | 'b', unknown>;",
+    "interface Bag<V> extends Record<string, V> {} type A = Bag<number>; const bag: Bag<Command> = {};",
+    "interface Bag<K extends string, V> extends Record<K, V> {} type A = Bag<'a' | 'b', unknown>;",
+    "interface Bag<T> { [key: string]: T } function f(bag: Bag<Command>) {}",
+    "type Kind = 'a' | 'b'; type A = { [K in Kind]: unknown };",
+    `type Kind = 'a' | 'b'; type A = { [K in Kind as \`get\${K}\`]: unknown };`,
+    "type A = { [K in 'a' | 'b' as K]: unknown };",
+    "type A = Partial<Record<'a', unknown>>;",
+    "interface Bag<T = unknown> { read<T>(input: Record<string, T>): T }",
+    "export type Plain<T> = globalThis.Extract<T, Record<string, unknown>>;",
   ],
 })

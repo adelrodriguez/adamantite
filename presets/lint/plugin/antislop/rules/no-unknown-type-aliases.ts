@@ -1,10 +1,10 @@
-import type { ESTree, Rule } from "@oxlint/plugins"
+import type { Rule } from "@oxlint/plugins"
 
 import {
   createTypeAliasEnvironment,
-  resolvedTypeMatches,
   type TypeAliasEnvironment,
 } from "../shared/type-alias-resolution.ts"
+import { resolvesToUnknown } from "../shared/unknown-type.ts"
 
 /**
  * Ban named aliases that merely conceal TypeScript's unknown top type.
@@ -13,24 +13,12 @@ const rule: Rule = {
   createOnce(context) {
     let environment: TypeAliasEnvironment | null = null
 
-    const resolvesToUnknown = (type: ESTree.TSType): boolean =>
-      environment !== null
-      && resolvedTypeMatches(type, environment, (resolved, matches) => {
-        if (resolved.type === "TSUnknownKeyword") return true
-
-        if (resolved.type === "TSParenthesizedType") {
-          return matches(resolved.typeAnnotation)
-        }
-
-        return resolved.type === "TSUnionType" && resolved.types.some(matches)
-      })
-
     return {
       Program(node) {
         environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
       },
       TSTypeAliasDeclaration(node) {
-        if (!resolvesToUnknown(node.typeAnnotation)) return
+        if (environment === null || !resolvesToUnknown(node.typeAnnotation, environment)) return
         context.report({
           data: { alias: node.id.name },
           messageId: "unknownAlias",

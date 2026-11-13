@@ -1,8 +1,13 @@
 import type { Definition, ESTree, Rule, SourceCode } from "@oxlint/plugins"
-import type { VisitorKeys } from "../shared/child-nodes.ts"
 import { readBooleanOption } from "../../options.ts"
-import { mentionsUncheckedType } from "../shared/function-parameters.ts"
 import { resolveVariable } from "../shared/scope.ts"
+import {
+  createTypeAliasEnvironment,
+  resolvedTypeMatches,
+  visibleTypeParameter,
+  type TypeAliasEnvironment,
+} from "../shared/type-alias-resolution.ts"
+import { builtInTypeName, mentionsUncheckedType } from "../shared/unknown-type.ts"
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function
 
@@ -154,18 +159,104 @@ function declaredType(
 }
 
 /**
+ * Return the type parameter that a type reference names, as `T` in `<T>(value: T)`, or null when
+ * the reference names another type. A nearer type declaration with the same name hides the
+ * parameter.
+ */
+function referencedTypeParameter(
+  type: ESTree.TSTypeReference,
+  environment: TypeAliasEnvironment
+): ESTree.TSTypeParameter | null {
+  return type.typeName.type !== "Identifier" || type.typeArguments
+    ? null
+    : visibleTypeParameter(type.typeName.name, type, environment)
+}
+
+/**
+ * Return whether a declared type may hold any value, because it is a type parameter with no
+ * constraint, or with a constraint that has `unknown` or `any`, as in `<T>(value: T)`. A union
+ * matches when one of its members matches. The check resolves local aliases, as in `type Same<X> =
+ * X` with `value: Same<T>`.
+ */
+/**
+ * Built-in types that hold every value of their type argument, apart from `null` and `undefined`,
+ * so `NonNullable<T>` holds any value of an unconstrained `T`.
+ */
+const PASS_THROUGH_TYPES: ReadonlySet<string> = new Set(["Awaited", "NoInfer", "NonNullable"])
+
+/**
+ * Return whether an intersection member leaves the other members as they are, as `{}` and `object`
+ * do for an unconstrained `T`. Local aliases resolve to their bodies.
+ */
+function addsNothing(type: ESTree.TSType, environment: TypeAliasEnvironment): boolean {
+  return resolvedTypeMatches(type, environment, (resolved, matches) => {
+    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
+
+    return (
+      resolved.type === "TSObjectKeyword"
+      || resolved.type === "TSUnknownKeyword"
+      || (resolved.type === "TSTypeLiteral" && resolved.members.length === 0)
+    )
+  })
+}
+
+function isUncheckedTypeParameter(
+  type: ESTree.TSType,
+  environment: TypeAliasEnvironment,
+  seen: ReadonlySet<ESTree.TSTypeParameter>
+): boolean {
+  return resolvedTypeMatches(type, environment, (resolved, matches) => {
+    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
+
+    if (resolved.type === "TSUnionType") return resolved.types.some(matches)
+
+    if (resolved.type === "TSIntersectionType") {
+      return (
+        resolved.types.some(matches)
+        && resolved.types.every((member) => addsNothing(member, environment) || matches(member))
+      )
+    }
+
+    if (resolved.type !== "TSTypeReference") return false
+    const wrapper = builtInTypeName(resolved, environment)
+    const argument = resolved.typeArguments?.params[0]
+
+    if (wrapper !== null && PASS_THROUGH_TYPES.has(wrapper) && argument !== undefined) {
+      return matches(argument)
+    }
+
+    const parameter = referencedTypeParameter(resolved, environment)
+
+    if (parameter === null || seen.has(parameter)) return false
+    const constraint = parameter.constraint
+
+    return (
+      constraint === null
+      || mentionsUncheckedType(constraint, environment)
+      || isUncheckedTypeParameter(constraint, environment, new Set([...seen, parameter]))
+    )
+  })
+}
+
+/**
  * Return whether a `typeof` operand reads a binding with a declared type that has no `unknown` or
- * `any`. Such a value is already parsed, so `typeof` only picks a member of an owned union.
+ * `any`, and that is not a type parameter that may hold any value. Such a value is already parsed,
+ * so `typeof` only picks a member of an owned union. Local aliases resolve to their bodies. An
+ * imported alias has no body in the file, so it counts as owned.
  */
 function hasOwnedType(
   argument: ESTree.Expression,
   sourceCode: SourceCode,
-  visitorKeys: VisitorKeys
+  environment: TypeAliasEnvironment
 ): boolean {
   const root = operandRoot(argument)
   const type = root === null ? null : declaredType(root, sourceCode)
 
-  return type !== null && !mentionsUncheckedType(type, visitorKeys)
+  return (
+    type !== null
+    && !mentionsUncheckedType(type, environment)
+    && !isUncheckedTypeParameter(type, environment, new Set())
+  )
 }
 
 /**
@@ -173,14 +264,20 @@ function hasOwnedType(
  */
 const rule: Rule = {
   createOnce(context) {
+    let environment: TypeAliasEnvironment | null = null
+
     return {
+      Program(node) {
+        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
+      },
       UnaryExpression(node) {
         const allowInTypeGuards = readBooleanOption(context.options, "allowInTypeGuards") === true
 
         if (
-          node.operator === "typeof"
+          environment !== null
+          && node.operator === "typeof"
           && !isExistenceProbe(node)
-          && !hasOwnedType(node.argument, context.sourceCode, context.sourceCode.visitorKeys)
+          && !hasOwnedType(node.argument, context.sourceCode, environment)
           && (!allowInTypeGuards || !isInsideTypeGuard(node))
         ) {
           context.report({ messageId: "runtimeTypeof", node })
@@ -192,7 +289,7 @@ const rule: Rule = {
     defaultOptions: [{ allowInTypeGuards: false }],
     docs: {
       description:
-        "Disallow runtime typeof checks on values that may be unparsed. Decode external values into meaningful types at their I/O boundary. A value with a declared type that has no `unknown` or `any` may use typeof.",
+        "Disallow runtime typeof checks on values that may be unparsed. Decode external values into meaningful types at their I/O boundary. A value with a declared type that has no `unknown` or `any`, and that is not an unconstrained type parameter, may use typeof. The rule resolves local type aliases before it checks the type.",
     },
     messages: {
       runtimeTypeof:

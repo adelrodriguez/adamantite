@@ -1,9 +1,13 @@
 import type { ESTree } from "@oxlint/plugins"
 
+import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts"
 import {
   createTypeAliasEnvironment,
   hasVisibleTypeBinding,
+  namedTypeReference,
   visibleTypeAlias,
+  visibleInterfaces,
+  type NamedTypeReference,
   type TypeAliasEnvironment as LexicalTypeAliasEnvironment,
 } from "./type-alias-resolution.ts"
 
@@ -16,9 +20,18 @@ const BUILT_INS = new Set([
   "Omit",
   "PropertyKey",
   "NonNullable",
+  "Uppercase",
+  "Lowercase",
+  "Capitalize",
+  "Uncapitalize",
 ])
 
 const TRANSPARENT_WRAPPERS = new Set(["Readonly", "Partial", "Required", "NonNullable"])
+
+/**
+ * The built-in string types that map each key to one key, so the key set keeps its size.
+ */
+const KEY_CASE_CHANGES = new Set(["Uppercase", "Lowercase", "Capitalize", "Uncapitalize"])
 
 /**
  * The type argument bound to each type parameter, with the substitutions of the place that wrote
@@ -48,44 +61,178 @@ export type WideningTarget = {
 }
 
 export type TypeEnvironment = {
-  readonly interfaces: ReadonlyMap<string, readonly ESTree.TSInterfaceDeclaration[]>
   readonly typeAliases: LexicalTypeAliasEnvironment
-}
-
-function declaredStatement(statement: ESTree.Statement): ESTree.Node | null {
-  return statement.type === "ExportNamedDeclaration"
-    || statement.type === "ExportDefaultDeclaration"
-    ? (statement.declaration ?? null)
-    : statement
 }
 
 export function createTypeEnvironment(
   program: ESTree.Program,
   visitorKeys: Readonly<Record<string, readonly string[]>>
 ): TypeEnvironment {
-  const interfaces = new Map<string, ESTree.TSInterfaceDeclaration[]>()
-
-  for (const statement of program.body) {
-    const declaration = declaredStatement(statement)
-
-    if (declaration?.type !== "TSInterfaceDeclaration") continue
-    const declarations = interfaces.get(declaration.id.name) ?? []
-    declarations.push(declaration)
-    interfaces.set(declaration.id.name, declarations)
-  }
-
-  return {
-    interfaces,
-    typeAliases: createTypeAliasEnvironment(program, visitorKeys),
-  }
+  return { typeAliases: createTypeAliasEnvironment(program, visitorKeys) }
 }
 
-function typeReferenceName(type: ESTree.TSTypeReference): string | null {
-  return type.typeName.type === "Identifier" ? type.typeName.name : null
+function isBuiltIn(
+  reference: NamedTypeReference,
+  name: string,
+  environment: TypeEnvironment
+): boolean {
+  return (
+    reference.name === name
+    && BUILT_INS.has(name)
+    && (reference.global || !hasVisibleTypeBinding(name, reference.node, environment.typeAliases))
+  )
 }
 
-function isBuiltIn(name: string, use: ESTree.Node, environment: TypeEnvironment): boolean {
-  return BUILT_INS.has(name) && !hasVisibleTypeBinding(name, use, environment.typeAliases)
+function isTransparentWrapper(reference: NamedTypeReference, environment: TypeEnvironment) {
+  return (
+    TRANSPARENT_WRAPPERS.has(reference.name) && isBuiltIn(reference, reference.name, environment)
+  )
+}
+
+/**
+ * Return the type argument bound to a type parameter. A `globalThis` use names no type parameter.
+ */
+function substitutionFor(
+  reference: NamedTypeReference,
+  substitutions: TypeAliasEnvironment
+): ResolvedType | undefined {
+  return reference.global ? undefined : substitutions.get(reference.name)
+}
+
+function localAlias(
+  reference: NamedTypeReference,
+  environment: TypeEnvironment
+): ESTree.TSTypeAliasDeclaration | null {
+  return reference.global
+    ? null
+    : visibleTypeAlias(reference.name, reference.node, environment.typeAliases)
+}
+
+function localInterfaces(
+  reference: NamedTypeReference,
+  environment: TypeEnvironment
+): readonly ESTree.TSInterfaceDeclaration[] {
+  return reference.global
+    ? []
+    : visibleInterfaces(reference.name, reference.node, environment.typeAliases)
+}
+
+function hasTypeParameters(
+  declaration: ESTree.TSInterfaceDeclaration | ESTree.TSTypeAliasDeclaration
+): boolean {
+  return (declaration.typeParameters?.params.length ?? 0) > 0
+}
+
+const BROAD_KEY_TYPES: ReadonlySet<string> = new Set([
+  "TSNumberKeyword",
+  "TSStringKeyword",
+  "TSSymbolKeyword",
+])
+
+const FINITE_KEY_TYPES: ReadonlySet<string> = new Set(["TSLiteralType", "TSNeverKeyword"])
+
+/**
+ * How many keys a key type allows. `string`, `number`, `symbol`, and `PropertyKey` allow any key,
+ * and literal types allow a finite set. An imported type or an unbound type parameter is
+ * unresolved, because the rule cannot see its keys.
+ */
+type KeyBreadth = "broad" | "finite" | "unresolved"
+
+function unionKeyBreadth(members: readonly KeyBreadth[]): KeyBreadth {
+  if (members.includes("broad")) return "broad"
+
+  return members.every((member) => member === "finite") ? "finite" : "unresolved"
+}
+
+function keyBreadth(
+  type: ESTree.TSType,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment,
+  visitedAliases: ReadonlySet<string> = new Set()
+): KeyBreadth {
+  const unwrapped = unwrapTransparentType(type)
+
+  if (BROAD_KEY_TYPES.has(unwrapped.type)) return "broad"
+
+  if (FINITE_KEY_TYPES.has(unwrapped.type)) return "finite"
+
+  if (unwrapped.type === "TSUnionType") {
+    return unionKeyBreadth(
+      unwrapped.types.map((member) =>
+        keyBreadth(member, environment, substitutions, visitedAliases)
+      )
+    )
+  }
+
+  // A template over finite parts, such as `get${"a" | "b"}`, has finite keys. The rule does not
+  // read the keys of other templates.
+  if (unwrapped.type === "TSTemplateLiteralType") {
+    return unwrapped.types.every(
+      (part) => keyBreadth(part, environment, substitutions, visitedAliases) === "finite"
+    )
+      ? "finite"
+      : "unresolved"
+  }
+
+  if (unwrapped.type !== "TSTypeReference") return "unresolved"
+  const reference = namedTypeReference(unwrapped)
+
+  if (reference === null) return "unresolved"
+  const { name, typeArguments } = reference
+  const substitution = substitutionFor(reference, substitutions)
+
+  if (substitution !== undefined) {
+    return keyBreadth(substitution.type, environment, substitution.substitutions, visitedAliases)
+  }
+
+  if (isBuiltIn(reference, "PropertyKey", environment)) return "broad"
+
+  if (KEY_CASE_CHANGES.has(name) && isBuiltIn(reference, name, environment)) {
+    const [key] = typeArguments
+
+    return key === undefined
+      ? "unresolved"
+      : keyBreadth(key, environment, substitutions, visitedAliases)
+  }
+
+  const alias = localAlias(reference, environment)
+
+  if (alias === null || hasTypeParameters(alias) || visitedAliases.has(name)) return "unresolved"
+  const nextVisited = new Set(visitedAliases)
+  nextVisited.add(name)
+
+  return keyBreadth(alias.typeAnnotation, environment, new Map(), nextVisited)
+}
+
+/**
+ * Return the breadth of a `Record` key. `Record` with no type arguments is still an error in
+ * TypeScript, so treat it as open.
+ */
+function recordKeyBreadth(
+  reference: NamedTypeReference,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment
+): KeyBreadth {
+  const [key] = reference.typeArguments
+
+  return key === undefined ? "broad" : keyBreadth(key, environment, substitutions)
+}
+
+/**
+ * Return the breadth of the keys of a mapped type. An `as` clause, as in `[K in Kind as
+ * Uppercase<K>]`, names the keys, and it sees the key parameter as its constraint. The clause can
+ * map each key to any key, so only a finite clause keeps the keys finite.
+ */
+function mappedKeyBreadth(
+  type: ESTree.TSMappedType,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment
+): KeyBreadth {
+  if (type.nameType === null) return keyBreadth(type.constraint, environment, substitutions)
+  const keySubstitutions = new Map(substitutions)
+  keySubstitutions.set(type.key.name, { substitutions, type: type.constraint })
+
+  return keyBreadth(type.nameType, environment, keySubstitutions) === "finite" ? "finite" : "broad"
 }
 
 function unwrapTransparentType(type: ESTree.TSType): ESTree.TSType {
@@ -131,17 +278,17 @@ function isEffectivelyEmptyInterface(
 }
 
 /**
- * Bind an alias's type parameters for its body. The body sees only these parameters, because the
- * type parameters of the alias that refers to it are not in scope there. Each explicit argument
- * keeps the substitutions of the place that wrote it, and a default sees the parameters before it.
+ * Bind the type parameters of an alias or an interface for its body and heritage. The body sees
+ * only these parameters, because the type parameters of the type that refers to it are not in scope
+ * there. Each explicit argument keeps the substitutions of the place that wrote it, and a default
+ * sees the parameters before it.
  */
-function aliasSubstitution(
-  alias: ESTree.TSTypeAliasDeclaration,
-  type: ESTree.TSTypeReference,
+function typeArgumentSubstitution(
+  declaration: ESTree.TSInterfaceDeclaration | ESTree.TSTypeAliasDeclaration,
+  arguments_: readonly ESTree.TSType[],
   base: TypeAliasEnvironment
 ): TypeAliasEnvironment | null {
-  const parameters = alias.typeParameters?.params ?? []
-  const arguments_ = type.typeArguments?.params ?? []
+  const parameters = declaration.typeParameters?.params ?? []
   const next = new Map<string, ResolvedType>()
 
   for (const [index, parameter] of parameters.entries()) {
@@ -196,19 +343,20 @@ function unsafeDirectValue(
   }
 
   if (unwrapped.type !== "TSTypeReference") return null
-  const name = typeReferenceName(unwrapped)
+  const reference = namedTypeReference(unwrapped)
 
-  if (name === null) return null
+  if (reference === null) return null
+  const { name, typeArguments } = reference
 
-  if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
-    const wrapped = unwrapped.typeArguments?.params[0]
+  if (isTransparentWrapper(reference, environment)) {
+    const [wrapped] = typeArguments
 
     return wrapped === undefined
       ? null
       : unsafeDirectValue(wrapped, environment, substitutions, resolvingAliases)
   }
 
-  const substitution = substitutions.get(name)
+  const substitution = substitutionFor(reference, substitutions)
 
   if (substitution !== undefined) {
     return unsafeDirectValue(
@@ -219,16 +367,16 @@ function unsafeDirectValue(
     )
   }
 
-  const interfaceDeclarations = environment.interfaces.get(name)
+  const interfaceDeclarations = localInterfaces(reference, environment)
 
-  if (interfaceDeclarations !== undefined) {
+  if (interfaceDeclarations.length > 0) {
     return isEffectivelyEmptyInterface(interfaceDeclarations) ? "empty-object" : null
   }
 
-  const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases)
+  const alias = localAlias(reference, environment)
 
   if (alias === null || resolvingAliases.has(name)) return null
-  const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions)
+  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
 
   if (nextSubstitutions === null) return null
   const nextResolving = new Set(resolvingAliases)
@@ -255,16 +403,27 @@ function dictionaryValueTypes(
 
   if (unwrapped.type === "TSMappedType") {
     return unwrapped.typeAnnotation === null
+      || mappedKeyBreadth(unwrapped, environment, substitutions) === "finite"
       ? []
       : [{ substitutions, type: unwrapped.typeAnnotation }]
   }
 
   if (unwrapped.type !== "TSTypeReference") return []
-  const name = typeReferenceName(unwrapped)
+  const reference = namedTypeReference(unwrapped)
 
-  if (name === null) return []
+  return reference === null
+    ? []
+    : referenceValueTypes(reference, environment, substitutions, resolvingAliases)
+}
 
-  const substitution = substitutions.get(name)
+function referenceValueTypes(
+  reference: NamedTypeReference,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment,
+  resolvingAliases: ReadonlySet<string>
+): readonly ResolvedType[] {
+  const { name, typeArguments } = reference
+  const substitution = substitutionFor(reference, substitutions)
 
   if (substitution !== undefined) {
     return dictionaryValueTypes(
@@ -275,54 +434,136 @@ function dictionaryValueTypes(
     )
   }
 
-  if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
-    const wrapped = unwrapped.typeArguments?.params[0]
+  if (isTransparentWrapper(reference, environment)) {
+    const [wrapped] = typeArguments
 
     return wrapped === undefined
       ? []
       : dictionaryValueTypes(wrapped, environment, substitutions, resolvingAliases)
   }
 
-  if (name === "Record" && isBuiltIn(name, unwrapped, environment)) {
-    const value = unwrapped.typeArguments?.params[1] ?? null
+  if (isBuiltIn(reference, "Record", environment)) {
+    const value = typeArguments[1]
 
-    return value === null ? [] : [{ substitutions, type: value }]
+    return value === undefined
+      || recordKeyBreadth(reference, environment, substitutions) === "finite"
+      ? []
+      : [{ substitutions, type: value }]
   }
 
-  if ((name === "Pick" || name === "Omit") && isBuiltIn(name, unwrapped, environment)) {
-    const source = unwrapped.typeArguments?.params[0]
+  if (isBuiltIn(reference, "Pick", environment) || isBuiltIn(reference, "Omit", environment)) {
+    const [source] = typeArguments
 
     return source === undefined
       ? []
       : dictionaryValueTypes(source, environment, substitutions, resolvingAliases)
   }
 
-  const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases)
-
-  if (alias === null || resolvingAliases.has(name)) return []
-  const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions)
-
-  if (nextSubstitutions === null) return []
+  if (resolvingAliases.has(name)) return []
   const nextResolving = new Set(resolvingAliases)
   nextResolving.add(name)
+  const alias = localAlias(reference, environment)
 
-  return dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving)
+  if (alias === null) {
+    return localInterfaces(reference, environment).flatMap((declaration) =>
+      interfaceValueTypes(declaration, reference, environment, substitutions, nextResolving)
+    )
+  }
+
+  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
+
+  return nextSubstitutions === null
+    ? []
+    : dictionaryValueTypes(alias.typeAnnotation, environment, nextSubstitutions, nextResolving)
 }
 
-export function classifyUnsafeDictionaryValue(
-  valueType: ESTree.TSType,
-  environment: TypeEnvironment
-): UnsafeDictionary | null {
-  const unsafeValue = unsafeDirectValue(valueType, environment, new Map(), new Set())
+/**
+ * Return the value types of an interface's index signatures and of the types it extends. They see
+ * the type arguments of the use, as an alias body does.
+ */
+function interfaceValueTypes(
+  declaration: ESTree.TSInterfaceDeclaration,
+  reference: NamedTypeReference,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment,
+  resolvingAliases: ReadonlySet<string>
+): readonly ResolvedType[] {
+  const nextSubstitutions = typeArgumentSubstitution(
+    declaration,
+    reference.typeArguments,
+    substitutions
+  )
 
-  return unsafeValue === null ? null : { kind: "unsafe-dictionary", unsafeValue }
+  if (nextSubstitutions === null) return []
+
+  const indexValues = declaration.body.body.flatMap((member): readonly ResolvedType[] =>
+    member.type === "TSIndexSignature"
+      ? [{ substitutions: nextSubstitutions, type: member.typeAnnotation.typeAnnotation }]
+      : []
+  )
+
+  const heritageValues = declaration.extends.flatMap((heritage) => {
+    const base = namedTypeReference(heritage)
+
+    return base === null
+      ? []
+      : referenceValueTypes(base, environment, nextSubstitutions, resolvingAliases)
+  })
+
+  return [...indexValues, ...heritageValues]
 }
 
-export function classifyUnsafeDictionary(
-  type: ESTree.TSType,
+type GenericDeclaration =
+  | ESTree.Class
+  | ESTree.TSInterfaceDeclaration
+  | ESTree.TSTypeAliasDeclaration
+
+function enclosingGenericDeclaration(node: ESTree.Node): GenericDeclaration | null {
+  let current: ESTree.Node | null = node.parent
+
+  while (current !== null && current.type !== "Program") {
+    if (
+      current.type === "TSTypeAliasDeclaration"
+      || current.type === "TSInterfaceDeclaration"
+      || current.type === "ClassDeclaration"
+      || current.type === "ClassExpression"
+    ) {
+      return current
+    }
+
+    current = current.parent
+  }
+
+  return null
+}
+
+/**
+ * Bind the type parameters of the enclosing declaration to their defaults. A plain use of the
+ * declaration, such as `Bag` for `type Bag<T = unknown> = Record<string, T>`, gets these types, so
+ * the declaration states them. A closer binder with the same name hides a parameter.
+ */
+function defaultTypeArguments(node: ESTree.Node, environment: TypeEnvironment) {
+  const declaration = enclosingGenericDeclaration(node)
+  const defaults = new Map<string, ResolvedType>()
+
+  if (declaration === null) return defaults
+  const hidden = lexicalTypeParameterNames(node, environment.typeAliases.visitorKeys, declaration)
+
+  for (const parameter of declaration.typeParameters?.params ?? []) {
+    const name = parameter.name.name
+
+    if (parameter.default === null || hidden.has(name)) continue
+    defaults.set(name, { substitutions: new Map(defaults), type: parameter.default })
+  }
+
+  return defaults
+}
+
+function classifyValueTypes(
+  valueTypes: readonly ResolvedType[],
   environment: TypeEnvironment
 ): UnsafeDictionary | null {
-  for (const valueType of dictionaryValueTypes(type, environment, new Map(), new Set())) {
+  for (const valueType of valueTypes) {
     const unsafeValue = unsafeDirectValue(
       valueType.type,
       environment,
@@ -334,6 +575,46 @@ export function classifyUnsafeDictionary(
   }
 
   return null
+}
+
+export function classifyUnsafeDictionaryValue(
+  valueType: ESTree.TSType,
+  environment: TypeEnvironment
+): UnsafeDictionary | null {
+  return classifyValueTypes(
+    [{ substitutions: defaultTypeArguments(valueType, environment), type: valueType }],
+    environment
+  )
+}
+
+export function classifyUnsafeDictionary(
+  type: ESTree.TSType,
+  environment: TypeEnvironment
+): UnsafeDictionary | null {
+  const substitutions = defaultTypeArguments(type, environment)
+
+  return classifyValueTypes(
+    dictionaryValueTypes(type, environment, substitutions, new Set()),
+    environment
+  )
+}
+
+/**
+ * Classify the type that an interface `extends` clause or a class `implements` clause names.
+ */
+export function classifyUnsafeHeritage(
+  heritage: ESTree.TSClassImplements | ESTree.TSInterfaceHeritage,
+  environment: TypeEnvironment
+): UnsafeDictionary | null {
+  const reference = namedTypeReference(heritage)
+
+  if (reference === null) return null
+  const substitutions = defaultTypeArguments(heritage, environment)
+
+  return classifyValueTypes(
+    referenceValueTypes(reference, environment, substitutions, new Set()),
+    environment
+  )
 }
 
 export function classifyWideningTarget(
@@ -354,119 +635,71 @@ export function classifyWideningTarget(
         : null
   }
 
-  if (unwrapped.type === "TSMappedType") return { kind: "open dictionary" }
+  if (unwrapped.type === "TSMappedType") {
+    return mappedKeyBreadth(unwrapped, environment, new Map()) === "broad"
+      ? { kind: "open dictionary" }
+      : null
+  }
 
   if (unwrapped.type !== "TSTypeReference") return null
-  const name = typeReferenceName(unwrapped)
+  const reference = namedTypeReference(unwrapped)
 
-  if (name === null) return null
+  if (reference === null) return null
+  const [wrapped] = reference.typeArguments
 
-  if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
-    const wrapped = unwrapped.typeArguments?.params[0]
-
+  if (isTransparentWrapper(reference, environment)) {
     return wrapped === undefined ? null : classifyWideningTarget(wrapped, environment)
   }
 
-  if (name === "Record" && isBuiltIn(name, unwrapped, environment)) {
-    return hasBroadRecordKey(unwrapped, environment, new Map()) ? { kind: "open dictionary" } : null
-  }
+  const resolved = classifyReferenceBroadTarget(reference, environment, new Map(), new Set())
 
-  const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases)
+  const declaration =
+    localAlias(reference, environment) ?? localInterfaces(reference, environment)[0]
 
-  if (alias === null) return null
+  // A generic named type is a container for the caller's values, and its other broad targets
+  // depend on the type argument.
+  if (declaration === undefined || !hasTypeParameters(declaration)) return resolved
 
-  if ((alias.typeParameters?.params.length ?? 0) > 0) {
-    const substitutions = aliasSubstitution(alias, unwrapped, new Map())
-
-    const resolved =
-      substitutions === null
-        ? null
-        : classifyAliasBroadTarget(
-            alias.typeAnnotation,
-            environment,
-            substitutions,
-            new Set([name])
-          )
-
-    return resolved?.kind === "open dictionary" ? { kind: "generic container" } : null
-  }
-
-  const substitutions = aliasSubstitution(alias, unwrapped, new Map())
-
-  if (substitutions === null) return null
-
-  const resolved = classifyAliasBroadTarget(
-    alias.typeAnnotation,
-    environment,
-    substitutions,
-    new Set([name])
-  )
-
-  return resolved
+  return resolved?.kind === "open dictionary" ? { kind: "generic container" } : null
 }
 
-function hasBroadRecordKey(
-  type: ESTree.TSTypeReference,
-  environment: TypeEnvironment,
-  substitutions: TypeAliasEnvironment
-): boolean {
-  const key = type.typeArguments?.params[0]
-
-  return key === undefined || isBroadMappedKey(key, environment, substitutions)
-}
-
-function isBroadMappedKey(
-  type: ESTree.TSType,
+/**
+ * Return whether an interface accepts any key, through an index signature of its own or through a
+ * type it extends. The heritage sees the type arguments of the use, as an alias body does.
+ */
+function isOpenInterface(
+  declarations: readonly ESTree.TSInterfaceDeclaration[],
+  reference: NamedTypeReference,
   environment: TypeEnvironment,
   substitutions: TypeAliasEnvironment,
-  visitedAliases: ReadonlySet<string> = new Set()
+  resolvingAliases: ReadonlySet<string>
 ): boolean {
-  const unwrapped = unwrapTransparentType(type)
+  return declarations.some((declaration) => {
+    if (declaration.body.body.some((member) => member.type === "TSIndexSignature")) return true
 
-  if (
-    unwrapped.type === "TSStringKeyword"
-    || unwrapped.type === "TSNumberKeyword"
-    || unwrapped.type === "TSSymbolKeyword"
-  ) {
-    return true
-  }
-
-  if (unwrapped.type === "TSUnionType") {
-    return unwrapped.types.some((member) =>
-      isBroadMappedKey(member, environment, substitutions, visitedAliases)
+    const heritageSubstitutions = typeArgumentSubstitution(
+      declaration,
+      reference.typeArguments,
+      substitutions
     )
-  }
 
-  if (unwrapped.type !== "TSTypeReference") return false
-  const name = typeReferenceName(unwrapped)
+    return (
+      heritageSubstitutions !== null
+      && declaration.extends.some((heritage) => {
+        const base = namedTypeReference(heritage)
 
-  if (name === null) return false
-  const substitution = substitutions.get(name)
-
-  if (substitution !== undefined) {
-    return isBroadMappedKey(
-      substitution.type,
-      environment,
-      substitution.substitutions,
-      visitedAliases
+        return (
+          base !== null
+          && classifyReferenceBroadTarget(
+            base,
+            environment,
+            heritageSubstitutions,
+            resolvingAliases
+          )?.kind === "open dictionary"
+        )
+      })
     )
-  }
-
-  if (name === "PropertyKey" && isBuiltIn(name, unwrapped, environment)) return true
-  const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases)
-
-  if (
-    alias === null
-    || (alias.typeParameters?.params.length ?? 0) > 0
-    || visitedAliases.has(name)
-  ) {
-    return false
-  }
-
-  const nextVisited = new Set(visitedAliases)
-  nextVisited.add(name)
-
-  return isBroadMappedKey(alias.typeAnnotation, environment, new Map(), nextVisited)
+  })
 }
 
 function classifyAliasBroadTarget(
@@ -488,16 +721,27 @@ function classifyAliasBroadTarget(
   }
 
   if (unwrapped.type === "TSMappedType") {
-    return isBroadMappedKey(unwrapped.constraint, environment, substitutions)
+    return mappedKeyBreadth(unwrapped, environment, substitutions) === "broad"
       ? { kind: "open dictionary" }
       : null
   }
 
   if (unwrapped.type !== "TSTypeReference") return null
-  const name = typeReferenceName(unwrapped)
+  const reference = namedTypeReference(unwrapped)
 
-  if (name === null) return null
-  const substitution = substitutions.get(name)
+  return reference === null
+    ? null
+    : classifyReferenceBroadTarget(reference, environment, substitutions, resolvingAliases)
+}
+
+function classifyReferenceBroadTarget(
+  reference: NamedTypeReference,
+  environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment,
+  resolvingAliases: ReadonlySet<string>
+): WideningTarget | null {
+  const { name, typeArguments } = reference
+  const substitution = substitutionFor(reference, substitutions)
 
   if (substitution !== undefined) {
     return classifyAliasBroadTarget(
@@ -508,28 +752,40 @@ function classifyAliasBroadTarget(
     )
   }
 
-  if (TRANSPARENT_WRAPPERS.has(name) && isBuiltIn(name, unwrapped, environment)) {
-    const wrapped = unwrapped.typeArguments?.params[0]
+  if (isTransparentWrapper(reference, environment)) {
+    const [wrapped] = typeArguments
 
     return wrapped === undefined
       ? null
       : classifyAliasBroadTarget(wrapped, environment, substitutions, resolvingAliases)
   }
 
-  if (name === "Record" && isBuiltIn(name, unwrapped, environment)) {
-    return hasBroadRecordKey(unwrapped, environment, substitutions)
+  if (isBuiltIn(reference, "Record", environment)) {
+    return recordKeyBreadth(reference, environment, substitutions) === "broad"
       ? { kind: "open dictionary" }
       : null
   }
 
-  const alias = visibleTypeAlias(name, unwrapped, environment.typeAliases)
-
-  if (alias === null || resolvingAliases.has(name)) return null
-  const nextSubstitutions = aliasSubstitution(alias, unwrapped, substitutions)
-
-  if (nextSubstitutions === null) return null
+  if (resolvingAliases.has(name)) return null
   const nextResolving = new Set(resolvingAliases)
   nextResolving.add(name)
+  const alias = localAlias(reference, environment)
+
+  if (alias === null) {
+    return isOpenInterface(
+      localInterfaces(reference, environment),
+      reference,
+      environment,
+      substitutions,
+      nextResolving
+    )
+      ? { kind: "open dictionary" }
+      : null
+  }
+
+  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
+
+  if (nextSubstitutions === null) return null
 
   return classifyAliasBroadTarget(
     alias.typeAnnotation,

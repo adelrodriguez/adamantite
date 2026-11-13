@@ -30,10 +30,11 @@ function isConstAssertion(node: TypeAssertion): boolean {
   )
 }
 
-function configuredSafetyMarkers(configured: readonly string[] = []): readonly string[] {
-  const markers = configured.flatMap((marker) => (marker.trim().length > 0 ? [marker.trim()] : []))
-
-  return markers.length > 0 ? markers : DEFAULT_SAFETY_MARKERS
+// The option schema rejects a blank marker, so every configured marker keeps text after the trim.
+function configuredSafetyMarkers(
+  configured: readonly string[] = DEFAULT_SAFETY_MARKERS
+): readonly string[] {
+  return configured.map((marker) => marker.trim())
 }
 
 function markerPattern(markers: readonly string[]): RegExp {
@@ -132,7 +133,7 @@ const rule: Rule = {
         additionalProperties: false,
         properties: {
           markers: {
-            items: { minLength: 1, type: "string" },
+            items: { pattern: "\\S", type: "string" },
             minItems: 1,
             type: "array",
             uniqueItems: true,

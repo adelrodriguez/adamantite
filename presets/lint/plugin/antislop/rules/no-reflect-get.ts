@@ -1,16 +1,21 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { isGlobalReflectMethodCall } from "../shared/reflect-method.ts"
+import { matchReflectMethodCall } from "../shared/reflect-method.ts"
 
 /**
  * Reports whether a call passes a receiver that differs from the target. Property syntax cannot
  * pass a receiver, so a Proxy `get` trap needs `Reflect.get(target, key, receiver)` to give a
  * getter the correct `this`.
  */
-function hasDistinctReceiver(sourceCode: SourceCode, args: ESTree.CallExpression["arguments"]) {
+function hasDistinctReceiver(
+  sourceCode: SourceCode,
+  args: ReadonlyArray<ESTree.Expression | ESTree.SpreadElement | null>
+) {
   const [target, , receiver] = args
 
-  if (target === undefined || receiver === undefined) return false
+  if (target === undefined || target === null || receiver === undefined || receiver === null) {
+    return false
+  }
 
   if (target.type === "SpreadElement" || receiver.type === "SpreadElement") return false
 
@@ -24,14 +29,13 @@ const rule: Rule = {
   createOnce(context) {
     return {
       CallExpression(node) {
-        if (node.callee.type === "Super" || node.callee.type === "V8IntrinsicExpression") return
+        const call = matchReflectMethodCall(context.sourceCode, node, "get")
 
-        if (
-          isGlobalReflectMethodCall(context.sourceCode, node.callee, "get")
-          && !hasDistinctReceiver(context.sourceCode, node.arguments)
-        ) {
-          context.report({ messageId: "reflectGet", node })
-        }
+        if (call === null) return
+
+        if (call.kind === "listed" && hasDistinctReceiver(context.sourceCode, call.arguments))
+          return
+        context.report({ messageId: "reflectGet", node })
       },
     }
   },

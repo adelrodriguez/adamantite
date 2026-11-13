@@ -1,30 +1,6 @@
 import type { ESTree, SourceCode } from "@oxlint/plugins"
-import { childNodes, type VisitorKeys } from "./child-nodes.ts"
 
 export type FunctionParameter = ESTree.ParamPattern
-
-/**
- * Return whether a type is or contains TypeScript's absorbing unknown top type.
- */
-export function containsUnknownType(type: ESTree.TSType): boolean {
-  if (type.type === "TSUnknownKeyword") return true
-
-  if (type.type === "TSParenthesizedType") return containsUnknownType(type.typeAnnotation)
-
-  return type.type === "TSUnionType" && type.types.some(containsUnknownType)
-}
-
-const UNCHECKED_TYPES: ReadonlySet<string> = new Set(["TSAnyKeyword", "TSUnknownKeyword"])
-
-/**
- * Return whether `unknown` or `any` appears anywhere in a type, as in `Record<string, unknown>`.
- */
-export function mentionsUncheckedType(type: ESTree.Node, visitorKeys: VisitorKeys): boolean {
-  return (
-    UNCHECKED_TYPES.has(type.type)
-    || childNodes(type, visitorKeys).some((child) => mentionsUncheckedType(child, visitorKeys))
-  )
-}
 
 /**
  * Return the TypeScript annotation attached to a function parameter or its wrapped binding.

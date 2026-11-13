@@ -1,5 +1,7 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
-import { isStringLiteral } from "./literals.ts"
+import { staticKeyName } from "./literals.ts"
+import { constBinding } from "./scope.ts"
+import { namedTypeReference } from "./type-alias-resolution.ts"
 
 /**
  * Unwrap syntax-only wrappers when inspecting array methods and accumulator references.
@@ -48,26 +50,14 @@ export function resolveArrayBinding(
  * binding.
  */
 export function constInitializer(variable: Variable): ESTree.Expression | null {
-  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return null
+  const binding = constBinding(variable)
 
-  for (const definition of variable.defs) {
-    if (
-      definition.type === "Variable"
-      && definition.node.type === "VariableDeclarator"
-      && definition.node.id.type === "Identifier"
-      && definition.node.init !== null
-      && definition.node.parent.type === "VariableDeclaration"
-      && definition.node.parent.kind === "const"
-    ) {
-      return definition.node.init
-    }
-  }
-
-  return null
+  return binding?.id.type === "Identifier" ? binding.init : null
 }
 
 /**
- * Read static method names, including computed string literals, without evaluating expressions.
+ * Read static method names, such as `filter` in `items.filter`, ``items[`filter`]``, or
+ * `items["filter"]`, without evaluating expressions.
  */
 export function arrayMethodTarget(
   callee: ESTree.Node
@@ -75,18 +65,12 @@ export function arrayMethodTarget(
   const node = unwrapArrayExpression(callee)
 
   if (node.type !== "MemberExpression") return null
-  const property = node.property
+  const name = staticKeyName(node.property, node.computed)
 
-  if (!node.computed && property.type === "Identifier") {
-    return { name: property.name, object: node.object }
-  }
-
-  if (node.computed && isStringLiteral(property)) {
-    return { name: property.value, object: node.object }
-  }
-
-  return null
+  return name === null ? null : { name, object: node.object }
 }
+
+const ARRAY_TYPES: ReadonlySet<string> = new Set(["Array", "ReadonlyArray"])
 
 function isArrayAnnotation(type: ESTree.TSType): boolean {
   if (type.type === "TSArrayType" || type.type === "TSTupleType") return true
@@ -97,11 +81,10 @@ function isArrayAnnotation(type: ESTree.TSType): boolean {
     return isArrayAnnotation(type.typeAnnotation)
   }
 
-  return (
-    type.type === "TSTypeReference"
-    && type.typeName.type === "Identifier"
-    && (type.typeName.name === "Array" || type.typeName.name === "ReadonlyArray")
-  )
+  if (type.type !== "TSTypeReference") return false
+  const reference = namedTypeReference(type)
+
+  return reference !== null && ARRAY_TYPES.has(reference.name)
 }
 
 /**
@@ -149,8 +132,7 @@ function isKnownArrayExpressionFrom(
   if (variable === null || visited.has(variable)) return false
   visited.add(variable)
 
-  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return false
-
+  // The annotation holds for each value that the binding gets, so check it before reassignment.
   for (const identifier of variable.identifiers) {
     const annotation = identifier.typeAnnotation?.typeAnnotation
 

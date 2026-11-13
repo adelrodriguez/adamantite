@@ -1,13 +1,17 @@
 import type { ESTree } from "@oxlint/plugins"
 
 import { childNodes, type VisitorKeys } from "./child-nodes.ts"
-import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts"
+import { lexicalTypeParameters, type LexicalTypeParameter } from "./lexical-type-parameters.ts"
 
 type TypeScope = ESTree.Node
 
-type TypeBinding = {
+type DeclaredTypeBinding = {
   readonly alias: ESTree.TSTypeAliasDeclaration | null
+  readonly declaration: ESTree.Node
   readonly name: string
+}
+
+type TypeBinding = DeclaredTypeBinding & {
   readonly scope: TypeScope
 }
 
@@ -51,12 +55,9 @@ function enclosingTypeScope(node: ESTree.Node): TypeScope {
   return node
 }
 
-function declaredTypeBinding(node: ESTree.Node): {
-  readonly alias: ESTree.TSTypeAliasDeclaration | null
-  readonly name: string
-} | null {
+function declaredTypeBinding(node: ESTree.Node): DeclaredTypeBinding | null {
   if (node.type === "TSTypeAliasDeclaration") {
-    return { alias: node, name: node.id.name }
+    return { alias: node, declaration: node, name: node.id.name }
   }
 
   if (
@@ -65,7 +66,7 @@ function declaredTypeBinding(node: ESTree.Node): {
     || node.type === "ClassDeclaration"
     || node.type === "ClassExpression"
   ) {
-    return node.id === null ? null : { alias: null, name: node.id.name }
+    return node.id === null ? null : { alias: null, declaration: node, name: node.id.name }
   }
 
   if (
@@ -73,7 +74,7 @@ function declaredTypeBinding(node: ESTree.Node): {
     || node.type === "ImportDefaultSpecifier"
     || node.type === "ImportNamespaceSpecifier"
   ) {
-    return { alias: null, name: node.local.name }
+    return { alias: null, declaration: node, name: node.local.name }
   }
 
   return null
@@ -132,11 +133,29 @@ function ancestorDistance(ancestor: ESTree.Node, node: ESTree.Node): number | nu
   return null
 }
 
-function nearestTypeBindings(
+/**
+ * The binding that a type name reads at a use: the declarations in the nearest scope that declares
+ * the name, a type parameter, or nothing in the file.
+ */
+type NearestTypeBinding =
+  | { readonly kind: "declared"; readonly bindings: readonly TypeBinding[] }
+  | { readonly kind: "none" }
+  | { readonly kind: "type-parameter"; readonly parameter: LexicalTypeParameter }
+
+/**
+ * The declarations of a name in the nearest scope that declares it, and the steps from the use up
+ * to that scope.
+ */
+type DeclaredBindings = {
+  readonly bindings: readonly TypeBinding[]
+  readonly distance: number
+}
+
+function nearestDeclaredBindings(
   name: string,
   use: ESTree.Node,
   environment: TypeAliasEnvironment
-): readonly TypeBinding[] {
+): DeclaredBindings {
   const candidates = environment.bindingsByName.get(name) ?? []
   let nearestDistance = Number.POSITIVE_INFINITY
   let nearest: TypeBinding[] = []
@@ -155,7 +174,31 @@ function nearestTypeBindings(
     nearest = [candidate]
   }
 
-  return nearest
+  return { bindings: nearest, distance: nearestDistance }
+}
+
+/**
+ * Resolve a type name at a use to its nearest binding. A type parameter and a declaration hide each
+ * other by scope, so the nearer one wins.
+ */
+function nearestTypeBinding(
+  name: string,
+  use: ESTree.Node,
+  environment: TypeAliasEnvironment
+): NearestTypeBinding {
+  const parameter = lexicalTypeParameters(use, environment.visitorKeys).find(
+    (candidate) => candidate.name === name
+  )
+
+  const declared = nearestDeclaredBindings(name, use, environment)
+
+  if (parameter !== undefined && parameter.distance < declared.distance) {
+    return { kind: "type-parameter", parameter }
+  }
+
+  return declared.bindings.length > 0
+    ? { bindings: declared.bindings, kind: "declared" }
+    : { kind: "none" }
 }
 
 /**
@@ -166,10 +209,48 @@ export function visibleTypeAlias(
   use: ESTree.Node,
   environment: TypeAliasEnvironment
 ): ESTree.TSTypeAliasDeclaration | null {
-  if (lexicalTypeParameterNames(use, environment.visitorKeys).has(name)) return null
-  const bindings = nearestTypeBindings(name, use, environment)
+  const nearest = nearestTypeBinding(name, use, environment)
 
-  return bindings.length === 1 ? (bindings[0]?.alias ?? null) : null
+  return nearest.kind === "declared" && nearest.bindings.length === 1
+    ? (nearest.bindings[0]?.alias ?? null)
+    : null
+}
+
+/**
+ * Resolve the nearest visible interface with this name, with every declaration that merges into it.
+ * Return no declarations when another kind of binding, such as an import, has the name.
+ */
+export function visibleInterfaces(
+  name: string,
+  use: ESTree.Node,
+  environment: TypeAliasEnvironment
+): readonly ESTree.TSInterfaceDeclaration[] {
+  const nearest = nearestTypeBinding(name, use, environment)
+
+  if (nearest.kind !== "declared") return []
+
+  const interfaces = nearest.bindings.flatMap(({ declaration }) =>
+    declaration.type === "TSInterfaceDeclaration" ? [declaration] : []
+  )
+
+  return interfaces.length === nearest.bindings.length ? interfaces : []
+}
+
+/**
+ * Resolve the type parameter that a type name reads at a use, as `T` in `<T>(value: T)`. Return
+ * null when a nearer declaration hides the parameter, or when the name reads another binder.
+ */
+export function visibleTypeParameter(
+  name: string,
+  use: ESTree.Node,
+  environment: TypeAliasEnvironment
+): ESTree.TSTypeParameter | null {
+  const nearest = nearestTypeBinding(name, use, environment)
+
+  return nearest.kind === "type-parameter"
+    && nearest.parameter.declaration.type === "TSTypeParameter"
+    ? nearest.parameter.declaration
+    : null
 }
 
 /**
@@ -180,14 +261,59 @@ export function hasVisibleTypeBinding(
   use: ESTree.Node,
   environment: TypeAliasEnvironment
 ): boolean {
-  return (
-    lexicalTypeParameterNames(use, environment.visitorKeys).has(name)
-    || nearestTypeBindings(name, use, environment).length > 0
-  )
+  return nearestTypeBinding(name, use, environment).kind !== "none"
 }
 
-function typeReferenceName(type: ESTree.TSTypeReference): string | null {
-  return type.typeName.type === "Identifier" ? type.typeName.name : null
+/**
+ * A written use of a named type, in a type annotation or in a heritage clause.
+ */
+export type NamedTypeReference = {
+  /**
+   * The use names the global type through `globalThis`, so no local declaration shadows it.
+   */
+  readonly global: boolean
+  readonly name: string
+  readonly node: ESTree.Node
+  readonly typeArguments: readonly ESTree.TSType[]
+}
+
+type TypeReferenceNode =
+  | ESTree.TSClassImplements
+  | ESTree.TSInterfaceHeritage
+  | ESTree.TSTypeReference
+
+function isGlobalThis(node: ESTree.Node): boolean {
+  return node.type === "Identifier" && node.name === "globalThis"
+}
+
+function globalTypeName(target: ESTree.Expression | ESTree.TSTypeName): string | null {
+  if (target.type === "TSQualifiedName") {
+    return isGlobalThis(target.left) ? target.right.name : null
+  }
+
+  return target.type === "MemberExpression"
+    && !target.computed
+    && target.property.type === "Identifier"
+    && isGlobalThis(target.object)
+    ? target.property.name
+    : null
+}
+
+/**
+ * Read the name and type arguments of a type use, such as `Record<K, V>`, `globalThis.Record<K,
+ * V>`, or the `Record<K, V>` of `interface A extends Record<K, V>`.
+ */
+export function namedTypeReference(node: TypeReferenceNode): NamedTypeReference | null {
+  const target = node.type === "TSTypeReference" ? node.typeName : node.expression
+  const typeArguments = node.typeArguments?.params ?? []
+
+  if (target.type === "Identifier") {
+    return { global: false, name: target.name, node, typeArguments }
+  }
+
+  const name = globalTypeName(target)
+
+  return name === null ? null : { global: true, name, node, typeArguments }
 }
 
 /**
@@ -233,7 +359,8 @@ export function resolvedTypeMatches(
     resolvingAliases: ReadonlySet<ESTree.TSTypeAliasDeclaration>
   ): boolean => {
     if (current.type === "TSTypeReference") {
-      const name = typeReferenceName(current)
+      const reference = namedTypeReference(current)
+      const name = reference === null || reference.global ? null : reference.name
 
       if (name !== null) {
         const substitution = substitutions.get(name)

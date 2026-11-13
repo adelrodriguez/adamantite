@@ -34,10 +34,42 @@ tester.run("no-chained-type-assertions", plugin.rules["no-chained-type-assertion
       errors: [error],
       name: "mixed const chain",
     },
+    {
+      code: "const value = (input as unknown satisfies unknown) as number;",
+      errors: [error],
+      name: "chain through a parenthesized satisfies",
+    },
+    {
+      code: "const value = input as unknown satisfies unknown as number;",
+      errors: [error],
+      name: "chain through a satisfies without parentheses",
+    },
+    {
+      code: "const value = <number>(<unknown>input satisfies unknown);",
+      errors: [error],
+      name: "angle-bracket chain through a satisfies",
+    },
+    {
+      code: "const value = ((input as unknown) satisfies unknown satisfies unknown) as number;",
+      errors: [error],
+      name: "chain through nested satisfies",
+    },
   ],
   valid: [
     "const value = input as User;",
     "const value = (input as User);",
     "const value = ({ id: 1 } as const) as const;",
+    {
+      code: "const value = (input satisfies User) as User;",
+      name: "one assertion after a satisfies",
+    },
+    {
+      code: "const value = (input as User) satisfies User;",
+      name: "satisfies after one assertion",
+    },
+    {
+      code: "const value = ({ id: 1 } as const satisfies User) as const;",
+      name: "const chain through a satisfies",
+    },
   ],
 })

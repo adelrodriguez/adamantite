@@ -1,5 +1,7 @@
 import type { ESTree, Rule, Variable } from "@oxlint/plugins"
 
+import { namedTypeReference } from "../shared/type-alias-resolution.ts"
+
 type BroadTypeKind = "top" | "object" | "record"
 
 type KnownValueEvidence = {
@@ -30,8 +32,11 @@ function unwrapTypeParentheses(type: ESTree.TSType): ESTree.TSType {
   return current
 }
 
+/**
+ * Return the name of a type reference, as `Record` in `Record<K, V>` or `globalThis.Record<K, V>`.
+ */
 function typeReferenceName(type: ESTree.TSTypeReference): string | null {
-  return type.typeName.type === "Identifier" ? type.typeName.name : null
+  return namedTypeReference(type)?.name ?? null
 }
 
 function isUnknownOrAnyType(type: ESTree.TSType): boolean {
@@ -188,6 +193,14 @@ function functionBoundary(node: ESTree.Node): ESTree.Node | null {
   }
 
   return null
+}
+
+/**
+ * Reports whether a node is inside a function boundary, or anywhere in the file when the boundary
+ * is the module. A nested function sees the same value of a const binding that has no writes.
+ */
+function isInsideBoundary(node: ESTree.Node, boundary: ESTree.Node | null): boolean {
+  return boundary === null || (node.start >= boundary.start && node.end <= boundary.end)
 }
 
 function resolvedVariableForIdentifier(
@@ -371,7 +384,7 @@ const rule: Rule = {
       if (
         widened === null
         || node.start <= widened.declaredAt
-        || functionBoundary(node) !== widened.boundary
+        || !isInsideBoundary(node, widened.boundary)
         || !assertionIsNarrower(
           context.sourceCode.text,
           widened.broadKind,

@@ -32,6 +32,7 @@ tester.run("no-manual-tagged-construction", plugin.rules["no-manual-tagged-const
   valid: [
     'Match.when({ _tag: "Ready" }, handleReady);',
     'Match.not({ "_tag": "Pending" });',
+    'Match[`when`]({ _tag: "Ready" }, handleReady);',
     "Ready.make({ value });",
     "new NotFound({ id });",
     "({ _tag: tag, value });",

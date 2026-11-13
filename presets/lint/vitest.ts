@@ -107,7 +107,10 @@ const rules: OxlintConfig["rules"] = {
   "vitest/prefer-to-have-length": "error",
   "vitest/prefer-todo": "error",
   "vitest/require-awaited-expect-poll": "error",
-  "vitest/require-hook": "error",
+  // `layer(TestLayer)("name", (it) => ...)` of @effect/vitest opens a suite, as `describe` does.
+  // The rule matches the name of the call, so a top-level call of any function named `layer`
+  // passes.
+  "vitest/require-hook": ["error", { allowedFunctionCalls: ["layer"] }],
   "vitest/require-local-test-context-for-concurrent-snapshots": "error",
   "vitest/require-mock-type-parameters": "error",
   "vitest/require-to-throw-message": "error",

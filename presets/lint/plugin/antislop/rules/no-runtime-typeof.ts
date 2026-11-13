@@ -4,6 +4,7 @@ import { resolveVariable } from "../shared/scope.ts"
 import {
   createTypeAliasEnvironment,
   resolvedTypeMatches,
+  visibleTypeParameter,
   type TypeAliasEnvironment,
 } from "../shared/type-alias-resolution.ts"
 import { mentionsUncheckedType } from "../shared/unknown-type.ts"
@@ -159,26 +160,16 @@ function declaredType(
 
 /**
  * Return the type parameter that a type reference names, as `T` in `<T>(value: T)`, or null when
- * the reference names another type.
+ * the reference names another type. A nearer type declaration with the same name hides the
+ * parameter.
  */
-function referencedTypeParameter(type: ESTree.TSTypeReference): ESTree.TSTypeParameter | null {
-  if (type.typeName.type !== "Identifier" || type.typeArguments) return null
-  const name = type.typeName.name
-  let current: ESTree.Node | null = type.parent
-
-  while (current !== null) {
-    if ("typeParameters" in current) {
-      const parameter = current.typeParameters?.params.find(
-        (candidate) => candidate.name.name === name
-      )
-
-      if (parameter !== undefined) return parameter
-    }
-
-    current = current.parent
-  }
-
-  return null
+function referencedTypeParameter(
+  type: ESTree.TSTypeReference,
+  environment: TypeAliasEnvironment
+): ESTree.TSTypeParameter | null {
+  return type.typeName.type !== "Identifier" || type.typeArguments
+    ? null
+    : visibleTypeParameter(type.typeName.name, type, environment)
 }
 
 /**
@@ -198,7 +189,7 @@ function isUncheckedTypeParameter(
     if (resolved.type === "TSUnionType") return resolved.types.some(matches)
 
     if (resolved.type !== "TSTypeReference") return false
-    const parameter = referencedTypeParameter(resolved)
+    const parameter = referencedTypeParameter(resolved, environment)
 
     if (parameter === null || seen.has(parameter)) return false
     const constraint = parameter.constraint

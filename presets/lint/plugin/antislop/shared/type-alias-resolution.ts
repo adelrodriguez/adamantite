@@ -1,7 +1,7 @@
 import type { ESTree } from "@oxlint/plugins"
 
 import { childNodes, type VisitorKeys } from "./child-nodes.ts"
-import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts"
+import { lexicalTypeParameters, type LexicalTypeParameter } from "./lexical-type-parameters.ts"
 
 type TypeScope = ESTree.Node
 
@@ -133,11 +133,29 @@ function ancestorDistance(ancestor: ESTree.Node, node: ESTree.Node): number | nu
   return null
 }
 
-function nearestTypeBindings(
+/**
+ * The binding that a type name reads at a use: the declarations in the nearest scope that declares
+ * the name, a type parameter, or nothing in the file.
+ */
+type NearestTypeBinding =
+  | { readonly kind: "declared"; readonly bindings: readonly TypeBinding[] }
+  | { readonly kind: "none" }
+  | { readonly kind: "type-parameter"; readonly parameter: LexicalTypeParameter }
+
+/**
+ * The declarations of a name in the nearest scope that declares it, and the steps from the use up
+ * to that scope.
+ */
+type DeclaredBindings = {
+  readonly bindings: readonly TypeBinding[]
+  readonly distance: number
+}
+
+function nearestDeclaredBindings(
   name: string,
   use: ESTree.Node,
   environment: TypeAliasEnvironment
-): readonly TypeBinding[] {
+): DeclaredBindings {
   const candidates = environment.bindingsByName.get(name) ?? []
   let nearestDistance = Number.POSITIVE_INFINITY
   let nearest: TypeBinding[] = []
@@ -156,7 +174,31 @@ function nearestTypeBindings(
     nearest = [candidate]
   }
 
-  return nearest
+  return { bindings: nearest, distance: nearestDistance }
+}
+
+/**
+ * Resolve a type name at a use to its nearest binding. A type parameter and a declaration hide each
+ * other by scope, so the nearer one wins.
+ */
+function nearestTypeBinding(
+  name: string,
+  use: ESTree.Node,
+  environment: TypeAliasEnvironment
+): NearestTypeBinding {
+  const parameter = lexicalTypeParameters(use, environment.visitorKeys).find(
+    (candidate) => candidate.name === name
+  )
+
+  const declared = nearestDeclaredBindings(name, use, environment)
+
+  if (parameter !== undefined && parameter.distance < declared.distance) {
+    return { kind: "type-parameter", parameter }
+  }
+
+  return declared.bindings.length > 0
+    ? { bindings: declared.bindings, kind: "declared" }
+    : { kind: "none" }
 }
 
 /**
@@ -167,10 +209,11 @@ export function visibleTypeAlias(
   use: ESTree.Node,
   environment: TypeAliasEnvironment
 ): ESTree.TSTypeAliasDeclaration | null {
-  if (lexicalTypeParameterNames(use, environment.visitorKeys).has(name)) return null
-  const bindings = nearestTypeBindings(name, use, environment)
+  const nearest = nearestTypeBinding(name, use, environment)
 
-  return bindings.length === 1 ? (bindings[0]?.alias ?? null) : null
+  return nearest.kind === "declared" && nearest.bindings.length === 1
+    ? (nearest.bindings[0]?.alias ?? null)
+    : null
 }
 
 /**
@@ -182,14 +225,32 @@ export function visibleInterfaces(
   use: ESTree.Node,
   environment: TypeAliasEnvironment
 ): readonly ESTree.TSInterfaceDeclaration[] {
-  if (lexicalTypeParameterNames(use, environment.visitorKeys).has(name)) return []
-  const bindings = nearestTypeBindings(name, use, environment)
+  const nearest = nearestTypeBinding(name, use, environment)
 
-  const interfaces = bindings.flatMap(({ declaration }) =>
+  if (nearest.kind !== "declared") return []
+
+  const interfaces = nearest.bindings.flatMap(({ declaration }) =>
     declaration.type === "TSInterfaceDeclaration" ? [declaration] : []
   )
 
-  return interfaces.length === bindings.length ? interfaces : []
+  return interfaces.length === nearest.bindings.length ? interfaces : []
+}
+
+/**
+ * Resolve the type parameter that a type name reads at a use, as `T` in `<T>(value: T)`. Return
+ * null when a nearer declaration hides the parameter, or when the name reads another binder.
+ */
+export function visibleTypeParameter(
+  name: string,
+  use: ESTree.Node,
+  environment: TypeAliasEnvironment
+): ESTree.TSTypeParameter | null {
+  const nearest = nearestTypeBinding(name, use, environment)
+
+  return nearest.kind === "type-parameter"
+    && nearest.parameter.declaration.type === "TSTypeParameter"
+    ? nearest.parameter.declaration
+    : null
 }
 
 /**
@@ -200,10 +261,7 @@ export function hasVisibleTypeBinding(
   use: ESTree.Node,
   environment: TypeAliasEnvironment
 ): boolean {
-  return (
-    lexicalTypeParameterNames(use, environment.visitorKeys).has(name)
-    || nearestTypeBindings(name, use, environment).length > 0
-  )
+  return nearestTypeBinding(name, use, environment).kind !== "none"
 }
 
 /**

@@ -1,35 +1,47 @@
 import type { ESTree } from "@oxlint/plugins"
 import { childNodes, type VisitorKeys } from "./child-nodes.ts"
 
-function collectInferTypeParameterNames(
+/**
+ * A type binder in scope at a node. `distance` counts the steps from the node up to the node that
+ * declares the binder, so a smaller distance is a nearer scope.
+ */
+export type LexicalTypeParameter = {
+  readonly declaration: ESTree.TSMappedType | ESTree.TSTypeParameter
+  readonly distance: number
+  readonly name: string
+}
+
+function collectInferTypeParameters(
   node: ESTree.Node,
   visitorKeys: VisitorKeys,
-  names: Set<string>
+  parameters: ESTree.TSTypeParameter[]
 ): void {
-  if (node.type === "TSInferType") names.add(node.typeParameter.name.name)
+  if (node.type === "TSInferType") parameters.push(node.typeParameter)
 
   for (const child of childNodes(node, visitorKeys)) {
-    collectInferTypeParameterNames(child, visitorKeys, names)
+    collectInferTypeParameters(child, visitorKeys, parameters)
   }
 }
 
 /**
- * Collect type binders that are in scope at a node and can shadow module aliases. With `outer`,
- * collect only the binders below that ancestor, which shadow its own type parameters.
+ * Collect type binders that are in scope at a node and can shadow module aliases, nearest first.
+ * With `outer`, collect only the binders below that ancestor, which shadow its own type
+ * parameters.
  */
-export function lexicalTypeParameterNames(
+export function lexicalTypeParameters(
   node: ESTree.Node,
   visitorKeys: VisitorKeys,
   outer?: ESTree.Node
-): ReadonlySet<string> {
-  const names = new Set<string>()
+): readonly LexicalTypeParameter[] {
+  const binders: LexicalTypeParameter[] = []
   let descendant: ESTree.Node = node
   let current: ESTree.Node = node
+  let distance = 0
 
   while (current.type !== "Program" && current !== outer) {
     if ("typeParameters" in current) {
       for (const parameter of current.typeParameters?.params ?? []) {
-        names.add(parameter.name.name)
+        binders.push({ declaration: parameter, distance, name: parameter.name.name })
       }
     }
 
@@ -37,16 +49,33 @@ export function lexicalTypeParameterNames(
       current.type === "TSMappedType"
       && (descendant === current.nameType || descendant === current.typeAnnotation)
     ) {
-      names.add(current.key.name)
+      binders.push({ declaration: current, distance, name: current.key.name })
     }
 
     if (current.type === "TSConditionalType" && descendant === current.trueType) {
-      collectInferTypeParameterNames(current.extendsType, visitorKeys, names)
+      const inferred: ESTree.TSTypeParameter[] = []
+      collectInferTypeParameters(current.extendsType, visitorKeys, inferred)
+
+      for (const parameter of inferred) {
+        binders.push({ declaration: parameter, distance, name: parameter.name.name })
+      }
     }
 
     descendant = current
     current = current.parent
+    distance += 1
   }
 
-  return names
+  return binders
+}
+
+/**
+ * Collect the names of the type binders that are in scope at a node. See `lexicalTypeParameters`.
+ */
+export function lexicalTypeParameterNames(
+  node: ESTree.Node,
+  visitorKeys: VisitorKeys,
+  outer?: ESTree.Node
+): ReadonlySet<string> {
+  return new Set(lexicalTypeParameters(node, visitorKeys, outer).map(({ name }) => name))
 }

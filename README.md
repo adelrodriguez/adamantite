@@ -406,13 +406,62 @@ The core preset changes three rules for some files:
 - `jsdoc/check-tag-names` accepts JSDoc type tags, such as `@type`, in JavaScript files, which
   have no type syntax.
 
-To change one of these rules for these files, set it in an `overrides` entry, because the
-preset's override takes priority over top-level `rules`.
+To change one of these rules for these files, use an `overrides` entry. See
+[change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
 
 List the core preset one time in `extends`, before the other Adamantite presets. Oxlint applies
 the entries in order, and a later entry replaces the rules of an earlier one. Some presets, such as
 strict and effect, change rules of core, and core replaces those changes when it comes after the
 preset. Doctor reports an Adamantite preset that comes before a core entry.
+
+### Change a rule that a preset sets for some files
+
+Some presets set rules for some files in an `overrides` entry. Oxlint applies the settings in this
+order, and a later setting replaces an earlier one:
+
+1. The top-level `rules` of each `extends` entry, in the order of `extends`.
+2. The top-level `rules` of your config.
+3. The `overrides` of each `extends` entry.
+4. The `overrides` of your config.
+
+So a setting in your top-level `rules` has no effect on a rule that a preset sets in an override,
+for the files of that override. Oxlint does not tell you that the setting has no effect. These
+presets set rules in an override:
+
+| Preset           | Files                                                     | Rules                                                                                                                                                                        |
+| ---------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`           | `**/*.{ts,tsx,mts,cts}`                                   | `no-redeclare`                                                                                                                                                               |
+| `core`           | `**/*.d.{ts,mts,cts}` and `**/*.{astro,vue,svelte}`       | `import/unambiguous`                                                                                                                                                         |
+| `core`           | `**/*.{js,jsx,mjs,cjs}`                                   | `jsdoc/check-tag-names`                                                                                                                                                      |
+| `strict`         | `**/*.d.{ts,mts,cts}`                                     | `anti-slop/no-object-parameters`, `anti-slop/no-unknown-parameters`, `anti-slop/no-unknown-returns`, and `anti-slop/no-unsafe-dictionary-type`                               |
+| `strict`         | `**/*.{test,spec}.{ts,tsx,mts,cts}` and `**/__tests__/**` | `anti-slop/no-chained-type-assertions`, `anti-slop/no-widen-then-assert`, `anti-slop/require-safety-comment-for-type-assertion`, and `typescript/consistent-type-assertions` |
+| `tailwind`       | `**/components/ui/**`                                     | `shadcn/no-arbitrary-values`, `shadcn/no-restyle`, and `shadcn/require-static-classes`                                                                                       |
+| `jest`, `vitest` | The preset's `testFiles`                                  | All rules of the preset. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                    |
+
+To change one of these rules for these files, set it in an `overrides` entry of your config with
+the same files. For example, this config turns off the `SAFETY:` comment rule of strict in test
+files:
+
+```ts
+import core from "adamantite/lint"
+import strict from "adamantite/lint/strict"
+import { defineConfig } from "oxlint"
+
+export default defineConfig({
+  extends: [core, strict],
+  ignorePatterns: core.ignorePatterns,
+  overrides: [
+    {
+      files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"],
+      rules: { "anti-slop/require-safety-comment-for-type-assertion": "off" },
+    },
+  ],
+})
+```
+
+An override that changes a `jest/*` or `vitest/*` rule must also set `plugins: jest.plugins` or
+`plugins: vitest.plugins`. Oxlint ignores these rules in an override that does not enable their
+plugin.
 
 ### The TypeScript presets
 
@@ -494,8 +543,10 @@ export default defineConfig({
 ```
 
 Change a test rule in an override, not in the top-level `rules`: the preset's rules for test files
-replace top-level settings. Keep `plugins: vitest.plugins` in that override too, because Oxlint
-ignores the `vitest/*` rules of an override that does not enable the `vitest` plugin.
+replace top-level settings. See
+[change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
+Keep `plugins: vitest.plugins` in that override too, because Oxlint ignores the `vitest/*` rules
+of an override that does not enable the `vitest` plugin.
 
 Both presets accept a describe title that starts with a capital letter, such as
 `describe("Calculator", ...)`, because the title often names the class or function under test.
@@ -800,12 +851,13 @@ same `anti-slop/*` names.
   requires a `SAFETY:` comment on each assertion, and `anti-slop/no-chained-type-assertions` and
   `anti-slop/no-widen-then-assert` report assertions that hide the source type. Outside tests,
   `typescript/consistent-type-assertions` is the only rule that reports an assertion. To change
-  one of these three rules, set it in an `overrides` entry for the same test files, because the
-  preset's override takes priority over top-level `rules`.
+  one of these rules in test files, use an `overrides` entry. See
+  [change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
 - In declaration files (`*.d.ts`), the preset turns off `anti-slop/no-unknown-parameters`,
   `anti-slop/no-unknown-returns`, `anti-slop/no-object-parameters`, and
   `anti-slop/no-unsafe-dictionary-type`. A declaration file states the types of code that it does
-  not hold, such as a built-in API or a package without types.
+  not hold, such as a built-in API or a package without types. To turn one of these rules on in
+  declaration files, use an `overrides` entry.
 - The preset turns off the core preset's `typescript/consistent-indexed-object-style` and
   `unicorn/no-immediate-mutation`, which conflict with `anti-slop/no-known-value-widening`.
 - The help of three core rules recommends a form that strict reports. `typescript/no-explicit-any`
@@ -860,9 +912,11 @@ export default defineConfig({
 The preset allows layout classes such as `mt-4` and `w-[320px]` on components, and turns
 off `no-restyle`, `no-arbitrary-values`, and `require-static-classes` under
 `**/components/ui/**`, where components own their appearance. Add the same override for
-another component directory. See the
-[@shadcn/lint documentation](https://github.com/shadcn-ui/lint#settings) for settings,
-contracts, and custom messages.
+another component directory. To turn one of these rules on under `**/components/ui/**`, use an
+`overrides` entry, as
+[change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files)
+shows. See the [@shadcn/lint documentation](https://github.com/shadcn-ui/lint#settings) for
+settings, contracts, and custom messages.
 
 ## Custom rules
 

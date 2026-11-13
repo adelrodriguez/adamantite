@@ -103,8 +103,37 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
       code: 'const isText: (value: unknown) => value is string = (value) => typeof value === "string";',
       errors: [error],
     },
+    { code: 'function f<T>(value: T) { return typeof value === "string"; }', errors: [error] },
+    { code: 'const f = <T,>(value: T) => typeof value === "string";', errors: [error] },
+    {
+      code: 'function f<T extends unknown>(value: T) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T extends Record<string, any>>(value: T) { return typeof value.id === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>(value: T | null) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T, U extends T>(value: U) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>({ id }: T) { return typeof id === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'class Store<T> { has(value: T) { return typeof value === "string"; } }',
+      errors: [error],
+    },
   ],
   valid: [
+    'function f<T extends string | number>(value: T) { return typeof value === "string"; }',
+    'function f<T extends string, U extends T>(value: U) { return typeof value === "string"; }',
+    'type T = string | number; function f(value: T) { return typeof value === "string"; }',
     'const isServer = typeof document === "undefined";',
     'const hasStorage = typeof localStorage !== "undefined";',
     'if (typeof globalThis.crypto === "undefined") throw new Error("no crypto");',

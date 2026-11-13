@@ -78,6 +78,12 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
       rules: { "no-redeclare": "off" },
     },
     {
+      // A declaration file without an import or export is a script on purpose: only a script can
+      // declare a wildcard module or a global.
+      files: ["**/*.d.{ts,mts,cts}"],
+      rules: { "import/unambiguous": "off" },
+    },
+    {
       // TEMPORARY: Astro, Vue, and Svelte compile a component's script as a module, but
       // `import/unambiguous` reports the script when it has no `import` or `export`. Remove this
       // override when Oxlint accepts these scripts:

@@ -92,7 +92,8 @@ const rules: OxlintConfig["rules"] = {
   "vitest/prefer-hooks-on-top": "error",
   "vitest/prefer-import-in-mock": "error",
   "vitest/prefer-importing-vitest-globals": "error",
-  "vitest/prefer-lowercase-title": "error",
+  // A describe title often names the class or function under test, such as `Calculator`.
+  "vitest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],
   "vitest/prefer-mock-promise-shorthand": "error",
   "vitest/prefer-mock-return-shorthand": "error",
   "vitest/prefer-snapshot-hint": "error",

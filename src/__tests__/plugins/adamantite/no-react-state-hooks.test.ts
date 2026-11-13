@@ -93,6 +93,10 @@ tester.run("no-react-state-hooks", plugin.rules["no-react-state-hooks"], {
       filename: `${CWD}/src/hooks/subscribe.ts`,
     },
     {
+      code: 'import { useState } from "react"\nexport function useCart() {\n  return useState(0)\n}',
+      filename: `${CWD}/src/features/cart/hooks.ts`,
+    },
+    {
       code: 'import { useState } from "react"\nexport function counter() {\n  return useState(0)\n}',
       filename: `${CWD}/src/state/counter.ts`,
       options: [{ allow: ["src/state/**"] }],

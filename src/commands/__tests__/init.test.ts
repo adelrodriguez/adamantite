@@ -496,7 +496,7 @@ describe("init", () => {
         )
         expect(logLines).toContainEqual(
           expect.stringMatching(
-            /^▲ `.+\/\.vscode\/settings\.json` has comments or trailing commas, so Adamantite does not rewrite it\. Run `adamantite doctor` for the settings to change\.$/
+            /^▲ `.+\/\.vscode\/settings\.json` has comments or trailing commas, so Adamantite does not rewrite it\. Add these settings, and keep the others:\n/u
           )
         )
         // A kept file is not an updated file, and not a failed step.

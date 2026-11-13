@@ -561,6 +561,11 @@ describe("zed", () => {
 
         if (Result.isFailure(result)) {
           expect(result.failure).toBeInstanceOf(JsoncNotEditable)
+          // The error lists every setting that the update would add, not only what Doctor checks.
+          expect(result.failure).toMatchObject({
+            change: expect.stringContaining('"format_on_save": "on"'),
+          })
+          expect(result.failure).toMatchObject({ change: expect.not.stringContaining('"theme"') })
         }
 
         expect(files.read(SETTINGS_PATH)).toBe(content)

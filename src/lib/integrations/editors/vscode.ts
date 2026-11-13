@@ -35,6 +35,7 @@ import {
   checkIsPlainJson,
   formatJson,
   mergeConfig,
+  pickChangedEntries,
   stringifyJson,
 } from "#lib/shared/json.ts"
 import { formatInitCommand } from "#lib/workspace/init-command.ts"
@@ -304,7 +305,7 @@ export default defineIntegration({
 
       if (!checkIsPlainJson(vscodeFile)) {
         return yield* new JsoncNotEditable({
-          change: "Run `adamantite doctor` for the settings to change.",
+          change: `Add these settings, and keep the others:\n${yield* formatJson(pickChangedEntries(existingConfig, newConfig))}`,
           path: settingsPath,
         })
       }

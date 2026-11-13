@@ -438,6 +438,13 @@ describe("vscode", () => {
 
         if (Result.isFailure(result)) {
           expect(result.failure).toBeInstanceOf(JsoncNotEditable)
+          // The error lists every setting that the update would add, not only what Doctor checks.
+          expect(result.failure).toMatchObject({
+            change: expect.stringContaining('"editor.formatOnSave": true'),
+          })
+          expect(result.failure).toMatchObject({
+            change: expect.not.stringContaining('"editor.tabSize"'),
+          })
         }
 
         expect(files.read(".vscode/settings.json")).toBe(content)

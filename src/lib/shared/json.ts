@@ -1,6 +1,7 @@
 import type { JsonObject, JsonValue } from "type-fest"
 
 import * as Effect from "effect/Effect"
+import * as Equal from "effect/Equal"
 import * as Option from "effect/Option"
 
 import * as Predicate from "effect/Predicate"
@@ -92,6 +93,22 @@ export const mergeConfig = ({ fallback, preferred }: ConfigLayers) =>
     catch: (cause) => new FailedToMergeConfig({ cause }),
     try: () => mergeJsonObjects(preferred, fallback),
   })
+
+/**
+ * The entries of `next` whose values differ from `current`. A setting that Adamantite cannot write
+ * is shown to the user as these entries.
+ */
+export function pickChangedEntries(
+  current: Schema.JsonObject,
+  next: Schema.JsonObject
+): Schema.JsonObject {
+  return Object.fromEntries(
+    // Only own keys count, so a key such as `toString` does not read the prototype.
+    Object.entries(next).filter(
+      ([key, value]) => !Object.hasOwn(current, key) || !Equal.equals(current[key], value)
+    )
+  )
+}
 
 /**
  * Whether `content` is plain JSON, without comments or trailing commas. Adamantite rewrites only

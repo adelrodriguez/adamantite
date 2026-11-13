@@ -28,13 +28,24 @@ const REPO_ROOT = join(import.meta.dirname, "../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")
 const RULES_MODULE = join(REPO_ROOT, "presets/rules/plugin.ts")
 
+// Oxlint uses the backend in `OXLINT_TSGOLINT_PATH` before it looks in `node_modules/.bin` or on
+// `PATH`, and `pnpm test` puts the repository's launcher on `PATH`. A trial gets a path that does
+// not exist, so only a launcher that the test project installs can start the backend. The entry
+// removes the variable when it finds that launcher.
+const MISSING_BACKEND = join(REPO_ROOT, "missing-tsrs-lint")
+
 // The build writes the Oxlint entry beside the CLI, so a run from source starts its source.
 const TEST_LAYER = Layer.mergeAll(
   NodeServices.layer,
-  Layer.succeed(OxlintCommand)((project) => ({
-    ...getOxlintCommand(project),
-    args: [join(REPO_ROOT, "src/oxlint.ts")],
-  }))
+  Layer.succeed(OxlintCommand)((project) => {
+    const command = getOxlintCommand(project)
+
+    return {
+      ...command,
+      args: [join(REPO_ROOT, "src/oxlint.ts")],
+      env: { ...command.env, OXLINT_TSGOLINT_PATH: MISSING_BACKEND },
+    }
+  })
 )
 
 const NO_DEBUGGER_RULE = [

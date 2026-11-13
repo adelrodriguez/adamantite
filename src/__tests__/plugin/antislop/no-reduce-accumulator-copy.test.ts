@@ -123,6 +123,16 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
       errors: [error],
       name: "fixed-key copy that is not the return value",
     },
+    {
+      code: "items.reduce((acc, item) => { acc.push(item); return acc.toReversed(); }, [0]);",
+      errors: [error],
+      name: "tuple that the step grows before a length-preserving copy",
+    },
+    {
+      code: "items.reduce((acc, item) => { Object.assign(acc, item); return Object.assign({}, acc, { sum: 0 }); }, { sum: 0 });",
+      errors: [error],
+      name: "object that the step grows before a fixed-key copy",
+    },
   ],
   valid: [
     "items.reduce((acc, item) => { acc.push(item); return acc; }, []);",

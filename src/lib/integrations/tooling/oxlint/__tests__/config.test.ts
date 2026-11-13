@@ -1,7 +1,9 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
+import * as Option from "effect/Option"
 import {
   checkImportsLintPreset,
   getImportedLintPresets,
+  inspectExtendsOrder,
   inspectRequiredOxlintConfig,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
@@ -104,6 +106,93 @@ describe("inspectRequiredOxlintConfig", () => {
       kind: "invalid",
       reason,
     })
+  })
+})
+
+/**
+ * A config that exports an object literal with the `extends` value.
+ */
+function toExtendsConfig(imports: readonly string[], extendsValue: string) {
+  return [...imports, "", `export default { extends: ${extendsValue} }`, ""].join("\n")
+}
+
+const CORE_IMPORT = 'import core from "adamantite/lint"'
+const STRICT_IMPORT = 'import strict from "adamantite/lint/strict"'
+const EFFECT_IMPORT = 'import effect from "adamantite/lint/effect"'
+
+describe("inspectExtendsOrder", () => {
+  it("find no preset before core in a generated config", () => {
+    expect(inspectExtendsOrder(toOxlintTsConfigContent(LINT_PRESETS))).toStrictEqual(Option.none())
+  })
+
+  it("find a preset that comes before core", () => {
+    expect(
+      inspectExtendsOrder(
+        toOxlintTsConfigContent(["strict"]).replace("[core, strict,", "[strict, core,")
+      )
+    ).toStrictEqual(Option.some({ before: ["strict"], core: "core" }))
+  })
+
+  it("list each preset that comes before core, and no preset after it", () => {
+    expect(
+      inspectExtendsOrder(
+        toExtendsConfig(
+          [CORE_IMPORT, STRICT_IMPORT, EFFECT_IMPORT, 'import node from "adamantite/lint/node"'],
+          "[effect, strict, core, node]"
+        )
+      )
+    ).toStrictEqual(Option.some({ before: ["effect", "strict"], core: "core" }))
+  })
+
+  it("find a preset that comes before a second core entry", () => {
+    expect(
+      inspectExtendsOrder(toExtendsConfig([CORE_IMPORT, STRICT_IMPORT], "[core, strict, core]"))
+    ).toStrictEqual(Option.some({ before: ["strict"], core: "core" }))
+  })
+
+  it("leave out an entry before core that is not an Adamantite preset", () => {
+    expect(
+      inspectExtendsOrder(
+        toExtendsConfig(
+          [CORE_IMPORT, STRICT_IMPORT, 'import shared from "./shared.ts"'],
+          "[shared, strict, core]"
+        )
+      )
+    ).toStrictEqual(Option.some({ before: ["strict"], core: "core" }))
+  })
+
+  it("use the local names of the imports", () => {
+    expect(
+      inspectExtendsOrder(
+        toExtendsConfig(
+          [
+            'import base, { ignorePatterns } from "adamantite/lint"',
+            'import rules from "adamantite/lint/strict"',
+          ],
+          "[rules, base]"
+        )
+      )
+    ).toStrictEqual(Option.some({ before: ["rules"], core: "base" }))
+  })
+
+  it("accept an entry before core that is not an Adamantite preset", () => {
+    expect(
+      inspectExtendsOrder(
+        toExtendsConfig(
+          [CORE_IMPORT, STRICT_IMPORT, 'import shared from "./shared.ts"'],
+          "[shared, ...more, core, strict]"
+        )
+      )
+    ).toStrictEqual(Option.none())
+  })
+
+  it.each([
+    ["does not extend core", toExtendsConfig([CORE_IMPORT, STRICT_IMPORT], "[strict]")],
+    ["has no extends array literal", toExtendsConfig([CORE_IMPORT, STRICT_IMPORT], "presets")],
+    ["has no extends property", [CORE_IMPORT, "", "export default {}", ""].join("\n")],
+    ["does not parse", "export default {"],
+  ])("find no preset before core in a config that %s", (_, content) => {
+    expect(inspectExtendsOrder(content)).toStrictEqual(Option.none())
   })
 })
 

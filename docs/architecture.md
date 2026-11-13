@@ -283,6 +283,12 @@ prompt moves the config to `react-strict`, keeps one extends entry when both pre
 present, and preserves project settings and `react-doctor/*` overrides. Assessment does not
 write the config.
 
+Doctor also reports an Adamantite preset that comes before the last core entry in the `extends`
+array. Oxlint applies the entries in order, so core then replaces the rules that the preset
+changes. `inspectExtendsOrder` in `tooling/oxlint/config.ts` reads the order from the config
+source. An entry that is not an Adamantite preset can come before core, and the finding keeps its
+place.
+
 The Effect definition also assesses the language service entry in `tsconfig.json`, and its
 `update` method writes the language service entry for init.
 Its runtime resolver, in `plugins/effect-tsgo/runtime.ts`, returns binding and backend

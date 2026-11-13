@@ -322,6 +322,20 @@ describe("vscode", () => {
       })
     )
 
+    it.effect("use a prerelease of TypeScript 7", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({ ...effectEditorFiles(), ".vscode/settings.json": "{}" })
+        files.write(
+          "node_modules/typescript/package.json",
+          yield* formatJson({ gitHead: "typescript-commit", version: "7.0.0-dev.20250101.1" })
+        )
+
+        yield* vscode.update(ROOT).pipe(provideFiles(files))
+
+        expect(files.read(`${EFFECT_SDK}/lib.es5.d.ts`)).toBe("interface String {}")
+      })
+    )
+
     it.effect("use @typescript/native when the typescript package is older than 7", () =>
       Effect.gen(function* () {
         const files = makeFiles({

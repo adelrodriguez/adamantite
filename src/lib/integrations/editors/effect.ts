@@ -3,7 +3,9 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
+import * as SemVer from "effect/SemVer"
 import { EffectEditorUnavailable, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
@@ -32,7 +34,16 @@ const findNativeTypescript = Effect.fn("findNativeTypescript")(function* (cwd: s
     if (Option.isSome(directory)) {
       const installed = yield* readPackageJson(directory.value)
 
-      if (Number(installed.version?.split(".")[0]) >= 7) {
+      // A native TypeScript preview is a prerelease, such as `7.0.0-dev.20250101.1`, which a range
+      // such as `>=7` does not match. So the check reads the major version.
+      const native =
+        installed.version !== undefined
+        && SemVer.parse(installed.version).pipe(
+          Result.map(({ major }) => major >= 7),
+          Result.getOrElse(() => false)
+        )
+
+      if (native) {
         return Schema.decodeUnknownOption(NATIVE_TYPESCRIPT)(installed)
       }
     }

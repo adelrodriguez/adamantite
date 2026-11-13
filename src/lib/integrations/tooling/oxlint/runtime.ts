@@ -36,8 +36,7 @@ export type RuntimePart = StockPart | ReplacedPart
 export class NoBackend extends Data.TaggedClass("None") {}
 
 /**
- * Oxlint starts the installed tsrs through its `tsrs-lint` launcher, because Oxlint does not find
- * tsrs by itself.
+ * Oxlint starts the installed tsrs through the `tsrs-lint` launcher at `launcher`.
  */
 export class TsrsBackend extends Data.TaggedClass("Tsrs")<{ readonly launcher: string }> {}
 
@@ -55,15 +54,16 @@ export class ReplacedBackend extends Data.TaggedClass("Replaced")<{
 export type RuntimeBackend = NoBackend | ReplacedBackend | TsrsBackend
 
 /**
- * The variables that make Oxlint start the backend.
+ * The variables that make Oxlint start the backend on `platform`.
  */
-export function toBackendEnv(backend: RuntimeBackend) {
+export function toBackendEnv(backend: RuntimeBackend, platform = process.platform) {
   return Match.valueTags(backend, {
     None: () => ({}),
     Replaced: ({ env }) => env,
-    // Oxlint starts the backend as `<path> headless`, and the `tsrs-lint` bin adds the `--lint`
-    // flag of tsrs.
-    Tsrs: ({ launcher }) => ({ OXLINT_TSGOLINT_PATH: launcher }),
+    // Oxlint 1.92 and later find the launcher with the same search as `findLauncher`, and start it
+    // as `<path> headless`. The `tsrs-lint` bin adds the `--lint` flag of tsrs. Windows still names
+    // the launcher, because no Windows run has confirmed that search. See ADR 0021.
+    Tsrs: ({ launcher }) => (platform === "win32" ? { OXLINT_TSGOLINT_PATH: launcher } : {}),
   })
 }
 
@@ -81,25 +81,23 @@ export interface OxlintRuntime {
 }
 
 /**
- * The launchers that package managers write for the `tsrs-lint` bin on Windows, which cannot start
- * the bin script itself: `.cmd` from npm and pnpm, and `.exe` from Bun.
- */
-const WINDOWS_LAUNCHERS = ["tsrs-lint.cmd", "tsrs-lint.exe"]
-
-/**
  * The nearest `tsrs-lint` launcher in a `node_modules/.bin` folder from `project` up to the root,
- * as Oxlint looks for its own backend on Windows. A workspace package often uses the launcher of
- * the root installation.
+ * as Oxlint looks for its backend. A workspace package often uses the launcher of the root
+ * installation.
  */
-const findWindowsLauncher = Effect.fn("findWindowsLauncher")(function* (project: string) {
+const findLauncher = Effect.fn("findLauncher")(function* (project: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
+
+  // The launchers that package managers write for the `tsrs-lint` bin. Windows cannot start the bin
+  // script itself, so it gets `.cmd` from npm and pnpm, and `.exe` from Bun.
+  const launchers =
+    process.platform === "win32" ? ["tsrs-lint.cmd", "tsrs-lint.exe"] : ["tsrs-lint"]
+
   const candidates: string[] = []
 
   for (let folder = project; ; folder = path.dirname(folder)) {
-    candidates.push(
-      ...WINDOWS_LAUNCHERS.map((name) => path.join(folder, "node_modules", ".bin", name))
-    )
+    candidates.push(...launchers.map((name) => path.join(folder, "node_modules", ".bin", name)))
 
     if (path.dirname(folder) === folder) {
       break
@@ -112,20 +110,10 @@ const findWindowsLauncher = Effect.fn("findWindowsLauncher")(function* (project:
 })
 
 /**
- * The installed tsrs, or no backend when the project does not install tsrs or when Windows has no
- * launcher for it.
+ * The installed tsrs, or no backend when no `node_modules/.bin` folder has a launcher for it.
  */
 const resolveDefaultBackend = Effect.fn("resolveDefaultBackend")(function* (project: string) {
-  const path = yield* Path.Path
-  const tsrs = yield* resolvePackageDirectory(project, "tsrs")
-
-  const launcher = Option.isNone(tsrs)
-    ? Option.none<string>()
-    : process.platform === "win32"
-      ? yield* findWindowsLauncher(project)
-      : Option.some(path.join(tsrs.value, "bin", "tsrs-lint"))
-
-  return Option.match(launcher, {
+  return Option.match(yield* findLauncher(project), {
     onNone: (): RuntimeBackend => new NoBackend(),
     onSome: (file): RuntimeBackend => new TsrsBackend({ launcher: file }),
   })

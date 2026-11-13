@@ -172,8 +172,8 @@
     "vitest": "5.0.5"
   },
   "peerDependencies": {
-    "oxlint": ">=1.88.0",
-    "tsrs": ">=0.21.0-ts7.1.0-beta",
+    "oxlint": ">=1.92.0",
+    "tsrs": ">=0.25.0-ts7.1.0-beta",
     "typescript": ">=7"
   },
   "peerDependenciesMeta": {

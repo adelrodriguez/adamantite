@@ -438,6 +438,12 @@ try {
     join(effectWorkspacePackage, "package.json"),
     JSON.stringify({ name: "effect-workspace-package", private: true, type: "module" })
   )
+  // Install this checkout here too, so init keeps it and never installs `adamantite` from the
+  // registry, whose peer ranges can reject the pinned tools.
+  run("npm", ["install", "--ignore-scripts", "--save-dev", join(packDirectory, tarball)], {
+    cwd: effectWorkspacePackage,
+    env: effectEnv,
+  })
   run(
     process.execPath,
     [cliPath, "init", "--non-interactive", "--script", "check", "--editor", "zed"],
@@ -549,6 +555,8 @@ try {
 
   // `adamantite/typescript` loads the type resets by a path inside the installed
   // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
+  // Outside Windows, the Oxlint entry sets no backend variable, so the lint error also proves that
+  // Oxlint finds the `tsrs-lint` launcher of the real tsrs by itself. See ADR 0021.
   console.info("Checking the type resets of the installed TypeScript preset...")
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')

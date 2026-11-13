@@ -19,6 +19,7 @@ import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+import * as NodeTerminal from "#terminal/node-terminal.ts"
 
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
@@ -53,6 +54,8 @@ export const makeAppLayer = (
 ) =>
   Layer.mergeAll(
     NodeServices.layer,
+    // Replaces the terminal of `NodeServices`, so each prompt turns raw mode off when it ends.
+    NodeTerminal.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),

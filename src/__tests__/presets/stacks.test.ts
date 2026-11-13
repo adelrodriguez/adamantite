@@ -91,13 +91,7 @@ const TREES: readonly FixtureTree[] = [
     preset: "effect",
   },
   {
-    knownReports: [
-      {
-        file: "adamantite/no-react-state-hooks/valid/useCounter.ts",
-        reason: "https://github.com/adelrodriguez/adamantite/issues/775",
-        rule: "unicorn/filename-case",
-      },
-    ],
+    knownReports: [],
     preset: "react-strict",
   },
   {

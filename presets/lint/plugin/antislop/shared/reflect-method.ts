@@ -1,7 +1,7 @@
-import type { ESTree, SourceCode, Variable } from "@oxlint/plugins"
+import type { ESTree, SourceCode } from "@oxlint/plugins"
 
 import { staticKeyName } from "./literals.ts"
-import { constBinding, isGlobalObject, resolveVariable } from "./scope.ts"
+import { isGlobalObject, matchesThroughAliases, readsProperty } from "./scope.ts"
 
 type ReflectArgument = ESTree.Expression | ESTree.SpreadElement | null
 
@@ -14,73 +14,19 @@ type ReflectMethodCall =
   | { readonly kind: "hidden" }
 
 /**
- * Return the `const` binding that an identifier reads, or null for any other expression. `visited`
- * stops a cycle of bindings.
+ * Reports whether an expression reads one Reflect method, such as `Reflect.get`,
+ * `globalThis.Reflect.get`, `R.get` after `const R = Reflect`, or a method that the code
+ * destructures from Reflect.
  */
-function resolveConstBinding(
-  sourceCode: SourceCode,
-  expression: ESTree.Node,
-  visited: Set<Variable>
-) {
-  if (expression.type !== "Identifier") return null
-  const variable = resolveVariable(sourceCode, expression)
-
-  if (variable === null || visited.has(variable)) return null
-  visited.add(variable)
-
-  return constBinding(variable)
-}
-
-/**
- * Reports whether an expression reads the global Reflect object, directly, through
- * `globalThis.Reflect`, or through a `const` alias.
- */
-function isReflect(
-  sourceCode: SourceCode,
-  expression: ESTree.Node,
-  visited: Set<Variable>
-): boolean {
-  if (isGlobalObject(sourceCode, expression, "Reflect")) return true
-  const binding = resolveConstBinding(sourceCode, expression, visited)
-
-  return binding?.id.type === "Identifier" && isReflect(sourceCode, binding.init, visited)
-}
-
-/**
- * Reports whether an expression reads one Reflect method, such as `Reflect.get`, or a `const`
- * binding of it, such as `const { get } = Reflect` or `const read = Reflect.get`.
- */
-function isReflectMethod(
-  sourceCode: SourceCode,
-  expression: ESTree.Node,
-  methodName: string,
-  visited: Set<Variable>
-): boolean {
-  if (expression.type === "MemberExpression") {
-    return (
-      staticKeyName(expression.property, expression.computed) === methodName
-      && isReflect(sourceCode, expression.object, visited)
-    )
-  }
-
-  const binding = resolveConstBinding(sourceCode, expression, visited)
-
-  if (binding === null) return false
-  const { id, init } = binding
-
-  if (id.type === "Identifier") return isReflectMethod(sourceCode, init, methodName, visited)
-
-  return (
-    id.type === "ObjectPattern"
-    && expression.type === "Identifier"
-    && id.properties.some(
-      (property) =>
-        property.type === "Property"
-        && property.value.type === "Identifier"
-        && property.value.name === expression.name
-        && staticKeyName(property.key, property.computed) === methodName
-    )
-    && isReflect(sourceCode, init, visited)
+function isReflectMethod(sourceCode: SourceCode, expression: ESTree.Node, methodName: string) {
+  return readsProperty(
+    sourceCode,
+    expression,
+    (name) => name === methodName,
+    (owner) =>
+      matchesThroughAliases(sourceCode, owner, (node) =>
+        isGlobalObject(sourceCode, node, "Reflect")
+      )
   )
 }
 
@@ -97,13 +43,13 @@ export function matchReflectMethodCall(
 ): ReflectMethodCall | null {
   const { callee } = call
 
-  if (isReflectMethod(sourceCode, callee, methodName, new Set())) {
+  if (isReflectMethod(sourceCode, callee, methodName)) {
     return { arguments: call.arguments, kind: "listed" }
   }
 
   if (
     callee.type !== "MemberExpression"
-    || !isReflectMethod(sourceCode, callee.object, methodName, new Set())
+    || !isReflectMethod(sourceCode, callee.object, methodName)
   ) {
     return null
   }

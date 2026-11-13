@@ -16,6 +16,37 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
   invalid: [
     { code: 'if (typeof input === "string") use(input);', errors: [error] },
     { code: "if (typeof input === undefined) use(input);", errors: [error] },
+    { code: 'function f(value: unknown) { return typeof value === "string"; }', errors: [error] },
+    { code: 'function f(value: any) { return typeof value === "string"; }', errors: [error] },
+    {
+      code: 'function f(value: string | (number | unknown)) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    { code: 'function f(value) { return typeof value === "string"; }', errors: [error] },
+    {
+      code: 'const data = JSON.parse(text); export const isObject = typeof data === "object";',
+      errors: [error],
+    },
+    {
+      code: 'function f(options: Record<string, unknown>) { return typeof options.retry === "number"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f(options: { retry: any }) { const { retry } = options; return typeof retry === "number"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f(options) { const { retry } = options; return typeof retry === "number"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f(options: Options) { const { inner } = options; const { retry } = inner; return typeof retry === "number"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f(options: Options) { return typeof options.load() === "string"; }',
+      errors: [error],
+    },
     {
       code: 'function isString(value: unknown): value is string { return typeof value === "string"; }',
       errors: [error],
@@ -56,6 +87,15 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     'if (typeof globalThis.crypto === "undefined") throw new Error("no crypto");',
     'const missing = "undefined" === typeof process;',
     "const value = input;",
+    'function delay(retry: number | RetryPolicy): number { return typeof retry === "number" ? retry : retry.delay; }',
+    'async function resolve(headers: HeadersInit | (() => Promise<HeadersInit>)) { return typeof headers === "function" ? await headers() : headers; }',
+    'function resolve(options: FetchTransportOptions) { return typeof (options.headers) === "function"; }',
+    'function resolve(options: FetchTransportOptions) { const { headers } = options; return typeof headers === "function"; }',
+    'function resolve(options: FetchTransportOptions) { const { headers: init = {} } = options; return typeof init === "function"; }',
+    'function resolve({ headers }: FetchTransportOptions) { return typeof headers === "function"; }',
+    'function resolve(retry: number | RetryPolicy = 3) { return typeof retry === "number"; }',
+    'class AsyncRun<T> { constructor(input: AsyncRunInput<T>) { this.run = typeof input === "function" ? input : input.try; } }',
+    'declare const input: string | number; export const isText = typeof input === "string";',
     {
       code: 'function isString(value: unknown): value is string { return typeof value === "string"; }',
       options: allowInTypeGuards,

@@ -1,5 +1,6 @@
 import type { ESTree, Rule, SourceCode, Variable } from "@oxlint/plugins"
 
+import { isNumberLiteral } from "../../shared/ast.ts"
 import {
   arrayMethodTarget,
   constInitializer,
@@ -7,7 +8,6 @@ import {
   resolveArrayBinding,
   unwrapArrayExpression,
 } from "../shared/array-method.ts"
-import { isNumberLiteral } from "../shared/literals.ts"
 import { isGlobalObject } from "../shared/scope.ts"
 
 type ReducerCallback = ESTree.ArrowFunctionExpression | ESTree.Function

@@ -1,6 +1,7 @@
 import type { ESTree, Rule } from "@oxlint/plugins"
 
-import { isMatchPatternObject, isStringLiteral, propertyName } from "../shared/tagged-values.ts"
+import { isStringLiteral } from "../../shared/ast.ts"
+import { isMatchPatternObject, propertyName } from "../shared/tagged-values.ts"
 
 /**
  * Effect constructors whose input carries `_tag` as data, such as the error code of a

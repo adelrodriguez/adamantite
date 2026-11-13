@@ -1,18 +1,13 @@
 import type { ESTree } from "@oxlint/plugins"
+import { isStringLiteral, staticKeyName } from "../../shared/ast.ts"
 
 const equalityOperators = new Set(["==", "===", "!=", "!=="])
 const broadEffectCatchMethods = new Set(["catch", "catchAll", "catchIf"])
 
-export const isStringLiteral = (
-  node: ESTree.Node | null | undefined
-): node is ESTree.StringLiteral => node?.type === "Literal" && typeof node.value === "string"
-
 export const isTagMember = (
   node: ESTree.Node | null | undefined
 ): node is ESTree.MemberExpression =>
-  node?.type === "MemberExpression"
-  && ((!node.computed && node.property.type === "Identifier" && node.property.name === "_tag")
-    || (node.computed && isStringLiteral(node.property) && node.property.value === "_tag"))
+  node?.type === "MemberExpression" && staticKeyName(node.property, node.computed) === "_tag"
 
 export const tagMemberFromComparison = (
   node: ESTree.BinaryExpression
@@ -60,17 +55,8 @@ export const isReasonTagMember = (node: ESTree.MemberExpression): boolean =>
       && isStringLiteral(node.object.property)
       && node.object.property.value === "reason"))
 
-export const propertyName = (property: ESTree.ObjectProperty): string | undefined => {
-  if (!property.computed && property.key.type === "Identifier") {
-    return property.key.name
-  }
-
-  if (isStringLiteral(property.key)) {
-    return property.key.value
-  }
-
-  return undefined
-}
+export const propertyName = (property: ESTree.ObjectProperty): string | undefined =>
+  staticKeyName(property.key, property.computed) ?? undefined
 
 export const isMatchPatternObject = (node: ESTree.ObjectExpression): boolean => {
   const call = node.parent

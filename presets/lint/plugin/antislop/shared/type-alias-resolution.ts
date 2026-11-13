@@ -1,6 +1,6 @@
 import type { ESTree } from "@oxlint/plugins"
 
-import { childNodes, type VisitorKeys } from "./child-nodes.ts"
+import { childNodes, type VisitorKeys } from "../../shared/ast.ts"
 import { lexicalTypeParameters, type LexicalTypeParameter } from "./lexical-type-parameters.ts"
 
 type TypeScope = ESTree.Node

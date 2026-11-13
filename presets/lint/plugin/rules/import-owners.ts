@@ -1,8 +1,8 @@
 import type { ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync, readFileSync } from "node:fs"
 import { posix } from "node:path"
+import { isStringLiteral } from "../shared/ast.ts"
 import { globToRegExp } from "../shared/glob.ts"
-import { isStringLiteral } from "../shared/imports.ts"
 import { readStringArrayOption, readStringOption } from "../shared/options.ts"
 import { resolveImport } from "../shared/resolver.ts"
 

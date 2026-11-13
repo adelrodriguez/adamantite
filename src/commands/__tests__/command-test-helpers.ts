@@ -1,5 +1,7 @@
 import type * as prompts from "@clack/prompts"
 import * as Command from "effect/cli/Command"
+import * as Prompt from "effect/cli/Prompt"
+import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
@@ -7,7 +9,6 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stdio from "effect/Stdio"
-import * as Terminal from "effect/Terminal"
 import { TestConsole } from "effect/testing"
 import {
   type FileSystemTestContext,
@@ -15,6 +16,7 @@ import {
   makeSystemError,
 } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { createTerminalTestContext, type TerminalTestContext } from "#__tests__/terminal.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import {
   type CommandFailedLike,
@@ -32,7 +34,7 @@ import {
   DependencyInstaller,
 } from "#lib/workspace/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
+import { TerminalCapabilities as AdamantiteTerminalCapabilities } from "#terminal/capabilities.ts"
 import { Prompter } from "#terminal/prompter.ts"
 
 interface LogEntry {
@@ -190,7 +192,7 @@ export function nonProbeInvocations(runner: RunnerTestContext) {
   return runner.invocations.filter((invocation) => !isProbe(invocation))
 }
 
-export const interactiveTerminalLayer = Layer.succeed(TerminalCapabilities)({
+export const interactiveTerminalLayer = Layer.succeed(AdamantiteTerminalCapabilities)({
   copyToClipboard: () => Effect.void,
   isInteractive: Effect.succeed(true),
 })
@@ -378,18 +380,15 @@ export function createDependencyInstallerTestContext(options?: {
   }
 }
 
-function makeQuietTerminalLayer() {
-  return Layer.succeed(Terminal.Terminal)(
-    Terminal.make({
-      columns: Effect.succeed(40),
-      display: () => Effect.void,
-      readInput: Effect.never,
-      readLine: Effect.never,
-      rows: Effect.succeed(24),
-      size: Effect.never,
-    })
-  )
-}
+/**
+ * The capabilities of a terminal that can prompt. Without this layer, commands run as in CI, where
+ * `canPrompt` is false. Colors stay off, so the output reads as plain text.
+ */
+export const promptingLayer = Layer.succeed(TerminalCapabilities.TerminalCapabilities)({
+  canAnimate: false,
+  canColor: false,
+  canPrompt: true,
+})
 
 const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
   ChildProcessSpawner.make(() => Effect.die("Command tests must not spawn processes"))
@@ -417,9 +416,14 @@ export interface RunCommandOptions<Layers extends readonly TestLayer[]> {
   readonly forwardedArguments?: readonly string[]
   readonly layers?: Layers
   readonly logLines?: unknown[]
+  /**
+   * The terminal that answers the prompts. The default terminal has no keys, so a prompt fails the
+   * test.
+   */
+  readonly terminal?: TerminalTestContext
 }
 
-function makeDefaultLayer(files: FileSystemTestContext) {
+function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestContext) {
   const platformLayer = Layer.mergeAll(files.layer, Path.layer)
 
   return Layer.mergeAll(
@@ -427,9 +431,15 @@ function makeDefaultLayer(files: FileSystemTestContext) {
     NodeVersionResolver.layer.pipe(Layer.provide(platformLayer)),
     makeModuleResolverLayer(files.root),
     TestConsole.layer,
-    makeQuietTerminalLayer(),
+    terminal.layer,
+    Layer.succeed(Prompt.Theme)(Prompt.makeTheme({ colors: false })),
+    Layer.succeed(TerminalCapabilities.TerminalCapabilities)({
+      canAnimate: false,
+      canColor: false,
+      canPrompt: false,
+    }),
     Stdio.layerTest({}),
-    Layer.succeed(TerminalCapabilities)({
+    Layer.succeed(AdamantiteTerminalCapabilities)({
       copyToClipboard: () => Effect.void,
       isInteractive: Effect.succeed(false),
     }),
@@ -459,7 +469,11 @@ export function runCommand<
   options: RunCommandOptions<Layers> = {}
 ) {
   const files = options.files ?? createFileSystemTestContext()
-  const testLayer = Layer.mergeAll(makeDefaultLayer(files), ...(options.layers ?? []))
+
+  const testLayer = Layer.mergeAll(
+    makeDefaultLayer(files, options.terminal ?? createTerminalTestContext()),
+    ...(options.layers ?? [])
+  )
 
   return Effect.exit(
     Command.runWith(command, { version: "test" })(args).pipe(

@@ -48,12 +48,7 @@ export const isInsideBroadEffectHandler = (node: ESTree.Node): boolean => {
 
 export const isReasonTagMember = (node: ESTree.MemberExpression): boolean =>
   node.object.type === "MemberExpression"
-  && ((!node.object.computed
-    && node.object.property.type === "Identifier"
-    && node.object.property.name === "reason")
-    || (node.object.computed
-      && isStringLiteral(node.object.property)
-      && node.object.property.value === "reason"))
+  && staticKeyName(node.object.property, node.object.computed) === "reason"
 
 export const propertyName = (property: ESTree.ObjectProperty): string | undefined =>
   staticKeyName(property.key, property.computed) ?? undefined
@@ -71,8 +66,6 @@ export const isMatchPatternObject = (node: ESTree.ObjectExpression): boolean => 
     callee.type === "MemberExpression"
     && callee.object.type === "Identifier"
     && callee.object.name === "Match"
-    && !callee.computed
-    && callee.property.type === "Identifier"
-    && (callee.property.name === "when" || callee.property.name === "not")
+    && ["not", "when"].includes(staticKeyName(callee.property, callee.computed) ?? "")
   )
 }

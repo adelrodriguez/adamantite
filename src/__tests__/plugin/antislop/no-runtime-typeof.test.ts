@@ -48,6 +48,21 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
       errors: [error],
     },
     {
+      code: 'function f(options: Options) { return typeof (options as unknown as Raw).retry === "number"; }',
+      errors: [error],
+      name: "as assertion on an owned binding",
+    },
+    {
+      code: 'function f(options: Options) { return typeof (options satisfies Raw)!.retry === "number"; }',
+      errors: [error],
+      name: "satisfies expression on an owned binding",
+    },
+    {
+      code: 'function f(options: unknown) { return typeof options!.retry === "number"; }',
+      errors: [error],
+      name: "non-null assertion on an unknown binding",
+    },
+    {
       code: 'function isString(value: unknown): value is string { return typeof value === "string"; }',
       errors: [error],
     },

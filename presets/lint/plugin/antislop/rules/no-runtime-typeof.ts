@@ -76,7 +76,9 @@ function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
 type BindingName = Definition["name"]
 
 /**
- * Return the identifier at the root of a `typeof` operand, as `options` in `options.headers`.
+ * Return the identifier at the root of a `typeof` operand, as `options` in `options.headers` or
+ * `options!.headers`. A non-null assertion keeps the owned type of the root. An `as` or `satisfies`
+ * expression can change the type, so the search stops there.
  */
 function operandRoot(argument: ESTree.Expression): ESTree.IdentifierReference | null {
   let current = argument
@@ -84,6 +86,7 @@ function operandRoot(argument: ESTree.Expression): ESTree.IdentifierReference | 
   while (
     current.type === "ParenthesizedExpression"
     || current.type === "ChainExpression"
+    || current.type === "TSNonNullExpression"
     || current.type === "MemberExpression"
   ) {
     current = current.type === "MemberExpression" ? current.object : current.expression

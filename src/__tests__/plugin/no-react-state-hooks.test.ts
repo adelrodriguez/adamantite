@@ -22,6 +22,11 @@ function feature(name: string) {
 tester.run("no-react-state-hooks", plugin.rules["no-react-state-hooks"], {
   invalid: [
     {
+      code: 'import * as React from "react"\nexport function Counter() {\n  return React[`useState`](0)[0]\n}',
+      errors: [{ data: { hook: "useState" }, messageId: "localState" }],
+      filename: feature("Counter.tsx"),
+    },
+    {
       code: 'import { useState } from "react"\nexport function Counter() {\n  const [count] = useState(0)\n  return count\n}',
       errors: [{ column: 18, data: { hook: "useState" }, line: 3, messageId: "localState" }],
       filename: feature("Counter.tsx"),

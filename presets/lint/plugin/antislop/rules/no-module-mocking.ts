@@ -1,6 +1,6 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { staticKeyName } from "../shared/literals.ts"
+import { staticKeyName } from "../../shared/ast.ts"
 import {
   isGlobalObject,
   matchesThroughAliases,

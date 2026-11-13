@@ -1,6 +1,6 @@
 import type { ESTree, SourceCode } from "@oxlint/plugins"
 
-import { staticKeyName } from "./literals.ts"
+import { staticKeyName } from "../../shared/ast.ts"
 import { isGlobalObject, matchesThroughAliases, readsProperty } from "./scope.ts"
 
 type ReflectArgument = ESTree.Expression | ESTree.SpreadElement | null

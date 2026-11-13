@@ -1,5 +1,5 @@
 import type { ESTree } from "@oxlint/plugins"
-import { childNodes, type VisitorKeys } from "./child-nodes.ts"
+import { childNodes, type VisitorKeys } from "../../shared/ast.ts"
 
 /**
  * A type binder in scope at a node. `distance` counts the steps from the node up to the node that

@@ -10,7 +10,7 @@ import type {
 } from "@oxlint/plugins"
 
 import type { PaddingType, SelectorOption, StatementMatcher } from "./padding-line-options.ts"
-import { isStringLiteral } from "../shared/literals.ts"
+import { isStringLiteral } from "../../shared/ast.ts"
 import {
   fitsOnOneLine,
   getActualLastToken,

@@ -313,9 +313,12 @@ package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through 
 ## First-party plugin
 
 Rules that no upstream plugin provides live in Adamantite's own Oxlint plugin under
-`presets/lint/plugin/`, with one module per rule in `rules/`. `options.ts` reads rule
-options for all rules, and `imports.ts` finds calls of imported functions, such as
-`useState` and `React.useState`. `index.ts` registers each
+`presets/lint/plugin/`, with one module per rule in `rules/`. The plugin-wide helpers live in
+`shared/`, which the `adamantite` and anti-slop plugins all use: `shared/options.ts` reads rule
+options for all rules, and `shared/imports.ts` finds calls of imported functions, such as
+`useState` and `React.useState`, and `shared/ast.ts` holds the AST helpers, such as the key
+reader. A layer map for `presets/lint/plugin` in the repository's `oxlint.config.ts` lets each
+plugin import `shared`, and rejects an import of another plugin's code. `index.ts` registers each
 rule under the `adamantite` namespace. Tsdown builds the plugin with the presets, so it
 ships at `dist/presets/lint/plugin/index.js`.
 

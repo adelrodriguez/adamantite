@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { childNodes } from "#presets/lint/plugin/antislop/shared/child-nodes.ts"
+import { childNodes } from "#presets/lint/plugin/shared/ast.ts"
 
 interface ExpressionStatementFields {
   readonly expression: { readonly name: string; readonly type: "Identifier" }

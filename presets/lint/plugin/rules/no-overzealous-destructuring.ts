@@ -1,5 +1,5 @@
 import type { ESTree, Rule, Visitor } from "@oxlint/plugins"
-import { readPositiveIntegerOption } from "../options.ts"
+import { readPositiveIntegerOption } from "../shared/options.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs and imports only types from packages.

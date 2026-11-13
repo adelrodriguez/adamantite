@@ -1,6 +1,6 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
-import { readPositiveIntegerOption } from "../../options.ts"
+import { readPositiveIntegerOption } from "../../shared/options.ts"
 import { fitsOnOneLine } from "../stylistic/padding-line-ast.ts"
 import createPaddingLineRule from "../stylistic/padding-line-between-statements.ts"
 

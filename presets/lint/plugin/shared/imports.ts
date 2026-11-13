@@ -1,4 +1,5 @@
 import type { Context, ESTree } from "@oxlint/plugins"
+import { staticKeyName } from "./ast.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs and imports only types from packages.
@@ -18,19 +19,8 @@ function getImportedName(specifier: ESTree.ImportSpecifier) {
   return specifier.imported.type === "Literal" ? specifier.imported.value : specifier.imported.name
 }
 
-/**
- * Whether an expression is a string literal, such as the source of `import("./module.ts")`.
- */
-export function isStringLiteral(node: ESTree.Expression): node is ESTree.StringLiteral {
-  return node.type === "Literal" && typeof node.value === "string"
-}
-
 function getPropertyName(member: ESTree.MemberExpression) {
-  if (!member.computed) {
-    return member.property.type === "Identifier" ? member.property.name : undefined
-  }
-
-  return isStringLiteral(member.property) ? member.property.value : undefined
+  return staticKeyName(member.property, member.computed) ?? undefined
 }
 
 function getCall(node: ESTree.Node) {

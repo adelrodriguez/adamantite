@@ -1,4 +1,5 @@
 import type { ESTree, Reference, Rule, SourceCode } from "@oxlint/plugins"
+import { staticKeyName } from "../../shared/ast.ts"
 
 import {
   type FunctionParameter,
@@ -106,15 +107,15 @@ function ownerNames(owner: ParameterOwner): string[] {
   }
 
   if (
-    (holder.type === "MethodDefinition"
-      || holder.type === "TSAbstractMethodDefinition"
-      || holder.type === "PropertyDefinition"
-      || holder.type === "Property"
-      || holder.type === "TSMethodSignature")
-    && !holder.computed
-    && holder.key.type === "Identifier"
+    holder.type === "MethodDefinition"
+    || holder.type === "TSAbstractMethodDefinition"
+    || holder.type === "PropertyDefinition"
+    || holder.type === "Property"
+    || holder.type === "TSMethodSignature"
   ) {
-    names.push(holder.key.name)
+    const name = staticKeyName(holder.key, holder.computed)
+
+    if (name !== null) names.push(name)
   }
 
   const typeName = declaringTypeName(holder)
@@ -153,10 +154,9 @@ function isRejectionCallback(owner: ParameterOwner): boolean {
   if (call.type !== "CallExpression") return false
   const callee = call.callee
 
-  if (callee.type !== "MemberExpression" || callee.computed) return false
-
-  if (callee.property.type !== "Identifier") return false
-  const index = REJECTION_CALLBACK_INDEX.get(callee.property.name)
+  if (callee.type !== "MemberExpression") return false
+  const name = staticKeyName(callee.property, callee.computed)
+  const index = name === null ? undefined : REJECTION_CALLBACK_INDEX.get(name)
 
   return index !== undefined && call.arguments[index] === owner
 }
@@ -185,9 +185,10 @@ const PARSERS = new Map<string, "factory" | "method">([
 ])
 
 function memberParser(callee: ESTree.Node): "factory" | "method" | undefined {
-  if (callee.type !== "MemberExpression" || callee.computed) return undefined
+  if (callee.type !== "MemberExpression") return undefined
+  const name = staticKeyName(callee.property, callee.computed)
 
-  return callee.property.type === "Identifier" ? PARSERS.get(callee.property.name) : undefined
+  return name === null ? undefined : PARSERS.get(name)
 }
 
 function isParserFactoryCall(node: ESTree.Node | null): boolean {

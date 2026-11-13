@@ -203,6 +203,9 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
     },
   ],
   valid: [
+    "items.reduce((acc, item) => Object.assign({}, acc, { 0: acc[0] + item.n }), { 0: 0 });",
+    "items.reduce((acc, item) => Object.assign({}, acc, { [0]: acc[0] + item.n }), { 0: 0 });",
+    'items.reduce((acc, item) => Object.assign({}, acc, { ["sum"]: acc.sum + item.n }), { sum: 0 });',
     "items.reduce((acc, item) => { acc.push(item); return acc; }, []);",
     "items.reduce((acc, item) => Object.assign(acc, item), {});",
     "items.reduce((acc, item) => Object.assign(acc, acc, item), {});",

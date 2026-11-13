@@ -13,6 +13,10 @@ const tester = new RuleTester()
 tester.run("no-manual-tag-comparison", plugin.rules["no-manual-tag-comparison"], {
   invalid: [
     {
+      code: '"Ready" === value[`_tag`];',
+      errors: [{ messageId: "manualComparison" }],
+    },
+    {
       code: 'value._tag === "Ready";',
       errors: [{ messageId: "manualComparison" }],
     },

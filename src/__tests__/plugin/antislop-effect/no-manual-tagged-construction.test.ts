@@ -13,6 +13,10 @@ const tester = new RuleTester()
 tester.run("no-manual-tagged-construction", plugin.rules["no-manual-tagged-construction"], {
   invalid: [
     {
+      code: 'const value = { [`_tag`]: "Ready" };',
+      errors: [{ messageId: "manualConstruction" }],
+    },
+    {
       code: 'const value = { _tag: "Ready", payload };',
       errors: [{ messageId: "manualConstruction" }],
     },
@@ -28,10 +32,12 @@ tester.run("no-manual-tagged-construction", plugin.rules["no-manual-tagged-const
   valid: [
     'Match.when({ _tag: "Ready" }, handleReady);',
     'Match.not({ "_tag": "Pending" });',
+    'Match[`when`]({ _tag: "Ready" }, handleReady);',
     "Ready.make({ value });",
     "new NotFound({ id });",
     "({ _tag: tag, value });",
     'PlatformError.systemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
+    'PlatformError[`systemError`]({ [`_tag`]: "NotFound", module: "FileSystem", method: "readFile" });',
     'new PlatformError.SystemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
     'new HeaderParseErrorReason({ _tag: "InvalidHttpDate", input });',
   ],

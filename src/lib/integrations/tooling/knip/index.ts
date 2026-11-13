@@ -1,5 +1,5 @@
-import type { CommandRunOptions } from "#lib/execution/command-runner.ts"
 import { defineConfigTooling } from "#lib/integrations/tooling/base.ts"
+import * as commands from "#lib/integrations/tooling/knip/command.ts"
 import {
   inspectRequiredKnipConfig,
   toKnipTsConfigContent,
@@ -8,27 +8,8 @@ import {
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
-function analyze(options: {
-  readonly cwd: string
-  readonly fix: boolean
-  readonly strict: boolean
-  readonly forwardedArguments: readonly string[]
-}): CommandRunOptions {
-  return {
-    args: [
-      ...(options.fix ? ["--fix", "--allow-remove-files"] : []),
-      ...(options.strict ? ["--production", "--strict"] : []),
-      ...options.forwardedArguments,
-    ],
-    command: "knip",
-    cwd: options.cwd,
-    stdin: "ignore",
-    title: "🧹 Analyzing unused code",
-  }
-}
-
 export default {
-  analyze,
+  analyze: commands.analyze,
   ...defineConfigTooling({
     configContent: toKnipTsConfigContent,
     configFiles: {

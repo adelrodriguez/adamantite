@@ -293,8 +293,9 @@ package requirement depends on the root config import instead.
 `tooling/oxlint/runtime.ts` resolves the installed Oxlint package and applies the native
 overrides. Two overrides for the same part fail with `NativeRuntimeConflict`. A backend
 override replaces all default backend variables. Without a backend override, Oxlint starts the
-installed tsrs through its `tsrs-lint` launcher. A project without tsrs runs stock Oxlint, as
-ADR 0021 says. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
+installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
+launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
+runs stock Oxlint, as ADR 0021 says. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
 CLI. It clears the temporary binding variable before JavaScript plugins load. See ADR 0019,
 ADR 0021, and ADR 0022.
 

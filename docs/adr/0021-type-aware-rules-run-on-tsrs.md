@@ -3,6 +3,10 @@
 ADR 0022 renames the narrow toolchain to Oxlint runtime and changes the module ownership.
 The names and paths below describe this decision when it was made.
 
+Oxlint 1.92 finds tsrs by itself, so outside Windows the entry no longer sets
+`OXLINT_TSGOLINT_PATH`. Windows ARM64 now has the packages for both backends. The update of
+2026-11-13 (issue #752) below records both changes.
+
 Oxlint runs its type-aware rules in a separate backend process. Until now, that backend was
 oxlint-tsgolint, which is built on typescript-go. [tsrs](https://github.com/oxc-project/tsrs), a
 Rust port of the TypeScript 7 compiler, ships `tsrs --lint` since 0.21.0. It implements the
@@ -44,6 +48,34 @@ Oxlint and tsrs versions against the platform package.
 Knip counts a peer of a used package as used, so the analyze preset does not report `tsrs` as an
 unused devDependency.
 
+## Update of 2026-11-13: discovery and Windows ARM64
+
+Oxlint 1.92 and later look for the backend themselves
+([oxc-project/oxc#28751](https://github.com/oxc-project/oxc/pull/28751)). They search
+`node_modules/.bin` in the working folder and each folder above it, and then `PATH`. Each folder
+gives `tsrs-lint` priority over `tsgolint`. On Windows, they look for `tsrs-lint.CMD` and then
+`tsrs-lint.exe`. This is the search that the entry already used on Windows.
+
+- The entry now looks for the launcher with that search on every platform, as
+  `node_modules/.bin/tsrs-lint` outside Windows. Doctor checks the launcher that it finds, so Doctor
+  and Oxlint agree on the backend.
+- Outside Windows, the entry sets no variable, and Oxlint finds the launcher. A run on macOS with
+  Oxlint 1.93.0 and tsrs 0.25.0 found it from the project root and from a workspace package. The
+  smoke test lints a type error with the real tsrs on Linux in CI and on macOS.
+- On Windows, the entry still sets `OXLINT_TSGOLINT_PATH`. The upstream change was tested only
+  with mock launchers, and CI has no Windows runner. Remove the Windows variable when a Windows run
+  of the smoke test passes without it.
+- The `oxlint` peer range starts at 1.92.0, because Oxlint 1.91 and earlier look only for
+  `tsgolint`.
+- Oxlint also selects only `tsgolint` when a Go profiling variable, such as
+  `OXLINT_TSGOLINT_CPU`, is set. Outside Windows, such a variable now makes the type-aware run fail
+  to find a backend. tsrs does not support those variables.
+
+tsrs 0.25.0 publishes `@tsrs/win32-arm64`. `@effect/tsgo` 0.69.0 ships a Windows ARM64 build of
+tsrs 0.25.0 and of Oxlint 1.91.0 to 1.93.0. `@effect/tsgo` 0.68.1 ships only tsrs 0.24.0, and no
+tsrs build for Windows ARM64, so Adamantite pins 0.69.0. Nobody has run the type-aware rules on
+Windows ARM64.
+
 ## Considered options
 
 - **Run `effect-tsgo --tsrs-lint oxlint` in place of the entry.** The upstream proxy now replaces
@@ -61,12 +93,6 @@ unused devDependency.
 - tsrs does not support the Go profiling variables of tsgolint, such as `OXLINT_TSGOLINT_CPU`.
 - The packaged Effect builds do not run on Linux with musl. The stock `tsrs` package has musl
   builds.
-- The type-aware rules do not run on Windows ARM64. tsrs 0.21.0 publishes no `@tsrs/win32-arm64`
-  package, so `tsrs-lint` fails with "This platform is not supported". `@effect/tsgo` 0.67.1 ships
-  no tsrs build for Windows ARM64, so the `effect` preset fails with `EffectBuildMissing`.
-  oxlint-tsgolint did support Windows ARM64. We accepted this gap (2026-11-05, PR #620) and wait
-  for the upstream fix. [oxc-project/tsrs#903](https://github.com/oxc-project/tsrs/pull/903) adds
-  the package, and no published tsrs release includes it yet. Remove this note when the pinned
-  `tsrs` and `@effect/tsgo` both ship Windows ARM64 builds.
-- When Oxlint finds tsrs by itself, the backend of a project without the `effect` preset needs no
-  variable.
+- Before tsrs 0.25.0 and `@effect/tsgo` 0.69.0, the type-aware rules did not run on Windows ARM64,
+  which oxlint-tsgolint supported. We accepted this gap (2026-11-05, PR #620). The update of
+  2026-11-13 pins releases that ship the builds.

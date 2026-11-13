@@ -37,9 +37,10 @@ const files = [{ path: ".zed/settings.json", type: "config" }] as const
 
 const CONFIG = {
   languages: {
-    // oxfmt cannot format Astro files, so Zed's managed Prettier formats them and installs the
-    // listed plugins itself. Like Zed's default for Astro, there is no `formatter` key, so "auto"
-    // picks Prettier through `allowed`, and no `parser`, which the plugin infers.
+    // Oxfmt formats Astro files only with its `astro` option and the `@astrojs/compiler-rs` package
+    // in the project, and Adamantite manages neither. So Zed's managed Prettier formats them and
+    // installs the listed plugins itself. Like Zed's default for Astro, there is no `formatter` key,
+    // so "auto" picks Prettier through `allowed`, and no `parser`, which the plugin infers.
     Astro: {
       format_on_save: "on",
       prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },

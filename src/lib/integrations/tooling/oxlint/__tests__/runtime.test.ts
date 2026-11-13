@@ -254,8 +254,8 @@ describe("Oxlint runtime", () => {
 
   it.effect("say that @effect/tsgo has no builds of tsrs for a platform without them", () =>
     Effect.gen(function* () {
-      // @effect/tsgo 0.67.1 ships no tsrs builds for Windows ARM64, because tsrs has no build for
-      // it yet.
+      // @effect/tsgo 0.67.1 shipped no tsrs builds for Windows ARM64, because tsrs had no build for
+      // it before 0.25.0.
       const files = createFileSystemTestContext({
         files: {
           [`${ARTIFACTS}/oxlint/1.88.0/oxlint.${PLATFORM}.node`]: "",

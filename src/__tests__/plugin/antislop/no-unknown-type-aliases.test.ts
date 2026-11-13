@@ -35,6 +35,9 @@ tester.run("no-unknown-type-aliases", plugin.rules["no-unknown-type-aliases"], {
     },
     { code: "type Box<T> = T; type Payload = Box<unknown>;", errors: [error] },
     { code: "type Second<A, B = A> = B; type Payload = Second<unknown>;", errors: [error] },
+    { code: "type Payload = Awaited<unknown>;", errors: [error] },
+    { code: "type Payload = NoInfer<unknown>;", errors: [error] },
+    { code: "type Payload = string | NoInfer<unknown>;", errors: [error] },
   ],
   valid: [
     "type User = { readonly id: string };",
@@ -42,5 +45,7 @@ tester.run("no-unknown-type-aliases", plugin.rules["no-unknown-type-aliases"], {
     "type Payload = string | number;",
     "type Box<T> = { readonly value: T }; type Payload = Box<unknown>;",
     'import type { Payload } from "./payload"; type Envelope = { kind: "empty" } | Payload; type Reply<Payload> = Envelope | Payload[]; type BatchReply = Reply<unknown>;',
+    "type Payload = Promise<unknown>;",
+    "interface NoInfer<T> { readonly value: T } type Payload = NoInfer<unknown>;",
   ],
 })

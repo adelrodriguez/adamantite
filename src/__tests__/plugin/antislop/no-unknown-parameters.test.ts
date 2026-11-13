@@ -87,6 +87,11 @@ tester.run("no-unknown-parameters", plugin.rules["no-unknown-parameters"], {
       code: "function toError(error: unknown): string { return error instanceof Error ? String(error) : error.message; }",
       errors: [{ ...error, data: { parameter: "error" } }],
     },
+    { code: "type Input = unknown; function parse(input: Input): void {}", errors: [error] },
+    { code: "type Box<T> = T; function parse(input: Box<unknown>): void {}", errors: [error] },
+    { code: "function parse(input: NoInfer<unknown>): void {}", errors: [error] },
+    { code: "function parse(input: Awaited<unknown>): void {}", errors: [error] },
+    { code: "function parse(input: string | Awaited<unknown>): void {}", errors: [error] },
   ],
   valid: [
     "function enrich(cause: unknown): void {}",
@@ -115,5 +120,9 @@ tester.run("no-unknown-parameters", plugin.rules["no-unknown-parameters"], {
     "const decode = Schema.decodeUnknownSync(User);\nfunction read(input: unknown): User { return decode(input); }",
     "function read(value: unknown): User { return value instanceof User ? value : schema.parse(value); }",
     "function toError(error: unknown): Error { return error instanceof Error ? error : new Error(String(error)); }",
+    "type Box<T> = { readonly value: T }; function parse(input: Box<unknown>): void {}",
+    "type Input = unknown; function parse<Input>(input: Input): void {}",
+    'import type { Input } from "./input"; function parse(input: Input): void {}',
+    "interface NoInfer<T> { readonly value: T } function parse(input: NoInfer<unknown>): void {}",
   ],
 })

@@ -102,11 +102,15 @@ const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(Ox
 /**
  * Lint the files with the effect preset in one real Oxlint run, through the Oxlint entry. Oxlint,
  * `@effect/tsgo`, and `effect` resolve from the repository's `node_modules`, which nothing patches.
- * `jsPlugins` adds plugins next to the preset.
+ * `jsPlugins` adds plugins next to the preset. `presets` are the preset names of `extends`, in
+ * order.
  */
 function lint(
   files: Record<string, string>,
-  { jsPlugins = [] }: { jsPlugins?: readonly string[] } = {}
+  {
+    jsPlugins = [],
+    presets = ["effect"],
+  }: { jsPlugins?: readonly string[]; presets?: ReadonlyArray<"core" | "effect"> } = {}
 ) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-effect-"))
 
@@ -131,9 +135,12 @@ function lint(
       join(tempDir, "oxlint.config.ts"),
       [
         'import { defineConfig } from "oxlint"',
-        `import effect from ${JSON.stringify(join(REPO_ROOT, "presets/lint/effect.ts"))}`,
+        ...presets.map(
+          (preset) =>
+            `import ${preset} from ${JSON.stringify(join(REPO_ROOT, `presets/lint/${preset}.ts`))}`
+        ),
         "",
-        `export default defineConfig({ extends: [effect], jsPlugins: ${JSON.stringify(jsPlugins)} })`,
+        `export default defineConfig({ extends: [${presets.join(", ")}], jsPlugins: ${JSON.stringify(jsPlugins)} })`,
         "",
       ].join("\n")
     )
@@ -251,6 +258,26 @@ describe("effect preset", () => {
     )
 
     expect(diagnostics.map(({ code }) => code)).toStrictEqual([`${NAMESPACE}(floating-effect)`])
+  })
+
+  // `Effect.succeed` needs its argument, so a fix that removes `undefined` fails the type check with
+  // TS2554. The effect rule asks for `Effect.undefined` instead.
+  it("report Effect.succeed(undefined) only with the effect rule when core comes first", () => {
+    const diagnostics = lint(
+      {
+        "voided.ts": [
+          'import * as Effect from "effect/Effect"',
+          "",
+          "export const voided = Effect.succeed(undefined)",
+          "",
+        ].join("\n"),
+      },
+      { presets: ["core", "effect"] }
+    )
+
+    expect(diagnostics.map(({ code }) => code)).toStrictEqual([
+      `${NAMESPACE}(effect-succeed-with-undefined)`,
+    ])
   })
 })
 

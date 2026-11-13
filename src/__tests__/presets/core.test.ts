@@ -173,4 +173,30 @@ describe("core preset", () => {
 
     expect(codes).toStrictEqual([])
   })
+
+  // `eslint/no-empty-function` reports `() => {}`, and `eslint/array-callback-return` and
+  // `eslint/no-useless-return` report a bare `return` in a `map` callback. Core must accept the
+  // explicit `undefined` that these rules need.
+  it("accept an explicit undefined where another core rule needs a value", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "declare function use(callback: () => undefined): void",
+        "declare const flags: boolean[]",
+        "",
+        "use(() => undefined)",
+        "",
+        "export const mapped = flags.map((flag) => {",
+        "  if (flag) {",
+        "    return 1",
+        "  }",
+        "",
+        "  return undefined",
+        "})",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
 })

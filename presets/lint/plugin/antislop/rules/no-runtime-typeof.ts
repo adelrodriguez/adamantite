@@ -186,14 +186,18 @@ const PASS_THROUGH_TYPES: ReadonlySet<string> = new Set(["Awaited", "NoInfer", "
 
 /**
  * Return whether an intersection member leaves the other members as they are, as `{}` and `object`
- * do for an unconstrained `T`.
+ * do for an unconstrained `T`. Local aliases resolve to their bodies.
  */
-function addsNothing(type: ESTree.TSType): boolean {
-  return (
-    type.type === "TSObjectKeyword"
-    || type.type === "TSUnknownKeyword"
-    || (type.type === "TSTypeLiteral" && type.members.length === 0)
-  )
+function addsNothing(type: ESTree.TSType, environment: TypeAliasEnvironment): boolean {
+  return resolvedTypeMatches(type, environment, (resolved, matches) => {
+    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
+
+    return (
+      resolved.type === "TSObjectKeyword"
+      || resolved.type === "TSUnknownKeyword"
+      || (resolved.type === "TSTypeLiteral" && resolved.members.length === 0)
+    )
+  })
 }
 
 function isUncheckedTypeParameter(
@@ -209,7 +213,7 @@ function isUncheckedTypeParameter(
     if (resolved.type === "TSIntersectionType") {
       return (
         resolved.types.some(matches)
-        && resolved.types.every((member) => addsNothing(member) || matches(member))
+        && resolved.types.every((member) => addsNothing(member, environment) || matches(member))
       )
     }
 

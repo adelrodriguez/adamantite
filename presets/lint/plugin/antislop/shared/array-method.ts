@@ -1,4 +1,5 @@
 import type { ESTree, Scope, SourceCode, Variable } from "@oxlint/plugins"
+import { isStringLiteral } from "./literals.ts"
 
 /**
  * Unwrap syntax-only wrappers when inspecting array methods and accumulator references.
@@ -40,10 +41,6 @@ export function resolveArrayBinding(
   }
 
   return null
-}
-
-function isStringLiteral(node: ESTree.Node): node is ESTree.StringLiteral {
-  return node.type === "Literal" && typeof node.value === "string"
 }
 
 /**

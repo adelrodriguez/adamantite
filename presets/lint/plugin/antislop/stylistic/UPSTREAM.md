@@ -26,3 +26,14 @@ The opinionated policy lives outside this directory in `../../rules/require-read
 Fetch an explicit upstream revision, compare the original rule and types against this revision, and port relevant fixes while retaining the adapters above. Update this record and preserve the license. Run `pnpm check` and `pnpm sync:skill-assets` as required by repository guidance.
 
 Focused Oxlint RuleTester cases live in `../../rules/require-readable-spacing.test.ts`; they test exact fixes, JSDoc/trailing comments, same-line statements, semicolon-free code, TypeScript exports/overloads, Effect-style generators, and upstream removal behavior. `../../rules/require-readable-spacing-cli.test.ts` verifies the exported plugin through the native Oxlint CLI on multiple files, including rejection, autofix, and repeated-fix stability. The complete upstream JS/TS test suites have not been ported; this is focused compatibility evidence, not a claim of full upstream conformance.
+
+## Adamantite changes
+
+Adamantite copied this folder from anti-slop and lints it with its own presets:
+
+- Missing tokens and scopes raise the `Padding rule invariant` errors instead of non-null assertions.
+- The unused ESLint options schema is removed. `require-readable-spacing` sets `schema: []`.
+- The statement table is a `Map` built from one key-sorted object and the derived `singleline-` and
+  `multiline-` entries.
+- The `@private` JSDoc tags are removed, and `padding-line-options.d.ts` is now
+  `padding-line-options.ts`, so the build emits it.

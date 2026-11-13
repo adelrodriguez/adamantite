@@ -9,11 +9,8 @@ import type {
   Location,
 } from "@oxlint/plugins"
 
-type ASTNode = ESTree.Node
-
-type Token = SyntaxToken | Comment
-
 import type { PaddingType, SelectorOption, StatementMatcher } from "./padding-line-options.ts"
+import { isStringLiteral } from "../shared/literals.ts"
 import {
   isClosingBraceToken,
   isFunction,
@@ -27,8 +24,11 @@ import {
   skipChainExpression,
 } from "./padding-line-ast.ts"
 
+type ASTNode = ESTree.Node
+
+type Token = SyntaxToken | Comment
+
 const CJS_EXPORT = /^(?:module\s*\.\s*)?exports(?:\s*\.|\s*\[|$)/u
-const CJS_IMPORT = /^require\(/u
 
 /**
  * This rule is a replica of padding-line-between-statements.
@@ -77,7 +77,6 @@ function isSelectorOption(option: PolicyStatementOption<string>): option is Sele
  * Creates tester which check if a node starts with specific keyword with the appropriate
  * AST_NODE_TYPES.
  *
- * @private
  * @param keyword The keyword to test.
  *
  * @returns The created tester.
@@ -96,7 +95,6 @@ function newKeywordTester(type: string | string[], keyword: string): NodeTestObj
 /**
  * Creates tester which check if a node is specific type.
  *
- * @private
  * @param type The node type to test.
  *
  * @returns The created tester.
@@ -110,7 +108,6 @@ function newNodeTypeTester(type: string): NodeTestObject {
 /**
  * Checks the given node is an expression statement of IIFE.
  *
- * @private
  * @param node The node to check.
  *
  * @returns `true` if the node is an expression statement of IIFE.
@@ -142,7 +139,6 @@ function isIIFEStatement(node: ASTNode): boolean {
 /**
  * Checks the given node is a CommonJS require statement
  *
- * @private
  * @param node The node to check.
  *
  * @returns `true` if the node is a CommonJS require statement.
@@ -152,7 +148,7 @@ function isCJSRequire(node: ASTNode): boolean {
     const declaration = node.declarations[0]
 
     if (declaration?.init) {
-      let call = declaration?.init
+      let call = declaration.init
 
       while (call.type === "MemberExpression") call = call.object
 
@@ -169,7 +165,6 @@ function isCJSRequire(node: ASTNode): boolean {
  * Checks whether the given node is a block-like statement. This checks the last token of the node
  * is the closing brace of a block.
  *
- * @private
  * @param sourceCode The source code to get tokens.
  * @param node The node to check.
  *
@@ -211,8 +206,7 @@ function isBlockLikeStatement(node: ASTNode, sourceCode: SourceCode): boolean {
 function isDirective(node: ASTNode, sourceCode: SourceCode): boolean {
   return (
     isTopLevelExpressionStatement(node)
-    && node.expression.type === "Literal"
-    && typeof node.expression.value === "string"
+    && isStringLiteral(node.expression)
     && !isParenthesized(node.expression, sourceCode)
   )
 }
@@ -247,7 +241,6 @@ function isDirectivePrologue(node: ASTNode, sourceCode: SourceCode): boolean {
 /**
  * Checks the given node is a CommonJS export statement
  *
- * @private
  * @param node The node to check.
  *
  * @returns `true` if the node is a CommonJS export statement.
@@ -296,14 +289,16 @@ function isExpression(node: ASTNode, sourceCode: SourceCode): boolean {
  *     foo()
  *     ;[1, 2, 3].forEach(bar)
  *
- * @private
  * @param sourceCode The source code to get tokens.
  * @param node The node to get.
  *
  * @returns The actual last token.
  */
-function getActualLastToken(node: ASTNode, sourceCode: SourceCode): Token | null {
-  const semiToken = sourceCode.getLastToken(node)!
+function getActualLastToken(node: ASTNode, sourceCode: SourceCode): Token {
+  const semiToken = sourceCode.getLastToken(node)
+
+  if (semiToken === null) throw new Error("Padding rule invariant: statement has no tokens")
+
   const prevToken = sourceCode.getTokenBefore(semiToken)
   const nextToken = sourceCode.getTokenAfter(semiToken)
 
@@ -321,7 +316,6 @@ function getActualLastToken(node: ASTNode, sourceCode: SourceCode): Token | null
 /**
  * This returns the concatenation of the first 2 captured strings.
  *
- * @private
  * @param _ Unused. Whole matched string.
  * @param trailingSpaces The trailing spaces of the first line.
  * @param indentSpaces The indentation spaces of the last line.
@@ -356,8 +350,6 @@ function getReportLoc(node: ASTNode, sourceCode: SourceCode): Location {
 
 /**
  * Check and report statements for `any` configuration. It does nothing.
- *
- * @private
  */
 function verifyForAny(): void {
   // Empty
@@ -368,7 +360,6 @@ function verifyForAny(): void {
  * the given 2 statements. However, if comments exist between 2 blank lines, it does not remove
  * those blank lines automatically.
  *
- * @private
  * @param context The rule context to report.
  * @param _ Unused. The previous node to check.
  * @param nextNode The next node to check.
@@ -411,7 +402,6 @@ function verifyForNever(
  * the given 2 statements. If the `prevNode` has trailing comments, it inserts a blank line after
  * the trailing comments.
  *
- * @private
  * @param context The rule context to report.
  * @param prevNode The previous node to check.
  * @param nextNode The next node to check.
@@ -428,7 +418,7 @@ function verifyForAlways(
   context.report({
     fix(fixer) {
       const sourceCode = context.sourceCode
-      let prevToken = getActualLastToken(prevNode, sourceCode)!
+      let prevToken = getActualLastToken(prevNode, sourceCode)
 
       const nextToken =
         sourceCode.getFirstTokenBetween(prevToken, nextNode, {
@@ -451,7 +441,6 @@ function verifyForAlways(
            *     // comment.
            *     bar()
            *
-           * @private
            * @param token The token to check.
            *
            * @returns `true` if the token is not a trailing comment.
@@ -465,7 +454,7 @@ function verifyForAlways(
 
             return true
           },
-        })! || nextNode
+        }) ?? nextNode
 
       const insertText = isTokenOnSameLine(prevToken, nextToken) ? "\n\n" : "\n"
 
@@ -480,8 +469,6 @@ function verifyForAlways(
 /**
  * Types of blank lines. `any`, `never`, and `always` are defined. Those have `verify` method to
  * check and report statements.
- *
- * @private
  */
 const PaddingTypes = {
   always: { verify: verifyForAlways },
@@ -489,7 +476,7 @@ const PaddingTypes = {
   never: { verify: verifyForNever },
 }
 
-const MaybeMultilineStatementType: Record<string, NodeTestObject> = {
+const MaybeMultilineStatementType = {
   "block-like": { test: isBlockLikeStatement },
   const: newKeywordTester("VariableDeclaration", "const"),
   export: newKeywordTester(
@@ -505,41 +492,16 @@ const MaybeMultilineStatementType: Record<string, NodeTestObject> = {
       node.type === "VariableDeclaration" && (node.kind === "using" || node.kind === "await using"),
   },
   var: newKeywordTester("VariableDeclaration", "var"),
-}
+} satisfies Record<string, NodeTestObject>
 
 /**
- * Types of statements. Those have `test` method to check it matches to the given statement.
- *
- * @private
+ * Statement types that match one statement kind each.
  */
-const StatementTypes: Record<string, NodeTestObject> = {
+const BaseStatementTypes = {
   "*": { test: (): boolean => true },
-  exports: { test: isCJSExport },
-  require: { test: isCJSRequire },
-  directive: { test: isDirectivePrologue },
-  iife: { test: isIIFEStatement },
-
   block: newNodeTypeTester("BlockStatement"),
-  empty: newNodeTypeTester("EmptyStatement"),
-  function: newNodeTypeTester("FunctionDeclaration"),
-  "ts-method": newNodeTypeTester("TSMethodSignature"),
-
   break: newKeywordTester("BreakStatement", "break"),
   case: newKeywordTester("SwitchCase", "case"),
-  class: newKeywordTester("ClassDeclaration", "class"),
-  continue: newKeywordTester("ContinueStatement", "continue"),
-  debugger: newKeywordTester("DebuggerStatement", "debugger"),
-  default: newKeywordTester(["SwitchCase", "ExportDefaultDeclaration"], "default"),
-  do: newKeywordTester("DoWhileStatement", "do"),
-  for: newKeywordTester(["ForStatement", "ForInStatement", "ForOfStatement"], "for"),
-  if: newKeywordTester("IfStatement", "if"),
-  import: newKeywordTester("ImportDeclaration", "import"),
-  switch: newKeywordTester("SwitchStatement", "switch"),
-  throw: newKeywordTester("ThrowStatement", "throw"),
-  try: newKeywordTester("TryStatement", "try"),
-  while: newKeywordTester(["WhileStatement", "DoWhileStatement"], "while"),
-  with: newKeywordTester("WithStatement", "with"),
-
   "cjs-export": {
     test: (node, sourceCode) =>
       node.type === "ExpressionStatement"
@@ -547,36 +509,58 @@ const StatementTypes: Record<string, NodeTestObject> = {
       && CJS_EXPORT.test(sourceCode.getText(node.expression.left)),
   },
   "cjs-import": {
-    test: (node, sourceCode) =>
-      node.type === "VariableDeclaration"
-      && node.declarations.length > 0
-      && node.declarations[0]?.init != null
-      && sourceCode.getText(node.declarations[0].init).startsWith("require("),
-  },
+    test: (node, sourceCode) => {
+      if (node.type !== "VariableDeclaration") return false
+      const init = node.declarations[0]?.init
 
+      return init ? sourceCode.getText(init).startsWith("require(") : false
+    },
+  },
+  class: newKeywordTester("ClassDeclaration", "class"),
+  continue: newKeywordTester("ContinueStatement", "continue"),
+  debugger: newKeywordTester("DebuggerStatement", "debugger"),
+  default: newKeywordTester(["SwitchCase", "ExportDefaultDeclaration"], "default"),
+  directive: { test: isDirectivePrologue },
+  do: newKeywordTester("DoWhileStatement", "do"),
+  empty: newNodeTypeTester("EmptyStatement"),
   enum: newKeywordTester("TSEnumDeclaration", "enum"),
-  interface: newKeywordTester("TSInterfaceDeclaration", "interface"),
+  exports: { test: isCJSExport },
+  for: newKeywordTester(["ForStatement", "ForInStatement", "ForOfStatement"], "for"),
+  function: newNodeTypeTester("FunctionDeclaration"),
   "function-overload": newNodeTypeTester("TSDeclareFunction"),
-  ...Object.fromEntries(
-    Object.entries(MaybeMultilineStatementType).flatMap(([key, value]) => [
+  if: newKeywordTester("IfStatement", "if"),
+  iife: { test: isIIFEStatement },
+  import: newKeywordTester("ImportDeclaration", "import"),
+  interface: newKeywordTester("TSInterfaceDeclaration", "interface"),
+  require: { test: isCJSRequire },
+  switch: newKeywordTester("SwitchStatement", "switch"),
+  throw: newKeywordTester("ThrowStatement", "throw"),
+  try: newKeywordTester("TryStatement", "try"),
+  "ts-method": newNodeTypeTester("TSMethodSignature"),
+  while: newKeywordTester(["WhileStatement", "DoWhileStatement"], "while"),
+  with: newKeywordTester("WithStatement", "with"),
+} satisfies Record<string, NodeTestObject>
+
+/**
+ * Types of statements. Those have `test` method to check it matches to the given statement. Each
+ * type that can span lines also has a `singleline-` and a `multiline-` form.
+ */
+const StatementTypes = new Map<string, NodeTestObject>([
+  ...Object.entries(BaseStatementTypes),
+  ...Object.entries(MaybeMultilineStatementType).flatMap(
+    ([key, value]): Array<[string, NodeTestObject]> => [
       [key, value],
       [
         `singleline-${key}`,
-        {
-          ...value,
-          test: (node, sourceCode) => value.test(node, sourceCode) && isSingleLine(node),
-        },
+        { test: (node, sourceCode) => value.test(node, sourceCode) && isSingleLine(node) },
       ],
       [
         `multiline-${key}`,
-        {
-          ...value,
-          test: (node, sourceCode) => value.test(node, sourceCode) && !isSingleLine(node),
-        },
+        { test: (node, sourceCode) => value.test(node, sourceCode) && !isSingleLine(node) },
       ],
-    ])
+    ]
   ),
-}
+])
 
 /**
  * Build the vendored padding rule with caller-owned, typed policy options. `statementTypes`
@@ -622,8 +606,6 @@ export default function createPaddingLineRule<Extra extends string = never>(
 
       /**
        * Processes to enter to new scope. This manages the current previous statement.
-       *
-       * @private
        */
       function enterScope(): void {
         scopeInfo = {
@@ -634,8 +616,6 @@ export default function createPaddingLineRule<Extra extends string = never>(
 
       /**
        * Processes to exit from the current scope.
-       *
-       * @private
        */
       function exitScope(): void {
         if (scopeInfo) scopeInfo = scopeInfo.upper
@@ -644,7 +624,6 @@ export default function createPaddingLineRule<Extra extends string = never>(
       /**
        * Checks whether the given node matches the given type.
        *
-       * @private
        * @param node The statement node to check.
        * @param type The statement type to check.
        *
@@ -671,7 +650,7 @@ export default function createPaddingLineRule<Extra extends string = never>(
           return true
         }
 
-        const statementType = customStatementTypes[type] ?? StatementTypes[type]
+        const statementType = customStatementTypes[type] ?? StatementTypes.get(type)
 
         if (statementType === undefined)
           throw new Error(`Padding rule invariant: unsupported statement type ${type}`)
@@ -682,7 +661,6 @@ export default function createPaddingLineRule<Extra extends string = never>(
       /**
        * Finds the last matched configure from options.
        *
-       * @private
        * @param prevNode The previous statement to match.
        * @param nextNode The current statement to match.
        *
@@ -692,25 +670,20 @@ export default function createPaddingLineRule<Extra extends string = never>(
         prevNode: ASTNode,
         nextNode: ASTNode
       ): (typeof PaddingTypes)[keyof typeof PaddingTypes] {
-        for (let i = options.length - 1; i >= 0; --i) {
-          const configure = options[i]
+        let blankLine: PaddingType = "any"
 
-          if (configure === undefined)
-            throw new Error("Padding rule invariant: configuration entry is missing")
-
-          if (match(prevNode, configure.prev) && match(nextNode, configure.next)) {
-            return PaddingTypes[configure.blankLine]
-          }
+        for (const entry of options) {
+          if (match(prevNode, entry.prev) && match(nextNode, entry.next))
+            blankLine = entry.blankLine
         }
 
-        return PaddingTypes.any
+        return PaddingTypes[blankLine]
       }
 
       /**
        * Gets padding line sequences between the given 2 statements. Comments are separators of the
        * padding line sequences.
        *
-       * @private
        * @param prevNode The previous statement to count.
        * @param nextNode The current statement to count.
        *
@@ -721,13 +694,14 @@ export default function createPaddingLineRule<Extra extends string = never>(
         nextNode: ASTNode
       ): Array<[Token, Token]> {
         const pairs: Array<[Token, Token]> = []
-        let prevToken: Token = getActualLastToken(prevNode, sourceCode)!
+        let prevToken: Token = getActualLastToken(prevNode, sourceCode)
 
         if (nextNode.loc.start.line - prevToken.loc.end.line >= 2) {
           do {
-            const token: Token = sourceCode.getTokenAfter(prevToken, {
-              includeComments: true,
-            })!
+            const token = sourceCode.getTokenAfter(prevToken, { includeComments: true })
+
+            if (token === null)
+              throw new Error("Padding rule invariant: token before the next statement is missing")
 
             if (token.loc.start.line - prevToken.loc.end.line >= 2) pairs.push([prevToken, token])
 
@@ -741,7 +715,6 @@ export default function createPaddingLineRule<Extra extends string = never>(
       /**
        * Verify padding lines between the given node and the previous node.
        *
-       * @private
        * @param node The node to verify.
        */
       function verify(node: ASTNode): void {
@@ -761,13 +734,15 @@ export default function createPaddingLineRule<Extra extends string = never>(
           return
         }
 
+        if (scopeInfo === null) throw new Error("Padding rule invariant: statement outside a scope")
+
         // Save this node as the current previous statement.
-        const prevNode = scopeInfo!.prevNode
+        const prevNode = scopeInfo.prevNode
 
         // Verify.
         if (prevNode) pendingPairs.push({ nextNode: node, prevNode })
 
-        scopeInfo!.prevNode = node
+        scopeInfo.prevNode = node
       }
 
       function verifyPendingPairs(): void {
@@ -783,7 +758,6 @@ export default function createPaddingLineRule<Extra extends string = never>(
        * Verify padding lines between the given node and the previous node. Then process to enter to
        * new scope.
        *
-       * @private
        * @param node The node to verify.
        */
       function verifyThenEnterScope(node: ASTNode): void {
@@ -801,100 +775,40 @@ export default function createPaddingLineRule<Extra extends string = never>(
       )
 
       return {
+        ":statement": verify,
+        BlockStatement: enterScope,
+        "BlockStatement:exit": exitScope,
         Program: enterScope,
         "Program:exit": () => {
           verifyPendingPairs()
           exitScope()
         },
-        BlockStatement: enterScope,
-        "BlockStatement:exit": exitScope,
-        SwitchStatement: enterScope,
-        "SwitchStatement:exit": exitScope,
-        SwitchCase: verifyThenEnterScope,
-        "SwitchCase:exit": exitScope,
         StaticBlock: enterScope,
         "StaticBlock:exit": exitScope,
-
+        SwitchCase: verifyThenEnterScope,
+        "SwitchCase:exit": exitScope,
+        SwitchStatement: enterScope,
+        "SwitchStatement:exit": exitScope,
+        TSDeclareFunction: verifyThenEnterScope,
+        "TSDeclareFunction:exit": exitScope,
         TSInterfaceBody: enterScope,
         "TSInterfaceBody:exit": exitScope,
+        TSMethodSignature: verifyThenEnterScope,
+        "TSMethodSignature:exit": exitScope,
         TSModuleBlock: enterScope,
         "TSModuleBlock:exit": exitScope,
         TSTypeLiteral: enterScope,
         "TSTypeLiteral:exit": exitScope,
-        TSDeclareFunction: verifyThenEnterScope,
-        "TSDeclareFunction:exit": exitScope,
-        TSMethodSignature: verifyThenEnterScope,
-        "TSMethodSignature:exit": exitScope,
-
-        ":statement": verify,
         ...selectorMatchListeners,
       }
     },
     meta: {
-      type: "layout",
-      docs: {
-        description: "Require or disallow padding lines between statements",
-      },
       fixable: "whitespace",
-      hasSuggestions: false,
-      // This is intentionally an array schema as you can pass 0..n config objects
-      schema: {
-        $defs: {
-          paddingType: {
-            enum: Object.keys(PaddingTypes),
-            type: "string",
-          },
-          selectorOption: {
-            additionalProperties: false,
-            properties: {
-              lineMode: {
-                enum: ["any", "singleline", "multiline"],
-                type: "string",
-              },
-              selector: {
-                type: "string",
-              },
-            },
-            required: ["selector"],
-            type: "object",
-          },
-          statementMatcher: {
-            anyOf: [{ $ref: "#/$defs/statementType" }, { $ref: "#/$defs/selectorOption" }],
-          },
-          statementOption: {
-            anyOf: [
-              { $ref: "#/$defs/statementMatcher" },
-              {
-                additionalItems: false,
-                items: { $ref: "#/$defs/statementMatcher" },
-                minItems: 1,
-                type: "array",
-                uniqueItems: true,
-              },
-            ],
-          },
-          statementType: {
-            enum: Object.keys(StatementTypes),
-            type: "string",
-          },
-        },
-        additionalItems: false,
-        items: {
-          additionalProperties: false,
-          properties: {
-            blankLine: { $ref: "#/$defs/paddingType" },
-            next: { $ref: "#/$defs/statementOption" },
-            prev: { $ref: "#/$defs/statementOption" },
-          },
-          required: ["blankLine", "prev", "next"],
-          type: "object",
-        },
-        type: "array",
-      },
       messages: {
         expectedBlankLine: "Expected blank line before this statement.",
         unexpectedBlankLine: "Unexpected blank line before this statement.",
       },
+      type: "layout",
     },
   }
 }

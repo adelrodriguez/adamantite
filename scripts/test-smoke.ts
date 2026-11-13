@@ -775,18 +775,13 @@ try {
     cwd: pluginFixture,
   })
 
-  // Each page has an import or an export, because core's import/unambiguous reports a framework
-  // script without one: https://github.com/adelrodriguez/adamantite/issues/780
   const astroPage = join(pluginFixture, "src", "pages", "index.astro")
   const sveltePage = join(pluginFixture, "src", "counter.svelte")
   mkdirSync(dirname(astroPage), { recursive: true })
-  writeFileSync(
-    astroPage,
-    "---\nexport const prerender = true\nconst greeting = 'hello';\n---\n<p>{greeting}</p>\n"
-  )
+  writeFileSync(astroPage, "---\nconst greeting = 'hello';\n---\n<p>{greeting}</p>\n")
   writeFileSync(
     sveltePage,
-    "<script lang=\"ts\">\n  import { untrack } from 'svelte';\n  const count = untrack(() => 1);\n</script>\n<p>{count}</p>\n"
+    "<script lang=\"ts\">\n  const count = 'one';\n</script>\n<p>{count}</p>\n"
   )
 
   const pluginEnv = {
@@ -798,7 +793,7 @@ try {
   assertFileContains(astroPage, 'const greeting = "hello"\n---\n\n<p>{greeting}</p>')
   assertFileContains(
     sveltePage,
-    '  import { untrack } from "svelte"\n\n  const count = untrack(() => 1)\n</script>\n\n<p>{count}</p>'
+    '<script lang="ts">\n  const count = "one"\n</script>\n\n<p>{count}</p>'
   )
   run(process.execPath, [cliPath, "check", "--only", "format"], {
     cwd: pluginFixture,

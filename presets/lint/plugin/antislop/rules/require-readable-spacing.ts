@@ -1,16 +1,18 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 
+import { isSingleLine } from "../stylistic/padding-line-ast.ts"
 import createPaddingLineRule from "../stylistic/padding-line-between-statements.ts"
 
 import type { NodeTestObject } from "../stylistic/padding-line-between-statements.ts"
 
 /**
- * A `const`/`let`/`var`/`using` declaration, optionally exported, written on one line.
+ * A `const`/`let`/`var`/`using` declaration, optionally exported, written on one line. The
+ * semicolon-less style's semicolon on the next line, as in `;[a, b].forEach(f)`, does not count.
  */
-function isSinglelineBinding(node: ESTree.Node): boolean {
+function isSinglelineBinding(node: ESTree.Node, sourceCode: SourceCode): boolean {
   const declaration = node.type === "ExportNamedDeclaration" ? node.declaration : node
 
-  return declaration?.type === "VariableDeclaration" && node.loc.start.line === node.loc.end.line
+  return declaration?.type === "VariableDeclaration" && isSingleLine(node, sourceCode)
 }
 
 /**
@@ -25,11 +27,12 @@ function hasLeadingComment(node: ESTree.Node, sourceCode: SourceCode): boolean {
 }
 
 const singlelineBinding: NodeTestObject = {
-  test: (node) => isSinglelineBinding(node),
+  test: (node, sourceCode) => isSinglelineBinding(node, sourceCode),
 }
 
 const undocumentedSinglelineBinding: NodeTestObject = {
-  test: (node, sourceCode) => isSinglelineBinding(node) && !hasLeadingComment(node, sourceCode),
+  test: (node, sourceCode) =>
+    isSinglelineBinding(node, sourceCode) && !hasLeadingComment(node, sourceCode),
 }
 
 const paddingRule = createPaddingLineRule(

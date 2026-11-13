@@ -40,10 +40,43 @@ export const isFunction = (node: ESTree.Node): boolean =>
   || node.type === "ArrowFunctionExpression"
 
 /**
- * Preserve the upstream multiline statement heuristic.
+ * Gets the actual last token.
+ *
+ * If a semicolon is semicolon-less style's semicolon, this ignores it. For example:
+ *
+ *     foo()
+ *     ;[1, 2, 3].forEach(bar)
+ *
+ * @param node The node to get.
+ * @param sourceCode The source code to get tokens.
+ *
+ * @returns The actual last token.
  */
-export const isSingleLine = (node: ESTree.Node): boolean =>
-  node.loc.start.line === node.loc.end.line
+export function getActualLastToken(node: ESTree.Node, sourceCode: SourceCode): Token {
+  const semiToken = sourceCode.getLastToken(node)
+
+  if (semiToken === null) throw new Error("Padding rule invariant: statement has no tokens")
+
+  const prevToken = sourceCode.getTokenBefore(semiToken)
+  const nextToken = sourceCode.getTokenAfter(semiToken)
+
+  const isSemicolonLessStyle =
+    prevToken
+    && nextToken
+    && prevToken.range[0] >= node.range[0]
+    && isSemicolonToken(semiToken)
+    && !isTokenOnSameLine(prevToken, semiToken)
+    && isTokenOnSameLine(semiToken, nextToken)
+
+  return isSemicolonLessStyle ? prevToken : semiToken
+}
+
+/**
+ * Test whether a statement fits on one line. The statement ends at its actual last token, so the
+ * semicolon-less style's semicolon on the line of the next statement does not count.
+ */
+export const isSingleLine = (node: ESTree.Node, sourceCode: SourceCode): boolean =>
+  node.loc.start.line === getActualLastToken(node, sourceCode).loc.end.line
 
 /**
  * Unwrap optional chaining before checking IIFE syntax.

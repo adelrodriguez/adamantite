@@ -12,11 +12,11 @@ import type {
 import type { PaddingType, SelectorOption, StatementMatcher } from "./padding-line-options.ts"
 import { isStringLiteral } from "../shared/literals.ts"
 import {
+  getActualLastToken,
   isClosingBraceToken,
   isFunction,
   isNotSemicolonToken,
   isParenthesized,
-  isSemicolonToken,
   isSingleLine,
   isTokenOnSameLine,
   isTopLevelExpressionStatement,
@@ -282,38 +282,6 @@ function isExpression(node: ASTNode, sourceCode: SourceCode): boolean {
 }
 
 /**
- * Gets the actual last token.
- *
- * If a semicolon is semicolon-less style's semicolon, this ignores it. For example:
- *
- *     foo()
- *     ;[1, 2, 3].forEach(bar)
- *
- * @param sourceCode The source code to get tokens.
- * @param node The node to get.
- *
- * @returns The actual last token.
- */
-function getActualLastToken(node: ASTNode, sourceCode: SourceCode): Token {
-  const semiToken = sourceCode.getLastToken(node)
-
-  if (semiToken === null) throw new Error("Padding rule invariant: statement has no tokens")
-
-  const prevToken = sourceCode.getTokenBefore(semiToken)
-  const nextToken = sourceCode.getTokenAfter(semiToken)
-
-  const isSemicolonLessStyle =
-    prevToken
-    && nextToken
-    && prevToken.range[0] >= node.range[0]
-    && isSemicolonToken(semiToken)
-    && !isTokenOnSameLine(prevToken, semiToken)
-    && isTokenOnSameLine(semiToken, nextToken)
-
-  return isSemicolonLessStyle ? prevToken : semiToken
-}
-
-/**
  * This returns the concatenation of the first 2 captured strings.
  *
  * @param _ Unused. Whole matched string.
@@ -331,7 +299,7 @@ function replacerToRemovePaddingLines(
 }
 
 function getReportLoc(node: ASTNode, sourceCode: SourceCode): Location {
-  if (isSingleLine(node)) return node.loc
+  if (isSingleLine(node, sourceCode)) return node.loc
 
   const line = node.loc.start.line
   const sourceLine = sourceCode.lines[line - 1]
@@ -552,11 +520,17 @@ const StatementTypes = new Map<string, NodeTestObject>([
       [key, value],
       [
         `singleline-${key}`,
-        { test: (node, sourceCode) => value.test(node, sourceCode) && isSingleLine(node) },
+        {
+          test: (node, sourceCode) =>
+            value.test(node, sourceCode) && isSingleLine(node, sourceCode),
+        },
       ],
       [
         `multiline-${key}`,
-        { test: (node, sourceCode) => value.test(node, sourceCode) && !isSingleLine(node) },
+        {
+          test: (node, sourceCode) =>
+            value.test(node, sourceCode) && !isSingleLine(node, sourceCode),
+        },
       ],
     ]
   ),
@@ -644,8 +618,8 @@ export default function createPaddingLineRule<Extra extends string = never>(
 
           const lineMode = type.lineMode
 
-          if (lineMode === "singleline") return isSingleLine(innerStatementNode)
-          else if (lineMode === "multiline") return !isSingleLine(innerStatementNode)
+          if (lineMode === "singleline") return isSingleLine(innerStatementNode, sourceCode)
+          else if (lineMode === "multiline") return !isSingleLine(innerStatementNode, sourceCode)
 
           return true
         }

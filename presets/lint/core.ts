@@ -67,6 +67,18 @@ export const ignorePatterns: string[] = [
 
 const config: OxlintConfig & { ignorePatterns: string[] } = {
   ignorePatterns,
+  overrides: [
+    {
+      // TEMPORARY: Astro, Vue, and Svelte compile a component's script as a module, but
+      // `import/unambiguous` reports the script when it has no `import` or `export`. Remove this
+      // override when Oxlint accepts these scripts:
+      // https://github.com/oxc-project/oxc/issues/29454
+      files: ["**/*.{astro,vue,svelte}"],
+      rules: {
+        "import/unambiguous": "off",
+      },
+    },
+  ],
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   rules: {
     "accessor-pairs": "error",

@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query"
-
 export function UserName() {
   const {
     data: { user },
@@ -9,3 +7,8 @@ export function UserName() {
 }
 
 declare function fetchUser(): Promise<{ user: { name: string } }>
+
+declare function useQuery<Data>(query: {
+  readonly queryFn: () => Promise<Data>
+  readonly queryKey: readonly string[]
+}): { readonly data: Data }

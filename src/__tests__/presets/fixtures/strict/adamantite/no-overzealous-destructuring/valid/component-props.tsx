@@ -1,14 +1,14 @@
 import type { ComponentProps } from "react"
 
-interface Props extends ComponentProps<"button"> {
+interface Props extends ComponentProps<"div"> {
   size: "lg" | "sm"
   variant: "ghost" | "solid"
 }
 
-export function Button({ children, className, size, type, variant, ...props }: Props) {
+export function Card({ children, className, size, title, variant, ...props }: Props) {
   return (
-    <button className={`${className} ${size} ${variant}`} type={type} {...props}>
+    <div className={`${className} ${size} ${variant}`} title={title} {...props}>
       {children}
-    </button>
+    </div>
   )
 }

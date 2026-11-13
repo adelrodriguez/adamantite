@@ -358,6 +358,21 @@ preset hold fixtures for several plugins. The harness in `src/__tests__/presets/
 starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the effect preset loads the
 Effect build of Oxlint.
 
+A valid fixture is code that a target project can keep. `src/__tests__/presets/stacks.ts` lists the
+stacks, and `stacks.test.ts` lints each fixture tree with each stack that has its preset, with the
+options that init writes. Each invalid fixture must still get the report of its rule, and no rule of
+the stack can report a valid fixture. A report that stays is in the `knownReports` list of the tree,
+with the issue of the conflict. A case that some other rule always reports belongs only in the
+`RuleTester` test. Files in a `modules/` folder beside `valid/` are the modules that the fixtures
+import.
+
+`overlap.test.ts` fails when two presets set one rule, unless one of the presets is core. A preset
+cannot see the other presets of a config, and only core has a known position in `extends`. Each
+rule of core that a preset changes has fixtures under
+`src/__tests__/presets/fixtures/overlap/<preset>/<namespace>/<rule>/`. At least one fixture must get
+a result that differs from the result of core alone, so the test fails when the change has no
+effect.
+
 The rules in `presets/lint/plugins/anti-slop/` ship in the `strict` preset, and the rules in
 `presets/lint/plugins/anti-slop-effect/` ship in the `effect` preset. Both plugins keep the name
 of the upstream code. Both started as a copy of

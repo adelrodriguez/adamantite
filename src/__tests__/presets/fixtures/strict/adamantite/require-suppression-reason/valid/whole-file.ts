@@ -1,3 +1,5 @@
 /* eslint-disable no-console -- this script prints its progress */
 
-console.log("done")
+export function report(): void {
+  console.log("done")
+}

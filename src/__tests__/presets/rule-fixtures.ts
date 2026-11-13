@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import process from "node:process"
+import type { OxlintConfig } from "oxlint"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
@@ -34,6 +35,12 @@ const OXLINT_VARIABLE = "ADAMANTITE_TEST_OXLINT"
  *
  * Keep one case per file, so a relaxed rule cannot hide behind another report in the same file, and
  * the file name tells which case changed.
+ *
+ * A valid fixture is code that a target project can keep: `stacks.test.ts` lints each tree with
+ * each stack of its preset, and no rule of the stack can report a valid fixture. A case that some
+ * other rule always reports belongs in the RuleTester test of the rule. Files in
+ * `<fixturesDir>/<namespace>/<rule>/modules/` are the modules that the fixtures import, such as a
+ * module that stands for a package. No test reads their reports.
  */
 export interface RuleFixtureOptions {
   /**
@@ -48,20 +55,23 @@ export interface RuleFixtureOptions {
 
 export type RuleFixtureKind = "invalid" | "valid"
 
-export interface RuleFixtureCase {
+export interface RuleFixture {
   /**
    * Fixture path relative to the fixtures directory, with forward slashes.
    */
   readonly file: string
   readonly kind: RuleFixtureKind
   /**
-   * Lines where the rule under test reported the file.
-   */
-  readonly reportedLines: readonly number[]
-  /**
    * The rule name as a config sets it, such as `anti-slop/no-reflect-get`.
    */
   readonly rule: string
+}
+
+export interface RuleFixtureCase extends RuleFixture {
+  /**
+   * Lines where the rule under test reported the file.
+   */
+  readonly reportedLines: readonly number[]
 }
 
 const OxlintJsonOutput = Schema.Struct({
@@ -95,11 +105,50 @@ export function listFixtureRules(fixturesDir: string): string[] {
 }
 
 /**
- * Lint every fixture in one real Oxlint run through the preset, and return one case per fixture
- * file with the reports of that file's own rule. The run goes through the Oxlint entry, as
- * `adamantite check` does, so a preset that needs the Effect build of Oxlint loads too.
+ * A fixture tree and the config that lints it.
  */
-export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[] {
+export interface FixtureTreeOptions {
+  /**
+   * The unstable Effect modules that the tsconfig of the tree allows, as a target project lists
+   * them for `effecttsgo/unstable-api-usage`.
+   */
+  readonly allowedUnstableApis?: readonly string[]
+  /**
+   * Absolute path of the directory to lint.
+   */
+  readonly fixturesDir: string
+  /**
+   * The `options` of the config. Without it, Oxlint runs no type-aware rule of a built-in plugin.
+   */
+  readonly options?: OxlintConfig["options"]
+  /**
+   * Absolute paths of the preset modules, in the order of `extends`.
+   */
+  readonly presets: readonly string[]
+}
+
+export interface FixtureReport {
+  /**
+   * Fixture path relative to the fixtures directory, with forward slashes.
+   */
+  readonly file: string
+  readonly line: number
+  /**
+   * The rule name as a config sets it, such as `anti-slop/no-reflect-get`. A type check error has
+   * the plugin `typescript` and its code, such as `typescript/TS2307`.
+   */
+  readonly rule: string
+}
+
+const REPORT_CODE = /^(?<plugin>[^(]+)\((?<rule>.+)\)$/
+
+/**
+ * Lint a fixture tree in one real Oxlint run with the presets, and return each report. The run goes
+ * through the Oxlint entry, as `adamantite check` does, so a preset that needs the Effect build of
+ * Oxlint loads too. The tree is in the `include` of a tsconfig that extends the Adamantite preset
+ * and has the plugin entry of the Effect rules. React supplies the JSX types.
+ */
+export function lintFixtureTree(options: FixtureTreeOptions): FixtureReport[] {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-rule-fixtures-"))
 
   try {
@@ -121,12 +170,35 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
 
     cpSync(options.fixturesDir, join(tempDir, FIXTURES_DIRECTORY), { recursive: true })
     writeFileSync(
+      join(tempDir, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          jsx: "react-jsx",
+          plugins: [
+            {
+              allowedUnstableApis: options.allowedUnstableApis ?? [],
+              diagnostics: true,
+              name: "@effect/language-service",
+            },
+          ],
+          types: ["node"],
+        },
+        extends: join(REPO_ROOT, "presets/tsconfig.json"),
+        include: [FIXTURES_DIRECTORY],
+      })
+    )
+    writeFileSync(
       join(tempDir, "oxlint.config.ts"),
       [
         'import { defineConfig } from "oxlint"',
-        `import preset from ${JSON.stringify(options.presetPath)}`,
+        ...options.presets.map(
+          (preset, index) => `import preset${index} from ${JSON.stringify(preset)}`
+        ),
         "",
-        "export default defineConfig({ extends: [preset] })",
+        "export default defineConfig({",
+        `  extends: [${options.presets.map((_, index) => `preset${index}`).join(", ")}],`,
+        `  options: ${JSON.stringify(options.options ?? {})},`,
+        "})",
         "",
       ].join("\n")
     )
@@ -158,34 +230,59 @@ export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[]
       })
     }
 
-    const reportedLinesByFile = new Map<string, number[]>()
+    return output.diagnostics.flatMap((diagnostic) => {
+      const code = REPORT_CODE.exec(diagnostic.code ?? "")?.groups
 
-    for (const diagnostic of output.diagnostics) {
-      const file = diagnostic.filename.split(sep).join("/")
-      const lines = reportedLinesByFile.get(`${diagnostic.code}:${file}`) ?? []
+      const file = diagnostic.filename
+        .split(sep)
+        .join("/")
+        .slice(FIXTURES_DIRECTORY.length + 1)
 
-      lines.push(...diagnostic.labels.map((label) => label.span.line))
-      reportedLinesByFile.set(`${diagnostic.code}:${file}`, lines)
-    }
+      const rule = code === undefined ? "" : `${code["plugin"]}/${code["rule"]}`
 
-    const kinds: RuleFixtureKind[] = ["valid", "invalid"]
-
-    return listDirectory(options.fixturesDir).flatMap((namespace) =>
-      listDirectory(join(options.fixturesDir, namespace)).flatMap((ruleName) =>
-        kinds.flatMap((kind) =>
-          listDirectory(join(options.fixturesDir, namespace, ruleName, kind)).map((name) => {
-            const rule = `${namespace}/${ruleName}`
-            const file = `${rule}/${kind}/${name}`
-            const key = `${namespace}(${ruleName}):${FIXTURES_DIRECTORY}/${file}`
-
-            return { file, kind, reportedLines: reportedLinesByFile.get(key) ?? [], rule }
-          })
-        )
-      )
-    )
+      return diagnostic.labels.map((label) => ({ file, line: label.span.line, rule }))
+    })
   } finally {
     rmSync(tempDir, { force: true, recursive: true })
   }
+}
+
+/**
+ * List each rule fixture file of the tree, with its rule and kind. Synchronous, so a test file can
+ * use the result to declare its tests.
+ */
+export function listRuleFixtures(fixturesDir: string): RuleFixture[] {
+  const kinds: RuleFixtureKind[] = ["valid", "invalid"]
+
+  return listFixtureRules(fixturesDir).flatMap((rule) =>
+    kinds.flatMap((kind) =>
+      listDirectory(join(fixturesDir, rule, kind)).map((name) => ({
+        file: `${rule}/${kind}/${name}`,
+        kind,
+        rule,
+      }))
+    )
+  )
+}
+
+/**
+ * Lint every fixture in one real Oxlint run through the preset, and return one case per fixture
+ * file with the reports of that file's own rule.
+ */
+export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[] {
+  const reports = lintFixtureTree({
+    fixturesDir: options.fixturesDir,
+    presets: [options.presetPath],
+  })
+
+  return listRuleFixtures(options.fixturesDir).map((fixture) => ({
+    file: fixture.file,
+    kind: fixture.kind,
+    reportedLines: reports
+      .filter((report) => report.file === fixture.file && report.rule === fixture.rule)
+      .map((report) => report.line),
+    rule: fixture.rule,
+  }))
 }
 
 export function selectRuleFixtures(

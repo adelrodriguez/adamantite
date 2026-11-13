@@ -1,2 +1,3 @@
 declare const owner: { property: string }
-Reflect.set(owner, 'property', 'next')
+
+export const changed = Reflect.set(owner, "property", "next")

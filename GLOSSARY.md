@@ -10,6 +10,12 @@ Published configuration that a target project consumes for linting, formatting, 
 or TypeScript.
 _Avoid_: Plugin, template
 
+**Stack**:
+A set of presets that a target project selects together with core, such as `effect`, `vitest`,
+`node`, and `strict`. The preset tests lint the rule fixtures with each stack, so a rule of one
+preset cannot report code that another preset of the stack accepts.
+_Avoid_: Combination, preset group
+
 **Vendored bundle**:
 Historical. Third-party code that Adamantite built into the package at a pinned upstream commit
 because upstream did not publish to npm. No vendored bundle remains. The anti-slop rules became

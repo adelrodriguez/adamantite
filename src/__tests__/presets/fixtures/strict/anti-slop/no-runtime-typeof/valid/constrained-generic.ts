@@ -1,3 +1,3 @@
-export function describe<T extends number | string>(value: T): string {
-  return typeof value === "string" ? value : value.toFixed(2)
+export function pick<T extends number | string>(value: T, fallback: T): T {
+  return typeof value === "string" ? value : fallback
 }

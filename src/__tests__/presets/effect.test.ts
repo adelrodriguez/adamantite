@@ -100,17 +100,13 @@ const OxlintJsonOutput = Schema.Struct({
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
 
 /**
- * Lint the files with the presets in one real Oxlint run, through the Oxlint entry. Oxlint,
+ * Lint the files with the effect preset in one real Oxlint run, through the Oxlint entry. Oxlint,
  * `@effect/tsgo`, and `effect` resolve from the repository's `node_modules`, which nothing patches.
- * The presets extend in order, as in the config that init writes. `jsPlugins` adds plugins next to
- * the presets.
+ * `jsPlugins` adds plugins next to the preset.
  */
 function lint(
   files: Record<string, string>,
-  {
-    jsPlugins = [],
-    presets = ["effect"],
-  }: { jsPlugins?: readonly string[]; presets?: readonly string[] } = {}
+  { jsPlugins = [] }: { jsPlugins?: readonly string[] } = {}
 ) {
   const tempDir = mkdtempSync(join(tmpdir(), "adamantite-effect-"))
 
@@ -135,12 +131,9 @@ function lint(
       join(tempDir, "oxlint.config.ts"),
       [
         'import { defineConfig } from "oxlint"',
-        ...presets.map(
-          (preset) =>
-            `import ${preset} from ${JSON.stringify(join(REPO_ROOT, `presets/lint/${preset}.ts`))}`
-        ),
+        `import effect from ${JSON.stringify(join(REPO_ROOT, "presets/lint/effect.ts"))}`,
         "",
-        `export default defineConfig({ extends: [${presets.join(", ")}], jsPlugins: ${JSON.stringify(jsPlugins)} })`,
+        `export default defineConfig({ extends: [effect], jsPlugins: ${JSON.stringify(jsPlugins)} })`,
         "",
       ].join("\n")
     )
@@ -229,54 +222,6 @@ describe("effect preset", () => {
     expect(diagnostics.map(({ code, filename }) => ({ code, filename }))).toStrictEqual([
       { code: `${NAMESPACE}(floating-effect)`, filename: "bad.ts" },
     ])
-  })
-
-  // Core's unicorn array rules match a method by its name only. They read `Option.some(value)` as
-  // `Array.prototype.some` with a callback, and a data-first `Array` function as an array method
-  // with a `thisArg`.
-  it("accept Effect module functions that share a name with array methods", () => {
-    const diagnostics = lint(
-      {
-        "good.ts": [
-          'import * as Array from "effect/Array"',
-          'import * as Option from "effect/Option"',
-          "",
-          "export function first(values: readonly string[], fallback: string) {",
-          "  const found = Array.findLast(values, (value) => value.length > 0)",
-          "",
-          "  return Option.isSome(found) ? found : Option.some(fallback)",
-          "}",
-          "",
-        ].join("\n"),
-      },
-      { presets: ["core", "effect"] }
-    )
-
-    expect(diagnostics.map(({ code }) => code)).toStrictEqual([])
-  })
-
-  // Core's `unicorn/throw-new-error` reads a call of a function whose name ends in `Error` as an
-  // error made without `new`. It skips only `Data.TaggedError`, and its fix adds `new`, which breaks
-  // the class (oxc-project/oxc#27718).
-  it("accept an error class that Schema.TaggedError makes", () => {
-    const diagnostics = lint(
-      {
-        "good.ts": [
-          'import * as Schema from "effect/Schema"',
-          "",
-          "export class NotFound extends Schema.TaggedError<",
-          "  NotFound,",
-          "  { readonly brand: unique symbol }",
-          '>()("NotFound", {',
-          "  id: Schema.String,",
-          "}) {}",
-          "",
-        ].join("\n"),
-      },
-      { presets: ["core", "effect"] }
-    )
-
-    expect(diagnostics.map(({ code }) => code)).toStrictEqual([])
   })
 
   // The Effect binding loads through `NAPI_RS_NATIVE_LIBRARY_PATH`, which every napi-rs package

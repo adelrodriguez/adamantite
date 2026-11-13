@@ -169,6 +169,8 @@ export default defineConfig({
         root: "presets/lint/plugin",
       },
     ],
+    // A `?raw` import gives the source text of a module, not the module, so a test can import both.
+    "import/no-duplicates": ["error", { considerQueryString: true }],
     // Repository suppressions use `@ts-expect-error - reason`, so the format belongs in the check.
     "typescript/ban-ts-comment": [
       "error",

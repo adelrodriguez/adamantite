@@ -1,9 +1,9 @@
 import type { ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync, readFileSync } from "node:fs"
 import { posix } from "node:path"
-import { isStringLiteral } from "../shared/ast.ts"
+import { isStringLiteral } from "../../shared/ast.ts"
+import { readStringArrayOption, readStringOption } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
-import { readStringArrayOption, readStringOption } from "../shared/options.ts"
 import { resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to

@@ -87,7 +87,10 @@ export default defineConfig({
       },
       {
         import: "oxc-resolver",
-        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugins/shared/resolver.ts"],
+        owners: [
+          "src/lib/workspace/module-resolver.ts",
+          "presets/lint/plugins/adamantite/shared/resolver.ts",
+        ],
       },
       // Commands run tools through Toolchain. Only the lifecycle commands `init` and `update` use
       // the tooling integrations directly.
@@ -156,14 +159,13 @@ export default defineConfig({
         },
         root: "src",
       },
-      // Each plugin uses the plugin-wide helpers in `shared`, and no plugin imports another
-      // plugin's code. `shared` imports no plugin. `index.ts` registers the adamantite plugin.
+      // Each plugin uses the helpers of all plugins in `shared`, and no plugin imports another
+      // plugin's code. `shared` imports no plugin.
       {
-        entries: ["index.ts"],
         layers: {
+          adamantite: { imports: ["shared"] },
           "anti-slop": { imports: ["shared"] },
           "anti-slop-effect": { imports: ["shared"] },
-          rules: { imports: ["shared"] },
           shared: { imports: [] },
         },
         root: "presets/lint/plugins",

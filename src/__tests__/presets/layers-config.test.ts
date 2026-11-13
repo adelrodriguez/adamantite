@@ -28,7 +28,7 @@ function lint(options: Readonly<Options>) {
         jsPlugins: [
           {
             name: "adamantite",
-            specifier: pathToFileURL(join(REPO, "presets/lint/plugins/index.ts")).href,
+            specifier: pathToFileURL(join(REPO, "presets/lint/plugins/adamantite/index.ts")).href,
           },
         ],
         rules: { "adamantite/layers": ["error", ...options] },

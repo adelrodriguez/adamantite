@@ -1,7 +1,7 @@
 import { posix } from "node:path"
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, it } from "vitest"
-import { createLayersRule, type Modules } from "#presets/lint/plugins/rules/layers.ts"
+import { createLayersRule, type Modules } from "#presets/lint/plugins/adamantite/rules/layers.ts"
 
 RuleTester.describe = describe
 

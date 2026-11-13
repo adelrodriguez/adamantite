@@ -9,7 +9,7 @@ const config: OxlintConfig = {
   jsPlugins: [
     {
       name: "adamantite",
-      specifier: new URL(`plugins/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
+      specifier: new URL(`plugins/adamantite/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
     },
   ],
 }

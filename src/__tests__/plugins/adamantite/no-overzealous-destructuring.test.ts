@@ -1,6 +1,6 @@
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, it } from "vitest"
-import plugin from "#presets/lint/plugins/index.ts"
+import plugin from "#presets/lint/plugins/adamantite/index.ts"
 
 RuleTester.describe = describe
 

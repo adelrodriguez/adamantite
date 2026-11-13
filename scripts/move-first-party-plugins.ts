@@ -1,7 +1,10 @@
 import { execFileSync } from "node:child_process"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { mkdirSync, readdirSync, readFileSync, rmdirSync, writeFileSync } from "node:fs"
 import { posix, resolve } from "node:path"
 import process from "node:process"
+import * as EffectArray from "effect/Array"
+import * as Order from "effect/Order"
+import { parseSync, type ValueSpan } from "oxc-parser"
 
 // Give each first-party plugin its own folder below `presets/lint/plugins/`, with the rule
 // namespace as the folder name, and move the RuleTester tests the same way. Each step moves the
@@ -104,23 +107,37 @@ function movePath(path: string): string {
   return path
 }
 
+const FROM_THE_END = Order.flip(Order.mapInput(Order.Number, (request: ValueSpan) => request.start))
+
 /**
- * Point each relative import of a file at the new path of its target, from the new path of the
- * file.
+ * Point each relative import and re-export of a file at the new path of its target, from the new
+ * path of the file. The parser finds the module requests, so an import in the code of a test case,
+ * such as `import { run } from "../execution/run.ts"` in a RuleTester test, stays as it is.
  */
 function moveRelativeImports(file: string, content: string): string {
-  return content.replaceAll(
-    /(?<head>\bfrom\s+|\bimport\s*\(\s*|^import\s+)"(?<specifier>\.{1,2}\/[^"]+)"/gm,
-    (match, head: string, specifier: string) => {
-      const target = posix.join(posix.dirname(file), specifier)
+  const { module } = parseSync(file, content)
 
-      if (movePath(file) === file && movePath(target) === target) return match
+  const requests = [
+    ...module.staticImports.map((entry) => entry.moduleRequest),
+    ...module.staticExports.flatMap((entry) =>
+      entry.entries.flatMap((item) => item.moduleRequest ?? [])
+    ),
+  ]
 
-      const moved = posix.relative(posix.dirname(movePath(file)), movePath(target))
+  let moved = content
 
-      return `${head}"${moved.startsWith("../") ? moved : `./${moved}`}"`
+  // Replace from the end, so the earlier offsets stay correct.
+  for (const request of EffectArray.sort(requests, FROM_THE_END)) {
+    const target = posix.join(posix.dirname(file), request.value)
+
+    if (request.value.startsWith(".") && (movePath(file) !== file || movePath(target) !== target)) {
+      const specifier = posix.relative(posix.dirname(movePath(file)), movePath(target))
+
+      moved = `${moved.slice(0, request.start)}"${specifier.startsWith("../") ? specifier : `./${specifier}`}"${moved.slice(request.end)}`
     }
-  )
+  }
+
+  return moved
 }
 
 function escapeRegExp(text: string): string {
@@ -180,6 +197,19 @@ const textFiles = tracked.filter(
       && !file.startsWith(FIXTURES))
 )
 
+/**
+ * Remove a folder that a move left empty, and each parent folder that it leaves empty.
+ */
+function removeEmptyFolders(folder: string) {
+  for (
+    let current = folder;
+    current !== "." && readdirSync(resolve(root, current)).length === 0;
+    current = posix.dirname(current)
+  ) {
+    rmdirSync(resolve(root, current))
+  }
+}
+
 // Read each file at its old path before any file moves.
 const rewrites = textFiles.flatMap((file) => {
   const content = readFileSync(resolve(root, file), "utf8")
@@ -199,6 +229,7 @@ for (const file of tracked) {
     if (write) {
       mkdirSync(resolve(root, posix.dirname(target)), { recursive: true })
       execFileSync("git", ["mv", file, target], { cwd: root })
+      removeEmptyFolders(posix.dirname(file))
     }
 
     console.info(`${write ? "Moved" : "Would move"} ${file} to ${target}`)

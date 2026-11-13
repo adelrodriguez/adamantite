@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { globToRegExp } from "#presets/lint/plugins/shared/glob.ts"
+import { globToRegExp } from "#presets/lint/plugins/adamantite/shared/glob.ts"
 
 describe("globToRegExp", () => {
   it.each([

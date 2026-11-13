@@ -1,5 +1,5 @@
 import type { Context, ESTree } from "@oxlint/plugins"
-import { staticKeyName } from "./ast.ts"
+import { staticKeyName } from "../../shared/ast.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs and imports only types from packages.

@@ -1,7 +1,7 @@
 import type { Context, Rule, Visitor } from "@oxlint/plugins"
+import { readStringArrayOption } from "../../shared/options.ts"
 import { globToRegExp } from "../shared/glob.ts"
 import { findImportedCalls } from "../shared/imports.ts"
-import { readStringArrayOption } from "../shared/options.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs and imports only types from packages.

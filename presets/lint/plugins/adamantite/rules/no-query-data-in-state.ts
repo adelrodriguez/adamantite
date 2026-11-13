@@ -1,5 +1,5 @@
 import type { Context, ESTree, Rule, Visitor } from "@oxlint/plugins"
-import { staticKeyName } from "../shared/ast.ts"
+import { staticKeyName } from "../../shared/ast.ts"
 import { findImportedCalls, type ImportedCall } from "../shared/imports.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to

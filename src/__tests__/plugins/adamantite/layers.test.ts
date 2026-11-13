@@ -13,7 +13,7 @@ import {
   type Modules,
   readLayersOptions,
   splitAtRoot,
-} from "#presets/lint/plugins/rules/layers.ts"
+} from "#presets/lint/plugins/adamantite/rules/layers.ts"
 
 RuleTester.describe = describe
 

@@ -5,7 +5,7 @@ import {
   createImportOwnersRule,
   isImportOf,
   readImportOwners,
-} from "#presets/lint/plugins/rules/import-owners.ts"
+} from "#presets/lint/plugins/adamantite/rules/import-owners.ts"
 
 RuleTester.describe = describe
 

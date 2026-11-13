@@ -1,5 +1,7 @@
 import type { OxlintConfig } from "oxlint"
+import { testFiles as jestTestFiles } from "./jest.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
+import { testFiles as vitestTestFiles } from "./vitest.ts"
 
 // Framework-neutral opinions: values keep their source object visible, types come from
 // validation or narrowing instead of assertions, each suppression gives its reason, no debug
@@ -28,8 +30,9 @@ const config: OxlintConfig = {
     {
       // Tests build partial fixtures and doubles, where an assertion is often the clearest option.
       // Outside tests, `consistent-type-assertions` already reports each assertion once. In tests,
-      // each assertion states its reason, and no chain or widening hides the source type.
-      files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"],
+      // each assertion states its reason, and no chain or widening hides the source type. The files
+      // are each file that the jest or vitest preset treats as a test, so the presets agree.
+      files: [...new Set([...jestTestFiles, ...vitestTestFiles])],
       rules: {
         "anti-slop/no-chained-type-assertions": "error",
         "anti-slop/no-widen-then-assert": "error",

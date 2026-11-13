@@ -161,13 +161,36 @@ export default defineConfig({
       },
       // Each plugin uses the helpers of all plugins in `shared`, and no plugin imports another
       // plugin's code. `shared` imports no plugin. `entry.ts` gives the presets the `jsPlugins` entry
-      // of each plugin.
+      // of each plugin. In a plugin, `index.ts` registers the rules, and the rules use the helpers
+      // of the plugin.
       {
         entries: ["entry.ts"],
         layers: {
-          adamantite: { imports: ["shared"] },
-          "anti-slop": { imports: ["shared"] },
-          "anti-slop-effect": { imports: ["shared"] },
+          adamantite: {
+            entries: ["index.ts"],
+            imports: ["shared"],
+            layers: {
+              rules: { imports: ["shared"] },
+              shared: { imports: [] },
+            },
+          },
+          "anti-slop": {
+            entries: ["index.ts"],
+            imports: ["shared"],
+            layers: {
+              rules: { imports: ["shared", "stylistic"] },
+              shared: { imports: [] },
+              stylistic: { imports: [] },
+            },
+          },
+          "anti-slop-effect": {
+            entries: ["index.ts"],
+            imports: ["shared"],
+            layers: {
+              rules: { imports: ["shared"] },
+              shared: { imports: [] },
+            },
+          },
           shared: { imports: [] },
         },
         root: "presets/lint/plugins",

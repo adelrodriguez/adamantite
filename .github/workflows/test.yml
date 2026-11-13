@@ -161,6 +161,15 @@ jobs:
             command: pnpm run test:presets
           - name: e2e
             command: pnpm run test:dist
+          # The rules rely on the AST shape of each Oxlint version that peerDependencies allows,
+          # so the RuleTester tests and the preset fixtures also run with the minimum version.
+          - name: minimum-oxlint
+            command: |
+              oxlint_version="$(node -p "const range = JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).peerDependencies.oxlint; const match = /^>=(\d+\.\d+\.\d+)$/.exec(range); if (match === null) throw new Error('Expected peerDependencies.oxlint to be >=<version>, not ' + range); match[1]")"
+              oxlint_dir="${RUNNER_TEMP}/adamantite-minimum-oxlint"
+              mkdir "${oxlint_dir}"
+              npm install --prefix "${oxlint_dir}" "oxlint@${oxlint_version}"
+              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run src/__tests__/plugin src/__tests__/presets/strict.test.ts src/__tests__/presets/effect.test.ts
 
     steps:
       - name: Checkout

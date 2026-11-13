@@ -23,6 +23,8 @@
           "effect/Path",
           "effect/PlatformError",
           "effect/process",
+          "effect/SemVer",
+          "effect/SemVerRange",
           "effect/Stdio",
           "effect/Terminal",
           "effect/testing/TestConsole"

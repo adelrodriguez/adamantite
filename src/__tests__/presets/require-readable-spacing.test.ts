@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 // RuleTester checks each fix once. This test runs the fix through the Oxlint CLI on several files,
 // and checks that a second fix changes nothing.
 const REPO_ROOT = join(import.meta.dirname, "../../..")
-const PLUGIN = join(REPO_ROOT, "presets/lint/plugin/antislop/index.ts")
+const PLUGIN = join(REPO_ROOT, "presets/lint/plugin/anti-slop/index.ts")
 
 let probeRoot: string
 

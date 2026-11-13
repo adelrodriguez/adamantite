@@ -1,9 +1,9 @@
 import { RuleTester } from "oxlint/plugins-dev"
 import { describe, expect, it } from "vitest"
 import format from "#presets/format.ts"
-import plugin from "#presets/lint/plugin/antislop/index.ts"
-import { DEFAULT_PRINT_WIDTH } from "#presets/lint/plugin/antislop/rules/require-readable-spacing.ts"
-import createPaddingLineRule from "#presets/lint/plugin/antislop/stylistic/padding-line-between-statements.ts"
+import plugin from "#presets/lint/plugin/anti-slop/index.ts"
+import { DEFAULT_PRINT_WIDTH } from "#presets/lint/plugin/anti-slop/rules/require-readable-spacing.ts"
+import createPaddingLineRule from "#presets/lint/plugin/anti-slop/stylistic/padding-line-between-statements.ts"
 
 RuleTester.describe = describe
 

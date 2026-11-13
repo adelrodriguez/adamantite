@@ -6,7 +6,7 @@ import type { OxlintConfig } from "oxlint"
 //
 // The anti-slop plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
 // access, no module mocking, and readable spacing. Its rules started as a copy of
-// https://github.com/dmmulroy/anti-slop and now live in plugin/antislop/ as first-party code. They
+// https://github.com/dmmulroy/anti-slop and now live in plugin/anti-slop/ as first-party code. They
 // keep the `anti-slop` namespace, so project settings and suppressions keep working.
 //
 // The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
@@ -22,7 +22,7 @@ const config: OxlintConfig = {
     },
     {
       name: "anti-slop",
-      specifier: new URL(`plugin/antislop/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
+      specifier: new URL(`plugin/anti-slop/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
     },
   ],
   overrides: [

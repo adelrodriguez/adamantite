@@ -771,6 +771,21 @@ same `anti-slop/*` names.
   `typeof` check outside a type predicate, `Reflect.get` and `Reflect.apply`, and Vitest or Jest
   module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
   accumulator, `shape` in symbol names, and a missing blank line between statement groups.
+- `anti-slop/no-unsafe-dictionary-type` reports a named dictionary such as
+  `Record<string, unknown>` at its declaration, not at each use. Some types accept open fields on
+  purpose, such as the fields that each caller adds to a log event. Name that field bag once, and
+  suppress the rule at its declaration with a reason:
+
+  ```ts
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- each caller adds its own log fields
+  type LogFields = Record<string, unknown>
+
+  export type Logger = {
+    info: (event: LogFields) => void
+    error: (event: LogFields) => void
+  }
+  ```
+
 - `anti-slop/require-readable-spacing` adds blank lines around a statement that spans several
   lines. `adamantite fix` runs lint before Oxfmt, so the rule also counts a one-line statement
   that ends past column 100 as multiline, because Oxfmt wraps it. A line that Oxfmt cannot

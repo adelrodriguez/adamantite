@@ -169,6 +169,11 @@ const config: OxlintConfig = {
     // rules no option to ignore a receiver, so an Effect project turns them off.
     "unicorn/no-array-callback-reference": "off",
     "unicorn/no-array-method-this-argument": "off",
+    // TEMPORARY: The core rule reads a call of a function whose name ends in `Error` as an error
+    // made without `new`. It skips `Data.TaggedError`, but it reports `Schema.TaggedError` and
+    // `Schema.Error`, and its fix adds `new`, which breaks the class. Remove this line when Oxlint
+    // skips them too: https://github.com/oxc-project/oxc/issues/27718
+    "unicorn/throw-new-error": "off",
   },
 }
 

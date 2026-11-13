@@ -255,6 +255,30 @@ describe("effect preset", () => {
     expect(diagnostics.map(({ code }) => code)).toStrictEqual([])
   })
 
+  // Core's `unicorn/throw-new-error` reads a call of a function whose name ends in `Error` as an
+  // error made without `new`. It skips only `Data.TaggedError`, and its fix adds `new`, which breaks
+  // the class (oxc-project/oxc#27718).
+  it("accept an error class that Schema.TaggedError makes", () => {
+    const diagnostics = lint(
+      {
+        "good.ts": [
+          'import * as Schema from "effect/Schema"',
+          "",
+          "export class NotFound extends Schema.TaggedError<",
+          "  NotFound,",
+          "  { readonly brand: unique symbol }",
+          '>()("NotFound", {',
+          "  id: Schema.String,",
+          "}) {}",
+          "",
+        ].join("\n"),
+      },
+      { presets: ["core", "effect"] }
+    )
+
+    expect(diagnostics.map(({ code }) => code)).toStrictEqual([])
+  })
+
   // The Effect binding loads through `NAPI_RS_NATIVE_LIBRARY_PATH`, which every napi-rs package
   // reads. The plugin loads `oxc-parser`, which the entry does not load itself, so the plugin fails
   // to load when the variable outlives the Oxlint binding.

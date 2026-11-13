@@ -121,7 +121,9 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "jsdoc/require-yields-type": "error",
     "no-array-constructor": "error",
     "no-async-promise-executor": "error",
-    "no-await-in-loop": "error",
+    // The rule tells the author to start the calls together. That is a defect when each call needs
+    // the result of the call before it, and the rule cannot tell the two cases apart.
+    "no-await-in-loop": "off",
     "no-caller": "error",
     "no-case-declarations": "error",
     "no-class-assign": "error",
@@ -201,7 +203,9 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "no-sparse-arrays": "error",
     "no-template-curly-in-string": "error",
     "no-this-before-super": "error",
-    "no-throw-literal": "error",
+    // `typescript/only-throw-error` reads the type of the thrown value, so it reports every throw
+    // that this rule reports. With both rules on, one throw needs two suppressions.
+    "no-throw-literal": "off",
     "no-unassigned-vars": "error",
     "no-unexpected-multiline": "error",
     "no-unmodified-loop-condition": "error",

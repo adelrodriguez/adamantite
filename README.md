@@ -598,6 +598,11 @@ The preset turns off two core rules, `unicorn/no-array-callback-reference` and
 `unicorn/no-array-method-this-argument`. They match an array method by its name only, so they
 report Effect calls such as `Option.some(value)` and `Array.findLast(values, predicate)`.
 
+The preset also turns off the core rule `unicorn/throw-new-error`, until Oxlint fixes
+[oxc-project/oxc#27718](https://github.com/oxc-project/oxc/issues/27718). The rule reports an error
+class that `Schema.TaggedError` or `Schema.Error` makes, and its fix adds a `new` that breaks the
+class.
+
 The `@effect/tsgo` rules are not a JavaScript plugin. They exist only in the Effect builds of the Oxlint
 binding and tsrs, which `@effect/tsgo` ships. When the project installs
 `@effect/tsgo`, Adamantite runs Oxlint with those builds. Nothing changes in

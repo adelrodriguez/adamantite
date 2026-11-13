@@ -18,12 +18,14 @@ import {
 import * as commands from "#lib/integrations/tooling/oxlint/command.ts"
 import {
   checkImportsLintPreset,
+  getExtendedLintPresets,
   inspectExtendsOrder,
   inspectRequiredOxlintConfig,
   type MisplacedCorePreset,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 import {
+  findExcludedPresets,
   type LintPreset,
   RETIRED_LINT_PRESETS,
   type RetiredLintPreset,
@@ -112,6 +114,30 @@ function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Findin
   }
 }
 
+/**
+ * The finding for a config that extends two presets that report the same defects, such as jest and
+ * vitest. Assessment does not write the config.
+ */
+function toExcludedPresetsFinding({
+  excluded,
+  preset,
+}: {
+  readonly excluded: LintPreset
+  readonly preset: LintPreset
+}): Finding {
+  return {
+    currentState: `\`oxlint.config.ts\` extends the \`${preset}\` and \`${excluded}\` presets, which report the same defects. Each defect gets two reports.`,
+    goal: [
+      `Keep the preset of the tool that the project uses, and remove the import and the \`extends\` entry of the other. Keep all other project settings.`,
+      `If some files need \`${preset}\` and other files need \`${excluded}\`, remove the two \`extends\` entries. Add an \`overrides\` entry for each preset with \`files\` that do not overlap, as the documentation comment of each preset shows.`,
+      "Run `adamantite check`, then run `adamantite doctor` again.",
+    ],
+    id: "excluded-presets",
+    integration: "oxlint",
+    title: "The config extends two presets that report the same defects",
+  }
+}
+
 const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 
 export default defineIntegration({
@@ -155,6 +181,14 @@ export default defineIntegration({
         Option.toArray
       )
 
+      const excludedPresetsFindings = lintConfig.pipe(
+        Option.flatMap((content) =>
+          Array.head(findExcludedPresets(getExtendedLintPresets(content)))
+        ),
+        Option.map((excluded) => toExcludedPresetsFinding(excluded)),
+        Option.toArray
+      )
+
       return {
         applicable: true,
         findings: [
@@ -162,6 +196,7 @@ export default defineIntegration({
           ...runtimeFindings,
           ...retiredPresetFindings,
           ...presetOrderFindings,
+          ...excludedPresetsFindings,
           ...getConfigFindings(state, {
             configContent,
             configFile: CONFIG_FILE,

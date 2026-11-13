@@ -6,6 +6,7 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import {
   describeLintPreset,
+  findExcludedPresets,
   findMissingRequiredPresets,
   LINT_PRESETS,
   lintPresets,
@@ -14,6 +15,10 @@ import packageJson from "../../../../../../package.json" with { type: "json" }
 
 const PRESET_FILES_DIR = join(import.meta.dirname, "../../../../../../presets/lint")
 const presetsWithPlugins = lintPresets.flatMap((preset) => ("plugin" in preset ? [preset] : []))
+
+const excludedPairs = lintPresets.flatMap((preset) =>
+  "excludes" in preset ? preset.excludes.map((excluded) => [preset.name, excluded] as const) : []
+)
 
 function isLintExport([subpath]: readonly [string, unknown]) {
   return subpath === "./lint" || subpath.startsWith("./lint/")
@@ -54,6 +59,10 @@ describe("lintPresets", () => {
     )
   })
 
+  it.each(excludedPairs)("exclude %s in the excludes of %s too", (preset, excluded) => {
+    expect(getPreset(excluded)).toHaveProperty("excludes", expect.arrayContaining([preset]))
+  })
+
   it.each(presetsWithPlugins)("name $plugin.name in the hint of the $name preset", (preset) => {
     expect(describeLintPreset(preset)).toContain(`Installs ${preset.plugin.name}`)
   })
@@ -68,6 +77,12 @@ describe("describeLintPreset", () => {
       "Check React code, JSX accessibility, and performance."
     )
   })
+
+  it("add the excluded presets after the rule hint", () => {
+    expect(describeLintPreset(getPreset("jest"))).toBe(
+      "Find focused or skipped tests and check assertions. Cannot be selected with the vitest preset."
+    )
+  })
 })
 
 describe("findMissingRequiredPresets", () => {
@@ -79,5 +94,18 @@ describe("findMissingRequiredPresets", () => {
 
   it("report nothing when the selection has every required preset", () => {
     expect(findMissingRequiredPresets(["react", "react-strict"])).toStrictEqual([])
+  })
+})
+
+describe("findExcludedPresets", () => {
+  it("report the jest and vitest presets together", () => {
+    expect(findExcludedPresets(["vitest", "strict", "jest"])).toStrictEqual([
+      { excluded: "vitest", preset: "jest" },
+      { excluded: "jest", preset: "vitest" },
+    ])
+  })
+
+  it("report nothing when the selection has one preset of each excluded pair", () => {
+    expect(findExcludedPresets(["vitest", "strict"])).toStrictEqual([])
   })
 })

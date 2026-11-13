@@ -94,6 +94,7 @@ Available setup values:
   Sherif.
 - Presets: `react`, `react-strict`, `tanstack`, `nextjs`, `vue`, `effect`,
   `jest`, `vitest`, `node`, `architecture`, `strict`, and `tailwind`. `react-strict` requires `react`.
+  `jest` and `vitest` cannot be selected together.
 - Editors: `vscode` and `zed`.
 - TypeScript presets: `typescript` and `tsconfig`. See [the TypeScript presets](#the-typescript-presets).
 
@@ -507,6 +508,11 @@ The `jest` and `vitest` presets apply their rules only to test files, so rules s
 `vitest/require-hook` do not report scripts and library code. Each preset exports `testFiles`, the
 files that its test runner runs as tests by default. `vitest` `testFiles` match `*.test.*` and
 `*.spec.*` files. `jest` `testFiles` also match files in `__tests__` folders.
+
+Select one of the two presets. They report the same test defects, so a config that extends both
+gets two reports for each defect. Init accepts only one of them, and `adamantite doctor` reports a
+config that extends both. If one package runs both test runners, use each preset in an override
+with files that do not overlap.
 
 Extend the preset to use these files:
 

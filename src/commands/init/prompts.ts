@@ -1,10 +1,14 @@
 import type { PackageManagerName } from "nypm"
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import type { TypeScriptPreset } from "#lib/integrations/workspace/tsconfig.ts"
+import type { OperationCancelled } from "#lib/shared/errors.ts"
 import {
   describeLintPreset,
+  findExcludedPresets,
   findMissingRequiredPresets,
+  type LintPreset,
   lintPresets,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
@@ -24,12 +28,38 @@ const describeScriptConflict = (conflict: ScriptConflict) =>
   `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
 
 /**
- * Asks for the lint presets, and adds each preset that a selected preset requires.
+ * Asks which preset to keep of each selected pair that excludes each other, and removes the other
+ * preset of the pair.
+ */
+function keepOneOfExcludedPresets(
+  selected: readonly LintPreset[]
+): Effect.Effect<readonly LintPreset[], OperationCancelled, Prompter> {
+  return Option.match(Array.head(findExcludedPresets(selected)), {
+    onNone: () => Effect.succeed(selected),
+    onSome: ({ excluded, preset }) =>
+      Effect.gen(function* () {
+        const prompter = yield* Prompter
+
+        const kept = yield* prompter.select({
+          message: `The ${preset} and ${excluded} presets report the same defects. Which one should Adamantite use?`,
+          options: [preset, excluded].map((name) => ({ label: name, value: name })),
+        })
+
+        return yield* keepOneOfExcludedPresets(
+          selected.filter((name) => name === kept || (name !== preset && name !== excluded))
+        )
+      }),
+  })
+}
+
+/**
+ * Asks for the lint presets, keeps one preset of each pair that excludes each other, and adds each
+ * preset that a selected preset requires.
  */
 const promptPresets = Effect.gen(function* () {
   const prompter = yield* Prompter
 
-  const selected = yield* prompter.multiselect({
+  const chosen = yield* prompter.multiselect({
     message: "Which presets should Adamantite use with the core preset?",
     options: lintPresets.map((preset) => ({
       hint: describeLintPreset(preset),
@@ -38,6 +68,8 @@ const promptPresets = Effect.gen(function* () {
     })),
     required: false,
   })
+
+  const selected = yield* keepOneOfExcludedPresets(chosen)
 
   const missingPresets = findMissingRequiredPresets(selected)
 

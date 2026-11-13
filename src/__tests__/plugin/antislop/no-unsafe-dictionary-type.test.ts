@@ -118,6 +118,24 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
       code: "function outer() { type Exclude<T, U> = { value: T; filter: U }; type A = Exclude<string, Record<string, unknown>>; }",
       errors: [error],
     },
+    // A heritage clause is a dictionary contract too.
+    { code: "interface Bag extends Record<string, unknown> { id: string }", errors: [error] },
+    { code: "interface Bag extends Readonly<Record<string, unknown>> {}", errors: [error] },
+    {
+      code: "class Bag implements Record<string, unknown> { [key: string]: string }",
+      errors: [error],
+    },
+    { code: "interface Bag extends globalThis.Record<string, unknown> {}", errors: [error] },
+    // A default type argument is the value type of every plain use of the alias.
+    { code: "type Bag<T = unknown> = Record<string, T>; const a: Bag = {};", errors: [error] },
+    { code: "interface Bag<T = unknown> { [key: string]: T }", errors: [error] },
+    // `globalThis.Record` names the global type, even where an import shadows `Record`.
+    { code: "type A = globalThis.Record<string, unknown>;", errors: [error] },
+    {
+      code: 'import { Record } from "effect"; type A = globalThis.Record<string, unknown>;',
+      errors: [error],
+    },
+    { code: "type A = Record<string, globalThis.Readonly<unknown>>;", errors: [error] },
   ],
   valid: [
     "type Commands = Record<string, Command>;",
@@ -154,5 +172,11 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     "export type NotPlain<T> = Exclude<T, Readonly<Record<string, unknown>>>;",
     "type Merge<T> = T; export type Deep<T> = { [K in keyof T]: T[K] extends Record<string, unknown> ? Merge<T[K]> : T[K] };",
     "export type Nested<T> = T extends { readonly data: Record<string, unknown> } ? T['data'] : never;",
+    "interface Owner extends Record<string, Command> { id: string }",
+    "class Store implements Record<string, string> { [key: string]: string }",
+    "interface Record<K, V> { key: K; value: V } interface Bag extends Record<string, unknown> {}",
+    "type Bag<T = Command> = Record<string, T>; const a: Bag = {};",
+    "interface Bag<T = Command> { [key: string]: T }",
+    "type A = globalThis.Record<string, Command>;",
   ],
 })

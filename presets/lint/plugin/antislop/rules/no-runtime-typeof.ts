@@ -154,8 +154,64 @@ function declaredType(
 }
 
 /**
+ * Return the type parameter that a type reference names, as `T` in `<T>(value: T)`, or null when
+ * the reference names another type.
+ */
+function referencedTypeParameter(type: ESTree.TSTypeReference): ESTree.TSTypeParameter | null {
+  if (type.typeName.type !== "Identifier" || type.typeArguments) return null
+  const name = type.typeName.name
+  let current: ESTree.Node | null = type.parent
+
+  while (current !== null) {
+    if ("typeParameters" in current) {
+      const parameter = current.typeParameters?.params.find(
+        (candidate) => candidate.name.name === name
+      )
+
+      if (parameter !== undefined) return parameter
+    }
+
+    current = current.parent
+  }
+
+  return null
+}
+
+/**
+ * Return whether a declared type may hold any value, because it is a type parameter with no
+ * constraint, or with a constraint that has `unknown` or `any`, as in `<T>(value: T)`. A union
+ * matches when one of its members matches.
+ */
+function isUncheckedTypeParameter(
+  type: ESTree.TSType,
+  visitorKeys: VisitorKeys,
+  seen: ReadonlySet<ESTree.TSTypeParameter>
+): boolean {
+  if (type.type === "TSParenthesizedType") {
+    return isUncheckedTypeParameter(type.typeAnnotation, visitorKeys, seen)
+  }
+
+  if (type.type === "TSUnionType") {
+    return type.types.some((member) => isUncheckedTypeParameter(member, visitorKeys, seen))
+  }
+
+  if (type.type !== "TSTypeReference") return false
+  const parameter = referencedTypeParameter(type)
+
+  if (parameter === null || seen.has(parameter)) return false
+  const constraint = parameter.constraint
+
+  return (
+    constraint === null
+    || mentionsUncheckedType(constraint, visitorKeys)
+    || isUncheckedTypeParameter(constraint, visitorKeys, new Set([...seen, parameter]))
+  )
+}
+
+/**
  * Return whether a `typeof` operand reads a binding with a declared type that has no `unknown` or
- * `any`. Such a value is already parsed, so `typeof` only picks a member of an owned union.
+ * `any`, and that is not a type parameter that may hold any value. Such a value is already parsed,
+ * so `typeof` only picks a member of an owned union.
  */
 function hasOwnedType(
   argument: ESTree.Expression,
@@ -165,7 +221,11 @@ function hasOwnedType(
   const root = operandRoot(argument)
   const type = root === null ? null : declaredType(root, sourceCode)
 
-  return type !== null && !mentionsUncheckedType(type, visitorKeys)
+  return (
+    type !== null
+    && !mentionsUncheckedType(type, visitorKeys)
+    && !isUncheckedTypeParameter(type, visitorKeys, new Set())
+  )
 }
 
 /**
@@ -192,7 +252,7 @@ const rule: Rule = {
     defaultOptions: [{ allowInTypeGuards: false }],
     docs: {
       description:
-        "Disallow runtime typeof checks on values that may be unparsed. Decode external values into meaningful types at their I/O boundary. A value with a declared type that has no `unknown` or `any` may use typeof.",
+        "Disallow runtime typeof checks on values that may be unparsed. Decode external values into meaningful types at their I/O boundary. A value with a declared type that has no `unknown` or `any`, and that is not an unconstrained type parameter, may use typeof.",
     },
     messages: {
       runtimeTypeof:

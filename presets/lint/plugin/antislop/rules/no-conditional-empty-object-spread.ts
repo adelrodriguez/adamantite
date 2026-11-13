@@ -3,6 +3,14 @@ import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
 import { resolveVariable } from "../shared/scope.ts"
 
 // Parentheses and type operators do not change the value that a branch spreads.
+const EXPRESSION_WRAPPERS: ReadonlySet<string> = new Set([
+  "ParenthesizedExpression",
+  "TSAsExpression",
+  "TSSatisfiesExpression",
+  "TSTypeAssertion",
+  "TSNonNullExpression",
+])
+
 function unwrapExpression(node: ESTree.Expression): ESTree.Expression {
   let current = node
 
@@ -19,6 +27,24 @@ function unwrapExpression(node: ESTree.Expression): ESTree.Expression {
   return current
 }
 
+/**
+ * Return whether code only spreads a value at this node: as the argument of a spread, or as a
+ * branch of a conditional that code spreads. A spread reads the value and cannot fill it.
+ */
+function isOnlySpread(node: ESTree.Node): boolean {
+  const { parent } = node
+
+  if (parent === null) return false
+
+  if (parent.type === "SpreadElement") return parent.parent.type === "ObjectExpression"
+
+  if (parent.type === "JSXSpreadAttribute") return true
+
+  if (parent.type === "ConditionalExpression") return parent.test !== node && isOnlySpread(parent)
+
+  return EXPRESSION_WRAPPERS.has(parent.type) && isOnlySpread(parent)
+}
+
 function isEmptyObjectExpression(node: ESTree.Expression): boolean {
   return node.type === "ObjectExpression" && node.properties.length === 0
 }
@@ -28,7 +54,9 @@ function isNullLiteral(node: ESTree.Expression): boolean {
 }
 
 /**
- * Return whether an identifier is the global `undefined` or a `const` that holds `{}`.
+ * Return whether an identifier is the global `undefined` or a `const` that holds `{}`. The `const`
+ * holds `{}` only when code does nothing with it but spread it, because a property write, a call
+ * such as `Object.assign(fallback, values)`, or any other use can fill it.
  */
 function isEmptyBinding(sourceCode: SourceCode, node: ESTree.IdentifierReference): boolean {
   const variable = resolveVariable(sourceCode, node)
@@ -39,7 +67,8 @@ function isEmptyBinding(sourceCode: SourceCode, node: ESTree.IdentifierReference
   const [definition] = variable.defs
 
   return (
-    definition?.type === "Variable"
+    variable.references.every((reference) => reference.init || isOnlySpread(reference.identifier))
+    && definition?.type === "Variable"
     && definition.node.type === "VariableDeclarator"
     && definition.node.parent.type === "VariableDeclaration"
     && definition.node.parent.kind === "const"

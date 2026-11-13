@@ -24,6 +24,12 @@ const config: OxlintConfig = {
     "nextjs/no-title-in-document-head": "error",
     "nextjs/no-typos": "error",
     "nextjs/no-unwanted-polyfillio": "error",
+
+    // Core turns on this rule, which reports an async function that has no `await`. Next.js
+    // rejects each exported function of a `"use server"` file that is not async, so the user
+    // cannot remove the keyword from a server action. An Oxlint override selects files by path,
+    // not by directive, so a Next.js project turns the rule off in all files.
+    "typescript/require-await": "off",
   },
 }
 

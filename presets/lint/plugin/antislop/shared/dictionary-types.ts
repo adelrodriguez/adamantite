@@ -278,16 +278,17 @@ function isEffectivelyEmptyInterface(
 }
 
 /**
- * Bind an alias's type parameters for its body. The body sees only these parameters, because the
- * type parameters of the alias that refers to it are not in scope there. Each explicit argument
- * keeps the substitutions of the place that wrote it, and a default sees the parameters before it.
+ * Bind the type parameters of an alias or an interface for its body and heritage. The body sees
+ * only these parameters, because the type parameters of the type that refers to it are not in scope
+ * there. Each explicit argument keeps the substitutions of the place that wrote it, and a default
+ * sees the parameters before it.
  */
-function aliasSubstitution(
-  alias: ESTree.TSTypeAliasDeclaration,
+function typeArgumentSubstitution(
+  declaration: ESTree.TSInterfaceDeclaration | ESTree.TSTypeAliasDeclaration,
   arguments_: readonly ESTree.TSType[],
   base: TypeAliasEnvironment
 ): TypeAliasEnvironment | null {
-  const parameters = alias.typeParameters?.params ?? []
+  const parameters = declaration.typeParameters?.params ?? []
   const next = new Map<string, ResolvedType>()
 
   for (const [index, parameter] of parameters.entries()) {
@@ -375,7 +376,7 @@ function unsafeDirectValue(
   const alias = localAlias(reference, environment)
 
   if (alias === null || resolvingAliases.has(name)) return null
-  const nextSubstitutions = aliasSubstitution(alias, typeArguments, substitutions)
+  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
 
   if (nextSubstitutions === null) return null
   const nextResolving = new Set(resolvingAliases)
@@ -461,7 +462,7 @@ function referenceValueTypes(
   const alias = localAlias(reference, environment)
 
   if (alias === null || resolvingAliases.has(name)) return []
-  const nextSubstitutions = aliasSubstitution(alias, typeArguments, substitutions)
+  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
 
   if (nextSubstitutions === null) return []
   const nextResolving = new Set(resolvingAliases)
@@ -622,26 +623,41 @@ export function classifyWideningTarget(
 
 /**
  * Return whether an interface accepts any key, through an index signature of its own or through a
- * type it extends.
+ * type it extends. The heritage sees the type arguments of the use, as an alias body does.
  */
 function isOpenInterface(
   declarations: readonly ESTree.TSInterfaceDeclaration[],
+  reference: NamedTypeReference,
   environment: TypeEnvironment,
+  substitutions: TypeAliasEnvironment,
   resolvingAliases: ReadonlySet<string>
 ): boolean {
-  return declarations.some(
-    (declaration) =>
-      declaration.body.body.some((member) => member.type === "TSIndexSignature")
-      || declaration.extends.some((heritage) => {
-        const reference = namedTypeReference(heritage)
+  return declarations.some((declaration) => {
+    if (declaration.body.body.some((member) => member.type === "TSIndexSignature")) return true
+
+    const heritageSubstitutions = typeArgumentSubstitution(
+      declaration,
+      reference.typeArguments,
+      substitutions
+    )
+
+    return (
+      heritageSubstitutions !== null
+      && declaration.extends.some((heritage) => {
+        const base = namedTypeReference(heritage)
 
         return (
-          reference !== null
-          && classifyReferenceBroadTarget(reference, environment, new Map(), resolvingAliases)?.kind
-            === "open dictionary"
+          base !== null
+          && classifyReferenceBroadTarget(
+            base,
+            environment,
+            heritageSubstitutions,
+            resolvingAliases
+          )?.kind === "open dictionary"
         )
       })
-  )
+    )
+  })
 }
 
 function classifyAliasBroadTarget(
@@ -714,12 +730,18 @@ function classifyReferenceBroadTarget(
   const alias = localAlias(reference, environment)
 
   if (alias === null) {
-    return isOpenInterface(localInterfaces(reference, environment), environment, nextResolving)
+    return isOpenInterface(
+      localInterfaces(reference, environment),
+      reference,
+      environment,
+      substitutions,
+      nextResolving
+    )
       ? { kind: "open dictionary" }
       : null
   }
 
-  const nextSubstitutions = aliasSubstitution(alias, typeArguments, substitutions)
+  const nextSubstitutions = typeArgumentSubstitution(alias, typeArguments, substitutions)
 
   if (nextSubstitutions === null) return null
 

@@ -13,6 +13,10 @@ const tester = new RuleTester()
 tester.run("no-manual-tagged-construction", plugin.rules["no-manual-tagged-construction"], {
   invalid: [
     {
+      code: 'const value = { [`_tag`]: "Ready" };',
+      errors: [{ messageId: "manualConstruction" }],
+    },
+    {
       code: 'const value = { _tag: "Ready", payload };',
       errors: [{ messageId: "manualConstruction" }],
     },

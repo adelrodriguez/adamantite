@@ -145,6 +145,38 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     { code: "type A<K extends string> = { [P in K]: unknown };", errors: [error] },
     // An `as` clause names the keys of a mapped type, so its keys decide whether the type is open.
     { code: "type Bag = { [K in 'seed' as string]: unknown };", errors: [error] },
+    // A named interface passes its type arguments to its index signatures and heritage, as an
+    // alias passes them to its body.
+    {
+      code: "interface Bag<V> extends Record<string, V> {} type A = Bag<unknown>;",
+      errors: [error],
+    },
+    {
+      code: "interface Bag<V> extends Record<string, V> {} function f(bag: Bag<unknown>) {}",
+      errors: [error],
+    },
+    {
+      code: "interface Bag<V> extends Record<string, V> {} const bag: Bag<unknown> = {};",
+      errors: [error],
+    },
+    {
+      code: "interface Bag<K extends string, V> extends Readonly<Record<K, V>> {} type A = Bag<string, any>;",
+      errors: [error],
+    },
+    { code: "interface Bag<T> { [key: string]: T } type A = Bag<unknown>;", errors: [error] },
+    {
+      code: "interface Bag<T> { [key: string]: T } interface Outer<U> extends Bag<U> {} type A = Outer<object>;",
+      errors: [error],
+    },
+    // A plain use of an unsafe interface reports only at the declaration, as a plain alias use does.
+    {
+      code: "interface Bag<T = unknown> { [key: string]: T } const a: Bag = {}; function f(bag: Bag) {}",
+      errors: 1,
+    },
+    {
+      code: "interface Bag extends Record<string, unknown> {} const a: Bag = {}; function f(bag: Bag) {}",
+      errors: 1,
+    },
     // A nearer alias hides an outer type parameter with the same name.
     {
       code: "function outer<T>() { function inner() { type T = unknown; type A = Record<string, T>; } }",
@@ -195,6 +227,9 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     "type A = globalThis.Record<string, Command>;",
     // A finite literal key set is a closed object, like `{ a: unknown; b: unknown }`.
     "type A = Record<'a' | 'b', unknown>;",
+    "interface Bag<V> extends Record<string, V> {} type A = Bag<number>; const bag: Bag<Command> = {};",
+    "interface Bag<K extends string, V> extends Record<K, V> {} type A = Bag<'a' | 'b', unknown>;",
+    "interface Bag<T> { [key: string]: T } function f(bag: Bag<Command>) {}",
     "type Kind = 'a' | 'b'; type A = { [K in Kind]: unknown };",
     `type Kind = 'a' | 'b'; type A = { [K in Kind as \`get\${K}\`]: unknown };`,
     "type A = { [K in 'a' | 'b' as K]: unknown };",

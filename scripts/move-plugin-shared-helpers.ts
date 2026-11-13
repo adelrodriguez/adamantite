@@ -16,11 +16,13 @@ const PLUGIN = "presets/lint/plugin"
 // A rule of the adamantite plugin imports `../<module>.ts`, a rule of the anti-slop plugins
 // imports `../../<module>.ts`, a test imports `#presets/lint/plugin/<module>.ts`, and the
 // `adamantite/import-owners` options in oxlint.config.ts name `presets/lint/plugin/<module>.ts`.
+// The smoke test names the built module as the package subpath `adamantite/lint/plugin/<module>`.
 const replacements = MODULES.flatMap((module): Array<readonly [string, string]> => [
   [`"../${module}.ts"`, `"../shared/${module}.ts"`],
   [`"../../${module}.ts"`, `"../../shared/${module}.ts"`],
   [`"#${PLUGIN}/${module}.ts"`, `"#${PLUGIN}/shared/${module}.ts"`],
   [`"${PLUGIN}/${module}.ts"`, `"${PLUGIN}/shared/${module}.ts"`],
+  [`"adamantite/lint/plugin/${module}"`, `"adamantite/lint/plugin/shared/${module}"`],
 ])
 
 function listTypeScriptFiles(directory: string): string[] {
@@ -40,6 +42,7 @@ const files = [
   ),
   ...listTypeScriptFiles(join(root, "src/__tests__")),
   join(root, "oxlint.config.ts"),
+  join(root, "scripts/test-smoke.ts"),
 ].map((path) => relative(root, path))
 
 for (const file of files) {

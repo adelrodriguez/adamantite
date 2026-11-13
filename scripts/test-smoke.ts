@@ -523,7 +523,7 @@ try {
 
   for (const specifier of [
     "adamantite/lint/core",
-    "adamantite/lint/plugin/options",
+    "adamantite/lint/plugin/shared/options",
     "adamantite/lint/plugin/rules/layers",
     "adamantite/rules/load",
   ]) {

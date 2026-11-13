@@ -9,6 +9,7 @@ function isProjectLocalImport(source: string): boolean {
 
 function getImportedName(specifier: ESTree.ImportSpecifier): string {
   if (specifier.imported.type === "Identifier") return specifier.imported.name
+
   return specifier.imported.value
 }
 
@@ -16,17 +17,6 @@ function getImportedName(specifier: ESTree.ImportSpecifier): string {
  * Keep dependency-bearing Effect service constructors local to their owning capability modules.
  */
 const rule: Rule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow project-local make<CapabilityName> imports outside test and spec files.",
-    },
-    messages: {
-      serviceConstructorImport:
-        'Do not import Effect service constructor "{{name}}" into runtime code. Import the owning Layer, yield the contextual service, and allow its requirements to propagate to the composition root.',
-    },
-  },
   create(context) {
     const isTestFile = TEST_FILE.test(context.filename.replaceAll("\\", "/"))
 
@@ -38,16 +28,28 @@ const rule: Rule = {
           if (specifier.type !== "ImportSpecifier") continue
 
           const importedName = getImportedName(specifier)
+
           if (!SERVICE_CONSTRUCTOR_NAME.test(importedName)) continue
 
           context.report({
-            node: specifier,
-            messageId: "serviceConstructorImport",
             data: { name: importedName },
+            messageId: "serviceConstructorImport",
+            node: specifier,
           })
         }
       },
     }
+  },
+  meta: {
+    docs: {
+      description:
+        "Disallow project-local make<CapabilityName> imports outside test and spec files.",
+    },
+    messages: {
+      serviceConstructorImport:
+        'Do not import Effect service constructor "{{name}}" into runtime code. Import the owning Layer, yield the contextual service, and allow its requirements to propagate to the composition root.',
+    },
+    type: "problem",
   },
 }
 

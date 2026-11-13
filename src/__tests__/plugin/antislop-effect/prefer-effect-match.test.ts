@@ -9,11 +9,6 @@ RuleTester.it = it
 RuleTester.itOnly = it.only
 
 new RuleTester().run("prefer-effect-match", plugin.rules["prefer-effect-match"], {
-  valid: [
-    'kind === "a" ? first : fallback;',
-    'kind === "a" ? first : other === "b" ? second : fallback;',
-    "condition ? first : otherCondition ? second : fallback;",
-  ],
   invalid: [
     {
       code: 'kind === "a" ? first : kind === "b" ? second : fallback;',
@@ -23,5 +18,10 @@ new RuleTester().run("prefer-effect-match", plugin.rules["prefer-effect-match"],
       code: "`a` !== kind ? first : `b` === kind ? second : fallback;",
       errors: [{ messageId: "preferMatch" }],
     },
+  ],
+  valid: [
+    'kind === "a" ? first : fallback;',
+    'kind === "a" ? first : other === "b" ? second : fallback;',
+    "condition ? first : otherCondition ? second : fallback;",
   ],
 })

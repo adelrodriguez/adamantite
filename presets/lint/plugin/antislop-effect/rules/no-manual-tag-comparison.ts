@@ -7,8 +7,25 @@ import {
 } from "../shared/tagged-values.ts"
 
 const rule: Rule = {
+  createOnce(context) {
+    return {
+      BinaryExpression(node) {
+        if (tagMemberFromComparison(node) === undefined || isInsideBroadEffectHandler(node)) {
+          return
+        }
+
+        context.report({ messageId: "manualComparison", node })
+      },
+      SwitchStatement(node) {
+        if (!isTagMember(node.discriminant) || isInsideBroadEffectHandler(node)) {
+          return
+        }
+
+        context.report({ messageId: "manualSwitch", node })
+      },
+    }
+  },
   meta: {
-    type: "problem",
     docs: {
       description: "Use Effect Match or Predicate helpers instead of manually branching on `_tag`.",
     },
@@ -18,22 +35,7 @@ const rule: Rule = {
       manualSwitch:
         "Use Match.value(value).pipe(Match.tag/Match.tags/Match.tagsExhaustive) or the tagged enum `$match` helper instead of switching on `_tag`.",
     },
-  },
-  createOnce(context) {
-    return {
-      BinaryExpression(node) {
-        if (tagMemberFromComparison(node) === undefined || isInsideBroadEffectHandler(node)) {
-          return
-        }
-        context.report({ node, messageId: "manualComparison" })
-      },
-      SwitchStatement(node) {
-        if (!isTagMember(node.discriminant) || isInsideBroadEffectHandler(node)) {
-          return
-        }
-        context.report({ node, messageId: "manualSwitch" })
-      },
-    }
+    type: "problem",
   },
 }
 

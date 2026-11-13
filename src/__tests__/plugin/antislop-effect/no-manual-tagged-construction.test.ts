@@ -12,16 +12,6 @@ new RuleTester().run(
   "no-manual-tagged-construction",
   plugin.rules["no-manual-tagged-construction"],
   {
-    valid: [
-      'Match.when({ _tag: "Ready" }, handleReady);',
-      'Match.not({ "_tag": "Pending" });',
-      "Ready.make({ value });",
-      "new NotFound({ id });",
-      "({ _tag: tag, value });",
-      'PlatformError.systemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
-      'new PlatformError.SystemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
-      'new HeaderParseErrorReason({ _tag: "InvalidHttpDate", input });',
-    ],
     invalid: [
       {
         code: 'const value = { _tag: "Ready", payload };',
@@ -35,6 +25,16 @@ new RuleTester().run(
         code: 'Effect.fail({ _tag: "NotFound", path });',
         errors: [{ messageId: "manualConstruction" }],
       },
+    ],
+    valid: [
+      'Match.when({ _tag: "Ready" }, handleReady);',
+      'Match.not({ "_tag": "Pending" });',
+      "Ready.make({ value });",
+      "new NotFound({ id });",
+      "({ _tag: tag, value });",
+      'PlatformError.systemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
+      'new PlatformError.SystemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
+      'new HeaderParseErrorReason({ _tag: "InvalidHttpDate", input });',
     ],
   }
 )

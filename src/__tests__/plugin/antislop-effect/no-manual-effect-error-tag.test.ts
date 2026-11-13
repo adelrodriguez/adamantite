@@ -8,7 +8,9 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-new RuleTester().run("no-manual-effect-error-tag", plugin.rules["no-manual-effect-error-tag"], {
+const tester = new RuleTester()
+
+tester.run("no-manual-effect-error-tag", plugin.rules["no-manual-effect-error-tag"], {
   invalid: [
     {
       code: 'Effect.catch((error) => error._tag === "NotFound" ? recover : fail);',

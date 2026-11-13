@@ -2,11 +2,11 @@ import type { ESTree, Rule } from "@oxlint/plugins"
 
 const equalityOperators = new Set(["==", "===", "!=", "!=="])
 
+const isLiteral = (node: ESTree.Node): boolean =>
+  node.type === "Literal" || (node.type === "TemplateLiteral" && node.expressions.length === 0)
+
 const rule: Rule = {
   createOnce(context) {
-    const isLiteral = (node: ESTree.Node): boolean =>
-      node.type === "Literal" || (node.type === "TemplateLiteral" && node.expressions.length === 0)
-
     const comparedValue = (node: ESTree.Expression): string | undefined => {
       if (node.type !== "BinaryExpression" || !equalityOperators.has(node.operator)) {
         return undefined
@@ -21,7 +21,7 @@ const rule: Rule = {
 
     return {
       ConditionalExpression(node) {
-        if (node.parent?.type === "ConditionalExpression") return
+        if (node.parent.type === "ConditionalExpression") return
         const value = comparedValue(node.test)
 
         if (value === undefined) return

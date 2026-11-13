@@ -8,7 +8,9 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-new RuleTester().run("no-manual-tag-comparison", plugin.rules["no-manual-tag-comparison"], {
+const tester = new RuleTester()
+
+tester.run("no-manual-tag-comparison", plugin.rules["no-manual-tag-comparison"], {
   invalid: [
     {
       code: 'value._tag === "Ready";',

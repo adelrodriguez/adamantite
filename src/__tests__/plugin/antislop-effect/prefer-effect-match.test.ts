@@ -8,7 +8,9 @@ RuleTester.it = it
 
 RuleTester.itOnly = it.only
 
-new RuleTester().run("prefer-effect-match", plugin.rules["prefer-effect-match"], {
+const tester = new RuleTester()
+
+tester.run("prefer-effect-match", plugin.rules["prefer-effect-match"], {
   invalid: [
     {
       code: 'kind === "a" ? first : kind === "b" ? second : fallback;',

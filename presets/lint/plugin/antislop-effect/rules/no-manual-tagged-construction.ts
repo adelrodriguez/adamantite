@@ -32,7 +32,7 @@ const isTagInputConstructorArgument = (node: ESTree.ObjectExpression): boolean =
   const call = node.parent
 
   if (
-    (call?.type !== "CallExpression" && call?.type !== "NewExpression")
+    (call.type !== "CallExpression" && call.type !== "NewExpression")
     || !call.arguments.includes(node)
   ) {
     return false

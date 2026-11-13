@@ -85,10 +85,17 @@ function isArrayAnnotation(type: ESTree.TSType): boolean {
  * Recognize local array evidence; unknown receivers and iterator pipelines are deliberately
  * excluded.
  */
-export function isKnownArrayExpression(
+export function isKnownArrayExpression(sourceCode: SourceCode, expression: ESTree.Node): boolean {
+  return isKnownArrayExpressionFrom(sourceCode, expression, new Set())
+}
+
+/**
+ * Follow bindings to array evidence, and stop at a binding that `visited` already holds.
+ */
+function isKnownArrayExpressionFrom(
   sourceCode: SourceCode,
   expression: ESTree.Node,
-  visited = new Set<Variable>()
+  visited: Set<Variable>
 ): boolean {
   const node = unwrapArrayExpression(expression)
 
@@ -109,7 +116,7 @@ export function isKnownArrayExpression(
         "toReversed",
         "toSpliced",
       ].includes(method.name)
-      && isKnownArrayExpression(sourceCode, method.object, visited)
+      && isKnownArrayExpressionFrom(sourceCode, method.object, visited)
     )
   }
 
@@ -136,7 +143,7 @@ export function isKnownArrayExpression(
       && definition.node.parent.type === "VariableDeclaration"
       && definition.node.parent.kind === "const"
     ) {
-      return isKnownArrayExpression(sourceCode, definition.node.init, visited)
+      return isKnownArrayExpressionFrom(sourceCode, definition.node.init, visited)
     }
   }
 

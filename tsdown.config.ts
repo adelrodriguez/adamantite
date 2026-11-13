@@ -20,13 +20,11 @@ export default defineConfig([
     copy: [
       { from: ["presets/tsconfig.json", "presets/typescript.json"], to: "dist/presets" },
       { from: "presets/typescript/resets/*", to: "dist/presets/typescript/resets" },
+      // The anti-slop rules started as copies of MIT-licensed code, so their notices ship with them.
+      { from: "presets/lint/plugin/antislop/license.md", to: "dist/presets/lint/plugin/antislop" },
       {
-        from: [
-          "presets/lint/vendor/antislop/plugin.mjs",
-          "presets/lint/vendor/antislop/plugin.d.mts",
-          "presets/lint/vendor/antislop/license.md",
-        ],
-        to: "dist/presets/lint/vendor/antislop",
+        from: "presets/lint/plugin/antislop/stylistic/license.md",
+        to: "dist/presets/lint/plugin/antislop/stylistic",
       },
       {
         from: [

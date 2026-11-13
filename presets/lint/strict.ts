@@ -4,10 +4,10 @@ import type { OxlintConfig } from "oxlint"
 // validation or narrowing instead of assertions, each suppression gives its reason, no debug
 // console call stays, and no task comment marks a workaround. Use it with any other preset.
 //
-// The anti-slop plugin (https://github.com/dmmulroy/anti-slop) holds most of the type rules: no
-// `unknown` in signatures, no Reflect-based access, no module mocking, and readable spacing.
-// Upstream is not published to npm, so Adamantite ships a bundled build in vendor/antislop/.
-// scripts/vendor-plugins.ts regenerates it.
+// The anti-slop plugin holds most of the type rules: no `unknown` in signatures, no Reflect-based
+// access, no module mocking, and readable spacing. Its rules started as a copy of
+// https://github.com/dmmulroy/anti-slop and now live in plugin/antislop/ as first-party code. They
+// keep the `anti-slop` namespace, so project settings and suppressions keep working.
 //
 // The source tree holds `plugin/index.ts` and the dist tree holds `plugin/index.js`, so the plugin
 // extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the
@@ -22,7 +22,7 @@ const config: OxlintConfig = {
     },
     {
       name: "anti-slop",
-      specifier: new URL("vendor/antislop/plugin.mjs", import.meta.url).href,
+      specifier: new URL(`plugin/antislop/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
     },
   ],
   overrides: [

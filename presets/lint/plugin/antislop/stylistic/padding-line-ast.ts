@@ -6,7 +6,7 @@ type Token = SyntaxToken | Comment
 /**
  * Line terminators recognized by the upstream padding matcher.
  */
-export const LINEBREAKS = new Set(["\r\n", "\r", "\n", "\u2028", "\u2029"])
+export const LINEBREAKS: ReadonlySet<string> = new Set(["\r\n", "\r", "\n", "\u2028", "\u2029"])
 
 /**
  * Test a closing brace without treating comment text as punctuation.

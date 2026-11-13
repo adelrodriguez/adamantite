@@ -26,3 +26,4 @@
 - [ADR 0024: Layer maps nest with explicit imports](0024-layer-maps-nest-with-explicit-imports.md)
 - [ADR 0025: The strict preset absorbs the anti-slop rules](0025-strict-absorbs-anti-slop.md)
 - [ADR 0026: The TypeScript preset owns its type resets](0026-typescript-preset-owns-type-resets.md)
+- [ADR 0027: Adamantite owns the anti-slop rules](0027-adamantite-owns-the-anti-slop-rules.md)

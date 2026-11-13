@@ -58,6 +58,15 @@ tester.run("no-object-parameters", plugin.rules["no-object-parameters"], {
       code: "type Identity<T> = T; type Wrapped<T> = Identity<T>; function consume(value: Wrapped<object>) {}",
       errors: [error],
     },
+    // `Readonly`, `NonNullable`, and an intersection with `{}` leave `object` as broad as before.
+    { code: "function visit(node: Readonly<object>) {}", errors: [error] },
+    { code: "function visit(node: NonNullable<object>) {}", errors: [error] },
+    { code: "function visit(node: globalThis.Readonly<object>) {}", errors: [error] },
+    { code: "function visit(node: Readonly<NonNullable<object>> | null) {}", errors: [error] },
+    { code: "type Node = Readonly<object>; function visit(node: Node) {}", errors: [error] },
+    { code: "function visit(node: object & {}) {}", errors: [error] },
+    { code: "function visit(node: {} & object & {}) {}", errors: [error] },
+    { code: "type Empty = {}; function visit(node: object & Empty) {}", errors: [error] },
   ],
   valid: [
     "declare const records: WeakMap<WeakKey, string>; function getEvaluatorRecord(evaluator: WeakKey) { return records.get(evaluator); }",
@@ -76,5 +85,10 @@ tester.run("no-object-parameters", plugin.rules["no-object-parameters"], {
     "type Payload = object; function outer() { type Payload = { readonly id: string }; function consume(value: Payload) {} }",
     "type Identity<T> = T; function consume<Identity>(value: Identity) {}",
     "function one() { type Payload = object; } function two() { function consume(value: Payload) {} }",
+    "type Readonly<T> = { readonly value: T }; function visit(node: Readonly<object>) {}",
+    "interface Owner { readonly id: string } function visit(node: Readonly<Owner>) {}",
+    "interface Owner { readonly id: string } function visit(node: object & Owner) {}",
+    "function visit(node: object & { readonly id: string }) {}",
+    "function visit(node: {} & {}) {}",
   ],
 })

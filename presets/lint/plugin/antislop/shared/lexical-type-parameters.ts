@@ -14,17 +14,19 @@ function collectInferTypeParameterNames(
 }
 
 /**
- * Collect type binders that are in scope at a node and can shadow module aliases.
+ * Collect type binders that are in scope at a node and can shadow module aliases. With `outer`,
+ * collect only the binders below that ancestor, which shadow its own type parameters.
  */
 export function lexicalTypeParameterNames(
   node: ESTree.Node,
-  visitorKeys: VisitorKeys
+  visitorKeys: VisitorKeys,
+  outer?: ESTree.Node
 ): ReadonlySet<string> {
   const names = new Set<string>()
   let descendant: ESTree.Node = node
   let current: ESTree.Node = node
 
-  while (current.type !== "Program") {
+  while (current.type !== "Program" && current !== outer) {
     if ("typeParameters" in current) {
       for (const parameter of current.typeParameters?.params ?? []) {
         names.add(parameter.name.name)

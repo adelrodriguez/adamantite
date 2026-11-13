@@ -3,10 +3,15 @@ import type { ESTree, Rule } from "@oxlint/plugins"
 import {
   classifyUnsafeDictionary,
   classifyUnsafeDictionaryValue,
+  classifyUnsafeHeritage,
   createTypeEnvironment,
   type TypeEnvironment,
 } from "../shared/dictionary-types.ts"
-import { hasVisibleTypeBinding, visibleTypeAlias } from "../shared/type-alias-resolution.ts"
+import {
+  hasVisibleTypeBinding,
+  namedTypeReference,
+  visibleTypeAlias,
+} from "../shared/type-alias-resolution.ts"
 
 const typeNodeKinds: ReadonlySet<string> = new Set([
   "JSDocNonNullableType",
@@ -52,8 +57,10 @@ function isTypeNode(node: ESTree.Node): node is ESTree.TSType {
   return typeNodeKinds.has(node.type)
 }
 
-function typeReferenceName(type: ESTree.TSTypeReference): string | null {
-  return type.typeName.type === "Identifier" ? type.typeName.name : null
+type Heritage = ESTree.TSClassImplements | ESTree.TSInterfaceHeritage
+
+function isHeritage(node: ESTree.Node): node is Heritage {
+  return node.type === "TSClassImplements" || node.type === "TSInterfaceHeritage"
 }
 
 function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
@@ -69,11 +76,12 @@ function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
 
 function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false
-  const name = typeReferenceName(node)
+  const reference = namedTypeReference(node)
 
   return (
-    name !== null
-    && visibleTypeAlias(name, node, environment.typeAliases) !== null
+    reference !== null
+    && !reference.global
+    && visibleTypeAlias(reference.name, node, environment.typeAliases) !== null
     && !isInsideTypeAliasDeclaration(node)
   )
 }
@@ -90,12 +98,12 @@ function isTypeFilterArgument(
   const reference = parent.parent
 
   if (reference.type !== "TSTypeReference") return false
-  const name = typeReferenceName(reference)
+  const filter = namedTypeReference(reference)
 
   return (
-    name !== null
-    && typeFilters.has(name)
-    && !hasVisibleTypeBinding(name, reference, environment.typeAliases)
+    filter !== null
+    && typeFilters.has(filter.name)
+    && (filter.global || !hasVisibleTypeBinding(filter.name, reference, environment.typeAliases))
   )
 }
 
@@ -132,6 +140,8 @@ function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): bo
 
   while (current.type !== "Program") {
     if (isTypeNode(current) && classifyUnsafeDictionary(current, environment) !== null) return false
+
+    if (isHeritage(current) && classifyUnsafeHeritage(current, environment) !== null) return false
     current = current.parent
   }
 
@@ -157,10 +167,18 @@ const rule: Rule = {
       report(node, unsafe.unsafeValue)
     }
 
+    const reportUnsafeHeritage = (node: Heritage) => {
+      if (environment === null) return
+      const unsafe = classifyUnsafeHeritage(node, environment)
+
+      if (unsafe !== null) report(node, unsafe.unsafeValue)
+    }
+
     return {
       Program(node) {
         environment = createTypeEnvironment(node, context.sourceCode.visitorKeys)
       },
+      TSClassImplements: reportUnsafeHeritage,
       TSIndexSignature(node) {
         if (environment === null || node.parent.type === "TSTypeLiteral") return
 
@@ -171,6 +189,7 @@ const rule: Rule = {
 
         if (unsafe !== null) report(node, unsafe.unsafeValue)
       },
+      TSInterfaceHeritage: reportUnsafeHeritage,
       TSMappedType: reportIfUnsafe,
       TSTypeLiteral: reportIfUnsafe,
       TSTypeReference: reportIfUnsafe,

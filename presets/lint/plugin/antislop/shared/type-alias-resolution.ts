@@ -186,8 +186,56 @@ export function hasVisibleTypeBinding(
   )
 }
 
-function typeReferenceName(type: ESTree.TSTypeReference): string | null {
-  return type.typeName.type === "Identifier" ? type.typeName.name : null
+/**
+ * A written use of a named type, in a type annotation or in a heritage clause.
+ */
+export type NamedTypeReference = {
+  /**
+   * The use names the global type through `globalThis`, so no local declaration shadows it.
+   */
+  readonly global: boolean
+  readonly name: string
+  readonly node: ESTree.Node
+  readonly typeArguments: readonly ESTree.TSType[]
+}
+
+type TypeReferenceNode =
+  | ESTree.TSClassImplements
+  | ESTree.TSInterfaceHeritage
+  | ESTree.TSTypeReference
+
+function isGlobalThis(node: ESTree.Node): boolean {
+  return node.type === "Identifier" && node.name === "globalThis"
+}
+
+function globalTypeName(target: ESTree.Expression | ESTree.TSTypeName): string | null {
+  if (target.type === "TSQualifiedName") {
+    return isGlobalThis(target.left) ? target.right.name : null
+  }
+
+  return target.type === "MemberExpression"
+    && !target.computed
+    && target.property.type === "Identifier"
+    && isGlobalThis(target.object)
+    ? target.property.name
+    : null
+}
+
+/**
+ * Read the name and type arguments of a type use, such as `Record<K, V>`, `globalThis.Record<K,
+ * V>`, or the `Record<K, V>` of `interface A extends Record<K, V>`.
+ */
+export function namedTypeReference(node: TypeReferenceNode): NamedTypeReference | null {
+  const target = node.type === "TSTypeReference" ? node.typeName : node.expression
+  const typeArguments = node.typeArguments?.params ?? []
+
+  if (target.type === "Identifier") {
+    return { global: false, name: target.name, node, typeArguments }
+  }
+
+  const name = globalTypeName(target)
+
+  return name === null ? null : { global: true, name, node, typeArguments }
 }
 
 /**
@@ -233,7 +281,8 @@ export function resolvedTypeMatches(
     resolvingAliases: ReadonlySet<ESTree.TSTypeAliasDeclaration>
   ): boolean => {
     if (current.type === "TSTypeReference") {
-      const name = typeReferenceName(current)
+      const reference = namedTypeReference(current)
+      const name = reference === null || reference.global ? null : reference.name
 
       if (name !== null) {
         const substitution = substitutions.get(name)

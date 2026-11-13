@@ -78,7 +78,8 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
       code: "type Unsafe = Record<string, unknown>; type AlsoUnsafe = Unsafe; const x: Unsafe = {};",
       errors: 2,
     },
-    { code: "type Index<T = unknown> = Record<string, T>; type A = Index;", errors: 1 },
+    // An unsafe default makes the declaration unsafe, and the alias that uses it reports too.
+    { code: "type Index<T = unknown> = Record<string, T>; type A = Index;", errors: 2 },
     {
       code: "type Index<T, U = T> = Record<string, U>; type A = Index<string, unknown>;",
       errors: 1,
@@ -90,7 +91,7 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     },
     {
       code: "type Marker<T> = { readonly __brand?: never }; type Index<T, U = Marker<T>> = Record<string, U>; type A = Index<Item>;",
-      errors: 1,
+      errors: 2,
     },
     {
       code: "function outer() { type Identity<T> = T; type A = Record<string, Identity<unknown>>; }",
@@ -136,6 +137,7 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
       errors: [error],
     },
     { code: "type A = Record<string, globalThis.Readonly<unknown>>;", errors: [error] },
+    { code: "class Bag<T = unknown> implements Record<string, T> { [key: string]: T }", errors: 2 },
   ],
   valid: [
     "type Commands = Record<string, Command>;",
@@ -178,5 +180,7 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     "type Bag<T = Command> = Record<string, T>; const a: Bag = {};",
     "interface Bag<T = Command> { [key: string]: T }",
     "type A = globalThis.Record<string, Command>;",
+    "interface Bag<T = unknown> { read<T>(input: Record<string, T>): T }",
+    "export type Plain<T> = globalThis.Extract<T, Record<string, unknown>>;",
   ],
 })

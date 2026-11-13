@@ -28,11 +28,11 @@ function getFirstPartyRules(rules: OxlintConfig["rules"]) {
 
 const presetRules = getFirstPartyRules(strict.rules)
 
-// The preset enables some anti-slop rules for every file and the assertion rules only in tests.
-const antislopRules = [
-  ...Object.keys(strict.rules ?? {}),
-  ...(strict.overrides ?? []).flatMap((override) => Object.keys(override.rules ?? {})),
-].filter((name) => name.startsWith("anti-slop/"))
+// The preset enables some anti-slop rules for every file and the assertion rules only in tests. An
+// override that turns a rule off, such as the override for declaration files, enables nothing.
+const antislopRules = [strict.rules, ...(strict.overrides ?? []).map((override) => override.rules)]
+  .flatMap((rules) => Object.entries(rules ?? {}))
+  .flatMap(([name, setting]) => (name.startsWith("anti-slop/") && setting !== "off" ? [name] : []))
 
 // These rules need options from the target project, such as a layer map, so the project turns them
 // on.

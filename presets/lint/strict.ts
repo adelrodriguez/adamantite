@@ -14,6 +14,18 @@ const config: OxlintConfig = {
   jsPlugins: [firstPartyPlugin("adamantite"), firstPartyPlugin("anti-slop")],
   overrides: [
     {
+      // A declaration file states the types of code that it does not hold, such as a built-in API or
+      // a package without types. It cannot change a signature that takes or returns `unknown`,
+      // `object`, or a dictionary.
+      files: ["**/*.d.{ts,mts,cts}"],
+      rules: {
+        "anti-slop/no-object-parameters": "off",
+        "anti-slop/no-unknown-parameters": "off",
+        "anti-slop/no-unknown-returns": "off",
+        "anti-slop/no-unsafe-dictionary-type": "off",
+      },
+    },
+    {
       // Tests build partial fixtures and doubles, where an assertion is often the clearest option.
       // Outside tests, `consistent-type-assertions` already reports each assertion once. In tests,
       // each assertion states its reason, and no chain or widening hides the source type.

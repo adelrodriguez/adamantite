@@ -226,7 +226,7 @@ src/
     assessment/     integration registry, project assessment, agent prompt
     toolchain/      check, fix, and analyze operations
     hardening/      harden context, harden prompt, rule facts, and rule trials
-  terminal/         user prompting, findings, resolution menu, and title output
+  terminal/         status output, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
   oxlint.ts         entry that runs Oxlint with the project's Oxlint runtime

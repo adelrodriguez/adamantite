@@ -190,6 +190,14 @@ function functionBoundary(node: ESTree.Node): ESTree.Node | null {
   return null
 }
 
+/**
+ * Reports whether a node is inside a function boundary, or anywhere in the file when the boundary
+ * is the module. A nested function sees the same value of a const binding that has no writes.
+ */
+function isInsideBoundary(node: ESTree.Node, boundary: ESTree.Node | null): boolean {
+  return boundary === null || (node.start >= boundary.start && node.end <= boundary.end)
+}
+
 function resolvedVariableForIdentifier(
   scopes: ReadonlyArray<{
     readonly references: ReadonlyArray<{
@@ -371,7 +379,7 @@ const rule: Rule = {
       if (
         widened === null
         || node.start <= widened.declaredAt
-        || functionBoundary(node) !== widened.boundary
+        || !isInsideBoundary(node, widened.boundary)
         || !assertionIsNarrower(
           context.sourceCode.text,
           widened.broadKind,

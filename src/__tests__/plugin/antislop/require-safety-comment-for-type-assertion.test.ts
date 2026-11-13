@@ -40,6 +40,11 @@ tester.run(
         code: "// SAFE+: The caller parsed this value.\nconst value = input as User;",
         options: [{ markers: ["SAFE+"] }],
       },
+      {
+        code: "// INVARIANT: The caller parsed this value.\nconst value = input as User;",
+        name: "marker with outer spaces",
+        options: [{ markers: [" INVARIANT "] }],
+      },
     ],
   }
 )

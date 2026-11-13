@@ -29,32 +29,28 @@ describe("Toolchain", () => {
     })
   )
 
-  it.effect("report only the second round of a fix", () =>
+  it.effect("format without output before the lint stage", () =>
     Effect.gen(function* () {
       const invocations: CommandRunOptions[] = []
 
       const runner = CommandRunner.make((options) => {
         invocations.push(options)
 
-        // The first round lint still has the reports that the second round fixes.
-        return Effect.succeed(ChildProcessSpawner.ExitCode(invocations.length === 2 ? 1 : 0))
+        // The first format fails, and the fix still runs the other stages and succeeds.
+        return Effect.succeed(ChildProcessSpawner.ExitCode(invocations.length === 1 ? 2 : 0))
       })
 
       yield* Toolchain.fix({ cwd: "/target", files: ["index.ts"] }).pipe(
         Effect.provideService(CommandRunner, runner)
       )
 
-      const quiet = { stderr: "ignore", stdout: "ignore" }
-
       expect(invocations).toMatchObject([
-        { ...quiet, args: ["--write", "index.ts"], command: "oxfmt" },
-        { ...quiet, args: [expect.any(String), "--fix", "index.ts"], command: "node" },
-        { ...quiet, args: ["--write", "index.ts"], command: "oxfmt" },
+        { args: ["--write", "index.ts"], command: "oxfmt", stderr: "ignore", stdout: "ignore" },
         { args: [expect.any(String), "--fix", "index.ts"], command: "node" },
         { args: ["--write", "index.ts"], command: "oxfmt" },
       ])
-      // The second round prints its output, so the user sees the reports that remain.
-      expect(invocations.slice(3).map((options) => options.stdout)).toStrictEqual([
+      // The lint and last format stages print their output.
+      expect(invocations.slice(1).map((options) => options.stdout)).toStrictEqual([
         undefined,
         undefined,
       ])

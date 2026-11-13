@@ -4,7 +4,6 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
-import type { CommandRunOptions } from "#lib/execution/command-runner.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
@@ -14,38 +13,42 @@ import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
 const OXLINT = getOxlintCommand(process.cwd())
 
 /**
- * The invocations of a fix with both stages: a round without output, then the reported round.
+ * The format stage that runs without output before the lint stage.
  */
-function toFixRounds(lint: CommandRunOptions, format: CommandRunOptions) {
-  const quiet = { stderr: "ignore", stdout: "ignore" } as const
-
-  return [{ ...format, ...quiet }, { ...lint, ...quiet }, { ...format, ...quiet }, lint, format]
+function quietFormat(args: readonly string[]) {
+  return {
+    args: ["--write", ...args],
+    command: "oxfmt",
+    cwd: process.cwd(),
+    stderr: "ignore",
+    stdout: "ignore",
+    title: "✨ Formatting",
+  }
 }
 
 describe("fix", () => {
   describe("default invocation", () => {
-    it.effect("run a round without output, then lint before formatting", () =>
+    it.effect("format without output, then lint before formatting", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual(
-          toFixRounds(
-            {
-              ...OXLINT,
-              args: [...OXLINT.args, "--fix"],
-              title: "🔧 Fixing lint issues",
-            },
-            {
-              args: ["--write"],
-              command: "oxfmt",
-              cwd: process.cwd(),
-              title: "✨ Formatting",
-            }
-          )
-        )
+        expect(runner.invocations).toStrictEqual([
+          quietFormat([]),
+          {
+            ...OXLINT,
+            args: [...OXLINT.args, "--fix"],
+            title: "🔧 Fixing lint issues",
+          },
+          {
+            args: ["--write"],
+            command: "oxfmt",
+            cwd: process.cwd(),
+            title: "✨ Formatting",
+          },
+        ])
       })
     )
   })
@@ -61,13 +64,9 @@ describe("fix", () => {
         const exit = yield* runCommand(fixCommand, args, { layers: [runner.layer] })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        const lintArguments = [...OXLINT.args, "--fix", "--fix-suggestions", "--fix-dangerously"]
-
         expect(
-          runner.invocations
-            .filter((invocation) => invocation.name === "oxlint")
-            .map((invocation) => invocation.args)
-        ).toStrictEqual([lintArguments, lintArguments])
+          runner.invocations.find((invocation) => invocation.name === "oxlint")?.args
+        ).toStrictEqual([...OXLINT.args, "--fix", "--fix-suggestions", "--fix-dangerously"])
       })
     )
   })
@@ -145,21 +144,20 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual(
-          toFixRounds(
-            {
-              ...OXLINT,
-              args: [...OXLINT.args, "--fix", join(files.root, "index.ts")],
-              title: "🔧 Fixing lint issues",
-            },
-            {
-              args: ["--write", join(files.root, "index.ts")],
-              command: "oxfmt",
-              cwd: process.cwd(),
-              title: "✨ Formatting",
-            }
-          )
-        )
+        expect(runner.invocations).toStrictEqual([
+          quietFormat([join(files.root, "index.ts")]),
+          {
+            ...OXLINT,
+            args: [...OXLINT.args, "--fix", join(files.root, "index.ts")],
+            title: "🔧 Fixing lint issues",
+          },
+          {
+            args: ["--write", join(files.root, "index.ts")],
+            command: "oxfmt",
+            cwd: process.cwd(),
+            title: "✨ Formatting",
+          },
+        ])
       })
     )
   })
@@ -175,21 +173,20 @@ describe("fix", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(runner.invocations).toStrictEqual(
-          toFixRounds(
-            {
-              ...OXLINT,
-              args: [...OXLINT.args, "--fix", "--fix-dangerously", "--deny-warnings"],
-              title: "🔧 Fixing lint issues",
-            },
-            {
-              args: ["--write"],
-              command: "oxfmt",
-              cwd: process.cwd(),
-              title: "✨ Formatting",
-            }
-          )
-        )
+        expect(runner.invocations).toStrictEqual([
+          quietFormat([]),
+          {
+            ...OXLINT,
+            args: [...OXLINT.args, "--fix", "--fix-dangerously", "--deny-warnings"],
+            title: "🔧 Fixing lint issues",
+          },
+          {
+            args: ["--write"],
+            command: "oxfmt",
+            cwd: process.cwd(),
+            title: "✨ Formatting",
+          },
+        ])
       })
     )
   })
@@ -197,8 +194,7 @@ describe("fix", () => {
   describe("error handling", () => {
     it.effect("run formatting after linting fails and report the first failure", () =>
       Effect.gen(function* () {
-        // The round without output succeeds, and the reported round fails in both stages.
-        const runner = createRunnerTestContext([0, 0, 0, 1, 2])
+        const runner = createRunnerTestContext([0, 1, 2])
 
         const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
 
@@ -208,14 +204,13 @@ describe("fix", () => {
         expect(error).toMatchObject({ command: "node", exitCode: 1 })
         expect(
           runner.invocations.map((invocation) => invocation.name ?? invocation.command)
-        ).toStrictEqual(["oxfmt", "oxlint", "oxfmt", "oxlint", "oxfmt"])
+        ).toStrictEqual(["oxfmt", "oxlint", "oxfmt"])
       })
     )
 
-    it.effect("ignore failures of the round without output", () =>
+    it.effect("ignore a failure of the first format stage", () =>
       Effect.gen(function* () {
-        // The first lint still reports what the reported round fixes.
-        const runner = createRunnerTestContext([2, 1, 2, 0, 0])
+        const runner = createRunnerTestContext([2, 0, 0])
 
         const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
 
@@ -225,7 +220,7 @@ describe("fix", () => {
 
     it.effect("report a formatting failure after linting succeeds", () =>
       Effect.gen(function* () {
-        const runner = createRunnerTestContext([0, 0, 0, 0, 2])
+        const runner = createRunnerTestContext([0, 0, 2])
 
         const exit = yield* runCommand(fixCommand, [], { layers: [runner.layer] })
 

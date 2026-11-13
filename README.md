@@ -149,7 +149,9 @@ adamantite check --only format
 
 ### `adamantite fix`
 
-Apply safe Oxlint fixes, then format the files with Oxfmt. Suggested and dangerous fixes require explicit flags:
+Format the files with Oxfmt, apply safe Oxlint fixes, then format again. Lint runs on formatted
+code, so a rule that reads line breaks sees the lines that Oxfmt writes. The first format shows no
+output. Suggested and dangerous fixes require explicit flags:
 
 ```sh
 adamantite fix
@@ -158,10 +160,8 @@ adamantite fix --dangerous
 adamantite fix --all
 ```
 
-`fix` runs the two stages in two rounds, because one fix can cause a new report. For example,
-Oxfmt can wrap a line, and the line then needs a blank line before it. The first round shows no
-output. The second round shows the reports that remain. After one `fix`, `adamantite check`
-reports only the problems that `fix` cannot repair.
+Oxlint applies one pass of fixes. If one fix causes a report that another fix repairs, run `fix`
+again. [oxc#16118](https://github.com/oxc-project/oxc/issues/16118) tracks repeated fix passes.
 
 Use `--only` to run one stage. Arguments after `--` go to that stage, and to Oxlint when
 both run:
@@ -745,8 +745,8 @@ same `anti-slop/*` names.
   Fix the code now, or track the work in your issue tracker. Do not only rename the marker.
 - The anti-slop rules ask the code to decode input at its boundary into types that it owns.
   They report `unknown` in function signatures and type aliases, loose dictionary types, a
-  `typeof` check outside a type predicate, `Reflect.get` without a receiver, `Reflect.apply`,
-  and Vitest or Jest module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
+  `typeof` check outside a type predicate, `Reflect.get` and `Reflect.apply`, and Vitest or Jest
+  module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
   accumulator, `shape` in symbol names, and a missing blank line between statement groups.
 - In test files, where type assertions are allowed, `anti-slop/require-safety-comment-for-type-assertion`
   requires a `SAFETY:` comment on each assertion, and `anti-slop/no-chained-type-assertions` and

@@ -64,11 +64,10 @@ export const check = Effect.fn("Toolchain.check")(function* ({
 })
 
 /**
- * Fixes lint issues with Oxlint, then formats with Oxfmt, in two rounds. The first round formats,
- * fixes, and formats again without output. The second round fixes and formats, and its result is
- * the result of the operation: both stages run, and the operation fails with the first failure. The
- * forwarded arguments go to the lint stage, or to the stage that `only` selects, which runs one
- * time.
+ * Formats with Oxfmt, fixes lint issues with Oxlint, then formats again. The first format shows no
+ * output. The lint and last format stages both run, and the operation fails with the first failure.
+ * The forwarded arguments go to the lint stage, or to the stage that `only` selects, which runs
+ * once.
  */
 export const fix = Effect.fn("Toolchain.fix")(function* ({
   cwd,
@@ -108,17 +107,14 @@ export const fix = Effect.fn("Toolchain.fix")(function* ({
     }),
   }
 
-  // Oxlint applies one pass of fixes, and spacing rules read the line breaks that Oxfmt writes. So
-  // one fix can cause a report that only a second pass sees, such as a blank line that is missing
-  // after `no-else-return` moves a statement, or after Oxfmt wraps a line. The second round reports
-  // the same failures, so the first round ignores its own.
+  // Spacing rules decide blank lines from line breaks, and Oxfmt can wrap a line, so the lint stage
+  // reads formatted code. The last format stage reports the same problems, so this one is quiet.
+  // Oxlint applies one pass of fixes, so a fix that causes a new report still needs a second `fix`
+  // until Oxlint repeats its passes: https://github.com/oxc-project/oxc/issues/16118
   if (only === undefined) {
-    yield* Effect.forEach(
-      [stages.format, stages.lint, stages.format],
-      (stage) =>
-        runner.exitCode({ ...stage, stderr: "ignore", stdout: "ignore" }).pipe(Effect.ignore),
-      { discard: true }
-    )
+    yield* runner
+      .exitCode({ ...stages.format, stderr: "ignore", stdout: "ignore" })
+      .pipe(Effect.ignore)
   }
 
   yield* runner.runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])

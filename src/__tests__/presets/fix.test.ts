@@ -36,8 +36,8 @@ const SOURCE_RUNNER = Layer.effect(CommandRunner)(
   })
 ).pipe(Layer.provide(CommandRunner.layer), Layer.provide(NodeServices.layer))
 
-// Each case passes a fix only after another fix moves a statement or Oxfmt wraps a line, so one
-// round of lint and format left a blank line missing.
+// In each case, the spacing rule needs a blank line that appears only after another change: Oxfmt
+// wraps a line, or another lint fix moves a statement.
 const CASES = {
   "moved.ts": [
     "export function pick(a: number): number {",
@@ -93,13 +93,24 @@ describe("fix with the strict preset", () => {
     rmSync(project, { force: true, recursive: true })
   })
 
-  it.live.each(Object.keys(CASES))("leave %s in a state that check accepts", (file) =>
-    Effect.gen(function* () {
+  function fixThenCheck(file: keyof typeof CASES) {
+    return Effect.gen(function* () {
       yield* Toolchain.fix({ cwd: project, files: [file] })
 
       const checked = yield* Effect.exit(Toolchain.check({ cwd: project, files: [file] }))
 
       expect(checked).toStrictEqual(Exit.void)
     }).pipe(Effect.provide(SOURCE_RUNNER))
+  }
+
+  it.live("leave a line that Oxfmt wraps in a state that check accepts", () =>
+    fixThenCheck("wrapped.ts")
+  )
+
+  // Oxlint applies one pass of fixes, so the blank line after the statement that no-else-return
+  // moves needs a second fix. Remove `.fails` when Oxlint repeats its fix passes:
+  // https://github.com/oxc-project/oxc/issues/16118
+  it.live.fails("leave a statement that another fix moves in a state that check accepts", () =>
+    fixThenCheck("moved.ts")
   )
 })

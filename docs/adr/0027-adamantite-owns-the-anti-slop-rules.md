@@ -1,5 +1,10 @@
 # Adamantite owns the anti-slop rules
 
+Each first-party plugin now has a folder with the name of its rule namespace. Read
+`presets/lint/plugin/antislop/` below as `presets/lint/plugins/anti-slop/`, and
+`presets/lint/plugin/antislop-effect/` as `presets/lint/plugins/anti-slop-effect/`. The tests are
+in `src/__tests__/plugins/`. The decision still applies.
+
 The `strict` preset loaded a vendored bundle of anti-slop, and Adamantite fixed each upstream
 defect with a patch that `scripts/vendor-plugins.ts` applied before the build. Issue #742 showed
 that the patch path does not scale. A review of the 18 rules that `strict` enables found 14

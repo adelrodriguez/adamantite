@@ -198,9 +198,12 @@ commands do not forward arguments because they coordinate multiple operations.
 ```text
 presets/
   lint/             published Oxlint presets
-    plugin/         first-party Oxlint plugins and their rules
-      antislop/     the anti-slop rules of the strict preset
-      antislop-effect/ the anti-slop-effect rules of the effect preset
+    plugins/        first-party Oxlint plugins, one folder for each rule namespace
+      entry.ts      the jsPlugins entry of each plugin, for the presets
+      shared/       helpers that more than one plugin uses
+      adamantite/   the adamantite rules
+      anti-slop/    the anti-slop rules of the strict preset
+      anti-slop-effect/ the anti-slop-effect rules of the effect preset
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
@@ -243,7 +246,7 @@ appends the plugin package and the required presets to the hint, so a written hi
 setup text. A test fails when the list and the preset files in `presets/lint/` disagree.
 
 `package.json` exports core as `adamantite/lint` and each preset in the list as
-`adamantite/lint/<name>`. It has no wildcard export, so the first-party plugin, its rules, and
+`adamantite/lint/<name>`. It has no wildcard export, so the first-party plugins, their rules, and
 other modules below `presets/lint/` stay private. A new preset needs its own export entry. A test
 fails when the export map, the README import table, and `lintPresets` disagree, and the smoke
 test rejects each built module that the export map does not list.
@@ -310,49 +313,60 @@ Doctor's tsconfig integration asks the project's TypeScript which files a config
 package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through the
 `ChildProcessSpawner`, and it reports a library that loads the type resets. See ADR 0026.
 
-## First-party plugin
+## First-party plugins
 
-Rules that no upstream plugin provides live in Adamantite's own Oxlint plugin under
-`presets/lint/plugin/`, with one module per rule in `rules/`. The plugin-wide helpers live in
-`shared/`, which the `adamantite` and anti-slop plugins all use: `shared/options.ts` reads rule
-options for all rules, and `shared/imports.ts` finds calls of imported functions, such as
-`useState` and `React.useState`, and `shared/ast.ts` holds the AST helpers, such as the key
-reader. A layer map for `presets/lint/plugin` in the repository's `oxlint.config.ts` lets each
-plugin import `shared`, and rejects an import of another plugin's code. `index.ts` registers each
-rule under the `adamantite` namespace. Tsdown builds the plugin with the presets, so it
-ships at `dist/presets/lint/plugin/index.js`.
+Adamantite has three Oxlint plugins of its own under `presets/lint/plugins/`: `adamantite`,
+`anti-slop`, and `anti-slop-effect`. Each plugin has one folder, and the folder name is the rule
+namespace, the `meta.name` of the plugin, and the name of its fixture folder. In a plugin folder,
+`index.ts` registers the rules, `rules/` holds one module for each rule, and `shared/` holds the
+helpers that only this plugin uses. `adamantite/shared/imports.ts`, for example, finds calls of
+imported functions, such as `useState` and `React.useState`.
 
-A preset loads the plugin with a file URL from its own location. The source tree has `plugin/index.ts` and the dist tree has
-`plugin/index.js`, so the preset takes the extension from its own module URL. Rule code
-runs under the runtime that executes Oxlint in the target project, so it uses only
+`plugins/shared/` holds the helpers that more than one plugin uses: `options.ts` reads rule
+options, and `ast.ts` holds the AST helpers, such as the key reader. A helper moves there only
+when a second plugin needs it.
+
+The layer map for `presets/lint/plugins` in the repository's `oxlint.config.ts` lets each plugin
+import `plugins/shared`, and rejects an import of another plugin's code. Each plugin has its own
+map below it: `index.ts` is the entry, and `rules` imports `shared`. In `anti-slop`, `rules` also
+imports `stylistic`.
+
+A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
+such as `firstPartyPlugin("anti-slop")`. The function builds a file URL from its own location.
+The source tree has `<name>/index.ts` and the dist tree has `<name>/index.js`, so it takes the
+extension from its own module URL. Its parameter type accepts only the three namespaces.
+`entry.ts` imports no plugin code, so a preset loads no rule module.
+`src/__tests__/plugins/entry.test.ts` loads each plugin from its entry and fails when a plugin
+name and its folder name disagree. Tsdown builds the plugins with the presets, so the
+`adamantite` plugin ships at `dist/presets/lint/plugins/adamantite/index.js`.
+
+Rule code runs under the runtime that executes Oxlint in the target project, so it uses only
 runtime-neutral APIs. It imports only types from `@oxlint/plugins`, a devDependency pinned
 to the Oxlint version. The one runtime package is `oxc-resolver`, which `adamantite/layers`
-uses, and which has Node-API bindings for Node.js and Bun. `presets/lint/plugin/tsconfig.json` lets the source import rule
-modules with their `.ts` extension, which Node.js needs to load the source plugin.
+uses, and which has Node-API bindings for Node.js and Bun. `presets/lint/plugins/tsconfig.json`
+lets the source import rule modules with their `.ts` extension, which Node.js needs to load the
+source plugin.
 
-Each rule has a `RuleTester` test under `src/__tests__/plugin/<rule>.test.ts` for messages,
-locations, and options, and `valid/` and `invalid/` fixtures under
+Each rule has a `RuleTester` test under `src/__tests__/plugins/<namespace>/<rule>.test.ts` for
+messages, locations, and options, and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
 Oxlint run. Each fixture file holds one case. The namespace folder, such as `anti-slop`, lets one
 preset hold fixtures for several plugins. The harness in `src/__tests__/presets/rule-fixtures.ts`
 starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the effect preset loads the
 Effect build of Oxlint.
 
-The anti-slop rules are two more first-party plugins. The rules in
-`presets/lint/plugin/antislop/` keep the plugin name `anti-slop` and ship in the `strict` preset.
-The rules in `presets/lint/plugin/antislop-effect/` keep the plugin name `anti-slop-effect` and
-ship in the `effect` preset. Both started as a copy of
+The rules in `presets/lint/plugins/anti-slop/` ship in the `strict` preset, and the rules in
+`presets/lint/plugins/anti-slop-effect/` ship in the `effect` preset. Both plugins keep the name
+of the upstream code. Both started as a copy of
 [anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`, so project settings and
 suppressions that name their rules keep working. Their rules follow the same conventions as the
-`adamantite` rules. Their RuleTester tests sit in `src/__tests__/plugin/antislop/` and
-`src/__tests__/plugin/antislop-effect/`, and
-`src/__tests__/presets/require-readable-spacing.test.ts` runs the spacing fix through the Oxlint
-CLI twice. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
-copied code. The build copies each `license.md` under `presets/lint/plugin/` to the same path in
+`adamantite` rules. `src/__tests__/presets/require-readable-spacing.test.ts` runs the spacing fix
+through the Oxlint CLI twice. Each `license.md`, and `anti-slop/stylistic/license.md`, keeps the MIT notice of the
+copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
 ship. Adamantite shipped both plugins as vendored bundles before. ADR 0027 records why they moved.
 
-The `architecture` preset loads the first-party plugin without enabling rules. Init offers it
+The `architecture` preset loads the `adamantite` plugin without enabling rules. Init offers it
 for projects that configure layer maps and import owners without the other rules of `strict`.
 The `strict` preset continues to load the same plugin.
 

@@ -135,6 +135,24 @@ describe("parseJson", () => {
 })
 
 describe("mergeConfig", () => {
+  it.effect(
+    "keep the preferred keys in their order, then add the keys that only the fallback has",
+    () =>
+      Effect.gen(function* () {
+        // The project's file lists `m`, `b`, and `a` in that order. Entries keep the order, which an
+        // object literal would lose to the key sort.
+        const preferred = Object.fromEntries([
+          ["m", true],
+          ["b", false],
+          ["a", 3],
+        ])
+
+        const merged = yield* mergeConfig({ fallback: { a: 1, z: 2 }, preferred })
+
+        expect(Object.keys(merged)).toStrictEqual(["m", "b", "a", "z"])
+      })
+  )
+
   // mergeConfig concatenates arrays on conflicts, so this property holds on array-free configs.
   const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean, Schema.Null])
 

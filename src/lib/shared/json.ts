@@ -89,8 +89,8 @@ function mergeJsonObjects(
   fallback: Schema.JsonObject
 ): Schema.JsonObject {
   const keys = [
-    ...Object.keys(fallback),
-    ...Object.keys(preferred).filter((key) => !Object.hasOwn(fallback, key)),
+    ...Object.keys(preferred),
+    ...Object.keys(fallback).filter((key) => !Object.hasOwn(preferred, key)),
   ]
 
   return Object.fromEntries(

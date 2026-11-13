@@ -28,9 +28,7 @@ const isBroadEffectCatchCall = (
   && node.callee.type === "MemberExpression"
   && node.callee.object.type === "Identifier"
   && node.callee.object.name === "Effect"
-  && !node.callee.computed
-  && node.callee.property.type === "Identifier"
-  && broadEffectCatchMethods.has(node.callee.property.name)
+  && broadEffectCatchMethods.has(staticKeyName(node.callee.property, node.callee.computed) ?? "")
 
 export const isInsideBroadEffectHandler = (node: ESTree.Node): boolean => {
   let current: ESTree.Node | null = node.parent

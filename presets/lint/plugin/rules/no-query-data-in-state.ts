@@ -1,4 +1,5 @@
 import type { Context, ESTree, Rule, Visitor } from "@oxlint/plugins"
+import { staticKeyName } from "../shared/ast.ts"
 import { findImportedCalls, type ImportedCall } from "../shared/imports.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
@@ -17,7 +18,7 @@ const QUERY_HOOKS: ReadonlySet<string> = new Set([
 const STATE_HOOKS: ReadonlySet<string> = new Set(["useState"])
 
 function isDataKey(property: ESTree.BindingProperty) {
-  return !property.computed && property.key.type === "Identifier" && property.key.name === "data"
+  return staticKeyName(property.key, property.computed) === "data"
 }
 
 function getReferences(context: Context, declarator: ESTree.VariableDeclarator, name: string) {
@@ -47,8 +48,7 @@ function findDataReads(context: Context, call: ESTree.CallExpression): ESTree.No
 
       return member.type === "MemberExpression"
         && member.object === identifier
-        && !member.computed
-        && member.property.name === "data"
+        && staticKeyName(member.property, member.computed) === "data"
         ? [member]
         : []
     })

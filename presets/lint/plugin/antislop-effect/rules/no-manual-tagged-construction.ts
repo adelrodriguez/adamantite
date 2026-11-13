@@ -1,6 +1,6 @@
 import type { ESTree, Rule } from "@oxlint/plugins"
 
-import { isStringLiteral } from "../../shared/ast.ts"
+import { isStringLiteral, staticKeyName } from "../../shared/ast.ts"
 import { isMatchPatternObject, propertyName } from "../shared/tagged-values.ts"
 
 /**
@@ -18,12 +18,8 @@ const TAG_INPUT_CONSTRUCTORS = new Set([
 const calleeName = (callee: ESTree.Expression | ESTree.Super): string | undefined => {
   if (callee.type === "Identifier") return callee.name
 
-  if (
-    callee.type === "MemberExpression"
-    && !callee.computed
-    && callee.property.type === "Identifier"
-  ) {
-    return callee.property.name
+  if (callee.type === "MemberExpression") {
+    return staticKeyName(callee.property, callee.computed) ?? undefined
   }
 
   return undefined

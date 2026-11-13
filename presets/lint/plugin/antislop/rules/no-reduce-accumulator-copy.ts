@@ -1,6 +1,6 @@
 import type { ESTree, Rule, SourceCode, Variable } from "@oxlint/plugins"
 
-import { isNumberLiteral } from "../../shared/ast.ts"
+import { isNumberLiteral, staticKeyName } from "../../shared/ast.ts"
 import {
   arrayMethodTarget,
   constInitializer,
@@ -210,7 +210,10 @@ function resolveInitialValue(
 function hasFixedKeys(node: ESTree.Node) {
   return (
     node.type === "ObjectExpression"
-    && node.properties.every((property) => property.type === "Property" && !property.computed)
+    && node.properties.every(
+      (property) =>
+        property.type === "Property" && staticKeyName(property.key, property.computed) !== null
+    )
   )
 }
 

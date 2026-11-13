@@ -52,10 +52,6 @@ tester.run("no-unknown-parameters", plugin.rules["no-unknown-parameters"], {
       errors: [{ ...error, data: { parameter: "{ value }" } }],
     },
     {
-      code: 'function read(value: unknown): User { return schema["parse"](value); }',
-      errors: [{ ...error, data: { parameter: "value" } }],
-    },
-    {
       code: "function read(value: unknown): User { return parse(value); }",
       errors: [{ ...error, data: { parameter: "value" } }],
     },
@@ -111,6 +107,7 @@ tester.run("no-unknown-parameters", plugin.rules["no-unknown-parameters"], {
     'task["catch"]((error: unknown) => String(error));',
     "task[`then`]((value) => value, (error: unknown) => String(error));",
     "function read(value: unknown): User { return schema[`parse`](value); }",
+    'function read(value: unknown): User { return schema["parse"](value); }',
     "class Report { [`formatCause`](cause: unknown): string { return String(cause); } }",
     "class AppError extends Error { constructor(message: string, cause: unknown) { super(message, { cause }); } }",
     "declare class AppError { constructor(message: string, cause: unknown); }",

@@ -23,7 +23,7 @@ const PRETTIER_ASTRO = {
   prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
 }
 
-const OXFMT_ASTRO = {
+const OXFMT_LANGUAGE = {
   format_on_save: "on",
   formatter: [OXFMT_FORMATTER],
   prettier: { allowed: false },
@@ -227,7 +227,7 @@ describe("zed", () => {
 
         expect(yield* zed.detect(ROOT).pipe(provideFiles(files))).toBe(true)
         expect(yield* parseJson(files.read(SETTINGS_PATH))).toMatchObject({
-          languages: { Astro: OXFMT_ASTRO },
+          languages: { Astro: OXFMT_LANGUAGE, Svelte: OXFMT_LANGUAGE },
           lsp: {
             oxlint: {
               binary: { arguments: [OXLINT_ENTRY, "--lsp"], path: "node" },
@@ -396,14 +396,14 @@ describe("zed", () => {
         const formatter = [{ external: "custom" }, { external: "custom" }]
 
         const files = makeFiles({
-          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Svelte: { formatter } } }),
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Python: { formatter } } }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
         const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config).toHaveProperty(["languages", "Svelte", "formatter"], formatter)
+        expect(config).toHaveProperty(["languages", "Python", "formatter"], formatter)
       })
     )
 
@@ -417,7 +417,26 @@ describe("zed", () => {
 
         const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config).toHaveProperty(["languages", "Astro"], OXFMT_ASTRO)
+        expect(config).toHaveProperty(["languages", "Astro"], OXFMT_LANGUAGE)
+      })
+    )
+
+    it.effect("keep a Svelte setup that the project wrote", () =>
+      Effect.gen(function* () {
+        const svelte = {
+          format_on_save: "on",
+          prettier: { allowed: true, plugins: ["prettier-plugin-svelte"] },
+        }
+
+        const files = makeFiles({
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Svelte: svelte } }),
+        })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
+
+        expect(config).toHaveProperty(["languages", "Svelte"], svelte)
       })
     )
 

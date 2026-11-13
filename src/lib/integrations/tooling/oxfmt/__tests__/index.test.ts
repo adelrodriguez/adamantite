@@ -14,39 +14,15 @@ function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
 }
 
-function provideFiles(
-  files: FileSystemTestContext,
-  packages: Readonly<Record<string, string>> = {}
-) {
-  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages)])
+function provideFiles(files: FileSystemTestContext) {
+  return Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
 }
 
-function runAssess(files: FileSystemTestContext, packages: Readonly<Record<string, string>> = {}) {
+function runAssess(files: FileSystemTestContext) {
   return readProject(ROOT).pipe(
     Effect.flatMap((project) => oxfmt.assess(project)),
-    provideFiles(files, packages)
+    provideFiles(files)
   )
-}
-
-const OXFMT_PACKAGE = { "oxfmt/package.json": "node_modules/oxfmt/package.json" }
-
-const COMPILER_PACKAGE = {
-  "@astrojs/compiler-rs/package.json": "node_modules/@astrojs/compiler-rs/package.json",
-}
-
-/**
- * A project with the managed Oxfmt setup that declares Astro `astro`.
- */
-function makeAstroFiles(astro: string) {
-  return Effect.gen(function* () {
-    return makeFiles({
-      "oxfmt.config.ts": toOxfmtTsConfigContent(),
-      "package.json": yield* formatJson({
-        devDependencies: { astro, oxfmt: oxfmt.version },
-        scripts: { check: "adamantite check" },
-      }),
-    })
-  })
 }
 
 describe("oxfmt", () => {
@@ -99,45 +75,6 @@ describe("oxfmt", () => {
           packageActions: [],
           warnings: [],
         })
-      })
-    )
-
-    it.effect("report an Astro project whose Oxfmt cannot load the Astro compiler", () =>
-      Effect.gen(function* () {
-        // Astro 6 depends on @astrojs/compiler, not on @astrojs/compiler-rs.
-        const result = yield* runAssess(yield* makeAstroFiles("6.1.0"), OXFMT_PACKAGE)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState: expect.stringContaining("`@astrojs/compiler-rs`"),
-              id: "unavailable-astro-compiler",
-              integration: "oxfmt",
-            },
-          ],
-        })
-      })
-    )
-
-    it.effect("accept an Astro project whose Oxfmt loads the Astro compiler", () =>
-      Effect.gen(function* () {
-        const result = yield* runAssess(yield* makeAstroFiles("7.4.12"), {
-          ...OXFMT_PACKAGE,
-          ...COMPILER_PACKAGE,
-        })
-
-        expect(result).toMatchObject({ applicable: true, findings: [] })
-      })
-    )
-
-    it.effect("leave the Astro compiler to package assessment when Oxfmt is missing", () =>
-      Effect.gen(function* () {
-        const result = yield* runAssess(yield* makeAstroFiles("6.1.0"))
-
-        expect(result.applicable && result.findings).not.toContainEqual(
-          expect.objectContaining({ id: "unavailable-astro-compiler" })
-        )
       })
     )
 

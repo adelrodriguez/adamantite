@@ -94,6 +94,10 @@ const TREES: readonly FixtureTree[] = [
     ],
     preset: "react-strict",
   },
+  {
+    knownReports: [],
+    preset: "tanstack",
+  },
 ]
 
 function sortUnique(values: readonly string[]): string[] {

@@ -75,7 +75,7 @@ const rule: Rule = {
     },
     messages: {
       chained:
-        "This assertion chain discards type evidence. Keep the original precise type, or parse untrusted input at its boundary before narrowing it.",
+        "This assertion chain discards type evidence. Keep the original precise type, or parse untrusted input at its boundary before narrowing it. If a test passes input of the wrong type on purpose, pass it without an assertion and put `// @ts-expect-error -- reason` above the call.",
     },
     type: "problem",
   },

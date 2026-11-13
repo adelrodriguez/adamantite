@@ -150,6 +150,17 @@ describe("inspectExtendsOrder", () => {
     ).toStrictEqual(Option.some({ before: ["strict"], core: "core" }))
   })
 
+  it("leave out an entry before core that is not an Adamantite preset", () => {
+    expect(
+      inspectExtendsOrder(
+        toExtendsConfig(
+          [CORE_IMPORT, STRICT_IMPORT, 'import shared from "./shared.ts"'],
+          "[shared, strict, core]"
+        )
+      )
+    ).toStrictEqual(Option.some({ before: ["strict"], core: "core" }))
+  })
+
   it("use the local names of the imports", () => {
     expect(
       inspectExtendsOrder(

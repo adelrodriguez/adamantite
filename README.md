@@ -409,10 +409,10 @@ The core preset changes three rules for some files:
 To change one of these rules for these files, set it in an `overrides` entry, because the
 preset's override takes priority over top-level `rules`.
 
-Keep the core preset first in `extends`. Oxlint applies the entries in order, and a later entry
-replaces the rules of an earlier one. Some presets, such as strict and effect, change rules of
-core, and core replaces those changes when it comes after the preset. Doctor reports an
-Adamantite preset that comes before core.
+List the core preset one time in `extends`, before the other Adamantite presets. Oxlint applies
+the entries in order, and a later entry replaces the rules of an earlier one. Some presets, such as
+strict and effect, change rules of core, and core replaces those changes when it comes after the
+preset. Doctor reports an Adamantite preset that comes before a core entry.
 
 ### The TypeScript presets
 

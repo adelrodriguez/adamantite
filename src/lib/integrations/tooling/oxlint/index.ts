@@ -1,3 +1,4 @@
+import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
@@ -101,13 +102,13 @@ function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Findin
   return {
     currentState: `\`oxlint.config.ts\` lists ${presets} before the core preset \`${core}\` in \`extends\`.`,
     goal: [
-      `Move \`${core}\` to the first position of the \`extends\` array. Keep the order of the other entries.`,
+      `List \`${core}\` one time in the \`extends\` array, before \`${Array.headNonEmpty(before)}\`. Keep the order of the other entries.`,
       "Oxlint applies the `extends` entries in order, and a later entry replaces the rules of an earlier one. A preset, such as strict or effect, changes some rules of core. When core comes after the preset, the rules of core replace those changes.",
       "Run `adamantite check`, and correct the code that the restored rules report. Then run `adamantite doctor` again.",
     ],
     id: "core-preset-order",
     integration: "oxlint",
-    title: "The core preset must come before the other presets in extends",
+    title: "The core preset must come before the other Adamantite presets in extends",
   }
 }
 

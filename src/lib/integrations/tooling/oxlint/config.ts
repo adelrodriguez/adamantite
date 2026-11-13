@@ -215,9 +215,10 @@ function getNamedObjectProperty(
  */
 export interface MisplacedCorePreset {
   /**
-   * The local names of the presets that come before core, in the order of `extends`.
+   * The local names of the presets that come before the last core entry, in the order of `extends`.
+   * The list is not empty.
    */
-  readonly before: readonly string[]
+  readonly before: Array.NonEmptyReadonlyArray<string>
   /**
    * The local name of the core preset.
    */
@@ -228,9 +229,10 @@ const CORE_PRESET_MODULE = publicImport("./lint")
 
 /**
  * Find the Adamantite presets that the `extends` array of an `oxlint.config.ts` lists before the
- * core preset. Oxlint applies the entries in order, and a later entry replaces the rules of an
- * earlier one, so core turns off each change that an earlier preset makes to a core rule. A config
- * that does not parse, does not extend core, or has no `extends` array literal has none.
+ * last entry of the core preset. Oxlint applies the entries in order, and a later entry replaces
+ * the rules of an earlier one, so core replaces each change that an earlier preset makes to a core
+ * rule. A config that does not parse, does not extend core, or has no `extends` array literal has
+ * none.
  */
 export function inspectExtendsOrder(content: string): Option.Option<MisplacedCorePreset> {
   return pipe(
@@ -260,23 +262,25 @@ export function inspectExtendsOrder(content: string): Option.Option<MisplacedCor
             : Option.none()
         ),
         Option.flatMap((elements) => {
-          const names = elements.map((element) =>
-            element?.type === "Identifier" ? element.name : undefined
+          // The module of each entry that is a binding of an Adamantite preset.
+          const entries = elements.map((element) =>
+            element?.type === "Identifier"
+              ? { module: presetModules.get(element.name), name: element.name }
+              : undefined
           )
 
-          const coreIndex = names.findIndex(
-            (name) => name !== undefined && presetModules.get(name) === CORE_PRESET_MODULE
-          )
+          const coreIndex = entries.map((entry) => entry?.module).lastIndexOf(CORE_PRESET_MODULE)
+          const core = entries[coreIndex]
 
-          const core = names[coreIndex]
-
-          const before = names
+          const before = entries
             .slice(0, Math.max(coreIndex, 0))
-            .filter((name): name is string => name !== undefined && presetModules.has(name))
+            .flatMap((entry) =>
+              entry?.module === undefined || entry.module === CORE_PRESET_MODULE ? [] : [entry.name]
+            )
 
-          return core === undefined || before.length === 0
-            ? Option.none()
-            : Option.some({ before, core })
+          return core !== undefined && Array.isArrayNonEmpty(before)
+            ? Option.some({ before, core: core.name })
+            : Option.none()
         })
       )
     })

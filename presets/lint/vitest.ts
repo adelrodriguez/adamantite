@@ -90,7 +90,9 @@ const rules: OxlintConfig["rules"] = {
   "vitest/prefer-expect-type-of": "error",
   "vitest/prefer-hooks-in-order": "error",
   "vitest/prefer-hooks-on-top": "error",
-  "vitest/prefer-import-in-mock": "error",
+  // The rule asks for `vi.mock(import("./module.ts"))`, and the strict preset bans each module mock.
+  // A preset cannot see which other presets a project selects, so one instruction must go.
+  "vitest/prefer-import-in-mock": "off",
   "vitest/prefer-importing-vitest-globals": "error",
   // A describe title often names the class or function under test, such as `Calculator`.
   "vitest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],

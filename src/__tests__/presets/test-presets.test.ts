@@ -59,9 +59,24 @@ function lint(config: string, files: Record<string, string>) {
 const SCRIPT = "export function run() {\n  return 1\n}\n\nrun()\n"
 
 describe.each([
-  { name: "vitest", preset: vitest, testImport: 'import { expect, it } from "vitest"' },
-  { name: "jest", preset: jest, testImport: 'import { expect, it } from "@jest/globals"' },
-])("$name preset", ({ name, preset, testImport }) => {
+  {
+    moduleMock: ['import { vi } from "vitest"', "", 'vi.mock("./load.ts")', ""],
+    name: "vitest",
+    preset: vitest,
+    testImport: 'import { expect, it } from "vitest"',
+  },
+  {
+    moduleMock: [
+      'import { jest } from "@jest/globals"',
+      "",
+      'jest.mock("./load.ts", () => ({}))',
+      "",
+    ],
+    name: "jest",
+    preset: jest,
+    testImport: 'import { expect, it } from "@jest/globals"',
+  },
+])("$name preset", ({ moduleMock, name, preset, testImport }) => {
   const presetPath = JSON.stringify(join(REPO_ROOT, `presets/lint/${name}.ts`))
   const test = `${testImport}\n\nit("adds", () => {\n  expect(1 + 1).toBe(2)\n})\n`
 
@@ -122,6 +137,24 @@ describe.each([
     )
 
     expect(codes["src/math.test.ts"]).toStrictEqual([`${name}(prefer-lowercase-title)`])
+  })
+
+  // Strict bans each module mock, so the preset must not tell the author how to write one.
+  it("give a module mock only the report of the strict preset", () => {
+    const strictPath = JSON.stringify(join(REPO_ROOT, "presets/lint/strict.ts"))
+
+    const codes = lint(
+      [
+        `import preset from ${presetPath}`,
+        `import strict from ${strictPath}`,
+        "",
+        "export default { extends: [preset, strict] }",
+        "",
+      ].join("\n"),
+      { "src/load.test.ts": moduleMock.join("\n") }
+    )
+
+    expect(codes["src/load.test.ts"]).toStrictEqual(["anti-slop(no-module-mocking)"])
   })
 
   it("expose its plugins and rules only to JavaScript", () => {

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
@@ -39,7 +39,7 @@ const SOURCE_RUNNER = Layer.effect(CommandRunner)(
 // In "moved" and "wrapped", the spacing rule needs a blank line that appears only after another
 // change: another lint fix moves a statement, or Oxfmt wraps a line. In "unbreakable", Oxfmt keeps
 // a template literal past the print width on one line, and the blank lines that the rule adds for
-// it stay valid.
+// it stay valid. In "suppressed", a suppression with a reason suppresses nothing.
 const CASES = {
   "moved.ts": [
     "export function pick(a: number): number {",
@@ -49,6 +49,13 @@ const CASES = {
     "    console.info(a)",
     "  }",
     "  return 0",
+    "}",
+    "",
+  ].join("\n"),
+  "suppressed.ts": [
+    "export function add(left: number, right: number): number {",
+    "  // oxlint-disable-next-line no-console -- the CLI prints the sum for debugging",
+    "  return left + right",
     "}",
     "",
   ].join("\n"),
@@ -120,6 +127,17 @@ describe("fix with the strict preset", () => {
 
   it.live("keep a line that Oxfmt cannot wrap in a state that check accepts", () =>
     fixThenCheck("unbreakable.ts")
+  )
+
+  // Oxlint 1.93 and later remove an unused `oxlint-disable` directive with `--fix`, but only when
+  // the run reports unused directives. Fix and check do not report them, so the suppression stays,
+  // and adamantite/require-suppression-reason accepts its reason.
+  it.live("keep an unused suppression that has a reason in a state that check accepts", () =>
+    Effect.gen(function* () {
+      yield* fixThenCheck("suppressed.ts")
+
+      expect(readFileSync(join(project, "suppressed.ts"), "utf8")).toBe(CASES["suppressed.ts"])
+    })
   )
 
   // Oxlint applies one pass of fixes, so the blank line after the statement that no-else-return

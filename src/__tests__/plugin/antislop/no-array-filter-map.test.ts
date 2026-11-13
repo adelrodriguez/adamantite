@@ -12,23 +12,6 @@ const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" }
 const error = { messageId: "arrayFilterMap" }
 
 tester.run("no-array-filter-map", plugin.rules["no-array-filter-map"], {
-  valid: [
-    "const users = []; users.values().filter(active).map(email).toArray();",
-    "const users = []; users.values().map(email).filter(Boolean).toArray();",
-    "Iterator.from(users).filter(active).map(email).toArray();",
-    "function collect(users: IteratorObject<User>) { return users.filter(active).map(email).toArray(); }",
-    "const users = []; users.flatMap(user => user.active ? [user.email] : []);",
-    "const users = []; users.map(email); users.filter(active);",
-    "const users = []; users.map(email).map(normalize);",
-    "const users = []; users.filter(active).filter(verified);",
-    "const custom = { filter() { return this; }, map() {} }; custom.filter(active).map(email);",
-    "function collect(unknownReceiver) { return unknownReceiver.filter(active).map(email); }",
-    "const users = fetchUsers(); users.filter(active).map(email);",
-    "const users = []; function collect(users) { return users.filter(active).map(email); }",
-    "let users = []; users = iterator; users.filter(active).map(email);",
-    "const users = []; users[method](active).map(email);",
-    "const first = second; const second = first; first.filter(active).map(email);",
-  ],
   invalid: [
     { code: "[].filter(active).map(email);", errors: [error] },
     {
@@ -64,5 +47,22 @@ tester.run("no-array-filter-map", plugin.rules["no-array-filter-map"], {
       code: "const users = []; users.filter(active).map(email).filter(Boolean);",
       errors: [error, error],
     },
+  ],
+  valid: [
+    "const users = []; users.values().filter(active).map(email).toArray();",
+    "const users = []; users.values().map(email).filter(Boolean).toArray();",
+    "Iterator.from(users).filter(active).map(email).toArray();",
+    "function collect(users: IteratorObject<User>) { return users.filter(active).map(email).toArray(); }",
+    "const users = []; users.flatMap(user => user.active ? [user.email] : []);",
+    "const users = []; users.map(email); users.filter(active);",
+    "const users = []; users.map(email).map(normalize);",
+    "const users = []; users.filter(active).filter(verified);",
+    "const custom = { filter() { return this; }, map() {} }; custom.filter(active).map(email);",
+    "function collect(unknownReceiver) { return unknownReceiver.filter(active).map(email); }",
+    "const users = fetchUsers(); users.filter(active).map(email);",
+    "const users = []; function collect(users) { return users.filter(active).map(email); }",
+    "let users = []; users = iterator; users.filter(active).map(email);",
+    "const users = []; users[method](active).map(email);",
+    "const first = second; const second = first; first.filter(active).map(email);",
   ],
 })

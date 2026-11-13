@@ -12,27 +12,6 @@ const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" }
 const error = { messageId: "accumulatorCopy" }
 
 tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-copy"], {
-  valid: [
-    "items.reduce((acc, item) => { acc.push(item); return acc; }, []);",
-    "items.reduce((acc, item) => Object.assign(acc, item), {});",
-    "items.reduce((acc, item) => Object.assign(acc, acc, item), {});",
-    "items.reduce((acc, item) => { acc[item.id] = { ...item }; return acc; }, {});",
-    "items.reduce((acc, item) => { acc.push(Object.assign({}, item)); return acc; }, []);",
-    "items.reduce((acc, item) => { acc.push(item.slice()); return acc; }, []);",
-    "items.reduce((acc, item) => acc.concat(item), '');",
-    "items.reduce((acc, item) => acc.concat(item), customCollection);",
-    "function copy(acc) { return Object.assign({}, acc); }",
-    "items.map((acc, item) => Object.assign({}, acc));",
-    "items.reduce((acc, item) => { function copy(acc) { return Object.assign({}, acc); } return acc; }, {});",
-    "items.reduce((acc, item) => { const snapshot = () => Object.assign({}, acc); return acc; }, {});",
-    "items.reduce((acc, item) => { { const acc = {}; Object.assign({}, acc); } return acc; }, {});",
-    "const Object = custom; items.reduce((acc, item) => Object.assign({}, acc), {});",
-    "function run(Object) { return items.reduce((acc, item) => Object.assign({}, acc), {}); }",
-    "const Array = custom; items.reduce((acc, item) => Array.from(acc), []);",
-    "items.reduce((acc, item) => { let alias = acc; alias = item; return Object.assign({}, alias); }, {});",
-    "items.reduce((acc, item) => [...acc, item], []);", // Owned by the native rule.
-    "items.reduce((acc, item) => ({ ...acc, [item.id]: item }), {});",
-  ],
   invalid: [
     {
       code: "items.reduce((acc, item) => Object.assign({}, acc, { [item.id]: item }), {});",
@@ -99,5 +78,26 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
     { code: "items.reduce((acc, item) => acc.toSorted(), []);", errors: [error] },
     { code: "items.reduce((acc, item) => acc.toReversed(), []);", errors: [error] },
     { code: "items.reduce((acc, item) => acc.with(0, item), []);", errors: [error] },
+  ],
+  valid: [
+    "items.reduce((acc, item) => { acc.push(item); return acc; }, []);",
+    "items.reduce((acc, item) => Object.assign(acc, item), {});",
+    "items.reduce((acc, item) => Object.assign(acc, acc, item), {});",
+    "items.reduce((acc, item) => { acc[item.id] = { ...item }; return acc; }, {});",
+    "items.reduce((acc, item) => { acc.push(Object.assign({}, item)); return acc; }, []);",
+    "items.reduce((acc, item) => { acc.push(item.slice()); return acc; }, []);",
+    "items.reduce((acc, item) => acc.concat(item), '');",
+    "items.reduce((acc, item) => acc.concat(item), customCollection);",
+    "function copy(acc) { return Object.assign({}, acc); }",
+    "items.map((acc, item) => Object.assign({}, acc));",
+    "items.reduce((acc, item) => { function copy(acc) { return Object.assign({}, acc); } return acc; }, {});",
+    "items.reduce((acc, item) => { const snapshot = () => Object.assign({}, acc); return acc; }, {});",
+    "items.reduce((acc, item) => { { const acc = {}; Object.assign({}, acc); } return acc; }, {});",
+    "const Object = custom; items.reduce((acc, item) => Object.assign({}, acc), {});",
+    "function run(Object) { return items.reduce((acc, item) => Object.assign({}, acc), {}); }",
+    "const Array = custom; items.reduce((acc, item) => Array.from(acc), []);",
+    "items.reduce((acc, item) => { let alias = acc; alias = item; return Object.assign({}, alias); }, {});",
+    "items.reduce((acc, item) => [...acc, item], []);", // Owned by the native rule.
+    "items.reduce((acc, item) => ({ ...acc, [item.id]: item }), {});",
   ],
 })

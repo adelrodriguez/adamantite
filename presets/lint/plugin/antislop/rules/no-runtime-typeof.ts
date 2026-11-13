@@ -12,12 +12,15 @@ function isRuntimeFunction(node: ESTree.Node): node is RuntimeFunction {
 
 function isInsideTypeGuard(node: ESTree.Node): boolean {
   let current: ESTree.Node | null = node.parent
+
   while (current !== null && current.type !== "Program") {
     if (isRuntimeFunction(current)) {
       return current.returnType?.typeAnnotation.type === "TSTypePredicate"
     }
+
     current = current.parent
   }
+
   return false
 }
 
@@ -26,9 +29,12 @@ function isInsideTypeGuard(node: ESTree.Node): boolean {
  */
 function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
   const parent = node.parent
+
   if (parent.type !== "BinaryExpression") return false
+
   if (!["===", "!==", "==", "!="].includes(parent.operator)) return false
   const other = parent.left === node ? parent.right : parent.left
+
   return other.type === "Literal" && other.value === "undefined"
 }
 
@@ -36,8 +42,29 @@ function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
  * Disallow runtime typeof checks that narrow unparsed values instead of decoding them.
  */
 const rule: Rule = {
+  createOnce(context) {
+    return {
+      UnaryExpression(node) {
+        const option = context.options?.[0]
+
+        const allowInTypeGuards =
+          typeof option === "object"
+          && option !== null
+          && !Array.isArray(option)
+          && option.allowInTypeGuards === true
+
+        if (
+          node.operator === "typeof"
+          && !isExistenceProbe(node)
+          && (!allowInTypeGuards || !isInsideTypeGuard(node))
+        ) {
+          context.report({ messageId: "runtimeTypeof", node })
+        }
+      },
+    }
+  },
   meta: {
-    type: "problem",
+    defaultOptions: [{ allowInTypeGuards: false }],
     docs: {
       description:
         "Disallow runtime typeof checks; external values must be decoded into meaningful types at their I/O boundary.",
@@ -48,33 +75,14 @@ const rule: Rule = {
     },
     schema: [
       {
-        type: "object",
+        additionalProperties: false,
         properties: {
           allowInTypeGuards: { type: "boolean" },
         },
-        additionalProperties: false,
+        type: "object",
       },
     ],
-    defaultOptions: [{ allowInTypeGuards: false }],
-  },
-  createOnce(context) {
-    return {
-      UnaryExpression(node) {
-        const option = context.options?.[0]
-        const allowInTypeGuards =
-          typeof option === "object"
-          && option !== null
-          && !Array.isArray(option)
-          && option.allowInTypeGuards === true
-        if (
-          node.operator === "typeof"
-          && !isExistenceProbe(node)
-          && (!allowInTypeGuards || !isInsideTypeGuard(node))
-        ) {
-          context.report({ node, messageId: "runtimeTypeof" })
-        }
-      },
-    }
+    type: "problem",
   },
 }
 

@@ -8,14 +8,17 @@ function isTypeAssertionExpression(node: ESTree.Node): node is TypeAssertionExpr
 
 function unwrapParenthesizedExpression(expression: ESTree.Expression): ESTree.Expression {
   let current = expression
+
   while (current.type === "ParenthesizedExpression") {
     current = current.expression
   }
+
   return current
 }
 
 function isConstAssertion(node: TypeAssertionExpression): boolean {
   const { typeAnnotation } = node
+
   return (
     typeAnnotation.type === "TSTypeReference"
     && typeAnnotation.typeName.type === "Identifier"
@@ -54,8 +57,18 @@ function isForbiddenAssertionChain(node: TypeAssertionExpression): boolean {
  * assertions.
  */
 const rule: Rule = {
+  createOnce(context) {
+    const checkTypeAssertion = (node: TypeAssertionExpression) => {
+      if (!isOutermostAssertionInChain(node) || !isForbiddenAssertionChain(node)) return
+      context.report({ messageId: "chained", node })
+    }
+
+    return {
+      TSAsExpression: checkTypeAssertion,
+      TSTypeAssertion: checkTypeAssertion,
+    }
+  },
   meta: {
-    type: "problem",
     docs: {
       description:
         "Disallow chained TypeScript as and angle-bracket assertions, including parenthesized chains.",
@@ -64,17 +77,7 @@ const rule: Rule = {
       chained:
         "This assertion chain discards type evidence. Keep the original precise type, or parse untrusted input at its boundary before narrowing it.",
     },
-  },
-  createOnce(context) {
-    const checkTypeAssertion = (node: TypeAssertionExpression) => {
-      if (!isOutermostAssertionInChain(node) || !isForbiddenAssertionChain(node)) return
-      context.report({ node, messageId: "chained" })
-    }
-
-    return {
-      TSAsExpression: checkTypeAssertion,
-      TSTypeAssertion: checkTypeAssertion,
-    }
+    type: "problem",
   },
 }
 

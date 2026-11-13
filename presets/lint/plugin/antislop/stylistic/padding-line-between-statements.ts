@@ -8,8 +8,11 @@ import type {
   CreateRule,
   Location,
 } from "@oxlint/plugins"
+
 type ASTNode = ESTree.Node
+
 type Token = SyntaxToken | Comment
+
 import type { PaddingType, SelectorOption, StatementMatcher } from "./padding-line-options.ts"
 import {
   isClosingBraceToken,
@@ -55,13 +58,13 @@ export interface NodeTestObject {
 export type PolicyStatementOption<Extra extends string = never> =
   | StatementMatcher
   | Extra
-  | [StatementMatcher | Extra, ...(StatementMatcher | Extra)[]]
+  | [StatementMatcher | Extra, ...Array<StatementMatcher | Extra>]
 
-export type PolicyOptions<Extra extends string = never> = {
+export type PolicyOptions<Extra extends string = never> = Array<{
   blankLine: PaddingType
   prev: PolicyStatementOption<Extra>
   next: PolicyStatementOption<Extra>
-}[]
+}>
 
 const LT = `[${Array.from(LINEBREAKS).join("")}]`
 const PADDING_LINE_SEQUENCE = new RegExp(String.raw`^(\s*?${LT})\s*${LT}(\s*;?)$`, "u")
@@ -115,12 +118,15 @@ function newNodeTypeTester(type: string): NodeTestObject {
 function isIIFEStatement(node: ASTNode): boolean {
   if (node.type === "ExpressionStatement") {
     let expression = skipChainExpression(node.expression)
+
     if (expression.type === "UnaryExpression") expression = skipChainExpression(expression.argument)
 
     if (expression.type === "CallExpression") {
       let node: ASTNode = expression.callee
+
       while (node.type === "SequenceExpression") {
         const lastExpression = node.expressions.at(-1)
+
         if (lastExpression === undefined)
           throw new Error("Padding rule invariant: sequence expression is empty")
         node = lastExpression
@@ -129,6 +135,7 @@ function isIIFEStatement(node: ASTNode): boolean {
       return isFunction(node)
     }
   }
+
   return false
 }
 
@@ -143,8 +150,10 @@ function isIIFEStatement(node: ASTNode): boolean {
 function isCJSRequire(node: ASTNode): boolean {
   if (node.type === "VariableDeclaration") {
     const declaration = node.declarations[0]
+
     if (declaration?.init) {
       let call = declaration?.init
+
       while (call.type === "MemberExpression") call = call.object
 
       if (call.type === "CallExpression" && call.callee.type === "Identifier") {
@@ -152,6 +161,7 @@ function isCJSRequire(node: ASTNode): boolean {
       }
     }
   }
+
   return false
 }
 
@@ -178,6 +188,7 @@ function isBlockLikeStatement(node: ASTNode, sourceCode: SourceCode): boolean {
 
   // Checks the last token is a closing brace of blocks.
   const lastToken = sourceCode.getLastToken(node, isNotSemicolonToken)
+
   const belongingNode =
     lastToken && isClosingBraceToken(lastToken)
       ? sourceCode.getNodeByRangeIndex(lastToken.range[0])
@@ -226,8 +237,10 @@ function isDirectivePrologue(node: ASTNode, sourceCode: SourceCode): boolean {
 
       if (!isDirective(sibling, sourceCode)) return false
     }
+
     return true
   }
+
   return false
 }
 
@@ -242,8 +255,10 @@ function isDirectivePrologue(node: ASTNode, sourceCode: SourceCode): boolean {
 function isCJSExport(node: ASTNode): boolean {
   if (node.type === "ExpressionStatement") {
     const expression = node.expression
+
     if (expression.type === "AssignmentExpression") {
       let left = expression.left
+
       if (left.type === "MemberExpression") {
         while (left.object.type === "MemberExpression") left = left.object
 
@@ -257,6 +272,7 @@ function isCJSExport(node: ASTNode): boolean {
       }
     }
   }
+
   return false
 }
 
@@ -290,6 +306,7 @@ function getActualLastToken(node: ASTNode, sourceCode: SourceCode): Token | null
   const semiToken = sourceCode.getLastToken(node)!
   const prevToken = sourceCode.getTokenBefore(semiToken)
   const nextToken = sourceCode.getTokenAfter(semiToken)
+
   const isSemicolonLessStyle =
     prevToken
     && nextToken
@@ -324,15 +341,16 @@ function getReportLoc(node: ASTNode, sourceCode: SourceCode): Location {
 
   const line = node.loc.start.line
   const sourceLine = sourceCode.lines[line - 1]
+
   if (sourceLine === undefined)
     throw new Error("Padding rule invariant: statement source line is missing")
 
   return {
-    start: node.loc.start,
     end: {
-      line,
       column: sourceLine.length,
+      line,
     },
+    start: node.loc.start,
   }
 }
 
@@ -360,29 +378,31 @@ function verifyForNever(
   context: RuleContext,
   _: ASTNode,
   nextNode: ASTNode,
-  paddingLines: [Token, Token][]
+  paddingLines: Array<[Token, Token]>
 ): void {
   if (paddingLines.length === 0) return
 
   context.report({
-    node: nextNode,
-    messageId: "unexpectedBlankLine",
-    loc: getReportLoc(nextNode, context.sourceCode),
     fix(fixer) {
       if (paddingLines.length >= 2) return null
 
       const paddingPair = paddingLines[0]
+
       if (paddingPair === undefined)
         throw new Error("Padding rule invariant: reported padding pair is missing")
       const [prevToken, nextToken] = paddingPair
       const start = prevToken.range[1]
       const end = nextToken.range[0]
+
       const text = context.sourceCode.text
         .slice(start, end)
         .replace(PADDING_LINE_SEQUENCE, replacerToRemovePaddingLines)
 
       return fixer.replaceTextRange([start, end], text)
     },
+    loc: getReportLoc(nextNode, context.sourceCode),
+    messageId: "unexpectedBlankLine",
+    node: nextNode,
   })
 }
 
@@ -401,17 +421,15 @@ function verifyForAlways(
   context: RuleContext,
   prevNode: ASTNode,
   nextNode: ASTNode,
-  paddingLines: [Token, Token][]
+  paddingLines: Array<[Token, Token]>
 ): void {
   if (paddingLines.length > 0) return
 
   context.report({
-    node: nextNode,
-    messageId: "expectedBlankLine",
-    loc: getReportLoc(nextNode, context.sourceCode),
     fix(fixer) {
       const sourceCode = context.sourceCode
       let prevToken = getActualLastToken(prevNode, sourceCode)!
+
       const nextToken =
         sourceCode.getFirstTokenBetween(prevToken, nextNode, {
           includeComments: true,
@@ -441,15 +459,21 @@ function verifyForAlways(
           filter(token) {
             if (isTokenOnSameLine(prevToken, token)) {
               prevToken = token
+
               return false
             }
+
             return true
           },
         })! || nextNode
+
       const insertText = isTokenOnSameLine(prevToken, nextToken) ? "\n\n" : "\n"
 
       return fixer.insertTextAfter(prevToken, insertText)
     },
+    loc: getReportLoc(nextNode, context.sourceCode),
+    messageId: "expectedBlankLine",
+    node: nextNode,
   })
 }
 
@@ -460,27 +484,27 @@ function verifyForAlways(
  * @private
  */
 const PaddingTypes = {
+  always: { verify: verifyForAlways },
   any: { verify: verifyForAny },
   never: { verify: verifyForNever },
-  always: { verify: verifyForAlways },
 }
 
 const MaybeMultilineStatementType: Record<string, NodeTestObject> = {
   "block-like": { test: isBlockLikeStatement },
-  expression: { test: isExpression },
-  return: newKeywordTester("ReturnStatement", "return"),
+  const: newKeywordTester("VariableDeclaration", "const"),
   export: newKeywordTester(
     ["ExportAllDeclaration", "ExportDefaultDeclaration", "ExportNamedDeclaration"],
     "export"
   ),
-  var: newKeywordTester("VariableDeclaration", "var"),
+  expression: { test: isExpression },
   let: newKeywordTester("VariableDeclaration", "let"),
-  const: newKeywordTester("VariableDeclaration", "const"),
+  return: newKeywordTester("ReturnStatement", "return"),
+  type: newKeywordTester("TSTypeAliasDeclaration", "type"),
   using: {
     test: (node) =>
       node.type === "VariableDeclaration" && (node.kind === "using" || node.kind === "await using"),
   },
-  type: newKeywordTester("TSTypeAliasDeclaration", "type"),
+  var: newKeywordTester("VariableDeclaration", "var"),
 }
 
 /**
@@ -527,7 +551,7 @@ const StatementTypes: Record<string, NodeTestObject> = {
       node.type === "VariableDeclaration"
       && node.declarations.length > 0
       && node.declarations[0]?.init != null
-      && CJS_IMPORT.test(sourceCode.getText(node.declarations[0].init)),
+      && sourceCode.getText(node.declarations[0].init).startsWith("require("),
   },
 
   enum: newKeywordTester("TSEnumDeclaration", "enum"),
@@ -564,82 +588,18 @@ export default function createPaddingLineRule<Extra extends string = never>(
   statementTypes?: Record<Extra, NodeTestObject>
 ): CreateRule {
   const customStatementTypes: Partial<Record<string, NodeTestObject>> = statementTypes ?? {}
+
   return {
-    meta: {
-      type: "layout",
-      docs: {
-        description: "Require or disallow padding lines between statements",
-      },
-      fixable: "whitespace",
-      hasSuggestions: false,
-      // This is intentionally an array schema as you can pass 0..n config objects
-      schema: {
-        $defs: {
-          paddingType: {
-            type: "string",
-            enum: Object.keys(PaddingTypes),
-          },
-          statementType: {
-            type: "string",
-            enum: Object.keys(StatementTypes),
-          },
-          selectorOption: {
-            type: "object",
-            properties: {
-              selector: {
-                type: "string",
-              },
-              lineMode: {
-                type: "string",
-                enum: ["any", "singleline", "multiline"],
-              },
-            },
-            required: ["selector"],
-            additionalProperties: false,
-          },
-          statementMatcher: {
-            anyOf: [{ $ref: "#/$defs/statementType" }, { $ref: "#/$defs/selectorOption" }],
-          },
-          statementOption: {
-            anyOf: [
-              { $ref: "#/$defs/statementMatcher" },
-              {
-                type: "array",
-                items: { $ref: "#/$defs/statementMatcher" },
-                minItems: 1,
-                uniqueItems: true,
-                additionalItems: false,
-              },
-            ],
-          },
-        },
-        type: "array",
-        additionalItems: false,
-        items: {
-          type: "object",
-          properties: {
-            blankLine: { $ref: "#/$defs/paddingType" },
-            prev: { $ref: "#/$defs/statementOption" },
-            next: { $ref: "#/$defs/statementOption" },
-          },
-          additionalProperties: false,
-          required: ["blankLine", "prev", "next"],
-        },
-      },
-      messages: {
-        unexpectedBlankLine: "Unexpected blank line before this statement.",
-        expectedBlankLine: "Expected blank line before this statement.",
-      },
-    },
     create(context) {
       const sourceCode = context.sourceCode
 
       const selectorMatchedNodes = new Map<string, Set<ASTNode>>()
-      const pendingPairs: { prevNode: ASTNode; nextNode: ASTNode }[] = []
+      const pendingPairs: Array<{ prevNode: ASTNode; nextNode: ASTNode }> = []
 
       function collectSelectorOption(option: PolicyStatementOption<Extra>): void {
         if (Array.isArray(option)) {
           for (const item of option) collectSelectorOption(item)
+
           return
         }
 
@@ -667,8 +627,8 @@ export default function createPaddingLineRule<Extra extends string = never>(
        */
       function enterScope(): void {
         scopeInfo = {
-          upper: scopeInfo,
           prevNode: null,
+          upper: scopeInfo,
         }
       }
 
@@ -700,6 +660,7 @@ export default function createPaddingLineRule<Extra extends string = never>(
 
         if (isSelectorOption(type)) {
           const matchedNodes = selectorMatchedNodes.get(type.selector)
+
           if (!matchedNodes?.has(innerStatementNode)) return false
 
           const lineMode = type.lineMode
@@ -708,12 +669,14 @@ export default function createPaddingLineRule<Extra extends string = never>(
           else if (lineMode === "multiline") return !isSingleLine(innerStatementNode)
 
           return true
-        } else {
-          const statementType = customStatementTypes[type] ?? StatementTypes[type]
-          if (statementType === undefined)
-            throw new Error(`Padding rule invariant: unsupported statement type ${type}`)
-          return statementType.test(innerStatementNode, sourceCode)
         }
+
+        const statementType = customStatementTypes[type] ?? StatementTypes[type]
+
+        if (statementType === undefined)
+          throw new Error(`Padding rule invariant: unsupported statement type ${type}`)
+
+        return statementType.test(innerStatementNode, sourceCode)
       }
 
       /**
@@ -731,12 +694,15 @@ export default function createPaddingLineRule<Extra extends string = never>(
       ): (typeof PaddingTypes)[keyof typeof PaddingTypes] {
         for (let i = options.length - 1; i >= 0; --i) {
           const configure = options[i]
+
           if (configure === undefined)
             throw new Error("Padding rule invariant: configuration entry is missing")
+
           if (match(prevNode, configure.prev) && match(nextNode, configure.next)) {
             return PaddingTypes[configure.blankLine]
           }
         }
+
         return PaddingTypes.any
       }
 
@@ -750,8 +716,11 @@ export default function createPaddingLineRule<Extra extends string = never>(
        *
        * @returns The array of token pairs.
        */
-      function getPaddingLineSequences(prevNode: ASTNode, nextNode: ASTNode): [Token, Token][] {
-        const pairs: [Token, Token][] = []
+      function getPaddingLineSequences(
+        prevNode: ASTNode,
+        nextNode: ASTNode
+      ): Array<[Token, Token]> {
+        const pairs: Array<[Token, Token]> = []
         let prevToken: Token = getActualLastToken(prevNode, sourceCode)!
 
         if (nextNode.loc.start.line - prevToken.loc.end.line >= 2) {
@@ -796,7 +765,7 @@ export default function createPaddingLineRule<Extra extends string = never>(
         const prevNode = scopeInfo!.prevNode
 
         // Verify.
-        if (prevNode) pendingPairs.push({ prevNode, nextNode: node })
+        if (prevNode) pendingPairs.push({ nextNode: node, prevNode })
 
         scopeInfo!.prevNode = node
       }
@@ -860,6 +829,72 @@ export default function createPaddingLineRule<Extra extends string = never>(
         ":statement": verify,
         ...selectorMatchListeners,
       }
+    },
+    meta: {
+      type: "layout",
+      docs: {
+        description: "Require or disallow padding lines between statements",
+      },
+      fixable: "whitespace",
+      hasSuggestions: false,
+      // This is intentionally an array schema as you can pass 0..n config objects
+      schema: {
+        $defs: {
+          paddingType: {
+            enum: Object.keys(PaddingTypes),
+            type: "string",
+          },
+          selectorOption: {
+            additionalProperties: false,
+            properties: {
+              lineMode: {
+                enum: ["any", "singleline", "multiline"],
+                type: "string",
+              },
+              selector: {
+                type: "string",
+              },
+            },
+            required: ["selector"],
+            type: "object",
+          },
+          statementMatcher: {
+            anyOf: [{ $ref: "#/$defs/statementType" }, { $ref: "#/$defs/selectorOption" }],
+          },
+          statementOption: {
+            anyOf: [
+              { $ref: "#/$defs/statementMatcher" },
+              {
+                additionalItems: false,
+                items: { $ref: "#/$defs/statementMatcher" },
+                minItems: 1,
+                type: "array",
+                uniqueItems: true,
+              },
+            ],
+          },
+          statementType: {
+            enum: Object.keys(StatementTypes),
+            type: "string",
+          },
+        },
+        additionalItems: false,
+        items: {
+          additionalProperties: false,
+          properties: {
+            blankLine: { $ref: "#/$defs/paddingType" },
+            next: { $ref: "#/$defs/statementOption" },
+            prev: { $ref: "#/$defs/statementOption" },
+          },
+          required: ["blankLine", "prev", "next"],
+          type: "object",
+        },
+        type: "array",
+      },
+      messages: {
+        expectedBlankLine: "Expected blank line before this statement.",
+        unexpectedBlankLine: "Unexpected blank line before this statement.",
+      },
     },
   }
 }

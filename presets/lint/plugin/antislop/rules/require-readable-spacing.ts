@@ -9,6 +9,7 @@ import type { NodeTestObject } from "../stylistic/padding-line-between-statement
  */
 function isSinglelineBinding(node: ESTree.Node): boolean {
   const declaration = node.type === "ExportNamedDeclaration" ? node.declaration : node
+
   return declaration?.type === "VariableDeclaration" && node.loc.start.line === node.loc.end.line
 }
 
@@ -17,6 +18,7 @@ function isSinglelineBinding(node: ESTree.Node): boolean {
  */
 function hasLeadingComment(node: ESTree.Node, sourceCode: SourceCode): boolean {
   const previousLine = sourceCode.getTokenBefore(node)?.loc.end.line
+
   return sourceCode
     .getCommentsBefore(node)
     .some((comment) => comment.loc.start.line !== previousLine)
@@ -32,40 +34,40 @@ const undocumentedSinglelineBinding: NodeTestObject = {
 
 const paddingRule = createPaddingLineRule(
   [
-    { blankLine: "always", prev: "import", next: "*" },
-    { blankLine: "always", prev: "*", next: { selector: "Program > :not(ImportDeclaration)" } },
-    { blankLine: "always", prev: { selector: "Program > :not(ImportDeclaration)" }, next: "*" },
-    { blankLine: "always", prev: "*", next: ["function", "class", "interface", "type"] },
-    { blankLine: "always", prev: ["function", "class", "interface", "type"], next: "*" },
+    { blankLine: "always", next: "*", prev: "import" },
+    { blankLine: "always", next: { selector: "Program > :not(ImportDeclaration)" }, prev: "*" },
+    { blankLine: "always", next: "*", prev: { selector: "Program > :not(ImportDeclaration)" } },
+    { blankLine: "always", next: ["function", "class", "interface", "type"], prev: "*" },
+    { blankLine: "always", next: "*", prev: ["function", "class", "interface", "type"] },
     {
       blankLine: "always",
-      prev: "*",
       next: ["multiline-const", "multiline-let", "multiline-var", "multiline-using"],
-    },
-    {
-      blankLine: "always",
-      prev: ["multiline-const", "multiline-let", "multiline-var", "multiline-using"],
-      next: "*",
-    },
-    {
-      blankLine: "always",
       prev: "*",
-      next: ["return", "if", "switch", "try", "for", "while", "do"],
     },
-    { blankLine: "always", prev: "block-like", next: "*" },
-    { blankLine: "any", prev: "import", next: "import" },
+    {
+      blankLine: "always",
+      next: "*",
+      prev: ["multiline-const", "multiline-let", "multiline-var", "multiline-using"],
+    },
+    {
+      blankLine: "always",
+      next: ["return", "if", "switch", "try", "for", "while", "do"],
+      prev: "*",
+    },
+    { blankLine: "always", next: "*", prev: "block-like" },
+    { blankLine: "any", next: "import", prev: "import" },
     // Consecutive single-line bindings form one group at any scope, including
     // module scope. A binding with its own leading comment starts a new group.
-    { blankLine: "any", prev: "singleline-binding", next: "undocumented-singleline-binding" },
+    { blankLine: "any", next: "undocumented-singleline-binding", prev: "singleline-binding" },
     {
       blankLine: "any",
-      prev: {
-        selector:
-          ':matches(TSDeclareFunction, ExportNamedDeclaration[declaration.type="TSDeclareFunction"])',
-      },
       next: {
         selector:
           ':matches(TSDeclareFunction, FunctionDeclaration, ExportNamedDeclaration[declaration.type="TSDeclareFunction"], ExportNamedDeclaration[declaration.type="FunctionDeclaration"])',
+      },
+      prev: {
+        selector:
+          ':matches(TSDeclareFunction, ExportNamedDeclaration[declaration.type="TSDeclareFunction"])',
       },
     },
   ],

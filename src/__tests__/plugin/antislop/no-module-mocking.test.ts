@@ -12,13 +12,6 @@ const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" }
 const error = { messageId: "moduleMock" }
 
 tester.run("no-module-mocking", plugin.rules["no-module-mocking"], {
-  valid: [
-    "const store = new InMemoryUserStore();",
-    "vi.spyOn(store, 'save');",
-    "const vi = { mock() {} }; vi.mock();",
-    "function test(jest: { mock(): void }) { jest.mock(); }",
-    "import { vi as localVi } from './helpers'; localVi.mock('./module');",
-  ],
   invalid: [
     { code: "vi.mock('./user-store');", errors: [error] },
     { code: "jest.mock('./user-store');", errors: [error] },
@@ -33,5 +26,12 @@ tester.run("no-module-mocking", plugin.rules["no-module-mocking"], {
       code: "import { jest } from '@jest/globals'; jest.mock('./user-store');",
       errors: [error],
     },
+  ],
+  valid: [
+    "const store = new InMemoryUserStore();",
+    "vi.spyOn(store, 'save');",
+    "const vi = { mock() {} }; vi.mock();",
+    "function test(jest: { mock(): void }) { jest.mock(); }",
+    "import { vi as localVi } from './helpers'; localVi.mock('./module');",
   ],
 })

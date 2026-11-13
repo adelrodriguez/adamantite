@@ -19,11 +19,6 @@ tester.run(
   "anti-slop/no-conditional-empty-object-spread",
   plugin.rules["no-conditional-empty-object-spread"],
   {
-    valid: [
-      "const result = { value };",
-      "const result = { ...values };",
-      "const result = condition ? { value } : {};",
-    ],
     invalid: [
       {
         code: "const result = { ...(value !== undefined ? { value } : {}) };",
@@ -33,6 +28,11 @@ tester.run(
         code: "const result = { ...(condition ? {} : { value }) };",
         errors: [error],
       },
+    ],
+    valid: [
+      "const result = { value };",
+      "const result = { ...values };",
+      "const result = condition ? { value } : {};",
     ],
   }
 )

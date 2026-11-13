@@ -54,9 +54,9 @@ function applyEdits(source: string, edits: readonly Edit[]) {
 }
 
 /**
- * Rewrite one rule module. `export const xRule = defineRule({ ... })` becomes
- * `const rule: Rule = { ... }` followed by `export default rule`, and every import from
- * `@oxlint/plugins` becomes one type import.
+ * Rewrite one rule module. `export const xRule = defineRule({ ... })` becomes `const rule: Rule = {
+ * ... }` followed by `export default rule`, and every import from `@oxlint/plugins` becomes one
+ * type import.
  */
 function convertRule(file: string, source: string) {
   const { program } = parseSync(file, source)
@@ -82,17 +82,18 @@ function convertRule(file: string, source: string) {
     }
 
     if (
-      statement.type !== "ExportNamedDeclaration" ||
-      statement.declaration?.type !== "VariableDeclaration"
+      statement.type !== "ExportNamedDeclaration"
+      || statement.declaration?.type !== "VariableDeclaration"
     ) {
       continue
     }
 
     const init = statement.declaration.declarations[0]?.init
+
     const value =
-      init?.type === "CallExpression" &&
-      init.callee.type === "Identifier" &&
-      init.callee.name === "defineRule"
+      init?.type === "CallExpression"
+      && init.callee.type === "Identifier"
+      && init.callee.name === "defineRule"
         ? init.arguments[0]
         : init
 
@@ -115,11 +116,12 @@ function convertRule(file: string, source: string) {
 }
 
 /**
- * Rewrite one upstream test for Vitest. The test reads its rule from the plugin, as the
- * first-party rule tests do.
+ * Rewrite one upstream test for Vitest. The test reads its rule from the plugin, as the first-party
+ * rule tests do.
  */
 function convertTest(source: string) {
   const ruleImport = /^import \{ (\w+) \} from "\.\/([\w-]+)\.ts";\n/gmu
+
   const rules = [...source.matchAll(ruleImport)].map(([, local = "", name = ""]) => ({
     local,
     name,
@@ -184,7 +186,10 @@ async function copyUpstream(cloneDir: string) {
   const sharedDir = path.join(cloneDir, "src/shared")
 
   for (const file of await listFiles(sharedDir)) {
-    output.set(path.join(PLUGIN_DIR, "shared", file), await readFile(path.join(sharedDir, file), "utf8"))
+    output.set(
+      path.join(PLUGIN_DIR, "shared", file),
+      await readFile(path.join(sharedDir, file), "utf8")
+    )
   }
 
   // The options module is only types, so it becomes a `.ts` module that the build emits with the

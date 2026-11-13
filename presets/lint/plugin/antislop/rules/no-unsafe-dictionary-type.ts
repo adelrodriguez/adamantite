@@ -58,16 +58,19 @@ function typeReferenceName(type: ESTree.TSTypeReference): string | null {
 
 function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
   let current: ESTree.Node | null = node.parent
+
   while (current !== null && current.type !== "Program") {
     if (current.type === "TSTypeAliasDeclaration") return true
     current = current.parent
   }
+
   return false
 }
 
 function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false
   const name = typeReferenceName(node)
+
   return (
     name !== null
     && visibleTypeAlias(name, node, environment.typeAliases) !== null
@@ -78,23 +81,29 @@ function isPlainAliasConsumerUse(node: ESTree.TSType, environment: TypeEnvironme
 function isInsideTypeParameterConstraint(node: ESTree.TSType): boolean {
   let child: ESTree.Node = node
   let parent: ESTree.Node | null = child.parent
+
   while (parent !== null && parent.type !== "Program") {
     if (parent.type === "TSTypeParameter" && parent.constraint === child) return true
     child = parent
     parent = child.parent
   }
+
   return false
 }
 
 function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (isInsideTypeParameterConstraint(node)) return false
+
   if (isPlainAliasConsumerUse(node, environment)) return false
+
   if (classifyUnsafeDictionary(node, environment) === null) return false
   let current: ESTree.Node | null = node.parent
+
   while (current !== null && current.type !== "Program") {
     if (isTypeNode(current) && classifyUnsafeDictionary(current, environment) !== null) return false
     current = current.parent
   }
+
   return true
 }
 
@@ -102,25 +111,17 @@ function shouldReportType(node: ESTree.TSType, environment: TypeEnvironment): bo
  * Disallow object-dictionary contracts whose direct value type is an unsafe escape hatch.
  */
 const rule: Rule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow object-dictionary contracts whose direct value type is unknown, any, object, {}, or a union/alias containing one of those escape hatches.",
-    },
-    messages: {
-      unsafeDictionary:
-        "This dictionary's {{value}} value type gives callers no concrete value contract. Use an owner/schema-derived value type; parse external payloads before insertion.",
-    },
-  },
   createOnce(context) {
     let environment: TypeEnvironment | null = null
+
     const report = (node: ESTree.Node, value: string) => {
-      context.report({ node, messageId: "unsafeDictionary", data: { value } })
+      context.report({ data: { value }, messageId: "unsafeDictionary", node })
     }
+
     const reportIfUnsafe = (node: ESTree.TSType) => {
       if (environment === null || !shouldReportType(node, environment)) return
       const unsafe = classifyUnsafeDictionary(node, environment)
+
       if (unsafe === null) return
       report(node, unsafe.unsafeValue)
     }
@@ -129,9 +130,6 @@ const rule: Rule = {
       Program(node) {
         environment = createTypeEnvironment(node, context.sourceCode.visitorKeys)
       },
-      TSTypeReference: reportIfUnsafe,
-      TSTypeLiteral: reportIfUnsafe,
-      TSMappedType: reportIfUnsafe,
       TSIndexSignature(node) {
         if (
           environment === null
@@ -139,13 +137,29 @@ const rule: Rule = {
           || node.parent.type === "TSTypeLiteral"
         )
           return
+
         const unsafe = classifyUnsafeDictionaryValue(
           node.typeAnnotation.typeAnnotation,
           environment
         )
+
         if (unsafe !== null) report(node, unsafe.unsafeValue)
       },
+      TSMappedType: reportIfUnsafe,
+      TSTypeLiteral: reportIfUnsafe,
+      TSTypeReference: reportIfUnsafe,
     }
+  },
+  meta: {
+    docs: {
+      description:
+        "Disallow object-dictionary contracts whose direct value type is unknown, any, object, {}, or a union/alias containing one of those escape hatches.",
+    },
+    messages: {
+      unsafeDictionary:
+        "This dictionary's {{value}} value type gives callers no concrete value contract. Use an owner/schema-derived value type; parse external payloads before insertion.",
+    },
+    type: "problem",
   },
 }
 

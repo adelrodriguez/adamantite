@@ -12,12 +12,6 @@ const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" }
 const error = { messageId: "forbiddenSymbolName" }
 
 tester.run("no-shape-in-symbol-names", plugin.rules["no-shape-in-symbol-names"], {
-  valid: [
-    "declare const schema: ExternalSchema; const field = schema.shape.id;",
-    "declare const outer: External; const value = outer.inner.shape;",
-    "declare const schema: ExternalSchema; schema.shape.id.parse('x');",
-    "const owner = { id: 1 }; const value = owner.id;",
-  ],
   invalid: [
     { code: "const shape = 1;", errors: [error] },
     { code: "function shapeOf() {}", errors: [error] },
@@ -27,5 +21,11 @@ tester.run("no-shape-in-symbol-names", plugin.rules["no-shape-in-symbol-names"],
       code: "declare const owner: External; const shape = 'field'; const value = owner[shape];",
       errors: 2,
     },
+  ],
+  valid: [
+    "declare const schema: ExternalSchema; const field = schema.shape.id;",
+    "declare const outer: External; const value = outer.inner.shape;",
+    "declare const schema: ExternalSchema; schema.shape.id.parse('x');",
+    "const owner = { id: 1 }; const value = owner.id;",
   ],
 })

@@ -5,6 +5,7 @@ import {
   functionParameterBindingName,
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
+
 type ParameterOwner =
   | ESTree.ArrowFunctionExpression
   | ESTree.Function
@@ -16,6 +17,7 @@ type ParameterOwner =
 
 function isTypePredicateSubject(owner: ParameterOwner, parameterName: string): boolean {
   const predicate = owner.returnType?.typeAnnotation
+
   return (
     predicate?.type === "TSTypePredicate"
     && predicate.parameterName.type === "Identifier"
@@ -37,11 +39,15 @@ const REJECTION_CALLBACK_INDEX = new Map([
  */
 function isRejectionCallback(owner: ParameterOwner): boolean {
   const call = owner.parent
+
   if (call?.type !== "CallExpression") return false
   const callee = call.callee
+
   if (callee.type !== "MemberExpression" || callee.computed) return false
+
   if (callee.property.type !== "Identifier") return false
   const index = REJECTION_CALLBACK_INDEX.get(callee.property.name)
+
   return index !== undefined && call.arguments[index] === owner
 }
 
@@ -49,30 +55,23 @@ function isRejectionCallback(owner: ParameterOwner): boolean {
  * Disallow unknown inputs except explicitly named error-cause enrichment.
  */
 const rule: Rule = {
-  meta: {
-    type: "problem",
-    docs: {
-      description:
-        "Disallow explicitly unknown function parameters except `cause`, type-predicate subjects, and promise rejection reasons; decode unknown input at its I/O boundary instead.",
-    },
-    messages: {
-      unknownParameter:
-        "Parameter `{{parameter}}` leaves input unparsed. Accept a named domain type; run the expected schema or parser at the I/O boundary before calling this function.",
-    },
-  },
   createOnce(context) {
     const checkParameters = (node: ParameterOwner) => {
       for (const [index, parameter] of node.params.entries()) {
         const annotation = functionParameterTypeAnnotation(parameter)
+
         if (annotation === null || annotation === undefined) continue
+
         if (!containsUnknownType(annotation.typeAnnotation)) continue
         const name = functionParameterBindingName(parameter, context.sourceCode)
+
         if (name === "cause" || isTypePredicateSubject(node, name)) continue
+
         if (index === 0 && isRejectionCallback(node)) continue
         context.report({
-          node: annotation.typeAnnotation,
-          messageId: "unknownParameter",
           data: { parameter: name },
+          messageId: "unknownParameter",
+          node: annotation.typeAnnotation,
         })
       }
     }
@@ -89,6 +88,17 @@ const rule: Rule = {
       TSFunctionType: checkParameters,
       TSMethodSignature: checkParameters,
     }
+  },
+  meta: {
+    docs: {
+      description:
+        "Disallow explicitly unknown function parameters except `cause`, type-predicate subjects, and promise rejection reasons; decode unknown input at its I/O boundary instead.",
+    },
+    messages: {
+      unknownParameter:
+        "Parameter `{{parameter}}` leaves input unparsed. Accept a named domain type; run the expected schema or parser at the I/O boundary before calling this function.",
+    },
+    type: "problem",
   },
 }
 

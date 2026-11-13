@@ -133,7 +133,6 @@
     "version": "changeset version"
   },
   "dependencies": {
-    "@clack/prompts": "1.9.0",
     "@effect/platform-node": "4.1.2",
     "@effect/platform-node-shared": "4.1.2",
     "@oxlint/plugins": "1.93.0",

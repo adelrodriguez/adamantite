@@ -25,18 +25,6 @@
       "version": "3.0.3"
     },
     {
-      "name": "@clack/prompts",
-      "registry": "npm",
-      "source": {
-        "directory": "packages/prompts",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/bombshell-dev/clack"
-      },
-      "tracking": "dependency",
-      "version": "1.8.1"
-    },
-    {
       "name": "oxc-parser",
       "registry": "npm",
       "source": {
@@ -68,18 +56,6 @@
       },
       "tracking": "dependency",
       "version": "5.0.5"
-    },
-    {
-      "name": "knip",
-      "registry": "npm",
-      "source": {
-        "directory": "packages/knip",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/webpro-nl/knip"
-      },
-      "tracking": "dependency",
-      "version": "6.42.0"
     },
     {
       "name": "oxc-resolver",
@@ -117,38 +93,6 @@
       "version": "4.1.2"
     },
     {
-      "name": "oxlint",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/oxlint/-/oxlint-1.91.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "1.91.0"
-    },
-    {
-      "name": "tsrs",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/tsrs/-/tsrs-0.21.0-ts7.1.0-beta.tgz"
-      },
-      "tracking": "dependency",
-      "version": "0.21.0-ts7.1.0-beta"
-    },
-    {
-      "name": "@effect/tsgo",
-      "registry": "npm",
-      "source": {
-        "directory": "_packages/tsgo",
-        "host": "github.com",
-        "type": "repository",
-        "url": "https://github.com/Effect-TS/tsgo"
-      },
-      "tracking": "dependency",
-      "version": "0.67.3"
-    },
-    {
       "name": "vite-plus",
       "registry": "npm",
       "source": {
@@ -161,16 +105,6 @@
       "version": "1.5.0"
     },
     {
-      "name": "@oxlint/plugins",
-      "registry": "npm",
-      "source": {
-        "type": "tarball",
-        "url": "https://registry.npmjs.org/@oxlint/plugins/-/plugins-1.91.0.tgz"
-      },
-      "tracking": "dependency",
-      "version": "1.91.0"
-    },
-    {
       "name": "oxlint-plugin-react-doctor",
       "registry": "npm",
       "source": {
@@ -181,6 +115,72 @@
       },
       "tracking": "dependency",
       "version": "0.9.18"
+    },
+    {
+      "name": "@clack/prompts",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/prompts",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/bombshell-dev/clack"
+      },
+      "tracking": "dependency",
+      "version": "1.9.0"
+    },
+    {
+      "name": "@effect/tsgo",
+      "registry": "npm",
+      "source": {
+        "directory": "_packages/tsgo",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/Effect-TS/tsgo"
+      },
+      "tracking": "dependency",
+      "version": "0.69.0"
+    },
+    {
+      "name": "@oxlint/plugins",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/@oxlint/plugins/-/plugins-1.93.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "1.93.0"
+    },
+    {
+      "name": "knip",
+      "registry": "npm",
+      "source": {
+        "directory": "packages/knip",
+        "host": "github.com",
+        "type": "repository",
+        "url": "https://github.com/webpro-nl/knip"
+      },
+      "tracking": "dependency",
+      "version": "6.45.1"
+    },
+    {
+      "name": "oxlint",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/oxlint/-/oxlint-1.93.0.tgz"
+      },
+      "tracking": "dependency",
+      "version": "1.93.0"
+    },
+    {
+      "name": "tsrs",
+      "registry": "npm",
+      "source": {
+        "type": "tarball",
+        "url": "https://registry.npmjs.org/tsrs/-/tsrs-0.25.0-ts7.1.0-beta.tgz"
+      },
+      "tracking": "dependency",
+      "version": "0.25.0-ts7.1.0-beta"
     }
   ]
 }

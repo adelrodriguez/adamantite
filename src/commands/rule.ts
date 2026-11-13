@@ -313,10 +313,13 @@ const trial = Command.make("try", {
           })
         }
 
-        const cases = yield* Effect.all([
-          ...report.map((value) => parseTrialCase(value, "reported")),
-          ...accept.map((value) => parseTrialCase(value, "accepted")),
-        ])
+        const cases = yield* Effect.all(
+          [
+            ...report.map((value) => parseTrialCase(value, "reported")),
+            ...accept.map((value) => parseTrialCase(value, "accepted")),
+          ],
+          { concurrency: 1 }
+        )
 
         const cwd = process.cwd()
 

@@ -192,16 +192,19 @@ const readWorkflowState = (cwd: string) =>
     ).map((name) => `${WORKFLOWS_DIRECTORY}/${name}`)
 
     const workflows = Array.getSomes(
-      yield* Effect.forEach(workflowPaths, (workflowPath) =>
-        readFileIfFile(path.join(cwd, workflowPath)).pipe(
-          Effect.map((content) =>
-            Option.map(content, (text) => ({
-              block: readBlock(text),
-              content: text,
-              path: workflowPath,
-            }))
-          )
-        )
+      yield* Effect.forEach(
+        workflowPaths,
+        (workflowPath) =>
+          readFileIfFile(path.join(cwd, workflowPath)).pipe(
+            Effect.map((content) =>
+              Option.map(content, (text) => ({
+                block: readBlock(text),
+                content: text,
+                path: workflowPath,
+              }))
+            )
+          ),
+        { concurrency: "unbounded" }
       )
     )
 

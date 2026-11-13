@@ -76,6 +76,12 @@ const TREES: readonly FixtureTree[] = [
         reason: "https://github.com/adelrodriguez/adamantite/issues/766",
         rule: "eslint/prefer-object-spread",
       },
+      {
+        file: "anti-slop/no-unknown-parameters/valid/then-rejection-callback.ts",
+        reason:
+          "Since Oxlint 1.93, core's promise/prefer-catch reports the rejection callback of then(), as eslint-plugin-promise does. The fixture proves that the strict rule accepts it where a project allows then(). catch-callback.ts proves the catch() form.",
+        rule: "promise/prefer-catch",
+      },
     ],
     preset: "strict",
   },

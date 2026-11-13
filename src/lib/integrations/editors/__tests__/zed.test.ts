@@ -17,6 +17,18 @@ const OXFMT_FORMATTER = { language_server: { name: "oxfmt" } }
 const OXC_FIX_ALL = { code_action: "source.fixAll.oxc" }
 const OXLINT_ENTRY = "node_modules/adamantite/dist/oxlint.js"
 
+// The Astro setup that Adamantite wrote before Oxfmt formatted Astro files.
+const PRETTIER_ASTRO = {
+  format_on_save: "on",
+  prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
+}
+
+const OXFMT_LANGUAGE = {
+  format_on_save: "on",
+  formatter: [OXFMT_FORMATTER],
+  prettier: { allowed: false },
+}
+
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
 }
@@ -69,6 +81,44 @@ describe("zed", () => {
         if (result.applicable) {
           expect(result.findings[0]?.currentState).not.toContain("typeAware")
         }
+      })
+    )
+
+    it.effect("report the Prettier setup that Adamantite wrote for Astro", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Astro: PRETTIER_ASTRO } }),
+          "package.json": "{}",
+        })
+
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => zed.assess(project)),
+          provideFiles(files)
+        )
+
+        expect(result.applicable && result.findings).toContainEqual(
+          expect.objectContaining({ id: "legacy-zed-astro-formatter" })
+        )
+      })
+    )
+
+    it.effect("accept an Astro setup that the project changed", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          [SETTINGS_PATH]: yield* stringifyJson({
+            languages: { Astro: { ...PRETTIER_ASTRO, format_on_save: "off" } },
+          }),
+          "package.json": "{}",
+        })
+
+        const result = yield* readProject(ROOT).pipe(
+          Effect.flatMap((project) => zed.assess(project)),
+          provideFiles(files)
+        )
+
+        expect(result.applicable && result.findings).not.toContainEqual(
+          expect.objectContaining({ id: "legacy-zed-astro-formatter" })
+        )
       })
     )
 
@@ -177,6 +227,7 @@ describe("zed", () => {
 
         expect(yield* zed.detect(ROOT).pipe(provideFiles(files))).toBe(true)
         expect(yield* parseJson(files.read(SETTINGS_PATH))).toMatchObject({
+          languages: { Astro: OXFMT_LANGUAGE, Svelte: OXFMT_LANGUAGE },
           lsp: {
             oxlint: {
               binary: { arguments: [OXLINT_ENTRY, "--lsp"], path: "node" },
@@ -345,36 +396,71 @@ describe("zed", () => {
         const formatter = [{ external: "custom" }, { external: "custom" }]
 
         const files = makeFiles({
-          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Svelte: { formatter } } }),
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Python: { formatter } } }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
         const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config).toHaveProperty(["languages", "Svelte", "formatter"], formatter)
+        expect(config).toHaveProperty(["languages", "Python", "formatter"], formatter)
       })
     )
 
-    it.effect("deduplicate prettier plugins for the managed Astro entry", () =>
+    it.effect("move the Prettier setup that Adamantite wrote for Astro to Oxfmt", () =>
       Effect.gen(function* () {
         const files = makeFiles({
-          [SETTINGS_PATH]: yield* stringifyJson({
-            languages: {
-              Astro: { prettier: { allowed: true, plugins: ["prettier-plugin-astro"] } },
-            },
-          }),
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Astro: PRETTIER_ASTRO } }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
         const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config).not.toHaveProperty(["languages", "Astro", "formatter"])
-        expect(config).toHaveProperty(
-          ["languages", "Astro", "prettier", "plugins"],
-          ["prettier-plugin-astro"]
-        )
+        expect(config).toHaveProperty(["languages", "Astro"], OXFMT_LANGUAGE)
+      })
+    )
+
+    it.effect("keep a Svelte setup that the project wrote", () =>
+      Effect.gen(function* () {
+        const svelte = {
+          format_on_save: "on",
+          prettier: { allowed: true, plugins: ["prettier-plugin-svelte"] },
+        }
+
+        const files = makeFiles({
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Svelte: svelte } }),
+        })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
+
+        expect(config).toHaveProperty(["languages", "Svelte"], svelte)
+      })
+    )
+
+    it.effect("keep the Prettier formatter of an Astro setup that the project changed", () =>
+      Effect.gen(function* () {
+        // Zed uses an explicit `formatter` before Prettier, so a merged Oxfmt formatter would stop
+        // the project's Prettier plugins.
+        const astro = {
+          ...PRETTIER_ASTRO,
+          prettier: {
+            allowed: true,
+            plugins: ["prettier-plugin-astro", "prettier-plugin-tailwindcss"],
+          },
+        }
+
+        const files = makeFiles({
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Astro: astro } }),
+        })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        const config = yield* parseJson(files.read(SETTINGS_PATH))
+
+        expect(config).toHaveProperty(["languages", "Astro"], astro)
       })
     )
 

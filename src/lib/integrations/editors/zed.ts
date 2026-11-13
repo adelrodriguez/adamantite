@@ -13,6 +13,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { readEffectEditor } from "#lib/integrations/editors/effect.ts"
+import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { EffectEditorUnavailable, InvalidConfigFormat } from "#lib/shared/errors.ts"
 import {
@@ -35,15 +36,19 @@ import { formatInitCommand } from "#lib/workspace/init-command.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
 
+/**
+ * The settings of a language that Oxfmt formats through its language server.
+ */
+const OXFMT_LANGUAGE = {
+  format_on_save: "on",
+  formatter: [{ language_server: { name: "oxfmt" } }],
+  prettier: { allowed: false },
+} as const
+
 const CONFIG = {
   languages: {
-    // oxfmt cannot format Astro files, so Zed's managed Prettier formats them and installs the
-    // listed plugins itself. Like Zed's default for Astro, there is no `formatter` key, so "auto"
-    // picks Prettier through `allowed`, and no `parser`, which the plugin infers.
-    Astro: {
-      format_on_save: "on",
-      prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
-    },
+    // The format preset turns on Oxfmt for each plugin language. See ADR 0028.
+    ...Object.fromEntries(pluginLanguages.map(({ editors }) => [editors.zed, OXFMT_LANGUAGE])),
     CSS: {
       format_on_save: "on",
       formatter: [{ language_server: { name: "oxfmt" } }],
@@ -120,6 +125,30 @@ const CONFIG = {
     },
   },
 } as const
+
+/**
+ * The settings that Adamantite wrote for a plugin language before Oxfmt formatted it. Only Astro
+ * had any: Zed's managed Prettier with the Astro plugin.
+ */
+const LEGACY_PLUGIN_LANGUAGE_SETTINGS: Partial<
+  Record<(typeof pluginLanguages)[number]["editors"]["zed"], Schema.Json>
+> = {
+  Astro: { format_on_save: "on", prettier: { allowed: true, plugins: ["prettier-plugin-astro"] } },
+}
+
+/**
+ * The plugin languages whose entry in `config` keeps the settings that Adamantite wrote before
+ * Oxfmt formatted them.
+ */
+function findLegacyPluginLanguages(config: Schema.JsonObject) {
+  const languages = checkIsJsonObject(config.languages) ? config.languages : {}
+
+  return pluginLanguages.filter(({ editors }) => {
+    const legacy = LEGACY_PLUGIN_LANGUAGE_SETTINGS[editors.zed]
+
+    return legacy !== undefined && Equal.equals(languages[editors.zed], legacy)
+  })
+}
 
 const STALE_OXFMT_SETTINGS = {
   configPath: null,
@@ -267,19 +296,8 @@ function findStaleOxfmtSettingKeys(config: Schema.JsonObject): string[] {
     .map(([key]) => key)
 }
 
-function deduplicatePrettierPlugins(prettierConfig: Schema.Json) {
-  if (!checkIsJsonObject(prettierConfig) || !checkIsJsonArray(prettierConfig.plugins)) {
-    return prettierConfig
-  }
-
-  return Object.fromEntries([
-    ...Object.entries(prettierConfig),
-    ["plugins", Array.dedupe(prettierConfig.plugins)],
-  ])
-}
-
 // The merge concatenates preset and user arrays, so managed languages dedupe their `formatter`
-// and `prettier.plugins` arrays to keep repeated updates idempotent.
+// arrays to keep repeated updates idempotent.
 function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObject {
   const languageSettings = config.languages
 
@@ -301,10 +319,6 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
               return [key, Array.dedupe(value)]
             }
 
-            if (key === "prettier") {
-              return [key, deduplicatePrettierPlugins(value)]
-            }
-
             return [key, value]
           })
         ),
@@ -314,6 +328,32 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
 
   // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON object.
   return Object.fromEntries([...Object.entries(config), ["languages", languages]])
+}
+
+/**
+ * The plugin language entries that update writes: Oxfmt when the project has no entry or keeps the
+ * settings that Adamantite wrote before, and otherwise the project's own entry as it is. Zed uses
+ * an explicit `formatter` before Prettier, so merging Oxfmt into a project's entry would stop its
+ * Prettier plugins.
+ */
+function setPluginLanguageSettings(
+  config: Schema.JsonObject,
+  existing: Schema.JsonObject
+): Schema.JsonObject {
+  const current = checkIsJsonObject(existing.languages) ? existing.languages : {}
+  const legacy = new Set(findLegacyPluginLanguages(existing).map(({ editors }) => editors.zed))
+  const languages = checkIsJsonObject(config.languages) ? config.languages : {}
+
+  const pluginEntries = pluginLanguages.map(({ editors: { zed } }) => {
+    const entry = current[zed]
+
+    return [zed, entry === undefined || legacy.has(zed) ? OXFMT_LANGUAGE : entry] as const
+  })
+
+  return Object.fromEntries([
+    ...Object.entries(config),
+    ["languages", Object.fromEntries([...Object.entries(languages), ...pluginEntries])],
+  ])
 }
 
 // Adamantite owns the command that starts Oxlint, so the update replaces it instead of merging
@@ -396,6 +436,23 @@ export default defineIntegration({
         applicable: true,
         findings: [
           ...effectFindings,
+          ...(yield* Effect.forEach(
+            findLegacyPluginLanguages(config),
+            ({ editors: { zed }, name, option }) =>
+              formatJson({ languages: { [zed]: OXFMT_LANGUAGE } }).pipe(
+                Effect.map((reference): Finding => ({
+                  currentState: `\`${files[0].path}\` formats ${name} files with Prettier, as Adamantite set it up before Oxfmt formatted them.`,
+                  goal: [
+                    `Set \`languages.${zed}.formatter\` to the \`oxfmt\` language server, and set \`languages.${zed}.prettier.allowed\` to \`false\`. Preserve every other setting.`,
+                  ],
+                  id: `legacy-zed-${option}-formatter`,
+                  integration: "zed",
+                  reference: { content: `${reference}\n`, language: "json" },
+                  title: `Zed formats ${name} files with Prettier`,
+                }))
+              ),
+            { concurrency: 1 }
+          )),
           ...(staleKeys.length === 0
             ? []
             : [
@@ -468,11 +525,14 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      // The project's values win. `setOxlintBinary` and `setEffectSettings` then set only the values
-      // that the assessment checks.
+      // The project's values win. `setPluginLanguageSettings`, `setOxlintBinary`, and
+      // `setEffectSettings` then set only the values that they own.
       const mergedConfig = yield* mergeConfig({ fallback: CONFIG, preferred: existingConfig })
       const effect = yield* readEffectEditor(cwd)
-      const base = setOxlintBinary(deduplicateManagedFormatters(mergedConfig))
+
+      const base = setOxlintBinary(
+        deduplicateManagedFormatters(setPluginLanguageSettings(mergedConfig, existingConfig))
+      )
 
       const newConfig = Option.isSome(effect)
         ? yield* setEffectSettings(cwd, base, effect.value.rulesCustomization)

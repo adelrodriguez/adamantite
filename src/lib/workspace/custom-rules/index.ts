@@ -138,10 +138,10 @@ export const addCustomRuleTest = Effect.fn("addCustomRuleTest")(function* (
   const readRealPath = (file: string) =>
     fs.realPath(file).pipe(Effect.mapError((cause) => new FailedToReadFile({ cause, path: file })))
 
-  const [testDirectory, rulePath] = yield* Effect.all([
-    readRealPath(path.dirname(testPath)),
-    readRealPath(path.join(directory, rule)),
-  ])
+  const [testDirectory, rulePath] = yield* Effect.all(
+    [readRealPath(path.dirname(testPath)), readRealPath(path.join(directory, rule))],
+    { concurrency: "unbounded" }
+  )
 
   const relative = path.relative(testDirectory, rulePath).split(path.sep).join("/")
   const ruleImport = relative.startsWith("../") ? relative : `./${relative}`

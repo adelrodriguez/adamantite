@@ -11,7 +11,7 @@ import {
 } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
-import { delimiter, join, sep } from "node:path"
+import { delimiter, dirname, join, sep } from "node:path"
 import process from "node:process"
 import { pathToFileURL } from "node:url"
 import * as Predicate from "effect/Predicate"
@@ -278,6 +278,7 @@ const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
 const monorepoFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-monorepo-"))
 const effectFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-effect-"))
+const pluginFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-plugin-languages-"))
 
 try {
   writeFileSync(
@@ -438,6 +439,12 @@ try {
     join(effectWorkspacePackage, "package.json"),
     JSON.stringify({ name: "effect-workspace-package", private: true, type: "module" })
   )
+  // Install this checkout here too, so init keeps it and never installs `adamantite` from the
+  // registry, whose peer ranges can reject the pinned tools.
+  run("npm", ["install", "--ignore-scripts", "--save-dev", join(packDirectory, tarball)], {
+    cwd: effectWorkspacePackage,
+    env: effectEnv,
+  })
   run(
     process.execPath,
     [cliPath, "init", "--non-interactive", "--script", "check", "--editor", "zed"],
@@ -549,16 +556,22 @@ try {
 
   // `adamantite/typescript` loads the type resets by a path inside the installed
   // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
+  // Outside Windows, the Oxlint entry sets no backend variable, so the lint error also proves that
+  // Oxlint finds the `tsrs-lint` launcher of the real tsrs by itself. See ADR 0021.
   console.info("Checking the type resets of the installed TypeScript preset...")
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
 
-  for (const [command, args] of [
-    ["tsc", ["--noEmit", "--project", "tsconfig.json"]],
-    [process.execPath, [cliPath, "check", "--only", "lint"]],
+  // The lint inherits a path to a missing backend, as a shell with an old tsgolint setup passes it.
+  // The entry removes it outside Windows, so Oxlint still finds the real `tsrs-lint`.
+  const staleBackendEnv = { ...fixtureEnv, OXLINT_TSGOLINT_PATH: join(fixture, "missing-tsgolint") }
+
+  for (const [command, args, env] of [
+    ["tsc", ["--noEmit", "--project", "tsconfig.json"], fixtureEnv],
+    [process.execPath, [cliPath, "check", "--only", "lint"], staleBackendEnv],
   ] as const) {
     assertIncludes(
-      runExpectingFailure(command, [...args], { cwd: fixture, env: fixtureEnv }).output,
+      runExpectingFailure(command, [...args], { cwd: fixture, env }).output,
       "Type 'unknown' is not assignable to type '{ a: number; }'"
     )
   }
@@ -738,10 +751,68 @@ try {
     throw new Error(`Expected Doctor to resolve the workspace import, received:\n${doctorOutput}`)
   }
 
+  // Oxfmt formats Astro and Svelte files through plugins that import a package from the project:
+  // @astrojs/compiler-rs, which Astro 7 installs, and the compiler of Svelte 5. pnpm keeps
+  // @astrojs/compiler-rs out of the project's own node_modules, so this proves that Oxfmt still
+  // finds it. pnpm rejects packages younger than one day, so the versions are pinned. See ADR 0028.
+  console.info("Running `adamantite fix` on Astro and Svelte files in a pnpm project...")
+  writeFileSync(
+    join(pluginFixture, "package.json"),
+    JSON.stringify({
+      name: "adamantite-smoke-plugin-languages",
+      packageManager: `pnpm@${pnpmVersion}`,
+      private: true,
+      type: "module",
+      version: "0.0.0",
+    })
+  )
+  run(
+    "pnpm",
+    ["add", "--save-dev", join(packDirectory, tarball), "astro@7.4.11", "svelte@5.57.3"],
+    { cwd: pluginFixture }
+  )
+  run(process.execPath, [cliPath, "init", "--non-interactive", "--script", "check"], {
+    cwd: pluginFixture,
+  })
+
+  const astroPage = join(pluginFixture, "src", "pages", "index.astro")
+  const sveltePage = join(pluginFixture, "src", "counter.svelte")
+  mkdirSync(dirname(astroPage), { recursive: true })
+  writeFileSync(astroPage, "---\nconst greeting = 'hello';\n---\n<p>{greeting}</p>\n")
+  writeFileSync(
+    sveltePage,
+    "<script lang=\"ts\">\n  const count = 'one';\n</script>\n<p>{count}</p>\n"
+  )
+
+  const pluginEnv = {
+    ...process.env,
+    PATH: `${join(pluginFixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
+  }
+
+  run(process.execPath, [cliPath, "fix"], { cwd: pluginFixture, env: pluginEnv })
+  assertFileContains(astroPage, 'const greeting = "hello"\n---\n\n<p>{greeting}</p>')
+  assertFileContains(
+    sveltePage,
+    '<script lang="ts">\n  const count = "one"\n</script>\n\n<p>{count}</p>'
+  )
+  run(process.execPath, [cliPath, "check", "--only", "format"], {
+    cwd: pluginFixture,
+    env: pluginEnv,
+  })
+
+  const pluginDoctor = spawn(process.execPath, [cliPath, "doctor"], {
+    cwd: pluginFixture,
+    env: pluginEnv,
+  }).output
+
+  if (pluginDoctor.includes("Oxfmt cannot format")) {
+    throw new Error(`Expected Oxfmt to load the plugin packages, received:\n${pluginDoctor}`)
+  }
+
   console.info("Smoke test passed: init output is accepted by the pinned tool versions.")
 } catch (error) {
   console.info(
-    `Fixtures kept for debugging at: ${fixture}, ${monorepoFixture}, and ${effectFixture}`
+    `Fixtures kept for debugging at: ${fixture}, ${monorepoFixture}, ${effectFixture}, and ${pluginFixture}`
   )
   throw error
 } finally {
@@ -753,3 +824,5 @@ rmSync(fixture, { force: true, recursive: true })
 rmSync(monorepoFixture, { force: true, recursive: true })
 
 rmSync(effectFixture, { force: true, recursive: true })
+
+rmSync(pluginFixture, { force: true, recursive: true })

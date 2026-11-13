@@ -80,6 +80,7 @@ export default Command.make("doctor").pipe(
       // The interactive report shows each assessment warning before the outcome.
       const logWarnings = (assessment: ProjectAssessment) =>
         Effect.forEach(assessment.warnings, (warning) => prompter.log.warning(warning), {
+          concurrency: 1,
           discard: true,
         })
 

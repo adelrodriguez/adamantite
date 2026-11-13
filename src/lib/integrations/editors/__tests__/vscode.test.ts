@@ -146,6 +146,22 @@ describe("vscode", () => {
       })
     )
 
+    it.effect("format Astro and Svelte files with Oxfmt", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+
+        yield* vscode.create(ROOT).pipe(provideFiles(files))
+
+        const config = yield* parseJson(files.read(".vscode/settings.json"))
+
+        // The Astro and Svelte extensions set their own formatters, so a global default does not apply.
+        expect(config).toMatchObject({
+          "[astro]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+          "[svelte]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        })
+      })
+    )
+
     it.effect("copy the versioned compiler that matches the installed TypeScript commit", () =>
       Effect.gen(function* () {
         const files = makeFiles(effectEditorFiles())
@@ -406,7 +422,7 @@ describe("vscode", () => {
         const content = files.read(".vscode/settings.json")
 
         expect(content).toMatch(
-          /^\{\n\t\/\/ Team setting\n\t"editor\.tabSize": 4,\n\t"\[css\]": \{\n\t\t"/u
+          /^\{\n\t\/\/ Team setting\n\t"editor\.tabSize": 4,\n\t"\[astro\]": \{\n\t\t"/u
         )
         expect(content).toContain('\t"editor.formatOnSave": true')
       })

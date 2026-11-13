@@ -72,8 +72,8 @@ function runAssess(
 function makeStockFiles(nativeFiles: Record<string, string>) {
   return makeFiles({
     "/usr/bin/ldd": "GNU libc",
+    "node_modules/.bin/tsrs-lint": "",
     "node_modules/.bin/tsrs-lint.cmd": "",
-    "node_modules/tsrs/bin/tsrs-lint": "",
     [`node_modules/${STOCK_TSRS_PACKAGE}/package.json`]: "{}",
     "package.json": JSON.stringify({
       devDependencies: { oxlint: oxlint.version, tsrs: TSRS_VERSION },
@@ -283,6 +283,7 @@ describe("Oxlint runtime assessment", () => {
     Effect.gen(function* () {
       const result = yield* runAssess(
         makeFiles({
+          "node_modules/.bin/tsrs-lint": "",
           "node_modules/.bin/tsrs-lint.cmd": "",
           "oxlint.config.ts": toOxlintTsConfigContent(["effect"]),
         }),

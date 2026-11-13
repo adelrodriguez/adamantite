@@ -65,6 +65,7 @@ const PackageManifest = Schema.Struct({
   dependencies: Schema.optionalKey(StringRecord),
   devDependencies: Schema.optionalKey(StringRecord),
   name: Schema.optionalKey(Schema.String),
+  peerDependencies: Schema.optionalKey(StringRecord),
   scripts: Schema.optionalKey(StringRecord),
   version: Schema.optionalKey(Schema.String),
   workspaces: Schema.optionalKey(

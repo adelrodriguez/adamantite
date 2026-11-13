@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { firstPartyPlugin } from "./plugins/entry.ts"
 
 // Framework-neutral opinions: values keep their source object visible, types come from
 // validation or narrowing instead of assertions, each suppression gives its reason, no debug
@@ -8,23 +9,9 @@ import type { OxlintConfig } from "oxlint"
 // access, no module mocking, and readable spacing. Its rules started as a copy of
 // https://github.com/dmmulroy/anti-slop and now live in plugins/anti-slop/ as first-party code. They
 // keep the `anti-slop` namespace, so project settings and suppressions keep working.
-//
-// The source tree holds `plugins/adamantite/index.ts` and the dist tree holds `plugins/adamantite/index.js`, so the plugin
-// extension follows the extension of this module. Oxlint loads a TypeScript plugin only in the
-// source tree, where Node.js strips the types.
-const PLUGIN_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 
 const config: OxlintConfig = {
-  jsPlugins: [
-    {
-      name: "adamantite",
-      specifier: new URL(`plugins/adamantite/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
-    },
-    {
-      name: "anti-slop",
-      specifier: new URL(`plugins/anti-slop/index.${PLUGIN_EXTENSION}`, import.meta.url).href,
-    },
-  ],
+  jsPlugins: [firstPartyPlugin("adamantite"), firstPartyPlugin("anti-slop")],
   overrides: [
     {
       // Tests build partial fixtures and doubles, where an assertion is often the clearest option.

@@ -160,8 +160,10 @@ export default defineConfig({
         root: "src",
       },
       // Each plugin uses the helpers of all plugins in `shared`, and no plugin imports another
-      // plugin's code. `shared` imports no plugin.
+      // plugin's code. `shared` imports no plugin. `entry.ts` gives the presets the `jsPlugins` entry
+      // of each plugin.
       {
+        entries: ["entry.ts"],
         layers: {
           adamantite: { imports: ["shared"] },
           "anti-slop": { imports: ["shared"] },

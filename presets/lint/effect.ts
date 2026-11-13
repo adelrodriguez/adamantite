@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { firstPartyPlugin } from "./plugins/entry.ts"
 
 // The Effect Language Service for TypeScript-Go (https://github.com/Effect-TS/tsgo) reports
 // misuse of Effect: effects that never run, unhandled errors and requirements, nested effects, and
@@ -22,20 +23,9 @@ import type { OxlintConfig } from "oxlint"
 // plugins/anti-slop-effect/ as first-party code. They keep the `anti-slop-effect` namespace, so
 // project settings and suppressions keep working. The preset targets Effect codebases, so it
 // enables every rule of the plugin.
-//
-// The source tree holds `plugins/anti-slop-effect/index.ts` and the dist tree holds
-// `plugins/anti-slop-effect/index.js`, so the plugin extension follows the extension of this module.
-// Oxlint loads a TypeScript plugin only in the source tree, where Node.js strips the types.
-const PLUGIN_EXTENSION = import.meta.url.endsWith(".ts") ? "ts" : "js"
 
 const config: OxlintConfig = {
-  jsPlugins: [
-    {
-      name: "anti-slop-effect",
-      specifier: new URL(`plugins/anti-slop-effect/index.${PLUGIN_EXTENSION}`, import.meta.url)
-        .href,
-    },
-  ],
+  jsPlugins: [firstPartyPlugin("anti-slop-effect")],
   options: {
     typeAware: true,
   },

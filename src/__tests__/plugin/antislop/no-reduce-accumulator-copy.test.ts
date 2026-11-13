@@ -35,6 +35,14 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
       errors: [error],
     },
     {
+      code: "items[`reduce`]((acc, item) => Object[`assign`]({}, acc, item), {});",
+      errors: [error],
+    },
+    {
+      code: "rows[`reduceRight`]((acc, row) => acc[`concat`](row), []);",
+      errors: [error],
+    },
+    {
       code: "items.reduce((acc = {}, item) => Object.assign({}, acc, item), {});",
       errors: [error],
     },
@@ -203,6 +211,7 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
     "items.reduce((acc, item) => { acc.push(item.slice()); return acc; }, []);",
     "items.reduce((acc, item) => acc.concat(item), '');",
     "items.reduce((acc, item) => acc.concat(item), customCollection);",
+    `items[\`\${method}\`]((acc, item) => Object.assign({}, acc, item), {});`,
     "function copy(acc) { return Object.assign({}, acc); }",
     "items.map((acc, item) => Object.assign({}, acc));",
     "items.reduce((acc, item) => { function copy(acc) { return Object.assign({}, acc); } return acc; }, {});",

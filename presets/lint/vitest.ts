@@ -110,9 +110,10 @@ const rules: OxlintConfig["rules"] = {
   "vitest/prefer-todo": "error",
   "vitest/require-awaited-expect-poll": "error",
   // `layer(TestLayer)("name", (it) => ...)` of @effect/vitest opens a suite, as `describe` does.
-  // The rule matches the name of the call, so a top-level call of any function named `layer`
-  // passes.
-  "vitest/require-hook": ["error", { allowedFunctionCalls: ["layer"] }],
+  // `tester.run(...)` of RuleTester registers the suites of a rule test, as the stub that
+  // `adamantite rule test add` writes calls it. The rule matches the name of the call, so a
+  // top-level call of any function named `layer` or `tester.run` passes.
+  "vitest/require-hook": ["error", { allowedFunctionCalls: ["layer", "tester.run"] }],
   "vitest/require-local-test-context-for-concurrent-snapshots": "error",
   "vitest/require-mock-type-parameters": "error",
   "vitest/require-to-throw-message": "error",

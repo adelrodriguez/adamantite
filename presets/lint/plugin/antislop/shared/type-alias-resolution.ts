@@ -5,9 +5,13 @@ import { lexicalTypeParameterNames } from "./lexical-type-parameters.ts"
 
 type TypeScope = ESTree.Node
 
-type TypeBinding = {
+type DeclaredTypeBinding = {
   readonly alias: ESTree.TSTypeAliasDeclaration | null
+  readonly declaration: ESTree.Node
   readonly name: string
+}
+
+type TypeBinding = DeclaredTypeBinding & {
   readonly scope: TypeScope
 }
 
@@ -51,12 +55,9 @@ function enclosingTypeScope(node: ESTree.Node): TypeScope {
   return node
 }
 
-function declaredTypeBinding(node: ESTree.Node): {
-  readonly alias: ESTree.TSTypeAliasDeclaration | null
-  readonly name: string
-} | null {
+function declaredTypeBinding(node: ESTree.Node): DeclaredTypeBinding | null {
   if (node.type === "TSTypeAliasDeclaration") {
-    return { alias: node, name: node.id.name }
+    return { alias: node, declaration: node, name: node.id.name }
   }
 
   if (
@@ -65,7 +66,7 @@ function declaredTypeBinding(node: ESTree.Node): {
     || node.type === "ClassDeclaration"
     || node.type === "ClassExpression"
   ) {
-    return node.id === null ? null : { alias: null, name: node.id.name }
+    return node.id === null ? null : { alias: null, declaration: node, name: node.id.name }
   }
 
   if (
@@ -73,7 +74,7 @@ function declaredTypeBinding(node: ESTree.Node): {
     || node.type === "ImportDefaultSpecifier"
     || node.type === "ImportNamespaceSpecifier"
   ) {
-    return { alias: null, name: node.local.name }
+    return { alias: null, declaration: node, name: node.local.name }
   }
 
   return null
@@ -170,6 +171,25 @@ export function visibleTypeAlias(
   const bindings = nearestTypeBindings(name, use, environment)
 
   return bindings.length === 1 ? (bindings[0]?.alias ?? null) : null
+}
+
+/**
+ * Resolve the nearest visible interface with this name, with every declaration that merges into it.
+ * Return no declarations when another kind of binding, such as an import, has the name.
+ */
+export function visibleInterfaces(
+  name: string,
+  use: ESTree.Node,
+  environment: TypeAliasEnvironment
+): readonly ESTree.TSInterfaceDeclaration[] {
+  if (lexicalTypeParameterNames(use, environment.visitorKeys).has(name)) return []
+  const bindings = nearestTypeBindings(name, use, environment)
+
+  const interfaces = bindings.flatMap(({ declaration }) =>
+    declaration.type === "TSInterfaceDeclaration" ? [declaration] : []
+  )
+
+  return interfaces.length === bindings.length ? interfaces : []
 }
 
 /**

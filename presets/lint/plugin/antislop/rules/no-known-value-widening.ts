@@ -350,7 +350,7 @@ const rule: Rule = {
     },
     messages: {
       widening:
-        "The explicit {{target}} type on {{subject}} discards known type evidence. Keep inference, validate with `satisfies`, or use a named owner contract.",
+        "The explicit {{target}} type on {{subject}} discards known type evidence. Keep inference, validate with `satisfies`, or use a named owner contract with known keys.",
     },
     type: "problem",
   },

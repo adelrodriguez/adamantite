@@ -62,7 +62,11 @@ function isGlobalIdentifier(sourceCode: SourceCode, expression: ESTree.Node, nam
  * Reports whether an expression reads a global object by name, such as `Reflect` or
  * `globalThis.Reflect`, and no local binding shadows it.
  */
-export function isGlobalObject(sourceCode: SourceCode, expression: ESTree.Node, name: string) {
+export function isGlobalObject(
+  sourceCode: SourceCode,
+  expression: ESTree.Node,
+  name: string
+): boolean {
   if (isGlobalIdentifier(sourceCode, expression, name)) return true
 
   return (
@@ -97,15 +101,23 @@ function resolveConstBinding(
 export function matchesThroughAliases(
   sourceCode: SourceCode,
   expression: ESTree.Node,
+  matches: (expression: ESTree.Node) => boolean
+): boolean {
+  return matchesThroughAliasesFrom(sourceCode, expression, matches, new Set())
+}
+
+function matchesThroughAliasesFrom(
+  sourceCode: SourceCode,
+  expression: ESTree.Node,
   matches: (expression: ESTree.Node) => boolean,
-  visited = new Set<Variable>()
+  visited: Set<Variable>
 ): boolean {
   if (matches(expression)) return true
   const binding = resolveConstBinding(sourceCode, expression, visited)
 
   return (
     binding?.id.type === "Identifier"
-    && matchesThroughAliases(sourceCode, binding.init, matches, visited)
+    && matchesThroughAliasesFrom(sourceCode, binding.init, matches, visited)
   )
 }
 
@@ -118,8 +130,17 @@ export function readsProperty(
   sourceCode: SourceCode,
   expression: ESTree.Node,
   isName: (name: string) => boolean,
+  isOwner: (expression: ESTree.Node) => boolean
+): boolean {
+  return readsPropertyFrom(sourceCode, expression, isName, isOwner, new Set())
+}
+
+function readsPropertyFrom(
+  sourceCode: SourceCode,
+  expression: ESTree.Node,
+  isName: (name: string) => boolean,
   isOwner: (expression: ESTree.Node) => boolean,
-  visited = new Set<Variable>()
+  visited: Set<Variable>
 ): boolean {
   if (expression.type === "MemberExpression") {
     const name = staticKeyName(expression.property, expression.computed)
@@ -132,7 +153,7 @@ export function readsProperty(
   if (binding === null) return false
   const { id, init } = binding
 
-  if (id.type === "Identifier") return readsProperty(sourceCode, init, isName, isOwner, visited)
+  if (id.type === "Identifier") return readsPropertyFrom(sourceCode, init, isName, isOwner, visited)
 
   return (
     id.type === "ObjectPattern"

@@ -87,7 +87,10 @@ export default defineConfig({
       },
       {
         import: "oxc-resolver",
-        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/shared/resolver.ts"],
+        owners: [
+          "src/lib/workspace/module-resolver.ts",
+          "presets/lint/plugins/adamantite/shared/resolver.ts",
+        ],
       },
       // Commands run tools through Toolchain. Only the lifecycle commands `init` and `update` use
       // the tooling integrations directly.
@@ -156,17 +159,41 @@ export default defineConfig({
         },
         root: "src",
       },
-      // Each plugin uses the plugin-wide helpers in `shared`, and no plugin imports another
-      // plugin's code. `shared` imports no plugin. `index.ts` registers the adamantite plugin.
+      // Each plugin uses the helpers of all plugins in `shared`, and no plugin imports another
+      // plugin's code. `shared` imports no plugin. `entry.ts` gives the presets the `jsPlugins` entry
+      // of each plugin. In a plugin, `index.ts` registers the rules, and the rules use the helpers
+      // of the plugin.
       {
-        entries: ["index.ts"],
+        entries: ["entry.ts"],
         layers: {
-          antislop: { imports: ["shared"] },
-          "antislop-effect": { imports: ["shared"] },
-          rules: { imports: ["shared"] },
+          adamantite: {
+            entries: ["index.ts"],
+            imports: ["shared"],
+            layers: {
+              rules: { imports: ["shared"] },
+              shared: { imports: [] },
+            },
+          },
+          "anti-slop": {
+            entries: ["index.ts"],
+            imports: ["shared"],
+            layers: {
+              rules: { imports: ["shared", "stylistic"] },
+              shared: { imports: [] },
+              stylistic: { imports: [] },
+            },
+          },
+          "anti-slop-effect": {
+            entries: ["index.ts"],
+            imports: ["shared"],
+            layers: {
+              rules: { imports: ["shared"] },
+              shared: { imports: [] },
+            },
+          },
           shared: { imports: [] },
         },
-        root: "presets/lint/plugin",
+        root: "presets/lint/plugins",
       },
     ],
     // Repository suppressions use `@ts-expect-error - reason`, so the format belongs in the check.

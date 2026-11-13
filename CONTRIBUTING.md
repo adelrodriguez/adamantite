@@ -79,7 +79,7 @@ its package folder in `ADAMANTITE_TEST_OXLINT`:
 ```sh
 npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
 ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest run \
-  src/__tests__/plugin src/__tests__/presets/strict.test.ts src/__tests__/presets/effect.test.ts
+  src/__tests__/plugins src/__tests__/presets/strict.test.ts src/__tests__/presets/effect.test.ts
 ```
 
 Dependabot does not yet support pnpm 12. Use `pnpm run bump:deps` for package dependency

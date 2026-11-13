@@ -23,7 +23,7 @@ function lint(options: Readonly<Options>) {
         jsPlugins: [
           {
             name: "anti-slop",
-            specifier: pathToFileURL(join(REPO, "presets/lint/plugin/antislop/index.ts")).href,
+            specifier: pathToFileURL(join(REPO, "presets/lint/plugins/anti-slop/index.ts")).href,
           },
         ],
         rules: { "anti-slop/require-safety-comment-for-type-assertion": ["error", ...options] },

@@ -53,6 +53,89 @@ function isTypePredicateSubject(owner: ParameterOwner, parameterName: string): b
 }
 
 /**
+ * Names of functions, methods, classes, and interfaces that build or describe an error cause, such
+ * as `toError`, `AppError`, and `formatCauseDetail`.
+ */
+const ERROR_CAUSE_NAMES: readonly RegExp[] = [/(?:^e|E)rror$/, /(?:^c|C)ause(?![a-z])/]
+
+function isConstructor(owner: ParameterOwner): boolean {
+  if (owner.type === "TSConstructSignatureDeclaration" || owner.type === "TSConstructorType") {
+    return true
+  }
+
+  const method = owner.parent
+
+  return (
+    (method.type === "MethodDefinition" || method.type === "TSAbstractMethodDefinition")
+    && method.kind === "constructor"
+  )
+}
+
+/**
+ * Return the name of the class or interface whose body holds a member.
+ */
+function declaringTypeName(member: ESTree.Node): string | null {
+  const body = member.parent
+
+  if (body?.type === "TSInterfaceBody" && body.parent.type === "TSInterfaceDeclaration") {
+    return body.parent.id.name
+  }
+
+  if (
+    body?.type !== "ClassBody"
+    || (body.parent.type !== "ClassDeclaration" && body.parent.type !== "ClassExpression")
+  ) {
+    return null
+  }
+
+  return body.parent.id?.name ?? null
+}
+
+/**
+ * Return the names that say what a function is for: its own name, the name of the variable or
+ * member that holds it, and the name of the class or interface that declares that member.
+ */
+function ownerNames(owner: ParameterOwner): string[] {
+  const names: string[] = []
+
+  if ("id" in owner && owner.id) names.push(owner.id.name)
+  const holder = owner.type === "TSMethodSignature" ? owner : owner.parent
+
+  if (holder.type === "VariableDeclarator" && holder.id.type === "Identifier") {
+    names.push(holder.id.name)
+  }
+
+  if (
+    (holder.type === "MethodDefinition"
+      || holder.type === "TSAbstractMethodDefinition"
+      || holder.type === "PropertyDefinition"
+      || holder.type === "Property"
+      || holder.type === "TSMethodSignature")
+    && !holder.computed
+    && holder.key.type === "Identifier"
+  ) {
+    names.push(holder.key.name)
+  }
+
+  const typeName = declaringTypeName(holder)
+
+  if (typeName !== null) names.push(typeName)
+
+  return names
+}
+
+/**
+ * Return whether a function enriches an error with its cause: a constructor, or a function whose
+ * name or class name says that it builds an error or describes a cause.
+ */
+function isErrorCauseOwner(owner: ParameterOwner): boolean {
+  return (
+    isConstructor(owner)
+    || ownerNames(owner).some((name) => ERROR_CAUSE_NAMES.some((pattern) => pattern.test(name)))
+  )
+}
+
+/**
  * The argument position of the rejection callback for each promise method that takes one.
  */
 const REJECTION_CALLBACK_INDEX = new Map([
@@ -245,7 +328,9 @@ const rule: Rule = {
         if (!resolvesToUnknown(annotation.typeAnnotation, environment)) continue
         const name = functionParameterBindingName(parameter, context.sourceCode)
 
-        if (name === "cause" || isTypePredicateSubject(node, name)) continue
+        if (name === "cause" && isErrorCauseOwner(node)) continue
+
+        if (isTypePredicateSubject(node, name)) continue
 
         if (index === 0 && isRejectionCallback(node)) continue
 
@@ -277,7 +362,7 @@ const rule: Rule = {
   meta: {
     docs: {
       description:
-        "Disallow explicitly unknown function parameters except `cause`, type-predicate subjects, promise rejection reasons, and parameters that the function only passes to a schema parser. Decode unknown input at its I/O boundary instead.",
+        "Disallow explicitly unknown function parameters except an error `cause`, type-predicate subjects, promise rejection reasons, and parameters that the function only passes to a schema parser. Decode unknown input at its I/O boundary instead.",
     },
     messages: {
       unknownParameter:

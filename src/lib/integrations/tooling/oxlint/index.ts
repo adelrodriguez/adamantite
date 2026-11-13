@@ -102,7 +102,7 @@ function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Findin
   return {
     currentState: `\`oxlint.config.ts\` lists ${presets} before the core preset \`${core}\` in \`extends\`.`,
     goal: [
-      `List \`${core}\` one time in the \`extends\` array, before \`${Array.headNonEmpty(before)}\`. Keep the order of the other entries.`,
+      `Move \`${core}\` to the position directly before \`${Array.headNonEmpty(before)}\`, the first Adamantite preset in the \`extends\` array. Keep one \`${core}\` entry, and keep the order of the other entries.`,
       "Oxlint applies the `extends` entries in order, and a later entry replaces the rules of an earlier one. A preset, such as strict or effect, changes some rules of core. When core comes after the preset, the rules of core replace those changes.",
       "Run `adamantite check`, and correct the code that the restored rules report. Then run `adamantite doctor` again.",
     ],

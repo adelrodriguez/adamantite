@@ -169,7 +169,7 @@ describe("oxlint", () => {
                 currentState:
                   "`oxlint.config.ts` lists `strict` before the core preset `core` in `extends`.",
                 goal: expect.arrayContaining([
-                  "List `core` one time in the `extends` array, before `strict`. Keep the order of the other entries.",
+                  "Move `core` to the position directly before `strict`, the first Adamantite preset in the `extends` array. Keep one `core` entry, and keep the order of the other entries.",
                 ]),
                 id: "core-preset-order",
                 integration: "oxlint",

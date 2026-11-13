@@ -182,7 +182,7 @@ describe("update", () => {
       expect(installer.calls[0]?.packages).toStrictEqual([`knip@${knip.version}`])
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
-        "● Packages to install or update:\n    knip: 5.0.0 → 6.45.1",
+        "● Packages to install or update:\n  knip: 5.0.0 → 6.45.1",
         "✔ Dependencies updated.",
         "✅ Update finished.",
       ])
@@ -299,7 +299,7 @@ describe("update", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
-        "● Packages to install or update:\n    knip: 5.0.0 → 6.45.1",
+        "● Packages to install or update:\n  knip: 5.0.0 → 6.45.1",
         "❌ Update failed",
       ])
     })

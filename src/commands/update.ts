@@ -74,7 +74,7 @@ export default Command.make("update").pipe(
             "Packages to install or update:",
             ...updates.map(
               (action) =>
-                `  ${action.package}: ${action.type === "install_package" ? "not installed" : action.currentVersion} → ${action.targetVersion}`
+                `${action.package}: ${action.type === "install_package" ? "not installed" : action.currentVersion} → ${action.targetVersion}`
             ),
           ].join("\n")
         )

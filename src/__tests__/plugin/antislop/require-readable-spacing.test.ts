@@ -1,6 +1,8 @@
 import { RuleTester } from "oxlint/plugins-dev"
-import { describe, it } from "vitest"
+import { describe, expect, it } from "vitest"
+import format from "#presets/format.ts"
 import plugin from "#presets/lint/plugin/antislop/index.ts"
+import { DEFAULT_PRINT_WIDTH } from "#presets/lint/plugin/antislop/rules/require-readable-spacing.ts"
 import createPaddingLineRule from "#presets/lint/plugin/antislop/stylistic/padding-line-between-statements.ts"
 
 RuleTester.describe = describe
@@ -11,6 +13,21 @@ RuleTester.itOnly = it.only
 
 const tester = new RuleTester({ languageOptions: { parserOptions: { lang: "ts" } } })
 const error = { messageId: "expectedBlankLine" }
+
+/**
+ * An indented `const` on one line that ends at `column`.
+ */
+function bindingEndingAt(name: string, column: number) {
+  const start = `  const ${name} = load("`
+
+  return `${start}${"x".repeat(column - start.length - 2)}")`
+}
+
+describe("require-readable-spacing print width", () => {
+  it("default to the print width of the format preset", () => {
+    expect(DEFAULT_PRINT_WIDTH).toBe(format.printWidth)
+  })
+})
 
 tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"], {
   invalid: [
@@ -93,6 +110,23 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
       errors: [error],
       output: "function f() {\nfoo();\n\nwhile (ok) go();\n}",
     },
+    // Oxfmt wraps a line that ends past the print width, so the binding counts as multiline.
+    {
+      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 110)}\n}`,
+      errors: [error],
+      output: `function f() {\n  const a = 1\n\n${bindingEndingAt("b", 110)}\n}`,
+    },
+    {
+      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 101)}\n}`,
+      errors: [error],
+      output: `function f() {\n  const a = 1\n\n${bindingEndingAt("b", 101)}\n}`,
+    },
+    {
+      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 130)}\n  const c = 3\n}`,
+      errors: [error, error],
+      options: [{ printWidth: 120 }],
+      output: `function f() {\n  const a = 1\n\n${bindingEndingAt("b", 130)}\n\n  const c = 3\n}`,
+    },
   ],
   valid: [
     "import { a } from 'a';\nimport { b } from 'b';\n\nexport const c = a + b;",
@@ -118,6 +152,15 @@ tester.run("require-readable-spacing", plugin.rules["require-readable-spacing"],
     "function f() {\nconst a = 1\nconst b = 2\n;[a, b].forEach(f)\n}",
     "function f() {\nconst a = 1\nconst b = 2\n;(a + b).toFixed()\n}",
     "const a = 1\nconst b = 2\n\n;[a, b].forEach(f)",
+    `function f() {\n  const a = 1\n${bindingEndingAt("b", 100)}\n}`,
+    {
+      code: `function f() {\n  const a = 1\n${bindingEndingAt("b", 110)}\n}`,
+      options: [{ printWidth: 120 }],
+    },
+    `function f() {\n${bindingEndingAt("b", 110)}\n}`,
+    // The rule asks for blank lines around a line past the print width. If Oxfmt keeps the line,
+    // as for a long template literal, the rule still accepts those blank lines.
+    `function f() {\n  const a = 1\n\n${bindingEndingAt("b", 110)}\n\n  const c = 3\n}`,
   ],
 })
 

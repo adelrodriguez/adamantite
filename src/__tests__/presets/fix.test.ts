@@ -36,8 +36,10 @@ const SOURCE_RUNNER = Layer.effect(CommandRunner)(
   })
 ).pipe(Layer.provide(CommandRunner.layer), Layer.provide(NodeServices.layer))
 
-// In each case, the spacing rule needs a blank line that appears only after another change: Oxfmt
-// wraps a line, or another lint fix moves a statement.
+// In "moved" and "wrapped", the spacing rule needs a blank line that appears only after another
+// change: another lint fix moves a statement, or Oxfmt wraps a line. In "unbreakable", Oxfmt keeps
+// a template literal past the print width on one line, and the blank lines that the rule adds for
+// it stay valid.
 const CASES = {
   "moved.ts": [
     "export function pick(a: number): number {",
@@ -47,6 +49,15 @@ const CASES = {
     "    console.info(a)",
     "  }",
     "  return 0",
+    "}",
+    "",
+  ].join("\n"),
+  "unbreakable.ts": [
+    "export function run(): string {",
+    "  const a = 1",
+    `  const b = \`\${a}${"x".repeat(100)}\``,
+    "  const c = 3",
+    "  return b + c",
     "}",
     "",
   ].join("\n"),
@@ -105,6 +116,10 @@ describe("fix with the strict preset", () => {
 
   it.live("leave a line that Oxfmt wraps in a state that check accepts", () =>
     fixThenCheck("wrapped.ts")
+  )
+
+  it.live("keep a line that Oxfmt cannot wrap in a state that check accepts", () =>
+    fixThenCheck("unbreakable.ts")
   )
 
   // Oxlint applies one pass of fixes, so the blank line after the statement that no-else-return

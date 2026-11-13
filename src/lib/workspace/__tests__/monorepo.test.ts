@@ -198,9 +198,9 @@ describe("readWorkspace", () => {
         root: ROOT,
       })
 
-      const result = yield* Effect.all([checkIsMonorepo(ROOT), readWorkspace(ROOT)]).pipe(
-        Effect.provide([files.layer, Path.layer])
-      )
+      const result = yield* Effect.all([checkIsMonorepo(ROOT), readWorkspace(ROOT)], {
+        concurrency: "unbounded",
+      }).pipe(Effect.provide([files.layer, Path.layer]))
 
       expect(result).toStrictEqual([
         true,

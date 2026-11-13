@@ -142,7 +142,8 @@ const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
 
   const copied = yield* Effect.forEach(
     entries.filter((name) => name === source.executable || name.endsWith(".d.ts")),
-    (name) => fs.exists(path.join(sdk, name))
+    (name) => fs.exists(path.join(sdk, name)),
+    { concurrency: "unbounded" }
   )
 
   return copied.every(Boolean)

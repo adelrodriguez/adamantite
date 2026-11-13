@@ -173,7 +173,7 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean, preset: TypeSc
     if (isMonorepo) {
       yield* pipe(
         getMonorepoGuidance(preset),
-        Effect.forEach((line) => prompter.log.info(line))
+        Effect.forEach((line) => prompter.log.info(line), { concurrency: 1 })
       )
 
       return

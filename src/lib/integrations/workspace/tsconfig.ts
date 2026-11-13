@@ -228,16 +228,19 @@ export default defineIntegration({
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const findings = yield* Effect.forEach(configured, ({ directory, loadsResets }) =>
-        loadsResets
-          ? (directory === cwd ? Effect.succeed(packageJson) : readPackageJson(directory)).pipe(
-              Effect.map((manifest) =>
-                checkPublishesTypes(manifest)
-                  ? [toLibraryFinding(path.relative(cwd, path.join(directory, files[0].path)))]
-                  : []
+      const findings = yield* Effect.forEach(
+        configured,
+        ({ directory, loadsResets }) =>
+          loadsResets
+            ? (directory === cwd ? Effect.succeed(packageJson) : readPackageJson(directory)).pipe(
+                Effect.map((manifest) =>
+                  checkPublishesTypes(manifest)
+                    ? [toLibraryFinding(path.relative(cwd, path.join(directory, files[0].path)))]
+                    : []
+                )
               )
-            )
-          : Effect.succeed([])
+            : Effect.succeed([]),
+        { concurrency: "unbounded" }
       )
 
       return {

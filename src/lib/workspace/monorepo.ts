@@ -81,10 +81,10 @@ const readWorkspaceDeclarations = (cwd: string) =>
     const pnpmWorkspace = yield* readFileIfExists(path.join(cwd, "pnpm-workspace.yaml"))
 
     const [pnpmPatterns, catalogs] = Option.isSome(pnpmWorkspace)
-      ? yield* Effect.all([
-          readPnpmWorkspacePatterns(pnpmWorkspace.value),
-          readPnpmCatalogs(pnpmWorkspace.value),
-        ])
+      ? yield* Effect.all(
+          [readPnpmWorkspacePatterns(pnpmWorkspace.value), readPnpmCatalogs(pnpmWorkspace.value)],
+          { concurrency: 1 }
+        )
       : [[], {}]
 
     if (pnpmPatterns.length > 0) {

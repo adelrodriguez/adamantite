@@ -291,7 +291,7 @@ export default Command.make("harden", { commits, scope }).pipe(
               .warning(`Doctor found issues after the ${agent.name} session.`)
               .pipe(Effect.andThen(printFindings(findings))),
         }),
-        { discard: true }
+        { concurrency: 1, discard: true }
       )
 
       if (failures.length > 0) {

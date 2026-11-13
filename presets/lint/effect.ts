@@ -181,12 +181,23 @@ const config: OxlintConfig = {
     "promise/no-nesting": "off",
     "promise/valid-params": "off",
 
-    // Core turns on these unicorn rules, which match an array method by its name only. They read
-    // `Option.some(value)` as `Array.prototype.some` with a callback, and the data-first
-    // `Array.findLast(values, predicate)` as an array method with a `thisArg`. Oxlint gives the
-    // rules no option to ignore a receiver, so an Effect project turns them off.
+    // Core turns on these unicorn rules, which match a string or array method by its name only.
+    // They read functions of `effect/Array`, `effect/Option`, and `effect/String` as methods of a
+    // built-in:
+    // - `no-array-callback-reference` reads `Option.some(value)` as `Array.prototype.some`.
+    // - `no-array-method-this-argument` reads the data-first `Array.findLast(values, predicate)` as
+    //   an array method with a `thisArg`.
+    // - `prefer-array-find` and `prefer-array-some` read `Array.filter(values, predicate)` as
+    //   `Array.prototype.filter`. The advice of `prefer-array-find` names `find`, which
+    //   `effect/Array` does not have.
+    // - The fix of `prefer-string-slice` rewrites `String.substring` to `String.slice`, a different
+    //   function that reads a negative index from the end.
+    // Oxlint gives the rules no option to ignore a receiver, so an Effect project turns them off.
     "unicorn/no-array-callback-reference": "off",
     "unicorn/no-array-method-this-argument": "off",
+    "unicorn/prefer-array-find": "off",
+    "unicorn/prefer-array-some": "off",
+    "unicorn/prefer-string-slice": "off",
     // TEMPORARY: The core rule reads a call of a function whose name ends in `Error` as an error
     // made without `new`. It skips `Data.TaggedError`, but it reports `Schema.TaggedError` and
     // `Schema.Error`, and its fix adds `new`, which breaks the class. Remove this line when Oxlint

@@ -165,6 +165,13 @@ const config: OxlintConfig = {
     "anti-slop-effect/no-service-constructor-imports": "error",
     "anti-slop-effect/prefer-effect-match": "error",
 
+    // Core turns on this rule, which matches an array method by its name only. It reads the
+    // callback of `Effect.map` or `Option.map` as an `Array.prototype.map` callback, and reports a
+    // callback that returns nothing. Oxlint gives the rule no option to ignore a receiver, so an
+    // Effect project turns it off. With `noImplicitReturns`, TypeScript still reports a callback
+    // that returns a value on only some paths.
+    "array-callback-return": "off",
+
     // Core turns on these promise rules, which match `catch` by its name only. They cannot prove
     // that the `Effect` of an import is not a promise, so they read `Effect.catch` as
     // `Promise.prototype.catch`. `no-nesting` reports an `Effect.catch` in the handler of another,

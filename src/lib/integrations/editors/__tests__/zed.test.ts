@@ -421,21 +421,27 @@ describe("zed", () => {
       })
     )
 
-    it.effect("keep the Prettier plugins of an Astro setup that the project changed", () =>
+    it.effect("keep the Prettier formatter of an Astro setup that the project changed", () =>
       Effect.gen(function* () {
-        const plugins = ["prettier-plugin-astro", "prettier-plugin-tailwindcss"]
+        // Zed uses an explicit `formatter` before Prettier, so a merged Oxfmt formatter would stop
+        // the project's Prettier plugins.
+        const astro = {
+          ...PRETTIER_ASTRO,
+          prettier: {
+            allowed: true,
+            plugins: ["prettier-plugin-astro", "prettier-plugin-tailwindcss"],
+          },
+        }
 
         const files = makeFiles({
-          [SETTINGS_PATH]: yield* stringifyJson({
-            languages: { Astro: { ...PRETTIER_ASTRO, prettier: { allowed: true, plugins } } },
-          }),
+          [SETTINGS_PATH]: yield* stringifyJson({ languages: { Astro: astro } }),
         })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
         const config = yield* parseJson(files.read(SETTINGS_PATH))
 
-        expect(config).toHaveProperty(["languages", "Astro", "prettier", "plugins"], plugins)
+        expect(config).toHaveProperty(["languages", "Astro"], astro)
       })
     )
 

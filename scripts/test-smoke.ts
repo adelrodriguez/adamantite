@@ -562,12 +562,16 @@ try {
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
 
-  for (const [command, args] of [
-    ["tsc", ["--noEmit", "--project", "tsconfig.json"]],
-    [process.execPath, [cliPath, "check", "--only", "lint"]],
+  // The lint inherits a path to a missing backend, as a shell with an old tsgolint setup passes it.
+  // The entry removes it outside Windows, so Oxlint still finds the real `tsrs-lint`.
+  const staleBackendEnv = { ...fixtureEnv, OXLINT_TSGOLINT_PATH: join(fixture, "missing-tsgolint") }
+
+  for (const [command, args, env] of [
+    ["tsc", ["--noEmit", "--project", "tsconfig.json"], fixtureEnv],
+    [process.execPath, [cliPath, "check", "--only", "lint"], staleBackendEnv],
   ] as const) {
     assertIncludes(
-      runExpectingFailure(command, [...args], { cwd: fixture, env: fixtureEnv }).output,
+      runExpectingFailure(command, [...args], { cwd: fixture, env }).output,
       "Type 'unknown' is not assignable to type '{ a: number; }'"
     )
   }

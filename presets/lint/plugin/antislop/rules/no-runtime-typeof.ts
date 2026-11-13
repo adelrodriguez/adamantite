@@ -1,7 +1,11 @@
 import type { Definition, ESTree, Rule, SourceCode } from "@oxlint/plugins"
-import type { VisitorKeys } from "../shared/child-nodes.ts"
 import { readBooleanOption } from "../../options.ts"
 import { resolveVariable } from "../shared/scope.ts"
+import {
+  createTypeAliasEnvironment,
+  resolvedTypeMatches,
+  type TypeAliasEnvironment,
+} from "../shared/type-alias-resolution.ts"
 import { mentionsUncheckedType } from "../shared/unknown-type.ts"
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function
@@ -180,51 +184,51 @@ function referencedTypeParameter(type: ESTree.TSTypeReference): ESTree.TSTypePar
 /**
  * Return whether a declared type may hold any value, because it is a type parameter with no
  * constraint, or with a constraint that has `unknown` or `any`, as in `<T>(value: T)`. A union
- * matches when one of its members matches.
+ * matches when one of its members matches. The check resolves local aliases, as in `type Same<X> =
+ * X` with `value: Same<T>`.
  */
 function isUncheckedTypeParameter(
   type: ESTree.TSType,
-  visitorKeys: VisitorKeys,
+  environment: TypeAliasEnvironment,
   seen: ReadonlySet<ESTree.TSTypeParameter>
 ): boolean {
-  if (type.type === "TSParenthesizedType") {
-    return isUncheckedTypeParameter(type.typeAnnotation, visitorKeys, seen)
-  }
+  return resolvedTypeMatches(type, environment, (resolved, matches) => {
+    if (resolved.type === "TSParenthesizedType") return matches(resolved.typeAnnotation)
 
-  if (type.type === "TSUnionType") {
-    return type.types.some((member) => isUncheckedTypeParameter(member, visitorKeys, seen))
-  }
+    if (resolved.type === "TSUnionType") return resolved.types.some(matches)
 
-  if (type.type !== "TSTypeReference") return false
-  const parameter = referencedTypeParameter(type)
+    if (resolved.type !== "TSTypeReference") return false
+    const parameter = referencedTypeParameter(resolved)
 
-  if (parameter === null || seen.has(parameter)) return false
-  const constraint = parameter.constraint
+    if (parameter === null || seen.has(parameter)) return false
+    const constraint = parameter.constraint
 
-  return (
-    constraint === null
-    || mentionsUncheckedType(constraint, visitorKeys)
-    || isUncheckedTypeParameter(constraint, visitorKeys, new Set([...seen, parameter]))
-  )
+    return (
+      constraint === null
+      || mentionsUncheckedType(constraint, environment)
+      || isUncheckedTypeParameter(constraint, environment, new Set([...seen, parameter]))
+    )
+  })
 }
 
 /**
  * Return whether a `typeof` operand reads a binding with a declared type that has no `unknown` or
  * `any`, and that is not a type parameter that may hold any value. Such a value is already parsed,
- * so `typeof` only picks a member of an owned union.
+ * so `typeof` only picks a member of an owned union. Local aliases resolve to their bodies. An
+ * imported alias has no body in the file, so it counts as owned.
  */
 function hasOwnedType(
   argument: ESTree.Expression,
   sourceCode: SourceCode,
-  visitorKeys: VisitorKeys
+  environment: TypeAliasEnvironment
 ): boolean {
   const root = operandRoot(argument)
   const type = root === null ? null : declaredType(root, sourceCode)
 
   return (
     type !== null
-    && !mentionsUncheckedType(type, visitorKeys)
-    && !isUncheckedTypeParameter(type, visitorKeys, new Set())
+    && !mentionsUncheckedType(type, environment)
+    && !isUncheckedTypeParameter(type, environment, new Set())
   )
 }
 
@@ -233,14 +237,20 @@ function hasOwnedType(
  */
 const rule: Rule = {
   createOnce(context) {
+    let environment: TypeAliasEnvironment | null = null
+
     return {
+      Program(node) {
+        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
+      },
       UnaryExpression(node) {
         const allowInTypeGuards = readBooleanOption(context.options, "allowInTypeGuards") === true
 
         if (
-          node.operator === "typeof"
+          environment !== null
+          && node.operator === "typeof"
           && !isExistenceProbe(node)
-          && !hasOwnedType(node.argument, context.sourceCode, context.sourceCode.visitorKeys)
+          && !hasOwnedType(node.argument, context.sourceCode, environment)
           && (!allowInTypeGuards || !isInsideTypeGuard(node))
         ) {
           context.report({ messageId: "runtimeTypeof", node })
@@ -252,7 +262,7 @@ const rule: Rule = {
     defaultOptions: [{ allowInTypeGuards: false }],
     docs: {
       description:
-        "Disallow runtime typeof checks on values that may be unparsed. Decode external values into meaningful types at their I/O boundary. A value with a declared type that has no `unknown` or `any`, and that is not an unconstrained type parameter, may use typeof.",
+        "Disallow runtime typeof checks on values that may be unparsed. Decode external values into meaningful types at their I/O boundary. A value with a declared type that has no `unknown` or `any`, and that is not an unconstrained type parameter, may use typeof. The rule resolves local type aliases before it checks the type.",
     },
     messages: {
       runtimeTypeof:

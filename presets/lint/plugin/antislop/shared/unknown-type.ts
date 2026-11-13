@@ -94,11 +94,33 @@ export function exposesUnknown(type: ESTree.TSType, environment: TypeAliasEnviro
 const UNCHECKED_TYPES: ReadonlySet<string> = new Set(["TSAnyKeyword", "TSUnknownKeyword"])
 
 /**
- * Return whether `unknown` or `any` appears anywhere in a type, as in `Record<string, unknown>`.
+ * Return whether `unknown` or `any` appears in a node or below it. Each type reference below the
+ * node goes to `matches`, which resolves it.
  */
-export function mentionsUncheckedType(type: ESTree.Node, visitorKeys: VisitorKeys): boolean {
+function containsUncheckedType(
+  node: ESTree.Node,
+  visitorKeys: VisitorKeys,
+  matches: (child: ESTree.TSType) => boolean
+): boolean {
   return (
-    UNCHECKED_TYPES.has(type.type)
-    || childNodes(type, visitorKeys).some((child) => mentionsUncheckedType(child, visitorKeys))
+    UNCHECKED_TYPES.has(node.type)
+    || childNodes(node, visitorKeys).some((child) =>
+      child.type === "TSTypeReference"
+        ? matches(child)
+        : containsUncheckedType(child, visitorKeys, matches)
+    )
+  )
+}
+
+/**
+ * Return whether `unknown` or `any` appears anywhere in a type, as in `Record<string, unknown>`.
+ * The check resolves local aliases, as in `type Data = unknown`.
+ */
+export function mentionsUncheckedType(
+  type: ESTree.TSType,
+  environment: TypeAliasEnvironment
+): boolean {
+  return resolvedTypeMatches(type, environment, (resolved, matches) =>
+    containsUncheckedType(resolved, environment.visitorKeys, matches)
   )
 }

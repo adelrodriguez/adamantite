@@ -199,4 +199,20 @@ describe("core preset", () => {
 
     expect(codes).toStrictEqual([])
   })
+
+  // `typescript/no-non-null-assertion` bans `maybe!`, so core must not tell the author to write it.
+  it("not recommend the non-null assertion that core bans", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "declare const maybe: string | undefined",
+        "",
+        "export const a: string = maybe as string",
+        "export const b: string = maybe!",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual(["typescript(no-non-null-assertion)"])
+  })
 })

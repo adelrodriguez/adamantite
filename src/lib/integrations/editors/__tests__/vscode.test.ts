@@ -451,6 +451,21 @@ describe("vscode", () => {
       })
     )
 
+    it.effect("succeed without a write when a config with comments already has the settings", () =>
+      Effect.gen(function* () {
+        // The managed settings come from an update of an empty config.
+        const managed = makeFiles({ ".vscode/settings.json": "{}" })
+        yield* vscode.update(ROOT).pipe(provideFiles(managed))
+
+        const content = `// Team settings\n${managed.read(".vscode/settings.json")}`
+        const files = makeFiles({ ".vscode/settings.json": content })
+
+        yield* vscode.update(ROOT).pipe(provideFiles(files))
+
+        expect(files.read(".vscode/settings.json")).toBe(content)
+      })
+    )
+
     it.effect("return InvalidConfigFormat when the config is not a JSON object", () =>
       Effect.gen(function* () {
         const files = makeFiles({ ".vscode/settings.json": "[]" })

@@ -572,6 +572,21 @@ describe("zed", () => {
       })
     )
 
+    it.effect("succeed without a write when a config with comments already has the settings", () =>
+      Effect.gen(function* () {
+        // The managed settings come from an update of an empty config.
+        const managed = makeFiles({ [SETTINGS_PATH]: "{}" })
+        yield* zed.update(ROOT).pipe(provideFiles(managed))
+
+        const content = `// Zed settings\n${managed.read(SETTINGS_PATH)}`
+        const files = makeFiles({ [SETTINGS_PATH]: content })
+
+        yield* zed.update(ROOT).pipe(provideFiles(files))
+
+        expect(files.read(SETTINGS_PATH)).toBe(content)
+      })
+    )
+
     it.effect("return InvalidConfigFormat when the config is not a JSON object", () =>
       Effect.gen(function* () {
         const files = makeFiles({ [SETTINGS_PATH]: "[]" })

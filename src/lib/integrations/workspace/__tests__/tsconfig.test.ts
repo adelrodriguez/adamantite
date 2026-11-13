@@ -362,6 +362,21 @@ describe("tsconfig", () => {
       })
     )
 
+    it.effect(
+      "succeed without a write when a config with comments already extends the preset",
+      () =>
+        Effect.gen(function* () {
+          const content =
+            '{\n  // Visit https://aka.ms/tsconfig\n  "extends": "adamantite/typescript",\n}\n'
+
+          const files = makeFiles({ "tsconfig.json": content })
+
+          yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
+
+          expect(files.read("tsconfig.json")).toBe(content)
+        })
+    )
+
     it.effect("return InvalidConfigFormat when tsconfig.json is not a JSON object", () =>
       Effect.gen(function* () {
         const files = makeFiles({ "tsconfig.json": "true" })

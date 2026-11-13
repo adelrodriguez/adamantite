@@ -548,6 +548,11 @@ export default defineIntegration({
         ? yield* setEffectSettings(cwd, base, effect.value.rulesCustomization)
         : base
 
+      // A file that already holds the managed values needs no write, also when it has comments.
+      if (Equal.equals(existingConfig, newConfig)) {
+        return
+      }
+
       if (!checkIsPlainJson(zedFile)) {
         return yield* new JsoncNotEditable({
           change: `Add these settings, and keep the others:\n${yield* formatJson(pickChangedEntries(existingConfig, newConfig))}`,

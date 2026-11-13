@@ -3,6 +3,7 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Json5 from "effect/encoding/Json5"
 import * as Jsonc from "effect/encoding/Jsonc"
+import * as Equal from "effect/Equal"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
@@ -307,6 +308,11 @@ export default defineIntegration({
           mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined, preset),
         ],
       ])
+
+      // A file that already holds the managed values needs no write, also when it has comments.
+      if (Equal.equals(existingConfig, newConfig)) {
+        return
+      }
 
       if (!checkIsPlainJson(tsconfigFile)) {
         return yield* new JsoncNotEditable({

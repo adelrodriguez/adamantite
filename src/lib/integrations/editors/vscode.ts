@@ -1,5 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as Json5 from "effect/encoding/Json5"
+import * as Equal from "effect/Equal"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
@@ -302,6 +303,11 @@ export default defineIntegration({
         ["oxc.path.oxlint", CONFIG["oxc.path.oxlint"]],
         ...effectSettings,
       ])
+
+      // A file that already holds the managed values needs no write, also when it has comments.
+      if (Equal.equals(existingConfig, newConfig)) {
+        return
+      }
 
       if (!checkIsPlainJson(vscodeFile)) {
         return yield* new JsoncNotEditable({

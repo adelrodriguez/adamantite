@@ -1,6 +1,7 @@
 import type { JsonObject, JsonValue } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Json5 from "effect/encoding/Json5"
+import * as Equal from "effect/Equal"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
@@ -140,6 +141,11 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
   const nextPlugins = existing
     ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: true } : entry))
     : [...plugins, LANGUAGE_SERVICE_PLUGIN]
+
+  // A file that already holds the managed values needs no write, also when it has comments.
+  if (Equal.equals(plugins, nextPlugins)) {
+    return "unchanged" as const
+  }
 
   if (!checkIsPlainJson(content.value)) {
     return yield* new JsoncNotEditable({

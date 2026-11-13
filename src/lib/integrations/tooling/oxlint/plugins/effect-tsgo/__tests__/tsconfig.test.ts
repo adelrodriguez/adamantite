@@ -102,6 +102,27 @@ describe("tsconfig", () => {
       })
     )
 
+    it.effect("succeed without a write when a config with comments already has the entry", () =>
+      Effect.gen(function* () {
+        const content = `{
+  // Strict project
+  "compilerOptions": {
+    "plugins": [{ "name": "@effect/language-service", "diagnostics": true }],
+  },
+}
+`
+
+        const files = makeFiles({ "tsconfig.json": content })
+
+        const result = yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
+
+        expect({ content: files.read("tsconfig.json"), result }).toStrictEqual({
+          content,
+          result: "unchanged",
+        })
+      })
+    )
+
     it.effect("report a missing tsconfig.json without creating one", () =>
       Effect.gen(function* () {
         const files = makeFiles()

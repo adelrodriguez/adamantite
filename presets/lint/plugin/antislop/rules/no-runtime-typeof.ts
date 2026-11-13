@@ -1,5 +1,8 @@
-import type { ESTree, Rule } from "@oxlint/plugins"
+import type { Definition, ESTree, Rule, SourceCode } from "@oxlint/plugins"
+import type { VisitorKeys } from "../shared/child-nodes.ts"
 import { readBooleanOption } from "../../options.ts"
+import { mentionsUncheckedType } from "../shared/function-parameters.ts"
+import { resolveVariable } from "../shared/scope.ts"
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function
 
@@ -70,6 +73,99 @@ function isExistenceProbe(node: ESTree.UnaryExpression): boolean {
   return other.type === "Literal" && other.value === "undefined"
 }
 
+type BindingName = Definition["name"]
+
+/**
+ * Return the identifier at the root of a `typeof` operand, as `options` in `options.headers`.
+ */
+function operandRoot(argument: ESTree.Expression): ESTree.IdentifierReference | null {
+  let current = argument
+
+  while (
+    current.type === "ParenthesizedExpression"
+    || current.type === "ChainExpression"
+    || current.type === "MemberExpression"
+  ) {
+    current = current.type === "MemberExpression" ? current.object : current.expression
+  }
+
+  return current.type === "Identifier" ? current : null
+}
+
+function bindingName(
+  identifier: ESTree.IdentifierReference,
+  sourceCode: SourceCode
+): BindingName | null {
+  return resolveVariable(sourceCode, identifier)?.defs[0]?.name ?? null
+}
+
+/**
+ * Return the annotation written on a binding. A parameter with a default value keeps its annotation
+ * on the binding.
+ */
+function ownAnnotation(name: BindingName): ESTree.TSType | null {
+  return name.typeAnnotation?.typeAnnotation ?? null
+}
+
+/**
+ * Return the object pattern that destructures a binding, as in `const { headers } = options`.
+ */
+function destructuringPattern(
+  name: BindingName
+): ESTree.ObjectAssignmentTarget | ESTree.ObjectPattern | null {
+  const value =
+    name.parent.type === "AssignmentPattern" && name.parent.left === name ? name.parent : name
+
+  const property = value.parent
+
+  if (property.type !== "Property" || property.value !== value) return null
+
+  return property.parent.type === "ObjectPattern" ? property.parent : null
+}
+
+/**
+ * Return the annotation that declares a binding. A binding destructured from an object takes the
+ * annotation of its pattern, or of the binding that the pattern reads, one step away.
+ */
+function declaredType(
+  identifier: ESTree.IdentifierReference,
+  sourceCode: SourceCode
+): ESTree.TSType | null {
+  const name = bindingName(identifier, sourceCode)
+
+  if (name === null) return null
+
+  const pattern = destructuringPattern(name)
+
+  if (pattern === null) return ownAnnotation(name)
+
+  if (pattern.typeAnnotation) return pattern.typeAnnotation.typeAnnotation
+  const declarator = pattern.parent
+
+  if (declarator.type !== "VariableDeclarator" || declarator.init?.type !== "Identifier") {
+    return null
+  }
+
+  const source = bindingName(declarator.init, sourceCode)
+
+  return source === null ? null : ownAnnotation(source)
+}
+
+/**
+ * Return whether a `typeof` operand reads a binding with a declared type that has no `unknown` or
+ * `any`. Such a value is already parsed, so `typeof` only picks a member of an owned union.
+ */
+function hasOwnedType(
+  argument: ESTree.Expression,
+  sourceCode: SourceCode,
+  visitorKeys: VisitorKeys
+): boolean {
+  const root = operandRoot(argument)
+  const type = root === null ? null : declaredType(root, sourceCode)
+
+  return type !== null && !mentionsUncheckedType(type, visitorKeys)
+}
+
 /**
  * Disallow runtime typeof checks that narrow unparsed values instead of decoding them.
  */
@@ -82,6 +178,7 @@ const rule: Rule = {
         if (
           node.operator === "typeof"
           && !isExistenceProbe(node)
+          && !hasOwnedType(node.argument, context.sourceCode, context.sourceCode.visitorKeys)
           && (!allowInTypeGuards || !isInsideTypeGuard(node))
         ) {
           context.report({ messageId: "runtimeTypeof", node })
@@ -93,11 +190,11 @@ const rule: Rule = {
     defaultOptions: [{ allowInTypeGuards: false }],
     docs: {
       description:
-        "Disallow runtime typeof checks; external values must be decoded into meaningful types at their I/O boundary.",
+        "Disallow runtime typeof checks on values that may be unparsed. Decode external values into meaningful types at their I/O boundary. A value with a declared type that has no `unknown` or `any` may use typeof.",
     },
     messages: {
       runtimeTypeof:
-        "A `typeof` check narrows a representation without establishing its contract. Parse input at its I/O boundary, then branch on the domain value.",
+        "A `typeof` check narrows a representation without establishing its contract. Parse input at its I/O boundary, then branch on the domain value. A value with a declared owned type, such as `retry: number | RetryPolicy`, may use `typeof`.",
     },
     schema: [
       {

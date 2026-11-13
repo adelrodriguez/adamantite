@@ -411,7 +411,9 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "typescript/no-useless-empty-export": "error",
     "typescript/no-var-requires": "error",
     "typescript/no-wrapper-object-types": "error",
-    "typescript/non-nullable-type-assertion-style": "error",
+    // This rule tells the author to replace `value as T` with `value!`, which
+    // `typescript/no-non-null-assertion` bans. The ban stays, so the author narrows with a check.
+    "typescript/non-nullable-type-assertion-style": "off",
     "typescript/only-throw-error": "error",
     "typescript/parameter-properties": "error",
     "typescript/prefer-as-const": "error",

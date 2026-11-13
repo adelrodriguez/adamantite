@@ -10,9 +10,9 @@ import { firstPartyPlugin } from "./plugins/entry.ts"
 const config: OxlintConfig = {
   jsPlugins: ["oxlint-plugin-react-doctor", firstPartyPlugin("adamantite")],
   rules: {
-    // Hooks stay allowed in hook modules: `**/use[A-Z]*.{ts,tsx}`, `**/use-*.{ts,tsx}`,
-    // `**/hooks.{ts,tsx}`, and `**/hooks/**`. A project with another layout sets the rule's `allow`
-    // option.
+    // Hooks stay allowed in hook modules: `**/use-*.{ts,tsx}`, `**/hooks.{ts,tsx}`, and
+    // `**/hooks/**`. Each name passes core's `unicorn/filename-case`. A project with another layout
+    // sets the rule's `allow` option.
     "adamantite/no-react-state-hooks": "error",
 
     // State values stay immutable, and updaters stay pure.

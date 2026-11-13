@@ -1,7 +1,7 @@
-import { useCounter } from "./useCounter"
+import { useCart } from "./use-cart"
 
-export function Counter() {
-  const [count] = useCounter()
+export function Cart() {
+  const [items] = useCart()
 
-  return <p>{count}</p>
+  return <p>{items.length}</p>
 }

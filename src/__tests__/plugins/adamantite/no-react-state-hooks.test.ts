@@ -78,15 +78,16 @@ tester.run("no-react-state-hooks", plugin.rules["no-react-state-hooks"], {
       errors: [{ column: 9, data: { hook: "useState" }, line: 3, messageId: "localState" }],
       filename: feature("userProfile.tsx"),
     },
+    {
+      code: 'import { useState } from "react"\nexport function useCounter() {\n  return useState(0)\n}',
+      errors: [{ column: 9, data: { hook: "useState" }, line: 3, messageId: "localState" }],
+      filename: `${CWD}/src/features/useCounter.ts`,
+    },
   ],
   valid: [
     {
       code: 'import { useState } from "react"\nexport function useCart() {\n  return useState(0)\n}',
       filename: `${CWD}/src/features/use-cart.ts`,
-    },
-    {
-      code: 'import { useState } from "react"\nexport function useCounter() {\n  return useState(0)\n}',
-      filename: `${CWD}/src/features/useCounter.ts`,
     },
     {
       code: 'import { useEffect } from "react"\nexport function subscribe() {\n  useEffect(() => {}, [])\n}',

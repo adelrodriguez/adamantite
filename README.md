@@ -515,9 +515,9 @@ instead: derive state from loader data or URL params, move side effects to loade
 or event handlers, and let the React Compiler memoize. For the opinions that do not depend
 on React, add [the strict preset](#the-strict-preset).
 
-Hooks stay allowed in hook modules: files that match `**/use[A-Z]*.{ts,tsx}`,
-`**/use-*.{ts,tsx}`, `**/hooks.{ts,tsx}`, or `**/hooks/**`, such as `useCart.ts`, `use-cart.ts`,
-or `cart/hooks.ts`. A file such as `userProfile.tsx` is feature code.
+Hooks stay allowed in hook modules: files that match `**/use-*.{ts,tsx}`, `**/hooks.{ts,tsx}`,
+or `**/hooks/**`, such as `use-cart.ts` or `cart/hooks.ts`. Each of these names passes the
+kebab-case check of the core preset. A file such as `useCart.ts` is feature code.
 Globs match paths relative to the working directory. Set `allow` to use another layout, and
 `hooks` to change the list of reported hooks:
 
@@ -533,7 +533,7 @@ export default defineConfig({
   rules: {
     "adamantite/no-react-state-hooks": [
       "error",
-      { allow: ["src/state/**", "**/use[A-Z]*.{ts,tsx}"], hooks: ["useState", "useEffect"] },
+      { allow: ["src/state/**", "**/use-*.{ts,tsx}"], hooks: ["useState", "useEffect"] },
     ],
   },
 })

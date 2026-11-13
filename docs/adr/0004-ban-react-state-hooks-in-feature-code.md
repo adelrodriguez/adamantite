@@ -1,7 +1,8 @@
 # Ban React state, effect, and memoization hooks in feature code
 
 The default hook modules now also include `**/hooks.{ts,tsx}`, for a feature that keeps its hooks
-in one `hooks.ts` file.
+in one `hooks.ts` file. They no longer include `**/use[A-Z]*.{ts,tsx}`, because core's
+`unicorn/filename-case` reports a camelCase file name such as `useCart.ts` (#775).
 
 The `react-strict` preset takes a position on where React state and side effects belong. We
 decided (2026-09-29, issue #405) that `adamantite/no-react-state-hooks` reports `useState`,
@@ -9,7 +10,7 @@ decided (2026-09-29, issue #405) that `adamantite/no-react-state-hooks` reports 
 `useCallback` in feature code at `"error"`. State comes from loaders, URL params, and
 queries. Side effects live in loaders, actions, and event handlers. The React Compiler
 memoizes. Hook modules (`**/use[A-Z]*.{ts,tsx}`,
-`**/use-*.{ts,tsx}`, and `**/hooks/**` by default) keep the hooks for
+`**/use-*.{ts,tsx}`, and `**/hooks/**` by default at the time) keep the hooks for
 the few cases that need them.
 
 The ban was first planned as `no-restricted-imports` config (#404). A first-party rule is

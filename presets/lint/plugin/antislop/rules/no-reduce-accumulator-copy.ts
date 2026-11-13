@@ -143,13 +143,14 @@ function hasFixedKeys(node: ESTree.Node) {
 }
 
 /**
- * Reports whether the reducer returns the copy, directly or through more calls that keep its
- * length, such as `acc.with(0, a).with(1, b)`. A copy that the step changes later can grow.
+ * Return the expression that the reducer returns when it returns the copy, directly or through more
+ * calls that keep its length, such as `acc.with(0, a).with(1, b)`. A copy that the step changes
+ * later can grow, so it has no step result.
  */
-function isStepResult(
+function stepResult(
   copy: ESTree.Node,
   callback: ESTree.ArrowFunctionExpression | ESTree.Function
-) {
+): ESTree.Node | null {
   let result = copy
   let parent = result.parent
 
@@ -160,17 +161,31 @@ function isStepResult(
       const call = parent.parent
       const method = call.type === "CallExpression" ? arrayMethodTarget(call.callee) : null
 
-      if (method === null || ARRAY_COPY_LENGTH.get(method.name) !== "keep") return false
+      if (method === null || ARRAY_COPY_LENGTH.get(method.name) !== "keep") return null
 
       result = call
     } else {
-      return parent.type === "ReturnStatement" || callback.body === result
+      return parent.type === "ReturnStatement" || callback.body === result ? result : null
     }
 
     parent = result.parent
   }
 
-  return false
+  return null
+}
+
+/**
+ * Reports whether the step uses the accumulator only inside its result. A step that also uses the
+ * accumulator elsewhere can grow it, as in `acc.push(item)`, before it makes the copy.
+ */
+function isUsedOnlyIn(accumulator: Variable, result: ESTree.Node | null) {
+  return (
+    result !== null
+    && accumulator.references.every(
+      ({ identifier, init }) =>
+        init || (identifier.start >= result.start && identifier.end <= result.end)
+    )
+  )
 }
 
 /**
@@ -215,15 +230,15 @@ const rule: Rule = {
         ) {
           const target = node.arguments[0]
 
-          // A copy keeps a fixed size when the initial value has keys and each merged object has
-          // only fixed keys.
+          // A copy keeps a fixed size when the initial value has keys, each merged object has only
+          // fixed keys, and the step uses the accumulator only in the copy that it returns.
           const isBounded =
             initialValue?.type === "ObjectExpression"
             && initialValue.properties.length > 0
             && node.arguments.every(
               (argument) => isAccumulator(argument) || hasFixedKeys(unwrapArrayExpression(argument))
             )
-            && isStepResult(node, reducer.callback)
+            && isUsedOnlyIn(accumulator, stepResult(node, reducer.callback))
 
           copiesAccumulator =
             target !== undefined
@@ -242,14 +257,14 @@ const rule: Rule = {
             && isKnownArrayExpression(context.sourceCode, reducer.initialValue)
 
           // A window copy has a fixed length. A copy that keeps the length of a non-empty tuple
-          // keeps a fixed size when the step returns it.
+          // keeps a fixed size when the step returns it and uses the accumulator only there.
           const isBounded =
             arrayCopyLength === "window"
               ? hasFixedWindow(node.arguments)
               : arrayCopyLength === "keep"
                 && initialValue?.type === "ArrayExpression"
                 && initialValue.elements.length > 0
-                && isStepResult(node, reducer.callback)
+                && isUsedOnlyIn(accumulator, stepResult(node, reducer.callback))
 
           copiesAccumulator = arrayAccumulator && isAccumulator(method.object) && !isBounded
         }

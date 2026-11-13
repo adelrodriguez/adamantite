@@ -133,6 +133,16 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
       errors: [error],
       name: "object that the step grows before a fixed-key copy",
     },
+    {
+      code: "items.reduce((acc, item) => { const alias = acc; alias.push(item); return acc.with(0, item); }, [0, 0]);",
+      errors: [error],
+      name: "tuple that the step grows through an alias before a length-preserving copy",
+    },
+    {
+      code: "items.reduce((acc, item) => { grow(acc); return acc.toSorted(); }, [0, 0]);",
+      errors: [error],
+      name: "tuple that the step passes to a call before a length-preserving copy",
+    },
   ],
   valid: [
     "items.reduce((acc, item) => { acc.push(item); return acc; }, []);",
@@ -177,6 +187,14 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
     {
       code: "items.reduce((acc, item) => Object.assign({}, acc, { sum: acc.sum + item.n }), { sum: 0 });",
       name: "fixed keys on a non-empty initial value",
+    },
+    {
+      code: "items.reduce((acc = [0, 0], item) => acc.with(0, item), [0, 0]);",
+      name: "with on a tuple accumulator with a default value",
+    },
+    {
+      code: "items.reduce((acc, item) => { const n = item.n * 2; return acc.with(0, acc[0] + n); }, [0, 0]);",
+      name: "with on a tuple in a step with other statements",
     },
   ],
 })

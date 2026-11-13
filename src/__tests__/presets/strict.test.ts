@@ -5,11 +5,13 @@ import type { OxlintConfig } from "oxlint"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
+import { testFiles as jestTestFiles } from "#presets/lint/jest.ts"
 import adamantitePlugin from "#presets/lint/plugins/adamantite/index.ts"
 import antislopPlugin from "#presets/lint/plugins/anti-slop/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
+import { testFiles as vitestTestFiles } from "#presets/lint/vitest.ts"
 import packageJson from "../../../package.json" with { type: "json" }
 import {
   lintRuleFixtures,
@@ -52,6 +54,14 @@ describe("strict preset", () => {
         Order.String
       )
     )
+  })
+
+  it("apply its test-file rules to each file that the jest or vitest preset treats as a test", () => {
+    const testOverride = strict.overrides?.find(
+      (override) => override.rules?.["typescript/consistent-type-assertions"] !== undefined
+    )
+
+    expect(testOverride?.files).toStrictEqual([...new Set([...jestTestFiles, ...vitestTestFiles])])
   })
 
   it("have fixtures for exactly the rules the preset enables", () => {

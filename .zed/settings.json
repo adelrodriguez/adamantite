@@ -173,7 +173,6 @@
           "fixKind": "safe_fix",
           "run": "onType",
           "typeAware": true,
-          "unusedDisableDirectives": "deny",
           "rulesCustomization": {
             "effecttsgo/abort-controller-in-effect": {
               "severity": "off"

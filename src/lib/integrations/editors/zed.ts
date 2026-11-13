@@ -119,7 +119,6 @@ const CONFIG = {
           fixKind: "safe_fix",
           run: "onType",
           typeAware: true,
-          unusedDisableDirectives: "deny",
         },
       },
     },

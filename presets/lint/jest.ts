@@ -85,7 +85,10 @@ const rules: OxlintConfig["rules"] = {
   "jest/prefer-to-have-been-called-times": "error",
   "jest/prefer-to-have-length": "error",
   "jest/prefer-todo": "error",
-  "jest/require-hook": "error",
+  // `tester.run(...)` of RuleTester registers the suites of a rule test, as the stub that
+  // `adamantite rule test add` writes calls it. The rule matches the name of the call, so a
+  // top-level call of any function named `tester.run` passes.
+  "jest/require-hook": ["error", { allowedFunctionCalls: ["tester.run"] }],
   "jest/require-to-throw-message": "error",
   "jest/require-top-level-describe": "error",
   "jest/valid-describe-callback": "error",

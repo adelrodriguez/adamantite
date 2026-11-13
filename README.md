@@ -415,6 +415,11 @@ the entries in order, and a later entry replaces the rules of an earlier one. So
 strict and effect, change rules of core, and core replaces those changes when it comes after the
 preset. Doctor reports an Adamantite preset that comes before a core entry.
 
+The core preset reports an `oxlint-disable` or `eslint-disable` comment that suppresses nothing,
+and `adamantite fix` removes the comment. The Zed and VS Code setups report it with the same
+severity. Oxlint reads this setting, `options.reportUnusedDisableDirectives`, only from the root
+config. To change it, set it in the root `oxlint.config.ts`.
+
 ### Change a rule that a preset sets for some files
 
 Some presets set rules for some files in an `overrides` entry. Oxlint applies the settings in this
@@ -557,6 +562,9 @@ of an override that does not enable the `vitest` plugin.
 Both presets accept a describe title that starts with a capital letter, such as
 `describe("Calculator", ...)`, because the title often names the class or function under test.
 They report a test title that starts with a capital letter.
+
+Both presets accept a top-level `tester.run(...)` call in `require-hook`. A RuleTester test, such
+as the one that `adamantite rule test add` writes, registers its suites with that call.
 
 ### The react-strict preset
 

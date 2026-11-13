@@ -8,39 +8,120 @@ import {
   unwrapArrayExpression,
 } from "../shared/array-method.ts"
 import { isNumberLiteral } from "../shared/literals.ts"
+import { isGlobalObject } from "../shared/scope.ts"
 
-function enclosingReducer(node: ESTree.Node) {
+type ReducerCallback = ESTree.ArrowFunctionExpression | ESTree.Function
+
+/**
+ * Return the call that takes a node as an argument, past syntax-only wrappers, or null.
+ */
+function callWithArgument(node: ESTree.Node) {
+  let owner: ESTree.Node | null = node.parent
+
+  while (owner !== null && unwrapArrayExpression(owner) === node) owner = owner.parent
+
+  return owner?.type === "CallExpression"
+    && owner.arguments.some((argument) => unwrapArrayExpression(argument) === node)
+    ? owner
+    : null
+}
+
+/**
+ * Return the reduce call that takes a node as its reducer, or null.
+ */
+function reduceCallWithReducer(node: ESTree.Node) {
+  const call = callWithArgument(node)
+
+  if (call === null) return null
+  const method = arrayMethodTarget(call.callee)
+  const [reducer] = call.arguments
+
+  return (method?.name === "reduce" || method?.name === "reduceRight")
+    && call.arguments.length <= 2
+    && reducer !== undefined
+    && unwrapArrayExpression(reducer) === node
+    ? call
+    : null
+}
+
+/**
+ * Return the binding that names a function, for a function declaration or a function that
+ * initializes a `const` binding that no code reassigns. Return null for any other function.
+ */
+function functionBinding(sourceCode: SourceCode, callback: ReducerCallback) {
+  if (callback.type === "FunctionDeclaration") {
+    const variable = sourceCode
+      .getDeclaredVariables(callback)
+      .find((declared) => declared.defs.some((definition) => definition.type === "FunctionName"))
+
+    return variable?.references.some((reference) => reference.isWrite()) === false ? variable : null
+  }
+
+  let declarator: ESTree.Node | null = callback.parent
+
+  while (declarator !== null && unwrapArrayExpression(declarator) === callback) {
+    declarator = declarator.parent
+  }
+
+  if (declarator?.type !== "VariableDeclarator") return null
+  const [variable] = sourceCode.getDeclaredVariables(declarator)
+
+  return variable !== undefined && constInitializer(variable) === declarator.init ? variable : null
+}
+
+/**
+ * Return the reduce call that uses a function as its reducer: inline, or by the name of a function
+ * declaration or a `const` binding in the same file. Return null when no reduce call uses it.
+ */
+function reduceCallForCallback(sourceCode: SourceCode, callback: ReducerCallback) {
+  const inlineCall = reduceCallWithReducer(callback)
+
+  if (inlineCall !== null) return inlineCall
+  const variable = functionBinding(sourceCode, callback)
+
+  for (const reference of variable?.references ?? []) {
+    const call = reduceCallWithReducer(reference.identifier)
+
+    if (call !== null) return call
+  }
+
+  return null
+}
+
+/**
+ * Return the accumulator parameter and the initial value of a reducer, or null when the accumulator
+ * is not a plain name.
+ */
+function reducerParts(callback: ReducerCallback, call: ESTree.CallExpression) {
+  const firstParameter = callback.params[0]
+
+  const accumulator =
+    firstParameter?.type === "AssignmentPattern" ? firstParameter.left : firstParameter
+
+  if (accumulator?.type !== "Identifier") return null
+
+  return { accumulator, callback, initialValue: call.arguments[1] }
+}
+
+/**
+ * Find the reducer that runs a node. A callback inside the reducer, such as a `forEach` callback,
+ * runs on each step, so the search continues past it. Any other function, such as a stored
+ * callback, stops the search.
+ */
+function enclosingReducer(sourceCode: SourceCode, node: ESTree.Node) {
   let parent = node.parent
 
   while (parent !== null) {
-    if (parent.type === "FunctionDeclaration") return null
+    if (
+      parent.type === "ArrowFunctionExpression"
+      || parent.type === "FunctionDeclaration"
+      || parent.type === "FunctionExpression"
+    ) {
+      const call = reduceCallForCallback(sourceCode, parent)
 
-    if (parent.type === "ArrowFunctionExpression" || parent.type === "FunctionExpression") {
-      const callback = parent
-      let owner: ESTree.Node | null = callback.parent
+      if (call !== null) return reducerParts(parent, call)
 
-      while (owner !== null && unwrapArrayExpression(owner) === callback) owner = owner.parent
-
-      if (owner?.type !== "CallExpression") return null
-      const method = arrayMethodTarget(owner.callee)
-      const firstArgument = owner.arguments[0]
-
-      if (
-        method === null
-        || (method.name !== "reduce" && method.name !== "reduceRight")
-        || owner.arguments.length > 2
-        || firstArgument === undefined
-        || unwrapArrayExpression(firstArgument) !== callback
-      )
-        return null
-      const firstParameter = callback.params[0]
-
-      const accumulator =
-        firstParameter?.type === "AssignmentPattern" ? firstParameter.left : firstParameter
-
-      if (accumulator?.type !== "Identifier") return null
-
-      return { accumulator, callback, initialValue: owner.arguments[1] }
+      if (callWithArgument(parent) === null) return null
     }
 
     parent = parent.parent
@@ -66,15 +147,6 @@ function referencesAccumulator(
   return (
     initializer !== null && referencesAccumulator(sourceCode, initializer, accumulator, visited)
   )
-}
-
-function isGlobalCopyOwner(sourceCode: SourceCode, expression: ESTree.Node, name: string): boolean {
-  const node = unwrapArrayExpression(expression)
-
-  if (node.type !== "Identifier" || node.name !== name) return false
-  const variable = resolveArrayBinding(sourceCode, node)
-
-  return variable === null || variable.defs.length === 0
 }
 
 /**
@@ -199,7 +271,7 @@ const rule: Rule = {
         const method = arrayMethodTarget(node.callee)
 
         if (method === null) return
-        const reducer = enclosingReducer(node)
+        const reducer = enclosingReducer(context.sourceCode, node)
 
         if (reducer === null) return
 
@@ -226,7 +298,7 @@ const rule: Rule = {
 
         if (
           method.name === "assign"
-          && isGlobalCopyOwner(context.sourceCode, method.object, "Object")
+          && isGlobalObject(context.sourceCode, unwrapArrayExpression(method.object), "Object")
         ) {
           const target = node.arguments[0]
 
@@ -247,7 +319,7 @@ const rule: Rule = {
             && !isBounded
         } else if (
           method.name === "from"
-          && isGlobalCopyOwner(context.sourceCode, method.object, "Array")
+          && isGlobalObject(context.sourceCode, unwrapArrayExpression(method.object), "Array")
         ) {
           const source = node.arguments[0]
           copiesAccumulator = source !== undefined && isAccumulator(source)
@@ -266,7 +338,15 @@ const rule: Rule = {
                 && initialValue.elements.length > 0
                 && isUsedOnlyIn(accumulator, stepResult(node, reducer.callback))
 
-          copiesAccumulator = arrayAccumulator && isAccumulator(method.object) && !isBounded
+          // `concat` also copies an accumulator that it takes as an argument, such as
+          // `[item].concat(acc)`.
+          const concatsAccumulator =
+            method.name === "concat"
+            && isKnownArrayExpression(context.sourceCode, method.object)
+            && node.arguments.some(isAccumulator)
+
+          copiesAccumulator =
+            arrayAccumulator && (isAccumulator(method.object) || concatsAccumulator) && !isBounded
         }
 
         if (copiesAccumulator) context.report({ messageId: "accumulatorCopy", node })

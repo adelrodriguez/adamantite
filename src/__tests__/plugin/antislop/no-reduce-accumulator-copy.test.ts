@@ -183,6 +183,16 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
       errors: [error],
       name: "copy in a callback inside the reducer",
     },
+    {
+      code: "function step(acc, item) { item.tags.forEach((tag) => { acc = acc.concat(tag); }); return acc; } items.reduce(step, []);",
+      errors: [error],
+      name: "copy in a callback inside a named reducer",
+    },
+    {
+      code: "items.reduce((acc, item) => [...item.tags].concat(acc), [] as string[]);",
+      errors: [error],
+      name: "accumulator passed to concat on a spread array",
+    },
   ],
   valid: [
     "items.reduce((acc, item) => { acc.push(item); return acc; }, []);",
@@ -263,6 +273,14 @@ tester.run("no-reduce-accumulator-copy", plugin.rules["no-reduce-accumulator-cop
     {
       code: "function run(globalThis) { return items.reduce((acc, item) => globalThis.Object.assign({}, acc), {}); }",
       name: "parameter that shadows globalThis",
+    },
+    {
+      code: "function step(acc, item) { return acc.concat(item); } items.reduce(step, customCollection);",
+      name: "named reducer on an initial value that is not a known array",
+    },
+    {
+      code: "items.reduce((acc, item) => { const read = () => acc.concat(item); return acc; }, []);",
+      name: "copy in a stored callback inside the reducer",
     },
   ],
 })

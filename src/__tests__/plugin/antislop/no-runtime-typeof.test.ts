@@ -30,6 +30,25 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
       errors: [error],
       options: allowInTypeGuards,
     },
+    {
+      code: 'function check(values: unknown[]): boolean { return values.every((item) => typeof item === "string"); }',
+      errors: [error],
+      options: allowInTypeGuards,
+    },
+    {
+      code: 'function isStringArray(value: unknown): value is string[] { return Array.isArray(value) && value.every((item): boolean => typeof item === "string"); }',
+      errors: [error],
+      options: allowInTypeGuards,
+    },
+    {
+      code: 'const check: (value: unknown) => boolean = (value) => typeof value === "string";',
+      errors: [error],
+      options: allowInTypeGuards,
+    },
+    {
+      code: 'const isText: (value: unknown) => value is string = (value) => typeof value === "string";',
+      errors: [error],
+    },
   ],
   valid: [
     'const isServer = typeof document === "undefined";',
@@ -47,6 +66,18 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     },
     {
       code: 'function assertString(value: unknown): asserts value is string { if (typeof value !== "string") throw new Error(); }',
+      options: allowInTypeGuards,
+    },
+    {
+      code: 'function isStringArray(value: unknown): value is string[] { return Array.isArray(value) && value.every((item) => typeof item === "string"); }',
+      options: allowInTypeGuards,
+    },
+    {
+      code: 'function isStringArray(value: unknown): value is string[] { return Array.isArray(value) && value.every(function (item) { return typeof item === "string"; }); }',
+      options: allowInTypeGuards,
+    },
+    {
+      code: 'export const isText: (value: unknown) => value is string = (value) => typeof value === "string";',
       options: allowInTypeGuards,
     },
   ],

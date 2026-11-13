@@ -411,8 +411,11 @@ describe("rule trials in a real project", () => {
     "keep the root options for a case under a nested config, with $name",
     ({ setting }) =>
       Effect.gen(function* () {
-        // The entry starts the type-aware backend from the `tsrs` package of the project.
+        // Install tsrs as npm does, with its `tsrs-lint` bin in `node_modules/.bin`. Oxlint starts
+        // the type-aware backend from that launcher.
         symlinkSync(join(REPO_ROOT, "node_modules", "tsrs"), join(project, "node_modules", "tsrs"))
+        mkdirSync(join(project, "node_modules", ".bin"))
+        symlinkSync("../tsrs/bin/tsrs-lint", join(project, "node_modules", ".bin", "tsrs-lint"))
 
         write(
           "tsconfig.json",

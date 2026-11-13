@@ -141,6 +141,8 @@ describe("vscode", () => {
         const config = yield* parseJson(files.read(".vscode/settings.json"))
 
         expect(config).toHaveProperty(["editor.formatOnSave"], true)
+        // The Astro extension sets its own formatter for Astro, so a global default does not apply.
+        expect(config).toHaveProperty(["[astro]", "editor.defaultFormatter"], "oxc.oxc-vscode")
         expect(config).toHaveProperty(["oxc.path.oxlint"], "node_modules/adamantite/dist/oxlint.js")
         expect(config).not.toHaveProperty(["js/ts.tsdk.path"])
       })

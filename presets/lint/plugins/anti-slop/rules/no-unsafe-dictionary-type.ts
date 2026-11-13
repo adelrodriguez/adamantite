@@ -64,20 +64,18 @@ function isHeritage(node: ESTree.Node): node is Heritage {
   return node.type === "TSClassImplements" || node.type === "TSInterfaceHeritage"
 }
 
-function isInsideTypeAliasDeclaration(node: ESTree.Node): boolean {
-  let current: ESTree.Node | null = node.parent
-
-  while (current !== null && current.type !== "Program") {
-    if (current.type === "TSTypeAliasDeclaration") return true
-    current = current.parent
-  }
-
-  return false
+/**
+ * Return whether a node is the whole body of a type alias, as `Bag` in `type Other = Bag`. Such an
+ * alias gives the dictionary another name, so it reports as a declaration.
+ */
+function isTypeAliasBody(node: ESTree.TSType): boolean {
+  return node.parent.type === "TSTypeAliasDeclaration" && node.parent.typeAnnotation === node
 }
 
 /**
- * Return whether a node is a plain use of a local alias or interface, as `Bag` in `const a: Bag`.
- * The declaration reports its own unsafe dictionary, so its plain uses do not report again.
+ * Return whether a node is a plain use of a local alias or interface, as `Bag` in `const a: Bag` or
+ * `type Logger = { info: (fields: Bag) => void }`. The declaration reports its own unsafe
+ * dictionary, so its plain uses do not report again.
  */
 function isPlainNamedConsumerUse(node: ESTree.TSType, environment: TypeEnvironment): boolean {
   if (node.type !== "TSTypeReference" || node.typeArguments?.params.length) return false
@@ -88,7 +86,7 @@ function isPlainNamedConsumerUse(node: ESTree.TSType, environment: TypeEnvironme
     && !reference.global
     && (visibleTypeAlias(reference.name, node, environment.typeAliases) !== null
       || visibleInterfaces(reference.name, node, environment.typeAliases).length > 0)
-    && !isInsideTypeAliasDeclaration(node)
+    && !isTypeAliasBody(node)
   )
 }
 

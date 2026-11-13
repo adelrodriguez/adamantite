@@ -78,6 +78,26 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
       code: "type Unsafe = Record<string, unknown>; type AlsoUnsafe = Unsafe; const x: Unsafe = {};",
       errors: 2,
     },
+    {
+      code: "type Unsafe = Record<string, unknown>; type AlsoUnsafe = Readonly<Unsafe>;",
+      errors: 2,
+    },
+    // A use of a named dictionary inside an alias body reports only at the declaration, as in an
+    // interface. Only an alias whose whole body is the dictionary names it again.
+    {
+      code: "type Fields = Record<string, unknown>; type Logger = { info: (event: Fields) => void; warn(event: Fields): void };",
+      errors: 1,
+    },
+    {
+      code: "type Fields = Record<string, unknown>; interface Logger { info: (event: Fields) => void; warn(event: Fields): void }",
+      errors: 1,
+    },
+    {
+      code: "type Fields = Record<string, unknown>; type Log = (event: Fields) => void;",
+      errors: 1,
+    },
+    { code: "type Unsafe = Record<string, unknown>; type A = { bag: Unsafe };", errors: 1 },
+    { code: "type Unsafe = Record<string, unknown>; type A = Unsafe | Command;", errors: 1 },
     // An unsafe default makes the declaration unsafe, and the alias that uses it reports too.
     { code: "type Index<T = unknown> = Record<string, T>; type A = Index;", errors: 2 },
     {

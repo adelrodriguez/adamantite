@@ -19,12 +19,12 @@ const decodeOxlintJsonOutput = Schema.decodeUnknownSync(
  * Lint one file with the core preset in one real Oxlint run, through the Oxlint entry. The config
  * turns on the type-aware rules, as the config that init writes does.
  */
-function lint(source: string) {
+function lint(file: string, source: string) {
   const project = mkdtempSync(join(tmpdir(), "adamantite-core-"))
 
   try {
     symlinkSync(join(REPO_ROOT, "node_modules"), join(project, "node_modules"))
-    writeFileSync(join(project, "index.ts"), source)
+    writeFileSync(join(project, file), source)
     writeFileSync(
       join(project, "package.json"),
       JSON.stringify({ name: "fixture", type: "module" })
@@ -47,7 +47,7 @@ function lint(source: string) {
 
     const result = spawnSync(
       process.execPath,
-      [join(REPO_ROOT, "src/oxlint.ts"), "-c", "oxlint.config.ts", "-f", "json", "index.ts"],
+      [join(REPO_ROOT, "src/oxlint.ts"), "-c", "oxlint.config.ts", "-f", "json", file],
       { cwd: project, encoding: "utf8" }
     )
 
@@ -62,6 +62,7 @@ describe("core preset", () => {
   // call needs the result of the call before it, and a lint rule cannot tell the two cases apart.
   it("accept an await in a loop", () => {
     const codes = lint(
+      "index.ts",
       [
         "export async function send(urls: readonly string[]) {",
         "  for (const url of urls) {",
@@ -78,8 +79,38 @@ describe("core preset", () => {
   // `typescript/only-throw-error` reads the type of the thrown value, so it reports every throw
   // that `no-throw-literal` reports. With both rules on, one throw needs two suppressions.
   it("report a thrown value that is not an error one time", () => {
-    const codes = lint(["export function fail(): never {", '  throw "failed"', "}", ""].join("\n"))
+    const codes = lint(
+      "index.ts",
+      ["export function fail(): never {", '  throw "failed"', "}", ""].join("\n")
+    )
 
     expect(codes).toStrictEqual(["typescript(only-throw-error)"])
+  })
+
+  // Astro, Vue, and Svelte compile a component's script as a module, so the script needs no
+  // `import` or `export` to be one.
+  it.each([
+    ["card.astro", ["---", "const a = 1", "---", "<p>{a}</p>", ""]],
+    [
+      "card.vue",
+      [
+        '<script setup lang="ts">',
+        "const a = 1",
+        "</script>",
+        "<template><p>{{ a }}</p></template>",
+        "",
+      ],
+    ],
+    ["card.svelte", ['<script lang="ts">', "const a = 1", "</script>", "<p>{a}</p>", ""]],
+  ])("accept a script without an import or export in %s", (file, lines) => {
+    const codes = lint(file, lines.join("\n"))
+
+    expect(codes).toStrictEqual([])
+  })
+
+  it("report a TypeScript file without an import or export", () => {
+    const codes = lint("index.ts", ["console.info(1)", ""].join("\n"))
+
+    expect(codes).toStrictEqual(["import(unambiguous)"])
   })
 })

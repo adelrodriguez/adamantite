@@ -181,6 +181,72 @@ describe("oxlint", () => {
         })
     )
 
+    it.effect(
+      "report the jest and vitest presets together in extends without changing the project",
+      () =>
+        Effect.gen(function* () {
+          const config = toOxlintTsConfigContent(["jest", "vitest"])
+
+          const manifest = makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          })
+
+          const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
+
+          const result = yield* runAssess(files)
+
+          expect(result).toMatchObject({
+            applicable: true,
+            findings: [
+              {
+                currentState:
+                  "`oxlint.config.ts` extends the `jest` and `vitest` presets, which report the same defects. Each defect gets two reports.",
+                id: "excluded-presets",
+                integration: "oxlint",
+              },
+            ],
+          })
+          expect(files.read("oxlint.config.ts")).toBe(config)
+          expect(files.read("package.json")).toBe(manifest)
+        })
+    )
+
+    it.effect("report no finding when the jest and vitest presets are only in overrides", () =>
+      Effect.gen(function* () {
+        const config = toOxlintTsConfigContent()
+          .replace(
+            'import core from "adamantite/lint"',
+            [
+              'import core from "adamantite/lint"',
+              'import jest from "adamantite/lint/jest"',
+              'import vitest from "adamantite/lint/vitest"',
+            ].join("\n")
+          )
+          .replace(
+            "  ignorePatterns: core.ignorePatterns,",
+            [
+              "  ignorePatterns: core.ignorePatterns,",
+              "  overrides: [",
+              '    { files: ["jest/**/*.test.ts"], plugins: jest.plugins, rules: { ...jest.rules } },',
+              '    { files: ["vitest/**/*.test.ts"], plugins: vitest.plugins, rules: { ...vitest.rules } },',
+              "  ],",
+            ].join("\n")
+          )
+
+        const files = makeFiles({
+          "oxlint.config.ts": config,
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        expect(config).toContain("plugins: vitest.plugins")
+        expect(yield* runAssess(files)).toMatchObject({ applicable: true, findings: [] })
+      })
+    )
+
     it.effect("report no finding when core is the first entry of extends", () =>
       Effect.gen(function* () {
         const files = makeFiles({

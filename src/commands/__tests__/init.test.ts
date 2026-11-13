@@ -455,6 +455,39 @@ describe("init", () => {
         })
       })
     )
+
+    it.effect("keep one of the jest and vitest presets when both are selected", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+
+        const prompter = createPrompterTestContext({
+          confirmResponses: [false, false, false],
+          multiselectResponses: [["check"], ["jest", "vitest", "strict"], []],
+          selectResponses: ["vitest"],
+        })
+
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [prompter.layer, installer.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(prompter.selectCalls[0]).toMatchObject({
+          message:
+            "The jest and vitest presets report the same defects. Which one should Adamantite use?",
+          options: [
+            { label: "jest", value: "jest" },
+            { label: "vitest", value: "vitest" },
+          ],
+        })
+        expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
+          "vitest",
+          "strict",
+        ])
+      })
+    )
   })
 
   describe("sherif for analyze", () => {
@@ -895,6 +928,12 @@ describe("init", () => {
         args: ["--non-interactive", "--script", "check", "--preset", "react-strict"],
         name: "react-strict without the react preset",
         reason: "`--preset react-strict` requires `--preset react`.",
+      },
+      {
+        args: ["--non-interactive", "--script", "check", "--preset", "jest", "--preset", "vitest"],
+        name: "the jest and vitest presets together",
+        reason:
+          "`--preset jest` and `--preset vitest` report the same defects. Select one of them.",
       },
       {
         args: ["--non-interactive", "--script", "analyze", "--install-extensions"],

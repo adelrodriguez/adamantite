@@ -721,8 +721,9 @@ You can also select it during setup with
 ### The strict preset
 
 `adamantite/lint/strict` holds framework-neutral opinions. Use it with any other preset.
-It needs no extra package. Most of its type rules come from
-[anti-slop](https://github.com/dmmulroy/anti-slop), which Adamantite ships as a vendored build.
+It needs no extra package. Most of its type rules started as
+[anti-slop](https://github.com/dmmulroy/anti-slop) rules, which Adamantite now maintains under the
+same `anti-slop/*` names.
 
 - `adamantite/no-overzealous-destructuring` reports destructuring patterns nested more than
   `maxDepth` levels deep (default 2), such as `const { data: { user: { name } } } = query`,

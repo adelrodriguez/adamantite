@@ -3,11 +3,11 @@ import type { OxlintConfig } from "oxlint"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
+import antislopPlugin from "#presets/lint/plugin/antislop/index.ts"
 import adamantitePlugin from "#presets/lint/plugin/index.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
-import antislopPlugin from "#presets/lint/vendor/antislop/plugin.mjs"
 import packageJson from "../../../package.json" with { type: "json" }
 import {
   lintRuleFixtures,
@@ -39,7 +39,7 @@ const antislopRules = [
 const PROJECT_RULES = ["import-owners", "layers"]
 
 describe("strict preset", () => {
-  it("enable each rule of the vendored anti-slop plugin exactly once", () => {
+  it("enable each rule of the anti-slop plugin exactly once", () => {
     expect(EffectArray.sort(antislopRules, Order.String)).toStrictEqual(
       EffectArray.sort(
         Object.keys(antislopPlugin.rules).map((rule) => `anti-slop/${rule}`),

@@ -192,7 +192,8 @@ commands do not forward arguments because they coordinate multiple operations.
 ```text
 presets/
   lint/             published Oxlint presets
-    plugin/         first-party Oxlint plugin and its rules
+    plugin/         first-party Oxlint plugins and their rules
+      antislop/     the anti-slop rules of the strict preset
     vendor/         vendored plugin bundles
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
@@ -295,12 +296,12 @@ To update one, bump its pinned ref in the script's plugin list, re-run the scrip
 the upstream diff, and adjust the owning preset's rules if rules were added, removed, or
 renamed; each preset's drift test catches a mismatch.
 
-One upstream can supply more than one bundle. The anti-slop repository has two entry points.
-The `anti-slop` bundle ships in the `strict` preset, and the `anti-slop-effect` bundle ships in
-the `effect` preset. The script lists each entry point with the same pinned ref. When upstream
-copies third-party code into its source, the script adds that code's license to `license.md`.
-The build copies each bundle into `dist/presets/lint/vendor/`, and `scripts/test-build.ts` fails
-when a built preset loads a file that the build did not copy.
+The one bundle is `anti-slop-effect`, which ships in the `effect` preset. The anti-slop rules
+of the `strict` preset were a second bundle from the same upstream. They are now first-party code,
+as the [first-party plugin](#first-party-plugin) section describes. When upstream copies
+third-party code into its source, the script adds that code's license to `license.md`. The build
+copies each bundle into `dist/presets/lint/vendor/`, and `scripts/test-build.ts` fails when a
+built preset loads a file that the build did not copy.
 
 When an upstream rule has a defect, Adamantite fixes it with a patch in
 `scripts/vendor-patches/<name>/`. The script applies each patch that the plugin lists before
@@ -349,8 +350,7 @@ options for all rules, and `imports.ts` finds calls of imported functions, such 
 rule under the `adamantite` namespace. Tsdown builds the plugin with the presets, so it
 ships at `dist/presets/lint/plugin/index.js`.
 
-A preset loads the plugin with a file URL from its own location, as the strict preset also
-loads its vendored anti-slop bundle. The source tree has `plugin/index.ts` and the dist tree has
+A preset loads the plugin with a file URL from its own location. The source tree has `plugin/index.ts` and the dist tree has
 `plugin/index.js`, so the preset takes the extension from its own module URL. Rule code
 runs under the runtime that executes Oxlint in the target project, so it uses only
 runtime-neutral APIs. It imports only types from `@oxlint/plugins`, a devDependency pinned
@@ -362,6 +362,15 @@ Each rule has a `RuleTester` test under `src/__tests__/plugin/<rule>.test.ts` fo
 locations, and options, and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
 Oxlint run.
+
+The anti-slop rules are a second first-party plugin in `presets/lint/plugin/antislop/`. They
+started as a copy of [anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`, and
+they keep the plugin name `anti-slop`, so project settings and suppressions that name
+`anti-slop/*` rules keep working. Their rules follow the same conventions as the `adamantite`
+rules. Their RuleTester tests sit in `src/__tests__/plugin/antislop/`, and
+`src/__tests__/presets/require-readable-spacing.test.ts` runs the spacing fix through the Oxlint
+CLI twice. `license.md` and `stylistic/license.md` keep the MIT notices of the copied code, and the
+build copies them. See ADR 0027.
 
 The `architecture` preset loads the first-party plugin without enabling rules. Init offers it
 for projects that configure layer maps and import owners without the other rules of `strict`.

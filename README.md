@@ -740,8 +740,8 @@ same `anti-slop/*` names.
   Fix the code now, or track the work in your issue tracker. Do not only rename the marker.
 - The anti-slop rules ask the code to decode input at its boundary into types that it owns.
   They report `unknown` in function signatures and type aliases, loose dictionary types, a
-  `typeof` check outside a type predicate, `Reflect.get` and `Reflect.apply`, and Vitest or Jest
-  module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
+  `typeof` check outside a type predicate, `Reflect.get` without a receiver, `Reflect.apply`,
+  and Vitest or Jest module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
   accumulator, `shape` in symbol names, and a missing blank line between statement groups.
 - In test files, where type assertions are allowed, `anti-slop/require-safety-comment-for-type-assertion`
   requires a `SAFETY:` comment on each assertion, and `anti-slop/no-chained-type-assertions` and

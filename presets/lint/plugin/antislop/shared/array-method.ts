@@ -137,8 +137,7 @@ function isKnownArrayExpressionFrom(
   if (variable === null || visited.has(variable)) return false
   visited.add(variable)
 
-  if (variable.references.some((reference) => reference.isWrite() && !reference.init)) return false
-
+  // The annotation holds for each value that the binding gets, so check it before reassignment.
   for (const identifier of variable.identifiers) {
     const annotation = identifier.typeAnnotation?.typeAnnotation
 

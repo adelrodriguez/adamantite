@@ -104,6 +104,23 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
       errors: [error],
     },
     { code: 'function f<T>(value: T) { return typeof value === "string"; }', errors: [error] },
+    {
+      code: 'function f<T>(value: NonNullable<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>(value: NoInfer<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function f<T>(value: Awaited<T>) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    { code: 'function f<T>(value: T & {}) { return typeof value === "string"; }', errors: [error] },
+    {
+      code: 'function f<T>(value: T & object) { return typeof value === "function"; }',
+      errors: [error],
+    },
     { code: 'const f = <T,>(value: T) => typeof value === "string";', errors: [error] },
     {
       code: 'function f<T extends unknown>(value: T) { return typeof value === "string"; }',
@@ -176,6 +193,8 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     },
   ],
   valid: [
+    'type NonNullable<X> = string | number; function f<T>(value: NonNullable<T>) { return typeof value === "string"; }',
+    'function f<T>(value: T & RetryOptions) { return typeof value.retry === "number"; }',
     'function f<T extends string | number>(value: T) { return typeof value === "string"; }',
     'function f<T extends string, U extends T>(value: U) { return typeof value === "string"; }',
     'type T = string | number; function f(value: T) { return typeof value === "string"; }',

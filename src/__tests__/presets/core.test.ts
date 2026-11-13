@@ -152,7 +152,7 @@ describe("core preset", () => {
   })
 
   // A spread in a `map` callback is the usual way to copy an item with a change, as a React state
-  // update does. `prefer-object-spread` rewrites `Object.assign({}, …)` to this spread.
+  // update does.
   it("accept a spread copy of an item in a map callback", () => {
     const codes = lint(
       "index.ts",

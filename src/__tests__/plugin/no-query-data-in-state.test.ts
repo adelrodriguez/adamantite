@@ -18,6 +18,14 @@ const IMPORTS =
 tester.run("no-query-data-in-state", plugin.rules["no-query-data-in-state"], {
   invalid: [
     {
+      code: `${IMPORTS}export function Name() {\n  const query = useQuery(userQuery)\n  const [name] = useState(query[\`data\`])\n  return name\n}`,
+      errors: [{ data: { hook: "useState" }, messageId: "copiedData" }],
+    },
+    {
+      code: `${IMPORTS}export function Name() {\n  const { ["data"]: user } = useQuery(userQuery)\n  const [draft] = useState(user)\n  return draft\n}`,
+      errors: [{ data: { hook: "useState" }, messageId: "copiedData" }],
+    },
+    {
       code: `${IMPORTS}export function Name() {\n  const query = useQuery(userQuery)\n  const [name] = useState(query.data)\n  return name\n}`,
       errors: [{ column: 17, data: { hook: "useState" }, line: 5, messageId: "copiedData" }],
     },

@@ -25,6 +25,10 @@ tester.run("no-manual-effect-error-tag", plugin.rules["no-manual-effect-error-ta
       errors: [{ messageId: "reason" }],
     },
     {
+      code: 'Effect[`catchAll`](function (error) { return error[`_tag`] === "Timeout" ? retry : fail; });',
+      errors: [{ messageId: "tag" }],
+    },
+    {
       code: 'Effect.catchIf(predicate, (error) => { switch (error._tag) { case "NotFound": return recover; } });',
       errors: [{ messageId: "tag" }],
     },

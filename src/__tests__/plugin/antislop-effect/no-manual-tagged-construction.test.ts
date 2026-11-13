@@ -37,6 +37,7 @@ tester.run("no-manual-tagged-construction", plugin.rules["no-manual-tagged-const
     "new NotFound({ id });",
     "({ _tag: tag, value });",
     'PlatformError.systemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
+    'PlatformError[`systemError`]({ [`_tag`]: "NotFound", module: "FileSystem", method: "readFile" });',
     'new PlatformError.SystemError({ _tag: "NotFound", module: "FileSystem", method: "readFile" });',
     'new HeaderParseErrorReason({ _tag: "InvalidHttpDate", input });',
   ],

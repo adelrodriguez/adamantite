@@ -67,6 +67,13 @@ export const ignorePatterns: string[] = [
 
 const config: OxlintConfig & { ignorePatterns: string[] } = {
   ignorePatterns,
+  options: {
+    // Check fails on a suppression that suppresses nothing, and fix removes it. The Oxlint language
+    // server uses this severity when the editor does not set its own, as in the Zed and VS Code
+    // setups. Oxlint reads the option only from the root config. A nested config that extends this
+    // preset keeps the severity of the root config.
+    reportUnusedDisableDirectives: "error",
+  },
   // A rule in an override applies after the `rules` of the project config. To change one of these
   // rules for these files, set it in an override of the project config.
   overrides: [

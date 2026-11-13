@@ -498,7 +498,18 @@ const readToolingFacts = Effect.fn("readToolingFacts")(function* (cwd: string) {
  * A tooling integration that manages a package version and a TypeScript config file with legacy
  * JSON predecessors (Knip, Oxfmt).
  */
-export function defineConfigTooling<Workspace extends ToolingWorkspace>(options: {
+export function defineConfigTooling<
+  Workspace extends ToolingWorkspace,
+  RuntimeError = never,
+  RuntimeRequirements = never,
+>(options: {
+  /**
+   * Findings for the parts that the tool loads from the project when it runs, such as a package
+   * that a plugin of the tool imports. Assessment adds them while the integration is applicable.
+   */
+  readonly assessRuntime?: (
+    project: Project
+  ) => Effect.Effect<readonly Finding[], RuntimeError, RuntimeRequirements>
   /**
    * The config file content `init` writes and doctor findings reference. It can depend on the
    * workspace.
@@ -548,6 +559,9 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
             ? options.inspectConfig(yield* readFile(state.active.file.path), workspace)
             : undefined
 
+        const runtimeFindings =
+          options.assessRuntime === undefined ? [] : yield* options.assessRuntime(project)
+
         return {
           applicable: true,
           findings: [
@@ -558,6 +572,7 @@ export function defineConfigTooling<Workspace extends ToolingWorkspace>(options:
               inspection,
               toolName: options.name,
             }),
+            ...runtimeFindings,
           ],
           packageActions: pkg.packageActions,
           warnings: [...pkg.warnings, ...state.warnings],

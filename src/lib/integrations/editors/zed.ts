@@ -37,13 +37,11 @@ const files = [{ path: ".zed/settings.json", type: "config" }] as const
 
 const CONFIG = {
   languages: {
-    // Oxfmt formats Astro files only with its `astro` option and the `@astrojs/compiler-rs` package
-    // in the project, and Adamantite manages neither. So Zed's managed Prettier formats them and
-    // installs the listed plugins itself. Like Zed's default for Astro, there is no `formatter` key,
-    // so "auto" picks Prettier through `allowed`, and no `parser`, which the plugin infers.
+    // The format preset turns on Oxfmt's `astro` option, which needs Astro 7 or later. See ADR 0028.
     Astro: {
       format_on_save: "on",
-      prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
+      formatter: [{ language_server: { name: "oxfmt" } }],
+      prettier: { allowed: false },
     },
     CSS: {
       format_on_save: "on",
@@ -121,6 +119,25 @@ const CONFIG = {
     },
   },
 } as const
+
+/**
+ * The Astro setup that Adamantite wrote before Oxfmt formatted Astro files: Zed's managed Prettier
+ * with the Astro plugin. Update replaces it, and keeps an Astro setup that the project changed.
+ */
+const PRETTIER_ASTRO_SETTINGS = {
+  format_on_save: "on",
+  prettier: { allowed: true, plugins: ["prettier-plugin-astro"] },
+} as const satisfies Schema.Json
+
+/**
+ * Whether `config` keeps the Astro setup that Adamantite wrote before Oxfmt formatted Astro files.
+ */
+function checkHasPrettierAstro(config: Schema.JsonObject) {
+  return (
+    checkIsJsonObject(config.languages)
+    && Equal.equals(config.languages["Astro"], PRETTIER_ASTRO_SETTINGS)
+  )
+}
 
 const STALE_OXFMT_SETTINGS = {
   configPath: null,
@@ -268,19 +285,8 @@ function findStaleOxfmtSettingKeys(config: Schema.JsonObject): string[] {
     .map(([key]) => key)
 }
 
-function deduplicatePrettierPlugins(prettierConfig: Schema.Json) {
-  if (!checkIsJsonObject(prettierConfig) || !checkIsJsonArray(prettierConfig.plugins)) {
-    return prettierConfig
-  }
-
-  return Object.fromEntries([
-    ...Object.entries(prettierConfig),
-    ["plugins", Array.dedupe(prettierConfig.plugins)],
-  ])
-}
-
 // The merge concatenates preset and user arrays, so managed languages dedupe their `formatter`
-// and `prettier.plugins` arrays to keep repeated updates idempotent.
+// arrays to keep repeated updates idempotent.
 function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObject {
   const languageSettings = config.languages
 
@@ -302,10 +308,6 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
               return [key, Array.dedupe(value)]
             }
 
-            if (key === "prettier") {
-              return [key, deduplicatePrettierPlugins(value)]
-            }
-
             return [key, value]
           })
         ),
@@ -315,6 +317,18 @@ function deduplicateManagedFormatters(config: Schema.JsonObject): Schema.JsonObj
 
   // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON object.
   return Object.fromEntries([...Object.entries(config), ["languages", languages]])
+}
+
+function removeAstroSettings(config: Schema.JsonObject): Schema.JsonObject {
+  const languages = checkIsJsonObject(config.languages) ? config.languages : {}
+
+  return Object.fromEntries([
+    ...Object.entries(config),
+    [
+      "languages",
+      Object.fromEntries(Object.entries(languages).filter(([name]) => name !== "Astro")),
+    ],
+  ])
 }
 
 // Adamantite owns the command that starts Oxlint, so the update replaces it instead of merging
@@ -397,6 +411,24 @@ export default defineIntegration({
         applicable: true,
         findings: [
           ...effectFindings,
+          ...(checkHasPrettierAstro(config)
+            ? [
+                {
+                  currentState: `\`${files[0].path}\` formats Astro files with Prettier, as Adamantite set it up before Oxfmt formatted them.`,
+                  goal: [
+                    "Set `languages.Astro.formatter` to the `oxfmt` language server, and set `languages.Astro.prettier.allowed` to `false`. Preserve every other setting.",
+                  ],
+                  id: "legacy-zed-astro-formatter",
+                  integration: "zed",
+                  notes: ["Oxfmt formats Astro files only for Astro 7 and later."],
+                  reference: {
+                    content: `${yield* formatJson({ languages: { Astro: CONFIG.languages.Astro } })}\n`,
+                    language: "json",
+                  },
+                  title: "Zed formats Astro files with Prettier",
+                } satisfies Finding,
+              ]
+            : []),
           ...(staleKeys.length === 0
             ? []
             : [
@@ -469,9 +501,14 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      // The project's values win. `setOxlintBinary` and `setEffectSettings` then set only the values
-      // that the assessment checks.
-      const mergedConfig = yield* mergeConfig({ fallback: CONFIG, preferred: existingConfig })
+      // The project's values win, except an Astro setup that Adamantite wrote itself.
+      // `setOxlintBinary` and `setEffectSettings` then set only the values that the assessment
+      // checks.
+      const preferred = checkHasPrettierAstro(existingConfig)
+        ? removeAstroSettings(existingConfig)
+        : existingConfig
+
+      const mergedConfig = yield* mergeConfig({ fallback: CONFIG, preferred })
       const effect = yield* readEffectEditor(cwd)
       const base = setOxlintBinary(deduplicateManagedFormatters(mergedConfig))
 

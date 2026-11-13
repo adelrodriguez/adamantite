@@ -2,6 +2,10 @@ import type { FormatConfig } from "oxfmt"
 
 const config: FormatConfig = {
   arrowParens: "always",
+  // Oxfmt formats `.astro` files through `prettier-plugin-astro`, which imports
+  // `@astrojs/compiler-rs` from the project. Astro 7 and later depend on it, and Oxfmt loads it only
+  // when it formats an `.astro` file. See ADR 0028.
+  astro: true,
   bracketSameLine: false,
   bracketSpacing: true,
   embeddedLanguageFormatting: "auto",

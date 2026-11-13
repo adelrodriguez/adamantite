@@ -408,7 +408,7 @@ describe("vscode", () => {
         const content = files.read(".vscode/settings.json")
 
         expect(content).toMatch(
-          /^\{\n\t\/\/ Team setting\n\t"editor\.tabSize": 4,\n\t"\[css\]": \{\n\t\t"/u
+          /^\{\n\t\/\/ Team setting\n\t"editor\.tabSize": 4,\n\t"\[astro\]": \{\n\t\t"/u
         )
         expect(content).toContain('\t"editor.formatOnSave": true')
       })

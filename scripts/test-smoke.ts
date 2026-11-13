@@ -11,7 +11,7 @@ import {
 } from "node:fs"
 import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
-import { delimiter, join, sep } from "node:path"
+import { delimiter, dirname, join, sep } from "node:path"
 import process from "node:process"
 import { pathToFileURL } from "node:url"
 import * as Predicate from "effect/Predicate"
@@ -278,6 +278,7 @@ const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
 const monorepoFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-monorepo-"))
 const effectFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-effect-"))
+const astroFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-astro-"))
 
 try {
   writeFileSync(
@@ -746,10 +747,59 @@ try {
     throw new Error(`Expected Doctor to resolve the workspace import, received:\n${doctorOutput}`)
   }
 
+  // Astro 7 depends on @astrojs/compiler-rs, which Oxfmt imports to format `.astro` files. pnpm
+  // keeps it out of the project's own node_modules, so this proves that Oxfmt still finds it.
+  // pnpm rejects packages younger than one day, so the version is pinned. See ADR 0028.
+  console.info("Running `adamantite fix` on an Astro file in a pnpm project...")
+  writeFileSync(
+    join(astroFixture, "package.json"),
+    JSON.stringify({
+      name: "adamantite-smoke-astro",
+      packageManager: `pnpm@${pnpmVersion}`,
+      private: true,
+      type: "module",
+      version: "0.0.0",
+    })
+  )
+  run("pnpm", ["add", "--save-dev", join(packDirectory, tarball), "astro@7.4.11"], {
+    cwd: astroFixture,
+  })
+  run(process.execPath, [cliPath, "init", "--non-interactive", "--script", "check"], {
+    cwd: astroFixture,
+  })
+
+  const astroPage = join(astroFixture, "src", "pages", "index.astro")
+  mkdirSync(dirname(astroPage), { recursive: true })
+  writeFileSync(
+    astroPage,
+    "---\nexport const prerender = true\nconst greeting = 'hello';\n---\n<p>{greeting}</p>\n"
+  )
+
+  const astroEnv = {
+    ...process.env,
+    PATH: `${join(astroFixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
+  }
+
+  run(process.execPath, [cliPath, "fix"], { cwd: astroFixture, env: astroEnv })
+  assertFileContains(astroPage, 'const greeting = "hello"\n---\n\n<p>{greeting}</p>')
+  run(process.execPath, [cliPath, "check", "--only", "format"], {
+    cwd: astroFixture,
+    env: astroEnv,
+  })
+
+  const astroDoctor = spawn(process.execPath, [cliPath, "doctor"], {
+    cwd: astroFixture,
+    env: astroEnv,
+  }).output
+
+  if (astroDoctor.includes("Oxfmt cannot format Astro files")) {
+    throw new Error(`Expected Oxfmt to load the Astro compiler, received:\n${astroDoctor}`)
+  }
+
   console.info("Smoke test passed: init output is accepted by the pinned tool versions.")
 } catch (error) {
   console.info(
-    `Fixtures kept for debugging at: ${fixture}, ${monorepoFixture}, and ${effectFixture}`
+    `Fixtures kept for debugging at: ${fixture}, ${monorepoFixture}, ${effectFixture}, and ${astroFixture}`
   )
   throw error
 } finally {
@@ -761,3 +811,5 @@ rmSync(fixture, { force: true, recursive: true })
 rmSync(monorepoFixture, { force: true, recursive: true })
 
 rmSync(effectFixture, { force: true, recursive: true })
+
+rmSync(astroFixture, { force: true, recursive: true })

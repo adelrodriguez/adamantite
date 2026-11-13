@@ -41,6 +41,11 @@ import { checkRunsTool } from "#lib/workspace/package-json.ts"
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 
 const CONFIG = {
+  // The Astro extension sets its own formatter for Astro, which takes priority over the global
+  // default. The format preset turns on Oxfmt's `astro` option. See ADR 0028.
+  "[astro]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+  },
   "[css]": {
     "editor.defaultFormatter": "oxc.oxc-vscode",
   },

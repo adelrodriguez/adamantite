@@ -144,6 +144,12 @@ describe("inspectExtendsOrder", () => {
     ).toStrictEqual(Option.some({ before: ["effect", "strict"], core: "core" }))
   })
 
+  it("find a preset that comes before a second core entry", () => {
+    expect(
+      inspectExtendsOrder(toExtendsConfig([CORE_IMPORT, STRICT_IMPORT], "[core, strict, core]"))
+    ).toStrictEqual(Option.some({ before: ["strict"], core: "core" }))
+  })
+
   it("use the local names of the imports", () => {
     expect(
       inspectExtendsOrder(

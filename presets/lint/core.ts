@@ -121,7 +121,9 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "jsdoc/require-yields-type": "error",
     "no-array-constructor": "error",
     "no-async-promise-executor": "error",
-    "no-await-in-loop": "error",
+    // The rule tells the author to start the calls together. That is a defect when each call needs
+    // the result of the call before it, and the rule cannot tell the two cases apart.
+    "no-await-in-loop": "off",
     "no-caller": "error",
     "no-case-declarations": "error",
     "no-class-assign": "error",

@@ -34,7 +34,7 @@ const NO_CONTAINER_TYPES: ReadonlySet<string> = new Set()
  * Return the built-in name of a type reference, as `Promise` in `Promise<T>` or
  * `globalThis.Promise<T>`, or null when a local declaration shadows the name.
  */
-function builtInTypeName(
+export function builtInTypeName(
   type: ESTree.TSTypeReference,
   environment: TypeAliasEnvironment
 ): string | null {

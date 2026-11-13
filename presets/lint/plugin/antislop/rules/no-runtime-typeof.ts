@@ -7,7 +7,7 @@ import {
   visibleTypeParameter,
   type TypeAliasEnvironment,
 } from "../shared/type-alias-resolution.ts"
-import { mentionsUncheckedType } from "../shared/unknown-type.ts"
+import { builtInTypeName, mentionsUncheckedType } from "../shared/unknown-type.ts"
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function
 
@@ -178,6 +178,24 @@ function referencedTypeParameter(
  * matches when one of its members matches. The check resolves local aliases, as in `type Same<X> =
  * X` with `value: Same<T>`.
  */
+/**
+ * Built-in types that hold every value of their type argument, apart from `null` and `undefined`,
+ * so `NonNullable<T>` holds any value of an unconstrained `T`.
+ */
+const PASS_THROUGH_TYPES: ReadonlySet<string> = new Set(["Awaited", "NoInfer", "NonNullable"])
+
+/**
+ * Return whether an intersection member leaves the other members as they are, as `{}` and `object`
+ * do for an unconstrained `T`.
+ */
+function addsNothing(type: ESTree.TSType): boolean {
+  return (
+    type.type === "TSObjectKeyword"
+    || type.type === "TSUnknownKeyword"
+    || (type.type === "TSTypeLiteral" && type.members.length === 0)
+  )
+}
+
 function isUncheckedTypeParameter(
   type: ESTree.TSType,
   environment: TypeAliasEnvironment,
@@ -188,7 +206,21 @@ function isUncheckedTypeParameter(
 
     if (resolved.type === "TSUnionType") return resolved.types.some(matches)
 
+    if (resolved.type === "TSIntersectionType") {
+      return (
+        resolved.types.some(matches)
+        && resolved.types.every((member) => addsNothing(member) || matches(member))
+      )
+    }
+
     if (resolved.type !== "TSTypeReference") return false
+    const wrapper = builtInTypeName(resolved, environment)
+    const argument = resolved.typeArguments?.params[0]
+
+    if (wrapper !== null && PASS_THROUGH_TYPES.has(wrapper) && argument !== undefined) {
+      return matches(argument)
+    }
+
     const parameter = referencedTypeParameter(resolved, environment)
 
     if (parameter === null || seen.has(parameter)) return false

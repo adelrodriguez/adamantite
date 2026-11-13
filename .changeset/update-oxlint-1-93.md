@@ -19,5 +19,6 @@ To upgrade an existing project:
 
 - Run `adamantite update` to install the new versions.
 - In a project with the effect preset, expect `adamantite check` to report `Effect.all` and `Effect.forEach` calls without a `concurrency` option. Add `{ concurrency: 1 }` to keep the current order, or set the concurrency that the code needs.
+- Expect `adamantite check` to report a rejection callback that is the second argument of `then()`. Oxlint 1.93 reports it with `promise/prefer-catch`, which the core preset turns on. Move the callback to `.catch()`.
 - In a Vue project, expect `adamantite fix` to format `.vue` files differently. Oxfmt 0.77.0 formats them with its own formatter instead of Prettier (oxc-project/oxc#28848).
 - In an Astro or Svelte project, expect `adamantite fix` to format `.astro` and `.svelte` files. The format preset turns on Oxfmt's `astro` and `svelte` options, and Zed and VS Code format both languages with Oxfmt. Oxfmt needs a package from the project: `@astrojs/compiler-rs`, which Astro 7 and later install, and `svelte` 5 or later. In an Astro 5 or 6 project, or a Svelte 3 or 4 project, Oxfmt fails on those files, and Doctor reports it. Run `adamantite init` with your editors to move Zed's Astro setup from Prettier to Oxfmt.

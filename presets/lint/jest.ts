@@ -47,7 +47,10 @@ const rules: OxlintConfig["rules"] = {
   "jest/no-test-prefixes": "error",
   "jest/no-test-return-statement": "error",
   "jest/no-unneeded-async-expect-function": "error",
-  "jest/no-untyped-mock-factory": "error",
+  // The rule asks for a type parameter on a `jest.mock` factory, and the strict preset bans each
+  // module mock. A preset cannot see which other presets a project selects, so one instruction must
+  // go.
+  "jest/no-untyped-mock-factory": "off",
   "jest/padding-around-after-all-blocks": "error",
   "jest/padding-around-test-blocks": "error",
   "jest/prefer-called-with": "error",

@@ -93,6 +93,11 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
         "import/unambiguous": "off",
       },
     },
+    {
+      // A JavaScript file has no type syntax, so JSDoc is its only way to state a type.
+      files: ["**/*.{js,jsx,mjs,cjs}"],
+      rules: { "jsdoc/check-tag-names": ["error", { typed: false }] },
+    },
   ],
   plugins: ["eslint", "typescript", "unicorn", "oxc", "import", "jsdoc", "promise"],
   rules: {

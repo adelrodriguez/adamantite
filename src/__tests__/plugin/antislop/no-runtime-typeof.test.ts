@@ -90,6 +90,8 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     'function delay(retry: number | RetryPolicy): number { return typeof retry === "number" ? retry : retry.delay; }',
     'async function resolve(headers: HeadersInit | (() => Promise<HeadersInit>)) { return typeof headers === "function" ? await headers() : headers; }',
     'function resolve(options: FetchTransportOptions) { return typeof (options.headers) === "function"; }',
+    'function resolve(options?: FetchTransportOptions) { return typeof options!.headers === "function"; }',
+    'function resolve(options?: TransportConfig) { return typeof options?.transport!.headers === "function"; }',
     'function resolve(options: FetchTransportOptions) { const { headers } = options; return typeof headers === "function"; }',
     'function resolve(options: FetchTransportOptions) { const { headers: init = {} } = options; return typeof init === "function"; }',
     'function resolve({ headers }: FetchTransportOptions) { return typeof headers === "function"; }',

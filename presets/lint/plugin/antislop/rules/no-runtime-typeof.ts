@@ -128,7 +128,8 @@ function destructuringPattern(
 
 /**
  * Return the annotation that declares a binding. A binding destructured from an object takes the
- * annotation of its pattern, or of the binding that the pattern reads, one step away.
+ * annotation of its pattern, or of the binding at the root of the value that the pattern reads, one
+ * step away, as `options` in `const { headers } = options!` or `options.transport`.
  */
 function declaredType(
   identifier: ESTree.IdentifierReference,
@@ -145,11 +146,9 @@ function declaredType(
   if (pattern.typeAnnotation) return pattern.typeAnnotation.typeAnnotation
   const declarator = pattern.parent
 
-  if (declarator.type !== "VariableDeclarator" || declarator.init?.type !== "Identifier") {
-    return null
-  }
-
-  const source = bindingName(declarator.init, sourceCode)
+  if (declarator.type !== "VariableDeclarator" || declarator.init === null) return null
+  const root = operandRoot(declarator.init)
+  const source = root === null ? null : bindingName(root, sourceCode)
 
   return source === null ? null : ownAnnotation(source)
 }

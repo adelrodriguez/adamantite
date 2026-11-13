@@ -290,8 +290,7 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "oxc/no-barrel-file": "error",
     "oxc/no-const-enum": "error",
     // A spread in a `map` callback is the usual immutable copy of an item, as in a React state
-    // update. This rule tells the author to change the item in place instead, and
-    // `prefer-object-spread` reports the `Object.assign({}, …)` form, so no copy passes core.
+    // update. This rule tells the author to change the item in place instead.
     "oxc/no-map-spread": "off",
     "oxc/no-this-in-exported-function": "error",
     "oxc/number-arg-out-of-range": "error",
@@ -301,7 +300,10 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "prefer-const": "error",
     "prefer-exponentiation-operator": "error",
     "prefer-object-has-own": "error",
-    "prefer-object-spread": "error",
+    // `oxc/no-accumulating-spread` reports a spread of a `reduce` accumulator, so
+    // `Object.assign({}, acc, …)` is the only immutable copy of one. This rule reports that copy, and
+    // its fix writes the spread.
+    "prefer-object-spread": "off",
     "prefer-regex-literals": "error",
     "prefer-rest-params": "error",
     "prefer-spread": "error",

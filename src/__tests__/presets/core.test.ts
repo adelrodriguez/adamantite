@@ -152,7 +152,7 @@ describe("core preset", () => {
   })
 
   // A spread in a `map` callback is the usual way to copy an item with a change, as a React state
-  // update does. `prefer-object-spread` rewrites `Object.assign({}, …)` to this spread.
+  // update does.
   it("accept a spread copy of an item in a map callback", () => {
     const codes = lint(
       "index.ts",
@@ -167,6 +167,24 @@ describe("core preset", () => {
         "export function toggle(id: string): Todo[] {",
         "  return loadTodos().map((todo) => (todo.id === id ? { ...todo, done: !todo.done } : todo))",
         "}",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
+
+  // A copy of a `reduce` accumulator with fixed keys cannot grow. `oxc/no-accumulating-spread`
+  // reports the spread form, so core must accept the `Object.assign({}, …)` form.
+  it("accept an Object.assign copy of a reduce accumulator", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "const items = [{ n: 1 }, { n: 2 }]",
+        "",
+        "export const total = items.reduce((acc, item) => Object.assign({}, acc, { sum: acc.sum + item.n }), {",
+        "  sum: 0,",
+        "})",
         "",
       ].join("\n")
     )

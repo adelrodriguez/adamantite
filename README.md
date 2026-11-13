@@ -808,6 +808,12 @@ same `anti-slop/*` names.
   not hold, such as a built-in API or a package without types.
 - The preset turns off the core preset's `typescript/consistent-indexed-object-style` and
   `unicorn/no-immediate-mutation`, which conflict with `anti-slop/no-known-value-widening`.
+- The help of three core rules recommends a form that strict reports. `typescript/no-explicit-any`
+  recommends `unknown`, `typescript/no-wrapper-object-types` recommends `object` and its autofix
+  writes it, and `unicorn/no-instanceof-builtins` recommends `typeof`. The help belongs to the
+  upstream rules, so the preset cannot change it. Follow the strict report that comes next. It
+  names a form that both presets accept, such as a named domain type that you parse at the
+  boundary.
 
 Set `maxDepth` and `maxProperties` to change the destructuring limits, and `printWidth` to
 match an Oxfmt `printWidth` other than 100:

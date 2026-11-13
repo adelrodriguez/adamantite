@@ -71,7 +71,10 @@ Each tool has a folder: `index.ts` exports only the integration as a default exp
 helper modules beside it, such as `knip/config.ts`, hold the logic that only that tool
 uses. The `assessment` layer registers every managed integration. The tooling integrations
 that Toolchain runs also have command builders, which return `CommandRunOptions` and start no
-process. Oxlint and Oxfmt keep them in `command.ts`, and Knip and Sherif in `index.ts`.
+process. Each of these tools keeps its builders and their option types in `command.ts`, and
+`index.ts` attaches each builder to the integration by name. `tooling/__tests__/command.test.ts`
+fails when an `index.ts` holds a builder, or when the integration does not have a builder of its
+`command.ts`.
 
 ## Integration lifecycle
 

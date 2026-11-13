@@ -101,6 +101,29 @@ describe.each([
     expect(codes["src/script.ts"]).toBeUndefined()
   })
 
+  // A describe title often names the class or function under test, such as `Calculator`.
+  it("accept a capital letter at the start of a describe title, and report one in a test title", () => {
+    const codes = lint(
+      [`import preset from ${presetPath}`, "", "export default { extends: [preset] }", ""].join(
+        "\n"
+      ),
+      {
+        "src/math.test.ts": [
+          testImport.replace("{ expect, it }", "{ describe, expect, it }"),
+          "",
+          'describe("Calculator", () => {',
+          '  it("Adds", () => {',
+          "    expect(1 + 1).toBe(2)",
+          "  })",
+          "})",
+          "",
+        ].join("\n"),
+      }
+    )
+
+    expect(codes["src/math.test.ts"]).toStrictEqual([`${name}(prefer-lowercase-title)`])
+  })
+
   it("expose its plugins and rules only to JavaScript", () => {
     expect(preset.plugins).toStrictEqual([name])
     expect(preset.rules).toHaveProperty(`${name}/require-top-level-describe`)

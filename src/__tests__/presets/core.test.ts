@@ -113,4 +113,41 @@ describe("core preset", () => {
 
     expect(codes).toStrictEqual(["import(unambiguous)"])
   })
+
+  // A declaration file without an import or export is a script on purpose: only a script can
+  // declare a wildcard module or a global.
+  it("accept a declaration file without an import or export", () => {
+    const codes = lint(
+      "raw.d.ts",
+      [
+        'declare module "*?raw" {',
+        "  const content: string",
+        "  export default content",
+        "}",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
+
+  // TypeScript lets a type and a value share a name, as in a schema and the type that it infers.
+  // `no-redeclare` reads the pair as one name declared two times. The type check reports a name
+  // that is declared two times as a value.
+  it("accept a type and a value that share a name", () => {
+    const codes = lint(
+      "index.ts",
+      ["export const port = 8080", "export type port = typeof port", ""].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
+
+  // A JavaScript file has no type syntax, so JSDoc is its only way to state a type.
+  it("accept JSDoc type tags in a JavaScript file and report them in a TypeScript file", () => {
+    const source = ["/** @type {string[]} */", "export const names = []", ""].join("\n")
+
+    expect(lint("names.mjs", source)).toStrictEqual([])
+    expect(lint("names.ts", source)).toContain("jsdoc(check-tag-names)")
+  })
 })

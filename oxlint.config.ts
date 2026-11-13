@@ -6,7 +6,9 @@ import strict from "./presets/lint/strict.ts"
 import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
 export default defineConfig({
-  extends: [core, node, effect, strict],
+  // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
+  // rule makes some test code impossible to write.
+  extends: [core, node, effect, strict, vitest],
   ignorePatterns: [
     ...ignorePatterns,
     // Rule fixtures break rules on purpose; see src/__tests__/presets/rule-fixtures.ts.
@@ -17,17 +19,12 @@ export default defineConfig({
     typeCheck: true,
   },
   overrides: [
-    // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
-    // rule makes some test code impossible to write.
+    // `RuleTester` from `oxlint/plugins-dev` and `describeModelFixtures` declare their own
+    // `describe` and `it` blocks, so their calls are tests, not setup code.
     {
       files: testFiles,
       plugins: vitest.plugins,
       rules: {
-        ...vitest.rules,
-        // Describe titles name the service or error class under test, such as `NodeVersionResolver`.
-        "vitest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],
-        // `RuleTester` from `oxlint/plugins-dev` and `describeModelFixtures` declare their own
-        // `describe` and `it` blocks, so their calls are tests, not setup code.
         "vitest/require-hook": [
           "error",
           { allowedFunctionCalls: ["describeModelFixtures", "tester.run"] },
@@ -36,19 +33,12 @@ export default defineConfig({
     },
     // A type reset merges a declaration into a built-in global, such as `interface Array<T>`. Only
     // a script file can declare globals without `declare global`, so the resets reference each
-    // other by path instead of an import, redeclare built-in names, and keep interfaces with call
-    // signatures. They declare built-in contracts that take or return `unknown` on purpose, and
-    // restate library parameters, such as `{}`, `object`, and `Function`. A narrower parameter would
-    // send some calls to the library overload that returns `any`.
+    // other by path instead of an import, and keep interfaces with call signatures. They also
+    // restate library parameters, such as `{}` and `Function`. A narrower parameter would send some
+    // calls to the library overload that returns `any`.
     {
       files: ["presets/typescript/resets/*.d.ts"],
       rules: {
-        "anti-slop/no-object-parameters": "off",
-        "anti-slop/no-unknown-parameters": "off",
-        "anti-slop/no-unknown-returns": "off",
-        "anti-slop/no-unsafe-dictionary-type": "off",
-        "eslint/no-redeclare": ["error", { builtinGlobals: false }],
-        "import/unambiguous": "off",
         "typescript/no-empty-object-type": ["error", { allowObjectTypes: "always" }],
         "typescript/no-unsafe-function-type": "off",
         "typescript/prefer-function-type": "off",
@@ -62,14 +52,6 @@ export default defineConfig({
       rules: {
         "eslint/no-implicit-globals": "off",
         "eslint/no-shadow-restricted-names": "off",
-      },
-    },
-    // A wildcard module declaration is valid only in a script file. The override is temporary:
-    // inline disable comments do not suppress file-scope rules (oxc-project/oxc#21072).
-    {
-      files: ["src/__tests__/raw.d.ts"],
-      rules: {
-        "import/unambiguous": "off",
       },
     },
   ],

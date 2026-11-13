@@ -69,7 +69,8 @@ const rules: OxlintConfig["rules"] = {
   "jest/prefer-hooks-in-order": "error",
   "jest/prefer-hooks-on-top": "error",
   "jest/prefer-jest-mocked": "error",
-  "jest/prefer-lowercase-title": "error",
+  // A describe title often names the class or function under test, such as `Calculator`.
+  "jest/prefer-lowercase-title": ["error", { ignore: ["describe"] }],
   "jest/prefer-mock-promise-shorthand": "error",
   "jest/prefer-mock-return-shorthand": "error",
   "jest/prefer-snapshot-hint": "error",

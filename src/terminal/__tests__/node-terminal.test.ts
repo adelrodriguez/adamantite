@@ -6,6 +6,7 @@ import * as Fiber from "effect/Fiber"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
+import { TestClock } from "effect/testing"
 import { TerminalInput } from "#terminal/input.ts"
 import * as NodeTerminal from "#terminal/node-terminal.ts"
 
@@ -79,6 +80,19 @@ describe("NodeTerminal.layer", () => {
       const answers = [yield* confirm, yield* confirm]
 
       expect({ answers, rawModes }).toStrictEqual({ answers: [true, true], rawModes: [true] })
+    }).pipe(Effect.scoped, provideTerminal)
+  )
+
+  // A command can start another process after its last prompt, such as a package install, so the
+  // reader must not hold raw mode once Effect's 10 ms between prompts has passed.
+  it.effect("turn raw mode off 10 ms after the last prompt", () =>
+    Effect.gen(function* () {
+      const { rawModes } = yield* fakeTerminalStreams
+
+      yield* confirm
+      yield* TestClock.adjust("10 millis")
+
+      expect(rawModes).toStrictEqual([true, false])
     }).pipe(Effect.scoped, provideTerminal)
   )
 

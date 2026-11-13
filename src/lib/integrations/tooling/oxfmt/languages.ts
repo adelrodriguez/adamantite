@@ -1,7 +1,9 @@
 import type { FormatConfig } from "oxfmt"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import semver from "semver"
+import * as Result from "effect/Result"
+import * as SemVer from "effect/SemVer"
+import * as SemVerRange from "effect/SemVerRange"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/workspace/project.ts"
 import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
@@ -98,7 +100,15 @@ export const assessPluginLanguages = Effect.fn("assessPluginLanguages")(function
           ? (yield* readPackageJson(installed.value)).version
           : undefined
 
-        if (installedVersion !== undefined && semver.satisfies(installedVersion, range)) {
+        // A range or a version that does not parse is not supported.
+        const supported =
+          installedVersion !== undefined
+          && Result.all([SemVerRange.parse(range), SemVer.parse(installedVersion)]).pipe(
+            Result.map(([supportedRange, version]) => SemVerRange.matches(supportedRange, version)),
+            Result.getOrElse(() => false)
+          )
+
+        if (supported) {
           return []
         }
 

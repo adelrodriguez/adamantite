@@ -130,6 +130,27 @@ describe("plugin languages", () => {
     })
   )
 
+  it.effect("report a Svelte version that does not parse", () =>
+    Effect.gen(function* () {
+      // A SemVer version has no `v` prefix.
+      const result = yield* assess({
+        declares: { svelte: "^5.0.0" },
+        installed: { oxfmt: "0.78.0", svelte: "v5.0.0" },
+      })
+
+      expect(result).toMatchObject({
+        applicable: true,
+        findings: [
+          {
+            currentState: expect.stringContaining("`svelte` v5.0.0"),
+            id: "unavailable-svelte-plugin",
+            title: "Oxfmt cannot format Svelte files",
+          },
+        ],
+      })
+    })
+  )
+
   it.effect("skip the plugin languages when Oxfmt is not installed", () =>
     Effect.gen(function* () {
       const result = yield* assess({

@@ -41,8 +41,10 @@ plugin language is a new entry.
 - Doctor reports `unavailable-<option>-plugin` for each language whose framework `package.json`
   declares, when the package does not resolve from the installed Oxfmt, or when its version is
   outside the range that Oxfmt declares. The range comes from Oxfmt's `peerDependencies`, and
-  `semver` compares it, so an Oxfmt update moves the ranges without a change to Adamantite. The
-  Oxfmt integration runs the check through the `assessRuntime` option of `defineConfigTooling`.
+  Effect's `SemVerRange` matches the version against it, so an Oxfmt update moves the ranges
+  without a change to Adamantite. A range or a version that does not parse counts as outside the
+  range. The Oxfmt integration runs the check through the `assessRuntime` option of
+  `defineConfigTooling`.
 - Zed formats each plugin language with the `oxfmt` language server, and turns off Prettier for
   it, as for the other managed languages. The Oxc extension for Zed attaches Oxfmt to both
   languages. `update` keeps an entry that the project wrote, because Zed uses an explicit

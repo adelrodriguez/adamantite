@@ -2,7 +2,7 @@
 "adamantite": minor
 ---
 
-Update the managed tooling versions: Oxlint 1.93.0, Oxfmt 0.78.0, tsrs 0.25.0-ts7.1.0-beta, Knip 6.45.1, and `@effect/tsgo` 0.69.0. Also update the runtime dependencies `@oxlint/plugins` to 1.93.0 and `@clack/prompts` to 1.9.0, and add `semver` 7.8.6, which Doctor uses to compare the version of a package with the range that Oxfmt supports.
+Update the managed tooling versions: Oxlint 1.93.0, Oxfmt 0.78.0, tsrs 0.25.0-ts7.1.0-beta, Knip 6.45.1, and `@effect/tsgo` 0.69.0. Also update the runtime dependencies `@oxlint/plugins` to 1.93.0 and `@clack/prompts` to 1.9.0.
 
 The type-aware rules now have builds for Windows ARM64: tsrs 0.25.0 publishes `@tsrs/win32-arm64`, and `@effect/tsgo` 0.69.0 ships a Windows ARM64 build of tsrs.
 

@@ -14,6 +14,14 @@ const allowInTypeGuards = [{ allowInTypeGuards: true }]
 
 tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
   invalid: [
+    {
+      code: 'function resolve(raw: unknown) { const { headers } = raw!; return typeof headers === "function"; }',
+      errors: [error],
+    },
+    {
+      code: 'function resolve(raw: unknown) { const { headers } = raw as Options; return typeof headers === "function"; }',
+      errors: [error],
+    },
     { code: 'if (typeof input === "string") use(input);', errors: [error] },
     { code: "if (typeof input === undefined) use(input);", errors: [error] },
     { code: 'function f(value: unknown) { return typeof value === "string"; }', errors: [error] },
@@ -106,6 +114,9 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     'async function resolve(headers: HeadersInit | (() => Promise<HeadersInit>)) { return typeof headers === "function" ? await headers() : headers; }',
     'function resolve(options: FetchTransportOptions) { return typeof (options.headers) === "function"; }',
     'function resolve(options?: FetchTransportOptions) { return typeof options!.headers === "function"; }',
+    'function resolve(options?: FetchTransportOptions) { const { headers } = options!; return typeof headers === "function"; }',
+    'function resolve(options: Config) { const { headers } = options.transport; return typeof headers === "function"; }',
+    'function resolve({ headers }: FetchTransportOptions = {}) { return typeof headers === "function"; }',
     'function resolve(options?: TransportConfig) { return typeof options?.transport!.headers === "function"; }',
     'function resolve(options: FetchTransportOptions) { const { headers } = options; return typeof headers === "function"; }',
     'function resolve(options: FetchTransportOptions) { const { headers: init = {} } = options; return typeof init === "function"; }',

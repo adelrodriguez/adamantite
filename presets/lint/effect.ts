@@ -167,8 +167,11 @@ const config: OxlintConfig = {
 
     // Core turns on these promise rules, which match `catch` by its name only. They cannot prove
     // that the `Effect` of an import is not a promise, so they read `Effect.catch` as
-    // `Promise.prototype.catch`. Oxlint gives the rules no option to ignore a receiver, so an Effect
-    // project turns them off. TypeScript still checks the arguments of a promise method.
+    // `Promise.prototype.catch`. `no-nesting` reports an `Effect.catch` in the handler of another,
+    // and `valid-params` reports the data-first `Effect.catch(effect, handler)`. Oxlint gives the
+    // rules no option to ignore a receiver, so an Effect project turns them off. TypeScript still
+    // checks the arguments of a promise method.
+    "promise/no-nesting": "off",
     "promise/valid-params": "off",
 
     // Core turns on these unicorn rules, which match an array method by its name only. They read

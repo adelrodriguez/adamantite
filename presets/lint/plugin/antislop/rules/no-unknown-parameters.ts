@@ -1,12 +1,16 @@
 import type { ESTree, Reference, Rule, SourceCode } from "@oxlint/plugins"
 
 import {
-  containsUnknownType,
   type FunctionParameter,
   functionParameterBindingName,
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
 import { resolveVariable } from "../shared/scope.ts"
+import {
+  createTypeAliasEnvironment,
+  type TypeAliasEnvironment,
+} from "../shared/type-alias-resolution.ts"
+import { resolvesToUnknown } from "../shared/unknown-type.ts"
 
 type ParameterOwner =
   | ESTree.ArrowFunctionExpression
@@ -228,13 +232,17 @@ function isParserInput(
  */
 const rule: Rule = {
   createOnce(context) {
+    let environment: TypeAliasEnvironment | null = null
+
     const checkParameters = (node: ParameterOwner) => {
+      if (environment === null) return
+
       for (const [index, parameter] of node.params.entries()) {
         const annotation = functionParameterTypeAnnotation(parameter)
 
         if (annotation === null || annotation === undefined) continue
 
-        if (!containsUnknownType(annotation.typeAnnotation)) continue
+        if (!resolvesToUnknown(annotation.typeAnnotation, environment)) continue
         const name = functionParameterBindingName(parameter, context.sourceCode)
 
         if (name === "cause" || isTypePredicateSubject(node, name)) continue
@@ -254,6 +262,9 @@ const rule: Rule = {
       ArrowFunctionExpression: checkParameters,
       FunctionDeclaration: checkParameters,
       FunctionExpression: checkParameters,
+      Program(node) {
+        environment = createTypeAliasEnvironment(node, context.sourceCode.visitorKeys)
+      },
       TSCallSignatureDeclaration: checkParameters,
       TSConstructSignatureDeclaration: checkParameters,
       TSConstructorType: checkParameters,

@@ -2,9 +2,9 @@ import type { ESTree, Rule } from "@oxlint/plugins"
 
 import {
   createTypeAliasEnvironment,
-  resolvedTypeMatches,
   type TypeAliasEnvironment,
 } from "../shared/type-alias-resolution.ts"
+import { exposesUnknown } from "../shared/unknown-type.ts"
 
 type FunctionWithReturnType =
   | ESTree.ArrowFunctionExpression
@@ -22,36 +22,12 @@ const rule: Rule = {
   createOnce(context) {
     let environment: TypeAliasEnvironment | null = null
 
-    const resolvesToUnknown = (type: ESTree.TSType): boolean =>
-      environment !== null
-      && resolvedTypeMatches(type, environment, (resolved, matches) => {
-        if (resolved.type === "TSUnknownKeyword") return true
-
-        if (resolved.type === "TSParenthesizedType") {
-          return matches(resolved.typeAnnotation)
-        }
-
-        if (resolved.type === "TSUnionType") return resolved.types.some(matches)
-
-        if (
-          resolved.type !== "TSTypeReference"
-          || resolved.typeName.type !== "Identifier"
-          || (resolved.typeName.name !== "Promise" && resolved.typeName.name !== "PromiseLike")
-        ) {
-          return false
-        }
-
-        const value = resolved.typeArguments?.params[0]
-
-        return value !== undefined && matches(value)
-      })
-
     const checkReturnType = (node: FunctionWithReturnType) => {
       const annotation = node.returnType
 
-      if (annotation === null || annotation === undefined) return
+      if (annotation === null || annotation === undefined || environment === null) return
 
-      if (!resolvesToUnknown(annotation.typeAnnotation)) return
+      if (!exposesUnknown(annotation.typeAnnotation, environment)) return
       context.report({ messageId: "unknownReturn", node: annotation.typeAnnotation })
     }
 
@@ -74,7 +50,7 @@ const rule: Rule = {
   meta: {
     docs: {
       description:
-        "Disallow functions whose explicit return contract is unknown or Promise<unknown>.",
+        "Disallow functions whose explicit return contract is unknown, or a promise, iterable, or generator of unknown, such as Promise<unknown>.",
     },
     messages: {
       unknownReturn:

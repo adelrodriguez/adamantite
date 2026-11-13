@@ -1,8 +1,8 @@
 import type { Definition, ESTree, Rule, SourceCode } from "@oxlint/plugins"
 import type { VisitorKeys } from "../shared/child-nodes.ts"
 import { readBooleanOption } from "../../options.ts"
-import { mentionsUncheckedType } from "../shared/function-parameters.ts"
 import { resolveVariable } from "../shared/scope.ts"
+import { mentionsUncheckedType } from "../shared/unknown-type.ts"
 
 type RuntimeFunction = ESTree.ArrowFunctionExpression | ESTree.Function
 

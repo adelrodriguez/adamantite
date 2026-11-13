@@ -8,11 +8,11 @@ import {
   type WideningTarget,
 } from "../shared/dictionary-types.ts"
 import {
-  containsUnknownType,
   functionParameterBindingName,
   functionParameterTypeAnnotation,
 } from "../shared/function-parameters.ts"
 import { resolveVariable } from "../shared/scope.ts"
+import { resolvesToUnknown } from "../shared/unknown-type.ts"
 
 type FunctionExpression = ESTree.ArrowFunctionExpression | ESTree.Function
 
@@ -276,9 +276,10 @@ const rule: Rule = {
         const parameterAnnotation = functionParameterTypeAnnotation(parameter)
 
         if (
-          parameterAnnotation === null
+          environment === null
+          || parameterAnnotation === null
           || parameterAnnotation === undefined
-          || !containsUnknownType(parameterAnnotation.typeAnnotation)
+          || !resolvesToUnknown(parameterAnnotation.typeAnnotation, environment.typeAliases)
         ) {
           return
         }

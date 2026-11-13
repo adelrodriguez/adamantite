@@ -1,17 +1,18 @@
 import type { JsonObject, JsonValue } from "type-fest"
 import * as Effect from "effect/Effect"
+import * as Json5 from "effect/encoding/Json5"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/workspace/project.ts"
-import { InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { FailedToParseFile, InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
+import { readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import {
   checkIsJsonArray,
   checkIsJsonObject,
-  parseJson,
+  checkIsPlainJson,
   stringifyJson,
-  updateJsonText,
 } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
@@ -60,12 +61,15 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
 
   const plugin = Option.isNone(content)
     ? undefined
-    : yield* parseJson(content.value, configPath).pipe(
-        Effect.map((config) =>
-          checkIsJsonObject(config) && checkIsJsonObject(config["compilerOptions"])
-            ? findLanguageServicePlugin(config["compilerOptions"]["plugins"])
-            : undefined
-        )
+    : yield* Effect.fromResult(Json5.parse(content.value)).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+        Effect.mapBoth({
+          onFailure: (cause) => new FailedToParseFile({ cause, path: configPath }),
+          onSuccess: (config) =>
+            checkIsJsonObject(config) && checkIsJsonObject(config["compilerOptions"])
+              ? findLanguageServicePlugin(config["compilerOptions"]["plugins"])
+              : undefined,
+        })
       )
 
   if (plugin !== undefined && plugin["diagnostics"] !== false) {
@@ -110,7 +114,10 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
     return "missing" as const
   }
 
-  const config = yield* parseJson(content.value, configPath)
+  const config = yield* Effect.fromResult(Json5.parse(content.value)).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+    Effect.mapError((cause) => new FailedToParseFile({ cause, path: configPath }))
+  )
 
   if (!checkIsJsonObject(config)) {
     return yield* new InvalidConfigFormat({ path: configPath })
@@ -134,12 +141,23 @@ export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* 
     ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: true } : entry))
     : [...plugins, LANGUAGE_SERVICE_PLUGIN]
 
-  yield* writeFile(
-    configPath,
-    updateJsonText(content.value, {
-      ...config,
-      compilerOptions: { ...compilerOptions, plugins: nextPlugins },
+  if (!checkIsPlainJson(content.value)) {
+    return yield* new JsoncNotEditable({
+      change: `Add \`${yield* stringifyJson(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\`, or set \`diagnostics\` to \`true\` in the existing entry.`,
+      path: configPath,
     })
+  }
+
+  // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON objects.
+  yield* writeJsonFile(
+    configPath,
+    Object.fromEntries([
+      ...Object.entries(config),
+      [
+        "compilerOptions",
+        Object.fromEntries([...Object.entries(compilerOptions), ["plugins", nextPlugins]]),
+      ],
+    ])
   )
 
   return "updated" as const

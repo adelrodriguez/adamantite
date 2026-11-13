@@ -1,9 +1,10 @@
-import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
+import * as Json5 from "effect/encoding/Json5"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { Script } from "#lib/workspace/package-json.ts"
 import type { Project } from "#lib/workspace/project.ts"
@@ -18,23 +19,23 @@ import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
 import {
   FailedToInstallExtension,
+  FailedToParseFile,
   InvalidConfigFormat,
+  JsoncNotEditable,
   VscodeCliNotFound,
 } from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
   readFile,
   readFileIfExists,
-  writeFile,
   writeJsonFile,
 } from "#lib/shared/filesystem.ts"
 import {
   checkIsJsonObject,
+  checkIsPlainJson,
   formatJson,
   mergeConfig,
-  parseJson,
   stringifyJson,
-  updateJsonText,
 } from "#lib/shared/json.ts"
 import { formatInitCommand } from "#lib/workspace/init-command.ts"
 import { checkRunsTool } from "#lib/workspace/package-json.ts"
@@ -99,7 +100,10 @@ export default defineIntegration({
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const config = yield* parseJson(content.value, settingsPath)
+      const config = yield* Effect.fromResult(Json5.parse(content.value)).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+        Effect.mapError((cause) => new FailedToParseFile({ cause, path: settingsPath }))
+      )
 
       if (!checkIsJsonObject(config)) {
         return yield* new InvalidConfigFormat({ path: settingsPath })
@@ -258,9 +262,13 @@ export default defineIntegration({
       const settingsPath = path.join(cwd, files[0].path)
 
       const vscodeFile = yield* readFile(settingsPath)
-      const existingConfig = yield* parseJson(vscodeFile, settingsPath)
 
-      if (!Predicate.isObject(existingConfig)) {
+      const existingConfig = yield* Effect.fromResult(Json5.parse(vscodeFile)).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+        Effect.mapError((cause) => new FailedToParseFile({ cause, path: settingsPath }))
+      )
+
+      if (!checkIsJsonObject(existingConfig)) {
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
@@ -294,6 +302,13 @@ export default defineIntegration({
         ...effectSettings,
       ])
 
-      yield* writeFile(settingsPath, updateJsonText(vscodeFile, newConfig))
+      if (!checkIsPlainJson(vscodeFile)) {
+        return yield* new JsoncNotEditable({
+          change: "Run `adamantite doctor` for the settings to change.",
+          path: settingsPath,
+        })
+      }
+
+      yield* writeJsonFile(settingsPath, newConfig)
     }),
 })

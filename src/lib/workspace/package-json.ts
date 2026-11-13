@@ -4,14 +4,14 @@ import type { PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as Jsonc from "effect/encoding/Jsonc"
 import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
-import { InvalidPackageJson } from "#lib/shared/errors.ts"
-import { readFile, writeFile } from "#lib/shared/filesystem.ts"
-import { parseJson, updateJsonText } from "#lib/shared/json.ts"
+import { FailedToParseFile, InvalidPackageJson } from "#lib/shared/errors.ts"
+import { readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
 const RANGE_PREFIX_REGEX = /^[\^~]/
@@ -81,7 +81,10 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
     const path = yield* Path.Path
     const packagePath = path.join(cwd, "package.json")
     const content = yield* readFile(packagePath)
-    const parsed = yield* parseJson(content, packagePath)
+
+    const parsed = yield* Effect.fromResult(Jsonc.parse(content)).pipe(
+      Effect.mapError((cause) => new FailedToParseFile({ cause, path: packagePath }))
+    )
 
     yield* Schema.decodeUnknownEffect(PackageManifest)(parsed).pipe(
       Effect.mapError(
@@ -104,8 +107,7 @@ export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const packagePath = path.join(cwd, "package.json")
-    const content = yield* readFile(packagePath)
-    yield* writeFile(packagePath, updateJsonText(content, packageJson))
+    yield* writeJsonFile(packagePath, packageJson)
   })
 
 /**

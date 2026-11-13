@@ -5,6 +5,7 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import type { Script } from "#lib/workspace/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { decodeJson } from "#__tests__/json.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
@@ -12,9 +13,10 @@ import {
   CliNotFound,
   EffectEditorUnavailable,
   InvalidConfigFormat,
+  JsoncNotEditable,
   VscodeCliNotFound,
 } from "#lib/shared/errors.ts"
-import { formatJson, parseJson } from "#lib/shared/json.ts"
+import { formatJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import {
   EFFECT_COMPILER,
@@ -104,7 +106,7 @@ describe("vscode", () => {
 
           yield* vscode.create(ROOT).pipe(provideFiles(files))
 
-          const config = yield* parseJson(files.read(".vscode/settings.json"))
+          const config = yield* decodeJson(files.read(".vscode/settings.json"))
           expect(config).toMatchObject({
             "js/ts.tsdk.path": EFFECT_SDK,
             "oxc.lint.customization": {
@@ -138,7 +140,7 @@ describe("vscode", () => {
         const exists = yield* vscode.detect(ROOT).pipe(provideFiles(files))
         expect(exists).toBe(true)
 
-        const config = yield* parseJson(files.read(".vscode/settings.json"))
+        const config = yield* decodeJson(files.read(".vscode/settings.json"))
 
         expect(config).toHaveProperty(["editor.formatOnSave"], true)
         expect(config).toHaveProperty(["oxc.path.oxlint"], "node_modules/adamantite/dist/oxlint.js")
@@ -152,7 +154,7 @@ describe("vscode", () => {
 
         yield* vscode.create(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(".vscode/settings.json"))
+        const config = yield* decodeJson(files.read(".vscode/settings.json"))
 
         // The Astro and Svelte extensions set their own formatters, so a global default does not apply.
         expect(config).toMatchObject({
@@ -229,7 +231,7 @@ describe("vscode", () => {
         expect(files.list().map((path) => [path, files.read(path)])).toStrictEqual(before)
 
         yield* vscode.update(ROOT).pipe(provideFiles(files))
-        const config = yield* parseJson(files.read(".vscode/settings.json"))
+        const config = yield* decodeJson(files.read(".vscode/settings.json"))
         expect(config).toMatchObject({
           "editor.tabSize": 4,
           "oxc.lint.customization": {
@@ -376,7 +378,7 @@ describe("vscode", () => {
         expect(existsBefore).toBe(true)
         yield* vscode.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(".vscode/settings.json"))
+        const config = yield* decodeJson(files.read(".vscode/settings.json"))
 
         expect(config).toHaveProperty(["editor.tabSize"], 4)
         expect(config).toHaveProperty(["files.autoSave"], "afterDelay")
@@ -399,7 +401,7 @@ describe("vscode", () => {
 
         yield* vscode.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(".vscode/settings.json"))
+        const config = yield* decodeJson(files.read(".vscode/settings.json"))
 
         expect(config).toMatchObject({
           "editor.formatOnSave": false,
@@ -425,20 +427,20 @@ describe("vscode", () => {
       })
     )
 
-    it.effect("keep the comments and indentation of the existing config", () =>
+    it.effect("leave a config with comments unchanged and fail with JsoncNotEditable", () =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          ".vscode/settings.json": '{\n\t// Team setting\n\t"editor.tabSize": 4,\n}\n',
-        })
+        const content = '{\n\t// Team setting\n\t"editor.tabSize": 4,\n}\n'
+        const files = makeFiles({ ".vscode/settings.json": content })
 
-        yield* vscode.update(ROOT).pipe(provideFiles(files))
+        const result = yield* Effect.result(vscode.update(ROOT).pipe(provideFiles(files)))
 
-        const content = files.read(".vscode/settings.json")
+        expect(Result.isFailure(result)).toBe(true)
 
-        expect(content).toMatch(
-          /^\{\n\t\/\/ Team setting\n\t"editor\.tabSize": 4,\n\t"\[astro\]": \{\n\t\t"/u
-        )
-        expect(content).toContain('\t"editor.formatOnSave": true')
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(JsoncNotEditable)
+        }
+
+        expect(files.read(".vscode/settings.json")).toBe(content)
       })
     )
 

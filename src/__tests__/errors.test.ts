@@ -1,6 +1,4 @@
-import type { ParseError } from "jsonc-parser"
 import { describe, expect, it } from "@effect/vitest"
-import { parse, printParseErrorCode } from "jsonc-parser"
 import {
   CustomRuleExists,
   FailedToInstallDependency,
@@ -8,24 +6,9 @@ import {
   FailedToParseFile,
   FailedToReadFile,
   FailedToWriteFile,
+  JsoncNotEditable,
   ProjectCopyFailed,
 } from "#lib/shared/errors.ts"
-
-function createParseErrors(count: number): ParseError[] {
-  const errors: ParseError[] = []
-  parse("{ invalid", errors)
-
-  const [firstError] = errors
-
-  if (!firstError) {
-    throw new Error("Expected jsonc-parser to produce at least one parse error")
-  }
-
-  return Array.from({ length: count }, (_, index) => ({
-    ...firstError,
-    offset: firstError.offset + index,
-  }))
-}
 
 describe("errors", () => {
   describe("ProjectCopyFailed", () => {
@@ -55,21 +38,28 @@ describe("errors", () => {
   })
 
   describe("FailedToParseFile", () => {
-    it("use a fallback parse message when there are no parse errors", () => {
-      const error = new FailedToParseFile({ errors: [], path: "foo.json" })
+    it("name the file and the position of the syntax error", () => {
+      const error = new FailedToParseFile({
+        cause: new Error("Invalid JSONC at line 4, column 5"),
+        path: "tsconfig.json",
+      })
 
-      expect(error.message).toContain("Unknown JSON/JSONC parsing error")
+      expect(error.message).toBe(
+        "Failed to parse `tsconfig.json`. Fix the JSON or JSONC syntax and run the command again. Cause: Invalid JSONC at line 4, column 5."
+      )
     })
+  })
 
-    it("truncate parse details after the first three errors", () => {
-      const errors = createParseErrors(4)
-      const error = new FailedToParseFile({ errors, path: "foo.json" })
-      const [code] = errors.map((parseError) => printParseErrorCode(parseError.error))
+  describe("JsoncNotEditable", () => {
+    it("say why the file stays as it is and what to do", () => {
+      const error = new JsoncNotEditable({
+        change: 'Set `extends` to `"adamantite/typescript"`.',
+        path: "tsconfig.json",
+      })
 
-      expect(error.message).toContain(`- ${code} (offset: ${errors[0]?.offset})`)
-      expect(error.message).toContain(`- ${code} (offset: ${errors[1]?.offset})`)
-      expect(error.message).toContain(`- ${code} (offset: ${errors[2]?.offset})`)
-      expect(error.message).not.toContain(`offset: ${errors[3]?.offset}`)
+      expect(error.message).toBe(
+        '`tsconfig.json` has comments or trailing commas, so Adamantite does not rewrite it. Set `extends` to `"adamantite/typescript"`.'
+      )
     })
   })
 

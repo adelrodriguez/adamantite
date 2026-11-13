@@ -3,6 +3,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { decodeJson } from "#__tests__/json.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import updateCommand from "#commands/update.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
@@ -11,7 +12,6 @@ import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
-import { parseJson } from "#lib/shared/json.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
@@ -427,7 +427,7 @@ describe("update", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(yield* parseJson(files.read("skills-lock.json"))).toStrictEqual({
+        expect(yield* decodeJson(files.read("skills-lock.json"))).toStrictEqual({
           skills: { other: { source: "someone/other", sourceType: "local" } },
           version: 1,
         })

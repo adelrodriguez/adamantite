@@ -1,14 +1,19 @@
 import process from "node:process"
 import * as Effect from "effect/Effect"
+import * as Jsonc from "effect/encoding/Jsonc"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as SemVer from "effect/SemVer"
-import { EffectEditorUnavailable, InvalidConfigFormat } from "#lib/shared/errors.ts"
+import {
+  EffectEditorUnavailable,
+  FailedToParseFile,
+  InvalidConfigFormat,
+} from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
+import { checkIsJsonObject } from "#lib/shared/json.ts"
 import { formatInitCommand } from "#lib/workspace/init-command.ts"
 import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -84,7 +89,13 @@ const resolveSdkSource = Effect.fn("resolveSdkSource")(function* (
   }
 
   const metadataPath = path.join(platformDirectory.value, "lib", "upstream.json")
-  const metadata = yield* parseJson(yield* readFile(metadataPath), metadataPath)
+  const metadataText = yield* readFile(metadataPath)
+
+  const metadata = yield* Effect.fromResult(Jsonc.parse(metadataText)).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+    Effect.mapError((cause) => new FailedToParseFile({ cause, path: metadataPath }))
+  )
+
   const components = checkIsJsonObject(metadata) && metadata.components
   const builds = checkIsJsonObject(components) && components.typescript
   const tags = checkIsJsonObject(metadata) && metadata.tags
@@ -138,8 +149,8 @@ const sdkIsCurrent = Effect.fn("sdkIsCurrent")(function* (
     return false
   }
 
-  const metadata = yield* parseJson(content.value, metadataPath).pipe(
-    Effect.catchTag("FailedToParseFile", () => Effect.succeed(null))
+  const metadata = Result.getOrNull(
+    Jsonc.parse(content.value).pipe(Result.flatMap(Schema.decodeUnknownResult(Schema.Json)))
   )
 
   if (
@@ -174,7 +185,13 @@ export const readEffectEditor = Effect.fn("readEffectEditor")(function* (cwd: st
   const path = yield* Path.Path
   const manifest = yield* readPackageJson(directory.value)
   const presetPath = path.join(directory.value, "oxlint-schema.json")
-  const preset = yield* parseJson(yield* readFile(presetPath), presetPath)
+  const presetText = yield* readFile(presetPath)
+
+  const preset = yield* Effect.fromResult(Jsonc.parse(presetText)).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+    Effect.mapError((cause) => new FailedToParseFile({ cause, path: presetPath }))
+  )
+
   const definitions = checkIsJsonObject(preset) && preset.definitions
   const rules = checkIsJsonObject(definitions) && definitions["DummyRuleMap"]
   const properties = checkIsJsonObject(rules) && rules["properties"]

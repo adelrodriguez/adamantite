@@ -3,8 +3,10 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { decodeJson } from "#__tests__/json.ts"
 import { updateTsconfigPlugin } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/tsconfig.ts"
-import { parseJson, stringifyJson } from "#lib/shared/json.ts"
+import { JsoncNotEditable } from "#lib/shared/errors.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 
@@ -33,7 +35,7 @@ describe("tsconfig", () => {
         const result = yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
 
         expect(result).toBe("updated")
-        expect(yield* parseJson(files.read("tsconfig.json"))).toStrictEqual({
+        expect(yield* decodeJson(files.read("tsconfig.json"))).toStrictEqual({
           compilerOptions: {
             plugins: [{ name: "other" }, { diagnostics: true, name: "@effect/language-service" }],
             strict: true,
@@ -61,7 +63,7 @@ describe("tsconfig", () => {
 
         yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
 
-        expect(yield* parseJson(files.read("tsconfig.json"))).toStrictEqual({
+        expect(yield* decodeJson(files.read("tsconfig.json"))).toStrictEqual({
           compilerOptions: {
             plugins: [
               {
@@ -75,34 +77,28 @@ describe("tsconfig", () => {
       })
     )
 
-    it.effect("keep the comments of the existing config", () =>
+    it.effect("leave a config with comments unchanged and fail with JsoncNotEditable", () =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": `{
+        const content = `{
   // Strict project
   "compilerOptions": {
     "strict": true, // keep strict
     "plugins": []
   }
 }
-`,
-        })
+`
 
-        yield* updateTsconfigPlugin(ROOT).pipe(provideFiles(files))
+        const files = makeFiles({ "tsconfig.json": content })
 
-        expect(files.read("tsconfig.json")).toBe(`{
-  // Strict project
-  "compilerOptions": {
-    "strict": true, // keep strict
-    "plugins": [
-      {
-        "diagnostics": true,
-        "name": "@effect/language-service"
-      }
-    ]
-  }
-}
-`)
+        const result = yield* Effect.result(updateTsconfigPlugin(ROOT).pipe(provideFiles(files)))
+
+        expect(Result.isFailure(result)).toBe(true)
+
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(JsoncNotEditable)
+        }
+
+        expect(files.read("tsconfig.json")).toBe(content)
       })
     )
 

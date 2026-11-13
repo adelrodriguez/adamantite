@@ -205,7 +205,7 @@ describe("assessProject", () => {
         const files = createFileSystemTestContext({
           files: {
             "package.json": "{}",
-            [settingsPath]: '{ /* Keep this comment */ "projectSetting": true }',
+            [settingsPath]: '{ "projectSetting": true }',
           },
           root: ROOT,
         })
@@ -240,7 +240,6 @@ describe("assessProject", () => {
         yield* editor.update(ROOT).pipe(provideFiles)
 
         expect(yield* assess).toMatchObject({ applicable: true, findings: [] })
-        expect(files.read(settingsPath)).toContain("/* Keep this comment */")
         expect(files.read(settingsPath)).toContain('"projectSetting": true')
       })
   )

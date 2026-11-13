@@ -110,7 +110,7 @@ describe("plugin languages", () => {
         findings: [
           {
             currentState: expect.stringContaining("`svelte` 4.2.20"),
-            goal: [expect.stringContaining("`svelte` ^5.0.0")],
+            goal: expect.arrayContaining([expect.stringContaining("`svelte` ^5.0.0")]),
             id: "unavailable-svelte-plugin",
             title: "Oxfmt cannot format Svelte files",
           },
@@ -130,16 +130,14 @@ describe("plugin languages", () => {
     })
   )
 
-  it.effect("leave the plugin packages to package assessment when Oxfmt is missing", () =>
+  it.effect("skip the plugin languages when Oxfmt is not installed", () =>
     Effect.gen(function* () {
       const result = yield* assess({
         declares: { astro: "6.1.0", svelte: "^4.2.0" },
         installed: { svelte: "4.2.20" },
       })
 
-      expect(result.applicable && result.findings.map(({ id }) => id)).toStrictEqual([
-        "missing-oxfmt",
-      ])
+      expect(result).toMatchObject({ applicable: true, findings: [] })
     })
   )
 })

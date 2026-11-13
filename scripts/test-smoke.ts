@@ -278,7 +278,7 @@ const packDirectory = mkdtempSync(join(tmpdir(), "adamantite-smoke-pack-"))
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-"))
 const monorepoFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-monorepo-"))
 const effectFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-effect-"))
-const astroFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-astro-"))
+const pluginFixture = mkdtempSync(join(tmpdir(), "adamantite-smoke-plugin-languages-"))
 
 try {
   writeFileSync(
@@ -751,59 +751,73 @@ try {
     throw new Error(`Expected Doctor to resolve the workspace import, received:\n${doctorOutput}`)
   }
 
-  // Astro 7 depends on @astrojs/compiler-rs, which Oxfmt imports to format `.astro` files. pnpm
-  // keeps it out of the project's own node_modules, so this proves that Oxfmt still finds it.
-  // pnpm rejects packages younger than one day, so the version is pinned. See ADR 0028.
-  console.info("Running `adamantite fix` on an Astro file in a pnpm project...")
+  // Oxfmt formats Astro and Svelte files through plugins that import a package from the project:
+  // @astrojs/compiler-rs, which Astro 7 installs, and the compiler of Svelte 5. pnpm keeps
+  // @astrojs/compiler-rs out of the project's own node_modules, so this proves that Oxfmt still
+  // finds it. pnpm rejects packages younger than one day, so the versions are pinned. See ADR 0028.
+  console.info("Running `adamantite fix` on Astro and Svelte files in a pnpm project...")
   writeFileSync(
-    join(astroFixture, "package.json"),
+    join(pluginFixture, "package.json"),
     JSON.stringify({
-      name: "adamantite-smoke-astro",
+      name: "adamantite-smoke-plugin-languages",
       packageManager: `pnpm@${pnpmVersion}`,
       private: true,
       type: "module",
       version: "0.0.0",
     })
   )
-  run("pnpm", ["add", "--save-dev", join(packDirectory, tarball), "astro@7.4.11"], {
-    cwd: astroFixture,
-  })
+  run(
+    "pnpm",
+    ["add", "--save-dev", join(packDirectory, tarball), "astro@7.4.11", "svelte@5.57.3"],
+    { cwd: pluginFixture }
+  )
   run(process.execPath, [cliPath, "init", "--non-interactive", "--script", "check"], {
-    cwd: astroFixture,
+    cwd: pluginFixture,
   })
 
-  const astroPage = join(astroFixture, "src", "pages", "index.astro")
+  // Each page has an import or an export, because core's import/unambiguous reports a framework
+  // script without one: https://github.com/adelrodriguez/adamantite/issues/780
+  const astroPage = join(pluginFixture, "src", "pages", "index.astro")
+  const sveltePage = join(pluginFixture, "src", "counter.svelte")
   mkdirSync(dirname(astroPage), { recursive: true })
   writeFileSync(
     astroPage,
     "---\nexport const prerender = true\nconst greeting = 'hello';\n---\n<p>{greeting}</p>\n"
   )
+  writeFileSync(
+    sveltePage,
+    "<script lang=\"ts\">\n  import { untrack } from 'svelte';\n  const count = untrack(() => 1);\n</script>\n<p>{count}</p>\n"
+  )
 
-  const astroEnv = {
+  const pluginEnv = {
     ...process.env,
-    PATH: `${join(astroFixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
+    PATH: `${join(pluginFixture, "node_modules", ".bin")}${delimiter}${process.env.PATH ?? ""}`,
   }
 
-  run(process.execPath, [cliPath, "fix"], { cwd: astroFixture, env: astroEnv })
+  run(process.execPath, [cliPath, "fix"], { cwd: pluginFixture, env: pluginEnv })
   assertFileContains(astroPage, 'const greeting = "hello"\n---\n\n<p>{greeting}</p>')
+  assertFileContains(
+    sveltePage,
+    '  import { untrack } from "svelte"\n\n  const count = untrack(() => 1)\n</script>\n\n<p>{count}</p>'
+  )
   run(process.execPath, [cliPath, "check", "--only", "format"], {
-    cwd: astroFixture,
-    env: astroEnv,
+    cwd: pluginFixture,
+    env: pluginEnv,
   })
 
-  const astroDoctor = spawn(process.execPath, [cliPath, "doctor"], {
-    cwd: astroFixture,
-    env: astroEnv,
+  const pluginDoctor = spawn(process.execPath, [cliPath, "doctor"], {
+    cwd: pluginFixture,
+    env: pluginEnv,
   }).output
 
-  if (astroDoctor.includes("Oxfmt cannot format Astro files")) {
-    throw new Error(`Expected Oxfmt to load the Astro compiler, received:\n${astroDoctor}`)
+  if (pluginDoctor.includes("Oxfmt cannot format")) {
+    throw new Error(`Expected Oxfmt to load the plugin packages, received:\n${pluginDoctor}`)
   }
 
   console.info("Smoke test passed: init output is accepted by the pinned tool versions.")
 } catch (error) {
   console.info(
-    `Fixtures kept for debugging at: ${fixture}, ${monorepoFixture}, ${effectFixture}, and ${astroFixture}`
+    `Fixtures kept for debugging at: ${fixture}, ${monorepoFixture}, ${effectFixture}, and ${pluginFixture}`
   )
   throw error
 } finally {
@@ -816,4 +830,4 @@ rmSync(monorepoFixture, { force: true, recursive: true })
 
 rmSync(effectFixture, { force: true, recursive: true })
 
-rmSync(astroFixture, { force: true, recursive: true })
+rmSync(pluginFixture, { force: true, recursive: true })

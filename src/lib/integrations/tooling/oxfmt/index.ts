@@ -1,10 +1,10 @@
 import { defineConfigTooling } from "#lib/integrations/tooling/base.ts"
-import { assessAstroCompiler } from "#lib/integrations/tooling/oxfmt/astro.ts"
 import * as commands from "#lib/integrations/tooling/oxfmt/command.ts"
 import {
   inspectRequiredOxfmtConfig,
   toOxfmtTsConfigContent,
 } from "#lib/integrations/tooling/oxfmt/config.ts"
+import { assessPluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
@@ -12,7 +12,7 @@ export default {
   check: commands.check,
   fix: commands.fix,
   ...defineConfigTooling({
-    assessRuntime: assessAstroCompiler,
+    assessRuntime: assessPluginLanguages,
     configContent: toOxfmtTsConfigContent,
     configFiles: {
       config: "oxfmt.config.ts",

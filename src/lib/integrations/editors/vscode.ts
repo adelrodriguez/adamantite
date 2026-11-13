@@ -14,6 +14,7 @@ import {
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
 import { EFFECT_SDK_PATH, readEffectEditor } from "#lib/integrations/editors/effect.ts"
+import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
 import {
   FailedToInstallExtension,
@@ -41,11 +42,14 @@ import { checkRunsTool } from "#lib/workspace/package-json.ts"
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 
 const CONFIG = {
-  // The Astro extension sets its own formatter for Astro, which takes priority over the global
-  // default. The format preset turns on Oxfmt's `astro` option. See ADR 0028.
-  "[astro]": {
-    "editor.defaultFormatter": "oxc.oxc-vscode",
-  },
+  // The Astro and Svelte extensions set their own formatters, which take priority over the global
+  // default. The format preset turns on Oxfmt for each plugin language. See ADR 0028.
+  ...Object.fromEntries(
+    pluginLanguages.map(({ editors }) => [
+      `[${editors.vscode}]`,
+      { "editor.defaultFormatter": "oxc.oxc-vscode" },
+    ])
+  ),
   "[css]": {
     "editor.defaultFormatter": "oxc.oxc-vscode",
   },

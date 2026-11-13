@@ -141,11 +141,24 @@ describe("vscode", () => {
         const config = yield* parseJson(files.read(".vscode/settings.json"))
 
         expect(config).toHaveProperty(["editor.formatOnSave"], true)
-        // The Astro and Svelte extensions set their own formatters, so a global default does not apply.
-        expect(config).toHaveProperty(["[astro]", "editor.defaultFormatter"], "oxc.oxc-vscode")
-        expect(config).toHaveProperty(["[svelte]", "editor.defaultFormatter"], "oxc.oxc-vscode")
         expect(config).toHaveProperty(["oxc.path.oxlint"], "node_modules/adamantite/dist/oxlint.js")
         expect(config).not.toHaveProperty(["js/ts.tsdk.path"])
+      })
+    )
+
+    it.effect("format Astro and Svelte files with Oxfmt", () =>
+      Effect.gen(function* () {
+        const files = makeFiles()
+
+        yield* vscode.create(ROOT).pipe(provideFiles(files))
+
+        const config = yield* parseJson(files.read(".vscode/settings.json"))
+
+        // The Astro and Svelte extensions set their own formatters, so a global default does not apply.
+        expect(config).toMatchObject({
+          "[astro]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+          "[svelte]": { "editor.defaultFormatter": "oxc.oxc-vscode" },
+        })
       })
     )
 

@@ -3,10 +3,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
+import * as EffectArray from "effect/Array"
+import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
 import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
-import format from "#presets/format.ts"
+import formatPreset from "#presets/format.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 
@@ -15,6 +17,7 @@ const decodeOxfmtManifest = Schema.decodeUnknownSync(
     Schema.Struct({ peerDependenciesMeta: Schema.Record(Schema.String, Schema.Unknown) })
   )
 )
+
 const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
 const CORE_PRESET = join(REPO_ROOT, "presets/lint/core.ts")
 
@@ -90,7 +93,7 @@ describe("format preset", () => {
   })
 
   it("turn on Oxfmt for each plugin language", () => {
-    expect(pluginLanguages.filter(({ option }) => format[option] !== true)).toStrictEqual([])
+    expect(pluginLanguages.filter(({ option }) => formatPreset[option] !== true)).toStrictEqual([])
   })
 
   // Oxfmt lists each package that a bundled plugin imports from the project as an optional peer.
@@ -102,8 +105,11 @@ describe("format preset", () => {
 
     const optionalPeers = Object.keys(peerDependenciesMeta).filter((name) => name !== "vite-plus")
 
-    expect(pluginLanguages.map(({ requires }) => requires).toSorted()).toStrictEqual(
-      optionalPeers.toSorted()
-    )
+    expect(
+      EffectArray.sort(
+        pluginLanguages.map(({ requires }) => requires),
+        Order.String
+      )
+    ).toStrictEqual(EffectArray.sort(optionalPeers, Order.String))
   })
 })

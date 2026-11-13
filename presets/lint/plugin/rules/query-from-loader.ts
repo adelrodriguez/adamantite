@@ -1,5 +1,5 @@
 import type { Context, ESTree, Rule, Scope, Variable, Visitor } from "@oxlint/plugins"
-import { findImportedCalls, type ImportedCall } from "../imports.ts"
+import { findImportedCalls, type ImportedCall } from "../shared/imports.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs and imports only types from packages.

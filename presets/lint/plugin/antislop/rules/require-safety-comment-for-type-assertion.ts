@@ -1,5 +1,5 @@
 import type { ESTree, Rule, SourceCode } from "@oxlint/plugins"
-import { readStringArrayOption } from "../../options.ts"
+import { readStringArrayOption } from "../../shared/options.ts"
 
 type TypeAssertion = ESTree.TSAsExpression | ESTree.TSTypeAssertion
 

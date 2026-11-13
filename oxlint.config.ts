@@ -87,7 +87,7 @@ export default defineConfig({
       },
       {
         import: "oxc-resolver",
-        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/resolver.ts"],
+        owners: ["src/lib/workspace/module-resolver.ts", "presets/lint/plugin/shared/resolver.ts"],
       },
       // Commands run tools through Toolchain. Only the lifecycle commands `init` and `update` use
       // the tooling integrations directly.

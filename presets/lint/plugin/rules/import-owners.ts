@@ -1,10 +1,10 @@
 import type { ESTree, Options, Rule, Visitor } from "@oxlint/plugins"
 import { existsSync, readFileSync } from "node:fs"
 import { posix } from "node:path"
-import { globToRegExp } from "../glob.ts"
-import { isStringLiteral } from "../imports.ts"
-import { readStringArrayOption, readStringOption } from "../options.ts"
-import { resolveImport } from "../resolver.ts"
+import { globToRegExp } from "../shared/glob.ts"
+import { isStringLiteral } from "../shared/imports.ts"
+import { readStringArrayOption, readStringOption } from "../shared/options.ts"
+import { resolveImport } from "../shared/resolver.ts"
 
 // This module runs under whatever runtime executes oxlint in the target project, so it sticks to
 // runtime-neutral APIs: Node.js built-ins that Bun also provides, and oxc-resolver.

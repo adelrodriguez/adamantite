@@ -1,5 +1,5 @@
 import type { Definition, ESTree, Rule, SourceCode } from "@oxlint/plugins"
-import { readBooleanOption } from "../../options.ts"
+import { readBooleanOption } from "../../shared/options.ts"
 import { resolveVariable } from "../shared/scope.ts"
 import {
   createTypeAliasEnvironment,

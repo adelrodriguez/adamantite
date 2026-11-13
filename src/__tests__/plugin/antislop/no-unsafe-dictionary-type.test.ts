@@ -100,6 +100,24 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
       code: "function local() { type Record<K, V> = { key: K; value: V }; type A = Record<string, unknown>; } function global() { type A = Record<string, unknown>; }",
       errors: 1,
     },
+    { code: "function f(x: Record<string, unknown>) {}", errors: [error] },
+    {
+      code: "type Pick<T> = T extends string ? Record<string, unknown> : never;",
+      errors: [error],
+    },
+    {
+      code: "type Narrow<T> = T extends Record<string, unknown> ? true : false; type Bag = Narrow<Record<string, unknown>>;",
+      errors: 1,
+    },
+    { code: "type Bag = Extract<Record<string, unknown>, object>;", errors: [error] },
+    {
+      code: "type Extract<T, U> = { value: T; filter: U }; type A = Extract<string, Record<string, unknown>>;",
+      errors: [error],
+    },
+    {
+      code: "function outer() { type Exclude<T, U> = { value: T; filter: U }; type A = Exclude<string, Record<string, unknown>>; }",
+      errors: [error],
+    },
   ],
   valid: [
     "type Commands = Record<string, Command>;",
@@ -130,5 +148,11 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     "function run<T extends Record<string, unknown>>(input: T): T { return input; }",
     "declare class Store<T extends Record<string, unknown>> { read(): T }",
     "type Deep<T extends Readonly<Record<string, unknown>>> = T;",
+    // A conditional type test and the filter of `Extract` or `Exclude` have no `object` rewrite.
+    "export type IsPlain<T> = T extends Record<string, unknown> ? true : false;",
+    "export type Plain<T> = Extract<T, Record<string, unknown>>;",
+    "export type NotPlain<T> = Exclude<T, Readonly<Record<string, unknown>>>;",
+    "type Merge<T> = T; export type Deep<T> = { [K in keyof T]: T[K] extends Record<string, unknown> ? Merge<T[K]> : T[K] };",
+    "export type Nested<T> = T extends { readonly data: Record<string, unknown> } ? T['data'] : never;",
   ],
 })

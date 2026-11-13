@@ -155,6 +155,19 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
       code: "function outer() { interface ScoreMap { [name: string]: number } const scores: ScoreMap = { alice: 1 }; }",
       errors: [error],
     },
+    // A named interface passes its type arguments to the types it extends, as an alias does.
+    {
+      code: "interface Dict<K extends string, V> extends Record<K, V> {} const d: Dict<string, number> = { a: 1 };",
+      errors: [error],
+    },
+    {
+      code: "interface Dict<K extends string = string, V = number> extends Record<K, V> {} const d: Dict = { a: 1 };",
+      errors: [error],
+    },
+    {
+      code: "type Key = string; interface Dict<V, K extends string = Key> extends Readonly<Record<K, V>> {} const d: Dict<number> = { a: 1 };",
+      errors: [error],
+    },
     // An `as` clause names the keys of a mapped type, so its keys decide whether the type is open.
     { code: "const scores: { [K in 'seed' as string]: number } = { alice: 1 };", errors: [error] },
     {
@@ -197,6 +210,7 @@ tester.run("no-known-value-widening", plugin.rules["no-known-value-widening"], {
     "const counts: { readonly [K in 'a' | 'b']: number } = { a: 1, b: 2 };",
     `type Kind = 'a' | 'b'; const getters: { [K in Kind as \`get\${K}\`]: number } = { geta: 1, getb: 2 };`,
     "interface ScoreMap { [name: string]: number } const scores: ScoreMap = {};",
+    "interface Dict<K extends string, V> extends Record<K, V> {} const d: Dict<'a' | 'b', number> = { a: 1, b: 2 };",
     `${prelude} type Index<Key extends PropertyKey, Value> = Record<Key, Value>; const commands: Index<'start', Command> = { start: startCommand };`,
     "function isString(value: unknown): value is string { return true; } declare const input: unknown; isString(input);",
     "function isString(value: string | unknown): value is string { return true; } declare const input: string | unknown; isString(input);",

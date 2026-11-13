@@ -143,6 +143,58 @@ describe("oxlint", () => {
       })
     )
 
+    it.effect(
+      "report a preset that comes before core in extends without changing the project",
+      () =>
+        Effect.gen(function* () {
+          const config = toOxlintTsConfigContent(["strict"]).replace(
+            "extends: [core, strict, custom()]",
+            "extends: [strict, core, custom()]"
+          )
+
+          const manifest = makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          })
+
+          const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
+
+          const result = yield* runAssess(files)
+
+          expect(config).toContain("extends: [strict, core, custom()]")
+          expect(result).toMatchObject({
+            applicable: true,
+            findings: [
+              {
+                currentState:
+                  "`oxlint.config.ts` lists `strict` before the core preset `core` in `extends`.",
+                goal: expect.arrayContaining([
+                  "Move `core` to the first position of the `extends` array. Keep the order of the other entries.",
+                ]),
+                id: "core-preset-order",
+                integration: "oxlint",
+              },
+            ],
+          })
+          expect(files.read("oxlint.config.ts")).toBe(config)
+          expect(files.read("package.json")).toBe(manifest)
+        })
+    )
+
+    it.effect("report no finding when core is the first entry of extends", () =>
+      Effect.gen(function* () {
+        const files = makeFiles({
+          "oxlint.config.ts": toOxlintTsConfigContent(["effect", "strict"]),
+          "package.json": makePackageJson({
+            devDependencies: { oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        })
+
+        expect(yield* runAssess(files)).toMatchObject({ applicable: true, findings: [] })
+      })
+    )
+
     it.effect("report no migration for the tailwind preset or an old import in a comment", () =>
       Effect.gen(function* () {
         const config = [

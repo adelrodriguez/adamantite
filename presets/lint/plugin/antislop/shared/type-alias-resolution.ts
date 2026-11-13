@@ -190,6 +190,11 @@ function typeReferenceName(type: ESTree.TSTypeReference): string | null {
   return type.typeName.type === "Identifier" ? type.typeName.name : null
 }
 
+/**
+ * Bind an alias's type parameters for its body. The body sees only these parameters, because the
+ * type parameters of the alias that refers to it are not in scope there. Each explicit argument
+ * keeps the substitutions of the place that wrote it, and a default sees the parameters before it.
+ */
 function aliasSubstitutions(
   alias: ESTree.TSTypeAliasDeclaration,
   reference: ESTree.TSTypeReference,
@@ -197,7 +202,7 @@ function aliasSubstitutions(
 ): Substitutions | null {
   const parameters = alias.typeParameters?.params ?? []
   const arguments_ = reference.typeArguments?.params ?? []
-  const next = new Map(base)
+  const next = new Map<string, Substitution>()
 
   for (const [index, parameter] of parameters.entries()) {
     const explicitArgument = arguments_[index]

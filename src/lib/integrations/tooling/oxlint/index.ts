@@ -17,7 +17,9 @@ import {
 import * as commands from "#lib/integrations/tooling/oxlint/command.ts"
 import {
   checkImportsLintPreset,
+  inspectExtendsOrder,
   inspectRequiredOxlintConfig,
+  type MisplacedCorePreset,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 import {
@@ -89,6 +91,26 @@ const retiredLintPresetFindings = {
   },
 } as const satisfies Record<RetiredLintPreset, Finding>
 
+/**
+ * The finding for a config that lists an Adamantite preset before the core preset in `extends`.
+ * Assessment does not write the config.
+ */
+function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Finding {
+  const presets = before.map((name) => `\`${name}\``).join(", ")
+
+  return {
+    currentState: `\`oxlint.config.ts\` lists ${presets} before the core preset \`${core}\` in \`extends\`.`,
+    goal: [
+      `Move \`${core}\` to the first position of the \`extends\` array. Keep the order of the other entries.`,
+      "Oxlint applies the `extends` entries in order, and a later entry replaces the rules of an earlier one. A preset, such as strict or effect, changes some rules of core. When core comes after the preset, the rules of core replace those changes.",
+      "Run `adamantite check`, and correct the code that the restored rules report. Then run `adamantite doctor` again.",
+    ],
+    id: "core-preset-order",
+    integration: "oxlint",
+    title: "The core preset must come before the other presets in extends",
+  }
+}
+
 const detect = (cwd: string) => detectToolingConfig(cwd, "oxlint", configFiles)
 
 export default defineIntegration({
@@ -126,12 +148,19 @@ export default defineIntegration({
         checkImportsLintPreset(lintConfig, retired) ? [retiredLintPresetFindings[retired]] : []
       )
 
+      const presetOrderFindings = lintConfig.pipe(
+        Option.flatMap((content) => inspectExtendsOrder(content)),
+        Option.map((misplaced) => toCorePresetOrderFinding(misplaced)),
+        Option.toArray
+      )
+
       return {
         applicable: true,
         findings: [
           ...pkg.findings,
           ...runtimeFindings,
           ...retiredPresetFindings,
+          ...presetOrderFindings,
           ...getConfigFindings(state, {
             configContent,
             configFile: CONFIG_FILE,

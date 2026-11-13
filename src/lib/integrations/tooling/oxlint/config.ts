@@ -210,6 +210,79 @@ function getNamedObjectProperty(
   }
 }
 
+/**
+ * The Adamantite presets that an `extends` array lists before the core preset.
+ */
+export interface MisplacedCorePreset {
+  /**
+   * The local names of the presets that come before core, in the order of `extends`.
+   */
+  readonly before: readonly string[]
+  /**
+   * The local name of the core preset.
+   */
+  readonly core: string
+}
+
+const CORE_PRESET_MODULE = publicImport("./lint")
+
+/**
+ * Find the Adamantite presets that the `extends` array of an `oxlint.config.ts` lists before the
+ * core preset. Oxlint applies the entries in order, and a later entry replaces the rules of an
+ * earlier one, so core turns off each change that an earlier preset makes to a core rule. A config
+ * that does not parse, does not extend core, or has no `extends` array literal has none.
+ */
+export function inspectExtendsOrder(content: string): Option.Option<MisplacedCorePreset> {
+  return pipe(
+    parse(content),
+    Option.flatMap((ast) => {
+      // Each default import of an Adamantite lint preset, by its local name.
+      const presetModules = new Map(
+        ast.body.flatMap((statement) =>
+          statement.type === "ImportDeclaration"
+          && (statement.source.value === CORE_PRESET_MODULE
+            || statement.source.value.startsWith(LINT_PRESET_PREFIX))
+            ? statement.specifiers.flatMap((specifier) =>
+                specifier.type === "ImportDefaultSpecifier"
+                  ? [[specifier.local.name, statement.source.value] as const]
+                  : []
+              )
+            : []
+        )
+      )
+
+      return pipe(
+        getExportedConfigObject(ast),
+        Option.map((config) => getNamedObjectProperty(config, "extends")),
+        Option.flatMap((result) =>
+          result.status === "found" && result.property.value.type === "ArrayExpression"
+            ? Option.some(result.property.value.elements)
+            : Option.none()
+        ),
+        Option.flatMap((elements) => {
+          const names = elements.map((element) =>
+            element?.type === "Identifier" ? element.name : undefined
+          )
+
+          const coreIndex = names.findIndex(
+            (name) => name !== undefined && presetModules.get(name) === CORE_PRESET_MODULE
+          )
+
+          const core = names[coreIndex]
+
+          const before = names
+            .slice(0, Math.max(coreIndex, 0))
+            .filter((name): name is string => name !== undefined && presetModules.has(name))
+
+          return core === undefined || before.length === 0
+            ? Option.none()
+            : Option.some({ before, core })
+        })
+      )
+    })
+  )
+}
+
 function inspectOptionsObject(options: ObjectExpression): RequiredConfigInspection {
   for (const option of REQUIRED_BOOLEAN_OPTIONS) {
     const property = getNamedObjectProperty(options, option)

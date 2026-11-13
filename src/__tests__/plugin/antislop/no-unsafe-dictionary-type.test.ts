@@ -145,6 +145,11 @@ tester.run("no-unsafe-dictionary-type", plugin.rules["no-unsafe-dictionary-type"
     { code: "type A<K extends string> = { [P in K]: unknown };", errors: [error] },
     // An `as` clause names the keys of a mapped type, so its keys decide whether the type is open.
     { code: "type Bag = { [K in 'seed' as string]: unknown };", errors: [error] },
+    // A nearer alias hides an outer type parameter with the same name.
+    {
+      code: "function outer<T>() { function inner() { type T = unknown; type A = Record<string, T>; } }",
+      errors: [error],
+    },
     { code: `type Bag = { [K in 'a' | 'b' as \`get\${string}\`]: unknown };`, errors: [error] },
   ],
   valid: [

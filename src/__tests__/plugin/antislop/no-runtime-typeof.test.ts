@@ -165,6 +165,15 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
       code: 'type Data = unknown; function f<T extends Data>(value: T) { return typeof value === "string"; }',
       errors: [error],
     },
+    // A type parameter hides an outer type with the same name.
+    {
+      code: 'type T = string | number; function f<T>(value: T) { return typeof value === "string"; }',
+      errors: [error],
+    },
+    {
+      code: 'function outer<T extends string>() { function inner() { type T = unknown; function show(value: T) { return typeof value === "string"; } return show; } return inner; }',
+      errors: [error],
+    },
   ],
   valid: [
     'function f<T extends string | number>(value: T) { return typeof value === "string"; }',
@@ -193,6 +202,9 @@ tester.run("no-runtime-typeof", plugin.rules["no-runtime-typeof"], {
     'type Box<T> = T; function f(value: Box<string | number>) { return typeof value === "string"; }',
     'type Same<X> = X; function f<T extends string | number>(value: Same<T>) { return typeof value === "string"; }',
     'type Data = unknown; namespace Local { type Data = string | number; export function f(value: Data) { return typeof value === "string"; } }',
+    // A nearer type declaration hides an outer type parameter with the same name.
+    'function outer<T>() { function inner() { type T = string | number; function show(value: T) { return typeof value === "string"; } return show; } return inner; }',
+    'function outer<T>() { function inner() { interface T { readonly kind: string } function show(value: T) { return typeof value.kind === "string"; } return show; } return inner; }',
     // An imported alias has no declaration in the file, so the rule cannot see its body.
     'import type { Data } from "./data"; function f(value: Data) { return typeof value === "string"; }',
     {

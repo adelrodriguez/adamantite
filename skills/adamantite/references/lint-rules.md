@@ -133,6 +133,10 @@ export default defineConfig({
 
 Change test rules in that override. Top-level rules do not replace the preset's test override.
 Keep `plugins` in it, because Oxlint ignores `vitest/*` rules without the plugin.
+
+Extend the Jest preset or the Vitest preset, not both. They report the same defects, so each defect
+gets two reports. If one package runs both test runners, use each preset in an override with test
+paths that do not overlap.
 Continue when the intended test files receive the configured rules.
 
 ## Try a rule setting

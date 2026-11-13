@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Option from "effect/Option"
 import {
   checkImportsLintPreset,
+  getExtendedLintPresets,
   getImportedLintPresets,
   inspectExtendsOrder,
   inspectRequiredOxlintConfig,
@@ -193,6 +194,33 @@ describe("inspectExtendsOrder", () => {
     ["does not parse", "export default {"],
   ])("find no preset before core in a config that %s", (_, content) => {
     expect(inspectExtendsOrder(content)).toStrictEqual(Option.none())
+  })
+})
+
+describe("getExtendedLintPresets", () => {
+  it("list the presets of extends in a generated config, without core and custom", () => {
+    expect(getExtendedLintPresets(toOxlintTsConfigContent(["jest", "vitest"]))).toStrictEqual([
+      "jest",
+      "vitest",
+    ])
+  })
+
+  it("leave out a preset that the config imports but does not extend", () => {
+    expect(
+      getExtendedLintPresets(
+        toExtendsConfig(
+          [CORE_IMPORT, STRICT_IMPORT, 'import vitest from "adamantite/lint/vitest"'],
+          "[core, strict]"
+        )
+      )
+    ).toStrictEqual(["strict"])
+  })
+
+  it.each([
+    ["has no extends array literal", toExtendsConfig([CORE_IMPORT, STRICT_IMPORT], "presets")],
+    ["does not parse", "export default {"],
+  ])("list no preset for a config that %s", (_, content) => {
+    expect(getExtendedLintPresets(content)).toStrictEqual([])
   })
 })
 

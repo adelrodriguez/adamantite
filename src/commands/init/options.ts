@@ -4,6 +4,7 @@ import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import {
+  findExcludedPresets,
   findMissingRequiredPresets,
   LINT_PRESETS,
   type LintPreset,
@@ -114,6 +115,16 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
 
     return yield* new InvalidInitOptions({
       reason: `\`--preset ${requiredBy}\` requires \`--preset ${required}\`.`,
+    })
+  }
+
+  const excludedPreset = Array.head(findExcludedPresets(options.presets))
+
+  if (Option.isSome(excludedPreset)) {
+    const { excluded, preset } = excludedPreset.value
+
+    return yield* new InvalidInitOptions({
+      reason: `\`--preset ${preset}\` and \`--preset ${excluded}\` report the same defects. Select one of them.`,
     })
   }
 

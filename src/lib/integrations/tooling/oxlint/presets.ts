@@ -5,6 +5,12 @@ import tailwind from "#lib/integrations/tooling/oxlint/plugins/tailwind.ts"
 
 interface LintPresetDefinition {
   /**
+   * The presets that cannot be selected with this one, because they report the same defects. A
+   * selection of the two gives two reports for each defect. The exclusion goes both ways, so each
+   * preset lists the other.
+   */
+  readonly excludes?: readonly string[]
+  /**
    * What the preset's rules check, for the init choice. `describeLintPreset` adds the plugin
    * package and the required presets.
    */
@@ -63,11 +69,13 @@ export const lintPresets = [
     plugin: effectTsgo,
   },
   {
+    excludes: ["vitest"],
     hint: "Find focused or skipped tests and check assertions.",
     label: "jest",
     name: "jest",
   },
   {
+    excludes: ["jest"],
     hint: "Find focused or skipped tests and check assertions.",
     label: "vitest",
     name: "vitest",
@@ -107,8 +115,9 @@ export const RETIRED_LINT_PRESETS = ["shadcn", "react-doctor", "antislop"] as co
 export type RetiredLintPreset = (typeof RETIRED_LINT_PRESETS)[number]
 
 /**
- * The init hint: what the rules check, then the package that init installs and the presets that it
- * selects, so the user knows what a choice adds before selecting it.
+ * The init hint: what the rules check, then the package that init installs, the presets that it
+ * selects, and the presets that it excludes, so the user knows what a choice adds before selecting
+ * it.
  */
 export function describeLintPreset(preset: LintPresetDefinition): string {
   const setup = [
@@ -116,9 +125,11 @@ export function describeLintPreset(preset: LintPresetDefinition): string {
     ...(preset.requires ?? []).map((required) => `selects the ${required} preset`),
   ].join(" and ")
 
-  return setup === ""
-    ? preset.hint
-    : `${preset.hint} ${setup.charAt(0).toUpperCase()}${setup.slice(1)}.`
+  return [
+    preset.hint,
+    ...(setup === "" ? [] : [`${setup.charAt(0).toUpperCase()}${setup.slice(1)}.`]),
+    ...(preset.excludes ?? []).map((excluded) => `Cannot be selected with the ${excluded} preset.`),
+  ].join(" ")
 }
 
 /**
@@ -132,6 +143,22 @@ export function findMissingRequiredPresets(
       ? preset.requires
           .filter((required) => !selected.includes(required))
           .map((required) => ({ required, requiredBy: preset.name }))
+      : []
+  )
+}
+
+/**
+ * Each selected preset with a selected preset that it excludes, in the order of the catalog. Each
+ * preset of an excluded pair lists the other, so the pair appears once for each preset.
+ */
+export function findExcludedPresets(
+  selected: readonly string[]
+): ReadonlyArray<{ readonly excluded: LintPreset; readonly preset: LintPreset }> {
+  return lintPresets.flatMap((preset) =>
+    selected.includes(preset.name) && "excludes" in preset
+      ? preset.excludes
+          .filter((excluded) => selected.includes(excluded))
+          .map((excluded) => ({ excluded, preset: preset.name }))
       : []
   )
 }

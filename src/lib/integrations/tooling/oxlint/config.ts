@@ -228,6 +228,67 @@ export interface MisplacedCorePreset {
 const CORE_PRESET_MODULE = publicImport("./lint")
 
 /**
+ * Each entry of the `extends` array literal of a parsed `oxlint.config.ts`, with the module of an
+ * entry that is a default import binding of an Adamantite lint preset. An entry that is not an
+ * identifier is `undefined`. A config without an exported object or an `extends` array literal has
+ * none.
+ */
+function getExtendsEntries(ast: Program) {
+  // Each default import of an Adamantite lint preset, by its local name.
+  const presetModules = new Map(
+    ast.body.flatMap((statement) =>
+      statement.type === "ImportDeclaration"
+      && (statement.source.value === CORE_PRESET_MODULE
+        || statement.source.value.startsWith(LINT_PRESET_PREFIX))
+        ? statement.specifiers.flatMap((specifier) =>
+            specifier.type === "ImportDefaultSpecifier"
+              ? [[specifier.local.name, statement.source.value] as const]
+              : []
+          )
+        : []
+    )
+  )
+
+  return pipe(
+    getExportedConfigObject(ast),
+    Option.map((config) => getNamedObjectProperty(config, "extends")),
+    Option.flatMap((result) =>
+      result.status === "found" && result.property.value.type === "ArrayExpression"
+        ? Option.some(result.property.value.elements)
+        : Option.none()
+    ),
+    Option.map((elements) =>
+      elements.map((element) =>
+        element?.type === "Identifier"
+          ? { module: presetModules.get(element.name), name: element.name }
+          : undefined
+      )
+    )
+  )
+}
+
+/**
+ * The Adamantite lint presets that the `extends` array of an `oxlint.config.ts` lists, such as
+ * `jest` for the binding of `adamantite/lint/jest`. Core and `custom()` are not listed. A preset
+ * that the config uses only in `overrides` is not listed. A config that does not parse or has no
+ * `extends` array literal extends none.
+ */
+export function getExtendedLintPresets(content: string): string[] {
+  return pipe(
+    parse(content),
+    Option.flatMap((ast) => getExtendsEntries(ast)),
+    Option.map((entries) =>
+      entries.flatMap((entry) =>
+        entry?.module?.startsWith(LINT_PRESET_PREFIX) === true
+          ? [entry.module.slice(LINT_PRESET_PREFIX.length)]
+          : []
+      )
+    ),
+    Option.getOrElse((): string[] => [])
+  )
+}
+
+/**
  * Find the Adamantite presets that the `extends` array of an `oxlint.config.ts` lists before the
  * last entry of the core preset. Oxlint applies the entries in order, and a later entry replaces
  * the rules of an earlier one, so core replaces each change that an earlier preset makes to a core
@@ -237,52 +298,20 @@ const CORE_PRESET_MODULE = publicImport("./lint")
 export function inspectExtendsOrder(content: string): Option.Option<MisplacedCorePreset> {
   return pipe(
     parse(content),
-    Option.flatMap((ast) => {
-      // Each default import of an Adamantite lint preset, by its local name.
-      const presetModules = new Map(
-        ast.body.flatMap((statement) =>
-          statement.type === "ImportDeclaration"
-          && (statement.source.value === CORE_PRESET_MODULE
-            || statement.source.value.startsWith(LINT_PRESET_PREFIX))
-            ? statement.specifiers.flatMap((specifier) =>
-                specifier.type === "ImportDefaultSpecifier"
-                  ? [[specifier.local.name, statement.source.value] as const]
-                  : []
-              )
-            : []
+    Option.flatMap((ast) => getExtendsEntries(ast)),
+    Option.flatMap((entries) => {
+      const coreIndex = entries.map((entry) => entry?.module).lastIndexOf(CORE_PRESET_MODULE)
+      const core = entries[coreIndex]
+
+      const before = entries
+        .slice(0, Math.max(coreIndex, 0))
+        .flatMap((entry) =>
+          entry?.module === undefined || entry.module === CORE_PRESET_MODULE ? [] : [entry.name]
         )
-      )
 
-      return pipe(
-        getExportedConfigObject(ast),
-        Option.map((config) => getNamedObjectProperty(config, "extends")),
-        Option.flatMap((result) =>
-          result.status === "found" && result.property.value.type === "ArrayExpression"
-            ? Option.some(result.property.value.elements)
-            : Option.none()
-        ),
-        Option.flatMap((elements) => {
-          // The module of each entry that is a binding of an Adamantite preset.
-          const entries = elements.map((element) =>
-            element?.type === "Identifier"
-              ? { module: presetModules.get(element.name), name: element.name }
-              : undefined
-          )
-
-          const coreIndex = entries.map((entry) => entry?.module).lastIndexOf(CORE_PRESET_MODULE)
-          const core = entries[coreIndex]
-
-          const before = entries
-            .slice(0, Math.max(coreIndex, 0))
-            .flatMap((entry) =>
-              entry?.module === undefined || entry.module === CORE_PRESET_MODULE ? [] : [entry.name]
-            )
-
-          return core !== undefined && Array.isArrayNonEmpty(before)
-            ? Option.some({ before, core: core.name })
-            : Option.none()
-        })
-      )
+      return core !== undefined && Array.isArrayNonEmpty(before)
+        ? Option.some({ before, core: core.name })
+        : Option.none()
     })
   )
 }

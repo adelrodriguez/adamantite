@@ -9,13 +9,13 @@ import { firstPartyPlugin } from "./plugins/entry.ts"
 // type-aware rules that exist only in the Effect builds of the Oxlint binding and tsrs,
 // which @effect/tsgo ships. Adamantite runs Oxlint through its entry `dist/oxlint.js`, which loads
 // those builds when the project installs @effect/tsgo. Plain `oxlint` stops with
-// "Unknown plugin: 'effecttsgo'". See ADR 0019 and ADR 0021.
+// "Unknown plugin: 'effecttsgo'".
 //
 // The rules read their options, such as `allowedUnstableApis`, from the `@effect/language-service`
 // plugin entry in `tsconfig.json`.
 //
 // The preset enables only the @effect/tsgo rules that report Effect code. It does not ban platform
-// APIs in code that is not Effect code. See ADR 0007 for the criteria.
+// APIs in code that is not Effect code.
 //
 // The preset also loads the antislop-effect plugin, which reports tagged values that code handles
 // by hand instead of with Effect's tagged constructors, `Match`, and `catchTag`. Its rules started

@@ -557,7 +557,7 @@ try {
   // `adamantite/typescript` loads the type resets by a path inside the installed
   // package, so `JSON.parse()` returns `unknown` for both TypeScript and the type-aware lint.
   // Outside Windows, the Oxlint entry sets no backend variable, so the lint error also proves that
-  // Oxlint finds the `tsrs-lint` launcher of the real tsrs by itself. See ADR 0021.
+  // Oxlint finds the `tsrs-lint` launcher of the real tsrs by itself.
   console.info("Checking the type resets of the installed TypeScript preset...")
   const resetProbe = join(fixture, "src", "reset-probe.ts")
   writeFileSync(resetProbe, 'export const value: { a: number } = JSON.parse("{}")\n')
@@ -754,7 +754,7 @@ try {
   // Oxfmt formats Astro and Svelte files through plugins that import a package from the project:
   // @astrojs/compiler-rs, which Astro 7 installs, and the compiler of Svelte 5. pnpm keeps
   // @astrojs/compiler-rs out of the project's own node_modules, so this proves that Oxfmt still
-  // finds it. pnpm rejects packages younger than one day, so the versions are pinned. See ADR 0028.
+  // finds it. pnpm rejects packages younger than one day, so the versions are pinned.
   console.info("Running `adamantite fix` on Astro and Svelte files in a pnpm project...")
   writeFileSync(
     join(pluginFixture, "package.json"),

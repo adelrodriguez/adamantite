@@ -39,7 +39,7 @@ const { backend, binding, oxlint } = result.success
 const importOxlint = (file: string) => import(pathToFileURL(join(oxlint, "dist", file)).href)
 
 // A tsrs backend owns `OXLINT_TSGOLINT_PATH`. Outside Windows, Oxlint finds the launcher itself, so an
-// inherited path, such as one to an old tsgolint, must not win over that search. See ADR 0021.
+// inherited path, such as one to an old tsgolint, must not win over that search.
 if (backend instanceof TsrsBackend) {
   delete process.env["OXLINT_TSGOLINT_PATH"]
 }

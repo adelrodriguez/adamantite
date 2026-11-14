@@ -269,8 +269,7 @@ runs `check`, then the Doctor assessment, and exits 1 when either fails.
 During the session, the agent verifies each new or changed custom rule with temporary
 RuleTester cases and removes the cases before handback.
 Harden also exits 1 when the session added a link to a Markdown file that does not exist. A copy or "do nothing"
-exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings. See
-[ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md).
+exits 0 without verification. Without a terminal, it prints the prompt and exits 0. `harden` never produces Doctor findings.
 
 ### `adamantite update`
 
@@ -647,8 +646,7 @@ report. Examples are an effect that does the work of an event handler (`no-effec
 (`no-fetch-in-effect`), and state changed in place (`no-direct-state-mutation`). It also
 checks cleanup, stale timer references, discarded effect cleanup callbacks, loading flags
 that stay set after a failed request, and contexts or object URLs created during render. The
-TanStack Query and TanStack Start rules are not in this preset. See
-[ADR 0005](docs/adr/0005-curate-react-doctor-rules.md) for the criteria.
+TanStack Query and TanStack Start rules are not in this preset.
 
 React Doctor checks also run in hook modules where state and effect hooks are allowed.
 Some React Doctor rules
@@ -690,7 +688,6 @@ the query, so components outside route files can define their queries inline.
 `query-from-loader` checks one file at a time. It cannot prove that a loader preloads the
 options, so it moves queries toward shared definitions but does not guarantee the preload.
 Query refetches from effects and mutation invalidation are not checked by these presets.
-See [ADR 0008](docs/adr/0008-tanstack-query-options-from-loaders.md).
 
 ### The effect preset
 
@@ -805,8 +802,7 @@ entry can be a module, such as `effect/Path`, or a full package, such as `@effec
 
 The preset enables only rules that report Effect code. It does not ban platform APIs, such
 as `Date.now()` or `process.env`, in code that is not Effect code. Inside Effect code, it
-reports them, because `Clock`, `Random`, and `Config` let tests control them. See
-[ADR 0007](docs/adr/0007-effect-preset-patches-oxlint.md) for the criteria.
+reports them, because `Clock`, `Random`, and `Config` let tests control them.
 
 ### The architecture preset
 

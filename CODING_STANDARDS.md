@@ -3,8 +3,7 @@
 These standards cover choices that require review. The [architecture](docs/architecture.md)
 describes the module boundaries and lifecycle. [Oxlint](oxlint.config.ts),
 [Vitest](vitest.config.ts), and the [build](tsdown.config.ts) enforce the constraints they can
-check. Domain terms belong in [GLOSSARY.md](GLOSSARY.md), and decisions belong in the
-[ADRs](docs/adr/README.md).
+check. Domain terms belong in [GLOSSARY.md](GLOSSARY.md).
 
 ## Tests
 
@@ -142,8 +141,7 @@ Effect.gen(function* () {
 ```
 
 [PR #393](https://github.com/adelrodriguez/adamantite/pull/393) removed Doctor's repair path.
-[ADR 0002](docs/adr/0002-doctor-instructs-agents-mutate.md) records the decision, and the
-[lifecycle reference](docs/architecture.md#integration-lifecycle) describes each command's work.
+The [lifecycle reference](docs/architecture.md#integration-lifecycle) describes each command's work.
 
 ### Preserve explicit project choices when defaults change
 

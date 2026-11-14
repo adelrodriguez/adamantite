@@ -11,7 +11,7 @@ import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 /**
  * A language that Oxfmt formats only through a bundled Prettier plugin, which imports a package
- * from the project. See ADR 0028.
+ * from the project.
  */
 interface PluginLanguage {
   /**

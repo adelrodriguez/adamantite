@@ -1,9 +1,8 @@
 # Architecture
 
 Adamantite is an agent-first preset package and CLI that applies and maintains code-quality
-tooling in a target project. Product behavior is documented in the [README](../README.md), domain
-terms live in [GLOSSARY.md](../GLOSSARY.md), and durable tradeoffs belong in
-[decision records](./adr/README.md).
+tooling in a target project. Product behavior is documented in the [README](../README.md), and
+domain terms live in [GLOSSARY.md](../GLOSSARY.md).
 
 ## Runtime
 
@@ -20,7 +19,7 @@ compile-time package metadata and terminal-title values during builds and Vitest
 transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint.ts` builds to
 `dist/oxlint.js`, beside the CLI bundle, and runs Oxlint with the project's Oxlint runtime. The
 entry imports no macro module, so this repository runs it from source with
-`node src/oxlint.ts`. See ADR 0019. Repository tests run with Vitest
+`node src/oxlint.ts`. Repository tests run with Vitest
 under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 
 ## Module seams
@@ -54,8 +53,7 @@ A layer that the map does not connect to another layer is its sibling, so `works
 `execution` do not import each other, and
 `assessment` does not import `hardening`: harden is not an assessment. `workspace` knows
 target-project files and package state, but not integration types such as `Finding`. An import
-that breaks a map, or a folder that is not in its map, fails `pnpm run check`. See ADR 0013
-and ADR 0024.
+that breaks a map, or a folder that is not in its map, fails `pnpm run check`.
 
 `toolchain`, `assessment`, and `hardening` are siblings above `integrations`. The `check`,
 `fix`, and `analyze` commands call `toolchain/index.ts`, and `harden` calls its `check`
@@ -129,7 +127,7 @@ warnings, a non-interactive run prints a Markdown warning report and exits 0.
 
 Runtime findings check the installed packages. Package findings check the declarations and
 the managed versions. A project that declares tsrs, but cannot resolve its backend, gets a
-runtime finding, although the entry still runs stock Oxlint without tsrs, as ADR 0021 says.
+runtime finding, although the entry still runs stock Oxlint without tsrs.
 
 Package drift also stays structured so that `update` can install current managed package
 versions. Doctor renders package drift as findings that tell the user to run `update`.
@@ -143,14 +141,13 @@ present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effec
 its compiler and standard libraries. Zed starts the upstream CLI through Node.js. Both editor
 integrations hide duplicate Oxlint Effect reports, so the Effect server can supply diagnostics
 and semantic quick fixes. Doctor reports missing settings and a stale or incomplete SDK without
-writing files. See ADR 0023.
+writing files.
 
 ## Command boundaries
 
 - `check` and `fix` call Toolchain to run Oxfmt and Oxlint. Toolchain starts Oxlint through
   the entry `dist/oxlint.js` with `node`, so Oxlint runs with the project's Oxlint runtime.
-  `check` fails on Oxlint warnings unless `--allow-warnings` is set. See ADR 0018, ADR 0019,
-  and ADR 0022.
+  `check` fails on Oxlint warnings unless `--allow-warnings` is set.
 - `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
   `antislop/require-readable-spacing` counts a line past its `printWidth` option as multiline and
   adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
@@ -178,8 +175,7 @@ writing files. See ADR 0023.
   files. After a handoff, a link to a missing file that the session added fails the
   verification. `hardening/suppressions.ts` counts the disable comments of each rule in the
   files that Oxlint lints, and `hardening/overrides.ts` marks each file of an override that turns
-  a rule off, after a trial that turns the rule on again. The prompt shows both as data. See ADR
-  0012 and ADR 0020.
+  a rule off, after a trial that turns the rule on again. The prompt shows both as data.
 - `update` updates managed dependencies, writes the Adamantite skill again to each skill folder
   whose copy differs from the bundled skill in any file, removes the `adamantite` entry from
   `skills-lock.json`, then emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
@@ -189,14 +185,14 @@ writing files. See ADR 0023.
   Temporary verification cases do not stay in the target project. Users can opt in to saved
   `.test.*` files beside their rules, add them with `rule test add [name]`, and run them explicitly
   with `rule test`. `--path` selects another test location. Init, CI,
-  and harden do not run them by default. See ADR 0009.
+  and harden do not run them by default.
 - `rule try` runs a trial: `hardening/trial.ts` copies the files that git lists to a temporary
   folder, puts a trial config in place of the config that lints the cases, and lints the cases
   with Oxlint from the root of the copy. The copy gets a real `node_modules` folder with a link
   to each entry of the project folder, so the entry module that `custom()` writes stays in the
   copy. A link to a workspace package goes to the copy of the package, with the files that git
   ignores in it, such as build output. It exits 0 when each case
-  is as expected, 1 when a case is not, and 2 when the trial is not evidence. See ADR 0020.
+  is as expected, 1 when a case is not, and 2 when the trial is not evidence.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
@@ -280,7 +276,7 @@ still load through the preset's `jsPlugins` entries, which resolve from the targ
 plugin, with `defineManagedPlugin`. Its version table holds the build-time version of each registered
 package, and its type fails when a package has no version. Init installs the packages of the
 selected presets. Doctor and update maintain a package while the root config imports its
-preset. See ADR 0003.
+preset.
 
 Doctor reports imports of retired presets from the `retiredLintPresets` table in
 `tooling/oxlint/index.ts`: `shadcn`, renamed to `tailwind`, `antislop`, merged into `strict`,
@@ -307,9 +303,8 @@ overrides. Two overrides for the same part fail with `NativeRuntimeConflict`. A 
 override replaces all default backend variables. Without a backend override, Oxlint starts the
 installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
 launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
-runs stock Oxlint, as ADR 0021 says. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
-CLI. It clears the temporary binding variable before JavaScript plugins load. See ADR 0019,
-ADR 0021, and ADR 0022.
+runs stock Oxlint. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
+CLI. It clears the temporary binding variable before JavaScript plugins load.
 
 ## Type resets
 
@@ -327,7 +322,7 @@ fixtures started from ts-reset, so `license.md` keeps its MIT notice.
 
 Doctor's tsconfig integration asks the project's TypeScript which files a config loads. For each
 package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through the
-`ChildProcessSpawner`, and it reports a library that loads the type resets. See ADR 0026.
+`ChildProcessSpawner`, and it reports a library that loads the type resets.
 
 ## First-party plugins
 
@@ -399,12 +394,12 @@ effect.
 The rules in `presets/lint/plugins/antislop/` ship in the `strict` preset, and the rules in
 `presets/lint/plugins/antislop-effect/` ship in the `effect` preset. Both plugins use Adamantite's spelling. Both started as a copy of
 [anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Doctor reports old rule names
-in project settings and suppression comments, with their replacements. See ADR 0030. Their rules follow the same conventions as the
+in project settings and suppression comments, with their replacements. Their rules follow the same conventions as the
 `adamantite` rules. `src/__tests__/presets/require-readable-spacing.test.ts` runs the spacing fix
 through the Oxlint CLI twice. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
 copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
-ship. Adamantite shipped both plugins as vendored bundles before. ADR 0027 records why they moved.
+ship. Adamantite shipped both plugins as vendored bundles before.
 
 The `architecture` preset loads the `adamantite` plugin without enabling rules. Init offers it
 for projects that configure layer maps and import owners without the other rules of `strict`.
@@ -415,24 +410,24 @@ It is the one rule that resolves imports: it resolves each
 import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `createLayersRule`
 takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/layers/`, one for each layer model, and
-`src/__tests__/presets/layers.test.ts` lints each one in a real Oxlint run. See ADR 0013.
+`src/__tests__/presets/layers.test.ts` lints each one in a real Oxlint run.
 
 Nested maps activate from the concrete matched parent folder before any parent exemption.
 Each active map checks imports with its own entries, ignores, isolation, type-import policy,
 and resolver conditions. A duplicate concrete scope fails lint. Diagnostics name the concrete
-root and the declaration path. See ADR 0024.
+root and the declaration path.
 
 `adamantite/import-owners` also needs options from the target project. It matches each import
 as written, so it reads no module, but it reads `package.json` and `pnpm-workspace.yaml` files to
 find the workspace root that owner paths are relative to. `createImportOwnersRule` takes that
 lookup, so its `RuleTester` test passes a fake. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/import-owners/`. `src/__tests__/presets/model-fixtures.ts` lints
-the fixture projects of both rules. See ADR 0016.
+the fixture projects of both rules.
 
 ## Custom rules
 
 Custom rules are Oxlint rules that the target project writes in a rules folder, by default
-`.adamantite/lint`. See ADR 0009. These modules carry them:
+`.adamantite/lint`. These modules carry them:
 
 - `presets/rules/custom.ts` implements `custom()`, which runs while Oxlint loads the config. It
   finds the calling file in the call stack, resolves the rules folder from it, lists the

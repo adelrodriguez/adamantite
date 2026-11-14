@@ -98,7 +98,7 @@ jobs:
           shadcn_lint_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies['@shadcn/lint']")"
           typescript_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).devDependencies.typescript")"
           # A target project lists TypeScript itself. Without that entry, npm cannot add the plugin
-          # in a separate step: see ADR 0003.
+          # in a separate step.
           npm install "typescript@${typescript_version}" "@shadcn/lint@${shadcn_lint_version}"
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import tailwind from "adamantite/lint/tailwind"' '' 'export default defineConfig({ extends: [tailwind] })' > oxlint.config.ts
           printf '%s\n' 'export const Panel = () => <div style={{ padding: 16 }}>Panel</div>' > bad.tsx
@@ -121,7 +121,7 @@ jobs:
           effect_version="$(node -p "JSON.parse(require('node:fs').readFileSync('node_modules/adamantite/package.json', 'utf8')).dependencies.effect")"
           npm install "tsrs@${tsrs_version}" "@effect/tsgo@${effect_tsgo_version}" "effect@${effect_version}"
           # The effecttsgo rules exist only in the Effect builds, which the Oxlint entry loads
-          # without a patch: see ADR 0019.
+          # without a patch.
           printf '%s\n' '{ "compilerOptions": { "strict": true, "module": "esnext", "moduleResolution": "bundler" } }' > tsconfig.json
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import effect from "adamantite/lint/effect"' '' 'export default defineConfig({ extends: [effect] })' > oxlint.config.ts
           printf '%s\n' 'import * as Effect from "effect/Effect"' '' 'export function run() {' '  Effect.log("lost")' '}' > bad.ts

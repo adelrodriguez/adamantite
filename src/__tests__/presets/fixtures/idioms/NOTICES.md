@@ -18,6 +18,10 @@ Copyright (c) Meta Platforms, Inc. and affiliates.
 
 Copyright Contributors to the Jest project.
 
+## Next.js
+
+Copyright (c) 2025 Vercel, Inc.
+
 ## Node.js
 
 Copyright Node.js contributors. All rights reserved.
@@ -29,6 +33,18 @@ Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 ## p-retry
 
 Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
+
+## shadcn/ui
+
+Copyright (c) 2023 shadcn
+
+## TanStack Query
+
+Copyright (c) 2021-present Tanner Linsley
+
+## TanStack Router
+
+Copyright (c) 2021-present Tanner Linsley
 
 ## ufo
 

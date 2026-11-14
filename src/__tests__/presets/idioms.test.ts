@@ -99,6 +99,28 @@ const TREES: readonly IdiomTree[] = [
     preset: "effect",
     secondPasses: [],
   },
+  {
+    // `react/jsx-fragments` writes `<>`, and `eslint/no-unused-vars` then reports the import of
+    // `Fragment`, which the next pass removes.
+    preset: "react",
+    secondPasses: [{ file: "fragment.tsx", issue: ONE_FIX_PASS }],
+  },
+  {
+    preset: "react-strict",
+    secondPasses: [],
+  },
+  {
+    preset: "nextjs",
+    secondPasses: [],
+  },
+  {
+    preset: "tanstack",
+    secondPasses: [],
+  },
+  {
+    preset: "tailwind",
+    secondPasses: [],
+  },
 ]
 
 /**

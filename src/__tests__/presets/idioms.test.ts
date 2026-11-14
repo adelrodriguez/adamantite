@@ -131,6 +131,12 @@ const TREES: readonly IdiomTree[] = [
     preset: "jest",
     secondPasses: [{ file: "equal.test.ts", issue: ONE_FIX_PASS }],
   },
+  {
+    // Oxlint lints the script of a `.vue` file, and Oxfmt formats the whole file. No rule reads a
+    // template, and the type check skips `.vue` scripts, so these idioms prove neither.
+    preset: "vue",
+    secondPasses: [],
+  },
 ]
 
 /**

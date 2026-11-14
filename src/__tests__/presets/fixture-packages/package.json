@@ -1,0 +1,13 @@
+{
+  "name": "fixture-packages",
+  "private": true,
+  "description": "The packages that the preset test fixtures import. See docs/architecture.md.",
+  "type": "module",
+  "dependencies": {
+    "@tanstack/react-query": "5.107.1",
+    "@tanstack/react-router": "1.170.46",
+    "@types/react": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  }
+}

@@ -10,7 +10,7 @@ import { RETIRED_RULE_NAMESPACES } from "#lib/integrations/tooling/oxlint/preset
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
 import { findSuppressions, SOURCE_FILE } from "#lib/workspace/suppressions.ts"
 
-function replacement(rule: string) {
+function replacement(rule: string): string | undefined {
   for (const [old, current] of Object.entries(RETIRED_RULE_NAMESPACES)) {
     if (rule.startsWith(`${old}/`)) {
       return `${current}${rule.slice(old.length)}`

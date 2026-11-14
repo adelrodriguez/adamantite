@@ -526,11 +526,13 @@ const config: OxlintConfig & { ignorePatterns: string[] } = {
     "unicorn/no-useless-promise-resolve-reject": "error",
     "unicorn/no-useless-spread": "error",
     "unicorn/no-useless-switch-case": "error",
-    // The fix of this rule removes an `undefined` that other rules need: `() => {}` gets
-    // `no-empty-function`, a bare `return` in an array callback gets `array-callback-return`, and
-    // `Effect.succeed()` fails the type check. No option of the rule turns off its report of
-    // `return undefined`.
-    "unicorn/no-useless-undefined": "off",
+    // Keep required arguments and concise arrow results. A block callback that returns undefined
+    // declares its union result type, so the rule preserves the explicit return that
+    // `array-callback-return` needs. See "Explicit undefined results" in the README.
+    "unicorn/no-useless-undefined": [
+      "error",
+      { checkArguments: false, checkArrowFunctionBody: false },
+    ],
     "unicorn/no-zero-fractions": "error",
     // This rule requires uppercase hex digits, and Oxfmt always writes them in lowercase. Oxfmt
     // also writes the prefix and the exponent in lowercase, so the formatter covers the rest of it.

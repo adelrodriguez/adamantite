@@ -70,6 +70,17 @@ const retiredLintPresetFindings = {
     integration: "oxlint",
     title: "The antislop rules now belong to strict",
   },
+  node: {
+    currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/node` preset.",
+    goal: [
+      "Remove `adamantite/lint/node` and its `extends` entry. Keep the core `adamantite/lint` preset, which now enables all five Node rules.",
+      "Keep `node/*` rule settings, rule severity, rule options, and all other project settings.",
+      "Remove `--preset node` from init commands. Run `adamantite check`, then run Doctor again.",
+    ],
+    id: "node-preset-migration",
+    integration: "oxlint",
+    title: "Node rules now belong to core",
+  },
   "react-doctor": {
     currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/react-doctor` preset.",
     goal: [

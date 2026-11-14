@@ -81,11 +81,6 @@ export const lintPresets = [
     name: "vitest",
   },
   {
-    hint: "Check Node.js callbacks and CommonJS modules.",
-    label: "node",
-    name: "node",
-  },
-  {
     hint: "Check the layer maps and import owners you define.",
     label: "architecture",
     name: "architecture",
@@ -115,7 +110,7 @@ export const RETIRED_RULE_NAMESPACES = {
   "anti-slop-effect": "antislop-effect",
 } as const
 
-export const RETIRED_LINT_PRESETS = ["shadcn", "react-doctor", "antislop"] as const
+export const RETIRED_LINT_PRESETS = ["shadcn", "react-doctor", "antislop", "node"] as const
 
 export type RetiredLintPreset = (typeof RETIRED_LINT_PRESETS)[number]
 

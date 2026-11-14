@@ -12,7 +12,7 @@ _Avoid_: Plugin, template
 
 **Stack**:
 A set of presets that a target project selects together with core, such as `effect`, `vitest`,
-`node`, and `strict`. The preset tests lint the rule fixtures with each stack, so a rule of one
+and `strict`. The preset tests lint the rule fixtures with each stack, so a rule of one
 preset cannot report code that another preset of the stack accepts.
 _Avoid_: Combination, preset group
 

@@ -1,14 +1,13 @@
 import { defineConfig } from "oxlint"
 import core, { ignorePatterns } from "./presets/lint/core.ts"
 import effect from "./presets/lint/effect.ts"
-import node from "./presets/lint/node.ts"
 import strict from "./presets/lint/strict.ts"
 import vitest, { testFiles } from "./presets/lint/vitest.ts"
 
 export default defineConfig({
   // The vitest preset runs on this repository's tests, so `pnpm run check` fails when a preset
   // rule makes some test code impossible to write.
-  extends: [core, node, effect, strict, vitest],
+  extends: [core, effect, strict, vitest],
   ignorePatterns: [
     ...ignorePatterns,
     // Rule fixtures break rules on purpose; see src/__tests__/presets/rule-fixtures.ts.

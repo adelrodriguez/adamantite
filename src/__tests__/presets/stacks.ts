@@ -10,8 +10,8 @@ const REPO_ROOT = join(import.meta.dirname, "../../..")
  * accepts fails a test. Each preset is in at least one stack.
  */
 export const STACKS = {
-  effect: ["effect", "vitest", "node", "strict"],
-  jest: ["jest", "node", "architecture", "strict"],
+  effect: ["effect", "vitest", "strict"],
+  jest: ["jest", "architecture", "strict"],
   react: ["react", "react-strict", "tanstack", "nextjs", "vitest", "strict", "tailwind"],
   vue: ["vue", "vitest", "strict"],
 } as const satisfies Record<string, readonly LintPreset[]>

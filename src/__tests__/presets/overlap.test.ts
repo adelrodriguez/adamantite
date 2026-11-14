@@ -9,7 +9,6 @@ import core from "#presets/lint/core.ts"
 import effect from "#presets/lint/effect.ts"
 import jest from "#presets/lint/jest.ts"
 import nextjs from "#presets/lint/nextjs.ts"
-import node from "#presets/lint/node.ts"
 import reactStrict from "#presets/lint/react-strict.ts"
 import react from "#presets/lint/react.ts"
 import strict from "#presets/lint/strict.ts"
@@ -34,7 +33,6 @@ const PRESETS = {
   effect,
   jest,
   nextjs,
-  node,
   react,
   "react-strict": reactStrict,
   strict,

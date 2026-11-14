@@ -94,6 +94,22 @@ Dependabot does not yet support pnpm 12. Use `pnpm run bump:deps` for package de
 updates. Run `pnpm run analyze` after you add or remove dependencies or change imports and
 exports. Review all automatic fixes before you commit them.
 
+### Test the presets with the newest versions
+
+Each Monday, the `latest` workflow runs `pnpm run test:presets` with the locked versions and
+then with the newest versions of Oxlint, the managed plugins, the type-aware backend, and the
+packages that the fixtures import. When the newest versions fail, the workflow opens an issue
+with the `automated` label, or comments on the open issue that has the same failure. The script
+works in a temporary worktree of `HEAD`, so it changes no file of your checkout. To run it
+locally, name a folder for the report:
+
+```sh
+node scripts/test-latest.ts run --out /tmp/latest
+```
+
+To test a chosen version instead of the newest, add `--override <package>@<version>`. A manual
+run of the workflow takes the same values in its `overrides` input.
+
 ## Changesets
 
 Add a changeset for a change that affects users of the published package. Examples include

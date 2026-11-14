@@ -34,6 +34,10 @@ Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 
 Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
 
+## Pinia
+
+Copyright (c) 2019-present Eduardo San Martin Morote
+
 ## shadcn/ui
 
 Copyright (c) 2023 shadcn
@@ -49,6 +53,22 @@ Copyright (c) 2021-present Tanner Linsley
 ## ufo
 
 Copyright (c) Pooya Parsa <pooya@pi0.io>
+
+## Vitesse
+
+Copyright (c) 2020-PRESENT Anthony Fu
+
+## Vue core
+
+Copyright (c) 2018-present, Yuxi (Evan) You and Vue contributors
+
+## Vue Router
+
+Copyright (c) 2019-present Eduardo San Martin Morote
+
+## VueUse
+
+Copyright (c) 2019-PRESENT Anthony Fu<https://github.com/antfu>
 
 ## MIT License
 

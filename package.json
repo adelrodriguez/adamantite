@@ -142,6 +142,7 @@
     "@changesets/cli": "3.0.3",
     "@effect/tsgo": "0.69.0",
     "@effect/vitest": "4.1.2",
+    "@jest/globals": "30.5.2",
     "@shadcn/lint": "0.2.1",
     "@tanstack/intent": "0.5.5",
     "@tanstack/react-query": "5.107.1",
@@ -151,11 +152,13 @@
     "@types/react": "19.3.0",
     "@vitest/coverage-v8": "5.0.5",
     "@vitest/ui": "5.0.5",
+    "@vue/test-utils": "2.5.1",
     "figlet": "1.12.0",
     "knip": "6.45.1",
     "oxfmt": "0.78.0",
     "oxlint": "1.93.0",
     "oxlint-plugin-react-doctor": "0.9.18",
+    "pinia": "4.1.0",
     "react": "19.3.1",
     "sherif": "1.13.0",
     "tsdown": "0.23.1",
@@ -163,7 +166,9 @@
     "type-fest": "5.10.0",
     "typescript": "7.0.2",
     "unplugin-macros": "0.23.3",
-    "vitest": "5.0.5"
+    "vitest": "5.0.5",
+    "vue": "3.5.45",
+    "vue-router": "5.5.0"
   },
   "peerDependencies": {
     "oxlint": ">=1.92.0",

@@ -88,10 +88,6 @@ const TREES: readonly IdiomTree[] = [
     secondPasses: [{ file: "moved.ts", issue: ONE_FIX_PASS }],
   },
   {
-    preset: "node",
-    secondPasses: [],
-  },
-  {
     allowedUnstableApis: [
       "@effect/platform-node/NodeRuntime",
       "@effect/platform-node/NodeServices",

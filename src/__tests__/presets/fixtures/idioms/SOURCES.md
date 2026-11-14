@@ -14,11 +14,14 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | --- | --- | --- | --- |
 | `clean/abort-error.ts` | [p-retry](https://github.com/sindresorhus/p-retry/blob/ac3c4cdb7f015e1f71825e4274e2323a49b615eb/index.js#L59-L83) | MIT | A TypeScript class with an `override` name, and an optional call of `throwIfAborted`. |
 | `clean/build-object.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-each/src/table/template.ts#L40-L44), [defu](https://github.com/unjs/defu/blob/82632b66f5914e9946edce300e10633a3d5c0cb7/src/defu.ts#L45-L49) | MIT | Two small functions in place of the upstream modules. |
+| `clean/cli-options.ts` | [Node.js docs](https://github.com/nodejs/node/blob/530b8e3a983666c958d8f3b8b42c7cea3afd2765/doc/api/util.md#L2381-L2399) | MIT | A `port` option with a `process.env` fallback and a range check. |
+| `clean/compress.ts` | [Node.js docs](https://github.com/nodejs/node/blob/530b8e3a983666c958d8f3b8b42c7cea3afd2765/doc/api/stream.md#L122-L132) | MIT | The awaited `pipeline` in a function. |
 | `clean/copy-options.ts` | [defu](https://github.com/unjs/defu/blob/82632b66f5914e9946edce300e10633a3d5c0cb7/src/defu.ts#L4-L10), [ufo](https://github.com/unjs/ufo/blob/f06c800d0c59f2a4a1b9ba65eb6cb61a84419be6/src/url.ts#L117-L126) | MIT | One function with a spread copy, an `Object.assign` merge, and `structuredClone`. |
 | `clean/guards.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-util/src/isNonNullable.ts#L8-L10) | MIT | Adds a `typeof` predicate. |
 | `clean/index.ts` | [ufo](https://github.com/unjs/ufo/blob/f06c800d0c59f2a4a1b9ba65eb6cb61a84419be6/src/index.ts#L1-L5) | MIT | Re-exports the guards and segments idioms. |
 | `clean/literals.ts` | [ufo](https://github.com/unjs/ufo/blob/f06c800d0c59f2a4a1b9ba65eb6cb61a84419be6/src/utils.ts#L11-L16) | MIT | Lowercase hex and numeric separators, from the hex case of `format.test.ts`. Oxfmt always writes hex digits in lowercase. |
 | `clean/queue.ts` | [p-queue](https://github.com/sindresorhus/p-queue/blob/7f272ab5ff2254c0dc2537b7977e88ede1cd55e8/source/index.ts#L97-L154) | MIT | A small class with a private counter and a `Map` of `Set` listeners. |
+| `clean/read-config.ts` | [Node.js docs](https://github.com/nodejs/node/blob/530b8e3a983666c958d8f3b8b42c7cea3afd2765/doc/api/fs.md#L1960-L1985) | MIT | `readFile` of a joined path, with the error in `cause`. |
 | `clean/retry.ts` | [p-retry](https://github.com/sindresorhus/p-retry/blob/ac3c4cdb7f015e1f71825e4274e2323a49b615eb/index.js#L293-L312) | MIT | One awaited attempt that wraps the error in `cause`. |
 | `clean/segments.ts` | [ufo](https://github.com/unjs/ufo/blob/f06c800d0c59f2a4a1b9ba65eb6cb61a84419be6/src/utils.ts#L463-L483) | MIT | A `for...of` loop over `entries()` that labels each segment. |
 | `clean/worker-message.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-worker/src/types.ts#L234-L239) | MIT | Two message kinds with an exhaustive `switch`. |
@@ -29,14 +32,6 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | `fixable/suppressed.ts` | `fix.test.ts` | | A suppression with a reason that suppresses nothing. |
 | `fixable/unbreakable.ts` | `fix.test.ts` | | A template literal past the print width that Oxfmt cannot wrap. |
 | `fixable/wrapped.ts` | `fix.test.ts` | | A line that Oxfmt wraps, after which the spacing rule needs a blank line. |
-
-## node
-
-| File | Source | License | Changes |
-| --- | --- | --- | --- |
-| `clean/cli-options.ts` | [Node.js docs](https://github.com/nodejs/node/blob/530b8e3a983666c958d8f3b8b42c7cea3afd2765/doc/api/util.md#L2381-L2399) | MIT | A `port` option with a `process.env` fallback and a range check. |
-| `clean/compress.ts` | [Node.js docs](https://github.com/nodejs/node/blob/530b8e3a983666c958d8f3b8b42c7cea3afd2765/doc/api/stream.md#L122-L132) | MIT | The awaited `pipeline` in a function. |
-| `clean/read-config.ts` | [Node.js docs](https://github.com/nodejs/node/blob/530b8e3a983666c958d8f3b8b42c7cea3afd2765/doc/api/fs.md#L1960-L1985) | MIT | `readFile` of a joined path, with the error in `cause`. |
 
 ## effect
 

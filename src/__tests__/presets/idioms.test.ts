@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join, relative, sep } from "node:path"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
@@ -13,7 +13,7 @@ import { CommandRunner, type CommandRunOptions } from "#lib/execution/command-ru
 import * as Toolchain from "#lib/toolchain/index.ts"
 import {
   createFixtureProject,
-  type FixtureReport,
+  type FixtureLint,
   FIXTURES_DIRECTORY,
   lintFixtureProject,
   removeFixtureProject,
@@ -27,6 +27,17 @@ const ONE_FIX_PASS = "https://github.com/oxc-project/oxc/issues/16118"
 // Several fixes that the idioms show are suggestions, such as `eslint/no-useless-constructor` and
 // `effecttsgo/map-const-to-as`, so the test fixes as `adamantite fix --suggested` does.
 const FIX_LEVEL = "suggested"
+
+/**
+ * A file with a type error, which each run of the idioms must report. A run without the type check,
+ * such as a run without the type-aware backend, reports nothing on a clean idiom, so only this
+ * report shows that the run checked the types.
+ */
+const CANARY = {
+  file: "canary.ts",
+  report: { file: "canary.ts", line: 1, rule: "typescript/TS2322" },
+  source: "export const answer: string = 42\n",
+}
 
 // The build writes the Oxlint entry beside the CLI, so a run from source starts its source. Oxfmt
 // starts from this repository's install.
@@ -165,11 +176,54 @@ function listTreeStacks(preset: IdiomTree["preset"]): Stack[] {
   return preset === "core" ? EffectRecord.keys(STACKS) : listStacks(preset)
 }
 
+/**
+ * The folders of the idioms, in sorted order. Each one is the folder of one tree.
+ */
+function listTreeFolders(): string[] {
+  const folders = readdirSync(IDIOMS_DIR, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? [entry.name] : []
+  )
+
+  return EffectArray.sort(folders, Order.String)
+}
+
+/**
+ * The number of files in the folder of each tree that runs with the stack.
+ */
+function countStackFiles(stack: Stack, folder: "clean" | "fixable"): number {
+  return TREES.filter((tree) => listTreeStacks(tree.preset).includes(stack)).flatMap((tree) =>
+    listFiles(join(IDIOMS_DIR, tree.preset, folder))
+  ).length
+}
+
+describe("idiom trees", () => {
+  it("have one tree for each folder of idioms", () => {
+    expect(listTreeFolders()).toStrictEqual(
+      EffectArray.sort(
+        TREES.map((tree) => tree.preset),
+        Order.String
+      )
+    )
+  })
+
+  it.each(EffectRecord.keys(STACKS))(
+    "have a clean and a fixable idiom for the %s stack",
+    (stack) => {
+      expect(countStackFiles(stack, "clean")).toBeGreaterThan(0)
+      expect(countStackFiles(stack, "fixable")).toBeGreaterThan(0)
+    }
+  )
+})
+
 describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPasses }) => {
   const idiomsDir = join(IDIOMS_DIR, preset)
   const clean = listFiles(join(idiomsDir, "clean"))
   const fixable = listFiles(join(idiomsDir, "fixable"))
   const repeated = new Set(secondPasses.map((pass) => pass.file))
+
+  it("have a clean idiom", () => {
+    expect(clean.length).toBeGreaterThan(0)
+  })
 
   it("have a fixed file for each fixable idiom", () => {
     expect(listFiles(join(idiomsDir, "fixed"))).toStrictEqual(fixable)
@@ -184,7 +238,7 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
 
   describe.each(listTreeStacks(preset))("with the %s stack", (stack) => {
     let project: string
-    let reports: FixtureReport[]
+    let lint: FixtureLint
 
     beforeAll(() => {
       project = createFixtureProject({
@@ -193,15 +247,32 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
         options: STACK_OPTIONS,
         presets: listStackPresets(stack),
       })
-      reports = lintFixtureProject(project)
+
+      // The type check of fix and check reports each file of the project, also outside the
+      // files of the run, so the canary stays only for this run.
+      const canary = join(project, FIXTURES_DIRECTORY, CANARY.file)
+
+      writeFileSync(canary, CANARY.source)
+      lint = lintFixtureProject(project)
+      rmSync(canary)
     })
 
     afterAll(() => {
       removeFixtureProject(project)
     })
 
-    it("report no clean idiom", () => {
-      expect(reports.filter((report) => report.file.startsWith("clean/"))).toStrictEqual([])
+    it("lint each file of the tree and the canary", () => {
+      expect(lint.files).toBe(listFiles(idiomsDir).length + 1)
+    })
+
+    it("check the types", () => {
+      expect(lint.reports.filter((report) => report.file === CANARY.file)).toStrictEqual([
+        CANARY.report,
+      ])
+    })
+
+    it.each(clean)("report nothing in clean/%s", (file) => {
+      expect(lint.reports.filter((report) => report.file === `clean/${file}`)).toStrictEqual([])
     })
 
     it.live("keep each clean idiom unchanged after fix", () =>
@@ -219,7 +290,7 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
     )
 
     it.live.skipIf(fixable.length === 0)(
-      "rewrite each fixable idiom to its fixed file in a state that check accepts",
+      "rewrite each fixable idiom to its fixed file, which check accepts and a further fix keeps",
       () =>
         Effect.gen(function* () {
           const fixed = readFiles(join(idiomsDir, "fixed"), fixable)
@@ -262,6 +333,14 @@ describe.each(TREES)("$preset idioms", ({ allowedUnstableApis, preset, secondPas
           )
 
           expect(checked).toStrictEqual(Exit.void)
+
+          yield* Toolchain.fix({
+            cwd: project,
+            files: [`${FIXTURES_DIRECTORY}/fixable`],
+            level: FIX_LEVEL,
+          })
+
+          expect(readFixable()).toStrictEqual(fixed)
         }).pipe(Effect.provide(SOURCE_RUNNER))
     )
   })

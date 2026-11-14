@@ -132,6 +132,39 @@ export default { rules: { ...shared, "anti-slop/no-runtime-typeof": "off" }, ove
       })
     )
 
+    it.effect("report the retired node preset import without changing the project", () =>
+      Effect.gen(function* () {
+        const config = toOxlintTsConfigContent(["strict"]).replaceAll(
+          "adamantite/lint/strict",
+          "adamantite/lint/node"
+        )
+
+        const manifest = makePackageJson({
+          devDependencies: { oxlint: oxlint.version },
+          scripts: { check: "adamantite check" },
+        })
+
+        const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
+
+        expect(yield* runAssess(files)).toMatchObject({
+          applicable: true,
+          findings: [
+            {
+              currentState: expect.stringContaining("adamantite/lint/node"),
+              goal: expect.arrayContaining([
+                expect.stringContaining("Remove `adamantite/lint/node`"),
+                expect.stringContaining("node/*"),
+              ]),
+              id: "node-preset-migration",
+              integration: "oxlint",
+            },
+          ],
+        })
+        expect(files.read("oxlint.config.ts")).toBe(config)
+        expect(files.read("package.json")).toBe(manifest)
+      })
+    )
+
     it.effect("report the removed shadcn preset import without changing the project", () =>
       Effect.gen(function* () {
         const config = toOxlintTsConfigContent(["tailwind"]).replaceAll(

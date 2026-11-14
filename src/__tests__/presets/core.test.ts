@@ -58,6 +58,34 @@ function lint(file: string, source: string) {
 }
 
 describe("core preset", () => {
+  it.each([
+    ["handle-callback-err", "index.js", "export function load(err, data) { console.info(data) }"],
+    ["no-exports-assign", "index.cjs", "exports = {}"],
+    [
+      "no-mixed-requires",
+      "index.cjs",
+      'const count = 1, fs = require("node:fs"); console.info(count, fs)',
+    ],
+    ["no-new-require", "index.cjs", 'const fs = new require("node:fs"); console.info(fs)'],
+    ["no-path-concat", "index.cjs", 'console.info(__dirname + "/file")'],
+  ])("report node/%s without a separate preset", (rule, file, source) => {
+    expect(lint(file, source)).toContain(`node(${rule})`)
+  })
+
+  it.each([
+    [
+      "loader.ts",
+      'export function parse(loadModule: (key: string) => string) { const count = 1, item = loadModule("key"); return [item, count] }',
+    ],
+    [
+      "index.ts",
+      'export function create(Module: new (key: string) => object) { return new Module("key") }',
+    ],
+    ["index.d.ts", "export declare function onError(error: Error): void"],
+  ])("accept local module operations and error declarations in %s", (file, source) => {
+    expect(lint(file, source)).toStrictEqual([])
+  })
+
   // `no-await-in-loop` tells the author to start the calls together. That is a defect when each
   // call needs the result of the call before it, and a lint rule cannot tell the two cases apart.
   it("accept an await in a loop", () => {

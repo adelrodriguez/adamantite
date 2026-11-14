@@ -479,7 +479,8 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   `detect` returns one of four states: `Missing`, `Managed`, `Legacy`, or `Malformed`. Assess
   reads only the jobs in the block. Adamantite owns the block, as it owns the managed section of
   `AGENTS.md`, so `update` replaces the block with the current render on each run and does not
-  look for project changes in it. The rest of the file stays as the project wrote it. A project
+  look for project changes in it. The rest of the file stays as the project wrote it, and the
+  new jobs take the indentation of the jobs that they replace. A project
   has one block. Markers that do not make one block are `Malformed`, and Doctor reports them.
   An `adamantite.yml` without markers is `Legacy`, from a release before the block. Adamantite
   cannot tell its jobs from the project's jobs in it, so `update` keeps it, and Doctor reports

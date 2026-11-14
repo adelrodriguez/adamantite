@@ -130,7 +130,12 @@ describe("replaceBlock", () => {
     {
       content: lines(
         HEADER,
-        [`    ${START_MARKER}`, "    verify:", "        runs-on: ubuntu-latest", `    ${END_MARKER}`],
+        [
+          `    ${START_MARKER}`,
+          "    verify:",
+          "        runs-on: ubuntu-latest",
+          `    ${END_MARKER}`,
+        ],
         ["    e2e:", "        runs-on: ubuntu-latest", ""]
       ),
       expected: lines(

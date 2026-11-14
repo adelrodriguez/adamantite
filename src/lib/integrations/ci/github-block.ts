@@ -68,9 +68,33 @@ export function readBlock(content: string): Block | MalformedBlock | NoBlock {
   })
 }
 
+function measureIndent(line: string) {
+  return line.length - line.trimStart().length
+}
+
+// The line that starts the first job of a block body. Blank lines and comments start no job.
+function findFirstJob(lines: readonly string[]) {
+  return lines.find((line) => line.trim() !== "" && !line.trimStart().startsWith("#"))
+}
+
 /**
- * The workflow with `body` in place of the body of its managed block.
+ * The workflow with `body` in place of the body of its managed block. The new jobs take the
+ * indentation of the jobs that they replace, or of the start marker when the block has no job, so
+ * they stay siblings of the project's jobs.
  */
 export function replaceBlock(block: Block, body: string): string {
-  return [block.before, ...(body === "" ? [] : [body]), block.after].join("\n")
+  const lines = body === "" ? [] : body.split("\n")
+  const startMarker = block.before.slice(block.before.lastIndexOf("\n") + 1)
+  const from = measureIndent(findFirstJob(lines) ?? "")
+  const to = measureIndent(findFirstJob(block.body.split("\n")) ?? startMarker)
+
+  const indented = lines.map((line) => {
+    if (line.trim() === "") {
+      return line
+    }
+
+    return to > from ? `${" ".repeat(to - from)}${line}` : line.slice(from - to)
+  })
+
+  return [block.before, ...indented, block.after].join("\n")
 }

@@ -51,7 +51,7 @@ const OXFMT_LANGUAGE = {
 
 const CONFIG = {
   languages: {
-    // The format preset turns on Oxfmt for each plugin language. See ADR 0028.
+    // The format preset turns on Oxfmt for each plugin language.
     ...Object.fromEntries(pluginLanguages.map(({ editors }) => [editors.zed, OXFMT_LANGUAGE])),
     CSS: {
       format_on_save: "on",

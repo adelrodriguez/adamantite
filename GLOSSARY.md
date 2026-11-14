@@ -26,7 +26,7 @@ _Avoid_: Target project, test project, sandbox
 **Vendored bundle**:
 Historical. Third-party code that Adamantite built into the package at a pinned upstream commit
 because upstream did not publish to npm. No vendored bundle remains. The antislop rules became
-first-party plugins, as ADR 0027 records.
+first-party plugins.
 _Avoid_: Plugin, dependency
 
 **Type reset**:

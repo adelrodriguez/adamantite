@@ -4,7 +4,7 @@ const config: FormatConfig = {
   arrowParens: "always",
   // Oxfmt formats Astro and Svelte files through bundled Prettier plugins, which import a package
   // from the project: `@astrojs/compiler-rs`, which Astro 7 installs, and the compiler of Svelte 5.
-  // Oxfmt loads the package only when it formats such a file. See ADR 0028.
+  // Oxfmt loads the package only when it formats such a file.
   astro: true,
   bracketSameLine: false,
   bracketSpacing: true,

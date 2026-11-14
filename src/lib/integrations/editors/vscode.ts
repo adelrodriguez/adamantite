@@ -46,7 +46,7 @@ const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 
 const CONFIG = {
   // The Astro and Svelte extensions set their own formatters, which take priority over the global
-  // default. The format preset turns on Oxfmt for each plugin language. See ADR 0028.
+  // default. The format preset turns on Oxfmt for each plugin language.
   ...Object.fromEntries(
     pluginLanguages.map(({ editors }) => [
       `[${editors.vscode}]`,

@@ -63,7 +63,7 @@ export function toBackendEnv(backend: RuntimeBackend, platform = process.platfor
     // Oxlint 1.92 and later find the launcher with the same search as `findLauncher`, and start it
     // as `<path> headless`. Only when that search finds nothing does Oxlint also look on `PATH`.
     // The `tsrs-lint` bin adds the `--lint` flag of tsrs. Windows still names the launcher, because
-    // no Windows run has confirmed that search. See ADR 0021.
+    // no Windows run has confirmed that search.
     Tsrs: ({ launcher }) => (platform === "win32" ? { OXLINT_TSGOLINT_PATH: launcher } : {}),
   })
 }

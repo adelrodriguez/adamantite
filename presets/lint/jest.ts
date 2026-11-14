@@ -107,7 +107,7 @@ const config: OxlintConfig = {
 
 // Oxlint reads a config through `JSON.stringify`, which skips non-enumerable properties. So a config
 // that extends the preset gets only the override for test files, while a project override can still
-// read `jest.plugins` and `jest.rules`. See ADR 0011. `src/__tests__/presets/test-presets.test.ts`
+// read `jest.plugins` and `jest.rules`. `src/__tests__/presets/test-presets.test.ts`
 // checks both uses.
 Object.defineProperties(config, { plugins: { value: plugins }, rules: { value: rules } })
 

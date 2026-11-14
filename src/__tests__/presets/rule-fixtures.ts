@@ -79,6 +79,7 @@ const OxlintJsonOutput = Schema.Struct({
       labels: Schema.Array(Schema.Struct({ span: Schema.Struct({ line: Schema.Finite }) })),
     })
   ),
+  number_of_files: Schema.Int,
 })
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintJsonOutput))
@@ -135,6 +136,17 @@ export interface FixtureReport {
    * the plugin `typescript` and its code, such as `typescript/TS2307`.
    */
   readonly rule: string
+}
+
+/**
+ * The result of one Oxlint run on the `fixtures/` folder of a fixture project.
+ */
+export interface FixtureLint {
+  /**
+   * The number of files that Oxlint linted. A file that an ignore pattern skips is not in it.
+   */
+  readonly files: number
+  readonly reports: FixtureReport[]
 }
 
 const REPORT_CODE = /^(?<plugin>[^(]+)\((?<rule>.+)\)$/
@@ -209,11 +221,11 @@ export function removeFixtureProject(project: string): void {
 }
 
 /**
- * Lint the `fixtures/` folder of a fixture project in one real Oxlint run, and return each report.
- * The run goes through the Oxlint entry, as `adamantite check` does, so a preset that needs the
- * Effect build of Oxlint loads too.
+ * Lint the `fixtures/` folder of a fixture project in one real Oxlint run, and return each report
+ * and the number of files that Oxlint linted. The run goes through the Oxlint entry, as `adamantite
+ * check` does, so a preset that needs the Effect build of Oxlint loads too.
  */
-export function lintFixtureProject(project: string): FixtureReport[] {
+export function lintFixtureProject(project: string): FixtureLint {
   const result = spawnSync(
     process.execPath,
     [join(REPO_ROOT, "src/oxlint.ts"), "-c", "oxlint.config.ts", "-f", "json", FIXTURES_DIRECTORY],
@@ -234,7 +246,7 @@ export function lintFixtureProject(project: string): FixtureReport[] {
     })
   }
 
-  return output.diagnostics.flatMap((diagnostic) => {
+  const reports = output.diagnostics.flatMap((diagnostic) => {
     const code = REPORT_CODE.exec(diagnostic.code ?? "")?.groups
 
     const file = diagnostic.filename
@@ -246,6 +258,8 @@ export function lintFixtureProject(project: string): FixtureReport[] {
 
     return diagnostic.labels.map((label) => ({ file, line: label.span.line, rule }))
   })
+
+  return { files: output.number_of_files, reports }
 }
 
 /**
@@ -256,7 +270,7 @@ export function lintFixtureTree(options: FixtureTreeOptions): FixtureReport[] {
   const project = createFixtureProject(options)
 
   try {
-    return lintFixtureProject(project)
+    return lintFixtureProject(project).reports
   } finally {
     removeFixtureProject(project)
   }

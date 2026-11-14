@@ -1,0 +1,79 @@
+name: latest
+
+# Test the presets with the newest versions of Oxlint, the managed plugins, the type-aware backend,
+# and the libraries that the fixtures import. Dependabot does not update pnpm 12 dependencies, so
+# without this run the presets meet a new release only when someone updates the dependencies.
+# `scripts/test-latest.ts` updates the packages in a temporary worktree. The run makes no commit.
+
+on:
+  schedule:
+    # The same weekly time as the Dependabot updates.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      overrides:
+        description: "Packages to test at a chosen version instead of the newest, such as `@tanstack/react-query@4.36.1`, separated by spaces"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  latest:
+    name: latest
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: ".node-version"
+          cache: "pnpm"
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            src/__tests__/presets/fixture-packages/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Test the presets with the newest versions
+        env:
+          OVERRIDES: ${{ inputs.overrides }}
+        run: |
+          set -f
+          args=()
+          for spec in ${OVERRIDES}; do
+            args+=(--override "${spec}")
+          done
+          node scripts/test-latest.ts run --out "${RUNNER_TEMP}/latest" "${args[@]}"
+
+      # Upload before the publish step, so the artifacts stay when the publish fails.
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: latest-report
+          path: ${{ runner.temp }}/latest
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Open or update the failure issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/test-latest.ts publish --out "${RUNNER_TEMP}/latest" --repo "${GITHUB_REPOSITORY}"

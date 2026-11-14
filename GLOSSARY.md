@@ -16,6 +16,12 @@ and `strict`. The preset tests lint the rule fixtures with each stack, so a rule
 preset cannot report code that another preset of the stack accepts.
 _Avoid_: Combination, preset group
 
+**Fixture packages**:
+The npm packages that the preset test fixtures import, such as React and TanStack Query, so a
+type-aware run gets their real types. They have their own manifest and lockfile in
+`src/__tests__/presets/fixture-packages/`, apart from the packages of the repository.
+_Avoid_: Target project, test project, sandbox
+
 **Vendored bundle**:
 Historical. Third-party code that Adamantite built into the package at a pinned upstream commit
 because upstream did not publish to npm. No vendored bundle remains. The antislop rules became

@@ -379,6 +379,14 @@ with the issue of the conflict. A case that some other rule always reports belon
 `RuleTester` test. Files in a `modules/` folder beside `valid/` are the modules that the fixtures
 import.
 
+A fixture that imports a package, such as React or TanStack Query, gets the real types of the
+package from the fixture packages. `src/__tests__/presets/fixture-packages/` has its own
+`package.json` and `pnpm-lock.yaml` outside the pnpm workspace, so the root manifest lists only what
+Adamantite builds, publishes, and tests itself against. The `globalSetup` of the `presets` Vitest
+project installs the fixture packages from their lockfile. `createFixtureProject` links the packages
+of the repository and the fixture packages into the `node_modules` of each fixture project.
+`fixture-packages.test.ts` fails when a package is in both manifests.
+
 `overlap.test.ts` fails when two presets set one rule, unless one of the presets is core. A preset
 cannot see the other presets of a config, and only core has a known position in `extends`. Each
 rule of core that a preset changes has fixtures under

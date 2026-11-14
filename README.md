@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">💠 Adamantite</h1>
   <p align="center">
-    <strong>Agent-first presets that keep modern TypeScript codebases at high quality.</strong>
+    <strong>Strict, agent-first presets for modern TypeScript codebases.</strong>
   </p>
 </p>
 
@@ -17,7 +17,7 @@
   </a>
 </p>
 
-Adamantite is an agent-first set of presets and a CLI that help coding agents write
+Adamantite is a strict, agent-first set of presets and a CLI that help coding agents write
 excellent code. It configures Oxlint, Oxfmt, TypeScript, Knip, and Sherif with strict
 standards that agents must follow, and it gives agents the instructions to set up, repair,
 and update the project.

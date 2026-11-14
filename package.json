@@ -1,7 +1,7 @@
 {
   "name": "adamantite",
   "version": "0.47.0",
-  "description": "Agent-first presets that keep modern TypeScript codebases at high quality",
+  "description": "Strict, agent-first presets for modern TypeScript codebases",
   "keywords": [
     "adamantite",
     "formatter",

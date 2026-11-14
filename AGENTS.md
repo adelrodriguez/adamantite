@@ -2,7 +2,7 @@
 
 ## What is Adamantite
 
-Adamantite is an agent-first set of presets and a CLI that keep modern TypeScript codebases at high quality. It exists to help coding agents write excellent code. Every change follows these principles:
+Adamantite is a strict, agent-first set of presets and a CLI for modern TypeScript codebases. It exists to help coding agents write excellent code. Every change follows these principles:
 
 - **Enforce strict standards.** The presets are highly opinionated. A check fails when code breaks a standard, so agents must follow it.
 - **Embrace breaking changes.** Make the change that improves a standard, even when it breaks target projects. Make the update easy for agents with a Doctor finding that gives the migration, or a changeset that names the replacement.

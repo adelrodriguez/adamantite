@@ -30,12 +30,17 @@ export const INIT_EDITORS = ["vscode", "zed"] as const
 export type InitEditor = (typeof INIT_EDITORS)[number]
 
 /**
- * The name that the interactive prompt shows for each editor.
+ * The title and description that the interactive prompt shows for each editor. The `vscode`
+ * settings also apply to the editors that read `.vscode/settings.json`, so the prompt calls them
+ * universal.
  */
-export const INIT_EDITOR_LABELS = {
-  vscode: "VS Code / Cursor / Windsurf",
-  zed: "Zed",
-} as const satisfies Record<InitEditor, string>
+export const INIT_EDITOR_CHOICES = {
+  vscode: {
+    description: "creates .vscode/settings.json for VS Code, Cursor, Windsurf, and more",
+    title: "Universal",
+  },
+  zed: { description: "creates .zed/settings.json", title: "Zed" },
+} as const satisfies Record<InitEditor, { description: string; title: string }>
 
 /**
  * The setup that init applies. Each optional part exists only with the parts that it needs, so the

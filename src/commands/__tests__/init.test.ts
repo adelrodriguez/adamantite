@@ -245,6 +245,37 @@ describe("init", () => {
     })
   )
 
+  it.effect("describe the settings file of each editor choice in interactive init", () =>
+    Effect.gen(function* () {
+      const files = createInitTestContext()
+
+      // The cursor passes each editor choice, so the prompt shows each description.
+      const terminal = createTerminalTestContext([
+        ...pickMany(SCRIPT_ORDER, ["check"]),
+        ...pickMany(LINT_PRESETS, []),
+        "n",
+        ...pickMany(INIT_EDITORS, ["vscode", "zed"]),
+        "n",
+        "n",
+        "n",
+      ])
+
+      const exit = yield* runCommand(initCommand, [], {
+        files,
+        layers: [createDependencyInstallerTestContext().layer, promptingLayer],
+        terminal,
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(terminal.output()).toContain(
+        "Universal - creates .vscode/settings.json for VS Code, Cursor, Windsurf, and more"
+      )
+      expect(terminal.output()).toContain("Zed - creates .zed/settings.json")
+      expect(files.exists(".vscode/settings.json")).toBe(true)
+      expect(files.exists(".zed/settings.json")).toBe(true)
+    })
+  )
+
   describe("legacy config handling", () => {
     it.effect.each([
       {

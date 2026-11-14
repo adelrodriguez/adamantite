@@ -1,5 +1,7 @@
 # The strict preset absorbs the anti-slop rules
 
+> [ADR 0030](0030-antislop-rule-namespaces.md) replaces the rule namespace decision below.
+
 The `antislop` and `strict` presets enforced one design: types come from decoding and narrowing,
 not from assertions or `unknown`. Users had to find and select two presets, and the presets
 reported the same defect more than once. Outside tests, `input as unknown as string` got five

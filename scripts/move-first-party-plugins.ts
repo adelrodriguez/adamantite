@@ -27,17 +27,17 @@ const TESTS = "src/__tests__/plugins"
 // a run of this script on the commit before it writes the same files.
 const STEPS: ReadonlyMap<string, readonly Move[]> = new Map([
   [
-    "anti-slop-effect",
+    "antislop-effect",
     [
-      ["presets/lint/plugin/antislop-effect", "presets/lint/plugin/anti-slop-effect"],
-      ["src/__tests__/plugin/antislop-effect", "src/__tests__/plugin/anti-slop-effect"],
+      ["presets/lint/plugin/antislop-effect", "presets/lint/plugin/antislop-effect"],
+      ["src/__tests__/plugin/antislop-effect", "src/__tests__/plugin/antislop-effect"],
     ],
   ],
   [
-    "anti-slop",
+    "antislop",
     [
-      ["presets/lint/plugin/antislop", "presets/lint/plugin/anti-slop"],
-      ["src/__tests__/plugin/antislop", "src/__tests__/plugin/anti-slop"],
+      ["presets/lint/plugin/antislop", "presets/lint/plugin/antislop"],
+      ["src/__tests__/plugin/antislop", "src/__tests__/plugin/antislop"],
     ],
   ],
   [

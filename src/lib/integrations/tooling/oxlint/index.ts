@@ -35,6 +35,8 @@ import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import { getManagedScripts, checkRunsTool } from "#lib/workspace/package-json.ts"
 
+import { assessRuleMigrations } from "#lib/integrations/tooling/oxlint/rule-migrations.ts"
+
 const CONFIG_FILE = "oxlint.config.ts"
 const LEGACY_CONFIG_FILE = ".oxlintrc.json"
 
@@ -59,8 +61,8 @@ const retiredLintPresetFindings = {
     currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/antislop` preset.",
     goal: [
       "Replace `adamantite/lint/antislop` with `adamantite/lint/strict`. If strict is already imported, remove the antislop import and its `extends` entry.",
-      "Keep `anti-slop/*` rule settings, rule severity, rule options, and all other project settings. The rule namespace stays the same.",
-      'strict sets `anti-slop/no-chained-type-assertions`, `anti-slop/no-widen-then-assert`, and `anti-slop/require-safety-comment-for-type-assertion` in an override for test files, which takes priority over top-level `rules`. Move a project setting for these three rules into an `overrides` entry with `files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"]`.',
+      "Keep `antislop/*` rule settings, rule severity, rule options, and all other project settings. Rename old `anti-slop/*` settings to `antislop/*` too, as the rule migration finding specifies.",
+      'strict sets `antislop/no-chained-type-assertions`, `antislop/no-widen-then-assert`, and `antislop/require-safety-comment-for-type-assertion` in an override for test files, which takes priority over top-level `rules`. Move a project setting for these three rules into an `overrides` entry with `files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"]`.',
       "The strict preset also bans type assertions outside tests, console calls other than `console.info`, task comments, and deep destructuring, and it requires a reason on each suppression. Follow those reports when updating the code.",
       "Use `--preset strict` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
     ],
@@ -152,6 +154,7 @@ export default defineIntegration({
 
       const state = yield* detect(cwd)
       const runtimeFindings = yield* assessOxlintRuntime(project)
+      const migration = yield* assessRuleMigrations(project)
 
       const pkg = assessPackage(
         project,
@@ -194,6 +197,7 @@ export default defineIntegration({
         findings: [
           ...pkg.findings,
           ...runtimeFindings,
+          ...migration.findings,
           ...retiredPresetFindings,
           ...presetOrderFindings,
           ...excludedPresetsFindings,
@@ -205,7 +209,7 @@ export default defineIntegration({
           }),
         ],
         packageActions: pkg.packageActions,
-        warnings: [...pkg.warnings, ...state.warnings],
+        warnings: [...pkg.warnings, ...state.warnings, ...migration.warnings],
       } satisfies IntegrationAssessment
     }),
   check: commands.check,

@@ -29,7 +29,7 @@ const OXLINT_VARIABLE = "ADAMANTITE_TEST_OXLINT"
 
 /**
  * A preset's rule fixtures live in one directory, with one directory for each plugin namespace,
- * such as `anti-slop`, and one directory for each rule in it. Files in
+ * such as `antislop`, and one directory for each rule in it. Files in
  * `<fixturesDir>/<namespace>/<rule>/valid/` must not get a report from the rule. Files in
  * `<fixturesDir>/<namespace>/<rule>/invalid/` must get at least one report.
  *
@@ -62,7 +62,7 @@ export interface RuleFixture {
   readonly file: string
   readonly kind: RuleFixtureKind
   /**
-   * The rule name as a config sets it, such as `anti-slop/no-reflect-get`.
+   * The rule name as a config sets it, such as `antislop/no-reflect-get`.
    */
   readonly rule: string
 }
@@ -96,7 +96,7 @@ function listDirectory(path: string): string[] {
 
 /**
  * List the rules that have a fixture directory, as a config names them, such as
- * `anti-slop/no-reflect-get`. Synchronous, so a test file can use the result to declare its tests.
+ * `antislop/no-reflect-get`. Synchronous, so a test file can use the result to declare its tests.
  */
 export function listFixtureRules(fixturesDir: string): string[] {
   return listDirectory(fixturesDir).flatMap((namespace) =>
@@ -134,7 +134,7 @@ export interface FixtureReport {
   readonly file: string
   readonly line: number
   /**
-   * The rule name as a config sets it, such as `anti-slop/no-reflect-get`. A type check error has
+   * The rule name as a config sets it, such as `antislop/no-reflect-get`. A type check error has
    * the plugin `typescript` and its code, such as `typescript/TS2307`.
    */
   readonly rule: string

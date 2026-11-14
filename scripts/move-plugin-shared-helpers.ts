@@ -13,7 +13,7 @@ const selected = process.argv.slice(2).filter((argument) => argument !== "--writ
 const MODULES = ["glob", "imports", "options", "resolver"] as const
 const PLUGIN = "presets/lint/plugin"
 
-// A rule of the adamantite plugin imports `../<module>.ts`, a rule of the anti-slop plugins
+// A rule of the adamantite plugin imports `../<module>.ts`, a rule of the antislop plugins
 // imports `../../<module>.ts`, a test imports `#presets/lint/plugin/<module>.ts`, and the
 // `adamantite/import-owners` options in oxlint.config.ts name `presets/lint/plugin/<module>.ts`.
 // The smoke test names the built module as the package subpath `adamantite/lint/plugin/<module>`.

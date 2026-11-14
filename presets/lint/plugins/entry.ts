@@ -1,6 +1,6 @@
 // The first-party plugins, by rule namespace. Each one is the folder with that name beside this
 // module, and its `index.ts` registers the rules under the same name.
-export const FIRST_PARTY_PLUGINS = ["adamantite", "anti-slop", "anti-slop-effect"] as const
+export const FIRST_PARTY_PLUGINS = ["adamantite", "antislop", "antislop-effect"] as const
 
 type FirstPartyPlugin = (typeof FIRST_PARTY_PLUGINS)[number]
 

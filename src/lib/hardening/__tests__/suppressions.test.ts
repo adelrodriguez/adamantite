@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { findSuppressions } from "#lib/hardening/suppressions.ts"
+import { findSuppressions } from "#lib/workspace/suppressions.ts"
 
 describe("findSuppressions", () => {
   it("read the rules and the line of each disable comment, without the reason", () => {
@@ -42,5 +42,35 @@ describe("findSuppressions", () => {
 
   it("find none in a file that does not parse", () => {
     expect(findSuppressions("a.ts", "// oxlint-disable\nexport const = ;\n")).toStrictEqual([])
+  })
+})
+
+describe("component suppressions", () => {
+  it.each([
+    [
+      "App.vue",
+      '<script lang="tsx">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst view = <div />\n</script>',
+    ],
+    [
+      "App.vue",
+      "<script lang='jsx'>\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst view = <div />\n</script>",
+    ],
+    [
+      "App.vue",
+      '<template><div /></template>\n<script setup lang="ts">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst value: number = Reflect.get({}, "a")\n</script>',
+    ],
+    [
+      "App.svelte",
+      '<script lang="ts">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst value: number = Reflect.get({}, "a")\n</script>\n<div>{value}</div>',
+    ],
+    [
+      "App.astro",
+      '---\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst value: number = Reflect.get({}, "a")\n---\n<div>{value}</div>',
+    ],
+  ])("read embedded script comments in %s", (file, content) => {
+    const line = content.split("\n").findIndex((text) => text.startsWith("// oxlint")) + 1
+    expect(findSuppressions(file, content)).toStrictEqual([
+      { line, rules: ["anti-slop/no-reflect-get"] },
+    ])
   })
 })

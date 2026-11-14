@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
@@ -65,7 +66,12 @@ function runAssess(
 ) {
   return readProject(ROOT).pipe(
     Effect.flatMap((project) => oxlint.assess(project)),
-    Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages)])
+    Effect.provide([
+      files.layer,
+      makeOxlintFilesLayer(),
+      Path.layer,
+      makeModuleResolverLayer(ROOT, packages),
+    ])
   )
 }
 
@@ -324,7 +330,12 @@ describe("Oxlint runtime assessment", () => {
 
       const findings = yield* readProject(ROOT).pipe(
         Effect.flatMap((project) => assessOxlintRuntime(project)),
-        Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, {})])
+        Effect.provide([
+          files.layer,
+          makeOxlintFilesLayer(),
+          Path.layer,
+          makeModuleResolverLayer(ROOT, {}),
+        ])
       )
 
       expect(findings).toStrictEqual([])

@@ -206,7 +206,8 @@ function writeEntryModule(dir: string, name: string) {
     "",
   ].join("\n")
 
-  const root = findNodeModules(dir)
+  // File discovery is read-only. Keep its generated plugin entry outside the target project.
+  const root = process.argv.includes("--debug=files") ? undefined : findNodeModules(dir)
 
   const folders = [
     ...(root === undefined ? [] : [() => join(root, CACHE_DIRECTORY)]),

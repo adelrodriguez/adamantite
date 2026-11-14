@@ -13,6 +13,7 @@ import {
   makeSystemError,
 } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TerminalTestContext } from "#__tests__/terminal.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import {
@@ -200,9 +201,7 @@ export const promptingLayer = Layer.succeed(TerminalCapabilities.TerminalCapabil
   canPrompt: true,
 })
 
-const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
-  ChildProcessSpawner.make(() => Effect.die("Command tests must not spawn processes"))
-)
+const failingSpawnerLayer = makeOxlintFilesLayer()
 
 // Commands require these services statically even on paths that never use them. Tests that do
 // reach them pass their own layer, which takes precedence.

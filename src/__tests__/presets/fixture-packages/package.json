@@ -1,0 +1,18 @@
+{
+  "name": "fixture-packages",
+  "private": true,
+  "description": "The packages that the preset test fixtures import. See docs/architecture.md.",
+  "type": "module",
+  "dependencies": {
+    "@jest/globals": "30.5.2",
+    "@tanstack/react-query": "5.107.1",
+    "@tanstack/react-router": "1.170.46",
+    "@types/react": "19.3.0",
+    "@vue/test-utils": "2.5.1",
+    "pinia": "4.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vue": "3.5.45",
+    "vue-router": "5.5.0"
+  }
+}

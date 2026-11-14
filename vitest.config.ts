@@ -65,6 +65,8 @@ export default defineConfig({
           // Fixtures are code that the preset tests lint, not tests of this repository. Vitest
           // cannot run some of them, such as a Jest test that imports `@jest/globals`.
           exclude: ["src/__tests__/presets/fixtures/**"],
+          // The fixture projects link the fixture packages, which have their own lockfile.
+          globalSetup: ["src/__tests__/presets/fixture-packages.ts"],
           // A real Oxlint or Vitest run takes up to 3.4 seconds alone and more than 5 seconds
           // while the other test files run, so the default timeouts fail these tests at random.
           // Fixture tests lint in a `beforeAll` hook, so hooks get the same limit as tests. The

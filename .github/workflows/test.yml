@@ -183,6 +183,10 @@ jobs:
         with:
           node-version-file: ".node-version"
           cache: "pnpm"
+          # The preset tests install the fixture packages from their own lockfile.
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            src/__tests__/presets/fixture-packages/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

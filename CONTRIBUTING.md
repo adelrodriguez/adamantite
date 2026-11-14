@@ -82,6 +82,14 @@ ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest 
   src/__tests__/plugins src/__tests__/presets/strict.test.ts src/__tests__/presets/effect.test.ts
 ```
 
+A fixture that imports a package, such as `vue`, needs the package in the fixture packages, not in
+the root `package.json`. Add it with an exact version, and commit the lockfile of the fixture
+packages:
+
+```sh
+pnpm --dir src/__tests__/presets/fixture-packages add -E vue@<version>
+```
+
 Dependabot does not yet support pnpm 12. Use `pnpm run bump:deps` for package dependency
 updates. Run `pnpm run analyze` after you add or remove dependencies or change imports and
 exports. Review all automatic fixes before you commit them.

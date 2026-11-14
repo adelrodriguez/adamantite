@@ -49,6 +49,14 @@ describe("component suppressions", () => {
   it.each([
     [
       "App.vue",
+      '<script lang="tsx">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst view = <div />\n</script>',
+    ],
+    [
+      "App.vue",
+      "<script lang='jsx'>\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst view = <div />\n</script>",
+    ],
+    [
+      "App.vue",
       '<template><div /></template>\n<script setup lang="ts">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst value: number = Reflect.get({}, "a")\n</script>',
     ],
     [

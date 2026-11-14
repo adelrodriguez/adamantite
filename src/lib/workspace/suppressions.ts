@@ -1,4 +1,4 @@
-import { parseSync } from "oxc-parser"
+import { parseSync, type ParserOptions } from "oxc-parser"
 
 /**
  * Source files and component files whose embedded scripts Oxlint lints.
@@ -22,7 +22,11 @@ export function findSuppressions(
   file: string,
   content: string
 ): Array<{ readonly line: number; readonly rules: readonly string[] }> {
-  const scripts: Array<{ readonly offset: number; readonly source: string }> = []
+  const scripts: Array<{
+    readonly offset: number
+    readonly options: ParserOptions
+    readonly source: string
+  }> = []
 
   if (/\.(?:vue|svelte|astro)$/u.test(file)) {
     const frontmatter = file.endsWith(".astro")
@@ -32,29 +36,33 @@ export function findSuppressions(
     if (frontmatter !== null) {
       scripts.push({
         offset: frontmatter[0].indexOf("\n") + 1,
+        options: { lang: "ts" },
         source: frontmatter.groups?.["script"] ?? "",
       })
     }
 
-    for (const match of content.matchAll(/<script\b[^>]*>(?<script>[\s\S]*?)<\/script\s*>/giu)) {
+    for (const match of content.matchAll(
+      /<script\b(?<attributes>[^>]*)>(?<script>[\s\S]*?)<\/script\s*>/giu
+    )) {
       // A string in Astro frontmatter can contain an HTML script tag.
       if (match.index >= (frontmatter?.[0].length ?? 0)) {
+        const language = /\blang\s*=\s*["'](?<language>[^"']+)["']/iu
+          .exec(match.groups?.["attributes"] ?? "")
+          ?.groups?.["language"]?.toLowerCase()
+
         scripts.push({
           offset: match.index + match[0].indexOf(">") + 1,
+          options: { lang: language === "tsx" || language === "jsx" ? language : "ts" },
           source: match.groups?.["script"] ?? "",
         })
       }
     }
   } else {
-    scripts.push({ offset: 0, source: content })
+    scripts.push({ offset: 0, options: {}, source: content })
   }
 
-  return scripts.flatMap(({ offset, source }) => {
-    const { comments, errors } = parseSync(
-      file,
-      source,
-      /\.(?:vue|svelte|astro)$/u.test(file) ? { lang: "ts" } : {}
-    )
+  return scripts.flatMap(({ offset, options, source }) => {
+    const { comments, errors } = parseSync(file, source, options)
 
     if (errors.length > 0) {
       return []

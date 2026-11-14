@@ -58,7 +58,7 @@ describe("real rule migration assessment", () => {
       )
       writeFileSync(
         join(root, "App.vue"),
-        '<script setup lang="ts">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration probe\nconst value: number = 1\n</script>\n<template><div>{{ value }}</div></template>\n'
+        '<script lang="tsx">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration probe\nconst view = <div />\n</script>\n<template><div /></template>\n'
       )
       writeFileSync(
         join(root, "App.svelte"),

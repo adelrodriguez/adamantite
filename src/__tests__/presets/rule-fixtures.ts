@@ -17,7 +17,11 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
-const FIXTURES_DIRECTORY = "fixtures"
+
+/**
+ * The folder of a fixture project that holds the copy of the fixture tree.
+ */
+export const FIXTURES_DIRECTORY = "fixtures"
 
 /**
  * The variable that names an Oxlint package folder, such as `<folder>/node_modules/oxlint`, that
@@ -142,108 +146,131 @@ export interface FixtureReport {
 
 const REPORT_CODE = /^(?<plugin>[^(]+)\((?<rule>.+)\)$/
 
+const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
+
 /**
- * Lint a fixture tree in one real Oxlint run with the presets, and return each report. The run goes
- * through the Oxlint entry, as `adamantite check` does, so a preset that needs the Effect build of
- * Oxlint loads too. The tree is in the `include` of a tsconfig that extends the Adamantite preset
- * and has the plugin entry of the Effect rules. React supplies the JSX types.
+ * Write a temporary project that holds a copy of the fixture tree in `fixtures/`, and return its
+ * path. The project links the `node_modules` of the repository, and its `oxlint.config.ts` and
+ * `oxfmt.config.ts` extend the presets, so `adamantite check` and `adamantite fix` run in it as in
+ * a target project. The tree is in the `include` of a tsconfig that extends the Adamantite preset
+ * and has the plugin entry of the Effect rules. React supplies the JSX types. Remove the project
+ * with `removeFixtureProject`.
  */
-export function lintFixtureTree(options: FixtureTreeOptions): FixtureReport[] {
-  const tempDir = mkdtempSync(join(tmpdir(), "adamantite-rule-fixtures-"))
+export function createFixtureProject(options: FixtureTreeOptions): string {
+  const project = mkdtempSync(join(tmpdir(), "adamantite-fixtures-"))
+  const oxlint = process.env[OXLINT_VARIABLE]
+
+  if (oxlint === undefined || oxlint === "") {
+    symlinkSync(join(REPO_ROOT, "node_modules"), join(project, "node_modules"))
+  } else {
+    // Link each package of the repository, but take Oxlint from the named folder.
+    mkdirSync(join(project, "node_modules"))
+
+    for (const name of readdirSync(join(REPO_ROOT, "node_modules"))) {
+      symlinkSync(
+        name === "oxlint" ? oxlint : join(REPO_ROOT, "node_modules", name),
+        join(project, "node_modules", name)
+      )
+    }
+  }
+
+  cpSync(options.fixturesDir, join(project, FIXTURES_DIRECTORY), { recursive: true })
+  writeFileSync(
+    join(project, "tsconfig.json"),
+    JSON.stringify({
+      compilerOptions: {
+        jsx: "react-jsx",
+        plugins: [
+          {
+            allowedUnstableApis: options.allowedUnstableApis ?? [],
+            diagnostics: true,
+            name: "@effect/language-service",
+          },
+        ],
+        types: ["node"],
+      },
+      extends: join(REPO_ROOT, "presets/tsconfig.json"),
+      include: [FIXTURES_DIRECTORY],
+    })
+  )
+  writeFileSync(
+    join(project, "oxlint.config.ts"),
+    [
+      'import { defineConfig } from "oxlint"',
+      ...options.presets.map(
+        (preset, index) => `import preset${index} from ${JSON.stringify(preset)}`
+      ),
+      "",
+      "export default defineConfig({",
+      `  extends: [${options.presets.map((_, index) => `preset${index}`).join(", ")}],`,
+      `  options: ${JSON.stringify(options.options ?? {})},`,
+      "})",
+      "",
+    ].join("\n")
+  )
+  writeFileSync(
+    join(project, "oxfmt.config.ts"),
+    `import format from ${JSON.stringify(FORMAT_PRESET)}\n\nexport default format\n`
+  )
+
+  return project
+}
+
+export function removeFixtureProject(project: string): void {
+  rmSync(project, { force: true, recursive: true })
+}
+
+/**
+ * Lint the `fixtures/` folder of a fixture project in one real Oxlint run, and return each report.
+ * The run goes through the Oxlint entry, as `adamantite check` does, so a preset that needs the
+ * Effect build of Oxlint loads too.
+ */
+export function lintFixtureProject(project: string): FixtureReport[] {
+  const result = spawnSync(
+    process.execPath,
+    [join(REPO_ROOT, "src/oxlint.ts"), "-c", "oxlint.config.ts", "-f", "json", FIXTURES_DIRECTORY],
+    { cwd: project, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
+  )
+
+  if (result.error) {
+    throw result.error
+  }
+
+  let output: typeof OxlintJsonOutput.Type
 
   try {
-    const oxlint = process.env[OXLINT_VARIABLE]
-
-    if (oxlint === undefined || oxlint === "") {
-      symlinkSync(join(REPO_ROOT, "node_modules"), join(tempDir, "node_modules"))
-    } else {
-      // Link each package of the repository, but take Oxlint from the named folder.
-      mkdirSync(join(tempDir, "node_modules"))
-
-      for (const name of readdirSync(join(REPO_ROOT, "node_modules"))) {
-        symlinkSync(
-          name === "oxlint" ? oxlint : join(REPO_ROOT, "node_modules", name),
-          join(tempDir, "node_modules", name)
-        )
-      }
-    }
-
-    cpSync(options.fixturesDir, join(tempDir, FIXTURES_DIRECTORY), { recursive: true })
-    writeFileSync(
-      join(tempDir, "tsconfig.json"),
-      JSON.stringify({
-        compilerOptions: {
-          jsx: "react-jsx",
-          plugins: [
-            {
-              allowedUnstableApis: options.allowedUnstableApis ?? [],
-              diagnostics: true,
-              name: "@effect/language-service",
-            },
-          ],
-          types: ["node"],
-        },
-        extends: join(REPO_ROOT, "presets/tsconfig.json"),
-        include: [FIXTURES_DIRECTORY],
-      })
-    )
-    writeFileSync(
-      join(tempDir, "oxlint.config.ts"),
-      [
-        'import { defineConfig } from "oxlint"',
-        ...options.presets.map(
-          (preset, index) => `import preset${index} from ${JSON.stringify(preset)}`
-        ),
-        "",
-        "export default defineConfig({",
-        `  extends: [${options.presets.map((_, index) => `preset${index}`).join(", ")}],`,
-        `  options: ${JSON.stringify(options.options ?? {})},`,
-        "})",
-        "",
-      ].join("\n")
-    )
-
-    const result = spawnSync(
-      process.execPath,
-      [
-        join(REPO_ROOT, "src/oxlint.ts"),
-        "-c",
-        "oxlint.config.ts",
-        "-f",
-        "json",
-        FIXTURES_DIRECTORY,
-      ],
-      { cwd: tempDir, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 }
-    )
-
-    if (result.error) {
-      throw result.error
-    }
-
-    let output: typeof OxlintJsonOutput.Type
-
-    try {
-      output = decodeOxlintJsonOutput(result.stdout)
-    } catch (error) {
-      throw new Error(`Oxlint did not print JSON diagnostics.\n${result.stdout}${result.stderr}`, {
-        cause: error,
-      })
-    }
-
-    return output.diagnostics.flatMap((diagnostic) => {
-      const code = REPORT_CODE.exec(diagnostic.code ?? "")?.groups
-
-      const file = diagnostic.filename
-        .split(sep)
-        .join("/")
-        .slice(FIXTURES_DIRECTORY.length + 1)
-
-      const rule = code === undefined ? "" : `${code["plugin"]}/${code["rule"]}`
-
-      return diagnostic.labels.map((label) => ({ file, line: label.span.line, rule }))
+    output = decodeOxlintJsonOutput(result.stdout)
+  } catch (error) {
+    throw new Error(`Oxlint did not print JSON diagnostics.\n${result.stdout}${result.stderr}`, {
+      cause: error,
     })
+  }
+
+  return output.diagnostics.flatMap((diagnostic) => {
+    const code = REPORT_CODE.exec(diagnostic.code ?? "")?.groups
+
+    const file = diagnostic.filename
+      .split(sep)
+      .join("/")
+      .slice(FIXTURES_DIRECTORY.length + 1)
+
+    const rule = code === undefined ? "" : `${code["plugin"]}/${code["rule"]}`
+
+    return diagnostic.labels.map((label) => ({ file, line: label.span.line, rule }))
+  })
+}
+
+/**
+ * Lint a fixture tree in one real Oxlint run with the presets, in a fixture project, and return
+ * each report.
+ */
+export function lintFixtureTree(options: FixtureTreeOptions): FixtureReport[] {
+  const project = createFixtureProject(options)
+
+  try {
+    return lintFixtureProject(project)
   } finally {
-    rmSync(tempDir, { force: true, recursive: true })
+    removeFixtureProject(project)
   }
 }
 

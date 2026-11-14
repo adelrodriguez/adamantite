@@ -125,3 +125,23 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | `clean/user.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/examples/async/__tests__/user.test.js#L21-L33) | MIT | `expect.hasAssertions()` and a resolved value in place of the request. |
 | `clean/utils.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/examples/typescript/__tests__/utils.test.ts#L3-L14) | MIT | A typed `jest.fn` that `beforeEach` resets. |
 | `fixable/equal.test.ts` | Written for Adamantite | | `toEqual(3)`, which two fixes write as `toBe(3)`. A known second pass. |
+
+## vue
+
+The vue idioms do not prove template rules or type checks of `.vue` scripts. No rule reads a template, and the type check skips `.vue` scripts.
+
+| File | Source | License | Changes |
+| --- | --- | --- | --- |
+| `clean/async-panel.ts` | [Vue core](https://github.com/vuejs/core/blob/cbd95955a5362b44060908f6e28ad447c3031b8a/packages/runtime-core/__tests__/apiAsyncComponent.spec.ts#L895-L902) | MIT | An async component that imports a local `.vue` module. |
+| `clean/counter-context.ts` | [Vue core](https://github.com/vuejs/core/blob/cbd95955a5362b44060908f6e28ad447c3031b8a/packages-private/dts-test/inject.test-d.ts#L16-L26) | MIT | A provide function and an inject function that throws when the provider is missing. |
+| `clean/model-input.vue` | [Vue core](https://github.com/vuejs/core/blob/cbd95955a5362b44060908f6e28ad447c3031b8a/packages-private/sfc-playground/src/VersionSelect.vue#L1-L12) | MIT | A required `defineModel` on one input. |
+| `clean/name-list.vue` | [Vitesse](https://github.com/antfu-collective/vitesse/blob/a8785264f83c2ebe1b3cf689296775a4949957c8/src/pages/hi/%5Bname%5D.vue#L28-L37) | MIT | A keyed `v-for` over a destructured prop. |
+| `clean/props-emits.vue` | [Vue core](https://github.com/vuejs/core/blob/cbd95955a5362b44060908f6e28ad447c3031b8a/packages-private/sfc-playground/src/Header.vue#L1-L28) | MIT | One destructured prop and one typed event. |
+| `clean/use-counter.ts` | [VueUse](https://github.com/vueuse/vueuse/blob/bed1dce149ce6760fec13d4798c047f51a563180/packages/shared/useCounter/index.ts#L54-L72) | MIT | `inc` and `dec` only, with sorted keys. |
+| `clean/use-search.ts` | [Vitesse](https://github.com/antfu-collective/vitesse/blob/a8785264f83c2ebe1b3cf689296775a4949957c8/src/stores/user.ts#L3-L11) | MIT | A composable with `computed` and `watch`, without Pinia. |
+| `fixable/counter-store.ts` | [Pinia](https://github.com/vuejs/pinia/blob/4817135a25431172d363bd928476db7cdbf875c4/packages/docs/core-concepts/index.md#L58-L70) | MIT | `count.value++`, which the fix writes as `count.value += 1`. |
+| `fixable/counter.test.ts` | [Vitesse](https://github.com/antfu-collective/vitesse/blob/a8785264f83c2ebe1b3cf689296775a4949957c8/test/component.test.ts#L1-L28) | MIT | One async test without `expect.hasAssertions()`, which the fix adds. |
+| `fixable/router.ts` | [Vue Router](https://github.com/vuejs/router/blob/1a944681c6b07cbe5e673a8eecfbbe8e6c1dc5b0/packages/router/e2e/scroll-restoration/index.ts#L46-L56) | MIT | One route record with unsorted keys, which the fix sorts. |
+| `modules/env.d.ts` | Written for Adamantite |  | The type of a `.vue` import, which a target project declares, because TypeScript cannot resolve one without it. |
+| `modules/home-view.vue` | Written for Adamantite |  | The component that the router and the async component import. |
+| `modules/test-counter.vue` | [Vitesse](https://github.com/antfu-collective/vitesse/blob/a8785264f83c2ebe1b3cf689296775a4949957c8/test/component.test.ts#L1-L28) | MIT | The counter component that the test mounts. |

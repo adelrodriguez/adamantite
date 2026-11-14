@@ -20,7 +20,11 @@ export const testFiles: string[] = [
 const plugins: OxlintConfig["plugins"] = ["jest"]
 
 const rules: OxlintConfig["rules"] = {
-  "jest/consistent-test-it": "error",
+  // TEMPORARY: The fix of the rule renames a test call, such as `test` to `it` in `describe`, but
+  // it does not change the import. The file then calls a function that it does not import. Turn the
+  // rule on again when an Oxlint release keeps the import:
+  // https://github.com/oxc-project/oxc/issues/29181
+  "jest/consistent-test-it": "off",
   "jest/expect-expect": "error",
   "jest/max-expects": "error",
   "jest/max-nested-describe": "error",

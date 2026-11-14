@@ -78,7 +78,8 @@ describe.each([
   },
 ])("$name preset", ({ moduleMock, name, preset, testImport }) => {
   const presetPath = JSON.stringify(join(REPO_ROOT, `presets/lint/${name}.ts`))
-  const test = `${testImport}\n\nit("adds", () => {\n  expect(1 + 1).toBe(2)\n})\n`
+  // `prefer-to-be` reports `toEqual(2)`, so the file has a report that the preset rules make.
+  const test = `${testImport}\n\nit("adds", () => {\n  expect(1 + 1).toEqual(2)\n})\n`
 
   it("report only test files when a config extends it", () => {
     const codes = lint(
@@ -111,7 +112,7 @@ describe.each([
       { "checks/math.ts": test, "src/script.ts": SCRIPT }
     )
 
-    expect(codes["checks/math.ts"]).toContain(`${name}(consistent-test-it)`)
+    expect(codes["checks/math.ts"]).toContain(`${name}(prefer-to-be)`)
     expect(codes["checks/math.ts"]).not.toContain(`${name}(require-top-level-describe)`)
     expect(codes["src/script.ts"]).toBeUndefined()
   })
@@ -154,7 +155,7 @@ describe.each([
     )
 
     expect(codes["src/math.test.ts"]).not.toContain(`${name}(require-top-level-describe)`)
-    expect(codes["src/math.test.ts"]).toContain(`${name}(consistent-test-it)`)
+    expect(codes["src/math.test.ts"]).toContain(`${name}(prefer-to-be)`)
   })
 
   // A describe title often names the class or function under test, such as `Calculator`.

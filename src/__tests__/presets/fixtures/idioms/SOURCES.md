@@ -112,6 +112,7 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | File | Source | License | Changes |
 | --- | --- | --- | --- |
 | `clean/sum.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-util/src/__tests__/isPromise.test.ts#L10-L17) | MIT | Vitest imports, a local `sum`, and one `it.each` table. |
+| `clean/table.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-util/src/__tests__/isPromise.test.ts#L10-L17) | MIT | Vitest imports of `test`, a local `sum`, and one `test.each` table in `describe`. |
 
 ## jest
 
@@ -119,6 +120,7 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | --- | --- | --- | --- |
 | `clean/calc.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/examples/typescript/__tests__/calc.test.ts#L17-L29) | MIT | One `toBe` assertion, with imports from `@jest/globals`. |
 | `clean/user.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/examples/async/__tests__/user.test.js#L21-L33) | MIT | `expect.hasAssertions()` and a resolved value in place of the request. |
+| `clean/table.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-util/src/__tests__/isPromise.test.ts#L10-L17) | MIT | Imports of `test` from `@jest/globals`, a local `sum`, and one `test.each` table in `describe`. |
 | `clean/utils.test.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/examples/typescript/__tests__/utils.test.ts#L3-L14) | MIT | A typed `jest.fn` that `beforeEach` resets. |
 | `fixable/equal.test.ts` | Written for Adamantite | | `toEqual(3)`, which two fixes write as `toBe(3)`. A known second pass. |
 

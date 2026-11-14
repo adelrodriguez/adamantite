@@ -18,7 +18,11 @@ const plugins: OxlintConfig["plugins"] = ["vitest"]
 
 const rules: OxlintConfig["rules"] = {
   "vitest/consistent-each-for": "error",
-  "vitest/consistent-test-it": "error",
+  // TEMPORARY: The fix of the rule renames a test call, such as `test` to `it` in `describe`, but
+  // it does not change the import. The file then calls a function that it does not import. Turn the
+  // rule on again when an Oxlint release keeps the import:
+  // https://github.com/oxc-project/oxc/issues/29181
+  "vitest/consistent-test-it": "off",
   "vitest/hoisted-apis-on-top": "error",
   "vitest/max-expects": "error",
   "vitest/max-nested-describe": "error",

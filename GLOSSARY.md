@@ -1,7 +1,8 @@
 # Adamantite
 
-Adamantite is an opinionated preset package and CLI for modern TypeScript projects. It
-applies and maintains code-quality tooling in a target project.
+Adamantite is an agent-first preset package and CLI for modern TypeScript codebases. It
+applies and maintains code-quality tooling in a target project, and gives coding agents the
+instructions to set up, repair, and update that project.
 
 ## Language
 

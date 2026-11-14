@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">💠 Adamantite</h1>
   <p align="center">
-    <strong>Opinionated code-quality tooling for modern TypeScript projects.</strong>
+    <strong>Agent-first presets that keep modern TypeScript codebases at high quality.</strong>
   </p>
 </p>
 
@@ -17,9 +17,10 @@
   </a>
 </p>
 
-Adamantite provides one CLI and a set of presets for linting, formatting, type checking,
-dependency analysis, and monorepo checks. It configures Oxlint, Oxfmt, TypeScript, Knip,
-and Sherif so humans and coding agents can use the same project workflow.
+Adamantite is an agent-first set of presets and a CLI that help coding agents write
+excellent code. It configures Oxlint, Oxfmt, TypeScript, Knip, and Sherif with strict
+standards that agents must follow, and it gives agents the instructions to set up, repair,
+and update the project.
 
 ---
 

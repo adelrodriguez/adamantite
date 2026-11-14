@@ -1,13 +1,38 @@
 # AGENTS.md
 
-Use ASD-STE100 Simplified Technical English for all communication.
-
 Before you explore or change code, read [GLOSSARY.md](GLOSSARY.md) and the relevant parts of
 [docs/architecture.md](docs/architecture.md). Use the project's domain language.
 
 Read [CODING_STANDARDS.md](CODING_STANDARDS.md) before you write or review code.
 
 For terminal output and interaction, read [DESIGN.md](DESIGN.md).
+
+## What is Adamantite
+
+Adamantite is an agent-first set of presets and a CLI that keep modern TypeScript codebases at
+high quality. Its purpose is to help coding agents write excellent code. Apply these principles
+to every change:
+
+- **Enforce strict standards.** Adamantite is highly opinionated. Its presets set high standards
+  that agents must follow, and a check fails when code breaks them.
+- **Embrace breaking changes.** Make the change that improves the standard, even when it breaks
+  target projects. Make the update easy for agents instead, with a Doctor finding that gives the
+  migration or a changeset that names the replacement.
+- **Instruct agents instead of building analysis.** Keep programmatic and static analysis in
+  setup and updates to a minimum. Give agents the guidance to do the work, as `doctor` and
+  `harden` do: each renders a prompt for an agent and does not repair the project itself. See
+  [ADR 0002](docs/adr/0002-doctor-instructs-agents-mutate.md) and
+  [ADR 0012](docs/adr/0012-harden-instructs-agents-to-write-rules.md). Design for the
+  capabilities that new agents gain.
+- **Tighten, do not loosen.** Move the presets toward stricter rules. Do not turn off a rule or
+  widen its options to make code pass.
+- **Make the tools work together.** Adamantite's value is that Oxlint, Oxfmt, TypeScript, Knip,
+  Sherif, and their plugins work as one toolchain. Focus tests on how the tools combine, such as
+  the stack tests that lint each fixture with every preset of its stack.
+- **Do not test what a tool already tests.** Do not write a test that only proves the behavior of
+  Oxlint, Knip, Effect, or another tool. Test Adamantite's configuration and its integrations.
+- **Use Effect to its maximum.** When Effect offers a module or an option for a task, use it
+  instead of a platform API or a custom helper.
 
 ## Agent skills
 

@@ -1183,6 +1183,29 @@ describe("github", () => {
         })
     )
 
+    // The project can indent its jobs with a width that is not the width of the template.
+    it.effect("rewrite a managed block whose jobs have four-space indentation", () =>
+      Effect.gen(function* () {
+        const [top = "", jobs = ""] = `${yield* generateWorkflow(["check"])}${PROJECT_JOB}`.split(
+          "jobs:\n"
+        )
+
+        const files = makeFiles({
+          [WORKFLOW_PATH]: `${top}jobs:\n${jobs.replaceAll(/^(?=.)/gmu, "  ")}`,
+        })
+
+        const result = yield* github
+          .update(ROOT, { packageManager: "pnpm", scripts: ["check", "analyze"] })
+          .pipe(provideFallback(files))
+
+        expect(result).toBe("updated")
+        // The project's job is still a job, not a key of the managed job.
+        expect(Yaml.parse(files.read(WORKFLOW_PATH))).toStrictEqual(
+          Yaml.parse(`${yield* generateWorkflow(["check", "analyze"])}${PROJECT_JOB}`)
+        )
+      })
+    )
+
     it.effect("rewrite a generated workflow after the Node.js version source changes", () =>
       Effect.gen(function* () {
         const files = makeFiles({ ".nvmrc": "24\n" })

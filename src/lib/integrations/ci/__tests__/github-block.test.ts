@@ -123,4 +123,45 @@ describe("replaceBlock", () => {
       expect(replaceBlock(block, block.body)).toBe(content)
     }
   })
+
+  // The new jobs must stay siblings of the project's jobs, or YAML reads a project job as a key of
+  // a managed job.
+  it.each([
+    {
+      content: lines(
+        HEADER,
+        [`    ${START_MARKER}`, "    verify:", "        runs-on: ubuntu-latest", `    ${END_MARKER}`],
+        ["    e2e:", "        runs-on: ubuntu-latest", ""]
+      ),
+      expected: lines(
+        HEADER,
+        [`    ${START_MARKER}`, "    check:", "      runs-on: macos-latest", `    ${END_MARKER}`],
+        ["    e2e:", "        runs-on: ubuntu-latest", ""]
+      ),
+      name: "the jobs that they replace",
+    },
+    {
+      content: lines(HEADER, [`    ${START_MARKER}`, `    ${END_MARKER}`], ["    e2e: {}", ""]),
+      expected: lines(
+        HEADER,
+        [`    ${START_MARKER}`, "    check:", "      runs-on: macos-latest", `    ${END_MARKER}`],
+        ["    e2e: {}", ""]
+      ),
+      name: "the start marker, when the block is empty",
+    },
+    {
+      content: lines(HEADER, [START_MARKER], MANAGED_JOB, [END_MARKER], PROJECT_JOB, [""]),
+      expected: lines(
+        HEADER,
+        [START_MARKER, "  check:", "    runs-on: macos-latest", END_MARKER],
+        PROJECT_JOB,
+        [""]
+      ),
+      name: "the jobs that they replace, not of a start marker with a different indentation",
+    },
+  ])("give the new jobs the indentation of $name", ({ content, expected }) => {
+    expect(replaceBlock(readValidBlock(content), "  check:\n    runs-on: macos-latest")).toBe(
+      expected
+    )
+  })
 })

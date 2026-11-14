@@ -438,15 +438,15 @@ So a setting in your top-level `rules` has no effect on a rule that a preset set
 for the files of that override. Oxlint does not tell you that the setting has no effect. These
 presets set rules in an override:
 
-| Preset           | Files                                                     | Rules                                                                                                                                                                        |
-| ---------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`           | `**/*.{ts,tsx,mts,cts}`                                   | `no-redeclare`                                                                                                                                                               |
-| `core`           | `**/*.d.{ts,mts,cts}` and `**/*.{astro,vue,svelte}`       | `import/unambiguous`                                                                                                                                                         |
-| `core`           | `**/*.{js,jsx,mjs,cjs}`                                   | `jsdoc/check-tag-names`                                                                                                                                                      |
-| `strict`         | `**/*.d.{ts,mts,cts}`                                     | `anti-slop/no-object-parameters`, `anti-slop/no-unknown-parameters`, `anti-slop/no-unknown-returns`, and `anti-slop/no-unsafe-dictionary-type`                               |
-| `strict`         | `**/*.{test,spec}.{ts,tsx,mts,cts}` and `**/__tests__/**` | `anti-slop/no-chained-type-assertions`, `anti-slop/no-widen-then-assert`, `anti-slop/require-safety-comment-for-type-assertion`, and `typescript/consistent-type-assertions` |
-| `tailwind`       | `**/components/ui/**`                                     | `shadcn/no-arbitrary-values`, `shadcn/no-restyle`, and `shadcn/require-static-classes`                                                                                       |
-| `jest`, `vitest` | The preset's `testFiles`                                  | All rules of the preset. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                    |
+| Preset           | Files                                                     | Rules                                                                                                                                                                     |
+| ---------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`           | `**/*.{ts,tsx,mts,cts}`                                   | `no-redeclare`                                                                                                                                                            |
+| `core`           | `**/*.d.{ts,mts,cts}` and `**/*.{astro,vue,svelte}`       | `import/unambiguous`                                                                                                                                                      |
+| `core`           | `**/*.{js,jsx,mjs,cjs}`                                   | `jsdoc/check-tag-names`                                                                                                                                                   |
+| `strict`         | `**/*.d.{ts,mts,cts}`                                     | `antislop/no-object-parameters`, `antislop/no-unknown-parameters`, `antislop/no-unknown-returns`, and `antislop/no-unsafe-dictionary-type`                                |
+| `strict`         | `**/*.{test,spec}.{ts,tsx,mts,cts}` and `**/__tests__/**` | `antislop/no-chained-type-assertions`, `antislop/no-widen-then-assert`, `antislop/require-safety-comment-for-type-assertion`, and `typescript/consistent-type-assertions` |
+| `tailwind`       | `**/components/ui/**`                                     | `shadcn/no-arbitrary-values`, `shadcn/no-restyle`, and `shadcn/require-static-classes`                                                                                    |
+| `jest`, `vitest` | The preset's `testFiles`                                  | All rules of the preset. See [the jest and vitest presets](#the-jest-and-vitest-presets).                                                                                 |
 
 To change one of these rules for these files, set it in an `overrides` entry of your config with
 the same files. For example, this config turns off the `SAFETY:` comment rule of strict in test
@@ -463,7 +463,7 @@ export default defineConfig({
   overrides: [
     {
       files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"],
-      rules: { "anti-slop/require-safety-comment-for-type-assertion": "off" },
+      rules: { "antislop/require-safety-comment-for-type-assertion": "off" },
     },
   ],
 })
@@ -670,9 +670,9 @@ simpler replacement (`catch-all-to-map-error`). The rules come from
 [@effect/tsgo](https://github.com/Effect-TS/tsgo), the Effect Language Service for
 TypeScript-Go, and need Oxlint's type-aware mode.
 
-The preset also turns on the rules of the `anti-slop-effect` plugin. The rules started as a copy of
-[anti-slop](https://github.com/dmmulroy/anti-slop), and Adamantite now maintains them under the same
-`anti-slop-effect/*` names, so nothing extra needs to be installed. The rules report tagged values
+The preset also turns on the rules of the `antislop-effect` plugin. The rules started as a copy of
+[anti-slop](https://github.com/dmmulroy/anti-slop), and Adamantite now maintains them under its
+`antislop-effect/*` names, so nothing extra needs to be installed. The rules report tagged values
 that code handles by hand:
 
 - `no-manual-tagged-construction` reports an object literal with a `_tag`. Use a tagged class,
@@ -825,7 +825,7 @@ You can also select it during setup with
 `adamantite/lint/strict` holds framework-neutral opinions. Use it with any other preset.
 It needs no extra package. Most of its type rules started as
 [anti-slop](https://github.com/dmmulroy/anti-slop) rules, which Adamantite now maintains under the
-same `anti-slop/*` names.
+`antislop/*` names.
 
 - `adamantite/no-overzealous-destructuring` reports destructuring patterns nested more than
   `maxDepth` levels deep (default 2), such as `const { data: { user: { name } } } = query`,
@@ -840,18 +840,18 @@ same `anti-slop/*` names.
   comment that names no rule is reported by the core preset's `unicorn/no-abusive-eslint-disable`.
 - `no-warning-comments` reports a comment that starts with `TODO`, `FIXME`, `XXX`, or `HACK`.
   Fix the code now, or track the work in your issue tracker. Do not only rename the marker.
-- The anti-slop rules ask the code to decode input at its boundary into types that it owns.
+- The antislop rules ask the code to decode input at its boundary into types that it owns.
   They report `unknown` in function signatures and type aliases, loose dictionary types, a
   `typeof` check outside a type predicate, `Reflect.get` and `Reflect.apply`, and Vitest or Jest
   module mocks. They also report adjacent `filter` and `map` passes, a `reduce` that copies its
   accumulator, `shape` in symbol names, and a missing blank line between statement groups.
-- `anti-slop/no-unsafe-dictionary-type` reports a named dictionary such as
+- `antislop/no-unsafe-dictionary-type` reports a named dictionary such as
   `Record<string, unknown>` at its declaration, not at each use. Some types accept open fields on
   purpose, such as the fields that each caller adds to a log event. Name that field bag once, and
   suppress the rule at its declaration with a reason:
 
   ```ts
-  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- each caller adds its own log fields
+  // oxlint-disable-next-line antislop/no-unsafe-dictionary-type -- each caller adds its own log fields
   type LogFields = Record<string, unknown>
 
   export type Logger = {
@@ -860,24 +860,24 @@ same `anti-slop/*` names.
   }
   ```
 
-- `anti-slop/require-readable-spacing` adds blank lines around a statement that spans several
+- `antislop/require-readable-spacing` adds blank lines around a statement that spans several
   lines. `adamantite fix` runs lint before Oxfmt, so the rule also counts a one-line statement
   that ends past column 100 as multiline, because Oxfmt wraps it. A line that Oxfmt cannot
   wrap, such as a long template literal, also gets blank lines. If your Oxfmt config sets
   another `printWidth`, set the rule's `printWidth` option to the same value.
-- In test files, where type assertions are allowed, `anti-slop/require-safety-comment-for-type-assertion`
-  requires a `SAFETY:` comment on each assertion, and `anti-slop/no-chained-type-assertions` and
-  `anti-slop/no-widen-then-assert` report assertions that hide the source type. Outside tests,
+- In test files, where type assertions are allowed, `antislop/require-safety-comment-for-type-assertion`
+  requires a `SAFETY:` comment on each assertion, and `antislop/no-chained-type-assertions` and
+  `antislop/no-widen-then-assert` report assertions that hide the source type. Outside tests,
   `typescript/consistent-type-assertions` is the only rule that reports an assertion. To change
   one of these rules in test files, use an `overrides` entry. See
   [change a rule that a preset sets for some files](#change-a-rule-that-a-preset-sets-for-some-files).
-- In declaration files (`*.d.ts`), the preset turns off `anti-slop/no-unknown-parameters`,
-  `anti-slop/no-unknown-returns`, `anti-slop/no-object-parameters`, and
-  `anti-slop/no-unsafe-dictionary-type`. A declaration file states the types of code that it does
+- In declaration files (`*.d.ts`), the preset turns off `antislop/no-unknown-parameters`,
+  `antislop/no-unknown-returns`, `antislop/no-object-parameters`, and
+  `antislop/no-unsafe-dictionary-type`. A declaration file states the types of code that it does
   not hold, such as a built-in API or a package without types. To turn one of these rules on in
   declaration files, use an `overrides` entry.
 - The preset turns off the core preset's `typescript/consistent-indexed-object-style` and
-  `unicorn/no-immediate-mutation`, which conflict with `anti-slop/no-known-value-widening`.
+  `unicorn/no-immediate-mutation`, which conflict with `antislop/no-known-value-widening`.
 - The help of three core rules recommends a form that strict reports. `typescript/no-explicit-any`
   recommends `unknown`, `typescript/no-wrapper-object-types` recommends `object` and its autofix
   writes it, and `unicorn/no-instanceof-builtins` recommends `typeof`. The help belongs to the
@@ -898,7 +898,7 @@ export default defineConfig({
   ignorePatterns: core.ignorePatterns,
   rules: {
     "adamantite/no-overzealous-destructuring": ["error", { maxDepth: 1, maxProperties: 3 }],
-    "anti-slop/require-readable-spacing": ["error", { printWidth: 120 }],
+    "antislop/require-readable-spacing": ["error", { printWidth: 120 }],
   },
 })
 ```

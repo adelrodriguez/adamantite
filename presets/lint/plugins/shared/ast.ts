@@ -1,6 +1,6 @@
 import type { ESTree } from "@oxlint/plugins"
 
-// AST helpers that the adamantite plugin and both anti-slop plugins share. Rule code runs under the
+// AST helpers that the adamantite plugin and both antislop plugins share. Rule code runs under the
 // runtime that executes Oxlint in the target project, so this module imports only types.
 
 /**

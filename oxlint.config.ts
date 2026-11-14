@@ -154,7 +154,7 @@ export default defineConfig({
               shared: { imports: [] },
             },
           },
-          "anti-slop": {
+          antislop: {
             entries: ["index.ts"],
             imports: ["shared"],
             layers: {
@@ -163,7 +163,7 @@ export default defineConfig({
               stylistic: { imports: [] },
             },
           },
-          "anti-slop-effect": {
+          "antislop-effect": {
             entries: ["index.ts"],
             imports: ["shared"],
             layers: {

@@ -94,6 +94,11 @@ target project. A later Doctor run confirms whether the project reached the goal
 Tooling config generators produce only the current setup for `init` and Doctor reference
 content. They do not convert existing configs or generate patches.
 
+Doctor also lists the files that Oxlint lints and reads their suppression comments. The shared
+comment reader is in `workspace/suppressions.ts`, and the shared Oxlint process operations are in
+`integrations/tooling/oxlint/files.ts`. Config discovery keeps the source of each local module
+that it reaches, so the rule migration can read config keys without executing project code.
+
 An assessment reads the target project one time. `readProject` in `src/lib/workspace/project.ts`
 reads `package.json`, the workspace packages, the root `oxlint.config.ts`, and the custom rules
 that the Oxlint configs load, and each integration's `assess` takes that `Project`. A `Project`
@@ -147,7 +152,7 @@ writing files. See ADR 0023.
   `check` fails on Oxlint warnings unless `--allow-warnings` is set. See ADR 0018, ADR 0019,
   and ADR 0022.
 - `fix` fixes lint issues, then formats. Lint runs before Oxfmt wraps long lines, so
-  `anti-slop/require-readable-spacing` counts a line past its `printWidth` option as multiline and
+  `antislop/require-readable-spacing` counts a line past its `printWidth` option as multiline and
   adds the blank lines that the wrapped statement needs. `--only` runs one stage. Oxlint applies
   one pass of fixes, so a fix that causes a new fixable report still needs a second `fix`.
   `src/__tests__/presets/fix.test.ts` marks that case as an expected failure until Oxlint repeats
@@ -205,8 +210,8 @@ presets/
       entry.ts      the jsPlugins entry of each plugin, for the presets
       shared/       helpers that more than one plugin uses
       adamantite/   the adamantite rules
-      anti-slop/    the anti-slop rules of the strict preset
-      anti-slop-effect/ the anti-slop-effect rules of the effect preset
+      antislop/    the antislop rules of the strict preset
+      antislop-effect/ the antislop-effect rules of the effect preset
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
   format.ts         published Oxfmt preset
@@ -326,7 +331,7 @@ package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through 
 ## First-party plugins
 
 Adamantite has three Oxlint plugins of its own under `presets/lint/plugins/`: `adamantite`,
-`anti-slop`, and `anti-slop-effect`. Each plugin has one folder, and the folder name is the rule
+`antislop`, and `antislop-effect`. Each plugin has one folder, and the folder name is the rule
 namespace, the `meta.name` of the plugin, and the name of its fixture folder. In a plugin folder,
 `index.ts` registers the rules, `rules/` holds one module for each rule, and `shared/` holds the
 helpers that only this plugin uses. `adamantite/shared/imports.ts`, for example, finds calls of
@@ -338,11 +343,11 @@ when a second plugin needs it.
 
 The layer map for `presets/lint/plugins` in the repository's `oxlint.config.ts` lets each plugin
 import `plugins/shared`, and rejects an import of another plugin's code. Each plugin has its own
-map below it: `index.ts` is the entry, and `rules` imports `shared`. In `anti-slop`, `rules` also
+map below it: `index.ts` is the entry, and `rules` imports `shared`. In `antislop`, `rules` also
 imports `stylistic`.
 
 A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
-such as `firstPartyPlugin("anti-slop")`. The function builds a file URL from its own location.
+such as `firstPartyPlugin("antislop")`. The function builds a file URL from its own location.
 The source tree has `<name>/index.ts` and the dist tree has `<name>/index.js`, so it takes the
 extension from its own module URL. Its parameter type accepts only the three namespaces.
 `entry.ts` imports no plugin code, so a preset loads no rule module.
@@ -360,7 +365,7 @@ source plugin.
 Each rule has a `RuleTester` test under `src/__tests__/plugins/<namespace>/<rule>.test.ts` for
 messages, locations, and options, and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
-Oxlint run. Each fixture file holds one case. The namespace folder, such as `anti-slop`, lets one
+Oxlint run. Each fixture file holds one case. The namespace folder, such as `antislop`, lets one
 preset hold fixtures for several plugins. The harness in `src/__tests__/presets/rule-fixtures.ts`
 starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the effect preset loads the
 Effect build of Oxlint.
@@ -380,13 +385,12 @@ rule of core that a preset changes has fixtures under
 a result that differs from the result of core alone, so the test fails when the change has no
 effect.
 
-The rules in `presets/lint/plugins/anti-slop/` ship in the `strict` preset, and the rules in
-`presets/lint/plugins/anti-slop-effect/` ship in the `effect` preset. Both plugins keep the name
-of the upstream code. Both started as a copy of
-[anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`, so project settings and
-suppressions that name their rules keep working. Their rules follow the same conventions as the
+The rules in `presets/lint/plugins/antislop/` ship in the `strict` preset, and the rules in
+`presets/lint/plugins/antislop-effect/` ship in the `effect` preset. Both plugins use Adamantite's spelling. Both started as a copy of
+[anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Doctor reports old rule names
+in project settings and suppression comments, with their replacements. See ADR 0030. Their rules follow the same conventions as the
 `adamantite` rules. `src/__tests__/presets/require-readable-spacing.test.ts` runs the spacing fix
-through the Oxlint CLI twice. Each `license.md`, and `anti-slop/stylistic/license.md`, keeps the MIT notice of the
+through the Oxlint CLI twice. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
 copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
 ship. Adamantite shipped both plugins as vendored bundles before. ADR 0027 records why they moved.

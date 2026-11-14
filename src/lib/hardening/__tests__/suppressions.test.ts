@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { findSuppressions } from "#lib/hardening/suppressions.ts"
+import { findSuppressions } from "#lib/workspace/suppressions.ts"
 
 describe("findSuppressions", () => {
   it("read the rules and the line of each disable comment, without the reason", () => {

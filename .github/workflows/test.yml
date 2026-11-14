@@ -55,11 +55,11 @@ jobs:
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import strict from "adamantite/lint/strict"' '' 'export default defineConfig({ extends: [strict] })' > oxlint.config.ts
           printf '%s\n' 'export const value: number = Reflect.get({ count: 1 }, "count")' > bad.ts
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.ts > oxlint-output.txt 2>&1; then
-            echo "Expected anti-slop diagnostics from the packaged strict preset to fail the lint run"
+            echo "Expected antislop diagnostics from the packaged strict preset to fail the lint run"
             cat oxlint-output.txt
             exit 1
           fi
-          grep "anti-slop(no-reflect-get)" oxlint-output.txt
+          grep "antislop(no-reflect-get)" oxlint-output.txt
           printf '%s\n' 'import { defineConfig } from "oxlint"' 'import reactStrict from "adamantite/lint/react-strict"' '' 'export default defineConfig({ extends: [reactStrict] })' > oxlint.config.ts
           printf '%s\n' 'import { useState } from "react"' '' 'export const Counter = () => useState(0)[0]' > bad.tsx
           if ./node_modules/.bin/oxlint -c oxlint.config.ts bad.tsx > oxlint-output.txt 2>&1; then

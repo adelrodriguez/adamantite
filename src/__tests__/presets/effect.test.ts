@@ -9,7 +9,7 @@ import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import effect from "#presets/lint/effect.ts"
-import antislopEffectPlugin from "#presets/lint/plugins/anti-slop-effect/index.ts"
+import antislopEffectPlugin from "#presets/lint/plugins/antislop-effect/index.ts"
 import {
   lintRuleFixtures,
   listFixtureRules,
@@ -19,7 +19,7 @@ import {
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const NAMESPACE = "effecttsgo"
-const ANTISLOP_NAMESPACE = "anti-slop-effect"
+const ANTISLOP_NAMESPACE = "antislop-effect"
 const FIXTURES_DIR = join(import.meta.dirname, "fixtures/effect")
 const CATEGORY_PRESETS = ["correctness", "antipattern", "effect-native", "style"] as const
 
@@ -281,8 +281,8 @@ describe("effect preset", () => {
   })
 })
 
-describe("effect preset anti-slop rules", () => {
-  it("enable exactly the rules the anti-slop-effect plugin defines", () => {
+describe("effect preset antislop rules", () => {
+  it("enable exactly the rules the antislop-effect plugin defines", () => {
     expect(new Set(antislopPresetRules)).toStrictEqual(
       new Set(Object.keys(antislopEffectPlugin.rules))
     )
@@ -298,7 +298,7 @@ describe("effect preset anti-slop rules", () => {
   })
 })
 
-describe("effect preset anti-slop rule fixtures", () => {
+describe("effect preset antislop rule fixtures", () => {
   let cases: RuleFixtureCase[]
 
   beforeAll(() => {

@@ -1,5 +1,7 @@
 # Adamantite owns the anti-slop rules
 
+> [ADR 0030](0030-antislop-rule-namespaces.md) replaces the rule namespace decision below.
+
 Each first-party plugin now has a folder with the name of its rule namespace. Read
 `presets/lint/plugin/antislop/` below as `presets/lint/plugins/anti-slop/`, and
 `presets/lint/plugin/antislop-effect/` as `presets/lint/plugins/anti-slop-effect/`. The tests are

@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 // RuleTester checks each fix once. This test runs the fix through the Oxlint CLI on several files,
 // and checks that a second fix changes nothing.
 const REPO_ROOT = join(import.meta.dirname, "../../..")
-const PLUGIN = join(REPO_ROOT, "presets/lint/plugins/anti-slop/index.ts")
+const PLUGIN = join(REPO_ROOT, "presets/lint/plugins/antislop/index.ts")
 
 let probeRoot: string
 
@@ -26,7 +26,7 @@ function readProbe() {
   return ["first.ts", "second.ts"].map((file) => readFileSync(join(probeRoot, file), "utf8"))
 }
 
-describe("anti-slop/require-readable-spacing through the Oxlint CLI", () => {
+describe("antislop/require-readable-spacing through the Oxlint CLI", () => {
   beforeEach(() => {
     probeRoot = mkdtempSync(join(tmpdir(), "adamantite-readable-spacing-"))
     // The Oxlint entry resolves Oxlint from the project that it lints.
@@ -34,8 +34,8 @@ describe("anti-slop/require-readable-spacing through the Oxlint CLI", () => {
     writeFileSync(
       join(probeRoot, "oxlint.json"),
       JSON.stringify({
-        jsPlugins: [{ name: "anti-slop", specifier: PLUGIN }],
-        rules: { "anti-slop/require-readable-spacing": "error" },
+        jsPlugins: [{ name: "antislop", specifier: PLUGIN }],
+        rules: { "antislop/require-readable-spacing": "error" },
       })
     )
     writeFileSync(

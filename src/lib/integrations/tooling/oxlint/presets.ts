@@ -110,6 +110,11 @@ export const LINT_PRESETS = lintPresets.map((preset) => preset.name)
 /**
  * Presets that Adamantite no longer publishes, in the order that Doctor reports them.
  */
+export const RETIRED_RULE_NAMESPACES = {
+  "anti-slop": "antislop",
+  "anti-slop-effect": "antislop-effect",
+} as const
+
 export const RETIRED_LINT_PRESETS = ["shadcn", "react-doctor", "antislop"] as const
 
 export type RetiredLintPreset = (typeof RETIRED_LINT_PRESETS)[number]

@@ -195,7 +195,7 @@ describe.each([
       { "src/load.test.ts": moduleMock.join("\n") }
     )
 
-    expect(codes["src/load.test.ts"]).toStrictEqual(["anti-slop(no-module-mocking)"])
+    expect(codes["src/load.test.ts"]).toStrictEqual(["antislop(no-module-mocking)"])
   })
 
   it("expose its plugins and rules only to JavaScript", () => {

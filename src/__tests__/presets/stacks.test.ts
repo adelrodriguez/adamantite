@@ -52,27 +52,27 @@ const TREES: readonly FixtureTree[] = [
   {
     knownReports: [
       {
-        file: "anti-slop/no-chained-type-assertions/valid/outside-tests.ts",
+        file: "antislop/no-chained-type-assertions/valid/outside-tests.ts",
         reason: OUTSIDE_TESTS,
         rule: "typescript/consistent-type-assertions",
       },
       {
-        file: "anti-slop/no-widen-then-assert/valid/outside-tests.ts",
+        file: "antislop/no-widen-then-assert/valid/outside-tests.ts",
         reason: OUTSIDE_TESTS,
         rule: "typescript/consistent-type-assertions",
       },
       {
-        file: "anti-slop/no-widen-then-assert/valid/outside-tests.ts",
+        file: "antislop/no-widen-then-assert/valid/outside-tests.ts",
         reason: "The assertion needs a widened value, which this rule reports in each file.",
-        rule: "anti-slop/no-known-value-widening",
+        rule: "antislop/no-known-value-widening",
       },
       {
-        file: "anti-slop/require-safety-comment-for-type-assertion/valid/outside-tests.ts",
+        file: "antislop/require-safety-comment-for-type-assertion/valid/outside-tests.ts",
         reason: OUTSIDE_TESTS,
         rule: "typescript/consistent-type-assertions",
       },
       {
-        file: "anti-slop/no-unknown-parameters/valid/then-rejection-callback.ts",
+        file: "antislop/no-unknown-parameters/valid/then-rejection-callback.ts",
         reason:
           "Since Oxlint 1.93, core's promise/prefer-catch reports the rejection callback of then(), as eslint-plugin-promise does. The fixture proves that the strict rule accepts it where a project allows then(). catch-callback.ts proves the catch() form.",
         rule: "promise/prefer-catch",

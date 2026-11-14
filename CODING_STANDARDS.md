@@ -148,10 +148,12 @@ Effect.gen(function* () {
 ### Preserve explicit project choices when defaults change
 
 Preserve a target project's explicit optional setup when changing a generated default. A default
-defines fresh setup, and does not remove a user's opt-in.
+defines fresh setup, and does not remove a user's opt-in. Text that Adamantite owns, such as a
+managed block, is not a project choice. Adamantite replaces it, and the project puts its own
+setup outside it.
 
 Spot it: Regenerating a file removes a manually added step, such as a `rule test` step, or another
-setting that the project changed.
+setting that the project changed, from text that Adamantite does not own.
 
 ```ts
 // Avoid: regenerating an existing workflow without inspecting its content.
@@ -159,9 +161,13 @@ Effect.gen(function* () {
   yield* writeWorkflow(cwd, options)
 })
 
-// Prefer: github.update rewrites only a managed block that Adamantite generated.
+// Prefer: github.update replaces only the managed block, and keeps the rest of the file.
 Effect.gen(function* () {
-  if (!checkIsGeneratedBody(state.block.body)) {
+  if (
+    workflow === null
+    || state instanceof MalformedWorkflow
+    || state instanceof LegacyWorkflow
+  ) {
     return "kept" as const
   }
   yield* writeFile(path.join(cwd, state.path), replaceBlock(state.block, body))
@@ -169,11 +175,14 @@ Effect.gen(function* () {
 })
 ```
 
-The [GitHub integration](src/lib/integrations/ci/github.ts) keeps any managed block that differs
-from every block it can generate, and `init` points to `adamantite doctor`.
+The [GitHub integration](src/lib/integrations/ci/github.ts) replaces only the managed block, and
+keeps a legacy workflow, which has no border between Adamantite text and project text. `init`
+points to `adamantite doctor` for a kept workflow.
 [PR #636](https://github.com/adelrodriguez/adamantite/pull/636) fixed the repeated-init path after
 review found that it removed the optional test step. A later audit found that the fix matched only
 the literal `adamantite rule test` command, so other edits were still lost.
+[PR #872](https://github.com/adelrodriguez/adamantite/pull/872) made `update` replace the managed
+block on each run, so a template change reaches every project.
 
 ### Keep shared editor commands relative to the workspace
 

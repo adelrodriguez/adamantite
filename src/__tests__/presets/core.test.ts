@@ -220,17 +220,49 @@ describe("core preset", () => {
     expect(codes).toStrictEqual([])
   })
 
-  // `eslint/no-empty-function` reports `() => {}`, and `eslint/array-callback-return` and
-  // `eslint/no-useless-return` report a bare `return` in a `map` callback. Core must accept the
-  // explicit `undefined` that these rules need.
-  it("accept an explicit undefined where another core rule needs a value", () => {
+  // Keep required arguments and expression bodies. A block callback declares its optional result
+  // so `no-useless-undefined` preserves the return that `array-callback-return` needs.
+  it("accept required undefined arguments and explicit callback results", () => {
     const codes = lint(
       "index.ts",
       [
         "declare function use(callback: () => undefined): void",
+        "declare function consume(value: undefined): void",
         "declare const flags: boolean[]",
         "",
+        "consume(undefined)",
         "use(() => undefined)",
+        "",
+        "export const expression = flags.map((flag) => flag ? 1 : undefined)",
+        "",
+        "export const mapped = flags.map((flag): number | undefined => {",
+        "  if (flag) {",
+        "    return 1",
+        "  }",
+        "",
+        "  return undefined",
+        "})",
+        "",
+      ].join("\n")
+    )
+
+    expect(codes).toStrictEqual([])
+  })
+
+  it("report a redundant undefined yield", () => {
+    const codes = lint(
+      "index.ts",
+      ["export function* values() {", "  yield undefined", "}", ""].join("\n")
+    )
+
+    expect(codes).toStrictEqual(["unicorn(no-useless-undefined)"])
+  })
+
+  it("report an unannotated explicit undefined return", () => {
+    const codes = lint(
+      "index.ts",
+      [
+        "declare const flags: boolean[]",
         "",
         "export const mapped = flags.map((flag) => {",
         "  if (flag) {",
@@ -243,7 +275,18 @@ describe("core preset", () => {
       ].join("\n")
     )
 
-    expect(codes).toStrictEqual([])
+    expect(codes).toStrictEqual(["unicorn(no-useless-undefined)"])
+  })
+
+  it.each([
+    ["export const empty = () => {}", "eslint(no-empty-function)"],
+    [
+      "export const mapped = [1].map((value) => { console.info(value) })",
+      "eslint(array-callback-return)",
+    ],
+    ["export function noop() { return }", "eslint(no-useless-return)"],
+  ])("report invalid callback or return code: %s", (source, code) => {
+    expect(lint("index.ts", `${source}\n`)).toContain(code)
   })
 
   // `typescript/no-non-null-assertion` bans `maybe!`, so core must not tell the author to write it.

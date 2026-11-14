@@ -163,11 +163,7 @@ Effect.gen(function* () {
 
 // Prefer: github.update replaces only the managed block, and keeps the rest of the file.
 Effect.gen(function* () {
-  if (
-    workflow === null
-    || state instanceof MalformedWorkflow
-    || state instanceof LegacyWorkflow
-  ) {
+  if (workflow === null || state instanceof MalformedWorkflow || state instanceof LegacyWorkflow) {
     return "kept" as const
   }
   yield* writeFile(path.join(cwd, state.path), replaceBlock(state.block, body))

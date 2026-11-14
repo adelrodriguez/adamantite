@@ -32,7 +32,11 @@ export interface ModelFixtureOptions {
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(
-    Schema.Struct({ code: Schema.optional(Schema.String), filename: Schema.String })
+    Schema.Struct({
+      code: Schema.optional(Schema.String),
+      filename: Schema.String,
+      message: Schema.String,
+    })
   ),
 })
 
@@ -45,10 +49,22 @@ function listSourceFiles(dir: string): string[] {
 }
 
 /**
- * Lint one model in a real Oxlint run through the architecture preset, and return the files that
- * the rule reported.
+ * One report of the rule, with the file relative to the model.
  */
-function lintModel(options: ModelFixtureOptions, tempDir: string, model: string): Set<string> {
+export interface ModelReport {
+  readonly filename: string
+  readonly message: string
+}
+
+/**
+ * Lint one model in a real Oxlint run through the architecture preset, from a copy in `tempDir`,
+ * and return the reports of the rule.
+ */
+export function lintModel(
+  options: ModelFixtureOptions,
+  tempDir: string,
+  model: string
+): ModelReport[] {
   const projectDir = join(tempDir, model)
 
   cpSync(join(options.fixturesDir, model), projectDir, { recursive: true })
@@ -90,11 +106,12 @@ function lintModel(options: ModelFixtureOptions, tempDir: string, model: string)
     })
   }
 
-  return new Set(
-    output.diagnostics
-      .filter((diagnostic) => diagnostic.code === options.ruleCode)
-      .map((diagnostic) => diagnostic.filename.split(sep).join("/"))
-  )
+  return output.diagnostics
+    .filter((diagnostic) => diagnostic.code === options.ruleCode)
+    .map((diagnostic) => ({
+      filename: diagnostic.filename.split(sep).join("/"),
+      message: diagnostic.message,
+    }))
 }
 
 /**
@@ -107,7 +124,9 @@ export function describeModelFixtures(options: ModelFixtureOptions): void {
 
   beforeAll(() => {
     for (const model of models) {
-      reported.set(model, lintModel(options, tempDir, model))
+      const reports = lintModel(options, tempDir, model)
+
+      reported.set(model, new Set(reports.map((report) => report.filename)))
     }
   })
 

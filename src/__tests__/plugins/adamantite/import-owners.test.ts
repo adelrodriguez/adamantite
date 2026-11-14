@@ -15,13 +15,23 @@ RuleTester.itOnly = it.only
 
 // Every file is in the project at `/project`, and no import resolves. The fixture tests cover the
 // real workspace lookup and the resolution of project modules.
-const rule = createImportOwnersRule({ findRoot: () => "/project", resolve: constUndefined })
+const rule = createImportOwnersRule({
+  findRoot: () => ({ kind: "workspace", path: "/project" }),
+  resolve: constUndefined,
+})
 
 const tester = new RuleTester({
   languageOptions: { parserOptions: { lang: "tsx" }, sourceType: "module" },
 })
 
-const HINT = "Owners: the `adamantite/import-owners` options in the Oxlint config."
+function hint(index: number) {
+  return `Owners: the \`adamantite/import-owners\` options in the Oxlint config at \`options[${index}]\`. Owner paths are relative to the workspace root.`
+}
+
+const HINT = hint(0)
+
+// The message data that every report carries for the first option.
+const ANCHOR = { configPath: "options[0]", root: "workspace root" }
 
 const GIGET = { import: "giget", owners: ["src/lib/sources/repository/fetch.ts"] }
 const ZOD = { import: "zod", owners: ["packages/utils"] }
@@ -119,7 +129,7 @@ tester.run("import-owners", rule, {
       code: 'import { Alert as NativeAlert } from "react-native"',
       errors: [
         {
-          data: { import: "react-native", name: "Alert", owners: ALERT_OWNERS },
+          data: { ...ANCHOR, import: "react-native", name: "Alert", owners: ALERT_OWNERS },
           messageId: "name",
         },
       ],
@@ -130,7 +140,7 @@ tester.run("import-owners", rule, {
       code: 'export { Alert } from "react-native"',
       errors: [
         {
-          data: { import: "react-native", name: "Alert", owners: ALERT_OWNERS },
+          data: { ...ANCHOR, import: "react-native", name: "Alert", owners: ALERT_OWNERS },
           messageId: "name",
         },
       ],
@@ -157,7 +167,7 @@ tester.run("import-owners", rule, {
       code: 'type NativeAlert = import("react-native").Alert',
       errors: [
         {
-          data: { import: "react-native", name: "Alert", owners: ALERT_OWNERS },
+          data: { ...ANCHOR, import: "react-native", name: "Alert", owners: ALERT_OWNERS },
           messageId: "name",
         },
       ],
@@ -168,7 +178,7 @@ tester.run("import-owners", rule, {
       code: 'type Static = import("react-native").Alert.AlertStatic',
       errors: [
         {
-          data: { import: "react-native", name: "Alert", owners: ALERT_OWNERS },
+          data: { ...ANCHOR, import: "react-native", name: "Alert", owners: ALERT_OWNERS },
           messageId: "name",
         },
       ],
@@ -192,7 +202,7 @@ tester.run("import-owners", rule, {
       code: 'import Native from "react-native"',
       errors: [
         {
-          data: { import: "react-native", name: "default", owners: ALERT_OWNERS },
+          data: { ...ANCHOR, import: "react-native", name: "default", owners: ALERT_OWNERS },
           messageId: "name",
         },
       ],
@@ -214,6 +224,30 @@ tester.run("import-owners", rule, {
       errors: [{ messageId: "name" }],
       filename: file("apps/mobile/src/features/goals/components/row.tsx"),
       options: [ALERT],
+    },
+    {
+      // Each report names the option that produced it, when two options restrict one module.
+      code: 'import { Alert } from "react-native"\nimport * as Native from "react-native"',
+      errors: [
+        {
+          line: 1,
+          message: `Only ${ALERT_OWNERS} may import \`Alert\` from \`react-native\`. Use what the owner exports, or move this code into the owner. ${hint(0)}`,
+        },
+        {
+          line: 1,
+          message: `Only \`apps/mobile/src/native\` may import \`react-native\`. Use what the owner exports, or move this code into the owner. ${hint(1)}`,
+        },
+        {
+          line: 2,
+          message: `This import reaches \`Alert\` from \`react-native\`, which only ${ALERT_OWNERS} may import. Import only the names that this file needs. ${hint(0)}`,
+        },
+        {
+          line: 2,
+          message: `Only \`apps/mobile/src/native\` may import \`react-native\`. Use what the owner exports, or move this code into the owner. ${hint(1)}`,
+        },
+      ],
+      filename: file("apps/mobile/src/app/index.tsx"),
+      options: [ALERT, { import: "react-native", owners: ["apps/mobile/src/native"] }],
     },
   ],
   valid: [
@@ -275,16 +309,22 @@ tester.run("import-owners", rule, {
 })
 
 describe("readImportOwners", () => {
-  it("read one import and its owners from each option object", () => {
+  it("read one import and its owners from each option object, with the option's path", () => {
     expect(
-      readImportOwners([GIGET, ALERT, { import: "zod" }, { owners: ["src"] }]).map((entry) => ({
+      readImportOwners([GIGET, { import: "zod" }, { owners: ["src"] }, ALERT]).map((entry) => ({
+        configPath: entry.configPath,
         import: entry.import,
         names: entry.names,
         owners: entry.owners,
       }))
     ).toStrictEqual([
-      { import: "giget", names: undefined, owners: GIGET.owners },
-      { import: "react-native", names: new Set(["Alert"]), owners: ALERT.owners },
+      { configPath: "options[0]", import: "giget", names: undefined, owners: GIGET.owners },
+      {
+        configPath: "options[3]",
+        import: "react-native",
+        names: new Set(["Alert"]),
+        owners: ALERT.owners,
+      },
     ])
   })
 })

@@ -14,6 +14,10 @@ import { resolveImport } from "../shared/resolver.ts"
  */
 export interface ImportOwner {
   /**
+   * The path of the option object in the rule options, such as `options[1]`, which messages name.
+   */
+  readonly configPath: string
+  /**
    * The module as the import states it, such as `giget`. It also covers the module's subpaths, such
    * as `zod/mini` for `zod`.
    */
@@ -66,14 +70,33 @@ function readModuleKind(specifier: string): ModuleKind {
 }
 
 /**
+ * The folder that owner paths are relative to, by what makes it the root:
+ *
+ * - `workspace`: the nearest folder that lists workspace packages.
+ * - `package`: the nearest folder that holds a `package.json`, when no workspace holds the file.
+ */
+export interface Root {
+  readonly kind: "package" | "workspace"
+  readonly path: string
+}
+
+/**
+ * How a message names each kind of root. A message does not print the path of the root, because
+ * that path is different on each machine.
+ */
+const ROOT_NAMES = {
+  package: "package root",
+  workspace: "workspace root",
+} as const satisfies Record<Root["kind"], string>
+
+/**
  * What the rule reads from the file system. The plugin reads real files, and unit tests pass fakes.
  */
 export interface Project {
   /**
-   * The folder that owner paths are relative to: the root of the workspace that holds `file`, or
-   * the nearest folder above `file` that holds a `package.json` when no workspace holds it.
+   * The root that owner paths are relative to for `file`.
    */
-  readonly findRoot: (file: string) => string | undefined
+  readonly findRoot: (file: string) => Root | undefined
   /**
    * The file that `specifier` in `importer` resolves to, with `/` between folders, or undefined
    * when it does not resolve.
@@ -81,7 +104,8 @@ export interface Project {
   readonly resolve: (importer: string, specifier: string) => string | undefined
 }
 
-const OWNERS_HINT = "Owners: the `adamantite/import-owners` options in the Oxlint config."
+const OWNERS_HINT =
+  "Owners: the `adamantite/import-owners` options in the Oxlint config at `{{configPath}}`. Owner paths are relative to the {{root}}."
 
 function toPosixPath(path: string) {
   return path.replaceAll("\\", "/")
@@ -95,10 +119,10 @@ function normalizeOwner(owner: string) {
 }
 
 /**
- * Read one import and its owners from one option object. Undefined when `import` or `owners` is
- * missing.
+ * Read one import and its owners from one option object at `configPath`. Undefined when `import` or
+ * `owners` is missing.
  */
-function readImportOwner(option: Options[number]): ImportOwner | undefined {
+function readImportOwner(option: Options[number], configPath: string): ImportOwner | undefined {
   // The option readers read the first option object.
   const options = [option]
   const specifier = readStringOption(options, "import")
@@ -110,6 +134,7 @@ function readImportOwner(option: Options[number]): ImportOwner | undefined {
   }
 
   return {
+    configPath,
     import: specifier,
     kind: readModuleKind(specifier),
     names: names === undefined ? undefined : new Set(names),
@@ -126,7 +151,7 @@ function readImportOwner(option: Options[number]): ImportOwner | undefined {
  * `import` or `owners` is left out.
  */
 export function readImportOwners(options: Readonly<Options>): ImportOwner[] {
-  return options.flatMap((option) => readImportOwner(option) ?? [])
+  return options.flatMap((option, index) => readImportOwner(option, `options[${index}]`) ?? [])
 }
 
 /**
@@ -212,10 +237,19 @@ function findPackage(dir: string): string | undefined {
   return parent === dir ? undefined : findPackage(parent)
 }
 
-const project: Project = {
-  findRoot: (file) => findWorkspace(posix.dirname(file)) ?? findPackage(posix.dirname(file)),
-  resolve: resolveImport,
+function findRoot(file: string): Root | undefined {
+  const workspace = findWorkspace(posix.dirname(file))
+
+  if (workspace !== undefined) {
+    return { kind: "workspace", path: workspace }
+  }
+
+  const found = findPackage(posix.dirname(file))
+
+  return found === undefined ? undefined : { kind: "package", path: found }
 }
+
+const project: Project = { findRoot, resolve: resolveImport }
 
 /**
  * The names that an alias can give the file at `path`: the path itself, the path without its
@@ -276,8 +310,9 @@ export function createImportOwnersRule(project: Project): Rule {
       }
 
       // The closures below keep the narrowed root.
-      const projectRoot = root
-      const relative = posix.relative(root, importer)
+      const projectRoot = root.path
+      const relative = posix.relative(projectRoot, importer)
+      const rootName = ROOT_NAMES[root.kind]
 
       const restricted = readImportOwners(context.options).filter(
         (entry) => !entry.patterns.some((pattern) => pattern.test(relative))
@@ -287,9 +322,21 @@ export function createImportOwnersRule(project: Project): Rule {
         return {}
       }
 
+      /**
+       * The message data that names the option of `entry` and the root of its owner paths.
+       */
+      function describeEntry(entry: ImportOwner) {
+        return {
+          configPath: entry.configPath,
+          import: entry.import,
+          owners: formatList(entry.owners),
+          root: rootName,
+        }
+      }
+
       function reportModule(entry: ImportOwner, node: ESTree.Node) {
         context.report({
-          data: { import: entry.import, owners: formatList(entry.owners) },
+          data: describeEntry(entry),
           messageId: "module",
           node,
         })
@@ -297,7 +344,7 @@ export function createImportOwnersRule(project: Project): Rule {
 
       function reportName(entry: ImportOwner, node: ESTree.Node, name: string) {
         context.report({
-          data: { import: entry.import, name, owners: formatList(entry.owners) },
+          data: { ...describeEntry(entry), name },
           messageId: "name",
           node,
         })
@@ -305,11 +352,7 @@ export function createImportOwnersRule(project: Project): Rule {
 
       function reportNamespace(entry: ImportOwner, node: ESTree.Node, names: ReadonlySet<string>) {
         context.report({
-          data: {
-            import: entry.import,
-            names: formatList([...names]),
-            owners: formatList(entry.owners),
-          },
+          data: { ...describeEntry(entry), names: formatList([...names]) },
           messageId: "namespace",
           node,
         })

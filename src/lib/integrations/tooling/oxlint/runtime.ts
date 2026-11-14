@@ -61,8 +61,9 @@ export function toBackendEnv(backend: RuntimeBackend, platform = process.platfor
     None: () => ({}),
     Replaced: ({ env }) => env,
     // Oxlint 1.92 and later find the launcher with the same search as `findLauncher`, and start it
-    // as `<path> headless`. The `tsrs-lint` bin adds the `--lint` flag of tsrs. Windows still names
-    // the launcher, because no Windows run has confirmed that search. See ADR 0021.
+    // as `<path> headless`. Only when that search finds nothing does Oxlint also look on `PATH`.
+    // The `tsrs-lint` bin adds the `--lint` flag of tsrs. Windows still names the launcher, because
+    // no Windows run has confirmed that search. See ADR 0021.
     Tsrs: ({ launcher }) => (platform === "win32" ? { OXLINT_TSGOLINT_PATH: launcher } : {}),
   })
 }
@@ -83,7 +84,8 @@ export interface OxlintRuntime {
 /**
  * The nearest `tsrs-lint` launcher in a `node_modules/.bin` folder from `project` up to the root,
  * as Oxlint looks for its backend. A workspace package often uses the launcher of the root
- * installation.
+ * installation. Oxlint then also looks on `PATH`, but the project must install its own backend, so
+ * a launcher on `PATH` does not count.
  */
 const findLauncher = Effect.fn("findLauncher")(function* (project: string) {
   const fs = yield* FileSystem.FileSystem

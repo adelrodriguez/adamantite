@@ -74,9 +74,10 @@ describe("oxlint", () => {
     it.effect("report old rule keys and suppressions, then confirm their removal", () =>
       Effect.gen(function* () {
         const config = `import shared from "./shared.ts"
-export default { extends: [shared], rules: { "anti-slop/no-runtime-typeof": "off" }, overrides: [{ files: ["*.ts"], rules: { "anti-slop-effect/no-throw": "off" } }] }`
+export default { rules: { ...shared, "anti-slop/no-runtime-typeof": "off" }, overrides: [{ files: ["*.ts"], rules: { "anti-slop-effect/no-throw": "off" } }] }`
 
-        const shared = `export default { rules: { "anti-slop/no-reflect-get": "off" } }`
+        const shared = `export default { "anti-slop/no-reflect-get": "off" }`
+        const nested = `export default { rules: { "anti-slop/no-reflect-get": "off" } }`
 
         const source =
           "// oxlint-disable-next-line anti-slop/no-runtime-typeof, anti-slop-effect/no-throw -- migration case\nexport const value = 1\n"
@@ -87,7 +88,7 @@ export default { extends: [shared], rules: { "anti-slop/no-runtime-typeof": "off
             scripts: { check: "adamantite check" },
             workspaces: ["packages/*"],
           }),
-          "packages/app/oxlint.config.ts": shared,
+          "packages/app/oxlint.config.ts": nested,
           "packages/app/package.json": makePackageJson({ name: "app" }),
           "shared.ts": shared,
           "src/a.ts": source,
@@ -123,7 +124,7 @@ export default { extends: [shared], rules: { "anti-slop/no-runtime-typeof": "off
 
         files.write("oxlint.config.ts", config.replaceAll("anti-slop", "antislop"))
         files.write("shared.ts", shared.replaceAll("anti-slop", "antislop"))
-        files.write("packages/app/oxlint.config.ts", shared.replaceAll("anti-slop", "antislop"))
+        files.write("packages/app/oxlint.config.ts", nested.replaceAll("anti-slop", "antislop"))
         files.write("src/a.ts", source.replaceAll("anti-slop", "antislop"))
 
         const after = yield* assess()

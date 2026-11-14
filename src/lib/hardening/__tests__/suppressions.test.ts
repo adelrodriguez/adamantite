@@ -44,3 +44,25 @@ describe("findSuppressions", () => {
     expect(findSuppressions("a.ts", "// oxlint-disable\nexport const = ;\n")).toStrictEqual([])
   })
 })
+
+describe("component suppressions", () => {
+  it.each([
+    [
+      "App.vue",
+      '<template><div /></template>\n<script setup lang="ts">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst value: number = Reflect.get({}, "a")\n</script>',
+    ],
+    [
+      "App.svelte",
+      '<script lang="ts">\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst value: number = Reflect.get({}, "a")\n</script>\n<div>{value}</div>',
+    ],
+    [
+      "App.astro",
+      '---\n// oxlint-disable-next-line anti-slop/no-reflect-get -- migration\nconst value: number = Reflect.get({}, "a")\n---\n<div>{value}</div>',
+    ],
+  ])("read embedded script comments in %s", (file, content) => {
+    const line = content.split("\n").findIndex((text) => text.startsWith("// oxlint")) + 1
+    expect(findSuppressions(file, content)).toStrictEqual([
+      { line, rules: ["anti-slop/no-reflect-get"] },
+    ])
+  })
+})

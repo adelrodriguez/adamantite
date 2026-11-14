@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process"
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmdirSync,
+  writeFileSync,
+} from "node:fs"
 import path from "node:path"
 import process from "node:process"
 
@@ -10,7 +18,7 @@ const write = process.argv.includes("--write")
 
 const files = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8" })
   .split("\0")
-  .filter(Boolean)
+  .filter((file) => file.length > 0 && existsSync(path.join(root, file)))
 
 for (const file of files) {
   if (
@@ -20,6 +28,8 @@ for (const file of files) {
     || file.includes("rule-migrations")
     || file.startsWith("src/lib/integrations/tooling/oxlint/")
     || file.endsWith("rename-antislop.ts")
+    || file.endsWith("antislop-rename.test.ts")
+    || file.endsWith("suppressions.test.ts")
   ) {
     continue
   }
@@ -48,6 +58,21 @@ for (const file of files) {
       if (renamed !== file) {
         mkdirSync(path.dirname(path.join(root, renamed)), { recursive: true })
         renameSync(path.join(root, file), path.join(root, renamed))
+
+        for (
+          let directory = path.dirname(file);
+          directory.includes("anti-slop");
+          directory = path.dirname(directory)
+        ) {
+          const absolute = path.join(root, directory)
+
+          // Stop at a folder with other tracked files or untracked project files.
+          if (readdirSync(absolute).length > 0) {
+            break
+          }
+
+          rmdirSync(absolute)
+        }
       }
     }
   }

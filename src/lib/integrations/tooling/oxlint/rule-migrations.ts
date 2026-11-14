@@ -21,7 +21,7 @@ function replacement(rule: string) {
 }
 
 /**
- * Old rule keys in top-level or override rule objects, without loading project code.
+ * Old rule keys in config modules, including shared rule dictionaries, without loading code.
  */
 export function findRetiredRules(file: string, content: string) {
   const parsed = parseSync(file, content)
@@ -33,27 +33,12 @@ export function findRetiredRules(file: string, content: string) {
 
   new Visitor({
     Property(node) {
-      if (!("value" in node)) {
-        return
-      }
+      // Rule dictionaries can reach a config through aliases, spreads, and imports. Read their
+      // literal rule keys in every discovered module, rather than requiring an inline `rules`.
+      const rule = node.key.type === "Literal" ? node.key.value : undefined
 
-      const key = node.key.type === "Identifier" ? node.key.name : null
-      const literalKey = node.key.type === "Literal" ? node.key.value : null
-
-      if ((key !== "rules" && literalKey !== "rules") || node.value.type !== "ObjectExpression") {
-        return
-      }
-
-      for (const property of node.value.properties) {
-        if (property.type !== "Property") {
-          continue
-        }
-
-        const rule = property.key.type === "Literal" ? property.key.value : undefined
-
-        if (Predicate.isString(rule) && replacement(rule) !== undefined) {
-          entries.push({ line: content.slice(0, property.start).split("\n").length, rule })
-        }
+      if (Predicate.isString(rule) && replacement(rule) !== undefined) {
+        entries.push({ line: content.slice(0, node.start).split("\n").length, rule })
       }
     },
   }).visit(parsed.program)
@@ -69,7 +54,7 @@ export const assessRuleMigrations = Effect.fn("assessRuleMigrations")(function* 
 
   const configs = project.customRules.sources.flatMap(({ file, content }) =>
     findRetiredRules(file, content).map(({ line, rule }) => ({
-      location: `${path.relative(project.cwd, file)}:${line}`,
+      location: `${path.relative(project.cwd, file).replaceAll("\\", "/")}:${line}`,
       rule,
     }))
   )

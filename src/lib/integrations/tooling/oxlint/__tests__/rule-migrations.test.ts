@@ -17,6 +17,16 @@ describe("findRetiredRules", () => {
     ])
   })
 
+  it.each([
+    'const rules = { "anti-slop/no-runtime-typeof": "off" }; export default { rules }',
+    'const shared = { "anti-slop/no-runtime-typeof": "off" }; export default { rules: { ...shared } }',
+    'export const shared = { "anti-slop/no-runtime-typeof": "off" }',
+  ])("find old keys in a rule dictionary: %s", (content) => {
+    expect(findRetiredRules("rules.ts", content)).toStrictEqual([
+      { line: 1, rule: "anti-slop/no-runtime-typeof" },
+    ])
+  })
+
   it("ignore new names, unrelated strings, and config comments", () => {
     expect(
       findRetiredRules(

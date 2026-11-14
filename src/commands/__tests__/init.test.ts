@@ -1812,7 +1812,7 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read(workflowPath)).toBe(workflow)
         expect(logLines).toContainEqual(
-          `● \`${workflowPath}\` has no \`# ADAMANTITE:START\` and \`# ADAMANTITE:END\` comments, so \`adamantite init\` cannot tell its jobs from yours and kept the file. Run \`adamantite doctor\` for the repair.`
+          `● \`${workflowPath}\` has no \`# ADAMANTITE:START\` and \`# ADAMANTITE:END\` comments, so \`adamantite init\` cannot tell the Adamantite jobs from yours and kept the file. Run \`adamantite doctor\` for the repair.`
         )
       })
     )

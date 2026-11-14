@@ -423,6 +423,37 @@ and `adamantite fix` removes the comment. The Zed and VS Code setups report it w
 severity. Oxlint reads this setting, `options.reportUnusedDisableDirectives`, only from the root
 config. To change it, set it in the root `oxlint.config.ts`.
 
+### Explicit undefined results
+
+The core preset enables `unicorn/no-useless-undefined` with `checkArguments: false` and
+`checkArrowFunctionBody: false`. It preserves `consume(undefined)` and `() => undefined`.
+The `no-empty-function`, `array-callback-return`, and `no-useless-return` rules stay enabled.
+With the effect preset, `Effect.succeed(undefined)` still gets the Effect rule that recommends
+`Effect.undefined`.
+
+For a simple optional result, use an expression callback. For a block callback that returns
+`undefined`, declare a union result type that includes its other possible results:
+
+```ts
+declare const flags: boolean[]
+
+export const expression = flags.map((flag) => (flag ? 1 : undefined))
+
+export const mapped = flags.map((flag): number | undefined => {
+  if (flag) {
+    return 1
+  }
+
+  return undefined
+})
+```
+
+The rule preserves `return undefined` in a function with an explicit return type other than
+`void` or `undefined`. A `: undefined` annotation alone does not preserve a block return.
+An unannotated `return undefined` can still get a fix that writes a bare `return`, which the
+callback-return or redundant-return checks reject. Change that callback to one of the forms
+above before running `adamantite fix`. The rule still reports redundant initializers and yields.
+
 ### Change a rule that a preset sets for some files
 
 Some presets set rules for some files in an `overrides` entry. Oxlint applies the settings in this

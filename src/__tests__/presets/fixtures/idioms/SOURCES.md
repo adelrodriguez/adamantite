@@ -24,6 +24,7 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | `clean/read-config.ts` | [Node.js docs](https://github.com/nodejs/node/blob/530b8e3a983666c958d8f3b8b42c7cea3afd2765/doc/api/fs.md#L1960-L1985) | MIT | `readFile` of a joined path, with the error in `cause`. |
 | `clean/retry.ts` | [p-retry](https://github.com/sindresorhus/p-retry/blob/ac3c4cdb7f015e1f71825e4274e2323a49b615eb/index.js#L293-L312) | MIT | One awaited attempt that wraps the error in `cause`. |
 | `clean/segments.ts` | [ufo](https://github.com/unjs/ufo/blob/f06c800d0c59f2a4a1b9ba65eb6cb61a84419be6/src/utils.ts#L463-L483) | MIT | A `for...of` loop over `entries()` that labels each segment. |
+| `clean/undefined.ts` | Written for Adamantite | | Required `undefined` arguments, concise arrow results, expression callbacks, and typed optional block returns. |
 | `clean/worker-message.ts` | [Jest](https://github.com/jestjs/jest/blob/aa88f7cf0bfc7a3a2efbfcab97914886b22d4454/packages/jest-worker/src/types.ts#L234-L239) | MIT | Two message kinds with an exhaustive `switch`. |
 | `fixable/abort-error.ts` | [p-retry](https://github.com/sindresorhus/p-retry/blob/ac3c4cdb7f015e1f71825e4274e2323a49b615eb/index.js#L59-L83) | MIT | Adds a constructor that only calls `super`, which the fix removes. |
 | `fixable/greeting.ts` | Written for Adamantite | | String concatenation, which the fix writes as a template literal. |

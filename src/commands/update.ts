@@ -14,7 +14,7 @@ import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { printFindings } from "#terminal/findings.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 
 // Managed plugins stay out of this fallback: a plugin is updated only while its preset is imported,
 // which the assessment already covers.
@@ -33,6 +33,9 @@ const knownPackages = [
  */
 type StepOutcome = "applied" | "applyFailed" | "checkFailed" | "idle"
 
+const warnLockFile = (error: { readonly message: string }) =>
+  Output.warning(`Could not update \`skills-lock.json\`. ${error.message}`)
+
 export default Command.make("update").pipe(
   Command.withDescription(
     "Update managed packages and the Adamantite skill, then report setup issues"
@@ -40,9 +43,7 @@ export default Command.make("update").pipe(
   Command.withHandler(() =>
     Effect.gen(function* () {
       const cwd = process.cwd()
-      const prompter = yield* Prompter
-
-      yield* prompter.intro("💠 adamantite update")
+      yield* Output.intro("💠 adamantite update")
 
       const project = yield* readProject(cwd)
       const assessment = yield* assessProject(project)
@@ -68,29 +69,21 @@ export default Command.make("update").pipe(
       const unchanged = fallback.filter((pkg) => pkg.packageActions.length === 0)
 
       if (updates.length > 0) {
-        yield* prompter.log.info("Packages to install or update:")
-
-        for (const action of updates) {
-          const currentVersion =
-            action.type === "install_package" ? "not installed" : action.currentVersion
-
-          yield* prompter.log.info(
-            `  ${action.package}: ${currentVersion} → ${action.targetVersion}`
-          )
-        }
-
-        yield* prompter.withSpinner(
-          () =>
-            addRootDevDependencies(
-              cwd,
-              updates.map((action) => `${action.package}@${action.targetVersion}`)
+        yield* Output.info(
+          [
+            "Packages to install or update:",
+            ...updates.map(
+              (action) =>
+                `${action.package}: ${action.type === "install_package" ? "not installed" : action.currentVersion} → ${action.targetVersion}`
             ),
-          {
-            failure: "Failed to update dependencies",
-            start: "Updating dependencies...",
-            success: "Dependencies updated.",
-          }
+          ].join("\n")
         )
+
+        yield* addRootDevDependencies(
+          cwd,
+          updates.map((action) => `${action.package}@${action.targetVersion}`)
+        )
+        yield* Output.success("Dependencies updated.")
       }
 
       // A failed package update fails the whole command.
@@ -101,48 +94,40 @@ export default Command.make("update").pipe(
         Effect.flatMap((folders) =>
           folders.length === 0
             ? Effect.succeed("idle" as const)
-            : prompter
-                .withSpinner(() => writeSkill(cwd, folders), {
-                  failure: "Failed to refresh the Adamantite skill.",
-                  start: "Refreshing the Adamantite skill...",
-                  success: "Adamantite skill refreshed.",
-                })
-                .pipe(
-                  Effect.as("applied" as const),
-                  Effect.catchTag(
-                    ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
-                    (error) =>
-                      prompter.log
-                        .warning(`Could not refresh the Adamantite skill. ${error.message}`)
-                        .pipe(Effect.as("applyFailed" as const))
-                  )
+            : writeSkill(cwd, folders).pipe(
+                Effect.andThen(Output.success("Adamantite skill refreshed.")),
+                Effect.as("applied" as const),
+                Effect.catchTag(
+                  ["FailedToCreateDirectory", "FailedToReadFile", "FailedToWriteFile"],
+                  (error) =>
+                    Output.warning(`Could not refresh the Adamantite skill. ${error.message}`).pipe(
+                      Effect.as("applyFailed" as const)
+                    )
                 )
+              )
         ),
         Effect.catchTag("FailedToReadFile", (error) =>
-          prompter.log
-            .warning(`Could not check the Adamantite skill. ${error.message}`)
-            .pipe(Effect.as("checkFailed" as const))
+          Output.warning(`Could not check the Adamantite skill. ${error.message}`).pipe(
+            Effect.as("checkFailed" as const)
+          )
         )
       )
 
       // `npx skills add` records the skill in `skills-lock.json`, and `skills update` would then
       // write the same folders. Adamantite owns the copy, so the lock entry goes away.
-      const lockWarning = (error: { readonly message: string }) =>
-        prompter.log.warning(`Could not update \`skills-lock.json\`. ${error.message}`)
-
       const lock: StepOutcome = yield* removeSkillsLockEntry(cwd).pipe(
         Effect.flatMap((removed) =>
           removed
-            ? prompter.log
-                .info("Removed the `adamantite` entry from `skills-lock.json`.")
-                .pipe(Effect.as("applied" as const))
+            ? Output.info("Removed the `adamantite` entry from `skills-lock.json`.").pipe(
+                Effect.as("applied" as const)
+              )
             : Effect.succeed("idle" as const)
         ),
         Effect.catchTag(["FailedToParseFile", "FailedToReadFile"], (error) =>
-          lockWarning(error).pipe(Effect.as("checkFailed" as const))
+          warnLockFile(error).pipe(Effect.as("checkFailed" as const))
         ),
         Effect.catchTag("FailedToWriteFile", (error) =>
-          lockWarning(error).pipe(Effect.as("applyFailed" as const))
+          warnLockFile(error).pipe(Effect.as("applyFailed" as const))
         )
       )
 
@@ -157,7 +142,7 @@ export default Command.make("update").pipe(
       ])
 
       for (const warning of warnings) {
-        yield* prompter.log.warning(warning)
+        yield* Output.warning(warning)
       }
 
       const findings = [
@@ -169,9 +154,7 @@ export default Command.make("update").pipe(
 
       if (findings.length > 0) {
         yield* printFindings(findings)
-        yield* prompter.log.info(
-          "Run `adamantite doctor` for the remaining repairs and an agent prompt."
-        )
+        yield* Output.info("Run `adamantite doctor` for the remaining repairs and an agent prompt.")
       }
 
       const foundWork = [packages, skill, lock].some(
@@ -184,19 +167,11 @@ export default Command.make("update").pipe(
 
       return "success" as const
     }).pipe(
-      Effect.tapError(() =>
-        Effect.gen(function* () {
-          const prompter = yield* Prompter
-          yield* prompter.outro("❌ Update failed")
-        })
-      ),
+      Effect.tapError(() => Output.outro("❌ Update failed")),
       Effect.tap((value) =>
-        Effect.gen(function* () {
-          const prompter = yield* Prompter
-          yield* prompter.outro(
-            value === "no-changes" ? "✅ No managed updates were applied." : "✅ Update finished."
-          )
-        })
+        Output.outro(
+          value === "no-changes" ? "✅ No managed updates were applied." : "✅ Update finished."
+        )
       )
     )
   )

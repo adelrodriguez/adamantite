@@ -1,6 +1,8 @@
 import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
+import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
+import * as Console from "effect/Console"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -34,9 +36,8 @@ import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readWorkspace } from "#lib/workspace/monorepo.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
 import { readProject } from "#lib/workspace/project.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
 import { printFindings } from "#terminal/findings.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 import { AgentSessionEnded, chooseResolution } from "#terminal/resolution-menu.ts"
 
 const version = getPackageVersion()
@@ -149,12 +150,10 @@ export default Command.make("harden", { commits, scope }).pipe(
       const cwd = process.cwd()
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
-      const prompter = yield* Prompter
-      const terminal = yield* TerminalCapabilities
-      const isInteractive = yield* terminal.isInteractive
+      const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities
 
-      if (isInteractive) {
-        yield* prompter.intro("💠 adamantite harden")
+      if (canPrompt) {
+        yield* Output.intro("💠 adamantite harden")
       }
 
       const packageJson = yield* readPackageJson(cwd)
@@ -210,8 +209,8 @@ export default Command.make("harden", { commits, scope }).pipe(
 
       const { agentReach, prompt } = yield* preparePrompt(cwd, scopeDirectory, commits)
 
-      if (!isInteractive) {
-        yield* prompter.message(prompt)
+      if (!canPrompt) {
+        yield* Console.log(prompt)
 
         return
       }
@@ -225,7 +224,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       })
 
       if (!(resolution instanceof AgentSessionEnded)) {
-        yield* prompter.outro("Harden ended without an agent session.")
+        yield* Output.outro("Harden ended without an agent session.")
 
         return
       }
@@ -237,8 +236,7 @@ export default Command.make("harden", { commits, scope }).pipe(
       const checkFailures = yield* Toolchain.check({ cwd }).pipe(
         Effect.as([]),
         Effect.catchTags({
-          CliNotFound: (error) =>
-            prompter.log.error(error.message).pipe(Effect.as([checkFailed()])),
+          CliNotFound: (error) => Output.error(error.message).pipe(Effect.as([checkFailed()])),
           CommandFailed: () => Effect.succeed([checkFailed()]),
         })
       )
@@ -274,28 +272,28 @@ export default Command.make("harden", { commits, scope }).pipe(
       ]
 
       for (const warning of assessment.warnings) {
-        yield* prompter.log.warning(warning)
+        yield* Output.warning(warning)
       }
 
       yield* Effect.forEach(
         failures,
         matchFailure({
           BrokenLink: ({ link }) =>
-            prompter.log.error(
+            Output.error(
               `\`${link.file}\` links to \`${link.target}\`, which does not exist, after the ${agent.name} session.`
             ),
           CheckFailed: () =>
-            prompter.log.error(`\`adamantite check\` failed after the ${agent.name} session.`),
+            Output.error(`\`adamantite check\` failed after the ${agent.name} session.`),
           Findings: ({ findings }) =>
-            prompter.log
-              .warning(`Doctor found issues after the ${agent.name} session.`)
-              .pipe(Effect.andThen(printFindings(findings))),
+            Output.warning(`Doctor found issues after the ${agent.name} session.`).pipe(
+              Effect.andThen(printFindings(findings))
+            ),
         }),
         { concurrency: 1, discard: true }
       )
 
       if (failures.length > 0) {
-        yield* prompter.outro("⚠️ Harden verification failed.")
+        yield* Output.outro("⚠️ Harden verification failed.")
 
         return yield* new CommandFailed({
           command: "harden",
@@ -303,10 +301,8 @@ export default Command.make("harden", { commits, scope }).pipe(
         })
       }
 
-      yield* prompter.log.success(
-        `\`adamantite check\` and Doctor pass after the ${agent.name} session.`
-      )
-      yield* prompter.outro("✅ Harden checks passed.")
+      yield* Output.success(`\`adamantite check\` and Doctor pass after the ${agent.name} session.`)
+      yield* Output.outro("✅ Harden checks passed.")
     }).pipe(
       Effect.catchTag(
         [
@@ -317,14 +313,13 @@ export default Command.make("harden", { commits, scope }).pipe(
         ],
         (error) =>
           Effect.gen(function* () {
-            const prompter = yield* Prompter
-            const terminal = yield* TerminalCapabilities
+            const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities
 
-            if (yield* terminal.isInteractive) {
-              yield* prompter.log.warning(error.message)
-              yield* prompter.outro("⚠️ Harden did not start.")
+            if (canPrompt) {
+              yield* Output.warning(error.message)
+              yield* Output.outro("⚠️ Harden did not start.")
             } else {
-              yield* prompter.message(error.message)
+              yield* Console.log(error.message)
             }
 
             return yield* new CommandFailed({
@@ -333,10 +328,9 @@ export default Command.make("harden", { commits, scope }).pipe(
             })
           })
       ),
-      Effect.catchTag("OperationCancelled", () =>
+      Effect.catchTag("QuitError", () =>
         Effect.gen(function* () {
-          const prompter = yield* Prompter
-          yield* prompter.cancel("Harden was cancelled.")
+          yield* Output.cancel("Harden was cancelled.")
 
           return yield* new CommandFailed({
             command: "harden",

@@ -43,7 +43,7 @@ cannot read a flag. Apply verbosity only at the effect edges:
   `Effect.catch`) and render it with `Cause.pretty`. `Cause.pretty` natively renders the
   error name and message, cleaned stack traces with span annotations, and the nested
   `error.cause` chain with indentation. Do not hand-roll cause-chain walking or stack
-  formatting. If per-line control is needed for the clack gutter, build the output from
+  formatting. If per-line control is needed for the status symbol, build the output from
   `Cause.prettyErrors` instead, which returns the individual `Error` instances.
 - `CommandRunner.exitCode` and `DependencyInstaller.addDevDependencies`. Verbose: log the
   command before execution.
@@ -64,8 +64,8 @@ cannot read a flag. Apply verbosity only at the effect edges:
 
 ### Formatting rules
 
-Verbose output goes through the same clack logger as the default output, so every line
-keeps the gutter prefix. Reuse the sanitization from `formatCauseOutput` (strip ANSI
+Verbose output goes through the same `#terminal/output.ts` functions as the default output, so
+every line keeps its status symbol. Reuse the sanitization from `formatCauseOutput` (strip ANSI
 codes, treat carriage returns as line breaks, drop blank lines) and export an
 untruncated variant instead of duplicating the logic.
 

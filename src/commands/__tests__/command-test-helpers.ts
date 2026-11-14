@@ -1,13 +1,11 @@
-import type * as prompts from "@clack/prompts"
 import * as Command from "effect/cli/Command"
+import * as Prompt from "effect/cli/Prompt"
+import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Stdio from "effect/Stdio"
-import * as Terminal from "effect/Terminal"
 import { TestConsole } from "effect/testing"
 import {
   type FileSystemTestContext,
@@ -15,6 +13,7 @@ import {
   makeSystemError,
 } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { createTerminalTestContext, type TerminalTestContext } from "#__tests__/terminal.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
 import {
   type CommandFailedLike,
@@ -22,42 +21,12 @@ import {
   CommandRunner,
 } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import {
-  CliNotFound,
-  type FailedToInstallDependency,
-  OperationCancelled,
-} from "#lib/shared/errors.ts"
+import { CliNotFound, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 import {
   type DetectedPackageManager,
   DependencyInstaller,
 } from "#lib/workspace/dependency-installer.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
-import { Prompter } from "#terminal/prompter.ts"
-
-interface LogEntry {
-  readonly level: "error" | "info" | "success" | "warning"
-  readonly message: string
-}
-
-interface SpinnerEntry {
-  readonly message?: string
-  readonly type: "message" | "start" | "stop"
-}
-
-export interface PrompterTestContext {
-  readonly cancels: string[]
-  readonly confirmCalls: prompts.ConfirmOptions[]
-  readonly intros: string[]
-  readonly layer: Layer.Layer<Prompter>
-  readonly logs: LogEntry[]
-  readonly messages: string[]
-  readonly multiselectCalls: unknown[]
-  readonly notes: Array<{ readonly message: string; readonly title: string }>
-  readonly outros: string[]
-  readonly selectCalls: unknown[]
-  readonly spinnerEntries: SpinnerEntry[]
-}
 
 export interface DependencyInstallerCall {
   readonly options?: {
@@ -83,16 +52,6 @@ export interface RunnerTestContext {
 // A layer's output type is contravariant, so `never` accepts every layer that neither fails nor
 // requires other services.
 type TestLayer = Layer.Layer<never>
-
-function shiftResponse<T>(queue: T[], kind: string): T {
-  const response = queue.shift()
-
-  if (response === undefined) {
-    throw new Error(`Missing ${kind} response`)
-  }
-
-  return response
-}
 
 export function createRunnerTestContext(
   options:
@@ -190,11 +149,6 @@ export function nonProbeInvocations(runner: RunnerTestContext) {
   return runner.invocations.filter((invocation) => !isProbe(invocation))
 }
 
-export const interactiveTerminalLayer = Layer.succeed(TerminalCapabilities)({
-  copyToClipboard: () => Effect.void,
-  isInteractive: Effect.succeed(true),
-})
-
 // Drawn from the shipped catalog so a changed seed or probe form fails these tests.
 export function agentByCommand(command: string): CodingAgent {
   const agent = codingAgents.find((candidate) => candidate.command === command)
@@ -204,148 +158,6 @@ export function agentByCommand(command: string): CodingAgent {
   }
 
   return agent
-}
-
-export function createPrompterTestContext(options?: {
-  readonly cancelAtPromptIndex?: number
-  readonly confirmResponses?: boolean[]
-  readonly multiselectResponses?: unknown[][]
-  readonly selectResponses?: unknown[]
-}): PrompterTestContext {
-  const cancelAtPromptIndex = options?.cancelAtPromptIndex
-  const confirmResponses = [...(options?.confirmResponses ?? [])]
-  const multiselectResponses = [...(options?.multiselectResponses ?? [])]
-  const selectResponses = [...(options?.selectResponses ?? [])]
-  const cancels: string[] = []
-  const confirmCalls: prompts.ConfirmOptions[] = []
-  const intros: string[] = []
-  const logs: LogEntry[] = []
-  const messages: string[] = []
-  const multiselectCalls: unknown[] = []
-  const notes: Array<{ readonly message: string; readonly title: string }> = []
-  const outros: string[] = []
-  const selectCalls: unknown[] = []
-  const spinnerEntries: SpinnerEntry[] = []
-  let promptIndex = 0
-
-  // CancelAtPromptIndex is 1-based: 1 means cancel the first prompt shown.
-  function shouldCancelPrompt() {
-    promptIndex += 1
-
-    return cancelAtPromptIndex === promptIndex
-  }
-
-  return {
-    cancels,
-    confirmCalls,
-    intros,
-    layer: Layer.succeed(Prompter)({
-      cancel: (message) =>
-        Effect.sync(() => {
-          cancels.push(message)
-          logs.push({ level: "warning", message })
-        }),
-      confirm: (config) =>
-        Effect.gen(function* () {
-          if (shouldCancelPrompt()) {
-            return yield* new OperationCancelled({})
-          }
-
-          confirmCalls.push(config)
-
-          return shiftResponse(confirmResponses, "confirm")
-        }),
-      intro: (message) =>
-        Effect.sync(() => {
-          intros.push(message)
-        }),
-      log: {
-        error: (message) =>
-          Effect.sync(() => {
-            logs.push({ level: "error", message })
-          }),
-        info: (message) =>
-          Effect.sync(() => {
-            logs.push({ level: "info", message })
-          }),
-        success: (message) =>
-          Effect.sync(() => {
-            logs.push({ level: "success", message })
-          }),
-        warning: (message) =>
-          Effect.sync(() => {
-            logs.push({ level: "warning", message })
-          }),
-      },
-      message: (message) =>
-        Effect.sync(() => {
-          messages.push(message)
-        }),
-      multiselect: <T>(config: prompts.MultiSelectOptions<T>) =>
-        Effect.gen(function* () {
-          if (shouldCancelPrompt()) {
-            return yield* new OperationCancelled({})
-          }
-
-          multiselectCalls.push(config)
-
-          // SAFETY: each test queues multiselect responses matching the option type of the prompt it triggers.
-          return shiftResponse(multiselectResponses, "multiselect") as T[]
-        }),
-      note: (message, title) =>
-        Effect.sync(() => {
-          notes.push({ message, title })
-        }),
-      outro: (message) =>
-        Effect.sync(() => {
-          outros.push(message)
-        }),
-      select: <T>(config: prompts.SelectOptions<T>) =>
-        Effect.gen(function* () {
-          if (shouldCancelPrompt()) {
-            return yield* new OperationCancelled({})
-          }
-
-          selectCalls.push(config)
-
-          // SAFETY: each test queues a select response that matches the option type of the prompt.
-          return shiftResponse(selectResponses, "select") as T
-        }),
-      withSpinner: (run, spinnerOptions) =>
-        Effect.acquireUseRelease(
-          Effect.sync(() => {
-            spinnerEntries.push({ message: spinnerOptions.start, type: "start" })
-          }),
-          () =>
-            run({
-              message: (message) =>
-                Effect.sync(() => {
-                  spinnerEntries.push({ message, type: "message" })
-                }),
-            }),
-          (_, exit) =>
-            Effect.sync(() => {
-              spinnerEntries.push({
-                message: Exit.match(exit, {
-                  onFailure: () => spinnerOptions.failure,
-                  onSuccess: (value) =>
-                    Predicate.isFunction(spinnerOptions.success)
-                      ? spinnerOptions.success(value)
-                      : spinnerOptions.success,
-                }),
-                type: "stop",
-              })
-            })
-        ),
-    }),
-    logs,
-    messages,
-    multiselectCalls,
-    notes,
-    outros,
-    selectCalls,
-    spinnerEntries,
-  }
 }
 
 export function createDependencyInstallerTestContext(options?: {
@@ -378,18 +190,15 @@ export function createDependencyInstallerTestContext(options?: {
   }
 }
 
-function makeQuietTerminalLayer() {
-  return Layer.succeed(Terminal.Terminal)(
-    Terminal.make({
-      columns: Effect.succeed(40),
-      display: () => Effect.void,
-      readInput: Effect.never,
-      readLine: Effect.never,
-      rows: Effect.succeed(24),
-      size: Effect.never,
-    })
-  )
-}
+/**
+ * The capabilities of a terminal that can prompt. Without this layer, commands run as in CI, where
+ * `canPrompt` is false. Colors stay off, so the output reads as plain text.
+ */
+export const promptingLayer = Layer.succeed(TerminalCapabilities.TerminalCapabilities)({
+  canAnimate: false,
+  canColor: false,
+  canPrompt: true,
+})
 
 const failingSpawnerLayer = Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(
   ChildProcessSpawner.make(() => Effect.die("Command tests must not spawn processes"))
@@ -417,22 +226,30 @@ export interface RunCommandOptions<Layers extends readonly TestLayer[]> {
   readonly forwardedArguments?: readonly string[]
   readonly layers?: Layers
   readonly logLines?: unknown[]
+  /**
+   * The terminal that answers the prompts. The default terminal has no keys, so a prompt fails the
+   * test.
+   */
+  readonly terminal?: TerminalTestContext
 }
 
-function makeDefaultLayer(files: FileSystemTestContext) {
+function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestContext) {
   const platformLayer = Layer.mergeAll(files.layer, Path.layer)
 
   return Layer.mergeAll(
     platformLayer,
     NodeVersionResolver.layer.pipe(Layer.provide(platformLayer)),
     makeModuleResolverLayer(files.root),
-    TestConsole.layer,
-    makeQuietTerminalLayer(),
-    Stdio.layerTest({}),
-    Layer.succeed(TerminalCapabilities)({
-      copyToClipboard: () => Effect.void,
-      isInteractive: Effect.succeed(false),
+    // Fresh, so a test that runs two commands reads separate lines for each run.
+    Layer.fresh(TestConsole.layer),
+    terminal.layer,
+    Layer.succeed(Prompt.Theme)(Prompt.makeTheme({ colors: false })),
+    Layer.succeed(TerminalCapabilities.TerminalCapabilities)({
+      canAnimate: false,
+      canColor: false,
+      canPrompt: false,
     }),
+    Stdio.layerTest({}),
     failingSpawnerLayer,
     unexpectedRunnerLayer,
     // Fresh, so this default does not memoize `CodingAgents` ahead of a test's runner layer.
@@ -459,7 +276,11 @@ export function runCommand<
   options: RunCommandOptions<Layers> = {}
 ) {
   const files = options.files ?? createFileSystemTestContext()
-  const testLayer = Layer.mergeAll(makeDefaultLayer(files), ...(options.layers ?? []))
+
+  const testLayer = Layer.mergeAll(
+    makeDefaultLayer(files, options.terminal ?? createTerminalTestContext()),
+    ...(options.layers ?? [])
+  )
 
   return Effect.exit(
     Command.runWith(command, { version: "test" })(args).pipe(

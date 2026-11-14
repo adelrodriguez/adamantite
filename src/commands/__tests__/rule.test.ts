@@ -4,6 +4,7 @@ import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { createTerminalTestContext } from "#__tests__/terminal.ts"
 import ruleCommand, { renderTrial } from "#commands/rule.ts"
 import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
 import {
@@ -15,22 +16,17 @@ import {
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
-import {
-  createPrompterTestContext,
-  createRunnerTestContext,
-  interactiveTerminalLayer,
-  runCommand,
-} from "./command-test-helpers.ts"
+import { createRunnerTestContext, promptingLayer, runCommand } from "./command-test-helpers.ts"
 
 describe("rule add", () => {
   it.effect("write only the rule stub to .adamantite/lint", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext()
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
 
       const exit = yield* runCommand(ruleCommand, ["add", "no-process-env"], {
         files,
-        layers: [prompter.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -38,16 +34,9 @@ describe("rule add", () => {
         toCustomRuleStub("no-process-env")
       )
       expect(files.list()).toStrictEqual([".adamantite/lint/no-process-env.ts"])
-      expect(prompter.logs).toStrictEqual([
-        {
-          level: "success",
-          message: "Wrote .adamantite/lint/no-process-env.ts.",
-        },
-        {
-          level: "info",
-          message:
-            '`custom()` from `adamantite/rules` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells agents how to verify the rule with temporary cases.',
-        },
+      expect(logLines).toStrictEqual([
+        "✔ Wrote .adamantite/lint/no-process-env.ts.",
+        '● `custom()` from `adamantite/rules` loads the rule. Run `adamantite doctor` to check the wiring. The "Custom rules" section of the Adamantite skill tells agents how to verify the rule with temporary cases.',
       ])
     })
   )
@@ -59,7 +48,7 @@ describe("rule add", () => {
       const exit = yield* runCommand(
         ruleCommand,
         ["add", "--dir", "tooling/lint/rules", "no-window"],
-        { files, layers: [createPrompterTestContext().layer] }
+        { files }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -77,7 +66,6 @@ describe("rule add", () => {
 
       const exit = yield* runCommand(ruleCommand, ["add", "no-process-env"], {
         files,
-        layers: [createPrompterTestContext().layer],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -96,7 +84,6 @@ describe("rule add", () => {
 
       const exit = yield* runCommand(ruleCommand, ["add", "no-process-env"], {
         files,
-        layers: [createPrompterTestContext().layer],
       })
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CustomRuleExists)
@@ -114,7 +101,6 @@ describe("rule add", () => {
 
       const exit = yield* runCommand(ruleCommand, ["add", "_helpers"], {
         files,
-        layers: [createPrompterTestContext().layer],
       })
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(InvalidRuleName)
@@ -132,7 +118,6 @@ describe("rule add", () => {
 
       const exit = yield* runCommand(ruleCommand, ["add", "test"], {
         files,
-        layers: [createPrompterTestContext().layer],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -149,7 +134,6 @@ describe("rule add", () => {
 
       const exit = yield* runCommand(ruleCommand, ["add", "test", "no-debugger"], {
         files,
-        layers: [createPrompterTestContext().layer],
       })
 
       expect(Exit.isFailure(exit)).toBe(true)
@@ -172,27 +156,46 @@ describe("rule test add", () => {
         },
       })
 
-      const prompter = createPrompterTestContext({ selectResponses: ["no-debugger"] })
+      const terminal = createTerminalTestContext(["enter"])
 
       const exit = yield* runCommand(ruleCommand, ["test", "add"], {
         files,
-        layers: [prompter.layer, interactiveTerminalLayer],
+        layers: [promptingLayer],
+        terminal,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.selectCalls).toStrictEqual([
-        {
-          message: "Which rule needs a test?",
-          options: [
-            { label: "no-debugger", value: "no-debugger" },
-            { label: "no-window", value: "no-window" },
-          ],
-        },
-      ])
+      // The first frame offers the two rules only, because the helper file is not a rule.
+      expect(terminal.output()).toBe(
+        "? Which rule needs a test? › \n❯ no-debugger \n  no-window ✔ Which rule needs a test? …  no-debugger\n"
+      )
       expect(files.read(".adamantite/lint/no-debugger.test.ts")).toContain(
         'import rule from "./no-debugger.ts"'
       )
       expect(files.read(".adamantite/lint/no-window.test.ts")).toBe("// existing test\n")
+    })
+  )
+
+  it.effect("write no test and exit with 1 when the user cancels the rule prompt", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
+      })
+
+      const logLines: unknown[] = []
+
+      const exit = yield* runCommand(ruleCommand, ["test", "add"], {
+        files,
+        layers: [promptingLayer],
+        logLines,
+        terminal: createTerminalTestContext(["ctrl+c"]),
+      })
+
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
+        new CommandFailed({ command: "rule test add", exitCode: ChildProcessSpawner.ExitCode(1) })
+      )
+      expect(logLines).toStrictEqual(["\n■ No rule test was added."])
+      expect(files.list()).toStrictEqual([".adamantite/lint/no-debugger.ts"])
     })
   )
 
@@ -202,19 +205,18 @@ describe("rule test add", () => {
         files: { ".adamantite/lint/no-debugger.ts": "// rule\n" },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
 
       const exit = yield* runCommand(ruleCommand, ["test", "add"], {
         files,
-        layers: [prompter.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.messages).toStrictEqual(["no-debugger"])
-      expect(prompter.logs).toStrictEqual([
-        { level: "info", message: "Pass a rule name with `adamantite rule test add <name>`." },
+      expect(logLines).toStrictEqual([
+        "no-debugger",
+        "● Pass a rule name with `adamantite rule test add <name>`.",
       ])
-      expect(prompter.selectCalls).toStrictEqual([])
       expect(files.list()).toStrictEqual([".adamantite/lint/no-debugger.ts"])
     })
   )
@@ -228,7 +230,7 @@ describe("rule test add", () => {
       const exit = yield* runCommand(
         ruleCommand,
         ["test", "add", "no-debugger", "--path", "tests/lint/no-debugger.test.ts"],
-        { files, layers: [createPrompterTestContext().layer] }
+        { files }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -245,12 +247,13 @@ describe("rule test add", () => {
         files: { ".adamantite/lint/no-debugger.ts": "// user-owned rule\n" },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test", "add", "no-debugger"], {
         files,
-        layers: [prompter.layer, runner.layer],
+        layers: [runner.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -271,7 +274,6 @@ describe("rule test add", () => {
 
       const exit = yield* runCommand(ruleCommand, ["test", "add", "no-debugger"], {
         files,
-        layers: [createPrompterTestContext().layer],
       })
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CustomRuleNotFound)
@@ -293,7 +295,6 @@ describe("rule test add", () => {
 
       const exit = yield* runCommand(ruleCommand, ["test", "add", "no-debugger"], {
         files,
-        layers: [createPrompterTestContext().layer],
       })
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CustomRuleExists)
@@ -313,7 +314,7 @@ describe("rule test add", () => {
       const exit = yield* runCommand(
         ruleCommand,
         ["test", "add", "no-window", "--dir", "tooling/lint"],
-        { files, layers: [createPrompterTestContext().layer] }
+        { files }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -330,13 +331,13 @@ describe("rule test add", () => {
         files: { "tooling/lint/no-window.ts": "// rule\n" },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(
         ruleCommand,
         ["test", "add", "--dir", "tooling/lint", "--path", "tests/no-window.test.ts", "no-window"],
-        { files, layers: [prompter.layer, runner.layer] }
+        { files, layers: [runner.layer], logLines }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -345,18 +346,10 @@ describe("rule test add", () => {
       )
       expect(files.list()).toStrictEqual(["tests/no-window.test.ts", "tooling/lint/no-window.ts"])
       expect(runner.invocations).toStrictEqual([])
-      expect(prompter.logs).toStrictEqual([
-        { level: "success", message: "Wrote tests/no-window.test.ts." },
-        {
-          level: "info",
-          message:
-            "Adapt the valid and invalid cases to the rule, then run `adamantite rule test` with `--path` and the test file path.",
-        },
-        {
-          level: "info",
-          message:
-            "RuleTester uses node:test. Exclude this test from Vitest and Jest discovery. See Custom rules in the Adamantite README.",
-        },
+      expect(logLines).toStrictEqual([
+        "✔ Wrote tests/no-window.test.ts.",
+        "● Adapt the valid and invalid cases to the rule, then run `adamantite rule test` with `--path` and the test file path.",
+        "● RuleTester uses node:test. Exclude this test from Vitest and Jest discovery. See Custom rules in the Adamantite README.",
       ])
     })
   )
@@ -386,7 +379,7 @@ describe("rule test", () => {
         ["test", "--path", "tests/lint/no-debugger.test.ts"],
         {
           files,
-          layers: [createPrompterTestContext().layer, runner.layer],
+          layers: [runner.layer],
         }
       )
 
@@ -422,7 +415,7 @@ describe("rule test", () => {
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
         files,
-        layers: [createPrompterTestContext().layer, runner.layer],
+        layers: [runner.layer],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -451,7 +444,7 @@ describe("rule test", () => {
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
         files,
-        layers: [createPrompterTestContext().layer, runner.layer],
+        layers: [runner.layer],
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -473,7 +466,7 @@ describe("rule test", () => {
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
         files,
-        layers: [createPrompterTestContext().layer, createRunnerTestContext([1]).layer],
+        layers: [createRunnerTestContext([1]).layer],
       })
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(CommandFailed)
@@ -498,21 +491,19 @@ describe("rule test", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
         files,
-        layers: [prompter.layer, runner.layer],
+        layers: [runner.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(prompter.logs).toStrictEqual([
-        {
-          level: "warning",
-          message:
-            "`rule test` cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. It does not run the tests of that rules folder.",
-        },
+      expect(logLines).toStrictEqual([
+        "▲ `rule test` cannot read the `dir` of a `custom()` call in `oxlint.config.ts`, because it is not a string literal. It does not run the tests of that rules folder.",
+        "🧪 Testing custom rules · adamantite (node)",
       ])
       expect(runner.invocations.map((invocation) => invocation.args)).toStrictEqual([
         ["--test", ".adamantite/lint/no-a.test.ts"],
@@ -529,27 +520,20 @@ describe("rule test", () => {
         },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
         files,
-        layers: [prompter.layer, runner.layer],
+        layers: [runner.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toStrictEqual([])
-      expect(prompter.logs).toStrictEqual([
-        {
-          level: "warning",
-          message:
-            "`rule test` cannot resolve the import of `./tooling/missing.ts` in `oxlint.config.ts`, so it does not run the tests of the rules folders behind it.",
-        },
-        {
-          level: "info",
-          message:
-            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
-        },
+      expect(logLines).toStrictEqual([
+        "▲ `rule test` cannot resolve the import of `./tooling/missing.ts` in `oxlint.config.ts`, so it does not run the tests of the rules folders behind it.",
+        "● No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
       ])
     })
   )
@@ -567,22 +551,19 @@ describe("rule test", () => {
   ])("say that there are no tests, and pass, with $name", ({ files: fixture }) =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({ files: fixture })
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const runner = createRunnerTestContext()
 
       const exit = yield* runCommand(ruleCommand, ["test"], {
         files,
-        layers: [prompter.layer, runner.layer],
+        layers: [runner.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(runner.invocations).toStrictEqual([])
-      expect(prompter.logs).toStrictEqual([
-        {
-          level: "info",
-          message:
-            "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
-        },
+      expect(logLines).toStrictEqual([
+        "● No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
       ])
     })
   )
@@ -595,16 +576,16 @@ describe("rule ast", () => {
         files: { "src/value.ts": "export const value = (1 + 2) as number\n" },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
 
       const exit = yield* runCommand(ruleCommand, ["ast", "src/value.ts"], {
         files,
-        layers: [prompter.layer],
+        logLines,
       })
 
       expect(Exit.isSuccess(exit)).toBe(true)
 
-      const [output] = prompter.messages
+      const [output] = logLines
 
       expect(output).toContain('"type": "TSAsExpression"')
       expect(output).toContain('"type": "BinaryExpression"')
@@ -618,18 +599,18 @@ describe("rule ast", () => {
         files: { "src/broken.ts": "export const = 1\n" },
       })
 
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
 
       const exit = yield* runCommand(ruleCommand, ["ast", "src/broken.ts"], {
         files,
-        layers: [prompter.layer],
+        logLines,
       })
 
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(FailedToParseSource)
       expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
         path: `${files.root}/src/broken.ts`,
       })
-      expect(prompter.messages).toStrictEqual([])
+      expect(logLines).toStrictEqual([])
     })
   )
 })
@@ -698,12 +679,12 @@ describe("rule try", () => {
     },
   ])("$name with exit code 2 before it copies the project", ({ args, message }) =>
     Effect.gen(function* () {
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
 
       // The test spawner dies on each process, so the error comes before the copy.
       const exit = yield* runCommand(ruleCommand, ["try", "no-console", ...args], {
         files: createFileSystemTestContext(),
-        layers: [prompter.layer],
+        logLines,
       })
 
       const failure = Option.getOrThrow(Exit.findErrorOption(exit))
@@ -712,7 +693,7 @@ describe("rule try", () => {
       expect(failure).toStrictEqual(
         new CommandFailed({ command: "rule try", exitCode: ChildProcessSpawner.ExitCode(2) })
       )
-      expect(prompter.logs).toStrictEqual([{ level: "error", message }])
+      expect(logLines).toStrictEqual([`✖ ${message}`])
     })
   )
 })

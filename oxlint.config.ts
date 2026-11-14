@@ -59,13 +59,11 @@ export default defineConfig({
     // A wrapper owns each of these packages, so the rest of the code uses the wrapper.
     "adamantite/import-owners": [
       "error",
+      // Only commands and the terminal ask the user. Lib code returns data, and the command decides
+      // whether to ask.
       {
-        import: "@clack/prompts",
-        owners: [
-          "src/terminal/prompter.ts",
-          "src/terminal/__tests__/prompter.test.ts",
-          "src/commands/__tests__/command-test-helpers.ts",
-        ],
+        import: "effect/cli/Prompt",
+        owners: ["src/commands", "src/terminal", "src/__tests__"],
       },
       {
         import: "oxc-resolver",

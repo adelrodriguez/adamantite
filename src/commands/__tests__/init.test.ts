@@ -4,11 +4,12 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import type { InitEditor, InitOptions } from "#commands/init/options.ts"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
+import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
+import { INIT_EDITORS, type InitEditor, type InitOptions } from "#commands/init/options.ts"
 import { installEditorExtensions, setupEditors } from "#commands/init/setup.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
@@ -17,16 +18,18 @@ import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.t
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { LINT_PRESETS } from "#lib/integrations/tooling/oxlint/presets.ts"
+import { LINT_PRESETS, lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
+import { TYPESCRIPT_PRESET_NAMES } from "#lib/integrations/workspace/tsconfig.ts"
 import { CliNotFound, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/workspace/agents.ts"
+import { SCRIPT_ORDER } from "#lib/workspace/package-json.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
-  createPrompterTestContext,
+  promptingLayer,
   runCommand,
 } from "./command-test-helpers.ts"
 
@@ -56,6 +59,29 @@ const monorepoPackageJson = JSON.stringify(
 // Interactive init probes the coding agent CLIs for the skill prompt. None of them is installed.
 
 const shippedSkill = getShippedSkillFiles()
+
+/**
+ * The keys that check the given choices of a multiselect and submit it. The prompt lists `Select
+ * All` and `Inverse Selection` above its choices, and its cursor starts on `Select All`.
+ */
+function pickMany<const T>(choices: readonly T[], selected: readonly T[]): TestKey[] {
+  const rows = choices.flatMap((choice, index) => (selected.includes(choice) ? [index + 2] : []))
+
+  return [
+    ...rows.flatMap((row, index): TestKey[] => [
+      ...Array.from({ length: row - (rows[index - 1] ?? 0) }, (): TestKey => "down"),
+      "space",
+    ]),
+    "enter",
+  ]
+}
+
+/**
+ * The keys that submit the given choice of a select, whose cursor starts on the first choice.
+ */
+function pickOne<const T>(choices: readonly T[], choice: T): TestKey[] {
+  return [...Array.from({ length: choices.indexOf(choice) }, (): TestKey => "down"), "enter"]
+}
 
 function createInitTestContext(files?: Record<string, string>) {
   return createFileSystemTestContext({
@@ -87,20 +113,28 @@ function runFreshSetup() {
   return Effect.gen(function* () {
     const files = createInitTestContext()
 
-    const prompter = createPrompterTestContext({
-      confirmResponses: [true, false, false, false],
-      multiselectResponses: [["check", "analyze"], ["react"], ["vscode"]],
-      selectResponses: ["typescript"],
-    })
+    const terminal = createTerminalTestContext([
+      ...pickMany(SCRIPT_ORDER, ["check", "analyze"]),
+      ...pickMany(LINT_PRESETS, ["react"]),
+      // Use the TypeScript preset, which the prompt offers by default.
+      "enter",
+      ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
+      ...pickMany(INIT_EDITORS, ["vscode"]),
+      // Decline the extensions, the GitHub Actions workflow, and the agent guidance.
+      "n",
+      "n",
+      "n",
+    ])
 
     const installer = createDependencyInstallerTestContext()
 
     const exit = yield* runCommand(initCommand, [], {
       files,
-      layers: [prompter.layer, installer.layer],
+      layers: [installer.layer, promptingLayer],
+      terminal,
     })
 
-    return { exit, files, installer, prompter }
+    return { exit, files, installer, terminal }
   })
 }
 
@@ -108,7 +142,7 @@ function runFreshSetup() {
 function runEffectSetup() {
   return Effect.gen(function* () {
     const files = createInitTestContext()
-    const prompter = createPrompterTestContext()
+    const logLines: unknown[] = []
     const installer = createDependencyInstallerTestContext()
     const runner = createRunnerTestContext()
 
@@ -123,7 +157,7 @@ function runEffectSetup() {
         "--typescript",
         "typescript",
       ],
-      { files, layers: [prompter.layer, installer.layer, runner.layer] }
+      { files, layers: [installer.layer, runner.layer], logLines }
     )
 
     return { exit, files, installer, runner }
@@ -188,11 +222,26 @@ describe("init", () => {
 
   it.effect("offer every selectable lint preset in interactive init", () =>
     Effect.gen(function* () {
-      const { prompter } = yield* runFreshSetup()
+      // The list pages, so the cursor moves to the last preset to show each one.
+      const terminal = createTerminalTestContext([
+        ...pickMany(SCRIPT_ORDER, ["check"]),
+        ...pickMany(LINT_PRESETS, ["tailwind"]),
+        "n",
+        ...pickMany(INIT_EDITORS, []),
+        "n",
+        "n",
+      ])
 
-      expect(prompter.multiselectCalls[1]).toMatchObject({
-        options: LINT_PRESETS.map((value) => ({ value })),
+      const exit = yield* runCommand(initCommand, [], {
+        files: createInitTestContext(),
+        layers: [createDependencyInstallerTestContext().layer, promptingLayer],
+        terminal,
       })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(
+        lintPresets.filter((preset) => !terminal.output().includes(preset.label))
+      ).toStrictEqual([])
     })
   )
 
@@ -224,21 +273,21 @@ describe("init", () => {
       ({ content, legacyConfig, modernConfig, script, tool }) =>
         Effect.gen(function* () {
           const files = createInitTestContext({ [legacyConfig]: content })
-          const prompter = createPrompterTestContext()
+          const logLines: unknown[] = []
           const installer = createDependencyInstallerTestContext()
 
           const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", script], {
             files,
-            layers: [prompter.layer, installer.layer],
+            layers: [installer.layer],
+            logLines,
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
           expect(files.read(legacyConfig)).toBe(content)
           expect(files.exists(modernConfig)).toBe(false)
-          expect(prompter.logs).toContainEqual({
-            level: "info",
-            message: `Legacy \`${legacyConfig}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool} config.`,
-          })
+          expect(logLines).toContainEqual(
+            `● Legacy \`${legacyConfig}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool} config.`
+          )
         })
     )
   })
@@ -246,7 +295,7 @@ describe("init", () => {
   it.effect("configure the first-party plugin presets without extra packages", () =>
     Effect.gen(function* () {
       const files = createInitTestContext({ "package.json": basePackageJson })
-      const prompter = createPrompterTestContext()
+      const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
 
       const exit = yield* runCommand(
@@ -262,7 +311,7 @@ describe("init", () => {
           "--preset",
           "tanstack",
         ],
-        { files, layers: [prompter.layer, installer.layer] }
+        { files, layers: [installer.layer], logLines }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -281,13 +330,13 @@ describe("init", () => {
     it.effect("install @shadcn/lint when the tailwind preset is selected", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({ "package.json": basePackageJson })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "tailwind"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -301,7 +350,7 @@ describe("init", () => {
     it.effect("install oxlint-plugin-react-doctor when the react-strict preset is selected", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({ "package.json": basePackageJson })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
@@ -315,7 +364,7 @@ describe("init", () => {
             "--preset",
             "react-strict",
           ],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -357,14 +406,14 @@ describe("init", () => {
     it.effect("ignore the language service plugin name in a new knip config", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--script", "analyze", "--preset", "effect"],
-          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+          { files, layers: [installer.layer, runner.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -383,23 +432,21 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+          { files, layers: [installer.layer, runner.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(readJson(files, "package.json")).toMatchObject({ scripts: { prepare: "husky" } })
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry.",
-        })
+        expect(logLines).toContainEqual(
+          "▲ No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry."
+        )
       })
     )
 
@@ -410,49 +457,54 @@ describe("init", () => {
           "tsconfig.json": "{}",
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+          { files, layers: [installer.layer, runner.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read("tsconfig.json")).toBe("{}")
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message: expect.stringContaining("In a monorepo, add the Effect language service entry"),
-        })
+        expect(logLines).toContainEqual(
+          expect.stringContaining("In a monorepo, add the Effect language service entry")
+        )
       })
     )
 
     it.effect("add the react preset when react-strict is selected without it", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
+        const logLines: unknown[] = []
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], ["react-strict"], []],
-        })
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, ["react-strict"]),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read("oxlint.config.ts")).toContain(
           'import react from "adamantite/lint/react"'
         )
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message: "Added the `react` preset, which `react-strict` requires.",
-        })
+        expect(logLines).toContainEqual(
+          "● Added the `react` preset, which `react-strict` requires."
+        )
       })
     )
 
@@ -460,28 +512,31 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], ["jest", "vitest", "strict"], []],
-          selectResponses: ["vitest"],
-        })
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, ["jest", "vitest", "strict"]),
+          ...pickOne(["jest", "vitest"], "vitest"),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.selectCalls[0]).toMatchObject({
-          message:
-            "The jest and vitest presets report the same defects. Which one should Adamantite use?",
-          options: [
-            { label: "jest", value: "jest" },
-            { label: "vitest", value: "vitest" },
-          ],
-        })
+        expect(terminal.output()).toContain(
+          "? The jest and vitest presets report the same defects. Which one should Adamantite use? › \n❯ jest \n  vitest "
+        )
+        expect(terminal.output()).toContain(
+          "✔ The jest and vitest presets report the same defects. Which one should Adamantite use? …  vitest"
+        )
         expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
           "vitest",
           "strict",
@@ -494,12 +549,13 @@ describe("init", () => {
     it.effect("install sherif with the analyze script in a monorepo", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({ "package.json": monorepoPackageJson })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "analyze"], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -525,7 +581,7 @@ describe("init", () => {
       it.effect(`install at the monorepo root with ${name}`, () =>
         Effect.gen(function* () {
           const files = createInitTestContext({ "package.json": monorepoPackageJson })
-          const prompter = createPrompterTestContext()
+          const logLines: unknown[] = []
 
           const installer = createDependencyInstallerTestContext({
             detectedPackageManager: { name },
@@ -533,7 +589,8 @@ describe("init", () => {
 
           const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
             files,
-            layers: [prompter.layer, installer.layer],
+            layers: [installer.layer],
+            logLines,
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
@@ -560,32 +617,22 @@ describe("init", () => {
     ])("leave $name as it is and print guidance in a monorepo", ({ files: rootFiles, tsconfig }) =>
       Effect.gen(function* () {
         const files = createInitTestContext({ "package.json": monorepoPackageJson, ...rootFiles })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--typescript", "typescript"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(readOptionalFile(files, "tsconfig.json")).toBe(tsconfig)
-        expect(prompter.logs).toStrictEqual(
+        expect(logLines).toStrictEqual(
           expect.arrayContaining([
-            {
-              level: "info",
-              message: "Adamantite leaves the root `tsconfig.json` unchanged in a monorepo.",
-            },
-            {
-              level: "info",
-              message:
-                'Add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
-            },
-            {
-              level: "info",
-              message: "In a library package, extend `adamantite/tsconfig` instead.",
-            },
+            "● Adamantite leaves the root `tsconfig.json` unchanged in a monorepo.",
+            '● Add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
+            "● In a library package, extend `adamantite/tsconfig` instead.",
           ])
         )
       })
@@ -618,17 +665,23 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false, false],
-          multiselectResponses: [["check"], [], ["vscode"]],
-          selectResponses: ["typescript"],
-        })
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "enter",
+          ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
+          ...pickMany(INIT_EDITORS, ["vscode"]),
+          "n",
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -651,16 +704,22 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false, false],
-          multiselectResponses: [["check"], [], ["zed"]],
-        })
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, ["zed"]),
+          "n",
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -692,43 +751,34 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, false],
-          multiselectResponses: [[], []],
-          selectResponses: ["tsconfig"],
-        })
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, []),
+          "enter",
+          ...pickOne(TYPESCRIPT_PRESET_NAMES, "tsconfig"),
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect([
-          prompter.multiselectCalls[0],
-          prompter.confirmCalls[0],
-          prompter.selectCalls[0],
-        ]).toMatchObject([
-          { required: false },
-          { message: "Use an Adamantite TypeScript preset?" },
-          {
-            message: "Which TypeScript preset should Adamantite use?",
-            options: [
-              {
-                hint: "JSON.parse() returns unknown, not any. Avoid in libraries.",
-                label: "Strict types",
-                value: "typescript",
-              },
-              {
-                hint: "No changes to built-in types. Use for libraries.",
-                label: "Strict config",
-                value: "tsconfig",
-              },
-            ],
-          },
-        ])
+        // The confirm defaults to yes, and the select shows the description of the focused preset.
+        expect(terminal.output()).toContain(
+          [
+            "? Use an Adamantite TypeScript preset? › (Y/n)✔ Use an Adamantite TypeScript preset? … yes",
+            "? Which TypeScript preset should Adamantite use? › ",
+            "❯ Strict types - JSON.parse() returns unknown, not any. Avoid in libraries.",
+            "  Strict config ? Which TypeScript preset should Adamantite use? › ",
+            "  Strict types ",
+            "❯ Strict config - No changes to built-in types. Use for libraries.✔ Which TypeScript preset should Adamantite use? …  Strict config",
+          ].join("\n")
+        )
         expect(installer.calls).toStrictEqual([
           { options: { silent: true, workspace: false }, packages: ["adamantite"] },
         ])
@@ -742,23 +792,31 @@ describe("init", () => {
         const files = createInitTestContext()
         const originalPackageJson = files.read("package.json")
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false],
-          multiselectResponses: [[], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(installer.calls).toStrictEqual([])
         expect(files.list()).toStrictEqual(["package.json"])
         expect(files.read("package.json")).toBe(originalPackageJson)
-        expect(prompter.outros).toStrictEqual([
+        expect(logLines).toStrictEqual([
+          "💠 adamantite init",
+          "● Detected package manager: bun",
           "💠 No setup selected, so Adamantite made no changes.",
         ])
       })
@@ -778,12 +836,13 @@ describe("init", () => {
             }),
           })
 
-          const prompter = createPrompterTestContext()
+          const logLines: unknown[] = []
           const installer = createDependencyInstallerTestContext()
 
           const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
             files,
-            layers: [prompter.layer, installer.layer],
+            layers: [installer.layer],
+            logLines,
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
@@ -803,7 +862,8 @@ describe("init", () => {
     it.effect("configure the project entirely from flags without showing prompts", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
+        const terminal = createTerminalTestContext()
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
@@ -824,11 +884,11 @@ describe("init", () => {
             "--github-actions",
             "--agents",
           ],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines, terminal }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter).toMatchObject({ confirmCalls: [], multiselectCalls: [] })
+        expect(terminal.output()).toBe("")
         expect(installer.calls).toStrictEqual([
           {
             options: { silent: true, workspace: false },
@@ -875,22 +935,21 @@ describe("init", () => {
     ])("set up the $preset preset with $name", ({ args, preset, scripts }) =>
       Effect.gen(function* () {
         const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, args, {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: `adamantite/${preset}` })
         expect(readJson(files, "package.json").scripts).toStrictEqual(scripts)
         expect(files.exists("oxlint.config.ts")).toBe(false)
-        expect(prompter.spinnerEntries).toContainEqual(
-          expect.objectContaining({
-            message: `\`tsconfig.json\` created with \`adamantite/${preset}\`.`,
-          })
+        expect(logLines).toContainEqual(
+          `✔ \`tsconfig.json\` created with \`adamantite/${preset}\`.`
         )
       })
     )
@@ -898,13 +957,13 @@ describe("init", () => {
     it.effect("deduplicate a repeated preset", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--preset", "react", "--preset", "react"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -959,12 +1018,13 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         const originalPackageJson = files.read("package.json")
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, args, {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -982,7 +1042,7 @@ describe("init", () => {
         Effect.gen(function* () {
           const files = createInitTestContext()
           const originalPackageJson = files.read("package.json")
-          const prompter = createPrompterTestContext()
+          const logLines: unknown[] = []
 
           const installer = createDependencyInstallerTestContext({
             detectedPackageManager: { name: "aube" },
@@ -991,7 +1051,7 @@ describe("init", () => {
           const exit = yield* runCommand(
             initCommand,
             ["--non-interactive", "--script", "check", "--github-actions"],
-            { files, layers: [prompter.layer, installer.layer] }
+            { files, layers: [installer.layer], logLines }
           )
 
           expect(Exit.isFailure(exit)).toBe(true)
@@ -1028,33 +1088,31 @@ describe("init", () => {
           "package.json": conflictingMonorepoPackageJson,
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
+
+        const terminal = createTerminalTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "analyze", "--script", "fix"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines, terminal }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls).toStrictEqual([])
+        expect(terminal.output()).toBe("")
 
         expect(readJson(files, "package.json").scripts).toStrictEqual({
           analyze: "knip --directory packages/app",
           fix: "adamantite fix",
         })
 
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Kept existing `analyze` script (`knip --directory packages/app`) instead of `adamantite analyze`. Use `--overwrite-scripts` to replace it.",
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message:
-            "Pass custom tool arguments after `--`, such as `adamantite analyze -- --directory packages/app`.",
-        })
+        expect(logLines).toContainEqual(
+          "▲ Kept existing `analyze` script (`knip --directory packages/app`) instead of `adamantite analyze`. Use `--overwrite-scripts` to replace it."
+        )
+        expect(logLines).toContainEqual(
+          "● Pass custom tool arguments after `--`, such as `adamantite analyze -- --directory packages/app`."
+        )
       })
     )
 
@@ -1064,13 +1122,13 @@ describe("init", () => {
           "package.json": conflictingMonorepoPackageJson,
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "analyze", "--script", "fix", "--overwrite-scripts"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1079,9 +1137,7 @@ describe("init", () => {
           analyze: "adamantite analyze",
           fix: "adamantite fix",
         })
-        expect(prompter.logs).not.toContainEqual(
-          expect.objectContaining({ message: expect.stringContaining("Kept existing") })
-        )
+        expect(logLines).not.toContainEqual(expect.stringContaining("Kept existing"))
       })
     )
 
@@ -1095,27 +1151,34 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          "y",
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "`check` runs `tsc && eslint .`. Adamantite would replace it with `adamantite check`.",
-        })
-        expect(prompter.confirmCalls[0]).toMatchObject({
-          message: "Replace this script with Adamantite's command?",
-        })
+        expect(logLines).toContainEqual(
+          "▲ `check` runs `tsc && eslint .`. Adamantite would replace it with `adamantite check`."
+        )
+        expect(terminal.output()).toContain(
+          "? Replace this script with Adamantite's command? › (y/N)✔ Replace this script with Adamantite's command? … yes\n"
+        )
 
         expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "adamantite check" })
       })
@@ -1131,26 +1194,33 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        // Keep the script, which the confirm offers by default. A kept script runs no CI, so no workflow question follows.
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          "enter",
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
 
         expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "tsc && eslint ." })
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Run `adamantite init` again and choose to replace the script.",
-        })
+        expect(logLines).toContainEqual(
+          "▲ Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Run `adamantite init` again and choose to replace the script."
+        )
       })
     )
 
@@ -1166,24 +1236,30 @@ describe("init", () => {
             }),
           })
 
-          // Only the typescript, CI, and agents confirms should fire; an overwrite
-          // confirm would fail the run with a missing confirm response.
-          const prompter = createPrompterTestContext({
-            confirmResponses: [false, false, false],
-            multiselectResponses: [["check"], [], []],
-          })
+          const logLines: unknown[] = []
+
+          // Only the TypeScript, CI, and agent questions follow the presets.
+          const terminal = createTerminalTestContext([
+            ...pickMany(SCRIPT_ORDER, ["check"]),
+            ...pickMany(LINT_PRESETS, []),
+            "n",
+            ...pickMany(INIT_EDITORS, []),
+            "n",
+            "n",
+          ])
 
           const installer = createDependencyInstallerTestContext()
 
           const exit = yield* runCommand(initCommand, [], {
             files,
-            layers: [prompter.layer, installer.layer],
+            layers: [installer.layer, promptingLayer],
+            logLines,
+            terminal,
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
-          expect(prompter.logs).not.toContainEqual(
-            expect.objectContaining({ message: expect.stringContaining("Kept existing") })
-          )
+          expect(terminal.output()).not.toContain("Replace this script")
+          expect(logLines).not.toContainEqual(expect.stringContaining("Kept existing"))
 
           expect(readJson(files, "package.json").scripts).toStrictEqual({
             check: "adamantite check",
@@ -1197,13 +1273,13 @@ describe("init", () => {
           "package.json": conflictingMonorepoPackageJson,
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "analyze", "--script", "check", "--agents"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1220,10 +1296,16 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, true],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "enter",
+        ])
 
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: { name: "npm" },
@@ -1231,7 +1313,9 @@ describe("init", () => {
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1249,24 +1333,30 @@ describe("init", () => {
 
           const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
-          const prompter = createPrompterTestContext({
-            confirmResponses: [false, false, true],
-            multiselectResponses: [["check"], [], []],
-          })
+          const logLines: unknown[] = []
+
+          const terminal = createTerminalTestContext([
+            ...pickMany(SCRIPT_ORDER, ["check"]),
+            ...pickMany(LINT_PRESETS, []),
+            "n",
+            ...pickMany(INIT_EDITORS, []),
+            "n",
+            "enter",
+          ])
 
           const installer = createDependencyInstallerTestContext()
 
           const exit = yield* runCommand(initCommand, [], {
             files,
-            layers: [prompter.layer, installer.layer],
+            layers: [installer.layer, promptingLayer],
+            logLines,
+            terminal,
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
-          expect(prompter.logs).toContainEqual({
-            level: "warning",
-            message:
-              "AGENTS.md has an incomplete ADAMANTITE marker. Remove the incomplete marker and run `adamantite init` again.",
-          })
+          expect(logLines).toContainEqual(
+            "▲ AGENTS.md has an incomplete ADAMANTITE marker. Remove the incomplete marker and run `adamantite init` again."
+          )
           expect(files.read("AGENTS.md")).toBe(existingAgents)
         })
     )
@@ -1276,16 +1366,24 @@ describe("init", () => {
         const existingAgents = "# Existing Instructions\n"
         const files = createInitTestContext({ "AGENTS.md": existingAgents })
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1299,26 +1397,33 @@ describe("init", () => {
         // it fails exactly like the old mkdir-based fixture on the real filesystem.
         const files = createInitTestContext({ "AGENTS.md/placeholder": "" })
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, true],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "enter",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message: expect.stringMatching(
+        expect(logLines).toContainEqual(
+          expect.stringMatching(
             /Could not update AGENTS\.md\. Could not read `.*\/AGENTS\.md`\. Check that the file exists and is readable, then try again\.( Cause: .*)? Adamantite will continue initialization\./
-          ),
-        })
-        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
+          )
+        )
+        expect(logLines.at(-1)).toBe("💠 Setup finished.")
       })
     )
   })
@@ -1327,14 +1432,14 @@ describe("init", () => {
     it.effect("write the shipped skill to `.agents/skills` and each agent folder that exists", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({ ".claude/settings.json": "{}\n" })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "fix", "--agents"],
-          { files, layers: [prompter.layer, installer.layer, runner.layer] }
+          { files, layers: [installer.layer, runner.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1350,10 +1455,9 @@ describe("init", () => {
           expect(files.read(`.claude/skills/adamantite/${file}`)).toBe(content)
         }
 
-        expect(prompter.spinnerEntries).toContainEqual({
-          message: "Adamantite skill added to `.agents/skills` and `.claude/skills`.",
-          type: "stop",
-        })
+        expect(logLines).toContainEqual(
+          "✔ Adamantite skill added to `.agents/skills` and `.claude/skills`."
+        )
       })
     )
 
@@ -1361,24 +1465,31 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, true],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "enter",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls.at(-1)).toStrictEqual({
-          initialValue: true,
-          message:
-            "Teach coding agents to use Adamantite? This adds an AGENTS.md section and the Adamantite skill.",
-        })
+        // The agent question is the last prompt, so the skill has no question of its own.
+        expect(terminal.output()).toMatch(
+          /\? Teach coding agents to use Adamantite\? This adds an AGENTS\.md section and the Adamantite skill\. › \(Y\/n\)✔ Teach coding agents to use Adamantite\? This adds an AGENTS\.md section and the Adamantite skill\. … yes\n$/u
+        )
         expect(files.read("AGENTS.md")).toContain(ADAMANTITE_AGENTS_START_MARKER)
         expect(files.read(".agents/skills/adamantite/SKILL.md")).toBe(shippedSkill["SKILL.md"])
       })
@@ -1388,16 +1499,24 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext({ ".claude/settings.json": "{}\n" })
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1416,18 +1535,18 @@ describe("init", () => {
 
         const files = createInitTestContext(copy)
         files.makeReadOnly(".agents/skills/adamantite/SKILL.md")
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "fix", "--agents"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         // A write to the read-only file would fail, so no warning means init wrote nothing.
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs.filter((log) => log.level === "warning")).toStrictEqual([])
+        expect(logLines).not.toContainEqual(expect.stringMatching(/^▲/u))
       })
     )
 
@@ -1435,23 +1554,22 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
         files.makeReadOnly(".agents/skills/adamantite/SKILL.md")
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "fix", "--agents"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message: expect.stringMatching(
-            /^Could not add the Adamantite skill\. Could not write `.*\/\.agents\/skills\/adamantite\/SKILL\.md`\..* Adamantite will continue initialization\.$/
-          ),
-        })
-        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
+        expect(logLines).toContainEqual(
+          expect.stringMatching(
+            /^▲ Could not add the Adamantite skill\. Could not write `.*\/\.agents\/skills\/adamantite\/SKILL\.md`\..* Adamantite will continue initialization\.$/
+          )
+        )
+        expect(logLines.at(-1)).toBe("💠 Setup finished.")
       })
     )
   })
@@ -1465,24 +1583,29 @@ describe("init", () => {
           "knip.json": yield* formatJson({ entry: ["src/main.ts"] }),
         })
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["analyze"], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["analyze"]),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`.",
-        })
+        expect(logLines).toContainEqual(
+          "▲ Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`."
+        )
         expect(files.exists("knip.json")).toBe(true)
       })
     )
@@ -1492,7 +1615,7 @@ describe("init", () => {
     it.effect("fail when no package manager can be detected", () =>
       Effect.gen(function* () {
         const files = createInitTestContext()
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
 
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: null,
@@ -1500,7 +1623,8 @@ describe("init", () => {
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer],
+          logLines,
         })
 
         expect(Exit.isFailure(exit)).toBe(true)
@@ -1513,17 +1637,27 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [true, true, true, false],
-          multiselectResponses: [["check"], ["react"], ["zed"]],
-          selectResponses: ["typescript"],
-        })
+        const logLines: unknown[] = []
+
+        // Accept the defaults of TypeScript, the extensions, and the workflow, and decline the agent guidance.
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, ["react"]),
+          "enter",
+          ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
+          ...pickMany(INIT_EDITORS, ["zed"]),
+          "enter",
+          "enter",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1540,13 +1674,13 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--agents", "--github-actions"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1564,13 +1698,13 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--agents", "--github-actions"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
@@ -1588,22 +1722,20 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--github-actions"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "No CI script runs an Adamantite command, so `adamantite init` did not set up the GitHub Actions workflow.",
-        })
+        expect(logLines).toContainEqual(
+          "▲ No CI script runs an Adamantite command, so `adamantite init` did not set up the GitHub Actions workflow."
+        )
       })
     )
 
@@ -1612,21 +1744,20 @@ describe("init", () => {
         const workflowPath = ".github/workflows/adamantite.yml"
         const workflow = "name: team checks\n"
         const files = createInitTestContext({ [workflowPath]: workflow })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--github-actions"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read(workflowPath)).toBe(workflow)
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message: `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`,
-        })
+        expect(logLines).toContainEqual(
+          `● \`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
+        )
       })
     )
 
@@ -1635,23 +1766,21 @@ describe("init", () => {
         const workflowPath = ".github/workflows/checks.yml"
         const workflow = "jobs:\n  # ADAMANTITE:START\n  verify:\n    runs-on: ubuntu-latest\n"
         const files = createInitTestContext({ [workflowPath]: workflow })
-        const prompter = createPrompterTestContext()
+        const logLines: unknown[] = []
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(
           initCommand,
           ["--non-interactive", "--script", "check", "--github-actions"],
-          { files, layers: [prompter.layer, installer.layer] }
+          { files, layers: [installer.layer], logLines }
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read(workflowPath)).toBe(workflow)
         expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message:
-            "Adamantite cannot read the managed block in `.github/workflows/checks.yml`, so `adamantite init` kept the workflow. It has `# ADAMANTITE:START` without `# ADAMANTITE:END` after it. Run `adamantite doctor` for the repair.",
-        })
+        expect(logLines).toContainEqual(
+          "▲ Adamantite cannot read the managed block in `.github/workflows/checks.yml`, so `adamantite init` kept the workflow. It has `# ADAMANTITE:START` without `# ADAMANTITE:END` after it. Run `adamantite doctor` for the repair."
+        )
       })
     )
 
@@ -1665,23 +1794,27 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext({
-          // TypeScript and the AGENTS.md guidance.
-          confirmResponses: [false, false],
-          multiselectResponses: [["fix"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["fix"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
-          "Add a GitHub Actions workflow to run the selected checks?"
-        )
+        expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
       })
     )
 
@@ -1694,23 +1827,28 @@ describe("init", () => {
           }),
         })
 
-        const prompter = createPrompterTestContext({
-          // Keep the conflicting script, then TypeScript and the AGENTS.md guidance.
-          confirmResponses: [false, false, false],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          "enter",
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
-          "Add a GitHub Actions workflow to run the selected checks?"
-        )
+        expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
         expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
       })
     )
@@ -1719,11 +1857,15 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          // TypeScript and the AGENTS.md guidance.
-          confirmResponses: [false, false],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext({
           detectedPackageManager: { name: "aube" },
@@ -1731,18 +1873,16 @@ describe("init", () => {
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.confirmCalls.map((call) => call.message)).not.toContain(
-          "Add a GitHub Actions workflow to run the selected checks?"
+        expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
+        expect(logLines).toContainEqual(
+          "● Adamantite cannot generate a GitHub Actions workflow for `aube`. It supports bun, deno, npm, pnpm, and yarn."
         )
-        expect(prompter.logs).toContainEqual({
-          level: "info",
-          message:
-            "Adamantite cannot generate a GitHub Actions workflow for `aube`. It supports bun, deno, npm, pnpm, and yarn.",
-        })
         expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
       })
     )
@@ -1753,65 +1893,78 @@ describe("init", () => {
         const workflowPath = ".github/workflows/adamantite.yml"
         files.makeReadOnly(workflowPath)
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, true, false],
-          multiselectResponses: [["check"], [], []],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, []),
+          "enter",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.exists(workflowPath)).toBe(false)
-        expect(prompter.logs).toStrictEqual(
+        expect(logLines).toStrictEqual(
           expect.arrayContaining([
-            {
-              level: "warning",
-              message: expect.stringMatching(
-                /Could not set up the GitHub Actions workflow\. Could not write `.*adamantite\.yml`\. Check the directory permissions and available disk space, then try again\./
-              ),
-            },
-            {
-              level: "warning",
-              message:
-                "Fix the reported problem and run `adamantite init` again, or create the workflow manually.",
-            },
+            expect.stringMatching(
+              /Could not set up the GitHub Actions workflow\. Could not write `.*adamantite\.yml`\. Check the directory permissions and available disk space, then try again\./
+            ),
+            "▲ Fix the reported problem and run `adamantite init` again, or create the workflow manually.",
           ])
         )
-        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
+        expect(logLines.at(-1)).toBe("💠 Setup finished.")
       })
     )
 
     it.effect("gracefully handle prompt cancellation", () =>
       Effect.gen(function* () {
-        const prompter = createPrompterTestContext({
-          cancelAtPromptIndex: 1,
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext(["ctrl+c"])
 
         const installer = createDependencyInstallerTestContext()
 
         const exit = yield* runCommand(initCommand, [], {
           files: createInitTestContext(),
-          layers: [prompter.layer, installer.layer],
+          layers: [installer.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.cancels).toStrictEqual(["Setup was cancelled."])
-        expect(prompter.outros).toStrictEqual([])
+        expect(logLines).toStrictEqual([
+          "💠 adamantite init",
+          "● Detected package manager: bun",
+          "\n■ Setup was cancelled.",
+        ])
         expect(installer.calls).toStrictEqual([])
       })
     )
 
     it.effect("continue successfully and show the exit code when the extension install fails", () =>
       Effect.gen(function* () {
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, true, false, false],
-          multiselectResponses: [["check"], [], ["vscode"]],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, ["vscode"]),
+          "enter",
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
@@ -1822,19 +1975,17 @@ describe("init", () => {
 
         const exit = yield* runCommand(initCommand, [], {
           files: createInitTestContext(),
-          layers: [prompter.layer, installer.layer, runner.layer],
+          layers: [installer.layer, runner.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
 
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message: "⚠️ Failed to install `oxc.oxc-vscode`. The `code` CLI exited with code 1.",
-        })
-        expect(prompter.logs).toContainEqual({
-          level: "warning",
-          message: "Install the extension manually after setup finishes.",
-        })
+        expect(logLines).toContainEqual(
+          "▲ Failed to install `oxc.oxc-vscode`. The `code` CLI exited with code 1."
+        )
+        expect(logLines).toContainEqual("▲ Install the extension manually after setup finishes.")
       })
     )
 
@@ -1842,10 +1993,17 @@ describe("init", () => {
       Effect.gen(function* () {
         const files = createInitTestContext()
 
-        const prompter = createPrompterTestContext({
-          confirmResponses: [false, true, false, false],
-          multiselectResponses: [["check"], [], ["vscode"]],
-        })
+        const logLines: unknown[] = []
+
+        const terminal = createTerminalTestContext([
+          ...pickMany(SCRIPT_ORDER, ["check"]),
+          ...pickMany(LINT_PRESETS, []),
+          "n",
+          ...pickMany(INIT_EDITORS, ["vscode"]),
+          "enter",
+          "n",
+          "n",
+        ])
 
         const installer = createDependencyInstallerTestContext()
 
@@ -1858,17 +2016,19 @@ describe("init", () => {
 
         const exit = yield* runCommand(initCommand, [], {
           files,
-          layers: [prompter.layer, installer.layer, runner.layer],
+          layers: [installer.layer, runner.layer, promptingLayer],
+          logLines,
+          terminal,
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(prompter.logs).toStrictEqual(
+        expect(logLines).toStrictEqual(
           expect.arrayContaining([
-            { level: "error", message: "VS Code's `code` command was not found on PATH." },
-            { level: "info", message: "Add the code command to PATH:" },
+            "✖ VS Code's `code` command was not found on PATH.",
+            "● Add the code command to PATH:",
           ])
         )
-        expect(prompter.outros).toStrictEqual(["💠 Setup finished."])
+        expect(logLines.at(-1)).toBe("💠 Setup finished.")
         expect(files.exists(".vscode/settings.json")).toBe(true)
       })
     )

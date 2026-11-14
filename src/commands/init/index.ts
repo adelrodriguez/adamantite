@@ -15,7 +15,7 @@ import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import { readPackageJson, checkRunsTool } from "#lib/workspace/package-json.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
@@ -55,11 +55,9 @@ export default Command.make("init", initCommandOptions).pipe(
   Command.withHandler((options) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
-      const prompter = yield* Prompter
-
       yield* printTitle
 
-      yield* prompter.intro("💠 adamantite init")
+      yield* Output.intro("💠 adamantite init")
 
       const dependencyInstaller = yield* DependencyInstaller
       const packageManager = yield* dependencyInstaller.detectPackageManager(cwd)
@@ -70,16 +68,16 @@ export default Command.make("init", initCommandOptions).pipe(
 
       if (packageManager.warnings?.length) {
         for (const warning of packageManager.warnings) {
-          yield* prompter.log.warning(warning)
+          yield* Output.warning(warning)
         }
       }
 
-      yield* prompter.log.info(`Detected package manager: ${packageManager.name}`)
+      yield* Output.info(`Detected package manager: ${packageManager.name}`)
 
       const isMonorepo = yield* checkIsMonorepo(cwd)
 
       if (isMonorepo) {
-        yield* prompter.log.info("This project is a monorepo.")
+        yield* Output.info("This project is a monorepo.")
       }
 
       if (
@@ -128,7 +126,7 @@ export default Command.make("init", initCommandOptions).pipe(
         && Option.isNone(initOptions.editors)
         && !initOptions.agents
       ) {
-        yield* prompter.outro("💠 No setup selected, so Adamantite made no changes.")
+        yield* Output.outro("💠 No setup selected, so Adamantite made no changes.")
 
         return
       }
@@ -218,15 +216,7 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupGitHubActions(cwd, initOptions.githubActions.value, managedScripts)
       }
 
-      yield* prompter.outro("💠 Setup finished.")
-    }).pipe(
-      Effect.catchTags({
-        OperationCancelled: () =>
-          Effect.gen(function* () {
-            const prompter = yield* Prompter
-            yield* prompter.cancel("Setup was cancelled.")
-          }),
-      })
-    )
+      yield* Output.outro("💠 Setup finished.")
+    }).pipe(Effect.catchTag("QuitError", () => Output.cancel("Setup was cancelled.")))
   )
 )

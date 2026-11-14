@@ -2,6 +2,9 @@ import process from "node:process"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
+import * as Prompt from "effect/cli/Prompt"
+import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
+import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
@@ -30,8 +33,7 @@ import {
 import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/inspect.ts"
 import { readWorkspace } from "#lib/workspace/monorepo.ts"
 import { readProject } from "#lib/workspace/project.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 
 const astFile = Argument.File("file", { mustExist: true }).pipe(
   Argument.withDescription("The JavaScript or TypeScript file to parse")
@@ -43,7 +45,6 @@ const ast = Command.make("ast", { file: astFile }).pipe(
   ),
   Command.withHandler(({ file }) =>
     Effect.gen(function* () {
-      const prompter = yield* Prompter
       const content = yield* readFile(file)
       // Oxlint gives rules an AST without parenthesized expressions.
       const result = parseSync(file, content, { preserveParens: false })
@@ -55,7 +56,7 @@ const ast = Command.make("ast", { file: astFile }).pipe(
         })
       }
 
-      yield* prompter.message(yield* formatJson(result.program))
+      yield* Console.log(yield* formatJson(result.program))
     })
   )
 )
@@ -82,13 +83,12 @@ const add = Command.make("add", { dir, name: ruleName }).pipe(
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
-      const prompter = yield* Prompter
       const path = yield* Path.Path
       const cwd = process.cwd()
       const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
-      yield* prompter.log.success(`Wrote ${path.relative(cwd, rulePath)}.`)
-      yield* prompter.log.info(
+      yield* Output.success(`Wrote ${path.relative(cwd, rulePath)}.`)
+      yield* Output.info(
         `\`custom()\` from \`adamantite/rules\` loads the rule. Run \`adamantite doctor\` to check the wiring. The "${CUSTOM_RULES_SECTION}" section of the Adamantite skill tells agents how to verify the rule with temporary cases.`
       )
     })
@@ -103,9 +103,7 @@ const addTest = Command.make("add", {
   Command.withDescription("Create a test for an existing rule. Omit the name to choose a rule"),
   Command.withHandler(({ dir, name, path: target }) =>
     Effect.gen(function* () {
-      const prompter = yield* Prompter
       const path = yield* Path.Path
-      const terminal = yield* TerminalCapabilities
       const directory = Option.getOrElse(dir, () => CUSTOM_RULES_DIRECTORY)
       const cwd = process.cwd()
       let selected = Option.getOrUndefined(name)
@@ -115,22 +113,22 @@ const addTest = Command.make("add", {
         const names = rules.map((file) => file.slice(0, -path.extname(file).length))
 
         if (names.length === 0) {
-          return yield* prompter.log.info(
+          return yield* Output.info(
             `No custom rules were found in \`${directory}\`. Run \`adamantite rule add <name>\` first.`
           )
         }
 
-        if (!(yield* terminal.isInteractive)) {
-          yield* prompter.message(names.join("\n"))
+        const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities
 
-          return yield* prompter.log.info(
-            "Pass a rule name with `adamantite rule test add <name>`."
-          )
+        if (!canPrompt) {
+          yield* Console.log(names.join("\n"))
+
+          return yield* Output.info("Pass a rule name with `adamantite rule test add <name>`.")
         }
 
-        selected = yield* prompter.select({
+        selected = yield* Prompt.Select({
+          choices: names.map((value) => ({ title: value, value })),
           message: "Which rule needs a test?",
-          options: names.map((value) => ({ label: value, value })),
         })
       }
 
@@ -141,14 +139,25 @@ const addTest = Command.make("add", {
         Option.getOrUndefined(target)
       )
 
-      yield* prompter.log.success(`Wrote ${path.relative(cwd, written)}.`)
-      yield* prompter.log.info(
+      yield* Output.success(`Wrote ${path.relative(cwd, written)}.`)
+      yield* Output.info(
         `Adapt the valid and invalid cases to the rule, then run \`adamantite rule test\`${Option.isSome(target) ? " with `--path` and the test file path." : "."}`
       )
-      yield* prompter.log.info(
+      yield* Output.info(
         "RuleTester uses node:test. Exclude this test from Vitest and Jest discovery. See Custom rules in the Adamantite README."
       )
-    })
+    }).pipe(
+      Effect.catchTag("QuitError", () =>
+        Output.cancel("No rule test was added.").pipe(
+          Effect.andThen(
+            new CommandFailed({
+              command: "rule test add",
+              exitCode: ChildProcessSpawner.ExitCode(1),
+            })
+          )
+        )
+      )
+    )
   )
 )
 
@@ -158,7 +167,6 @@ const test = Command.make("test", { path: testPath }).pipe(
   ),
   Command.withHandler(({ path: target }) =>
     Effect.gen(function* () {
-      const prompter = yield* Prompter
       const path = yield* Path.Path
       const runner = yield* CommandRunner
       const cwd = process.cwd()
@@ -176,19 +184,19 @@ const test = Command.make("test", { path: testPath }).pipe(
       )
 
       for (const source of unresolvedCalls) {
-        yield* prompter.log.warning(
+        yield* Output.warning(
           `\`rule test\` cannot read the \`dir\` of a \`custom()\` call in \`${path.relative(cwd, source)}\`, because it is not a string literal. It does not run the tests of that rules folder.`
         )
       }
 
       for (const { from, specifier } of unresolvedImports) {
-        yield* prompter.log.warning(
+        yield* Output.warning(
           `\`rule test\` cannot resolve the import of \`${specifier}\` in \`${path.relative(cwd, from)}\`, so it does not run the tests of the rules folders behind it.`
         )
       }
 
       if (Option.isNone(command)) {
-        return yield* prompter.log.info(
+        return yield* Output.info(
           "No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test."
         )
       }
@@ -300,8 +308,6 @@ const trial = Command.make("try", {
   ),
   Command.withHandler(({ accept, current, options, report, rule }) =>
     Effect.gen(function* () {
-      const prompter = yield* Prompter
-
       const setting = current
         ? new CurrentSetting()
         : new ErrorSetting({ options: Option.getOrElse(options, () => []) })
@@ -328,7 +334,7 @@ const trial = Command.make("try", {
         // Exit code 1 means that a case differs. A failure before the verdict checked no case, so
         // every failure here exits with 2.
         Effect.catch((error) =>
-          prompter.log.error(error.message).pipe(
+          Output.error(error.message).pipe(
             Effect.andThen(
               Effect.fail(
                 new CommandFailed({
@@ -341,7 +347,7 @@ const trial = Command.make("try", {
         )
       )
 
-      yield* prompter.message(renderTrial(rule, setting, results))
+      yield* Console.log(renderTrial(rule, setting, results))
 
       if (!results.every((result) => isAsExpected(result))) {
         return yield* new CommandFailed({

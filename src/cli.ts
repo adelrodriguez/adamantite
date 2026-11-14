@@ -19,8 +19,7 @@ import { PassthroughNotSupported } from "#lib/shared/errors.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
-import { TerminalCapabilities } from "#terminal/capabilities.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as NodeTerminal from "#terminal/node-terminal.ts"
 
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const
 
@@ -55,12 +54,12 @@ export const makeAppLayer = (
 ) =>
   Layer.mergeAll(
     NodeServices.layer,
+    // Replaces the terminal of `NodeServices` with one whose input closes before an agent handoff.
+    NodeTerminal.layer,
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,
-    Prompter.layer,
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
-    DependencyInstaller.layer,
-    TerminalCapabilities.layer
+    DependencyInstaller.layer
   )
 
 export const runCli = Effect.fn("runCli")(function* (args: readonly string[], version: string) {

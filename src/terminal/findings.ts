@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import type { Finding } from "#lib/integrations/base.ts"
-import { Prompter } from "#terminal/prompter.ts"
+import * as Output from "#terminal/output.ts"
 
 function renderFinding(finding: Finding): string {
   const sections = [
@@ -20,9 +20,7 @@ function renderFinding(finding: Finding): string {
 }
 
 export const printFindings = Effect.fn("printFindings")(function* (findings: readonly Finding[]) {
-  const prompter = yield* Prompter
-
   for (const [index, finding] of findings.entries()) {
-    yield* prompter.note(renderFinding(finding), `${index + 1}. ${finding.title}`)
+    yield* Output.note(`${index + 1}. ${finding.title}`, renderFinding(finding))
   }
 })

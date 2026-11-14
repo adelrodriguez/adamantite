@@ -398,16 +398,6 @@ export class MissingPackageVersion extends Data.TaggedError("MissingPackageVersi
   }
 }
 
-export class OperationCancelled extends Data.TaggedError("OperationCancelled")<{
-  reason?: string
-}> {
-  override get message() {
-    const detail = this.reason ? ` Reason: ${this.reason}` : ""
-
-    return `Operation cancelled.${detail}`
-  }
-}
-
 /**
  * Two Oxlint plugins replace the same native part of the Oxlint runtime.
  */

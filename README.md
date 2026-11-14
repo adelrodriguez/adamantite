@@ -1171,9 +1171,6 @@ Adamantite configures and runs these tools:
 - [@shadcn/lint](https://github.com/shadcn-ui/lint) by [shadcn](https://github.com/shadcn).
 - [TypeScript](https://github.com/microsoft/TypeScript) by Microsoft.
 
-The terminal interface uses [Clack](https://github.com/bombshell-dev/clack) by
-[Nate Moore](https://github.com/natemoo-re).
-
 ## License
 
 Adamantite uses the [MIT License](LICENSE).

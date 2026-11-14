@@ -1,12 +1,16 @@
 import type { JsonObject, JsonValue, PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Json5 from "effect/encoding/Json5"
+import * as Jsonc from "effect/encoding/Jsonc"
+import * as Equal from "effect/Equal"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { Project } from "#lib/workspace/project.ts"
@@ -15,9 +19,14 @@ import {
   type Finding,
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
-import { InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { mergeConfig, parseJson, updateJsonText } from "#lib/shared/json.ts"
+import { FailedToParseFile, InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
+import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
+import {
+  checkIsJsonObject,
+  checkIsPlainJson,
+  mergeConfig,
+  stringifyJson,
+} from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 import { readPackageJson } from "#lib/workspace/package-json.ts"
@@ -137,7 +146,9 @@ const readLoadsResets = Effect.fn("readLoadsResets")(
       return Option.none<boolean>()
     }
 
-    const config = yield* Effect.option(parseJson(stdout, path.join(directory, files[0].path)))
+    const config = Result.getSuccess(
+      Jsonc.parse(stdout).pipe(Result.flatMap(Schema.decodeUnknownResult(Schema.Json)))
+    )
 
     return Option.flatMap(config, (value) =>
       Option.map(decodeShowConfig(value), (showConfig) =>
@@ -204,8 +215,10 @@ export default defineIntegration({
               return []
             }
 
-            const config = yield* Effect.option(
-              parseJson(content.value, path.join(directory, files[0].path))
+            const config = Result.getSuccess(
+              Json5.parse(content.value).pipe(
+                Result.flatMap(Schema.decodeUnknownResult(Schema.Json))
+              )
             )
 
             const entries = Option.match(config, { onNone: () => [], onSome: readExtends })
@@ -272,9 +285,13 @@ export default defineIntegration({
       const configPath = path.join(cwd, files[0].path)
 
       const tsconfigFile = yield* readFile(configPath)
-      const existingConfig = yield* parseJson(tsconfigFile, configPath)
 
-      if (!Predicate.isObject(existingConfig)) {
+      const existingConfig = yield* Effect.fromResult(Json5.parse(tsconfigFile)).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+        Effect.mapError((cause) => new FailedToParseFile({ cause, path: configPath }))
+      )
+
+      if (!checkIsJsonObject(existingConfig)) {
         return yield* new InvalidConfigFormat({ path: configPath })
       }
 
@@ -292,6 +309,18 @@ export default defineIntegration({
         ],
       ])
 
-      yield* writeFile(configPath, updateJsonText(tsconfigFile, newConfig))
+      // A file that already holds the managed values needs no write, also when it has comments.
+      if (Equal.equals(existingConfig, newConfig)) {
+        return
+      }
+
+      if (!checkIsPlainJson(tsconfigFile)) {
+        return yield* new JsoncNotEditable({
+          change: `Set \`extends\` to \`${yield* stringifyJson(newConfig.extends)}\`.`,
+          path: configPath,
+        })
+      }
+
+      yield* writeJsonFile(configPath, newConfig)
     }),
 })

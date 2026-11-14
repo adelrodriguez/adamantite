@@ -12,7 +12,7 @@ import * as Stream from "effect/Stream"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
-import { InvalidConfigFormat } from "#lib/shared/errors.ts"
+import { InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
@@ -109,6 +109,26 @@ describe("tsconfig", () => {
 
           expect(result).toStrictEqual({ applicable: false })
         }
+      })
+    )
+
+    it.effect("read a tsconfig.json with comments and a trailing comma", () =>
+      Effect.gen(function* () {
+        const result = yield* assess(
+          {
+            "package.json": yield* stringifyJson(packageJson),
+            "tsconfig.json":
+              '{\n  // Visit https://aka.ms/tsconfig\n  "extends": "adamantite/typescript",\n}\n',
+          },
+          { "": "resets" }
+        )
+
+        expect(result).toStrictEqual({
+          applicable: true,
+          findings: [],
+          packageActions: [],
+          warnings: [],
+        })
       })
     )
 
@@ -315,33 +335,46 @@ describe("tsconfig", () => {
       })
     )
 
-    it.effect("keep the comments of the existing config", () =>
+    it.effect("leave a config with comments unchanged and fail with JsoncNotEditable", () =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          "tsconfig.json": `{
+        const content = `{
   // Shared base
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist", // build output
   },
 }
-`,
-        })
+`
 
-        yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
+        const files = makeFiles({ "tsconfig.json": content })
 
-        expect(files.read("tsconfig.json")).toBe(`{
-  // Shared base
-  "extends": [
-    "./tsconfig.base.json",
-    "adamantite/typescript"
-  ],
-  "compilerOptions": {
-    "outDir": "dist", // build output
-  },
-}
-`)
+        const result = yield* Effect.result(
+          tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
+        )
+
+        expect(Result.isFailure(result)).toBe(true)
+
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(JsoncNotEditable)
+        }
+
+        expect(files.read("tsconfig.json")).toBe(content)
       })
+    )
+
+    it.effect(
+      "succeed without a write when a config with comments already extends the preset",
+      () =>
+        Effect.gen(function* () {
+          const content =
+            '{\n  // Visit https://aka.ms/tsconfig\n  "extends": "adamantite/typescript",\n}\n'
+
+          const files = makeFiles({ "tsconfig.json": content })
+
+          yield* tsconfig.update(ROOT, "typescript").pipe(provideFiles(files))
+
+          expect(files.read("tsconfig.json")).toBe(content)
+        })
     )
 
     it.effect("return InvalidConfigFormat when tsconfig.json is not a JSON object", () =>

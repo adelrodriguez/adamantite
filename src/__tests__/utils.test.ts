@@ -1,5 +1,3 @@
-import type { JsonValue } from "type-fest"
-
 import { describe, expect, it } from "@effect/vitest"
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
@@ -11,13 +9,7 @@ import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { FailedToParseFile, FailedToReadFile, InvalidPackageJson } from "#lib/shared/errors.ts"
-import {
-  formatJson,
-  mergeConfig,
-  parseJson,
-  stringifyJson,
-  updateJsonText,
-} from "#lib/shared/json.ts"
+import { checkIsPlainJson, mergeConfig, stringifyJson } from "#lib/shared/json.ts"
 import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 import {
   matchDeclaredVersion,
@@ -28,18 +20,6 @@ import { printTitle } from "#terminal/title.ts"
 
 const ROOT = "/project"
 const noop = () => null
-
-function someKey(value: JsonValue, predicate: (key: string) => boolean): boolean {
-  if (Array.isArray(value)) {
-    return value.some((entry) => someKey(entry, predicate))
-  }
-
-  if (Predicate.isObject(value)) {
-    return Object.entries(value).some(([key, entry]) => predicate(key) || someKey(entry, predicate))
-  }
-
-  return false
-}
 
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
@@ -107,34 +87,75 @@ describe("readPackageJson", () => {
   )
 })
 
-describe("parseJson", () => {
-  it.effect("parse JSON with trailing commas", () =>
+describe("readPackageJson parse errors", () => {
+  it.effect("read a __proto__ key as an own key, not as the prototype", () =>
     Effect.gen(function* () {
-      const jsonWithTrailingComma = '{"name": "test", "version": "1.0.0",}'
-      const result = yield* parseJson(jsonWithTrailingComma)
-
-      expect(result).toStrictEqual({
-        name: "test",
-        version: "1.0.0",
+      const files = makeFiles({
+        "package.json":
+          '{ "name": "app", "private": true, "__proto__": { "devDependencies": { "adamantite": "0.47.0" } } }',
       })
+
+      const manifest = yield* readPackageJson(ROOT).pipe(provideFiles(files))
+
+      expect({
+        devDependencies: manifest.devDependencies,
+        ownKeys: Object.keys(manifest),
+      }).toStrictEqual({ devDependencies: undefined, ownKeys: ["name", "private", "__proto__"] })
     })
   )
 
-  it.effect("return an error for invalid JSON", () =>
+  it.effect("fail with the line and column of a syntax error", () =>
     Effect.gen(function* () {
-      const invalidJson = '{"name": "test", "version":}'
-      const result = yield* Effect.result(parseJson(invalidJson))
+      const files = makeFiles({ "package.json": '{\n  "name": "test"\n  "version": "1.0.0"\n}\n' })
+
+      const result = yield* Effect.result(readPackageJson(ROOT).pipe(provideFiles(files)))
 
       expect(Result.isFailure(result)).toBe(true)
 
       if (Result.isFailure(result)) {
         expect(result.failure).toBeInstanceOf(FailedToParseFile)
+        expect(result.failure.message).toContain("Cause: Invalid JSONC at line 3, column 3.")
       }
     })
   )
 })
 
+describe("checkIsPlainJson", () => {
+  it.each([
+    { content: '{ "a": [1, 2] }', expected: true, name: "plain JSON" },
+    { content: '{\n  // note\n  "a": 1\n}', expected: false, name: "a line comment" },
+    { content: '{ /* note */ "a": 1 }', expected: false, name: "a block comment" },
+    { content: '{ "a": 1, }', expected: false, name: "a trailing comma" },
+    {
+      content: '{ "a": "// not a comment" }',
+      expected: true,
+      name: "a comment marker in a string",
+    },
+    { content: '{ "a": }', expected: false, name: "invalid JSON" },
+  ])("return $expected for $name", ({ content, expected }) => {
+    expect(checkIsPlainJson(content)).toBe(expected)
+  })
+})
+
 describe("mergeConfig", () => {
+  it.effect(
+    "keep the preferred keys in their order, then add the keys that only the fallback has",
+    () =>
+      Effect.gen(function* () {
+        // The project's file lists `m`, `b`, and `a` in that order. Entries keep the order, which an
+        // object literal would lose to the key sort.
+        const preferred = Object.fromEntries([
+          ["m", true],
+          ["b", false],
+          ["a", 3],
+        ])
+
+        const merged = yield* mergeConfig({ fallback: { a: 1, z: 2 }, preferred })
+
+        expect(Object.keys(merged)).toStrictEqual(["m", "b", "a", "z"])
+      })
+  )
+
   // mergeConfig concatenates arrays on conflicts, so this property holds on array-free configs.
   const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean, Schema.Null])
 
@@ -170,141 +191,6 @@ describe("mergeConfig", () => {
         }
       }),
     { arbitrary: { runs: 200 } }
-  )
-})
-
-describe("updateJsonText", () => {
-  it("keep comments and trailing commas when it adds keys", () => {
-    const content = `{
-  // Editor settings
-  "editor.tabSize": 4, // keep four
-  "[json]": {
-    /* user choice */
-    "editor.wordWrap": "on",
-  },
-}
-`
-
-    expect(
-      updateJsonText(content, {
-        "[json]": { "editor.defaultFormatter": "oxc.oxc-vscode", "editor.wordWrap": "on" },
-        "editor.formatOnSave": true,
-        "editor.tabSize": 4,
-      })
-    ).toBe(`{
-  // Editor settings
-  "editor.tabSize": 4, // keep four
-  "[json]": {
-    /* user choice */
-    "editor.wordWrap": "on",
-    "editor.defaultFormatter": "oxc.oxc-vscode",
-  },
-  "editor.formatOnSave": true,
-}
-`)
-  })
-
-  it("keep tab indentation and CRLF line endings", () => {
-    const content = '{\r\n\t"name": "test",\r\n\t"scripts": {\r\n\t\t"build": "tsc"\r\n\t}\r\n}\r\n'
-
-    expect(
-      updateJsonText(content, { name: "test", scripts: { build: "tsc", check: "oxlint" } })
-    ).toBe(
-      '{\r\n\t"name": "test",\r\n\t"scripts": {\r\n\t\t"build": "tsc",\r\n\t\t"check": "oxlint"\r\n\t}\r\n}\r\n'
-    )
-  })
-
-  it("replace a changed value and keep its comment", () => {
-    const content = `{
-    "extends": "base", // the old base
-    "strict": true
-}
-`
-
-    expect(updateJsonText(content, { extends: ["base", "adamantite/typescript"], strict: true }))
-      .toBe(`{
-    "extends": [
-        "base",
-        "adamantite/typescript"
-    ], // the old base
-    "strict": true
-}
-`)
-  })
-
-  it("keep a comment on the last property with that property when it adds a key", () => {
-    expect(updateJsonText('{\n  "a": 1 // note on a\n}\n', { a: 1, b: 2 })).toBe(
-      '{\n  "a": 1, // note on a\n  "b": 2\n}\n'
-    )
-  })
-
-  it("keep a comment and a trailing comma on the last property when it adds a key", () => {
-    expect(updateJsonText('{\n  "a": 1, // note on a\n}\n', { a: 1, b: 2 })).toBe(
-      '{\n  "a": 1, // note on a\n  "b": 2,\n}\n'
-    )
-  })
-
-  it("change the last of repeated keys, which is the one that parsing keeps", () => {
-    expect(
-      updateJsonText('{\n  "a": false,\n  "a": false,\n  "b": 1\n}\n', { a: true, b: 1 })
-    ).toBe('{\n  "a": true,\n  "b": 1\n}\n')
-  })
-
-  it("keep the comments around a repeated key that it removes", () => {
-    expect(
-      updateJsonText(
-        '{\n  "tabSize": 4, // team preference\n  "save": false,\n  // effective setting\n  "save": false\n}\n',
-        { save: true, tabSize: 4 }
-      )
-    ).toBe('{\n  "tabSize": 4, // team preference\n  // effective setting\n  "save": true\n}\n')
-  })
-
-  it("keep the comment before the kept key when the removed key comes first", () => {
-    expect(
-      updateJsonText('{\n  "save": false,\n  // effective setting\n  "save": false\n}\n', {
-        save: true,
-      })
-    ).toBe('{\n  // effective setting\n  "save": true\n}\n')
-  })
-
-  it("add a key to the last of repeated objects", () => {
-    expect(
-      updateJsonText('{\n  "a": { "x": 1 },\n  "a": { "y": 2 }\n}\n', { a: { y: 2, z: 3 } })
-    ).toBe('{\n  "a": {\n    "y": 2,\n    "z": 3\n  }\n}\n')
-  })
-
-  it("remove a key that the next value does not have", () => {
-    expect(updateJsonText('{\n  "a": 1,\n  "b": 2\n}\n', { b: 2 })).toBe('{\n  "b": 2\n}\n')
-  })
-
-  it("remove a key that has the name of an Object method", () => {
-    expect(updateJsonText('{\n  "toString": false,\n  "a": 1\n}\n', { a: 1 })).toBe(
-      '{\n  "a": 1\n}\n'
-    )
-  })
-
-  it("return the content unchanged when the value does not change", () => {
-    const content = '{ "a": [1, 2], /* note */ "b": { "c": null } }'
-
-    expect(updateJsonText(content, { a: [1, 2], b: { c: null } })).toBe(content)
-  })
-
-  const plainJson = Schema.MutableJson.check(
-    Schema.makeFilter((value) => !someKey(value, (key) => key === "__proto__"))
-  )
-
-  it.effect.prop(
-    "produce text that parses to the next value",
-    { current: plainJson, next: plainJson },
-    ({ current, next }) =>
-      Effect.gen(function* () {
-        const parsed = yield* parseJson(updateJsonText(yield* formatJson(current), next))
-        // JSON has no negative zero, so compare with the parsed JSON form of `next`.
-        const expected = yield* parseJson(yield* stringifyJson(next))
-
-        expect(parsed).toStrictEqual(expected)
-      }),
-    { arbitrary: { runs: 300 } }
   )
 })
 

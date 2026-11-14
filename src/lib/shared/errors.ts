@@ -1,5 +1,4 @@
 import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import type { ParseError } from "jsonc-parser"
 import { stripVTControlCharacters } from "node:util"
 import * as Array from "effect/Array"
 import * as Data from "effect/Data"
@@ -7,7 +6,6 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import * as String from "effect/String"
-import { printParseErrorCode } from "jsonc-parser"
 
 const MAX_CAUSE_OUTPUT_LINES = 20
 
@@ -46,17 +44,6 @@ function formatCauseOutput(cause: unknown) {
   const shown = tail.length < lines.length ? ["…", ...tail] : tail
 
   return `\n${shown.join("\n")}`
-}
-
-function formatParseErrors(errors: ParseError[] = []) {
-  if (errors.length === 0) {
-    return "- Unknown JSON/JSONC parsing error"
-  }
-
-  return errors
-    .slice(0, 3)
-    .map((error) => `- ${printParseErrorCode(error.error)} (offset: ${error.offset})`)
-    .join("\n")
 }
 
 export class AdamantiteNotInstalled extends Data.TaggedError("AdamantiteNotInstalled")<{
@@ -229,19 +216,26 @@ export class FailedToMergeConfig extends Data.TaggedError("FailedToMergeConfig")
 }
 
 export class FailedToParseFile extends Data.TaggedError("FailedToParseFile")<{
-  path?: string
-  errors?: ParseError[]
+  path: string
+  cause: unknown
 }> {
   override get message() {
-    const target = this.path ? `\`${this.path}\`` : "the target file"
+    return `Failed to parse \`${this.path}\`. Fix the JSON or JSONC syntax and run the command again.${formatCauseDetail(this.cause)}`
+  }
+}
 
-    return [
-      `Failed to parse ${target}.`,
-      "Fix the JSON or JSONC syntax and run the command again.",
-      "",
-      "Parse details:",
-      formatParseErrors(this.errors),
-    ].join("\n")
+/**
+ * The file has comments or trailing commas, and a rewrite would delete them.
+ */
+export class JsoncNotEditable extends Data.TaggedError("JsoncNotEditable")<{
+  /**
+   * The change to make by hand, as a sentence.
+   */
+  change: string
+  path: string
+}> {
+  override get message() {
+    return `\`${this.path}\` has comments or trailing commas, so Adamantite does not rewrite it. ${this.change}`
   }
 }
 

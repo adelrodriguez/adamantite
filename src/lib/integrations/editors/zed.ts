@@ -1,10 +1,10 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Json5 from "effect/encoding/Json5"
 import * as Equal from "effect/Equal"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import type { Project } from "#lib/workspace/project.ts"
 import {
@@ -15,22 +15,26 @@ import {
 import { readEffectEditor } from "#lib/integrations/editors/effect.ts"
 import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
-import { EffectEditorUnavailable, InvalidConfigFormat } from "#lib/shared/errors.ts"
+import {
+  EffectEditorUnavailable,
+  FailedToParseFile,
+  InvalidConfigFormat,
+  JsoncNotEditable,
+} from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
   readFile,
   readFileIfExists,
-  writeFile,
   writeJsonFile,
 } from "#lib/shared/filesystem.ts"
 import {
   checkIsJsonArray,
   checkIsJsonObject,
+  checkIsPlainJson,
   formatJson,
   mergeConfig,
-  parseJson,
+  pickChangedEntries,
   stringifyJson,
-  updateJsonText,
 } from "#lib/shared/json.ts"
 import { formatInitCommand } from "#lib/workspace/init-command.ts"
 
@@ -387,7 +391,10 @@ export default defineIntegration({
         return { applicable: false } satisfies IntegrationAssessment
       }
 
-      const config = yield* parseJson(content.value, settingsPath)
+      const config = yield* Effect.fromResult(Json5.parse(content.value)).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+        Effect.mapError((cause) => new FailedToParseFile({ cause, path: settingsPath }))
+      )
 
       if (!checkIsJsonObject(config)) {
         return yield* new InvalidConfigFormat({ path: settingsPath })
@@ -518,9 +525,13 @@ export default defineIntegration({
       const settingsPath = path.join(cwd, files[0].path)
 
       const zedFile = yield* readFile(settingsPath)
-      const existingConfig = yield* parseJson(zedFile, settingsPath)
 
-      if (!Predicate.isObject(existingConfig)) {
+      const existingConfig = yield* Effect.fromResult(Json5.parse(zedFile)).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+        Effect.mapError((cause) => new FailedToParseFile({ cause, path: settingsPath }))
+      )
+
+      if (!checkIsJsonObject(existingConfig)) {
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
@@ -537,6 +548,18 @@ export default defineIntegration({
         ? yield* setEffectSettings(cwd, base, effect.value.rulesCustomization)
         : base
 
-      yield* writeFile(settingsPath, updateJsonText(zedFile, newConfig))
+      // A file that already holds the managed values needs no write, also when it has comments.
+      if (Equal.equals(existingConfig, newConfig)) {
+        return
+      }
+
+      if (!checkIsPlainJson(zedFile)) {
+        return yield* new JsoncNotEditable({
+          change: `Add these settings, and keep the others:\n${yield* formatJson(pickChangedEntries(existingConfig, newConfig))}`,
+          path: settingsPath,
+        })
+      }
+
+      yield* writeJsonFile(settingsPath, newConfig)
     }),
 })

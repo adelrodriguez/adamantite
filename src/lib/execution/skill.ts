@@ -1,13 +1,15 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Jsonc from "effect/encoding/Jsonc"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import { codingAgents } from "#lib/execution/coding-agents.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts" with { type: "macro" }
-import { FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
+import { FailedToParseFile, FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
   readDirectoryIfExists,
@@ -16,7 +18,7 @@ import {
   writeFile,
   writeJsonFile,
 } from "#lib/shared/filesystem.ts"
-import { checkIsJsonObject, parseJson } from "#lib/shared/json.ts"
+import { checkIsJsonObject } from "#lib/shared/json.ts"
 
 const SKILL_NAME = "adamantite"
 
@@ -180,7 +182,10 @@ export const removeSkillsLockEntry = Effect.fn("removeSkillsLockEntry")(function
     return false
   }
 
-  const lock = yield* parseJson(content.value, lockPath)
+  const lock = yield* Effect.fromResult(Jsonc.parse(content.value)).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+    Effect.mapError((cause) => new FailedToParseFile({ cause, path: lockPath }))
+  )
 
   if (!checkIsJsonObject(lock) || !checkIsJsonObject(lock.skills)) {
     return false
@@ -200,7 +205,7 @@ export const removeSkillsLockEntry = Effect.fn("removeSkillsLockEntry")(function
     return true
   }
 
-  yield* writeJsonFile(lockPath, { ...lock, skills })
+  yield* writeJsonFile(lockPath, Object.fromEntries([...Object.entries(lock), ["skills", skills]]))
 
   return true
 })

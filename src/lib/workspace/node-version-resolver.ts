@@ -2,6 +2,7 @@ import type { JsonValue } from "type-fest"
 import * as Context from "effect/Context"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
+import * as Jsonc from "effect/encoding/Jsonc"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
@@ -9,9 +10,8 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import * as Str from "effect/String"
-import type { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
+import { FailedToParseFile, type FailedToReadFile } from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
-import { parseJson } from "#lib/shared/json.ts"
 
 /**
  * A file that declares the Node.js version. It renders as `node-version-file`, so the workflow
@@ -126,9 +126,13 @@ export class NodeVersionResolver extends Context.Service<
           const packageJsonContent = yield* readDeclarationFile(cwd, "package.json")
 
           if (Option.isSome(packageJsonContent)) {
-            const packageJson = yield* parseJson(
-              packageJsonContent.value,
-              path.join(cwd, "package.json")
+            const packageJsonPath = path.join(cwd, "package.json")
+
+            const packageJson = yield* Effect.fromResult(
+              Jsonc.parse(packageJsonContent.value)
+            ).pipe(
+              Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
+              Effect.mapError((cause) => new FailedToParseFile({ cause, path: packageJsonPath }))
             )
 
             if (hasNodeDeclaration(packageJson)) {

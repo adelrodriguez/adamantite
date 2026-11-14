@@ -450,6 +450,62 @@ describe("init", () => {
       })
     )
 
+    it.effect("keep configs with comments, warn with the change to make, and continue", () =>
+      Effect.gen(function* () {
+        const tsconfigContent =
+          '{\n  // Visit https://aka.ms/tsconfig\n  "compilerOptions": {},\n}\n'
+
+        const vscodeContent = '{\n  // Team setting\n  "editor.tabSize": 4\n}\n'
+
+        const files = createInitTestContext({
+          ".vscode/settings.json": vscodeContent,
+          "tsconfig.json": tsconfigContent,
+        })
+
+        const logLines: unknown[] = []
+        const installer = createDependencyInstallerTestContext()
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          [
+            "--non-interactive",
+            "--script",
+            "check",
+            "--typescript",
+            "typescript",
+            "--editor",
+            "vscode",
+            "--editor",
+            "zed",
+          ],
+          { files, layers: [installer.layer, runner.layer], logLines }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        // Init keeps both files with comments and still creates the Zed settings after them.
+        expect({
+          tsconfig: files.read("tsconfig.json"),
+          vscode: files.read(".vscode/settings.json"),
+          zed: files.exists(".zed/settings.json"),
+        }).toStrictEqual({ tsconfig: tsconfigContent, vscode: vscodeContent, zed: true })
+        expect(logLines).toContainEqual(
+          expect.stringMatching(
+            /^▲ `.+\/tsconfig\.json` has comments or trailing commas, so Adamantite does not rewrite it\. Set `extends` to `"adamantite\/typescript"`\.$/
+          )
+        )
+        expect(logLines).toContainEqual(
+          expect.stringMatching(
+            /^▲ `.+\/\.vscode\/settings\.json` has comments or trailing commas, so Adamantite does not rewrite it\. Add these settings, and keep the others:\n/u
+          )
+        )
+        // A kept file is not an updated file, and not a failed step.
+        expect(logLines).not.toContainEqual(
+          expect.stringMatching(/`(tsconfig\.json|\.vscode\/settings\.json)` updated|Failed/u)
+        )
+      })
+    )
+
     it.effect("give tsconfig guidance instead of editing it in a monorepo", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({

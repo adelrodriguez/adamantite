@@ -3,9 +3,10 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { decodeJson } from "#__tests__/json.ts"
 import zed from "#lib/integrations/editors/zed.ts"
-import { InvalidConfigFormat } from "#lib/shared/errors.ts"
-import { formatJson, parseJson, stringifyJson } from "#lib/shared/json.ts"
+import { InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
+import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { readProject } from "#lib/workspace/project.ts"
 import { effectEditorFiles, effectEditorResolver } from "./effect-fixture.ts"
 
@@ -155,7 +156,7 @@ describe("zed", () => {
 
         yield* zed.update(cwd).pipe(provideFiles(files))
         const updated = files.read(settingsPath)
-        const config = yield* parseJson(updated)
+        const config = yield* decodeJson(updated)
         expect(config).toHaveProperty(["lsp", "typescript-ls", "binary"], {
           arguments: [
             "../../node_modules/@effect/tsgo/dist/effect-tsgo.cjs",
@@ -174,7 +175,7 @@ describe("zed", () => {
         expect(healthy).toMatchObject({ findings: [] })
 
         yield* zed.create(cwd).pipe(provideFiles(files))
-        expect(yield* parseJson(files.read(settingsPath))).toStrictEqual(config)
+        expect(yield* decodeJson(files.read(settingsPath))).toStrictEqual(config)
       })
     )
 
@@ -186,7 +187,7 @@ describe("zed", () => {
 
           yield* zed.create(ROOT).pipe(provideFiles(files))
 
-          const config = yield* parseJson(files.read(SETTINGS_PATH))
+          const config = yield* decodeJson(files.read(SETTINGS_PATH))
           expect(config).toHaveProperty(["lsp", "typescript-ls", "binary"], {
             arguments: [
               "node_modules/@effect/tsgo/dist/effect-tsgo.cjs",
@@ -226,7 +227,7 @@ describe("zed", () => {
         yield* zed.create(ROOT).pipe(provideFiles(files))
 
         expect(yield* zed.detect(ROOT).pipe(provideFiles(files))).toBe(true)
-        expect(yield* parseJson(files.read(SETTINGS_PATH))).toMatchObject({
+        expect(yield* decodeJson(files.read(SETTINGS_PATH))).toMatchObject({
           languages: { Astro: OXFMT_LANGUAGE, Svelte: OXFMT_LANGUAGE },
           lsp: {
             oxlint: {
@@ -246,7 +247,7 @@ describe("zed", () => {
 
         yield* zed.create(ROOT).pipe(provideFiles(files))
 
-        expect(yield* parseJson(files.read(SETTINGS_PATH))).not.toHaveProperty([
+        expect(yield* decodeJson(files.read(SETTINGS_PATH))).not.toHaveProperty([
           "lsp",
           "oxlint",
           "initialization_options",
@@ -274,7 +275,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toMatchObject({
           languages: { TypeScript: { format_on_save: "off", formatter: null } },
@@ -313,7 +314,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
         const first = files.read(SETTINGS_PATH)
-        const config = yield* parseJson(first)
+        const config = yield* decodeJson(first)
         expect(config).not.toHaveProperty(["lsp", "tsgo"])
         expect(config).toMatchObject({
           lsp: {
@@ -366,7 +367,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toHaveProperty(
           ["languages", "JavaScript", "formatter"],
@@ -396,7 +397,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toHaveProperty(
           ["lsp", "custom", "initialization_options", "arguments"],
@@ -419,7 +420,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toHaveProperty(["languages", "Python", "formatter"], formatter)
       })
@@ -433,7 +434,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toHaveProperty(["languages", "Astro"], OXFMT_LANGUAGE)
       })
@@ -452,7 +453,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toHaveProperty(["languages", "Svelte"], svelte)
       })
@@ -476,7 +477,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toHaveProperty(["languages", "Astro"], astro)
       })
@@ -499,7 +500,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const config = yield* parseJson(files.read(SETTINGS_PATH))
+        const config = yield* decodeJson(files.read(SETTINGS_PATH))
 
         expect(config).toHaveProperty(
           ["languages", "JavaScript", "formatter"],
@@ -523,7 +524,7 @@ describe("zed", () => {
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        expect(yield* parseJson(files.read(SETTINGS_PATH))).toHaveProperty(
+        expect(yield* decodeJson(files.read(SETTINGS_PATH))).toHaveProperty(
           ["lsp", "oxlint", "binary"],
           {
             arguments: [OXLINT_ENTRY, "--lsp"],
@@ -545,24 +546,44 @@ describe("zed", () => {
         const secondUpdate = files.read(SETTINGS_PATH)
 
         expect(secondUpdate).toBe(firstUpdate)
-        expect(yield* parseJson(secondUpdate)).toHaveProperty(["ui_font_size"], 14)
+        expect(yield* decodeJson(secondUpdate)).toHaveProperty(["ui_font_size"], 14)
       })
     )
 
-    it.effect("keep the comments of the existing config", () =>
+    it.effect("leave a config with comments unchanged and fail with JsoncNotEditable", () =>
       Effect.gen(function* () {
-        const files = makeFiles({
-          [SETTINGS_PATH]: '// Zed settings\n{\n  // Light theme\n  "theme": "One Light",\n}\n',
-        })
+        const content = '// Zed settings\n{\n  // Light theme\n  "theme": "One Light",\n}\n'
+        const files = makeFiles({ [SETTINGS_PATH]: content })
+
+        const result = yield* Effect.result(zed.update(ROOT).pipe(provideFiles(files)))
+
+        expect(Result.isFailure(result)).toBe(true)
+
+        if (Result.isFailure(result)) {
+          expect(result.failure).toBeInstanceOf(JsoncNotEditable)
+          // The error lists every setting that the update would add, not only what Doctor checks.
+          expect(result.failure).toMatchObject({
+            change: expect.stringContaining('"format_on_save": "on"'),
+          })
+          expect(result.failure).toMatchObject({ change: expect.not.stringContaining('"theme"') })
+        }
+
+        expect(files.read(SETTINGS_PATH)).toBe(content)
+      })
+    )
+
+    it.effect("succeed without a write when a config with comments already has the settings", () =>
+      Effect.gen(function* () {
+        // The managed settings come from an update of an empty config.
+        const managed = makeFiles({ [SETTINGS_PATH]: "{}" })
+        yield* zed.update(ROOT).pipe(provideFiles(managed))
+
+        const content = `// Zed settings\n${managed.read(SETTINGS_PATH)}`
+        const files = makeFiles({ [SETTINGS_PATH]: content })
 
         yield* zed.update(ROOT).pipe(provideFiles(files))
 
-        const content = files.read(SETTINGS_PATH)
-
-        expect(content).toMatch(
-          /^\/\/ Zed settings\n\{\n {2}\/\/ Light theme\n {2}"theme": "One Light",\n/u
-        )
-        expect(content).toContain('"format_on_save": "on"')
+        expect(files.read(SETTINGS_PATH)).toBe(content)
       })
     )
 

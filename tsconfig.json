@@ -18,6 +18,8 @@
           "effect/Arbitrary",
           "effect/ByteSize",
           "effect/cli",
+          "effect/encoding/Json5",
+          "effect/encoding/Jsonc",
           "effect/encoding/Yaml",
           "effect/FileSystem",
           "effect/Path",

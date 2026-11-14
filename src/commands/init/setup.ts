@@ -148,10 +148,12 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean, preset: TypeSc
 
     const exists = yield* tsconfig.detect(cwd)
 
-    yield* exists ? tsconfig.update(cwd, preset) : tsconfig.create(cwd, preset)
-    yield* Output.success(
-      `\`${tsconfig.config}\` ${exists ? "updated" : "created"} with \`${TYPESCRIPT_PRESETS[preset]}\`.`
-    )
+    yield* Effect.gen(function* () {
+      yield* exists ? tsconfig.update(cwd, preset) : tsconfig.create(cwd, preset)
+      yield* Output.success(
+        `\`${tsconfig.config}\` ${exists ? "updated" : "created"} with \`${TYPESCRIPT_PRESETS[preset]}\`.`
+      )
+    }).pipe(Effect.catchTag("JsoncNotEditable", (error) => Output.warning(error.message)))
   })
 
 /**
@@ -160,7 +162,13 @@ export const setupTypescript = (cwd: string, isMonorepo: boolean, preset: TypeSc
  */
 export const setupEffectTsgo = (cwd: string) =>
   Effect.gen(function* () {
-    const result = yield* effectTsgo.update(cwd)
+    const result = yield* effectTsgo
+      .update(cwd)
+      .pipe(
+        Effect.catchTag("JsoncNotEditable", (error) =>
+          Output.warning(error.message).pipe(Effect.as("kept" as const))
+        )
+      )
 
     if (result === "monorepo") {
       yield* Output.info(
@@ -187,10 +195,12 @@ export const setupEditors = (cwd: string, editors: readonly InitEditor[]) =>
       const integration = editorIntegrations[editor]
       const exists = yield* integration.detect(cwd)
 
-      yield* exists ? integration.update(cwd) : integration.create(cwd)
-      yield* Output.success(
-        `\`${integration.config}\` ${exists ? "updated" : "created"} with Adamantite preset.`
-      )
+      yield* Effect.gen(function* () {
+        yield* exists ? integration.update(cwd) : integration.create(cwd)
+        yield* Output.success(
+          `\`${integration.config}\` ${exists ? "updated" : "created"} with Adamantite preset.`
+        )
+      }).pipe(Effect.catchTag("JsoncNotEditable", (error) => Output.warning(error.message)))
     }
   })
 

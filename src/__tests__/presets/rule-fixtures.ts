@@ -1,13 +1,5 @@
 import { spawnSync } from "node:child_process"
-import {
-  cpSync,
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs"
+import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import process from "node:process"
@@ -15,6 +7,7 @@ import type { OxlintConfig } from "oxlint"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
+import { linkFixturePackages } from "./fixture-packages.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 
@@ -150,28 +143,23 @@ const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
 
 /**
  * Write a temporary project that holds a copy of the fixture tree in `fixtures/`, and return its
- * path. The project links the `node_modules` of the repository, and its `oxlint.config.ts` and
- * `oxfmt.config.ts` extend the presets, so `adamantite check` and `adamantite fix` run in it as in
- * a target project. The tree is in the `include` of a tsconfig that extends the Adamantite preset
- * and has the plugin entry of the Effect rules. React supplies the JSX types. Remove the project
- * with `removeFixtureProject`.
+ * path. The project links the packages of the repository and the fixture packages, and its
+ * `oxlint.config.ts` and `oxfmt.config.ts` extend the presets, so `adamantite check` and
+ * `adamantite fix` run in it as in a target project. The tree is in the `include` of a tsconfig
+ * that extends the Adamantite preset and has the plugin entry of the Effect rules. The fixture
+ * packages supply the types of the packages that the fixtures import, such as the JSX types of
+ * React. Remove the project with `removeFixtureProject`.
  */
 export function createFixtureProject(options: FixtureTreeOptions): string {
   const project = mkdtempSync(join(tmpdir(), "adamantite-fixtures-"))
   const oxlint = process.env[OXLINT_VARIABLE]
 
-  if (oxlint === undefined || oxlint === "") {
-    symlinkSync(join(REPO_ROOT, "node_modules"), join(project, "node_modules"))
-  } else {
-    // Link each package of the repository, but take Oxlint from the named folder.
-    mkdirSync(join(project, "node_modules"))
+  linkFixturePackages(join(project, "node_modules"))
 
-    for (const name of readdirSync(join(REPO_ROOT, "node_modules"))) {
-      symlinkSync(
-        name === "oxlint" ? oxlint : join(REPO_ROOT, "node_modules", name),
-        join(project, "node_modules", name)
-      )
-    }
+  if (oxlint !== undefined && oxlint !== "") {
+    // Take Oxlint from the named folder instead of the repository.
+    rmSync(join(project, "node_modules/oxlint"))
+    symlinkSync(oxlint, join(project, "node_modules/oxlint"))
   }
 
   cpSync(options.fixturesDir, join(project, FIXTURES_DIRECTORY), { recursive: true })

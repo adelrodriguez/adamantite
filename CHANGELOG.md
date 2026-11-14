@@ -1,5 +1,346 @@
 # adamantite
 
+## 0.48.0
+
+### Minor Changes
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Read template literal method keys in `antislop/no-array-filter-map` and `antislop/no-reduce-accumulator-copy`
+
+  Both rules read a method name from `items.filter` or `items["filter"]`, but not from a template literal with no expressions, such as ``items[`filter`](f)[`map`](g)`` or ``rows[`reduce`](...)``. They now read the key the same way as `antislop/no-reflect-get` and `antislop/no-reflect-apply`. A template literal with an expression, such as ``items[`${method}`]``, still does not count as a method name.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report assertion chains through `satisfies` in `antislop/no-chained-type-assertions`
+
+  A `satisfies` expression between two assertions, such as `(value as unknown satisfies unknown) as number`, hid the chain from the rule. A `satisfies` expression keeps the type of its operand, so the rule now looks through it as it looks through parentheses.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report more conditional spreads that omit properties in `antislop/no-conditional-empty-object-spread`
+
+  The rule now reports `...(name && { name })`, a branch of `undefined`, `null`, or `void 0`, an empty object under `satisfies` or `as`, an empty branch in a nested conditional, and a `const` that holds `{}`. A `const` counts as empty only when code does nothing with it but spread it, because a property write or a call such as `Object.assign(fallback, values)` can fill it. It also reports the same pattern in a JSX spread attribute, such as `<div {...(ok ? { title } : {})} />`. The message now says that one branch adds nothing, because that branch is not always an empty object.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report unsafe dictionaries in heritage clauses, alias defaults, and `globalThis.Record`
+
+  `antislop/no-unsafe-dictionary-type` now reports `interface A extends Record<string, unknown>` and `class A implements Record<string, unknown>`. It reports a type alias or interface whose default type argument makes it an unsafe dictionary, such as `type Bag<T = unknown> = Record<string, T>`, because every plain use of `Bag` gets that default. It also reads `globalThis.Record<string, unknown>` as the built-in `Record`, which Effect code writes when `import { Record } from "effect"` hides the global type.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Treat a named interface like a named alias, and a finite key set like a closed object, in the dictionary rules
+
+  `antislop/no-known-value-widening` now reports a known value widened to a named interface with an index signature, such as `interface ScoreMap { [name: string]: number }`, as it already did for `type Scores = Record<string, number>`. A name does not close the keys, so both lose the keys the value had. A generic interface passes its type arguments to the types it extends, as an alias does, so `interface Dict<K extends string, V> extends Record<K, V>` is open as `Dict<string, number>` and closed as `Dict<"a" | "b", number>`. The rule no longer calls an inline mapped type over literal keys, such as `{ [K in "a" | "b"]: number }`, an open dictionary. Its message now asks for a named owner contract with known keys.
+
+  `antislop/no-unsafe-dictionary-type` no longer reports `Record<"a" | "b", unknown>` or a mapped type over literal keys, because `{ a: unknown; b: unknown }` passes. It still reports a key type that it cannot resolve, such as an imported type. It now reads a named interface at a use with type arguments, as it reads an alias. `interface Bag<V> extends Record<string, V> {}` used as `Bag<unknown>` is reported, and `Bag<number>` is not. A plain use such as `const bag: Bag` is not reported again, because the interface declaration reports itself.
+
+  Both rules read the keys of a mapped type with an `as` clause from that clause. `{ [K in "seed" as string]: unknown }` is still an open dictionary. ``{ [K in Kind as `get${Capitalize<K>}`]: number }`` is closed when `Kind` is a finite set of literals. Any other `as` clause, such as an imported type or a template with `string`, counts as open.
+
+- [#819](https://github.com/adelrodriguez/adamantite/pull/819) [`224ecbe`](https://github.com/adelrodriguez/adamantite/commit/224ecbeb488518da8b64fcc7c1c977394684ff9a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Use Effect's prompts and console for the terminal, and remove the runtime dependency `@clack/prompts`. Questions now show `? message ›`, and each answer shows `✔ message … answer`. Status lines start with a symbol, such as `✔ Dependencies installed.`, and no guide line runs at the left edge. Each step prints one line when it finishes, without a spinner. The error that ends a command now goes to standard error.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `antislop/no-array-filter-map` report a reassigned variable with an array type
+
+  The strict preset now reports adjacent `filter` and `map` calls on a `let` variable that has an array type annotation, such as `let values: number[] = []`, also after the code assigns a new value to it. The annotation keeps each value an array. A reassigned variable without an annotation is still allowed, because its new value can be an iterator.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Read `globalThis` built-in types in `antislop/no-widen-then-assert` and `antislop/no-array-filter-map`
+
+  Both rules read a built-in type name only from a plain name. So `no-widen-then-assert` missed a binding widened to `globalThis.Record<string, unknown>` and asserted back, and `no-array-filter-map` and `no-reduce-accumulator-copy` did not count `globalThis.Array<T>` or `globalThis.ReadonlyArray<T>` as an array. Effect code writes these forms when `import { Array, Record } from "effect"` hides the global types. The rules now read `globalThis.X` as the built-in `X`. An assertion to `globalThis.Record<string, unknown>` is no longer called narrower, as with `Record<string, unknown>`.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `antislop/no-module-mocking` report mocks through a namespace import or a destructured method
+
+  The strict preset now reports `vitest.vi.mock(...)` after `import * as vitest from "vitest"`, the same form for `@jest/globals`, and a mock method that the code destructures from `vi` or `jest`, such as `const { doMock } = vi`. It also follows `const` aliases of `vi`, `jest`, and their mock methods, and reads `globalThis.vi`. An import of `vi` from your own module, such as `import { vi } from "./helpers"`, is still allowed.
+
+- [#857](https://github.com/adelrodriguez/adamantite/pull/857) [`77b2403`](https://github.com/adelrodriguez/adamantite/commit/77b24037b295dc381d5039bf866907f98e1911eb) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Move the Node.js lint rules into core
+
+  Core now enables `node/handle-callback-err`, `node/no-exports-assign`, `node/no-mixed-requires`, `node/no-new-require`, and `node/no-path-concat`. The separate `adamantite/lint/node` preset and `--preset node` choice are removed. Doctor reports the retired import.
+
+  Remove the Node preset import and its `extends` entry from `oxlint.config.ts`. Keep the core `adamantite/lint` preset and any `node/*` rule settings. Remove `--preset node` from init commands.
+
+  Oxlint matches the name `require` in the mixed-declaration and constructor rules even when it names a local parameter. Rename those parameters to names such as `loadModule` and `Module`. The callback rule also reports a declaration parameter named `err`, which can be renamed to `error`. These upstream limitations remain tracked in [issue #843](https://github.com/adelrodriguez/adamantite/issues/843).
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report `Readonly<object>` and `object & {}` parameters in `antislop/no-object-parameters`
+
+  The rule now reports a parameter typed `Readonly<object>`, `NonNullable<object>`, or an intersection of `object` with `{}`, because each type accepts the same values as `object`. A local type named `Readonly` or `NonNullable` keeps its own meaning, and an intersection with a named type, such as `object & Owner`, still passes.
+
+- [#842](https://github.com/adelrodriguez/adamantite/pull/842) [`f2e3d4a`](https://github.com/adelrodriguez/adamantite/commit/f2e3d4acb8e39a15bafc2c635f2663527b370594) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Ship the strict and effect rules as first-party code under the `antislop` and `antislop-effect` namespaces
+
+  This breaks rule settings and suppression comments that use `anti-slop/*` or `anti-slop-effect/*`. Replace those prefixes with `antislop/` and `antislop-effect/`. Keep the rule severity, options, and suppression reasons.
+
+  Run `adamantite doctor` to list each old config key and suppression with its replacement. Make those changes, run `adamantite check`, then run Doctor again. If Doctor cannot list the linted files, repair the config and run Doctor again to check the suppressions. `adamantite update` also shows remaining migration findings.
+
+- [#827](https://github.com/adelrodriguez/adamantite/pull/827) [`c63b959`](https://github.com/adelrodriguez/adamantite/commit/c63b9590c4623aa6cf09fe86ecb4544b080e1d19) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Rewrite only plain JSON files, and remove the `jsonc-parser` dependency
+
+  `adamantite init` no longer edits a `tsconfig.json`, `.vscode/settings.json`, or `.zed/settings.json` that has comments or trailing commas. It keeps the file as it is, prints the change to make by hand, such as the `extends` value to set, and continues with the next step. Before, init edited these files in place and kept their comments.
+
+  A plain JSON file is now written with two-space indentation, and it keeps the key order of the project file. A parse error now shows one line and column, such as `Invalid JSONC at line 3, column 3`. Adamantite reads these files with the parsers in Effect, so target projects no longer install `jsonc-parser`. A `__proto__` key in a project file is now read as an ordinary key.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Count a line past the print width as multiline in `require-readable-spacing`
+
+  Oxfmt wraps a statement whose line ends past its `printWidth`, and the wrapped statement needs blank lines around it. `antislop/require-readable-spacing` now counts a one-line statement that ends past column 100 as multiline, so it asks for those blank lines before Oxfmt wraps the line. A line that Oxfmt cannot wrap, such as a long template literal, also gets blank lines. If your Oxfmt config sets another `printWidth`, set the rule's new `printWidth` option to the same value.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `antislop/no-reduce-accumulator-copy` report copies in named reducers and other indirect copies
+
+  The strict preset now reports an accumulator copy in a function declaration or a `const` function that a `reduce` call in the same file uses as its reducer, such as `items.reduce(append, [])`. It also reports an accumulator passed to `concat` on a new array, such as `[item].concat(acc)`, `globalThis.Object.assign` and `globalThis.Array.from`, and a copy in a callback that the reducer passes to another call, such as `forEach`. A copy with a fixed size and a copy in a stored callback are still allowed.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `antislop/no-reflect-get` and `antislop/no-reflect-apply` report indirect access to Reflect
+
+  The strict preset now reports a `Reflect.get` or `Reflect.apply` call that the code reaches through a `const` alias such as `const R = Reflect`, through `globalThis.Reflect`, through destructuring such as `const { get } = Reflect`, through `.call` or `.apply` on the method, or through a template literal key such as ``Reflect[`get`]``. A `Reflect.get` call that passes a receiver different from the target is still allowed, also through `.call` and `.apply`.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Reject blank markers in `antislop/require-safety-comment-for-type-assertion`
+
+  The `markers` option accepted an entry with only spaces, and the rule dropped it without a warning. `{ "markers": ["  "] }` fell back to `SAFETY:`, and `{ "markers": ["WHY", " "] }` lost its second entry. Oxlint now stops with an options validation error for a blank marker, so remove the blank entry from your config.
+
+- [#748](https://github.com/adelrodriguez/adamantite/pull/748) [`1dda6fa`](https://github.com/adelrodriguez/adamantite/commit/1dda6fa5c5b3493412f60cb28399767ecf35db73) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Read template literal keys in the adamantite and antislop-effect rules
+
+  The rules that find calls of imported functions, such as `adamantite/no-react-state-hooks`, now report ``React[`useState`](0)``. The `antislop-effect` tag rules now report ``value[`_tag`] === "Ready"`` and ``{ [`_tag`]: "Ready" }``, classify ``error[`reason`][`_tag`]`` as a reason tag, and accept the pattern object of ``Match[`when`](...)``. `adamantite/no-query-data-in-state` reads ``query[`data`]`` and `{ ["data"]: user }`. In `antislop/no-unknown-parameters`, a parser, promise, or `cause` name written as a string or template key, such as `schema["parse"](value)`, gets the same exemption as the plain name. All three plugins now read property keys with one shared helper, so a key form that one plugin reads, the others read too.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report `typeof` on an unconstrained generic value in the strict preset
+
+  `antislop/no-runtime-typeof` allows `typeof` on a value with a declared owned type. It read a type parameter, as in `function describe<T>(value: T)`, as an owned type, but `T` can be any value. It now reports `typeof` when the declared type is a type parameter with no constraint, or with a constraint that has `unknown` or `any`, as in `<T extends Record<string, unknown>>`. It also reports such a type parameter behind `NonNullable`, `NoInfer`, or `Awaited`, or in an intersection with `{}` or `object`. A type parameter with an owned constraint, as in `<T extends string | number>`, is still allowed.
+
+  A nearer type alias or interface with the same name hides an outer type parameter, as `type T = string | number` inside a function nested in `function outer<T>()`. The rule then checks that declaration instead of the type parameter.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Resolve local type aliases in `antislop/no-runtime-typeof`
+
+  The rule allows `typeof` on a value with a declared type that has no `unknown` or `any`. It read only the written annotation, so a local alias that hides `unknown` or `any`, such as `type Payload = Record<string, unknown>` with `payload: Payload`, counted as an owned type. The rule now resolves local aliases, generic aliases, and aliases of type parameters before it checks the type, as the other `unknown` rules do. A local alias of an owned union, such as `type Label = string | (() => string)`, still allows `typeof`. An imported alias has no body in the file, so the rule still treats it as owned.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Allow an `unknown` parameter named `cause` only for errors in the strict preset
+
+  `antislop/no-unknown-parameters` allowed every `unknown` parameter named `cause`, so `function parse(cause: unknown)` passed. It now allows `cause` only on a constructor, as in `constructor(message: string, cause: unknown)`, and on a function, method, class, or interface whose name ends in `Error` or has the word `cause`, as in `toError`, `AppError`, or `formatCauseDetail`. A `cause` property in an object type, as in `options: { cause: unknown }`, is still allowed.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report `unknown` behind local aliases, `Awaited`, `NoInfer`, and iterables in the strict preset
+
+  `antislop/no-unknown-parameters`, `antislop/no-unknown-returns`, and `antislop/no-unknown-type-aliases` now share one check for `unknown`. All three rules resolve local type aliases, as in `type Box<T> = T` with `Box<unknown>`, and see through `Awaited<unknown>` and `NoInfer<unknown>`. `antislop/no-unknown-returns` also reports `globalThis.Promise<unknown>`, `Iterable<unknown>`, `AsyncIterable<unknown>`, `AsyncIterator<unknown>`, `Generator<unknown>`, and `AsyncGenerator<unknown>`. `antislop/no-known-value-widening` uses the same check for the parameter of a type guard. A local declaration with the same name as a built-in type, such as `interface Promise<T>`, is not treated as the built-in type.
+
+- [#832](https://github.com/adelrodriguez/adamantite/pull/832) [`9bdb04b`](https://github.com/adelrodriguez/adamantite/commit/9bdb04b7f8bb4b7a694b94d81d1750c5a12e3a04) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report an unused `oxlint-disable` comment in `adamantite check`, and remove it in `adamantite fix`
+
+  The core preset sets `options.reportUnusedDisableDirectives` to `"error"`. `adamantite check` now fails on an `oxlint-disable` comment that suppresses nothing, and `adamantite fix` removes the comment with Oxlint 1.93 or later. With Oxlint 1.92, remove the comment yourself.
+
+  Zed reported these comments before, but `check` and CI accepted them. Zed and VS Code now report them with the severity from the Oxlint config. New Zed settings no longer set `unusedDisableDirectives`. Existing settings keep it, so remove `lsp.oxlint.initialization_options.settings.unusedDisableDirectives` from `.zed/settings.json` if you want Zed to follow your Oxlint config.
+
+  To turn the report off, set `options.reportUnusedDisableDirectives` to `"off"` in the root `oxlint.config.ts`. Oxlint reads this option only from the root config.
+
+  The jest and vitest presets now accept a top-level `tester.run(...)` call in `require-hook`, and the RuleTester test that `adamantite rule test add` writes no longer has a suppression for `vitest/require-hook` and `jest/require-hook`. In a project without a test preset, that suppression suppressed nothing. `check` reports the suppression in a test that `rule test add` wrote before, and `fix` removes it.
+
+  When `fix` removes a comment that has no reason, the same run still reports `adamantite/require-suppression-reason` for the comment. The next `check` passes.
+
+- [#779](https://github.com/adelrodriguez/adamantite/pull/779) [`6ee9d13`](https://github.com/adelrodriguez/adamantite/commit/6ee9d1319ac5829b98478f3808263acfdc7f64ab) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Update the managed tooling versions: Oxlint 1.93.0, Oxfmt 0.78.0, tsrs 0.25.0-ts7.1.0-beta, Knip 6.45.1, and `@effect/tsgo` 0.69.0. Also update the runtime dependencies `@oxlint/plugins` to 1.93.0 and `@clack/prompts` to 1.9.0.
+
+  The type-aware rules now have builds for Windows ARM64: tsrs 0.25.0 publishes `@tsrs/win32-arm64`, and `@effect/tsgo` 0.69.0 ships a Windows ARM64 build of tsrs.
+
+  The effect preset enables the two new `@effect/tsgo` rules:
+
+  - `effecttsgo/missing-concurrency-option` reports an `Effect.all` or `Effect.forEach` call without a `concurrency` option. These calls run one effect at a time unless the option says otherwise.
+  - `effecttsgo/on-exit-failure-to-on-error` reports an `Effect.onExit` callback that acts only on failure, which `Effect.onError` replaces.
+
+  Oxlint 1.92.0 and later find the `tsrs-lint` launcher in `node_modules/.bin` themselves. Outside Windows, the Oxlint entry that `adamantite check`, `adamantite fix`, and the editors run no longer names the launcher in `OXLINT_TSGOLINT_PATH`.
+
+  The optional peer ranges move to `oxlint` 1.92.0 or later and `tsrs` 0.25.0-ts7.1.0-beta or later. npm rejected tsrs 0.25.0-ts7.1.0-beta against the old range, because a prerelease matches a range only through a version with the same major, minor, and patch.
+
+  To upgrade an existing project:
+
+  - Run `adamantite update` to install the new versions.
+  - In a project with the effect preset, expect `adamantite check` to report `Effect.all` and `Effect.forEach` calls without a `concurrency` option. Add `{ concurrency: 1 }` to keep the current order, or set the concurrency that the code needs.
+  - Expect `adamantite check` to report a rejection callback that is the second argument of `then()`. Oxlint 1.93 reports it with `promise/prefer-catch`, which the core preset turns on. Move the callback to `.catch()`.
+  - In a Vue project, expect `adamantite fix` to format `.vue` files differently. Oxfmt 0.77.0 formats them with its own formatter instead of Prettier (oxc-project/oxc#28848).
+  - In an Astro or Svelte project, expect `adamantite fix` to format `.astro` and `.svelte` files. The format preset turns on Oxfmt's `astro` and `svelte` options, and Zed and VS Code format both languages with Oxfmt. Oxfmt needs a package from the project: `@astrojs/compiler-rs`, which Astro 7 and later install, and `svelte` 5 or later. In an Astro 5 or 6 project, or a Svelte 3 or 4 project, Oxfmt fails on those files, and Doctor reports it. Run `adamantite init` with your editors to move Zed's Astro setup from Prettier to Oxfmt.
+
+- [#746](https://github.com/adelrodriguez/adamantite/pull/746) [`8f85ae5`](https://github.com/adelrodriguez/adamantite/commit/8f85ae57923a616c0d27712d4cbad32926a3d0fc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report assertions in nested functions in `antislop/no-widen-then-assert`
+
+  The rule used to report an assertion of a widened binding only in the function that declares the binding. An assertion in a test callback inside `describe`, or in a function that reads a module binding, was not reported. The binding is a `const` with no writes, so a nested function sees the same value. The rule now reports an assertion anywhere after the declaration in the declaring function, including in the functions nested in it.
+
+### Patch Changes
+
+- [#875](https://github.com/adelrodriguez/adamantite/pull/875) [`4192ef9`](https://github.com/adelrodriguez/adamantite/commit/4192ef9a3dffb60014a259483a7ee22eca5829c5) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Describe Adamantite as strict, agent-first code-quality tooling for TypeScript
+
+  The npm description and the README tagline now read "Strict, agent-first code-quality tooling for TypeScript." The README introduction says that Adamantite helps coding agents write excellent code. The npm description also no longer reads "An strict".
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop reporting an imported type that shares its name with a type parameter
+
+  `antislop/no-unknown-type-aliases`, `antislop/no-unknown-returns`, `antislop/no-unsafe-dictionary-type`, and `antislop/no-known-value-widening` resolve type aliases to find hidden `unknown` and open dictionaries. They gave the type parameters of one alias to every alias it refers to. So in `type Reply<Payload> = Envelope | Payload[]`, the rules read an imported `Payload` inside `Envelope` as the `unknown` argument of `Reply<unknown>`. Each alias body now sees only its own type parameters. A type argument that names a type parameter of an outer alias, such as `Index<T | Command>`, now resolves against that outer alias, so `no-unsafe-dictionary-type` reports it when the outer argument is `unknown`.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Name `@ts-expect-error` in the messages of `antislop/no-chained-type-assertions` and `antislop/no-widen-then-assert`
+
+  A test that passes input of the wrong type on purpose, such as `parsePort("abc" as unknown as number)`, had no form that both rules accept. The messages now tell you to pass the input without an assertion and put `// @ts-expect-error -- reason` above the call. The rules report the same code as before.
+
+- [#781](https://github.com/adelrodriguez/adamantite/pull/781) [`e49c354`](https://github.com/adelrodriguez/adamantite/commit/e49c3549476f5d4805d21e39443e26476ca25918) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept an `await` in a loop in the core preset
+
+  The core lint preset no longer enables `no-await-in-loop`. The rule told the author to start the calls together, and that is a defect when each call needs the result of the call before it, such as a retry, a lock order, or a page that depends on the page before it. Suppressions that name `no-await-in-loop` are now unused, so you can delete them.
+
+- [#873](https://github.com/adelrodriguez/adamantite/pull/873) [`b0214a2`](https://github.com/adelrodriguez/adamantite/commit/b0214a2b6f1f94d9644c19dec5a01d8588320cba) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop `adamantite fix` from breaking a test file that imports `test`
+
+  The jest and vitest lint presets now turn off `consistent-test-it` for a time. The fix of the rule renamed a `test` call in `describe` to `it`, but it did not change the import. The file then called an `it` that it did not import, and it failed at run time unless Vitest ran with `globals: true`. The presets will turn the rule on again when an Oxlint release keeps the import ([oxc-project/oxc#29181](https://github.com/oxc-project/oxc/issues/29181)). Suppressions that name `consistent-test-it` are now unused, so you can delete them.
+
+- [#798](https://github.com/adelrodriguez/adamantite/pull/798) [`13a54d6`](https://github.com/adelrodriguez/adamantite/commit/13a54d679398012de6a88bb35c40c2818d3191c8) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report a preset that comes before core in `extends`
+
+  Oxlint applies the `extends` entries of `oxlint.config.ts` in order, and a later entry replaces the rules of an earlier one. The strict preset changes three rules of core, and the effect preset turns three off. With `extends: [strict, core]`, core replaced those changes, so the ban on type assertions was off, and no tool reported it. `adamantite doctor` now reports each Adamantite preset that comes before a core entry, and tells you to move core directly before the first Adamantite preset.
+
+- [#795](https://github.com/adelrodriguez/adamantite/pull/795) [`bd908fd`](https://github.com/adelrodriguez/adamantite/commit/bd908fdf2f9402a7a4afddb5ba99703aab1ebe00) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept a declaration file that has no `import` or `export` in the core preset
+
+  The core lint preset now turns off `import/unambiguous` in `*.d.ts` files. A declaration file without an `import` or `export` is a script on purpose, because only a script can declare a wildcard module, such as `declare module "*?raw"`, or a global. You can delete an override that turns the rule off for these files.
+
+- [#795](https://github.com/adelrodriguez/adamantite/pull/795) [`bd908fd`](https://github.com/adelrodriguez/adamantite/commit/bd908fdf2f9402a7a4afddb5ba99703aab1ebe00) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept a capital letter at the start of a describe title in the vitest and jest presets
+
+  `vitest/prefer-lowercase-title` and `jest/prefer-lowercase-title` now have `ignore: ["describe"]`, so `describe("Calculator", ...)` passes. A describe title often names the class or function under test. The rules still report a test title that starts with a capital letter.
+
+- [#800](https://github.com/adelrodriguez/adamantite/pull/800) [`cf171d1`](https://github.com/adelrodriguez/adamantite/commit/cf171d10dd97130e532b78b89eb108a0c470b220) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report a named dictionary once in `antislop/no-unsafe-dictionary-type`, also when a type alias uses it
+
+  The rule reported a named dictionary such as `type LogFields = Record<string, unknown>` again at each use inside another type alias. So `type Logger = { info: (event: LogFields) => void }` got one report for each method, and the same members in an interface got none. Now a use inside a type alias reports only at the declaration, as a use in an interface or a variable does. An alias whose whole body is the dictionary, such as `type Other = LogFields`, still reports, because it gives the dictionary another name.
+
+  A logger or tracer that accepts open fields can name its field bag once and suppress the rule at that declaration with a reason. The strict preset section of the README shows how.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop reporting type tests in `antislop/no-unsafe-dictionary-type`
+
+  The rule no longer reports `Record<string, unknown>` in a conditional type test, such as `T extends Record<string, unknown> ? A : B`, or as the filter of the built-in `Extract` and `Exclude`. Those positions ask whether a type is a plain object, and `object` gives a different answer for interfaces and arrays. The rule still reports a dictionary in a type alias, a parameter, or the result of a conditional type.
+
+- [#812](https://github.com/adelrodriguez/adamantite/pull/812) [`292f52c`](https://github.com/adelrodriguez/adamantite/commit/292f52c3484abe22b69b17f2aba8631308e0e34f) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept the data-first `Effect.catch(effect, handler)` in the effect preset
+
+  The effect lint preset now turns off the core rule `promise/valid-params`. The rule matches a method by its name only, so it reported `Effect.catch(load("a"), () => load("b"))` as `Promise.catch()` with 2 arguments. In a project with the effect preset, the rule no longer checks the arguments of `Promise` methods. The type check still reports a promise method call with the wrong arguments.
+
+- [#814](https://github.com/adelrodriguez/adamantite/pull/814) [`8de880a`](https://github.com/adelrodriguez/adamantite/commit/8de880a9ec35308b208fc822991ec217813d8b85) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept an `Effect.map` or `Option.map` callback that returns nothing in the effect preset
+
+  The effect lint preset now turns off the core rule `array-callback-return`. The rule matches an array method by its name only, so it reported `Effect.map((text) => { log(text) })` as an `Array.prototype.map` callback that does not return on all code paths. The autofix of `typescript/no-confusing-void-expression` writes this form, so the fix of one core rule caused a report of another. In a project with the effect preset, a callback of a native array method that returns nothing is no longer reported. The type check still reports a callback that returns a value on only some paths when `noImplicitReturns` is on, as in `adamantite/tsconfig` and `adamantite/typescript`.
+
+- [#813](https://github.com/adelrodriguez/adamantite/pull/813) [`f180f10`](https://github.com/adelrodriguez/adamantite/commit/f180f10a27a6d3e622ba3cb7ceec77d3630f36be) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept an `Effect.catch` in the handler of another `Effect.catch` in the effect preset
+
+  The effect lint preset now turns off the core rule `promise/no-nesting`. The rule matches `then` and `catch` by name only, so it reported a fallback inside a fallback, such as `Effect.catch(() => load("b").pipe(Effect.catch(() => load("c"))))`, as a nested promise. In a project with the effect preset, the rule no longer reports a nested `then()` or `catch()` on a `Promise`.
+
+- [#781](https://github.com/adelrodriguez/adamantite/pull/781) [`e49c354`](https://github.com/adelrodriguez/adamantite/commit/e49c3549476f5d4805d21e39443e26476ca25918) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept an error class that `Schema.TaggedError` or `Schema.Error` makes in the effect preset
+
+  The effect lint preset now turns off the core rule `unicorn/throw-new-error`. The rule reported `class NotFound extends Schema.TaggedError<NotFound>()("NotFound", { ... }) {}` as an error made without `new`, and its fix added a `new` that broke the class. The rule stays off in the preset until Oxlint fixes [oxc-project/oxc#27718](https://github.com/oxc-project/oxc/issues/27718).
+
+- [#816](https://github.com/adelrodriguez/adamantite/pull/816) [`8c82710`](https://github.com/adelrodriguez/adamantite/commit/8c827105aecbac70e169bbb54714da81b9e58bc1) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop reporting and rewriting `effect/String` and `effect/Array` functions as built-in methods in the effect preset
+
+  The effect lint preset now turns off the core rules `unicorn/prefer-string-slice`, `unicorn/prefer-array-find`, and `unicorn/prefer-array-some`. The rules match a method by its name only:
+
+  - The fix of `prefer-string-slice` rewrote `String.substring(1)` from `effect/String` to `String.slice(1)`. That is a different Effect function, which reads a negative index from the end.
+  - `prefer-array-find` reported `Array.filter(values, predicate)[0]` and told you to use `find`, which `effect/Array` does not have.
+  - `prefer-array-some` reported `Array.filter(values, predicate).length > 0`.
+
+  In a project with the effect preset, the three rules no longer report the same patterns on native strings and arrays.
+
+- [#817](https://github.com/adelrodriguez/adamantite/pull/817) [`169fff4`](https://github.com/adelrodriguez/adamantite/commit/169fff44df8c45125701fa01cda6486d5a286789) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept a `layer` suite of `@effect/vitest` in the vitest preset
+
+  `vitest/require-hook` reported `layer(TestLayer)("name", (it) => ...)` as setup code outside a hook. The vitest preset now sets `allowedFunctionCalls: ["layer"]` on the rule, so a `layer` suite passes as a `describe` suite does. The rule matches the name of the call, not the import. So in a project without Effect, a top-level call of a function named `layer` also passes. The rule still reports a top-level call of another function.
+
+- [#830](https://github.com/adelrodriguez/adamantite/pull/830) [`963329a`](https://github.com/adelrodriguez/adamantite/commit/963329a147131185061bf82b675398c01142800e) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept one of the jest and vitest presets, not both
+
+  The jest and vitest presets report the same test defects, so a config that extended both gave two reports for each defect, such as `jest(no-disabled-tests)` and `vitest(no-disabled-tests)` on one skipped test. `adamantite init` now rejects `--preset jest --preset vitest`, and the interactive prompt asks which of the two presets to keep. `adamantite doctor` reports a config that extends both presets. A config that uses each preset in an override of its own is not reported.
+
+- [#809](https://github.com/adelrodriguez/adamantite/pull/809) [`990e9ec`](https://github.com/adelrodriguez/adamantite/commit/990e9ec95c70c3dea54590dee75a2072c3f5d67d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Preserve required `undefined` arguments and concise arrow results in the core preset
+
+  The core preset enables `unicorn/no-useless-undefined` with `checkArguments: false` and `checkArrowFunctionBody: false`. It keeps required arguments such as `consume(undefined)` and concise results such as `() => undefined`. The empty-function and callback-return checks stay enabled. With the effect preset, `Effect.succeed(undefined)` still gets the Effect rule that recommends `Effect.undefined`.
+
+  For an optional callback result, use an expression such as `(flag) => flag ? 1 : undefined`. For a block callback with an explicit `return undefined`, declare a union result type such as `: number | undefined`. An unannotated return is still reported, and its fix can conflict with the callback-return or redundant-return checks. Change that callback before applying fixes. A `: undefined` annotation alone does not preserve a block return. The rule still reports redundant initializers and yields.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let one `adamantite fix` add the blank lines that a line Oxfmt wraps needs
+
+  `adamantite fix` applies Oxlint fixes, then formats with Oxfmt. Before, Oxfmt could wrap a long one-line binding after the lint stage, and the strict preset's spacing rule then needed a blank line that `fix` had not added, so `check` failed after one `fix`. The spacing rule now counts a line past the print width as multiline, so the lint stage adds that blank line. Oxlint still applies one pass of fixes, so a fix that causes a new fixable report needs a second `fix` until Oxlint repeats its passes.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop reporting type guard calls on declared bindings in `antislop/no-known-value-widening`
+
+  TypeScript narrows a value at a type guard or assertion call, so a guard on a parameter typed `string | number` or `string | undefined` does not widen it. The rule now reports a guard call only when its argument is a literal or object value, such as `isString("known")`, or a `const` that holds one.
+
+- [#795](https://github.com/adelrodriguez/adamantite/pull/795) [`bd908fd`](https://github.com/adelrodriguez/adamantite/commit/bd908fdf2f9402a7a4afddb5ba99703aab1ebe00) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Allow hooks in a `hooks.ts` file by default in `adamantite/no-react-state-hooks`
+
+  The default `allow` list now includes `**/hooks.{ts,tsx}`, for a feature that keeps its hooks in one file, such as `features/cart/hooks.ts`. If your `allow` option repeats the defaults to add this glob, you can remove the option.
+
+- [#871](https://github.com/adelrodriguez/adamantite/pull/871) [`a249904`](https://github.com/adelrodriguez/adamantite/commit/a2499046f4f8430afe45fa5f388b57dfba39e398) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Name the option that produced each `adamantite/import-owners` report
+
+  A report of `adamantite/import-owners` named the owners, but not the option that restricted the import. With many options, or with two options for the same module, you could not tell which option to change. Each report now names the option, such as `options[1]`, with the same convention as `adamantite/layers`. It also says whether the owner paths are relative to the workspace root or to the package root. The report does not print the path of the root, because that path is different on each machine.
+
+- [#795](https://github.com/adelrodriguez/adamantite/pull/795) [`bd908fd`](https://github.com/adelrodriguez/adamantite/commit/bd908fdf2f9402a7a4afddb5ba99703aab1ebe00) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept JSDoc type tags in JavaScript files in the core preset
+
+  The core lint preset sets `jsdoc/check-tag-names` to `typed: true`, which reports a tag such as `@type`, because TypeScript syntax states the type. A JavaScript file has no type syntax, so the preset now sets `typed: false` for `.js`, `.jsx`, `.mjs`, and `.cjs` files.
+
+- [#823](https://github.com/adelrodriguez/adamantite/pull/823) [`4ad7d51`](https://github.com/adelrodriguez/adamantite/commit/4ad7d51dcab33f97377e1a0562f4d68a43cc7930) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop allowing camelCase hook file names by default in `adamantite/no-react-state-hooks`
+
+  The default `allow` list no longer includes `**/use[A-Z]*.{ts,tsx}`. The core preset's `unicorn/filename-case` reports a file such as `useCounter.ts` and asks for `use-counter.ts`, so the default named a hook module that core does not accept. Rename a hook module such as `useCounter.ts` to `use-counter.ts`, or move it under a `hooks` directory. A project that keeps camelCase file names can add `"**/use[A-Z]*.{ts,tsx}"` to the rule's `allow` option.
+
+- [#803](https://github.com/adelrodriguez/adamantite/pull/803) [`3700e99`](https://github.com/adelrodriguez/adamantite/commit/3700e99cbc84feaf992e275ffbd546f8e507439c) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept a spread copy of an item in a `map` callback in the core preset
+
+  The core lint preset no longer enables `oxc/no-map-spread`. The rule reported `{ ...item, done: true }` in a `map` callback and told the author to change the item in place. `prefer-object-spread` reports the `Object.assign({}, …)` form, so no immutable copy passed core. React state updates use this copy in reducers and event handlers. Suppressions that name `oxc/no-map-spread` are now unused, so you can delete them.
+
+- [#826](https://github.com/adelrodriguez/adamantite/pull/826) [`b31021c`](https://github.com/adelrodriguez/adamantite/commit/b31021c47d65a3ffc2d89134dcb3ff48e553251a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop telling the author how to write a module mock in the vitest and jest presets
+
+  The vitest lint preset no longer turns on `vitest/prefer-import-in-mock`, and the jest lint preset no longer turns on `jest/no-untyped-mock-factory`. The rules told the author to write `vi.mock(import("./load.ts"))` or to add a type parameter to a `jest.mock` factory, but the strict preset's `antislop/no-module-mocking` bans each module mock. So a project with strict got two reports on one `vi.mock` or `jest.mock` call, and the code that obeyed the first report still failed the check. A project without the strict preset can turn the rules on in its own `oxlint.config.ts`.
+
+- [#822](https://github.com/adelrodriguez/adamantite/pull/822) [`a14a6c3`](https://github.com/adelrodriguez/adamantite/commit/a14a6c38a213a30a1235b0e281491e5878c12d74) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept a server action that has no `await` in the nextjs preset
+
+  The nextjs lint preset now turns off the core rule `typescript/require-await`. Next.js rejects each exported function of a `"use server"` file that is not async, so the rule reported a server action that the user could not change. An Oxlint override selects files by path and cannot select a file by its `"use server"` directive, so the rule is off in all files of a project with the nextjs preset.
+
+- [#818](https://github.com/adelrodriguez/adamantite/pull/818) [`9b27769`](https://github.com/adelrodriguez/adamantite/commit/9b2776962d62772945bb0d51d3eb12e289feb946) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop recommending a non-null assertion in the core preset
+
+  The core lint preset no longer enables `typescript/non-nullable-type-assertion-style`. The rule reported `value as string` and told the author to write `value!`, which `typescript/no-non-null-assertion` bans. Core still bans the non-null assertion. Suppressions that name `typescript/non-nullable-type-assertion-style` are now unused, so you can delete them.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Name the fixes that work in the `antislop/no-object-parameters` message
+
+  The message now suggests a named domain type, `WeakKey` for a `WeakMap` or `WeakSet` key, or a generic `<T extends object>` that the signature uses again, such as in the return type. A generic with one use fails the core preset's `typescript/no-unnecessary-type-parameters`. The rule reports the same code as before.
+
+- [#824](https://github.com/adelrodriguez/adamantite/pull/824) [`aaa0616`](https://github.com/adelrodriguez/adamantite/commit/aaa06167fbbfab1c997712239d17090dc27ad9b6) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Document which preset rules need an `overrides` entry to change
+
+  A top-level `rules` setting has no effect on a rule that a preset sets in an override, for the files of that override, and Oxlint gives no warning. The README now gives the order in which Oxlint applies `rules` and `overrides`, and lists the files and rules of each override in the core, strict, tailwind, jest, and vitest presets. The strict, tailwind, and test preset sections link to it.
+
+- [#820](https://github.com/adelrodriguez/adamantite/pull/820) [`2e1aff8`](https://github.com/adelrodriguez/adamantite/commit/2e1aff8452eb9d46904eb9bd7d1a691f0369729d) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Stop asking for `useMemo` on an inline context value in the react preset
+
+  The react lint preset no longer turns on `react/jsx-no-constructed-context-values`. The rule reported `<ThemeContext.Provider value={{ mode }}>` and asked for `useMemo`, but the react-strict preset bans `useMemo` in feature code because the React Compiler memoizes. So a project with both presets got two reports that it could not satisfy together. The react preset already left out the similar `react-perf` rules for new objects, arrays, and functions in props. A project without the React Compiler can turn the rule on in its own `oxlint.config.ts`.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Keep single-line bindings grouped before an ASI-guard semicolon in `require-readable-spacing`
+
+  Without semicolons, Oxfmt writes a statement that starts with `[` or `(` as `;[a, b].forEach(f)`. The parser makes that semicolon the last token of the binding above it, so `antislop/require-readable-spacing` counted the binding as two lines. It reported the binding and the next statement, and its fix split a group of single-line bindings. The rule now ends a statement at its last token before that semicolon.
+
+- [#828](https://github.com/adelrodriguez/adamantite/pull/828) [`19590d0`](https://github.com/adelrodriguez/adamantite/commit/19590d0ce7fcb0a7280aec76f4f7c180aac4dfb5) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept an `Object.assign({}, acc, …)` copy of a `reduce` accumulator in the core preset
+
+  The core lint preset no longer enables `prefer-object-spread`. The rule reported `Object.assign({}, acc, { sum: acc.sum + item.n })` in a `reduce` callback, and its fix wrote `{ ...acc, sum: acc.sum + item.n }`, which `oxc/no-accumulating-spread` reports. No immutable copy of an accumulator passed core. The `Object.assign` copy now passes core, and the strict preset still reports it when the accumulator can grow. Suppressions that name `prefer-object-spread` are now unused, so you can delete them.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `antislop/no-reduce-accumulator-copy` accept copies with a fixed size, and give advice that passes the core preset
+
+  The rule no longer reports a copy that cannot grow: a sliding window such as `acc.slice(-2).concat(item)`, a `with`, `toSorted`, or `toReversed` copy of a non-empty tuple that the step returns, and an `Object.assign({}, acc, { sum: acc.sum + n })` copy with fixed keys on a non-empty initial value. A step that also uses the accumulator outside the copy that it returns, as in `acc.push(item)`, is still reported, because it can grow the accumulator first. The message used to ask for a mutated accumulator, which the core preset's `no-param-reassign` reports for `acc[key] = value`. It now names `Object.assign(acc, source)`, `acc.push(item)`, `Map#set`, and `Object.fromEntries`, which pass both presets.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let `antislop/no-reflect-get` accept a `Reflect.get` call that passes a receiver
+
+  A Proxy `get` trap forwards its receiver with `Reflect.get(target, key, receiver)`, so a getter gets the correct `this`. Property syntax cannot pass a receiver, so the strict preset no longer reports this call. A call without a receiver, or with the target as the receiver, is still reported.
+
+- [#876](https://github.com/adelrodriguez/adamantite/pull/876) [`f571d97`](https://github.com/adelrodriguez/adamantite/commit/f571d978f5f9c25a8edeac1702190276342f6e39) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Remove the README links to the architecture decision records, which no longer exist
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Make `antislop/require-safety-comment-for-type-assertion` read only the comment above the assertion's own statement
+
+  One `SAFETY:` comment above a test call or a function used to cover every assertion in an `if`, `for`, `while`, or `switch` header inside it. A trailing comment at the end of the previous line, such as `const a = 1 // SAFETY: ...`, also counted for the next line. The rule now stops at the nearest statement and ignores a trailing comment of earlier code. A comment above a `for` statement now covers an assertion in its initializer.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report only the names that a file declares in `antislop/no-shape-in-symbol-names`
+
+  The rule now checks the bindings, types, and members that a file declares, and a renamed import or export. It no longer reports a name that comes from another module, such as `import type { ZodRawShape } from "zod"`, `UserSchema.shape`, a JSX attribute, or an object key passed to another library. It reports each declaration once, not once for each reference.
+
+- [#825](https://github.com/adelrodriguez/adamantite/pull/825) [`b9879e1`](https://github.com/adelrodriguez/adamantite/commit/b9879e10c08261a614a3e1c4f79c6d4dea24251a) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Document the core advice that the strict preset reports
+
+  The README now explains that, with the strict preset, the help of `typescript/no-explicit-any`, `typescript/no-wrapper-object-types`, and `unicorn/no-instanceof-builtins` recommends a form that strict reports. Follow the strict report that comes next. It names a form that both presets accept.
+
+- [#795](https://github.com/adelrodriguez/adamantite/pull/795) [`bd908fd`](https://github.com/adelrodriguez/adamantite/commit/bd908fdf2f9402a7a4afddb5ba99703aab1ebe00) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept `unknown`, `object`, and dictionary types in a declaration file in the strict preset
+
+  The strict lint preset now turns off `antislop/no-unknown-parameters`, `antislop/no-unknown-returns`, `antislop/no-object-parameters`, and `antislop/no-unsafe-dictionary-type` in `*.d.ts` files. A declaration file states the types of code that it does not hold, such as a built-in API or a package without types, so it cannot change those signatures.
+
+- [#829](https://github.com/adelrodriguez/adamantite/pull/829) [`b1111d4`](https://github.com/adelrodriguez/adamantite/commit/b1111d42e34d73ad4d8af9e1e02c139a9c23dfa4) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Apply the strict test-file rules to the test files of the jest and vitest presets
+
+  The strict lint preset now selects its test files with the `testFiles` globs of the jest and vitest presets, so the three presets agree on which files are test files. The override that allows a type assertion with a safety comment now also applies to `.js`, `.jsx`, `.mjs`, and `.cjs` test files. In a `__tests__` folder, it applies only to files with these extensions and the TypeScript extensions, so a `.vue`, `.svelte`, or `.astro` file in that folder now gets the strict rules for ordinary files.
+
+- [#781](https://github.com/adelrodriguez/adamantite/pull/781) [`e49c354`](https://github.com/adelrodriguez/adamantite/commit/e49c3549476f5d4805d21e39443e26476ca25918) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Report a thrown value that is not an error one time in the core preset
+
+  The core lint preset no longer enables `no-throw-literal`. `typescript/only-throw-error` reads the type of the thrown value, so it reports every throw that `no-throw-literal` reported, such as `throw "failed"` or `throw undefined`. One throw got two reports, and a suppression had to name both rules. A suppression can now name only `typescript/only-throw-error`.
+
+- [#795](https://github.com/adelrodriguez/adamantite/pull/795) [`bd908fd`](https://github.com/adelrodriguez/adamantite/commit/bd908fdf2f9402a7a4afddb5ba99703aab1ebe00) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept a type and a value that share a name in the core preset
+
+  The core lint preset now turns off `no-redeclare` in TypeScript files. The rule reported `const Port = Schema.Number` with `type Port = typeof Port.Type`, which TypeScript permits. The type check still reports a value that is declared two times, such as a second `function run()`.
+
+  The setting is in an override of the preset. To change `no-redeclare` for TypeScript files, set it in an `overrides` entry of your config, because the preset's override takes priority over top-level `rules`.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Allow `typeof` in the callbacks of a type guard in the strict preset
+
+  `antislop/no-runtime-typeof` allows `typeof` inside a type guard, but it stopped at the nearest function. It now also allows `typeof` in an inline callback of a type guard, such as `value.every((item) => typeof item === "string")`, and in an arrow function whose variable has a type guard type, such as `const isText: (value: unknown) => value is string = (value) => typeof value === "string"`. A callback with its own return type that is not a type predicate, and a helper function stored in a variable, are still reported.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Allow `typeof` on a value with a declared owned type in the strict preset
+
+  `antislop/no-runtime-typeof` now reports `typeof` only on values that may be unparsed. It allows `typeof` on a variable, a parameter, or a property path such as `options.headers` or `options!.headers`, when the root binding has a type annotation with no `unknown` or `any`, as in `retry: number | RetryPolicy`. It also allows a property destructured from such a binding, as in `const { headers } = options`. A value typed `unknown` or `any`, an unannotated value, and the result of `JSON.parse` are still reported.
+
+- [#796](https://github.com/adelrodriguez/adamantite/pull/796) [`ac02471`](https://github.com/adelrodriguez/adamantite/commit/ac024717fb4d7b636d2da437e334829fc8957175) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Accept an Astro, Vue, or Svelte script without an `import` or `export` in the core preset
+
+  The core lint preset no longer reports `import/unambiguous` in `.astro`, `.vue`, and `.svelte` files. These frameworks compile a component's script as a module, but Oxlint reported a script with no `import` or `export` as one that could be parsed as a script. Suppressions and placeholder exports that you added for this rule in these files are now unneeded, so you can delete them. The rule still reports `.js` and `.ts` files.
+
+- [#745](https://github.com/adelrodriguez/adamantite/pull/745) [`dee1661`](https://github.com/adelrodriguez/adamantite/commit/dee16614252e62dfd9221c2a54edb6deea0033cc) Thanks [@adelrodriguez](https://github.com/adelrodriguez)! - Let a parser function take an `unknown` parameter in the strict preset
+
+  `antislop/no-unknown-parameters` no longer reports an `unknown` parameter when the function only passes it to a schema parser, such as `schema.parse(value)`, `z.safeParse(schema, value)`, or `Schema.decodeUnknownSync(User)(value)`, or checks it with `instanceof`. A function that reads the value without parsing it, or that also passes the raw value somewhere else, is still reported.
+
 ## 0.47.0
 
 ### Minor Changes

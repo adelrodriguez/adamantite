@@ -28,14 +28,9 @@ import {
   writeFile,
 } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
-import {
-  getCIScriptSets,
-  getCIWorkflowEntries,
-  hasCICompatibleScripts,
-} from "#lib/workspace/ci-scripts.ts"
+import { getCIWorkflowEntries, hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
 import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
 import {
-  NODE_VERSION_SOURCES,
   NodeVersionFile,
   NodeVersionResolver,
   type NodeVersionSource,
@@ -86,8 +81,6 @@ const Job = Schema.Struct({
   strategy: Schema.optionalKey(Schema.Struct({ matrix: Schema.optionalKey(Schema.Unknown) })),
 })
 
-const Workflow = Schema.Struct({ jobs: Schema.Record(Schema.String, Job) })
-
 const Matrix = Schema.Struct({
   include: Schema.Array(Schema.Struct({ command: Schema.optionalKey(Schema.String) })),
 })
@@ -112,13 +105,10 @@ class ManagedWorkflow extends Data.TaggedClass("Managed")<{
 }> {}
 
 /**
- * An `adamantite.yml` without markers. Releases before the managed block wrote only managed jobs
- * into it, so all its jobs are managed. A legacy workflow that does not parse has jobs that run
- * nothing.
+ * An `adamantite.yml` without markers, from a release before the managed block. Adamantite cannot
+ * tell its jobs from the project's jobs in it, so it does not change the file.
  */
 class LegacyWorkflow extends Data.TaggedClass("Legacy")<{
-  readonly content: string
-  readonly jobs: ReadonlyArray<typeof Job.Type>
   readonly path: string
 }> {}
 
@@ -135,13 +125,6 @@ const parseYaml = (content: string, path: string) =>
     catch: (cause) => new FailedToParseYaml({ cause, path }),
     try: () => Yaml.parse(content),
   })
-
-const parseJobs = (content: string, path: string) =>
-  parseYaml(content, path).pipe(
-    Effect.flatMap((parsed) => Schema.decodeUnknownEffect(Workflow)(parsed)),
-    Effect.map(({ jobs }) => Object.values(jobs)),
-    Effect.option
-  )
 
 // The jobs of a workflow by name, also of a workflow whose `jobs` key has no jobs yet.
 const JobNames = Schema.Struct({
@@ -199,7 +182,6 @@ const readWorkflowState = (cwd: string) =>
             Effect.map((content) =>
               Option.map(content, (text) => ({
                 block: readBlock(text),
-                content: text,
                 path: workflowPath,
               }))
             )
@@ -246,13 +228,7 @@ const readWorkflowState = (cwd: string) =>
     const legacy = workflows.find((workflow) => workflow.path === files[0].path)
 
     if (legacy) {
-      const jobs = yield* parseJobs(legacy.content, path.join(cwd, legacy.path))
-
-      return new LegacyWorkflow({
-        content: legacy.content,
-        jobs: Option.getOrElse(jobs, () => []),
-        path: legacy.path,
-      })
+      return new LegacyWorkflow({ path: legacy.path })
     }
 
     return new MissingWorkflow()
@@ -371,55 +347,6 @@ function readGeneratedBody(workflow: string) {
   return block.body
 }
 
-// Every workflow that `create` could have written, for any package manager, set of CI scripts, and
-// Node.js version source. The source can differ from the current one, because the project can add
-// or remove a version file after init.
-function listGeneratedWorkflows() {
-  return NODE_VERSION_SOURCES.flatMap((source) =>
-    Record.keys(getSetupSteps(source)).flatMap((packageManager) =>
-      getCIScriptSets().flatMap(
-        (scripts) => generateWorkflow({ packageManager, scripts }, source) ?? []
-      )
-    )
-  )
-}
-
-// Line endings and trailing blank lines change with a checkout or an editor, not with a choice of
-// the project, so the comparisons ignore them.
-function normalizeWorkflowText(content: string) {
-  return content.replaceAll("\r\n", "\n").replaceAll("\r", "").trimEnd()
-}
-
-/**
- * Whether `create` could have written this managed block body. Any other body, such as one with a
- * hard-coded Node.js version, holds choices that the project made, so `update` keeps it.
- */
-function checkIsGeneratedBody(body: string) {
-  const normalized = normalizeWorkflowText(body)
-
-  return listGeneratedWorkflows().some(
-    (workflow) => normalizeWorkflowText(readGeneratedBody(workflow)) === normalized
-  )
-}
-
-/**
- * Whether a release before the managed block could have written this workflow. Those releases wrote
- * the same workflow without the two marker lines.
- */
-function checkIsGeneratedLegacyWorkflow(content: string) {
-  const normalized = normalizeWorkflowText(content)
-
-  return listGeneratedWorkflows().some(
-    (workflow) =>
-      normalizeWorkflowText(
-        workflow
-          .split("\n")
-          .filter((line) => line.trim() !== START_MARKER && line.trim() !== END_MARKER)
-          .join("\n")
-      ) === normalized
-  )
-}
-
 export default defineIntegration({
   assess: ({ cwd, packageJson }: Project) =>
     Effect.gen(function* () {
@@ -442,6 +369,31 @@ export default defineIntegration({
               integration: "github",
               notes: ["Preserve the other jobs and project-specific settings."],
               title: "Malformed Adamantite workflow block",
+            },
+          ],
+          packageActions: [],
+          warnings: [],
+        } satisfies IntegrationAssessment
+      }
+
+      // The markers are the only repair, and `init` then writes the current jobs between them, so
+      // this one finding also covers the problems that the old jobs can have.
+      if (state instanceof LegacyWorkflow) {
+        return {
+          applicable: true,
+          findings: [
+            {
+              currentState: `\`${state.path}\` has no \`${START_MARKER}\` and \`${END_MARKER}\` comments, so Adamantite cannot tell its jobs from the project's jobs, and \`adamantite init\` does not change the file.`,
+              goal: [
+                `Put the jobs that run the Adamantite scripts between one \`${START_MARKER}\` comment and one \`${END_MARKER}\` comment.`,
+              ],
+              id: "legacy-adamantite-workflow",
+              integration: "github",
+              notes: [
+                "Preserve the other jobs and project-specific settings.",
+                "Adamantite owns the jobs between these comments. `adamantite init` replaces them with the current jobs, and keeps the rest of the workflow.",
+              ],
+              title: "Adamantite workflow without markers",
             },
           ],
           packageActions: [],
@@ -527,9 +479,7 @@ export default defineIntegration({
             integration: "github",
             notes: [
               `The detected package manager is \`${detectedPackageManager.name}\`.`,
-              state instanceof LegacyWorkflow
-                ? `\`${state.path}\` has no \`${START_MARKER}\` and \`${END_MARKER}\` comments, so Adamantite checks all its jobs. Put the jobs that run the Adamantite scripts between these comments, and preserve the other jobs and project-specific settings.`
-                : `Adamantite checks only the jobs between \`${START_MARKER}\` and \`${END_MARKER}\`. Change only those jobs, and preserve the other jobs and project-specific settings.`,
+              `Adamantite checks only the jobs between \`${START_MARKER}\` and \`${END_MARKER}\`. Change only those jobs, and preserve the other jobs and project-specific settings.`,
             ],
             title: "Outdated Adamantite workflow",
           },
@@ -560,8 +510,9 @@ export default defineIntegration({
   kind: "ci",
   name: "github",
   /**
-   * Rewrites the managed jobs when Adamantite generated them. In a workflow with a managed block,
-   * the rest of the file stays as the project wrote it.
+   * Writes the current jobs into the managed block. Adamantite owns the block, so `update` replaces
+   * it on each run, and the rest of the file stays as the project wrote it. A legacy or malformed
+   * workflow has no block that Adamantite can find, so `update` keeps it.
    */
   update: (cwd: string, options: WorkflowOptions) =>
     Effect.gen(function* () {
@@ -570,7 +521,11 @@ export default defineIntegration({
       const state = yield* readWorkflowState(cwd)
       const workflow = generateWorkflow(options, yield* resolver.resolve(cwd))
 
-      if (workflow === null || state instanceof MalformedWorkflow) {
+      if (
+        workflow === null
+        || state instanceof MalformedWorkflow
+        || state instanceof LegacyWorkflow
+      ) {
         return "kept" as const
       }
 
@@ -578,20 +533,6 @@ export default defineIntegration({
         yield* writeFile(path.join(cwd, files[0].path), workflow)
 
         return "updated" as const
-      }
-
-      if (state instanceof LegacyWorkflow) {
-        if (!checkIsGeneratedLegacyWorkflow(state.content)) {
-          return "kept" as const
-        }
-
-        yield* writeFile(path.join(cwd, state.path), workflow)
-
-        return "updated" as const
-      }
-
-      if (!checkIsGeneratedBody(state.block.body)) {
-        return "kept" as const
       }
 
       // Keep the line endings of the file. Each line of a CRLF body keeps its carriage return.

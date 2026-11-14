@@ -7,6 +7,7 @@ import { pipe } from "effect/Function"
 import * as Match from "effect/Match"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
+import { END_MARKER, START_MARKER } from "#lib/integrations/ci/github-block.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
@@ -264,32 +265,27 @@ export const setupGitHubActions = (
 
     const state = yield* github.detect(cwd)
 
-    const update = () => github.update(cwd, { packageManager, scripts })
-
+    // Adamantite can find its jobs only in a managed block, so init keeps the other workflows.
     const result = yield* Match.valueTags(state, {
-      Legacy: update,
+      Legacy: () => Effect.succeed("kept" as const),
       Malformed: () => Effect.succeed("kept" as const),
-      Managed: update,
+      Managed: () => github.update(cwd, { packageManager, scripts }),
       Missing: () =>
         github.create(cwd, { packageManager, scripts }).pipe(Effect.as("created" as const)),
     })
 
     yield* Output.success(`GitHub Actions workflow ${result}.`)
 
-    const reportKept = (workflowPath: string) =>
-      result === "kept"
-        ? Output.info(
-            `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
-          )
-        : Effect.void
-
     yield* Match.valueTags(state, {
-      Legacy: ({ path }) => reportKept(path),
+      Legacy: ({ path }) =>
+        Output.info(
+          `\`${path}\` has no \`${START_MARKER}\` and \`${END_MARKER}\` comments, so \`adamantite init\` cannot tell the Adamantite jobs from yours and kept the file. Run \`adamantite doctor\` for the repair.`
+        ),
       Malformed: ({ paths, reason }) =>
         Output.warning(
           `Adamantite cannot read the managed block in ${paths.map((workflowPath) => `\`${workflowPath}\``).join(", ")}, so \`adamantite init\` kept the workflow. ${reason} Run \`adamantite doctor\` for the repair.`
         ),
-      Managed: ({ path }) => reportKept(path),
+      Managed: () => Effect.void,
       Missing: () => Effect.void,
     })
   }).pipe(

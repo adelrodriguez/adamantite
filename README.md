@@ -106,10 +106,14 @@ The GitHub Actions workflow runs the `check` and `analyze` scripts that you sele
 Its job sits between `# ADAMANTITE:START` and `# ADAMANTITE:END` comments. Adamantite owns
 the jobs between these comments, and you own the rest of the workflow. You can rename the
 file in `.github/workflows` and add your own jobs outside the comments. Doctor checks only the
-jobs between the comments, and init updates them when you did not change them.
+jobs between the comments. Each `init` replaces the jobs between the comments with the current
+ones, so put your own jobs and steps outside the comments.
 Agents verify custom rules with temporary cases while they work. CI runs the rules through
-`check` by default. Users can add an explicit `adamantite rule test` step for optional saved tests.
-Init preserves a workflow with an explicit rule-test command, including its setup and other settings.
+`check` by default. To run optional saved tests in CI, add your own job with an
+`adamantite rule test` step outside the comments.
+An `adamantite.yml` from a release before the comments has no border between the Adamantite
+jobs and your jobs. Init does not change that file, and Doctor asks you to add the comments
+around the Adamantite jobs.
 
 Existing package scripts whose commands differ from Adamantite's are kept and reported
 instead of being replaced. The interactive initializer asks before overwriting them; in

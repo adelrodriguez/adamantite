@@ -472,15 +472,19 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   folders with migration instructions. Optional saved tests do not produce a finding.
 - The `github` integration in `src/lib/integrations/ci/github.ts` writes only the selected
   managed check and analyze scripts into the workflow. It does not add or require a rule-test
-  step. Users can add one themselves, and Doctor preserves it.
+  step. Users can add one in their own job outside the managed block, and Doctor accepts it.
 - The generated job sits in a managed block, between `# ADAMANTITE:START` and
   `# ADAMANTITE:END`. `github-block.ts` finds the block in the text, because the YAML parser
   drops comments. `github.ts` looks for the block in every file in `.github/workflows`, and
   `detect` returns one of four states: `Missing`, `Managed`, `Legacy`, or `Malformed`. Assess
-  reads only the jobs in the block, and `update` replaces only the block, when Adamantite
-  generated it. A project has one block. Markers that do not make one block are `Malformed`,
-  and Doctor reports them. An `adamantite.yml` without markers is `Legacy`, from a release
-  before the block, and all its jobs count as managed.
+  reads only the jobs in the block. Adamantite owns the block, as it owns the managed section of
+  `AGENTS.md`, so `update` replaces the block with the current render on each run and does not
+  look for project changes in it. The rest of the file stays as the project wrote it, and the
+  new jobs take the indentation of the jobs that they replace. A project
+  has one block. Markers that do not make one block are `Malformed`, and Doctor reports them.
+  An `adamantite.yml` without markers is `Legacy`, from a release before the block. Adamantite
+  cannot tell its jobs from the project's jobs in it, so `update` keeps it, and Doctor reports
+  it with one finding that asks for the markers.
 
 The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`

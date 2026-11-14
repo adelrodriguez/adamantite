@@ -1795,7 +1795,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("keep a GitHub Actions workflow that the project wrote, and point to doctor", () =>
+    it.effect("keep a GitHub Actions workflow without markers, and point to doctor", () =>
       Effect.gen(function* () {
         const workflowPath = ".github/workflows/adamantite.yml"
         const workflow = "name: team checks\n"
@@ -1812,9 +1812,45 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read(workflowPath)).toBe(workflow)
         expect(logLines).toContainEqual(
-          `● \`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
+          `● \`${workflowPath}\` has no \`# ADAMANTITE:START\` and \`# ADAMANTITE:END\` comments, so \`adamantite init\` cannot tell the Adamantite jobs from yours and kept the file. Run \`adamantite doctor\` for the repair.`
         )
       })
+    )
+
+    it.effect(
+      "replace a managed block that the project changed, and keep the jobs outside it",
+      () =>
+        Effect.gen(function* () {
+          const workflowPath = ".github/workflows/checks.yml"
+          const before = "name: team checks\non: push\njobs:\n"
+
+          const after =
+            "  e2e:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bun run test:e2e\n"
+
+          const files = createInitTestContext({
+            [workflowPath]: `${before}  # ADAMANTITE:START\n  verify:\n    runs-on: macos-latest\n    steps:\n      - run: bun run check\n  # ADAMANTITE:END\n${after}`,
+          })
+
+          const logLines: unknown[] = []
+          const installer = createDependencyInstallerTestContext()
+
+          const exit = yield* runCommand(
+            initCommand,
+            ["--non-interactive", "--script", "check", "--github-actions"],
+            { files, layers: [installer.layer], logLines }
+          )
+
+          const [head, block, tail] = files
+            .read(workflowPath)
+            .split(/ {2}# ADAMANTITE:(?:START|END)\n/u)
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          // The text outside the markers stays, and the jobs between them are the current ones.
+          expect([head, tail]).toStrictEqual([before, after])
+          expect(block).toContain("command: bun run check")
+          expect(block).not.toContain("macos-latest")
+          expect(logLines).toContainEqual("✔ GitHub Actions workflow updated.")
+        })
     )
 
     it.effect("keep a GitHub Actions workflow whose managed block is malformed", () =>

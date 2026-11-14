@@ -121,6 +121,16 @@ const TREES: readonly IdiomTree[] = [
     preset: "tailwind",
     secondPasses: [],
   },
+  {
+    preset: "vitest",
+    secondPasses: [],
+  },
+  {
+    // `jest/prefer-strict-equal` writes `toStrictEqual(3)`, and `jest/prefer-to-be` then writes
+    // `toBe(3)` in the next pass.
+    preset: "jest",
+    secondPasses: [{ file: "equal.test.ts", issue: ONE_FIX_PASS }],
+  },
 ]
 
 /**

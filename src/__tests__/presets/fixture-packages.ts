@@ -7,8 +7,8 @@ const REPO_ROOT = join(import.meta.dirname, "../../..")
 /**
  * The folder of the fixture packages: the packages that the fixtures import, such as React and
  * TanStack Query, so that a type-aware run gets their real types. The folder has its own
- * `package.json` and lockfile outside the pnpm workspace, so the root manifest lists only what
- * Adamantite builds, publishes, and tests itself against.
+ * `package.json`, lockfile, and `pnpm-workspace.yaml`, so pnpm installs it as a separate workspace
+ * and the root manifest lists only what Adamantite builds, publishes, and tests itself against.
  */
 export const FIXTURE_PACKAGES_DIR = join(import.meta.dirname, "fixture-packages")
 
@@ -20,7 +20,7 @@ export const FIXTURE_PACKAGES_DIR = join(import.meta.dirname, "fixture-packages"
 export default function installFixturePackages(): void {
   const result = spawnSync(
     "pnpm",
-    ["install", "--dir", FIXTURE_PACKAGES_DIR, "--ignore-workspace", "--frozen-lockfile"],
+    ["install", "--dir", FIXTURE_PACKAGES_DIR, "--frozen-lockfile"],
     { encoding: "utf8" }
   )
 

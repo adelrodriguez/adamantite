@@ -1,0 +1,4 @@
+# @jest/globals, which the jest idioms import, depends on @parcel/watcher. Its install script builds
+# the watcher from source only when no prebuilt binary fits the platform, and no test starts it.
+allowBuilds:
+  "@parcel/watcher": false

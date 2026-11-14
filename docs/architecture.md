@@ -381,8 +381,10 @@ import.
 
 A fixture that imports a package, such as React or TanStack Query, gets the real types of the
 package from the fixture packages. `src/__tests__/presets/fixture-packages/` has its own
-`package.json` and `pnpm-lock.yaml` outside the pnpm workspace, so the root manifest lists only what
-Adamantite builds, publishes, and tests itself against. The `globalSetup` of the `presets` Vitest
+`package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml`, so pnpm installs it as a separate
+workspace, and the root manifest lists only what Adamantite builds, publishes, and tests itself
+against. Its `pnpm-workspace.yaml` holds the pnpm settings of the fixture packages, such as
+`allowBuilds`, and never a `packages` key. The `globalSetup` of the `presets` Vitest
 project installs the fixture packages from their lockfile. `createFixtureProject` links the packages
 of the repository and the fixture packages into the `node_modules` of each fixture project.
 `fixture-packages.test.ts` fails when a package is in both manifests.

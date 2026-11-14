@@ -87,7 +87,7 @@ the root `package.json`. Add it with an exact version, and commit the lockfile o
 packages:
 
 ```sh
-pnpm --dir src/__tests__/presets/fixture-packages --ignore-workspace add -E vue@<version>
+pnpm --dir src/__tests__/presets/fixture-packages add -E vue@<version>
 ```
 
 Dependabot does not yet support pnpm 12. Use `pnpm run bump:deps` for package dependency

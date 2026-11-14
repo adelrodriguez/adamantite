@@ -283,7 +283,8 @@ selected presets. Doctor and update maintain a package while the root config imp
 preset. See ADR 0003.
 
 Doctor reports imports of retired presets from the `retiredLintPresets` table in
-`tooling/oxlint/index.ts`: `shadcn`, renamed to `tailwind`, and `react-doctor`. The `react-doctor` repair
+`tooling/oxlint/index.ts`: `shadcn`, renamed to `tailwind`, `antislop`, merged into `strict`,
+`node`, merged into core, and `react-doctor`. The `react-doctor` repair
 prompt moves the config to `react-strict`, keeps one extends entry when both presets were
 present, and preserves project settings and `react-doctor/*` overrides. Assessment does not
 write the config.

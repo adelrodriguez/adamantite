@@ -138,8 +138,13 @@ describe("inspectExtendsOrder", () => {
     expect(
       inspectExtendsOrder(
         toExtendsConfig(
-          [CORE_IMPORT, STRICT_IMPORT, EFFECT_IMPORT, 'import node from "adamantite/lint/node"'],
-          "[effect, strict, core, node]"
+          [
+            CORE_IMPORT,
+            STRICT_IMPORT,
+            EFFECT_IMPORT,
+            'import vitest from "adamantite/lint/vitest"',
+          ],
+          "[effect, strict, core, vitest]"
         )
       )
     ).toStrictEqual(Option.some({ before: ["effect", "strict"], core: "core" }))

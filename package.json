@@ -65,10 +65,6 @@
       "types": "./dist/presets/lint/nextjs.d.ts",
       "default": "./dist/presets/lint/nextjs.js"
     },
-    "./lint/node": {
-      "types": "./dist/presets/lint/node.d.ts",
-      "default": "./dist/presets/lint/node.js"
-    },
     "./lint/react": {
       "types": "./dist/presets/lint/react.d.ts",
       "default": "./dist/presets/lint/react.js"

@@ -60,3 +60,53 @@ brand on each `Schema.Class` and `Schema.TaggedError`, and sorted keys.
 | `fixable/as.ts` | Written for Adamantite | | `Effect.map` of a constant, which the fix writes as `Effect.as`. |
 | `fixable/handlers.ts` | [catch-tags](https://github.com/Effect-TS/effect/blob/f18320b2b84f77a197037fdccaf41808d8c82d4b/ai-docs/src/01_effect/04_errors/10_catch-tags.ts#L9-L24) | MIT | The upstream order of the handlers, which the fix sorts. |
 | `fixable/map.ts` | Written for Adamantite | | `Effect.flatMap` of `Effect.succeed`, which the fix writes as `Effect.map`. |
+
+## react
+
+| File | Source | License | Changes |
+| --- | --- | --- | --- |
+| `clean/ref-input.tsx` | [shadcn/ui](https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/new-york-v4/ui/input.tsx#L1-L20) | MIT | `ref` as a prop of an input, without the classes. |
+| `clean/sidebar-provider.tsx` | [shadcn/ui](https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/new-york-v4/ui/sidebar.tsx#L116-L150) | MIT | A context with one `open` value, without the state and the callbacks. |
+| `clean/todo-list.tsx` | [TanStack Query](https://github.com/TanStack/query/blob/36dd7927c85ce6cee37ab1eb3af25e7fc7ccbb14/examples/react/optimistic-updates-nextjs-app-router/components/TodoListUI.tsx#L60-L68) | MIT | The list with stable keys as its own component. |
+| `fixable/arrow-component.tsx` | Written for Adamantite |  | An arrow component, which the fix writes as a function declaration. |
+| `fixable/boolean-prop.tsx` | Written for Adamantite |  | `required={true}`, which the fix writes as `required`. |
+| `fixable/curly-text.tsx` | Written for Adamantite |  | A string child in braces, which the fix writes as text. |
+| `fixable/empty-input.tsx` | Written for Adamantite |  | An empty closing tag, which the fix removes. |
+| `fixable/fragment.tsx` | Written for Adamantite |  | `<Fragment>`, which the fix writes as `<>`. A known second pass removes the import. |
+
+## react-strict
+
+| File | Source | License | Changes |
+| --- | --- | --- | --- |
+| `clean/controlled-form.tsx` | [TanStack Query](https://github.com/TanStack/query/blob/36dd7927c85ce6cee37ab1eb3af25e7fc7ccbb14/examples/react/optimistic-updates-nextjs-app-router/components/TodoListUI.tsx#L13-L52) | MIT | A controlled input whose state comes from `use-input.ts`. |
+| `clean/counter.tsx` | [Next.js with-vitest](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/with-vitest/app/counter.tsx#L1-L15) | MIT | The state moves to `use-counter.ts`. |
+| `clean/use-counter.ts` | [Next.js with-vitest](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/with-vitest/app/counter.tsx#L1-L15) | MIT | The counter state, with an effect that listens to an event. |
+| `clean/use-input.ts` | [TanStack Query](https://github.com/TanStack/query/blob/36dd7927c85ce6cee37ab1eb3af25e7fc7ccbb14/examples/react/optimistic-updates-nextjs-app-router/components/TodoListUI.tsx#L13-L52) | MIT | The input state of the form. |
+| `clean/use-mobile.ts` | [shadcn/ui](https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/hooks/use-mobile.ts#L1-L17) | MIT | `useSyncExternalStore` in place of state and an effect. |
+
+## nextjs
+
+| File | Source | License | Changes |
+| --- | --- | --- | --- |
+| `clean/app/actions.ts` | [next-forms](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/next-forms/app/actions.ts#L16-L46) | MIT | A type guard in place of Zod, and no database. |
+| `clean/app/add-form.tsx` | [next-forms](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/next-forms/app/add-form.tsx#L21-L34) | MIT | `<output>` in place of the status paragraph, and a plain submit button. |
+| `clean/app/api/todos/route.ts` | [TanStack Query](https://github.com/TanStack/query/blob/36dd7927c85ce6cee37ab1eb3af25e7fc7ccbb14/examples/react/optimistic-updates-nextjs-app-router/app/api/todos/route.ts#L1-L7) | MIT | A fixed list in place of the store. |
+| `clean/app/form-page.tsx` | [next-forms](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/next-forms/app/page.tsx#L10-L26) | MIT | A page that passes the two server actions to forms. |
+| `clean/app/layout.tsx` | [create-next-app](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/packages/create-next-app/templates/app/ts/app/layout.tsx#L15-L26) | MIT | Metadata as a plain object, and no fonts. |
+| `clean/app/page.tsx` | [next-forms](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/next-forms/app/page.tsx#L10-L26) | MIT | A fixed list in place of the database, and no forms. |
+| `clean/app/revalidate.ts` | [cache-handler-redis](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/cache-handler-redis/app/server-actions.ts#L1-L7) | MIT | A server action without `await` (#776). An event stands for `updateTag`. |
+| `clean/app/state-action.ts` | [next-forms](https://github.com/vercel/next.js/blob/cbd8159c02ea96064457f7b654bbb9d4eab45137/examples/next-forms/app/actions.ts#L16-L46) | MIT | The state action of `useActionState`, without Zod and the database. |
+
+## tanstack
+
+| File | Source | License | Changes |
+| --- | --- | --- | --- |
+| `clean/routes/posts.tsx` | [TanStack Router](https://github.com/TanStack/router/blob/0b6d4f3f6b42e704555d9ff0014ddbf8b44f8e09/examples/react/basic-react-query-file-based/src/routes/posts.index.tsx#L1-L10) | MIT | The route type that the router generator writes, declared in the file. |
+| `clean/use-create-todo.ts` | [TanStack Query](https://github.com/TanStack/query/blob/36dd7927c85ce6cee37ab1eb3af25e7fc7ccbb14/examples/react/optimistic-updates-nextjs-app-router/components/TodoListUI.tsx#L11-L29) | MIT | A mutation that invalidates the query, without the optimistic update. |
+| `clean/use-posts.ts` | [TanStack Query](https://github.com/TanStack/query/blob/36dd7927c85ce6cee37ab1eb3af25e7fc7ccbb14/examples/react/basic/src/services/posts/queries.ts#L1-L16) | MIT | A fixed list in place of the fetch. |
+
+## tailwind
+
+| File | Source | License | Changes |
+| --- | --- | --- | --- |
+| `clean/components/ui/input.tsx` | [shadcn/ui](https://github.com/shadcn-ui/ui/blob/e62c9435fff729a175f38983dee73b2cb4f6a069/apps/v4/registry/new-york-v4/ui/input.tsx#L1-L20) | MIT | A local `cn()`, and fewer classes. |

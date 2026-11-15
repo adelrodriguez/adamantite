@@ -12,9 +12,8 @@ import * as Stream from "effect/Stream"
 import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import { integrations } from "#lib/integrations/index.ts"
+import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import { format as formatCommand } from "#lib/integrations/tooling/oxfmt/command.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
@@ -82,7 +81,6 @@ export function checkIsEmptySelection(selection: Selection): boolean {
  */
 const LEGACY_PATHS: ReadonlySet<string> = new Set([
   oxlint.config,
-  oxfmt.config,
   knip.config,
   tsconfig.config,
 ])
@@ -101,10 +99,7 @@ const renderLegacyFiles = Effect.fn("renderLegacyFiles")(function* (
 
   return [
     ...(lints
-      ? [
-          { content: toOxlintTsConfigContent(presets), path: oxlint.config },
-          { content: oxfmt.render(facts), path: oxfmt.config },
-        ]
+      ? [{ content: toOxlintTsConfigContent(presets), path: oxlint.config }]
       : []),
     ...(checkRunsTool(selection.scripts, "knip")
       ? [{ content: knip.render(facts), path: knip.config }]

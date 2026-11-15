@@ -12,7 +12,6 @@ import zed from "#lib/integrations/editors/zed.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import { inferSelection } from "#lib/integrations/selection.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
@@ -33,7 +32,6 @@ const warningReportTemplate = getWarningReportTemplate()
  */
 const managedIntegrations = [
   knip,
-  oxfmt,
   oxlint,
   oxlintCustom,
   ...managedPlugins,

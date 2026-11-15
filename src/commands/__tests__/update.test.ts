@@ -289,7 +289,7 @@ describe("update", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "package.json": manifest({ devDependencies: { knip: "catalog:", oxfmt: "npm:oxfmt@1" } }),
+          "package.json": manifest({ devDependencies: { knip: "catalog:", sherif: "npm:sherif@1" } }),
           "pnpm-workspace.yaml": "catalog:\n  knip: 0.0.1\n",
         },
       })
@@ -307,7 +307,7 @@ describe("update", () => {
       expect(installer.calls).toStrictEqual([])
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
-        expect.stringMatching(/^▲ `oxfmt` is declared as `npm:oxfmt@1`/u),
+        expect.stringMatching(/^▲ `sherif` is declared as `npm:sherif@1`/u),
         expect.stringMatching(/^\n1\. Outdated knip\n/u),
         "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
         "✅ Update finished.",

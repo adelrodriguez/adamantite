@@ -72,9 +72,11 @@ Each tool has a folder: `index.ts` exports only the integration as a default exp
 helper modules beside it, such as `knip/config.ts`, hold the logic that only that tool
 uses. The `assessment` layer registers every managed integration. The tooling integrations
 that Toolchain runs also have command builders, which return `CommandRunOptions` and start no
-process. Each of these tools keeps its builders and their option types in `command.ts`, and
-`index.ts` attaches each builder to the integration by name. `tooling/__tests__/command.test.ts`
-fails when an `index.ts` holds a builder, or when the integration does not have a builder of its
+process. Each of these tools keeps its builders and their option types in `command.ts`. An
+integration that owns a folder, such as `integrations/oxfmt/`, keeps its builders out of the
+`Integration`, and Toolchain and `setup` import its `command.ts` directly. In `tooling/`, `index.ts`
+attaches each builder to the integration by name, and `tooling/__tests__/command.test.ts` fails
+when an `index.ts` holds a builder, or when the integration does not have a builder of its
 `command.ts`.
 
 ## Integration lifecycle
@@ -137,8 +139,8 @@ selection that `inferSelection` in `integrations/selection.ts` reads from the pr
 `apply` writes the lockfile last, formatted the same way, and only `init` and `update` call it: `adamantite/import-owners`
 keeps `#lib/setup` and `writeLockfile` to them. `written` records the hash of each managed file
 that `apply` created, replaced, or found unchanged. The integrations that have not moved to a folder
-yet keep their setup steps in `src/commands/init/setup.ts`. For their files, the Oxlint, Oxfmt, and
-Knip configs and `tsconfig.json`, `written` records the hash when the file equals what this version
+yet keep their setup steps in `src/commands/init/setup.ts`. For their files, the Oxlint and Knip
+configs and `tsconfig.json`, `written` records the hash when the file equals what this version
 writes, or when its hash equals the hash that the lockfile recorded, and `apply` never writes or
 deletes them. Each run computes `written` again, so a file that the user changed leaves it.
 

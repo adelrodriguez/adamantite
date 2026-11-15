@@ -8,7 +8,6 @@ import { assessProject } from "#lib/assessment/index.ts"
 import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
@@ -25,7 +24,6 @@ import { printFileWrites } from "#terminal/setup.ts"
 const knownPackages = [
   oxlint,
   tsrs,
-  oxfmt,
   sherif,
   knip,
 ] as const satisfies readonly ToolingPackage[]

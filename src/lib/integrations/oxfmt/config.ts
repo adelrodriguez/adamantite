@@ -1,4 +1,4 @@
-import { getConfigTemplate } from "#lib/integrations/tooling/oxfmt/config.macro.ts" with { type: "macro" }
+import { getConfigTemplate } from "#lib/integrations/oxfmt/config.macro.ts" with { type: "macro" }
 import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 

@@ -5,14 +5,11 @@ import * as Order from "effect/Order"
 import { describe, expect, it } from "vitest"
 import * as knipCommands from "#lib/integrations/tooling/knip/command.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import * as oxfmtCommands from "#lib/integrations/tooling/oxfmt/command.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import * as oxlintCommands from "#lib/integrations/tooling/oxlint/command.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import * as sherifCommands from "#lib/integrations/tooling/sherif/command.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import knipIndex from "../knip/index.ts?raw"
-import oxfmtIndex from "../oxfmt/index.ts?raw"
 import oxlintIndex from "../oxlint/index.ts?raw"
 import sherifIndex from "../sherif/index.ts?raw"
 
@@ -22,7 +19,6 @@ const toolFolders = readdirSync(join(import.meta.dirname, ".."), { withFileTypes
 
 const tools = [
   { commands: { ...knipCommands }, index: knipIndex, integration: knip, name: "knip" },
-  { commands: { ...oxfmtCommands }, index: oxfmtIndex, integration: oxfmt, name: "oxfmt" },
   { commands: { ...oxlintCommands }, index: oxlintIndex, integration: oxlint, name: "oxlint" },
   { commands: { ...sherifCommands }, index: sherifIndex, integration: sherif, name: "sherif" },
 ]

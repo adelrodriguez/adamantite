@@ -5,7 +5,6 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
@@ -168,7 +167,6 @@ export default Command.make("init", initCommandOptions).pipe(
         dependencies.push(
           `${oxlint.name}@${oxlint.version}`,
           `${tsrs.name}@${tsrs.version}`,
-          `${oxfmt.name}@${oxfmt.version}`,
           // A preset with a managed plugin loads that plugin from the target project.
           ...managedPlugins
             .filter((plugin) => presets.includes(plugin.preset))
@@ -187,7 +185,6 @@ export default Command.make("init", initCommandOptions).pipe(
       yield* installDependencies(cwd, dependencies)
 
       if (Option.isSome(lint)) {
-        yield* setupToolConfig(cwd, oxfmt, oxfmt.create(cwd))
         yield* setupToolConfig(cwd, oxlint, oxlint.create(cwd, presets))
       }
 

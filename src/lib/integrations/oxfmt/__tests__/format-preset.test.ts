@@ -6,11 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
-import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
-import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
+import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
+import { pluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
 import formatPreset from "#presets/format.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../../../../..")
+const REPO_ROOT = join(import.meta.dirname, "../../../../..")
 
 const decodeOxfmtManifest = Schema.decodeUnknownSync(
   Schema.fromJsonString(

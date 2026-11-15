@@ -148,10 +148,14 @@ catch-all root config makes TypeScript treat all packages as one project. Adaman
 prints guidance instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
 in a library, to each package's `tsconfig.json` or to a shared base config.
 
-`init` and `update` write `.vscode/settings.json` and `.vscode/extensions.json` whole, and only
-when the file does not exist or still holds what Adamantite wrote, by the hash in the lockfile. A
-file that you changed stays as it is, and `adamantite doctor` reports a change that breaks the
-setup, such as a missing extension recommendation. `.vscode/extensions.json` recommends the Oxc
+`init` and `update` write each managed file whole: `oxfmt.config.ts`, `.vscode/settings.json`, and
+`.vscode/extensions.json`. They write a file only when it does not exist or still holds what
+Adamantite wrote, by the hash in the lockfile, and they format it with the project's Oxfmt first, so
+`adamantite fix` leaves it as it is. A file that you changed stays as it is, and `adamantite doctor`
+reports a change that breaks the setup, such as a missing extension recommendation. A file that the
+setup no longer needs is deleted when nobody changed it. A project that keeps a legacy
+`.oxfmtrc.json` or `.oxfmtrc.jsonc` gets no `oxfmt.config.ts`, because Oxfmt loads no config when
+it finds both, and Doctor reports the migration. `.vscode/extensions.json` recommends the Oxc
 extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
 for the `effect` preset, so VS Code offers to install them.
 

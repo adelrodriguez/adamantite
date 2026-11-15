@@ -10,6 +10,7 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { pathToFileURL } from "node:url"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as Digest from "effect/crypto/Digest"
@@ -31,7 +32,12 @@ const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
 
 // The files that `Setup.apply` writes. Each integration that moves to `src/lib/integrations/<name>/`
 // adds its managed files.
-const FORMATTED_FILES = [LOCKFILE_PATH, ".vscode/settings.json", ".vscode/extensions.json"]
+const FORMATTED_FILES = [
+  LOCKFILE_PATH,
+  "oxfmt.config.ts",
+  ".vscode/settings.json",
+  ".vscode/extensions.json",
+]
 
 // Every part of the selection that makes Setup write a file, with the longest renders: the VS Code
 // settings hide the Effect rules, and every extension is recommended.
@@ -74,6 +80,18 @@ describe("the files that Setup writes", () => {
     }
 
     symlinkSync(join(REPO_ROOT, "node_modules/oxfmt"), join(project, "node_modules/oxfmt"))
+
+    // The written `oxfmt.config.ts` imports `adamantite/format`, so a second setup formats with the
+    // preset of the repository.
+    mkdirSync(join(project, "node_modules/adamantite"))
+    writeFileSync(
+      join(project, "node_modules/adamantite/package.json"),
+      '{ "name": "adamantite", "type": "module", "exports": { "./format": "./format.js" } }\n'
+    )
+    writeFileSync(
+      join(project, "node_modules/adamantite/format.js"),
+      `export { default } from ${JSON.stringify(pathToFileURL(FORMAT_PRESET).href)}\n`
+    )
   })
 
   afterEach(() => {
@@ -86,8 +104,8 @@ describe("the files that Setup writes", () => {
     )
   }
 
-  function runOxfmt(args: readonly string[]) {
-    return spawnSync(join(REPO_ROOT, "node_modules/.bin/oxfmt"), [...args, ...FORMATTED_FILES], {
+  function runOxfmt(args: readonly string[], files: readonly string[] = FORMATTED_FILES) {
+    return spawnSync(join(REPO_ROOT, "node_modules/.bin/oxfmt"), [...args, ...files], {
       cwd: project,
       encoding: "utf8",
     })
@@ -135,7 +153,11 @@ describe("the files that Setup writes", () => {
         '{\n  "recommendations": [\n    "oxc.oxc-vscode",\n    "webpro.vscode-knip",\n    "TypeScriptTeam.native-preview"\n  ]\n}\n'
       )
 
-      const result = runOxfmt(["--check"])
+      // Oxfmt loads no config beside a legacy one, so Setup writes no `oxfmt.config.ts`.
+      const result = runOxfmt(
+        ["--check"],
+        FORMATTED_FILES.filter((file) => file !== "oxfmt.config.ts")
+      )
 
       expect(result.stderr).toBe("")
       expect(result.status).toBe(0)

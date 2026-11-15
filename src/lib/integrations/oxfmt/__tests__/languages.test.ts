@@ -3,8 +3,9 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
+import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
+import { PACKAGE } from "#lib/integrations/oxfmt/index.ts"
+import { assessPluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
 import { readProject } from "#lib/project/project.ts"
 import { formatJson } from "#lib/shared/json.ts"
 
@@ -42,7 +43,7 @@ function assess({ declares, installed }: Fixture) {
         ),
         "oxfmt.config.ts": toOxfmtTsConfigContent(),
         "package.json": yield* formatJson({
-          devDependencies: { ...declares, oxfmt: oxfmt.version },
+          devDependencies: { ...declares, oxfmt: PACKAGE.version },
           scripts: { check: "adamantite check" },
         }),
       },
@@ -57,7 +58,8 @@ function assess({ declares, installed }: Fixture) {
     )
 
     return yield* readProject(ROOT).pipe(
-      Effect.flatMap((project) => oxfmt.assess(project)),
+      Effect.flatMap(assessPluginLanguages),
+      Effect.map((findings) => ({ findings })),
       Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT, packages)])
     )
   })
@@ -73,7 +75,6 @@ describe("plugin languages", () => {
       })
 
       expect(result).toMatchObject({
-        applicable: true,
         findings: [
           {
             currentState: expect.stringContaining("`@astrojs/compiler-rs` is not installed"),
@@ -93,7 +94,7 @@ describe("plugin languages", () => {
         installed: { "@astrojs/compiler-rs": "0.5.3", astro: "7.4.11", oxfmt: "0.78.0" },
       })
 
-      expect(result).toMatchObject({ applicable: true, findings: [] })
+      expect(result).toMatchObject({ findings: [] })
     })
   )
 
@@ -106,7 +107,6 @@ describe("plugin languages", () => {
       })
 
       expect(result).toMatchObject({
-        applicable: true,
         findings: [
           {
             currentState: expect.stringContaining("`svelte` 4.2.20"),
@@ -126,7 +126,7 @@ describe("plugin languages", () => {
         installed: { oxfmt: "0.78.0", svelte: "5.57.3" },
       })
 
-      expect(result).toMatchObject({ applicable: true, findings: [] })
+      expect(result).toMatchObject({ findings: [] })
     })
   )
 
@@ -139,7 +139,6 @@ describe("plugin languages", () => {
       })
 
       expect(result).toMatchObject({
-        applicable: true,
         findings: [
           {
             currentState: expect.stringContaining("`svelte` v5.0.0"),
@@ -158,7 +157,7 @@ describe("plugin languages", () => {
         installed: { svelte: "4.2.20" },
       })
 
-      expect(result).toMatchObject({ applicable: true, findings: [] })
+      expect(result).toMatchObject({ findings: [] })
     })
   )
 })

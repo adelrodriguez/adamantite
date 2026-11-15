@@ -1,18 +1,20 @@
 import type { JsonObject } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
+import * as EffectArray from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
+import * as Order from "effect/Order"
 import type { InitOptions } from "#commands/init/options.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
+import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
+import { PACKAGE as oxfmt } from "#lib/integrations/oxfmt/index.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
-import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
-import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
@@ -26,6 +28,7 @@ import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
+  type DependencyInstallerTestContext,
   createDependencyInstallerTestContext,
   createRunnerTestContext,
   hashContent,
@@ -164,6 +167,25 @@ function runEffectSetup() {
   })
 }
 
+/**
+ * The packages that init installed in all its installs, sorted, and the distinct options of the
+ * installs. Init installs the tools of the integrations that have not moved to a folder yet, and
+ * `Setup.apply` installs the packages of the others.
+ */
+function sortPackages(packages: readonly string[]) {
+  return EffectArray.sort(packages, Order.String)
+}
+
+function listInstalls(installer: DependencyInstallerTestContext) {
+  return {
+    options: EffectArray.dedupeWith(
+      installer.calls.map((call) => call.options),
+      (first, second) => JSON.stringify(first) === JSON.stringify(second)
+    ),
+    packages: sortPackages(installer.calls.flatMap((call) => call.packages)),
+  }
+}
+
 describe("init", () => {
   describe("fresh project setup", () => {
     it.effect("install the managed packages and add the selected scripts", () =>
@@ -171,18 +193,16 @@ describe("init", () => {
         const { exit, files, installer } = yield* runFreshSetup()
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toStrictEqual([
-          {
-            options: { silent: true, workspace: false },
-            packages: [
-              "adamantite",
-              `oxlint@${oxlint.version}`,
-              `tsrs@${tsrs.version}`,
-              `oxfmt@${oxfmt.version}`,
-              `knip@${knip.version}`,
-            ],
-          },
-        ])
+        expect(listInstalls(installer)).toStrictEqual({
+          options: [{ silent: true, workspace: false }],
+          packages: sortPackages([
+            "adamantite",
+            `oxlint@${oxlint.version}`,
+            `tsrs@${tsrs.version}`,
+            `oxfmt@${oxfmt.version}`,
+            `knip@${knip.version}`,
+          ]),
+        })
         expect(readJson(files, "package.json").scripts).toStrictEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",
@@ -340,13 +360,6 @@ describe("init", () => {
         modernConfig: "oxlint.config.ts",
         script: "check",
         tool: "oxlint",
-      },
-      {
-        content: JSON.stringify({ semi: true }),
-        legacyConfig: ".oxfmtrc.json",
-        modernConfig: "oxfmt.config.ts",
-        script: "check",
-        tool: "oxfmt",
       },
       {
         content: '{\n  "entry": ["src/index.ts"],\n  "ignore": ["bunup.config.ts"],\n}\n',
@@ -700,11 +713,9 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls[0]?.packages).toStrictEqual([
-          "adamantite",
-          `sherif@${sherif.version}`,
-          `knip@${knip.version}`,
-        ])
+        expect(listInstalls(installer).packages).toStrictEqual(
+          sortPackages(["adamantite", `sherif@${sherif.version}`, `knip@${knip.version}`])
+        )
         expect(files.read("knip.config.ts")).toContain(
           "ignoreDependencies: ignoreDependencies.monorepo"
         )
@@ -735,9 +746,7 @@ describe("init", () => {
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
-          expect(installer.calls.map((call) => call.options)).toStrictEqual([
-            { silent: true, workspace },
-          ])
+          expect(listInstalls(installer).options).toStrictEqual([{ silent: true, workspace }])
         })
       )
     }
@@ -860,17 +869,15 @@ describe("init", () => {
         })
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls).toStrictEqual([
-          {
-            options: { silent: true, workspace: false },
-            packages: [
-              "adamantite",
-              `oxlint@${oxlint.version}`,
-              `tsrs@${tsrs.version}`,
-              `oxfmt@${oxfmt.version}`,
-            ],
-          },
-        ])
+        expect(listInstalls(installer)).toStrictEqual({
+          options: [{ silent: true, workspace: false }],
+          packages: sortPackages([
+            "adamantite",
+            `oxlint@${oxlint.version}`,
+            `tsrs@${tsrs.version}`,
+            `oxfmt@${oxfmt.version}`,
+          ]),
+        })
 
         expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "adamantite check" })
         expect(files.list()).toStrictEqual([
@@ -988,16 +995,14 @@ describe("init", () => {
           })
 
           expect(Exit.isSuccess(exit)).toBe(true)
-          expect(installer.calls).toStrictEqual([
-            {
-              options: { silent: true, workspace: false },
-              packages: [
-                `oxlint@${oxlint.version}`,
-                `tsrs@${tsrs.version}`,
-                `oxfmt@${oxfmt.version}`,
-              ],
-            },
-          ])
+          expect(listInstalls(installer)).toStrictEqual({
+            options: [{ silent: true, workspace: false }],
+            packages: sortPackages([
+              `oxlint@${oxlint.version}`,
+              `tsrs@${tsrs.version}`,
+              `oxfmt@${oxfmt.version}`,
+            ]),
+          })
         })
     )
 
@@ -1030,18 +1035,16 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(terminal.output()).toBe("")
-        expect(installer.calls).toStrictEqual([
-          {
-            options: { silent: true, workspace: false },
-            packages: [
-              "adamantite",
-              `oxlint@${oxlint.version}`,
-              `tsrs@${tsrs.version}`,
-              `oxfmt@${oxfmt.version}`,
-              `knip@${knip.version}`,
-            ],
-          },
-        ])
+        expect(listInstalls(installer)).toStrictEqual({
+          options: [{ silent: true, workspace: false }],
+          packages: sortPackages([
+            "adamantite",
+            `oxlint@${oxlint.version}`,
+            `tsrs@${tsrs.version}`,
+            `oxfmt@${oxfmt.version}`,
+            `knip@${knip.version}`,
+          ]),
+        })
         expect(readJson(files, "package.json").scripts).toStrictEqual({
           analyze: "adamantite analyze",
           check: "adamantite check",

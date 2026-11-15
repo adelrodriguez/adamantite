@@ -364,7 +364,32 @@ export function createFileSystemTestContext(options?: {
           ? Effect.succeed(makeFileInfo("Directory", 0))
           : Effect.fail(makeSystemError("NotFound", "stat", path))
       }),
-    stream: () => Stream.die(makeUnimplementedError("stream")),
+    // The bytes of a file, at most `bytesToRead` of them, in one chunk.
+    stream: (path, streamOptions) =>
+      Stream.suspend(() => {
+        const target = normalize(path)
+        const content = files.get(target)
+
+        if (unreadablePaths.has(target)) {
+          return Stream.fail(makeSystemError("PermissionDenied", "stream", path))
+        }
+
+        if (content === undefined) {
+          return Stream.fail(makeSystemError("NotFound", "stream", path))
+        }
+
+        const bytes = new TextEncoder().encode(content)
+
+        if (streamOptions?.offset !== undefined) {
+          return Stream.die(makeUnimplementedError("stream with an offset"))
+        }
+
+        return Stream.make(
+          streamOptions?.bytesToRead === undefined
+            ? bytes
+            : bytes.slice(0, Number(ByteSize.fromInputUnsafe(streamOptions.bytesToRead)))
+        )
+      }),
     symlink: makeUnimplemented("symlink"),
     truncate: makeUnimplemented("truncate"),
     utimes: makeUnimplemented("utimes"),

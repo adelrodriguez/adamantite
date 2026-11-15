@@ -23,7 +23,7 @@ import {
   listSupportedPackageManagers,
 } from "#lib/workspace/package-json.ts"
 import * as Output from "#terminal/output.ts"
-import { INIT_EDITOR_LABELS, INIT_EDITORS, type InitOptionsInput } from "./options.ts"
+import { INIT_EDITOR_CHOICES, INIT_EDITORS, type InitOptionsInput } from "./options.ts"
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
   `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
@@ -150,7 +150,7 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     : Option.none()
 
   const selectedEditors = yield* Prompt.MultiSelect({
-    choices: INIT_EDITORS.map((editor) => ({ title: INIT_EDITOR_LABELS[editor], value: editor })),
+    choices: INIT_EDITORS.map((editor) => ({ ...INIT_EDITOR_CHOICES[editor], value: editor })),
     message: "Which editors should Adamantite configure?",
   })
 

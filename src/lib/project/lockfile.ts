@@ -1,3 +1,4 @@
+import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
@@ -32,6 +33,14 @@ export const Lockfile = Schema.Struct({
 })
 
 export type Lockfile = typeof Lockfile.Type
+
+/**
+ * The hash that `written` records for `content`.
+ */
+export const hashContent = (content: string) =>
+  Digest.Digest.use((digest) =>
+    digest.digestHex(Digest.sha256, new TextEncoder().encode(content))
+  ).pipe(Effect.map((hex) => `sha256-${hex}`))
 
 // The schema version decides which schema reads the rest, so it decodes first. The Adamantite
 // version decodes leniently, because a newer schema can change its type.

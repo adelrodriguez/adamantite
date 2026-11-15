@@ -1,5 +1,4 @@
 import * as Array from "effect/Array"
-import * as Digest from "effect/crypto/Digest"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
@@ -18,7 +17,7 @@ import { integrations } from "#lib/integrations/index.ts"
 import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
-import { LOCKFILE_PATH, renderLockfile } from "#lib/project/lockfile.ts"
+import { hashContent, LOCKFILE_PATH, renderLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import {
   MANAGED_SCRIPT_COMMANDS,
@@ -106,11 +105,6 @@ export function checkIsEmptySelection(selection: Selection): boolean {
     && selection.typescript === null
   )
 }
-
-const hashContent = (content: string) =>
-  Digest.Digest.use((digest) =>
-    digest.digestHex(Digest.sha256, new TextEncoder().encode(content))
-  ).pipe(Effect.map((hex) => `sha256-${hex}`))
 
 /**
  * Applies the write rule to one managed file: write it when it does not exist, or when its hash

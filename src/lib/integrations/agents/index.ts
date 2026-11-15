@@ -16,6 +16,7 @@ import {
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { detectSkillFolders } from "#lib/integrations/agents/skill.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { hashContent } from "#lib/project/lockfile.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 const AGENTS_PATH = "AGENTS.md"
@@ -86,14 +87,38 @@ const assess = Effect.fn("assess")(function* (cwd: string) {
 })
 
 /**
- * The findings for each copy of the Adamantite skill in the skill folders of the agents that the
- * project uses: a copy that misses a file of the skill, which `update` writes, and a copy whose file
- * differs from the skill of this version. An earlier version wrote that file before the lockfile
- * recorded it, or the project changed it, so `update` keeps it.
+ * The state of one file of a skill copy: missing, what Adamantite writes, or changed. Adamantite
+ * writes the shipped file in the layout that the project's Oxfmt gives it, so a file whose hash
+ * equals the hash that the lockfile recorded is what Adamantite wrote.
  */
-const assessSkill = Effect.fn("assessSkill")(function* (cwd: string) {
+const readSkillFile = Effect.fn("readSkillFile")(function* (
+  { cwd, lockfile }: Project,
+  file: string,
+  shipped: string
+) {
   const path = yield* Path.Path
-  const folders = yield* detectSkillFolders(cwd)
+  const current = yield* readFileIfExists(path.join(cwd, file))
+
+  if (Option.isNone(current)) {
+    return "missing"
+  }
+
+  const recorded = Option.flatMapNullishOr(lockfile, ({ written }) => written[file])
+
+  return current.value === shipped
+    || (Option.isSome(recorded) && recorded.value === (yield* hashContent(current.value)))
+    ? "current"
+    : "changed"
+})
+
+/**
+ * The findings for each copy of the Adamantite skill in the skill folders of the agents that the
+ * project uses: a copy that misses a file of the skill, which `update` writes, and a copy with a
+ * changed file. An earlier version wrote that file before the lockfile recorded it, or the project
+ * changed it, so `update` keeps it.
+ */
+const assessSkill = Effect.fn("assessSkill")(function* (project: Project) {
+  const folders = yield* detectSkillFolders(project.cwd)
 
   const copies = yield* Effect.forEach(
     folders,
@@ -102,13 +127,10 @@ const assessSkill = Effect.fn("assessSkill")(function* (cwd: string) {
         Effect.forEach(
           Object.entries(shippedSkill),
           ([file, content]) =>
-            Effect.map(readFileIfExists(path.join(cwd, folder, "adamantite", file)), (current) => ({
-              file,
-              state: Option.match(current, {
-                onNone: () => "missing" as const,
-                onSome: (value) => (value === content ? ("current" as const) : ("changed" as const)),
-              }),
-            })),
+            Effect.map(
+              readSkillFile(project, `${folder}/adamantite/${file}`, content),
+              (state) => ({ file, state })
+            ),
           { concurrency: "unbounded" }
         ),
         (files) => ({ files, folder })
@@ -117,7 +139,9 @@ const assessSkill = Effect.fn("assessSkill")(function* (cwd: string) {
   )
 
   return copies.flatMap(({ files, folder }): Finding[] => {
-    const missing = files.filter(({ state }) => state === "missing").map(({ file }) => `\`${file}\``)
+    const missing = files
+      .filter(({ state }) => state === "missing")
+      .map(({ file }) => `\`${file}\``)
 
     return [
       ...(missing.length === 0
@@ -195,9 +219,9 @@ const assessSkillsLock = Effect.fn("assessSkillsLock")(function* (cwd: string) {
 })
 
 export default {
-  assess: ({ cwd }: Project, _selection: Selection) =>
+  assess: (project: Project, _selection: Selection) =>
     Effect.map(
-      Effect.all([assess(cwd), assessSkill(cwd), assessSkillsLock(cwd)], {
+      Effect.all([assess(project.cwd), assessSkill(project), assessSkillsLock(project.cwd)], {
         concurrency: "unbounded",
       }),
       ([agents, skill, lock]) => ({

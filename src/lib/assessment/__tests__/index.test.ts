@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
+import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
@@ -261,6 +262,7 @@ describe("assessProject", () => {
               Path.layer,
               makeModuleResolverLayer(ROOT),
               noProcessLayer,
+              Digest.layerWebCrypto,
               NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
               Layer.succeed(DependencyInstaller)({
                 addDevDependencies: () => Effect.void,
@@ -335,6 +337,7 @@ describe("assessProject", () => {
               Path.layer,
               makeModuleResolverLayer(ROOT),
               noProcessLayer,
+              Digest.layerWebCrypto,
               NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
               Layer.succeed(DependencyInstaller)({
                 addDevDependencies: () => Effect.void,

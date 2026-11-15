@@ -18,6 +18,7 @@ import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { Selection } from "#lib/project/selection.ts"
 import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
+import agents from "#lib/integrations/agents/index.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
@@ -189,6 +190,30 @@ describe("the files that Setup writes", () => {
 
       expect(result.stderr).toBe("")
       expect(result.status).toBe(0)
+    })
+  )
+
+  // Doctor must accept the skill that Setup formatted, and still report a copy that the user changed.
+  it.effect("pass the skill assessment with the layout that the project's Oxfmt gives it", () =>
+    Effect.gen(function* () {
+      writeFileSync(join(project, ".oxfmtrc.json"), '{ "printWidth": 40, "proseWrap": "always" }\n')
+
+      yield* apply(project)
+
+      const skill = join(project, ".agents/skills/adamantite/SKILL.md")
+
+      const assessSkill = readProject(project).pipe(
+        Effect.flatMap((current) => agents.assess(current, FULL_SELECTION)),
+        Effect.map(({ findings }) => findings.map(({ id }) => id)),
+        Effect.provide(layer)
+      )
+
+      expect(readFileSync(skill, "utf8")).not.toBe(getShippedSkillFiles()["SKILL.md"])
+      expect(yield* assessSkill).toStrictEqual([])
+
+      writeFileSync(skill, `${readFileSync(skill, "utf8")}\nA change of the user.\n`)
+
+      expect(yield* assessSkill).toStrictEqual(["stale-adamantite-skill"])
     })
   )
 

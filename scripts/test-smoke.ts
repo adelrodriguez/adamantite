@@ -288,6 +288,8 @@ try {
         name: "adamantite-smoke-fixture",
         packageManager: `npm@${npmVersion}`,
         private: true,
+        // Init replaces a selected script that runs another command, and keeps the others.
+        scripts: { check: "tsc --noEmit", test: "node --test" },
         version: "0.0.0",
       },
       null,
@@ -493,26 +495,24 @@ try {
     throw new Error("Effect editor setup changed the installed TypeScript package")
   }
 
+  const initArgs = [
+    cliPath,
+    "init",
+    "--non-interactive",
+    "--script",
+    "check",
+    "--script",
+    "analyze",
+    "--preset",
+    "architecture",
+    "--typescript",
+    "typescript",
+    "--agents",
+    "--github-actions",
+  ]
+
   console.info("Running `adamantite init` against the fixture project...")
-  run(
-    process.execPath,
-    [
-      cliPath,
-      "init",
-      "--non-interactive",
-      "--script",
-      "check",
-      "--script",
-      "analyze",
-      "--preset",
-      "architecture",
-      "--typescript",
-      "typescript",
-      "--agents",
-      "--github-actions",
-    ],
-    { cwd: fixture }
-  )
+  run(process.execPath, initArgs, { cwd: fixture })
 
   // Prove init kept the tarball: a registry install would validate the published presets
   // instead of this checkout's.
@@ -527,6 +527,21 @@ try {
   assertFileContains(join(fixture, ".github", "workflows", "adamantite.yml"), "runs-on")
   assertFileContains(join(fixture, "package.json"), '"check": "adamantite check"')
   assertFileContains(join(fixture, "package.json"), '"analyze": "adamantite analyze"')
+  assertFileContains(join(fixture, "package.json"), '"test": "node --test"')
+
+  console.info("Running `adamantite init` again, which must leave every file unchanged...")
+  const initialized = readFileSync(join(fixture, "package.json"), "utf8")
+  const again = spawn(process.execPath, initArgs, { cwd: fixture })
+
+  if (readFileSync(join(fixture, "package.json"), "utf8") !== initialized) {
+    throw new Error("Expected a second `adamantite init` to leave package.json byte-identical")
+  }
+
+  for (const line of again.stdout.split("\n").filter((text) => /^[✔●] `/u.test(text))) {
+    if (!line.endsWith("is up to date.") && !line.endsWith("already records this setup.")) {
+      throw new Error(`Expected a second \`adamantite init\` to change nothing, received: ${line}`)
+    }
+  }
 
   console.info("Checking the public and private imports of the installed package...")
   const privateImports = await verifyPackageExports(fixture)

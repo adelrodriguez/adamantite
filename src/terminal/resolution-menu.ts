@@ -3,7 +3,7 @@ import * as Console from "effect/Console"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Terminal from "effect/Terminal"
-import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
+import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
 import { TerminalInput } from "#terminal/input.ts"
 import * as Output from "#terminal/output.ts"
 

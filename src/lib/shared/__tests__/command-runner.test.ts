@@ -5,7 +5,7 @@ import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Sink from "effect/Sink"
 import * as Stream from "effect/Stream"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 
 function makeSpawnerLayer(spawned: ChildProcess.CommandOptions[]) {
   return Layer.succeed(ChildProcessSpawner.ChildProcessSpawner)(

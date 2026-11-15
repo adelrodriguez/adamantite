@@ -61,7 +61,7 @@ Effect.gen(function* () {
 ```
 
 The example comes from
-[coding-agents.test.ts](src/lib/execution/__tests__/coding-agents.test.ts).
+[coding-agents.test.ts](src/lib/handoff/__tests__/coding-agents.test.ts).
 [PR #375](https://github.com/adelrodriguez/adamantite/pull/375) introduced the Effect Vitest setup
 and this repository instruction.
 

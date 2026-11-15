@@ -8,7 +8,7 @@ metadata:
 sources:
   - "adelrodriguez/adamantite:src/cli.ts"
   - "adelrodriguez/adamantite:src/commands/**/*.ts"
-  - "adelrodriguez/adamantite:src/lib/execution/skill.ts"
+  - "adelrodriguez/adamantite:src/lib/integrations/agents/skill.ts"
   - "adelrodriguez/adamantite:src/lib/toolchain/index.ts"
   - "adelrodriguez/adamantite:src/lib/integrations/oxlint/plugins/**/*.ts"
   - "adelrodriguez/adamantite:src/lib/integrations/knip/config.ts"

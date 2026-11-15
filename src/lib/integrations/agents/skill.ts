@@ -3,7 +3,7 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import { codingAgents } from "#lib/execution/coding-agents.ts"
+import { codingAgents } from "#lib/handoff/coding-agents.ts"
 import { FailedToReadFile } from "#lib/shared/errors.ts"
 
 /**

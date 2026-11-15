@@ -1,4 +1,4 @@
-import type { CommandRunOptions } from "#lib/execution/command-runner.ts"
+import type { CommandRunOptions } from "#lib/shared/command-runner.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 
 interface Options {

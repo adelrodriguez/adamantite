@@ -10,7 +10,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
-import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
+import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"

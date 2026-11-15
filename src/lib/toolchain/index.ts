@@ -3,12 +3,12 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { FixLevel } from "#lib/integrations/oxlint/command.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
 import * as knip from "#lib/integrations/knip/command.ts"
 import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
 import * as oxlint from "#lib/integrations/oxlint/command.ts"
 import * as sherif from "#lib/integrations/sherif/command.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 import {
   CliNotFound,
   InvalidAnalyzeOptions,

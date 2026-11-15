@@ -5,8 +5,8 @@ import * as Fiber from "effect/Fiber"
 import * as Layer from "effect/Layer"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import { TestClock } from "effect/testing"
-import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
+import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 
 const claudeAgent: CodingAgent = {
   command: "claude",

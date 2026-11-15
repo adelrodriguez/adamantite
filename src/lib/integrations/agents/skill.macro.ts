@@ -10,7 +10,7 @@ import * as Order from "effect/Order"
  * POSIX paths relative to `skills/adamantite/`, in sorted order.
  */
 export function getShippedSkillFiles(): Record<string, string> {
-  const root = fileURLToPath(new URL("../../../skills/adamantite/", import.meta.url))
+  const root = fileURLToPath(new URL("../../../../skills/adamantite/", import.meta.url))
 
   const files = Array.sort(
     readdirSync(root, { recursive: true, withFileTypes: true })

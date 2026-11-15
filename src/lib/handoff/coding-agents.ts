@@ -4,8 +4,8 @@ import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Predicate from "effect/Predicate"
-import type { CommandFailedLike } from "#lib/execution/command-runner.ts"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
+import type { CommandFailedLike } from "#lib/shared/command-runner.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 
 export interface CodingAgent {
   readonly command: string

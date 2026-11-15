@@ -19,20 +19,20 @@ import {
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TerminalTestContext } from "#__tests__/terminal.ts"
-import { type CodingAgent, CodingAgents, codingAgents } from "#lib/execution/coding-agents.ts"
-import {
-  type CommandFailedLike,
-  type CommandRunOptions,
-  CommandRunner,
-} from "#lib/execution/command-runner.ts"
-import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
 import {
   type DetectedPackageManager,
   DependencyInstaller,
 } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, Lockfile } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
+import {
+  type CommandFailedLike,
+  type CommandRunOptions,
+  CommandRunner,
+} from "#lib/shared/command-runner.ts"
 import { CliNotFound, type FailedToInstallDependency } from "#lib/shared/errors.ts"
+import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 
 const LockfileJson = Schema.fromJsonString(Lockfile)
 

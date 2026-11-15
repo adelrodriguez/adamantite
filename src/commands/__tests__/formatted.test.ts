@@ -17,8 +17,8 @@ import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { Selection } from "#lib/project/selection.ts"
-import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts" with { type: "macro" }
 import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
+import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"

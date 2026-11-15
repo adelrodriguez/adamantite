@@ -8,13 +8,13 @@ import * as String from "effect/String"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
-import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts" with { type: "macro" }
-import { detectSkillFolders } from "#lib/execution/skill.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
   renderAgentsSection,
 } from "#lib/integrations/agents/section.ts"
+import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
+import { detectSkillFolders } from "#lib/integrations/agents/skill.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 

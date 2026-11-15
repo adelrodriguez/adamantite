@@ -195,10 +195,10 @@ export default defineConfig({
             imports: [],
             layers: {
               assessment: { imports: ["integrations"] },
-              execution: { imports: ["shared"] },
+              handoff: { imports: ["shared"] },
               // These layers independently compose integrations.
               hardening: { imports: ["integrations"] },
-              integrations: { imports: ["execution", "project"] },
+              integrations: { imports: ["handoff", "project"] },
               project: { imports: ["shared"] },
               setup: { imports: ["integrations"] },
               shared: { imports: [] },

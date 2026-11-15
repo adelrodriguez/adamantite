@@ -28,13 +28,13 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `commands`     | Define Effect CLI input, command composition, and user-facing output.                                                                             |
 | `toolchain`    | Coordinate check, fix, and analyze stages, argument routing, and failure policy.                                                                  |
-| `execution`    | Run child commands, hand off to coding agents, find the skill folders of the agents, and carry forwarded arguments.                               |
+| `handoff`      | Detect the installed coding agent CLIs, and hand the terminal to one of them.                                                                     |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
 | `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
 | `integrations` | Render the packages and managed files of each tool, editor, workspace feature, and CI provider, and assess each one against its supported state.  |
 | `project`      | Read target-project files, install dependencies, derive workspace state, and read the lockfile.                                                   |
 | `setup`        | Apply a selection: install the packages, set the managed scripts, write the managed files under the write rule, and write the lockfile last.      |
-| `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                                                              |
+| `shared`       | Define errors, filesystem helpers, JSON helpers, the command runner, and the forwarded arguments.                                                 |
 | `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                                                             |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
 
@@ -53,7 +53,7 @@ no preset and no preset test imports the CLI code.
 
 The nested `lib.layers` map holds the lib layers, with its root derived as `src/lib`.
 A layer that the map does not connect to another layer is its sibling, so `project` and
-`execution` do not import each other, and
+`handoff` do not import each other, and
 `assessment` does not import `hardening`: harden is not an assessment. `project` knows
 target-project files and package state, but not integration types such as `Finding`. An import
 that breaks a map, or a folder that is not in its map, fails `pnpm run check`.
@@ -165,7 +165,7 @@ the scope of a harden session. `adamantite/import-owners` enforces both lists.
 Interactive Doctor runs render findings as terminal notes, then offer to hand off to an
 installed coding agent CLI or to copy the combined Markdown prompt. The resolution menu in
 `src/terminal/resolution-menu.ts` offers these choices, so other commands can offer them with
-their own prompt. `CodingAgents` in `src/lib/execution` detects the agents and does the
+their own prompt. `CodingAgents` in `src/lib/handoff` detects the agents and does the
 handoff. Installation is
 detected by probing each supported CLI's version command, bounded by a timeout; only
 agents whose probe command starts appear in the menu. A handoff hands the terminal to
@@ -279,10 +279,10 @@ presets/
 src/
   commands/         CLI workflows
   lib/
-    shared/         errors, filesystem, and JSON helpers (bottom layer)
+    shared/         errors, filesystem and JSON helpers, the command runner, and forwarded arguments (bottom layer)
     project/        target-project state and file operations
       custom-rules/ rules folders, custom() discovery, rule file checks, and rule scaffolding
-    execution/      child command runs, coding-agent detection and handoff, the Adamantite skill, forwarded arguments
+    handoff/        coding-agent detection and handoff
     integrations/   integration types, one folder for each integration, and the helpers they share
       tooling/      the package and preset checks that several tools share
     assessment/     integration registry, project assessment, agent prompt

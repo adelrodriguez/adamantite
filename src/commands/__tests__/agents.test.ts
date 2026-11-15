@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts" with { type: "macro" }
+import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
 import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"

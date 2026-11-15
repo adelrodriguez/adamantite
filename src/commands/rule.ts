@@ -11,7 +11,6 @@ import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import { parseSync } from "oxc-parser"
-import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
   CurrentSetting,
   ErrorSetting,
@@ -29,6 +28,7 @@ import {
 import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/inspect.ts"
 import { readWorkspace } from "#lib/project/monorepo.ts"
 import { readProject } from "#lib/project/project.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { readFile } from "#lib/shared/filesystem.ts"
 import { formatJson } from "#lib/shared/json.ts"

@@ -9,7 +9,7 @@ import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
 import type { LintPreset } from "#lib/project/selection.ts"
-import { CommandRunner, type CommandRunOptions } from "#lib/execution/command-runner.ts"
+import { CommandRunner, type CommandRunOptions } from "#lib/shared/command-runner.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
 import {
   createFixtureProject,

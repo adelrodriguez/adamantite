@@ -10,7 +10,7 @@ import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.t
 import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import formatPreset from "#presets/format.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../../../../../..")
 
 const decodeOxfmtManifest = Schema.decodeUnknownSync(
   Schema.fromJsonString(

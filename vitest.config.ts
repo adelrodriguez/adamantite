@@ -9,13 +9,17 @@ import { defineConfig } from "vitest/config"
 // `src/__tests__/presets/rule-fixtures.ts` lints the preset fixtures with it.
 const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
 
-// These tests start real processes: Oxlint runs that lint files, rule trials in a copy of a
-// project, and Vitest runs that check the module cache. They touch the host filesystem, so they
-// stay out of the unit tests.
+// These tests start real processes: Oxlint and Oxfmt runs that lint and format files, rule trials
+// in a copy of a project, and Vitest runs that check the module cache. They touch the host
+// filesystem, so they stay out of the unit tests.
 const PROCESS_RUN_TESTS = [
   "src/__tests__/presets/**/*.test.ts",
   "src/__tests__/macro-cache.test.ts",
   "src/__tests__/trial.test.ts",
+  "src/lib/integrations/tooling/oxfmt/__tests__/format-preset.test.ts",
+  "src/lib/integrations/tooling/oxlint/__tests__/rule-migrations-assessment.test.ts",
+  "src/lib/toolchain/__tests__/idioms.test.ts",
+  "src/lib/workspace/custom-rules/__tests__/stub.test.ts",
 ]
 
 const MACRO_IMPORT = /with\s*\{\s*type:\s*["']macro["']\s*\}/

@@ -12,7 +12,7 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 import { readProject } from "#lib/workspace/project.ts"
 
-const REPO = join(import.meta.dirname, "../../..")
+const REPO = join(import.meta.dirname, "../../../../../..")
 
 function assess(root: string) {
   return Effect.runPromise(

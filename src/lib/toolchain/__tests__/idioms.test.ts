@@ -9,19 +9,25 @@ import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
-import { CommandRunner, type CommandRunOptions } from "#lib/execution/command-runner.ts"
-import * as Toolchain from "#lib/toolchain/index.ts"
 import {
   createFixtureProject,
   type FixtureLint,
   FIXTURES_DIRECTORY,
   lintFixtureProject,
   removeFixtureProject,
-} from "./rule-fixtures.ts"
-import { listStackPresets, listStacks, type Stack, STACK_OPTIONS, STACKS } from "./stacks.ts"
+} from "#__tests__/presets/rule-fixtures.ts"
+import {
+  listStackPresets,
+  listStacks,
+  type Stack,
+  STACK_OPTIONS,
+  STACKS,
+} from "#__tests__/presets/stacks.ts"
+import { CommandRunner, type CommandRunOptions } from "#lib/execution/command-runner.ts"
+import * as Toolchain from "#lib/toolchain/index.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
-const IDIOMS_DIR = join(import.meta.dirname, "fixtures/idioms")
+const REPO_ROOT = join(import.meta.dirname, "../../../..")
+const IDIOMS_DIR = join(REPO_ROOT, "src/__tests__/presets/fixtures/idioms")
 const ONE_FIX_PASS = "https://github.com/oxc-project/oxc/issues/16118"
 
 // Several fixes that the idioms show are suggestions, such as `eslint/no-useless-constructor` and

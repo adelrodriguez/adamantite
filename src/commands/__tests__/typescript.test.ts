@@ -1,7 +1,9 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Schema from "effect/Schema"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { Report } from "#commands/doctor.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import {
@@ -14,6 +16,8 @@ import {
 import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "tsconfig.json"
+
+const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
 
 const PACKAGE_JSON = '{ "name": "test-project", "devDependencies": { "adamantite": "1.0.0" } }\n'
 
@@ -87,6 +91,29 @@ describe("TypeScript setup", () => {
       expect(init.output).toContain(`● \`${CONFIG}\` kept, because it has changes`)
       expect(doctor.output).toContain("Missing TypeScript preset")
     })
+  )
+
+  // TypeScript follows `extends` through the base config, and so does Doctor.
+  it.effect.each([
+    { finding: undefined, preset: "tsconfig" },
+    { finding: "Mismatched TypeScript preset", preset: "typescript" },
+  ] as const)(
+    "find adamantite/tsconfig through a shared base config when the lockfile selects $preset",
+    ({ finding, preset }) =>
+      Effect.gen(function* () {
+        const files = makeProject({
+          ...makeLockfileFile(makeSelection({ typescript: preset })),
+          [CONFIG]: '{ "extends": "./tsconfig.base.json", "include": ["src"] }\n',
+          "tsconfig.base.json": '{ "extends": "adamantite/tsconfig" }\n',
+        })
+
+        const doctor = yield* runLifecycle("doctor", files, ["--json"])
+        const { findings } = decodeReport(doctor.output)
+
+        expect(findings.map(({ title }) => title)).toStrictEqual(
+          finding === undefined ? [] : [finding]
+        )
+      })
   )
 
   // An earlier version wrote the config before the selection added the effect preset (#837).

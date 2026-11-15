@@ -1,3 +1,4 @@
+import type * as FileSystem from "effect/FileSystem"
 import type { JsonValue, PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
@@ -13,8 +14,9 @@ import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
+import type { FailedToReadFile } from "#lib/shared/errors.ts"
 import { LANGUAGE_SERVICE_PLUGIN } from "#lib/integrations/effect-language-service.ts"
-import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import {
   type Selection,
@@ -117,6 +119,76 @@ function readExtends(config: JsonValue) {
   )
 }
 
+const ADAMANTITE_PRESETS: readonly string[] = Object.values(TYPESCRIPT_PRESETS)
+
+/**
+ * The `extends` entries of the TypeScript config at `file` and of each base config that they reach,
+ * as TypeScript follows them: a relative or absolute entry names a file, with `.json` added when
+ * the file does not exist, and Node.js resolves a package entry that names a `.json` file. The
+ * chain stops at an Adamantite preset, and at a base config that does not exist, does not decode,
+ * or comes again.
+ */
+const readExtendsChain = (
+  file: string,
+  visited: ReadonlySet<string> = new Set()
+): Effect.Effect<
+  readonly string[],
+  FailedToReadFile,
+  FileSystem.FileSystem | ModuleResolver | Path.Path
+> =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path
+    const resolver = yield* ModuleResolver
+
+    const own = yield* readFileIfExists(file)
+
+    // TypeScript adds `.json` to an entry whose file does not exist.
+    const found =
+      Option.isSome(own) || file.endsWith(".json")
+        ? Option.map(own, (text) => ({ file, text }))
+        : Option.map(yield* readFileIfExists(`${file}.json`), (text) => ({
+            file: `${file}.json`,
+            text,
+          }))
+
+    if (Option.isNone(found) || visited.has(found.value.file)) {
+      return []
+    }
+
+    const entries: readonly string[] = Option.match(
+      Result.getSuccess(
+        Json5.parse(found.value.text).pipe(Result.flatMap(Schema.decodeUnknownResult(Schema.Json)))
+      ),
+      { onNone: () => [], onSome: readExtends }
+    )
+
+    const directory = path.dirname(found.value.file)
+
+    const bases = yield* Effect.forEach(
+      entries,
+      (entry) =>
+        Effect.gen(function* () {
+          if (ADAMANTITE_PRESETS.includes(entry)) {
+            return []
+          }
+
+          const base =
+            path.isAbsolute(entry) || entry.startsWith("./") || entry.startsWith("../")
+              ? Option.some(path.resolve(directory, entry))
+              : Option.filter(yield* resolver.resolve(directory, entry), (resolved) =>
+                  resolved.endsWith(".json")
+                )
+
+          return Option.isNone(base)
+            ? []
+            : yield* readExtendsChain(base.value, new Set([...visited, found.value.file]))
+        }),
+      { concurrency: "unbounded" }
+    )
+
+    return [...entries, ...bases.flat()]
+  })
+
 // Another project imports a package that is not private and declares `exports` or `types`, so it
 // can read the declaration files that the package emits.
 function checkPublishesTypes(packageJson: PackageJson) {
@@ -142,8 +214,9 @@ function toLibraryFinding(configPath: string): Finding {
 }
 
 /**
- * The root and the workspace packages whose `tsconfig.json` names an Adamantite preset or loads its
- * type resets, with the presets that `extends` names.
+ * The root and the workspace packages whose `tsconfig.json` names an Adamantite preset, directly or
+ * through a base config, or loads its type resets, with the presets that the `extends` chain
+ * names.
  */
 const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
   cwd,
@@ -155,20 +228,7 @@ const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
     [cwd, ...workspace.packageDirectories],
     (directory) =>
       Effect.gen(function* () {
-        const content = yield* readFileIfExists(path.join(directory, CONFIG_PATH))
-
-        if (Option.isNone(content)) {
-          return []
-        }
-
-        const config = Result.getSuccess(
-          Json5.parse(content.value).pipe(Result.flatMap(Schema.decodeUnknownResult(Schema.Json)))
-        )
-
-        const entries: readonly string[] = Option.match(config, {
-          onNone: () => [],
-          onSome: readExtends,
-        })
+        const entries = yield* readExtendsChain(path.join(directory, CONFIG_PATH))
 
         const loadsResets =
           entries.length === 0

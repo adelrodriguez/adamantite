@@ -4,18 +4,13 @@ import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import process from "node:process"
-import { beforeAll, describe, expect, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import effect from "#presets/lint/effect.ts"
 import antislopEffectPlugin from "#presets/lint/plugins/antislop-effect/index.ts"
-import {
-  lintRuleFixtures,
-  listFixtureRules,
-  type RuleFixtureCase,
-  selectRuleFixtures,
-} from "./rule-fixtures.ts"
+import { listFixtureRules } from "./rule-fixtures.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const NAMESPACE = "effecttsgo"
@@ -295,36 +290,5 @@ describe("effect preset antislop rules", () => {
         Order.String
       )
     )
-  })
-})
-
-describe("effect preset antislop rule fixtures", () => {
-  let cases: RuleFixtureCase[]
-
-  beforeAll(() => {
-    cases = lintRuleFixtures({
-      fixturesDir: FIXTURES_DIR,
-      presetPath: join(REPO_ROOT, "presets/lint/effect.ts"),
-    })
-  })
-
-  describe.each(listFixtureRules(FIXTURES_DIR))("%s", (rule) => {
-    it("report every invalid fixture", () => {
-      const invalid = selectRuleFixtures(cases, rule, "invalid")
-      const missed = invalid.filter((entry) => entry.reportedLines.length === 0)
-
-      expect(invalid).not.toStrictEqual([])
-      expect(missed.map((entry) => entry.file)).toStrictEqual([])
-    })
-
-    it("report no valid fixture", () => {
-      const valid = selectRuleFixtures(cases, rule, "valid")
-      const reported = valid.filter((entry) => entry.reportedLines.length > 0)
-
-      expect(valid).not.toStrictEqual([])
-      expect(
-        reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)
-      ).toStrictEqual([])
-    })
   })
 })

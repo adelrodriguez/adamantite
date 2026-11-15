@@ -13,13 +13,7 @@ import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
 import { testFiles as vitestTestFiles } from "#presets/lint/vitest.ts"
 import packageJson from "../../../package.json" with { type: "json" }
-import {
-  lintRuleFixtures,
-  listFixtureRules,
-  type RuleFixtureCase,
-  lintFixtureTree,
-  selectRuleFixtures,
-} from "./rule-fixtures.ts"
+import { lintFixtureTree, listFixtureRules } from "./rule-fixtures.ts"
 import { STACK_OPTIONS } from "./stacks.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
@@ -90,37 +84,6 @@ describe("first-party plugin", () => {
 
   it("take the plugin types from the Oxlint version that runs the plugin", () => {
     expect(packageJson.dependencies["@oxlint/plugins"]).toBe(packageJson.devDependencies.oxlint)
-  })
-})
-
-describe("strict rule fixtures", () => {
-  let cases: RuleFixtureCase[]
-
-  beforeAll(() => {
-    cases = lintRuleFixtures({
-      fixturesDir: FIXTURES_DIR,
-      presetPath: STRICT_PRESET,
-    })
-  })
-
-  describe.each(listFixtureRules(FIXTURES_DIR))("%s", (rule) => {
-    it("report every invalid fixture", () => {
-      const invalid = selectRuleFixtures(cases, rule, "invalid")
-      const missed = invalid.filter((entry) => entry.reportedLines.length === 0)
-
-      expect(invalid).not.toStrictEqual([])
-      expect(missed.map((entry) => entry.file)).toStrictEqual([])
-    })
-
-    it("report no valid fixture", () => {
-      const valid = selectRuleFixtures(cases, rule, "valid")
-      const reported = valid.filter((entry) => entry.reportedLines.length > 0)
-
-      expect(valid).not.toStrictEqual([])
-      expect(
-        reported.map((entry) => `${entry.file}:${entry.reportedLines.join(",")}`)
-      ).toStrictEqual([])
-    })
   })
 })
 

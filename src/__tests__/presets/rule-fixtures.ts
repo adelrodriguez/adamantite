@@ -70,17 +70,6 @@ export function readFixtureOxlintVersion(): string {
  * `<fixturesDir>/<namespace>/<rule>/modules/` are the modules that the fixtures import, such as a
  * module that stands for a package. No test reads their reports.
  */
-export interface RuleFixtureOptions {
-  /**
-   * Absolute path of the directory that holds one directory for each plugin namespace.
-   */
-  readonly fixturesDir: string
-  /**
-   * Absolute path of the preset module that loads the plugin and enables its rules.
-   */
-  readonly presetPath: string
-}
-
 export const RULE_FIXTURE_KINDS = ["invalid", "valid"] as const
 
 export type RuleFixtureKind = (typeof RULE_FIXTURE_KINDS)[number]
@@ -95,13 +84,6 @@ export interface RuleFixture {
    * The rule name as a config sets it, such as `antislop/no-reflect-get`.
    */
   readonly rule: string
-}
-
-export interface RuleFixtureCase extends RuleFixture {
-  /**
-   * Lines where the rule under test reported the file.
-   */
-  readonly reportedLines: readonly number[]
 }
 
 const OxlintJsonOutput = Schema.Struct({
@@ -323,32 +305,4 @@ export function listRuleFixtures(fixturesDir: string): RuleFixture[] {
       }))
     )
   )
-}
-
-/**
- * Lint every fixture in one real Oxlint run through the preset, and return one case per fixture
- * file with the reports of that file's own rule.
- */
-export function lintRuleFixtures(options: RuleFixtureOptions): RuleFixtureCase[] {
-  const reports = lintFixtureTree({
-    fixturesDir: options.fixturesDir,
-    presets: [options.presetPath],
-  })
-
-  return listRuleFixtures(options.fixturesDir).map((fixture) => ({
-    file: fixture.file,
-    kind: fixture.kind,
-    reportedLines: reports
-      .filter((report) => report.file === fixture.file && report.rule === fixture.rule)
-      .map((report) => report.line),
-    rule: fixture.rule,
-  }))
-}
-
-export function selectRuleFixtures(
-  cases: readonly RuleFixtureCase[],
-  rule: string,
-  kind: RuleFixtureKind
-): RuleFixtureCase[] {
-  return cases.filter((entry) => entry.rule === rule && entry.kind === kind)
 }

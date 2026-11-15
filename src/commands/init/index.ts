@@ -58,18 +58,14 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
       // First, so a lockfile that does not read fails init before it changes a file.
       const recorded = yield* readLockfile(cwd)
 
-      const dependencyInstaller = yield* DependencyInstaller
-      const packageManager = yield* dependencyInstaller.detectPackageManager(cwd)
-
-      if (!packageManager) {
-        return yield* new NoPackageManager({})
-      }
-
-      if (packageManager.warnings?.length) {
-        for (const warning of packageManager.warnings) {
-          yield* Output.warning(warning)
-        }
-      }
+      const packageManager = yield* (yield* DependencyInstaller).detectPackageManager(cwd).pipe(
+        Effect.flatMap(
+          Option.match({
+            onNone: () => Effect.fail(new NoPackageManager({})),
+            onSome: Effect.succeed,
+          })
+        )
+      )
 
       yield* Output.info(`Detected package manager: ${packageManager.name}`)
 
@@ -111,7 +107,7 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
 
       const input = options.nonInteractive
         ? options
-        : yield* collectInteractiveInitOptions(isMonorepo, packageManager.name)
+        : yield* collectInteractiveInitOptions(isMonorepo)
 
       const initOptions = yield* validateInitOptions(input, packageManager.name)
 

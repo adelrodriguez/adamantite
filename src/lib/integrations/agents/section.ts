@@ -1,7 +1,7 @@
-import { runScriptCommand, type PackageManagerName } from "nypm"
 import type { Script } from "#lib/project/package-json.ts"
 import { getAgentsSectionTemplate } from "#lib/integrations/agents/section.macro.ts" with { type: "macro" }
 import { SCRIPT_ORDER, checkRunsTool } from "#lib/project/package-json.ts"
+import { type SupportedPackageManager, formatRunScript } from "#lib/project/package-manager.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
@@ -12,16 +12,16 @@ export const ADAMANTITE_AGENTS_END_MARKER = "<!-- ADAMANTITE:END -->"
 
 interface AgentsSectionOptions {
   readonly isMonorepo: boolean
-  readonly packageManager: PackageManagerName
+  readonly packageManager: SupportedPackageManager
   readonly scripts: readonly Script[]
 }
 
 function getScriptGuidance(
-  packageManager: PackageManagerName,
+  packageManager: SupportedPackageManager,
   script: Script,
   isMonorepo: boolean
 ) {
-  const command = runScriptCommand(packageManager, script)
+  const command = formatRunScript(packageManager, script)
 
   switch (script) {
     case "analyze":

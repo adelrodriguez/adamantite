@@ -7,9 +7,8 @@ import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
-import { runScriptCommand } from "nypm"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
-import type { Script, SupportedPackageManager } from "#lib/project/package-json.ts"
+import type { Script } from "#lib/project/package-json.ts"
 import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { getWorkflowTemplate } from "#lib/integrations/github/workflow.macro.ts" with { type: "macro" }
@@ -21,23 +20,25 @@ import {
   type NodeVersionSource,
 } from "#lib/project/node-version-resolver.ts"
 import {
-  checkIsSupportedPackageManager,
   SUPPORTED_PACKAGE_MANAGERS,
-} from "#lib/project/package-json.ts"
+  type SupportedPackageManager,
+  formatRunScript,
+  getRunVerb,
+} from "#lib/project/package-manager.ts"
 import { FailedToParseYaml } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfFile } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
 /**
  * A pattern that matches a package manager command that runs a script that `script` matches, as
- * `runScriptCommand` writes it, such as `pnpm run check` or `deno task check`. Flags can come
+ * `formatRunScript` writes it, such as `pnpm run check` or `deno task check`. Flags can come
  * between the package manager and its run verb, such as `pnpm --filter web run check`.
  */
 function makeScriptCommandPattern(script: string) {
   return SUPPORTED_PACKAGE_MANAGERS.map((packageManager) => {
-    const [binary, verb] = runScriptCommand(packageManager, "script").split(" ")
+    const verb = getRunVerb(packageManager)
 
-    return `${binary}(?:\\s+(?!${verb}\\b)\\S+)*\\s+${verb}\\s+${script}`
+    return `${packageManager}(?:\\s+(?!${verb}\\b)\\S+)*\\s+${verb}\\s+${script}`
   }).join("|")
 }
 
@@ -212,7 +213,7 @@ const { Available, Unavailable } = Data.taggedEnum<WorkflowSetup>()
 
 /**
  * The package manager that the workflow installs with, or why Adamantite cannot write a workflow:
- * the selection runs no script in CI, or the project's package manager is missing or unsupported.
+ * the selection runs no script in CI, or Adamantite cannot detect the project's package manager.
  */
 const readWorkflowSetup = Effect.fn("readWorkflowSetup")(function* (
   cwd: string,
@@ -229,20 +230,14 @@ const readWorkflowSetup = Effect.fn("readWorkflowSetup")(function* (
 
   const detected = yield* (yield* DependencyInstaller).detectPackageManager(cwd)
 
-  if (!detected) {
-    return Unavailable({
-      reason:
-        "Could not detect a package manager, so Adamantite does not write the GitHub Actions workflow.",
-    })
-  }
-
-  if (!checkIsSupportedPackageManager(detected.name)) {
-    return Unavailable({
-      reason: `\`${detected.name}\` is not a supported package manager for CI workflow generation, so Adamantite does not write the GitHub Actions workflow.`,
-    })
-  }
-
-  return Available({ packageManager: detected.name })
+  return Option.match(detected, {
+    onNone: () =>
+      Unavailable({
+        reason:
+          "Could not detect a package manager, so Adamantite does not write the GitHub Actions workflow.",
+      }),
+    onSome: ({ name }) => Available({ packageManager: name }),
+  })
 })
 
 const parseJobs = (content: string, path: string) =>
@@ -319,7 +314,7 @@ const assess = Effect.fn("assess")(function* (cwd: string, selection: Selection)
         goal: [
           ...missingScripts.map(
             (script) =>
-              `Make a job run the managed \`${script}\` script with \`${runScriptCommand(setup.packageManager, script)}\`.`
+              `Make a job run the managed \`${script}\` script with \`${formatRunScript(setup.packageManager, script)}\`.`
           ),
           "Use the project's Node.js version declaration instead of a hard-coded version.",
         ],

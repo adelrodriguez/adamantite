@@ -32,7 +32,7 @@ describe("addRootDevDependencies", () => {
               Effect.sync(() => {
                 events.push("install")
               }),
-            detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+            detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
           }),
         ])
       )

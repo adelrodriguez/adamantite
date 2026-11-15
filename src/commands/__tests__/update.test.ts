@@ -252,15 +252,12 @@ describe("update", () => {
       })
 
       const installer = createDependencyInstallerTestContext({
-        detectedPackageManager: { name: "pnpm" },
+        detectedPackageManager: Option.some({ name: "pnpm" }),
       })
 
       yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
 
-      expect(installer.calls.map((call) => call.options)).toContainEqual({
-        silent: true,
-        workspace: true,
-      })
+      expect(installer.calls.map((call) => call.options)).toContainEqual({ workspace: true })
     })
   )
 

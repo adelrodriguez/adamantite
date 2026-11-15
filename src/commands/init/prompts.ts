@@ -1,5 +1,4 @@
 import type * as Terminal from "effect/Terminal"
-import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Prompt from "effect/cli/Prompt"
 import * as Effect from "effect/Effect"
@@ -11,11 +10,7 @@ import {
   lintPresets,
 } from "#lib/integrations/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
-import {
-  checkIsSupportedPackageManager,
-  checkRunsTool,
-  listSupportedPackageManagers,
-} from "#lib/project/package-json.ts"
+import { checkRunsTool } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, type LintPreset, type TypeScriptPreset } from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
 import { INIT_EDITOR_CHOICES, type InitOptionsInput } from "./options.ts"
@@ -69,8 +64,7 @@ const promptPresets = Effect.gen(function* () {
 })
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
-  isMonorepo: boolean,
-  packageManager: PackageManagerName
+  isMonorepo: boolean
 ) {
   const selectedScripts = yield* Prompt.MultiSelect({
     choices: [
@@ -128,21 +122,12 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     message: "Which editors should Adamantite configure?",
   })
 
-  const canEnableGitHubActions = checkIsSupportedPackageManager(packageManager)
-
-  if (hasCICompatibleScripts(selectedScripts) && !canEnableGitHubActions) {
-    yield* Output.info(
-      `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports ${listSupportedPackageManagers("conjunction")}.`
-    )
-  }
-
-  const shouldEnableGitHubActions =
-    hasCICompatibleScripts(selectedScripts) && canEnableGitHubActions
-      ? yield* Prompt.Confirm({
-          initial: true,
-          message: "Add a GitHub Actions workflow to run the selected checks?",
-        })
-      : false
+  const shouldEnableGitHubActions = hasCICompatibleScripts(selectedScripts)
+    ? yield* Prompt.Confirm({
+        initial: true,
+        message: "Add a GitHub Actions workflow to run the selected checks?",
+      })
+    : false
 
   const shouldSetupAgents = yield* Prompt.Confirm({
     initial: true,

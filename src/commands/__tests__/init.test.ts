@@ -26,12 +26,17 @@ import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
 import * as Setup from "#lib/setup/index.ts"
-import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
+import {
+  FailedToInstallDependency,
+  InvalidInitOptions,
+  NoPackageManager,
+} from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
   type DependencyInstallerTestContext,
   createDependencyInstallerTestContext,
+  createPackageManagerTestContext,
   createRunnerTestContext,
   findingsLeft,
   getFailure,
@@ -65,6 +70,14 @@ const monorepoPackageJson = JSON.stringify(
   null,
   2
 )
+
+function withPackageManager(packageManager: string) {
+  return JSON.stringify({ name: "test-project", packageManager, version: "1.0.0" })
+}
+
+function withPackageManagerInMonorepo(packageManager: string) {
+  return JSON.stringify({ name: "test-project", packageManager, workspaces: ["packages/*"] })
+}
 
 // Interactive init probes the coding agent CLIs for the skill prompt. None of them is installed.
 
@@ -201,7 +214,7 @@ describe("init", () => {
 
         expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(listInstalls(installer)).toStrictEqual({
-          options: [{ silent: true, workspace: false }],
+          options: [{ workspace: false }],
           packages: sortPackages([
             `adamantite@${getPackageVersion()}`,
             `oxlint@${oxlint.version}`,
@@ -668,33 +681,129 @@ describe("init", () => {
     )
   })
 
-  describe("workspace installation", () => {
-    for (const { name, workspace } of [
-      { name: "npm", workspace: false },
-      { name: "pnpm", workspace: true },
-      { name: "yarn", workspace: true },
-      { name: "bun", workspace: true },
-    ] as const) {
-      it.effect(`install at the monorepo root with ${name}`, () =>
+  describe("package manager", () => {
+    const CHECK_PACKAGES = [
+      `adamantite@${getPackageVersion()}`,
+      `oxlint@${oxlint.version}`,
+      `tsrs@${tsrs.version}`,
+      `oxfmt@${oxfmt.version}`,
+    ].join(" ")
+
+    for (const { files, install, name, project } of [
+      {
+        files: { "package.json": withPackageManager("pnpm@10.0.0+sha512.abc") },
+        install: `pnpm add -D ${CHECK_PACKAGES}`,
+        name: "pnpm",
+        project: "the `packageManager` field",
+      },
+      {
+        files: { "package-lock.json": "{}" },
+        install: `npm install -D ${CHECK_PACKAGES}`,
+        name: "npm",
+        project: "`package-lock.json`",
+      },
+      {
+        files: { "yarn.lock": "" },
+        install: `yarn add -D ${CHECK_PACKAGES}`,
+        name: "yarn",
+        project: "`yarn.lock`",
+      },
+      {
+        files: { "bun.lock": "{}" },
+        install: `bun add -D ${CHECK_PACKAGES}`,
+        name: "bun",
+        project: "`bun.lock`",
+      },
+      {
+        files: { "package.json": withPackageManager("bun@1.2.0"), "package-lock.json": "{}" },
+        install: `bun add -D ${CHECK_PACKAGES}`,
+        name: "bun",
+        project: "the `packageManager` field over a lockfile",
+      },
+      {
+        files: { "package.json": monorepoPackageJson, "pnpm-lock.yaml": "" },
+        install: `pnpm add --workspace-root -D ${CHECK_PACKAGES}`,
+        name: "pnpm",
+        project: "a pnpm monorepo",
+      },
+      {
+        files: { "package.json": monorepoPackageJson, "package-lock.json": "{}" },
+        install: `npm install -D ${CHECK_PACKAGES}`,
+        name: "npm",
+        project: "an npm monorepo",
+      },
+      {
+        files: { "package.json": monorepoPackageJson, "yarn.lock": "" },
+        install: `yarn add -W -D ${CHECK_PACKAGES}`,
+        name: "yarn",
+        project: "a Yarn 1 monorepo",
+      },
+      {
+        files: { "package.json": withPackageManagerInMonorepo("yarn@4.5.0"), "yarn.lock": "" },
+        install: `yarn add -D ${CHECK_PACKAGES}`,
+        name: "yarn",
+        project: "a Yarn 4 monorepo",
+      },
+      {
+        files: { "bun.lock": "{}", "package.json": monorepoPackageJson },
+        install: `bun add -D ${CHECK_PACKAGES}`,
+        name: "bun",
+        project: "a Bun monorepo",
+      },
+    ]) {
+      it.effect(`detect ${name} from ${project} and install with it`, () =>
         Effect.gen(function* () {
-          const files = createInitTestContext({ "package.json": monorepoPackageJson })
+          const packageManager = createPackageManagerTestContext()
           const logLines: unknown[] = []
 
-          const installer = createDependencyInstallerTestContext({
-            detectedPackageManager: { name },
-          })
-
           const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
-            files,
-            layers: [installer.layer],
+            files: createInitTestContext(files),
+            layers: [packageManager.layer],
             logLines,
           })
 
           expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-          expect(listInstalls(installer).options).toStrictEqual([{ silent: true, workspace }])
+          expect(logLines).toContainEqual(`● Detected package manager: ${name}`)
+          expect(packageManager.commandLines).toStrictEqual([install])
         })
       )
     }
+
+    it.effect("fail with the package manager output when the install fails", () =>
+      Effect.gen(function* () {
+        const packageManager = createPackageManagerTestContext({
+          failure: {
+            stderr: " ERR_PNPM_FETCH_404  GET https://registry.npmjs.org/oxlint: Not Found",
+          },
+        })
+
+        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+          files: createInitTestContext({ "pnpm-lock.yaml": "" }),
+          layers: [packageManager.layer],
+        })
+
+        const error = getFailure(exit)
+        expect(error).toBeInstanceOf(FailedToInstallDependency)
+        expect(error?.message).toContain(
+          `\`pnpm add -D ${CHECK_PACKAGES}\` failed with exit code 1.`
+        )
+        expect(error?.message).toContain("ERR_PNPM_FETCH_404")
+      })
+    )
+
+    it.effect("fail when the `packageManager` field names an unsupported package manager", () =>
+      Effect.gen(function* () {
+        const packageManager = createPackageManagerTestContext()
+
+        const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", "check"], {
+          files: createInitTestContext({ "package.json": withPackageManager("aube@1.0.0") }),
+          layers: [packageManager.layer],
+        })
+
+        expect(getFailure(exit)).toBeInstanceOf(NoPackageManager)
+        expect(packageManager.commandLines).toStrictEqual([])
+      })
+    )
   })
 
   describe("selective setup", () => {
@@ -722,7 +831,7 @@ describe("init", () => {
 
         expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(listInstalls(installer)).toStrictEqual({
-          options: [{ silent: true, workspace: false }],
+          options: [{ workspace: false }],
           packages: sortPackages([
             `adamantite@${getPackageVersion()}`,
             `oxlint@${oxlint.version}`,
@@ -778,7 +887,7 @@ describe("init", () => {
         )
         expect(installer.calls).toStrictEqual([
           {
-            options: { silent: true, workspace: false },
+            options: { workspace: false },
             packages: [`adamantite@${getPackageVersion()}`],
           },
         ])
@@ -851,7 +960,7 @@ describe("init", () => {
 
           expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
           expect(listInstalls(installer)).toStrictEqual({
-            options: [{ silent: true, workspace: false }],
+            options: [{ workspace: false }],
             packages: sortPackages([
               `oxlint@${oxlint.version}`,
               `tsrs@${tsrs.version}`,
@@ -891,7 +1000,7 @@ describe("init", () => {
         expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(terminal.output()).toBe("")
         expect(listInstalls(installer)).toStrictEqual({
-          options: [{ silent: true, workspace: false }],
+          options: [{ workspace: false }],
           packages: sortPackages([
             `adamantite@${getPackageVersion()}`,
             `oxlint@${oxlint.version}`,
@@ -1023,37 +1132,6 @@ describe("init", () => {
         expect(files.read("package.json")).toBe(originalPackageJson)
       })
     )
-
-    it.effect(
-      "reject GitHub Actions with an unsupported package manager before changing the project",
-      () =>
-        Effect.gen(function* () {
-          const files = createInitTestContext()
-          const originalPackageJson = files.read("package.json")
-          const logLines: unknown[] = []
-
-          const installer = createDependencyInstallerTestContext({
-            detectedPackageManager: { name: "aube" },
-          })
-
-          const exit = yield* runCommand(
-            initCommand,
-            ["--non-interactive", "--script", "check", "--github-actions"],
-            { files, layers: [installer.layer], logLines }
-          )
-
-          expect(Exit.isFailure(exit)).toBe(true)
-          expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
-            new InvalidInitOptions({
-              reason:
-                "`--github-actions` does not support the detected package manager `aube`. Use bun, deno, npm, pnpm, or yarn.",
-            })
-          )
-          expect(installer.calls).toStrictEqual([])
-          expect(files.read("package.json")).toBe(originalPackageJson)
-          expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-        })
-    )
   })
 
   describe("edge cases", () => {
@@ -1063,7 +1141,7 @@ describe("init", () => {
         const logLines: unknown[] = []
 
         const installer = createDependencyInstallerTestContext({
-          detectedPackageManager: null,
+          detectedPackageManager: Option.none(),
         })
 
         const exit = yield* runCommand(initCommand, [], {
@@ -1182,41 +1260,6 @@ describe("init", () => {
 
         expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
-      })
-    )
-
-    it.effect("not offer GitHub Actions interactively with an unsupported package manager", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-
-        const logLines: unknown[] = []
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          ...pickMany(LINT_PRESETS, []),
-          "n",
-          ...pickMany(INIT_EDITORS, []),
-          "n",
-          ...FINISH_WITHOUT_AGENT,
-        ])
-
-        const installer = createDependencyInstallerTestContext({
-          detectedPackageManager: { name: "aube" },
-        })
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
-        expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
-        expect(logLines).toContainEqual(
-          "● Adamantite cannot generate a GitHub Actions workflow for `aube`. It supports bun, deno, npm, pnpm, and yarn."
-        )
-        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
       })
     )
 

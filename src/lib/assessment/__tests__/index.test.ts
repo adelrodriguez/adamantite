@@ -261,7 +261,7 @@ describe("assessProject", () => {
           NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
           Layer.succeed(DependencyInstaller)({
             addDevDependencies: () => Effect.void,
-            detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+            detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
           }),
         ])
       )
@@ -338,7 +338,7 @@ describe("assessProject", () => {
           NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
           Layer.succeed(DependencyInstaller)({
             addDevDependencies: () => Effect.void,
-            detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
+            detectPackageManager: () => Effect.succeedSome({ name: "pnpm" }),
           }),
         ])
       )

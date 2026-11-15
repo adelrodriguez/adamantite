@@ -102,9 +102,15 @@ export class CliNotFound extends Data.TaggedError("CliNotFound")<{
 export class CommandFailed extends Data.TaggedError("CommandFailed")<{
   command: string
   exitCode: ChildProcessSpawner.ExitCode
+  /**
+   * What the command printed, when the caller captured it instead of showing it.
+   */
+  output?: string
 }> {
   override get message() {
-    return `Command \`${this.command}\` failed with exit code ${this.exitCode}.`
+    const output = this.output?.trim() ?? ""
+
+    return `Command \`${this.command}\` failed with exit code ${this.exitCode}.${output === "" ? "" : `\n${output}`}`
   }
 }
 
@@ -381,7 +387,7 @@ export class NoPackageManager extends Data.TaggedError("NoPackageManager")<{
   cause?: unknown
 }> {
   override get message() {
-    return `No package manager was found. Run this command from a project with a lockfile.${formatCauseDetail(this.cause)}`
+    return `No package manager was found. Run this command from a project with a lockfile or a \`packageManager\` field in \`package.json\`.${formatCauseDetail(this.cause)}`
   }
 }
 

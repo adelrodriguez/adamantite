@@ -1,4 +1,3 @@
-import type { PackageManagerName } from "nypm"
 import * as Array from "effect/Array"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
@@ -8,14 +7,11 @@ import {
   findMissingRequiredPresets,
 } from "#lib/integrations/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
+import { type Script, SCRIPT_ORDER, checkRunsTool } from "#lib/project/package-json.ts"
 import {
-  checkIsSupportedPackageManager,
-  type Script,
   type SupportedPackageManager,
-  SCRIPT_ORDER,
-  checkRunsTool,
   listSupportedPackageManagers,
-} from "#lib/project/package-json.ts"
+} from "#lib/project/package-manager.ts"
 import {
   INIT_EDITORS,
   type InitEditor,
@@ -87,7 +83,7 @@ export interface InitOptionsInput {
  */
 export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   input: InitOptionsInput,
-  packageManager: PackageManagerName
+  packageManager: SupportedPackageManager
 ) {
   const options = {
     agents: input.agents,
@@ -132,20 +128,12 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  if (options.githubActions && !checkIsSupportedPackageManager(packageManager)) {
-    return yield* new InvalidInitOptions({
-      reason: `\`--github-actions\` does not support the detected package manager \`${packageManager}\`. Use ${listSupportedPackageManagers("disjunction")}.`,
-    })
-  }
-
   return {
     agents: options.agents,
     editors: Array.isReadonlyArrayNonEmpty(options.editors)
       ? Option.some(options.editors)
       : Option.none(),
-    githubActions: options.githubActions
-      ? Option.liftPredicate(packageManager, checkIsSupportedPackageManager)
-      : Option.none(),
+    githubActions: options.githubActions ? Option.some(packageManager) : Option.none(),
     lint: hasOxlint ? Option.some({ presets: options.presets }) : Option.none(),
     scripts: options.scripts,
     typescript: options.typescript,

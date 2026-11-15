@@ -60,7 +60,7 @@ export const makeAppLayer = (
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
-    DependencyInstaller.layer,
+    DependencyInstaller.layer.pipe(Layer.provide(NodeServices.layer)),
     Digest.layerWebCrypto
   )
 

@@ -80,7 +80,7 @@ const layer = Layer.mergeAll(
   // The project has its packages, so the install changes nothing.
   Layer.succeed(DependencyInstaller)({
     addDevDependencies: () => Effect.void,
-    detectPackageManager: () => Effect.succeed({ name: "bun" }),
+    detectPackageManager: () => Effect.succeedSome({ name: "bun" }),
   })
 )
 

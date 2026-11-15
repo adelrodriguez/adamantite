@@ -9,10 +9,14 @@ import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import * as Sink from "effect/Sink"
 import * as Stdio from "effect/Stdio"
+import * as Stream from "effect/Stream"
 import { TestConsole } from "effect/testing"
+import type { DetectedPackageManager } from "#lib/project/package-manager.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import {
   type FileSystemTestContext,
@@ -23,10 +27,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TerminalTestContext } from "#__tests__/terminal.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
-import {
-  type DetectedPackageManager,
-  DependencyInstaller,
-} from "#lib/project/dependency-installer.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, Lockfile } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import {
@@ -71,10 +72,7 @@ export function hashContent(content: string): string {
 }
 
 export interface DependencyInstallerCall {
-  readonly options?: {
-    readonly silent?: boolean
-    readonly workspace?: boolean
-  }
+  readonly options: { readonly workspace: boolean }
   readonly packages: string[]
 }
 
@@ -213,46 +211,43 @@ const InstalledManifest = Schema.fromJsonString(
   { space: 2 }
 )
 
+// As a package manager does, an install declares each package in the manifest of `cwd`.
+const declareDevDependencies = (packages: readonly string[], cwd: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem
+    const path = yield* Path.Path
+    const manifestPath = path.join(cwd, "package.json")
+
+    const manifest = yield* Schema.decodeEffect(InstalledManifest)(
+      yield* fs.readFileString(manifestPath)
+    )
+
+    const installed = packages.map((specifier) => {
+      const at = specifier.lastIndexOf("@")
+
+      return [specifier.slice(0, at), specifier.slice(at + 1)] as const
+    })
+
+    const updated = yield* Schema.encodeEffect(InstalledManifest)({
+      ...manifest,
+      devDependencies: { ...manifest.devDependencies, ...Object.fromEntries(installed) },
+    })
+
+    yield* fs.writeFileString(manifestPath, `${updated}\n`)
+  }).pipe(Effect.orDie)
+
 export function createDependencyInstallerTestContext(options?: {
   readonly addDevDependenciesError?: FailedToInstallDependency
-  readonly detectedPackageManager?: DetectedPackageManager | null
+  readonly detectedPackageManager?: Option.Option<DetectedPackageManager>
 }): DependencyInstallerTestContext {
   const calls: DependencyInstallerCall[] = []
-
-  const detectedPackageManager: DetectedPackageManager | null =
-    options && "detectedPackageManager" in options
-      ? (options.detectedPackageManager ?? null)
-      : { name: "bun" as const }
+  const detectedPackageManager = options?.detectedPackageManager ?? Option.some({ name: "bun" })
 
   return {
     calls,
     layer: Layer.effect(DependencyInstaller)(
       Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem
-        const path = yield* Path.Path
-
-        // As a package manager does, the install declares each package in the root manifest.
-        const declare = (packages: readonly string[], cwd: string) =>
-          Effect.gen(function* () {
-            const manifestPath = path.join(cwd, "package.json")
-
-            const manifest = yield* Schema.decodeEffect(InstalledManifest)(
-              yield* fs.readFileString(manifestPath)
-            )
-
-            const installed = packages.map((specifier) => {
-              const at = specifier.lastIndexOf("@")
-
-              return [specifier.slice(0, at), specifier.slice(at + 1)] as const
-            })
-
-            const updated = yield* Schema.encodeEffect(InstalledManifest)({
-              ...manifest,
-              devDependencies: { ...manifest.devDependencies, ...Object.fromEntries(installed) },
-            })
-
-            yield* fs.writeFileString(manifestPath, `${updated}\n`)
-          }).pipe(Effect.orDie)
+        const context = yield* Effect.context<FileSystem.FileSystem | Path.Path>()
 
         return DependencyInstaller.of({
           addDevDependencies: (packages, cwd, installOptions) =>
@@ -266,12 +261,77 @@ export function createDependencyInstallerTestContext(options?: {
                 return yield* options.addDevDependenciesError
               }
 
-              yield* declare(packages, cwd)
+              yield* declareDevDependencies(packages, cwd).pipe(Effect.provideContext(context))
             }),
           detectPackageManager: (_cwd) => Effect.succeed(detectedPackageManager),
         })
       })
     ),
+  }
+}
+
+export interface PackageManagerTestContext {
+  /**
+   * Each command line that the package manager ran, such as `pnpm add -D oxlint@1.0.0`.
+   */
+  readonly commandLines: string[]
+  readonly layer: Layer.Layer<DependencyInstaller, never, FileSystem.FileSystem | Path.Path>
+}
+
+/**
+ * The live `DependencyInstaller`, which detects the package manager from the test filesystem, with
+ * a package manager that records each command line and declares the packages it adds. With
+ * `failure`, the package manager prints its `stderr` and exits 1 instead.
+ */
+export function createPackageManagerTestContext(options?: {
+  readonly failure?: { readonly stderr: string }
+}): PackageManagerTestContext {
+  const commandLines: string[] = []
+
+  const spawnerLayer = Layer.effect(ChildProcessSpawner.ChildProcessSpawner)(
+    Effect.gen(function* () {
+      const context = yield* Effect.context<FileSystem.FileSystem | Path.Path>()
+
+      return ChildProcessSpawner.make((command) =>
+        Effect.gen(function* () {
+          if (!ChildProcess.isStandardCommand(command)) {
+            return yield* Effect.die("A package manager install runs one command")
+          }
+
+          const args = command.args.map(String)
+          commandLines.push([command.command, ...args].join(" "))
+
+          const packages = args
+            .slice(args.indexOf("-D") + 1)
+            .map((specifier) => specifier.replace(/^npm:/, ""))
+
+          if (options?.failure === undefined) {
+            yield* declareDevDependencies(packages, command.options.cwd ?? "/").pipe(
+              Effect.provideContext(context)
+            )
+          }
+
+          return ChildProcessSpawner.makeHandle({
+            all: Stream.empty,
+            exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(options?.failure ? 1 : 0)),
+            getInputFd: () => Sink.drain,
+            getOutputFd: () => Stream.empty,
+            isRunning: Effect.succeed(false),
+            kill: () => Effect.void,
+            pid: ChildProcessSpawner.ProcessId(1),
+            stderr: Stream.make(new TextEncoder().encode(options?.failure?.stderr ?? "")),
+            stdin: Sink.drain,
+            stdout: Stream.empty,
+            unref: Effect.succeed(Effect.void),
+          })
+        })
+      )
+    })
+  )
+
+  return {
+    commandLines,
+    layer: DependencyInstaller.layer.pipe(Layer.provide(spawnerLayer)),
   }
 }
 

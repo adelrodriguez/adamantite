@@ -35,7 +35,7 @@ const readAgentsSection = Effect.fn("readAgentsSection")(function* (
 ) {
   const detected = yield* (yield* DependencyInstaller).detectPackageManager(cwd)
 
-  return Option.map(Option.fromNullishOr(detected), ({ name }) =>
+  return Option.map(detected, ({ name }) =>
     renderAgentsSection({ isMonorepo: workspace.isMonorepo, packageManager: name, scripts })
   )
 })

@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 
 // The Tailwind preset (https://github.com/shadcn-ui/lint) checks a Tailwind v4
 // design system: components keep their own appearance, colors and sizes come
@@ -16,6 +17,7 @@ import type { OxlintConfig } from "oxlint"
 // stylesheet that imports Tailwind. A project with components elsewhere sets
 // settings.shadcn.ui in its own config.
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/tailwind" } satisfies PresetIdentity,
   jsPlugins: ["@shadcn/lint"],
   overrides: [
     {

@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 
 /**
  * The files that Vitest runs as tests by default. The preset applies its rules only to these files.
@@ -129,6 +130,7 @@ const rules: OxlintConfig["rules"] = {
 }
 
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/vitest" } satisfies PresetIdentity,
   overrides: [{ files: testFiles, plugins, rules }],
 }
 

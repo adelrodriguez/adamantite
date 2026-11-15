@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
 
 // Opinions for React feature code: state comes from loaders, URL params, and queries; side effects
@@ -8,6 +9,7 @@ import { firstPartyPlugin } from "./plugins/entry.ts"
 // in the target project. Init installs the pinned version, and Doctor and update maintain it.
 
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/react-strict" } satisfies PresetIdentity,
   jsPlugins: ["oxlint-plugin-react-doctor", firstPartyPlugin("adamantite")],
   rules: {
     // Hooks stay allowed in hook modules: `**/use-*.{ts,tsx}`, `**/hooks.{ts,tsx}`, and

@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   statSync,
   symlinkSync,
@@ -170,6 +171,54 @@ describe("custom preset", () => {
     expect(lint("src")).toStrictEqual([])
   })
 
+  // Adamantite loads the config and reads this identity to find each rules folder that the config
+  // reaches, as `presets/identity.ts` describes.
+  it("name the rules folder, the plugin, and the caller of each call, also without a folder", () => {
+    write(".adamantite/lint/no-debugger-here.ts", makeRule("No debugger here."))
+    write(
+      "tooling/lint/index.ts",
+      [
+        `import custom from ${JSON.stringify(CUSTOM_PRESET)}`,
+        "",
+        'export const missing = custom({ dir: "rules", name: "acme" })',
+        "",
+      ].join("\n")
+    )
+    write(
+      "oxlint.config.ts",
+      makeConfig("custom(), missing", ['import { missing } from "./tooling/lint/index.ts"'])
+    )
+
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        'const { default: config } = await import(process.argv[1]); console.log(JSON.stringify(config.extends.map((entry) => entry[Symbol.for("adamantite.preset")])))',
+        pathToFileURL(join(project, "oxlint.config.ts")).href,
+      ],
+      { cwd: project, encoding: "utf8" }
+    )
+
+    // Node.js names a module by its real path, and the temporary folder can be a link.
+    const root = realpathSync(project)
+
+    expect(JSON.parse(result.stdout)).toStrictEqual([
+      {
+        caller: join(root, "oxlint.config.ts"),
+        dir: join(root, ".adamantite/lint"),
+        module: "adamantite/rules",
+        name: "project",
+      },
+      {
+        caller: join(root, "tooling/lint/index.ts"),
+        dir: join(root, "tooling/lint/rules"),
+        module: "adamantite/rules",
+        name: "acme",
+      },
+    ])
+  })
+
   it("load a rules folder from a shared tooling package under its own name", () => {
     // A monorepo keeps its lint config and rules in a tooling package. The relative `dir` resolves
     // from the tooling config, so every package that extends it loads the same rules.
@@ -224,6 +273,8 @@ describe("custom preset", () => {
           readFileSync(join(REPO_ROOT, "presets/rules", file), "utf8")
         )
       }
+
+      write("copies/identity.ts", readFileSync(join(REPO_ROOT, "presets/identity.ts"), "utf8"))
 
       const result = spawnSync(
         process.execPath,

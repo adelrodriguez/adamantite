@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 import { firstPartyPlugin } from "./plugins/entry.ts"
 
 // The Effect Language Service for TypeScript-Go (https://github.com/Effect-TS/tsgo) reports
@@ -25,6 +26,7 @@ import { firstPartyPlugin } from "./plugins/entry.ts"
 // enables every rule of the plugin.
 
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/effect" } satisfies PresetIdentity,
   jsPlugins: [firstPartyPlugin("antislop-effect")],
   options: {
     typeAware: true,

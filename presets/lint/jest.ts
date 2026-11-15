@@ -1,4 +1,5 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 
 /**
  * The files that Jest runs as tests by default. The preset applies its rules only to these files.
@@ -102,6 +103,7 @@ const rules: OxlintConfig["rules"] = {
 }
 
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/jest" } satisfies PresetIdentity,
   overrides: [{ files: testFiles, plugins, rules }],
 }
 

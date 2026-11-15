@@ -13,6 +13,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path"
 import process from "node:process"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { DummyRule, OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 import {
   CACHE_DIRECTORY,
   DEFAULT_DIRECTORY,
@@ -98,12 +99,26 @@ export function findCallerFile(stack: string, ownFile: string): string | undefin
   return undefined
 }
 
-function resolveRulesDirectory(dir: string, stack: string) {
+/**
+ * What a `custom()` result holds under `PRESET`, so that Adamantite finds each rules folder that a
+ * loaded config reaches, also when the folder does not exist or holds no rule.
+ */
+export interface RulesFolderIdentity extends PresetIdentity {
+  /**
+   * The file that called `custom()`, or undefined when the stack names none.
+   */
+  readonly caller: string | undefined
+  /**
+   * The absolute rules folder.
+   */
+  readonly dir: string
+  readonly name: string
+}
+
+function resolveRulesDirectory(dir: string, caller: string | undefined) {
   if (isAbsolute(dir)) {
     return dir
   }
-
-  const caller = findCallerFile(stack, OWN_FILE)
 
   if (caller === undefined) {
     throw new Error(
@@ -249,20 +264,21 @@ function writeEntryModule(dir: string, name: string) {
  */
 export default function custom(options: CustomRulesOptions = {}): OxlintConfig {
   const name = options.name ?? DEFAULT_PLUGIN_NAME
+  const caller = findCallerFile(new Error("custom()").stack ?? "", OWN_FILE)
+  const dir = resolveRulesDirectory(options.dir ?? DEFAULT_DIRECTORY, caller)
 
-  const dir = resolveRulesDirectory(
-    options.dir ?? DEFAULT_DIRECTORY,
-    new Error("custom()").stack ?? ""
-  )
+  const identity = {
+    [PRESET]: { caller, dir, module: "adamantite/rules", name } satisfies RulesFolderIdentity,
+  }
 
   if (!existsSync(dir)) {
-    return {}
+    return identity
   }
 
   const files = listRuleFiles(dir)
 
   if (files.length === 0) {
-    return {}
+    return identity
   }
 
   const rules: Record<string, DummyRule> = {}
@@ -275,5 +291,5 @@ export default function custom(options: CustomRulesOptions = {}): OxlintConfig {
     rules[`${name}/${rule}`] = setting
   }
 
-  return { jsPlugins: [{ name, specifier: writeEntryModule(dir, name) }], rules }
+  return { ...identity, jsPlugins: [{ name, specifier: writeEntryModule(dir, name) }], rules }
 }

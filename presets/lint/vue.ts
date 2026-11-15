@@ -1,6 +1,8 @@
 import type { OxlintConfig } from "oxlint"
+import { PRESET, type PresetIdentity } from "../identity.ts"
 
 const config: OxlintConfig = {
+  [PRESET]: { module: "adamantite/lint/vue" } satisfies PresetIdentity,
   plugins: ["vue"],
   rules: {
     "vue/define-emits-declaration": "error",

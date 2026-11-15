@@ -3,7 +3,6 @@ import type { OxlintConfig } from "oxlint"
 import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
-import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import architecture from "#presets/lint/architecture.ts"
 import core from "#presets/lint/core.ts"
 import effect from "#presets/lint/effect.ts"
@@ -22,7 +21,7 @@ import {
   listFixtureRules,
   listRuleFixtures,
 } from "./rule-fixtures.ts"
-import { STACK_OPTIONS } from "./stacks.ts"
+import { type LintPreset, STACK_OPTIONS } from "./stacks.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 const CORE_PRESET = join(REPO_ROOT, "presets/lint/core.ts")

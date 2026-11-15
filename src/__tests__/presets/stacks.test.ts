@@ -3,7 +3,6 @@ import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as SemVer from "effect/SemVer"
-import { LINT_PRESETS, type LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import {
   type FixtureReport,
   lintFixtureTree,
@@ -13,7 +12,14 @@ import {
   RULE_FIXTURE_KINDS,
   type RuleFixture,
 } from "./rule-fixtures.ts"
-import { listStackPresets, listStacks, STACK_OPTIONS, STACKS } from "./stacks.ts"
+import {
+  type LintPreset,
+  listLintPresets,
+  listStackPresets,
+  listStacks,
+  STACK_OPTIONS,
+  STACKS,
+} from "./stacks.ts"
 
 interface KnownReport {
   /**
@@ -130,8 +136,8 @@ function sortUnique(values: readonly string[]): string[] {
 }
 
 describe("stacks", () => {
-  it("have each preset of the catalog in a stack", () => {
-    expect(sortUnique(Object.values(STACKS).flat())).toStrictEqual(sortUnique(LINT_PRESETS))
+  it("have each lint preset in a stack", () => {
+    expect(sortUnique(Object.values(STACKS).flat())).toStrictEqual(sortUnique(listLintPresets()))
   })
 })
 

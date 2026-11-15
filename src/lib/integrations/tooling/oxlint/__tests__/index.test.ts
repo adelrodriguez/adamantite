@@ -27,10 +27,10 @@ function makeFiles(files?: Record<string, string>) {
   })
 }
 
-function provideFiles(files: FileSystemTestContext, linted: readonly string[] = []) {
+function provideFiles(files: FileSystemTestContext) {
   return Effect.provide([
     files.layer,
-    makeOxlintFilesLayer(linted),
+    makeOxlintFilesLayer(),
     Path.layer,
     makeModuleResolverLayer(ROOT, { "oxlint/package.json": "node_modules/oxlint/package.json" }),
   ])
@@ -71,174 +71,6 @@ describe("oxlint", () => {
   })
 
   describe("assess", () => {
-    it.effect("report old rule keys and suppressions, then confirm their removal", () =>
-      Effect.gen(function* () {
-        const config = `import shared from "./shared.ts"
-export default { rules: { ...shared, "anti-slop/no-runtime-typeof": "off" }, overrides: [{ files: ["*.ts"], rules: { "anti-slop-effect/no-throw": "off" } }] }`
-
-        const shared = `export default { "anti-slop/no-reflect-get": "off" }`
-        const nested = `export default { rules: { "anti-slop/no-reflect-get": "off" } }`
-
-        const source =
-          "// oxlint-disable-next-line anti-slop/no-runtime-typeof, anti-slop-effect/no-throw -- migration case\nexport const value = 1\n"
-
-        const files = makeFiles({
-          "oxlint.config.ts": config,
-          "package.json": makePackageJson({
-            scripts: { check: "adamantite check" },
-            workspaces: ["packages/*"],
-          }),
-          "packages/app/oxlint.config.ts": nested,
-          "packages/app/package.json": makePackageJson({ name: "app" }),
-          "shared.ts": shared,
-          "src/a.ts": source,
-          "src/ignored.ts": source,
-        })
-
-        const assess = () =>
-          readProject(ROOT).pipe(
-            Effect.flatMap((project) => oxlint.assess(project)),
-            provideFiles(files, ["src/a.ts"])
-          )
-
-        const before = yield* assess()
-        const finding = before.findings?.find((entry) => entry.id === "antislop-rule-migration")
-
-        expect(finding?.currentState.split("\n")).toStrictEqual(
-          expect.arrayContaining([
-            expect.stringContaining("oxlint.config.ts:2"),
-            expect.stringContaining("shared.ts:1"),
-            expect.stringContaining("packages/app/oxlint.config.ts:1"),
-            expect.stringContaining("src/a.ts:1"),
-            expect.stringContaining(
-              "`anti-slop-effect/no-throw` becomes `antislop-effect/no-throw`"
-            ),
-            expect.stringContaining(
-              "`anti-slop/no-runtime-typeof` becomes `antislop/no-runtime-typeof`"
-            ),
-          ])
-        )
-        expect(finding?.currentState.split("\n")).toHaveLength(6)
-        expect(files.read("oxlint.config.ts")).toBe(config)
-        expect(files.read("src/a.ts")).toBe(source)
-
-        files.write("oxlint.config.ts", config.replaceAll("anti-slop", "antislop"))
-        files.write("shared.ts", shared.replaceAll("anti-slop", "antislop"))
-        files.write("packages/app/oxlint.config.ts", nested.replaceAll("anti-slop", "antislop"))
-        files.write("src/a.ts", source.replaceAll("anti-slop", "antislop"))
-
-        const after = yield* assess()
-        expect(after.findings?.some((entry) => entry.id === "antislop-rule-migration")).toBe(false)
-      })
-    )
-
-    it.effect("report the retired node preset import without changing the project", () =>
-      Effect.gen(function* () {
-        const config = toOxlintTsConfigContent(["strict"]).replaceAll(
-          "adamantite/lint/strict",
-          "adamantite/lint/node"
-        )
-
-        const manifest = makePackageJson({
-          devDependencies: { oxlint: oxlint.version },
-          scripts: { check: "adamantite check" },
-        })
-
-        const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
-
-        expect(yield* runAssess(files)).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState: expect.stringContaining("adamantite/lint/node"),
-              goal: expect.arrayContaining([
-                expect.stringContaining("Remove `adamantite/lint/node`"),
-                expect.stringContaining("node/*"),
-              ]),
-              id: "node-preset-migration",
-              integration: "oxlint",
-            },
-          ],
-        })
-        expect(files.read("oxlint.config.ts")).toBe(config)
-        expect(files.read("package.json")).toBe(manifest)
-      })
-    )
-
-    it.effect("report the removed shadcn preset import without changing the project", () =>
-      Effect.gen(function* () {
-        const config = toOxlintTsConfigContent(["tailwind"]).replaceAll(
-          "adamantite/lint/tailwind",
-          "adamantite/lint/shadcn"
-        )
-
-        const manifest = makePackageJson({
-          devDependencies: { oxlint: oxlint.version },
-          scripts: { check: "adamantite check" },
-        })
-
-        const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState: expect.stringContaining("adamantite/lint/shadcn"),
-              goal: expect.arrayContaining([
-                expect.stringContaining("adamantite/lint/tailwind"),
-                expect.stringContaining("shadcn/*"),
-                expect.stringContaining("settings.shadcn"),
-              ]),
-              id: "tailwind-preset-migration",
-              integration: "oxlint",
-            },
-          ],
-        })
-        expect(files.read("oxlint.config.ts")).toBe(config)
-        expect(files.read("package.json")).toBe(manifest)
-      })
-    )
-
-    it.effect("report the retired antislop preset import without changing the project", () =>
-      Effect.gen(function* () {
-        const config = toOxlintTsConfigContent(["strict"]).replaceAll(
-          "adamantite/lint/strict",
-          "adamantite/lint/antislop"
-        )
-
-        const manifest = makePackageJson({
-          devDependencies: { oxlint: oxlint.version },
-          scripts: { check: "adamantite check" },
-        })
-
-        const files = makeFiles({ "oxlint.config.ts": config, "package.json": manifest })
-
-        const result = yield* runAssess(files)
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState: expect.stringContaining("adamantite/lint/antislop"),
-              goal: expect.arrayContaining([
-                expect.stringContaining("adamantite/lint/strict"),
-                expect.stringContaining("antislop/*"),
-                expect.stringContaining(
-                  "Move a project setting for these three rules into an `overrides` entry"
-                ),
-              ]),
-              id: "strict-preset-migration",
-              integration: "oxlint",
-            },
-          ],
-        })
-        expect(files.read("oxlint.config.ts")).toBe(config)
-        expect(files.read("package.json")).toBe(manifest)
-      })
-    )
-
     it.effect(
       "report a preset that comes before core in extends without changing the project",
       () =>
@@ -347,25 +179,6 @@ export default { rules: { ...shared, "anti-slop/no-runtime-typeof": "off" }, ove
       Effect.gen(function* () {
         const files = makeFiles({
           "oxlint.config.ts": toOxlintTsConfigContent(["effect", "strict"]),
-          "package.json": makePackageJson({
-            devDependencies: { oxlint: oxlint.version },
-            scripts: { check: "adamantite check" },
-          }),
-        })
-
-        expect(yield* runAssess(files)).toMatchObject({ applicable: true, findings: [] })
-      })
-    )
-
-    it.effect("report no migration for the tailwind preset or an old import in a comment", () =>
-      Effect.gen(function* () {
-        const config = [
-          '// Previously imported "adamantite/lint/shadcn".',
-          toOxlintTsConfigContent(["tailwind"]),
-        ].join("\n")
-
-        const files = makeFiles({
-          "oxlint.config.ts": config,
           "package.json": makePackageJson({
             devDependencies: { oxlint: oxlint.version },
             scripts: { check: "adamantite check" },

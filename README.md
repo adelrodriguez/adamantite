@@ -694,8 +694,6 @@ as a hosted product. Read the
 you select the preset.
 
 If you add `react-strict` by hand, install `oxlint-plugin-react-doctor` as a devDependency.
-Run `adamantite doctor` for an existing `react-doctor` configuration. Its repair prompt
-moves the preset to `react-strict` and preserves project settings and rule overrides.
 
 ### The tanstack preset
 

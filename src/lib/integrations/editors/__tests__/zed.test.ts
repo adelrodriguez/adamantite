@@ -44,47 +44,6 @@ function provideFiles(files: FileSystemTestContext) {
 
 describe("zed", () => {
   describe("assess", () => {
-    it.effect("report stale oxfmt settings and preserve changed values", () =>
-      Effect.gen(function* () {
-        const files = makeFiles({
-          [SETTINGS_PATH]: yield* stringifyJson({
-            lsp: {
-              oxfmt: {
-                initialization_options: {
-                  settings: {
-                    configPath: null,
-                    typeAware: true,
-                    unusedDisableDirectives: false,
-                  },
-                },
-              },
-            },
-          }),
-          "package.json": "{}",
-        })
-
-        const result = yield* readProject(ROOT).pipe(
-          Effect.flatMap((project) => zed.assess(project)),
-          provideFiles(files)
-        )
-
-        expect(result).toMatchObject({
-          applicable: true,
-          findings: [
-            {
-              currentState: expect.stringContaining("configPath"),
-              id: "legacy-zed-oxfmt-settings",
-            },
-            { id: "zed-oxlint-entry" },
-          ],
-        })
-
-        if (result.applicable) {
-          expect(result.findings[0]?.currentState).not.toContain("typeAware")
-        }
-      })
-    )
-
     it.effect("report the Prettier setup that Adamantite wrote for Astro", () =>
       Effect.gen(function* () {
         const files = makeFiles({

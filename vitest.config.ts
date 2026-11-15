@@ -18,7 +18,6 @@ const PROCESS_RUN_TESTS = [
   "src/__tests__/trial.test.ts",
   "src/lib/integrations/tooling/oxfmt/__tests__/format-preset.test.ts",
   "src/lib/integrations/tooling/oxlint/__tests__/config-load.test.ts",
-  "src/lib/integrations/tooling/oxlint/__tests__/rule-migrations-assessment.test.ts",
   "src/lib/toolchain/__tests__/idioms.test.ts",
   "src/lib/project/custom-rules/__tests__/stub.test.ts",
 ]

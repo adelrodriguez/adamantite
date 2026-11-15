@@ -17,7 +17,6 @@ import {
 } from "#lib/integrations/tooling/base.ts"
 import * as commands from "#lib/integrations/tooling/oxlint/command.ts"
 import {
-  checkImportsLintPreset,
   getExtendedLintPresets,
   inspectExtendsOrder,
   inspectRequiredOxlintConfig,
@@ -25,18 +24,12 @@ import {
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
 import { listLintedFiles } from "#lib/integrations/tooling/oxlint/files.ts"
-import {
-  findExcludedPresets,
-  RETIRED_LINT_PRESETS,
-  type RetiredLintPreset,
-} from "#lib/integrations/tooling/oxlint/presets.ts"
+import { findExcludedPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { getSelectedScripts, type Project } from "#lib/project/project.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-
-import { assessRuleMigrations } from "#lib/integrations/tooling/oxlint/rule-migrations.ts"
 
 const CONFIG_FILE = "oxlint.config.ts"
 const LEGACY_CONFIG_FILE = ".oxlintrc.json"
@@ -52,61 +45,6 @@ const configFiles = {
 } satisfies ToolingConfigFiles
 
 const VERSION = getDependencyVersion("oxlint")
-
-/**
- * The finding for an import of each preset that Adamantite no longer publishes, with the steps that
- * move the config to its replacement. Assessment does not write the config.
- */
-const retiredLintPresetFindings = {
-  antislop: {
-    currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/antislop` preset.",
-    goal: [
-      "Replace `adamantite/lint/antislop` with `adamantite/lint/strict`. If strict is already imported, remove the antislop import and its `extends` entry.",
-      "Keep `antislop/*` rule settings, rule severity, rule options, and all other project settings. Rename old `anti-slop/*` settings to `antislop/*` too, as the rule migration finding specifies.",
-      'strict sets `antislop/no-chained-type-assertions`, `antislop/no-widen-then-assert`, and `antislop/require-safety-comment-for-type-assertion` in an override for test files, which takes priority over top-level `rules`. Move a project setting for these three rules into an `overrides` entry with `files: ["**/*.{test,spec}.{ts,tsx,mts,cts}", "**/__tests__/**"]`.',
-      "The strict preset also bans type assertions outside tests, console calls other than `console.info`, task comments, and deep destructuring, and it requires a reason on each suppression. Follow those reports when updating the code.",
-      "Use `--preset strict` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
-    ],
-    id: "strict-preset-migration",
-    integration: "oxlint",
-    title: "The antislop rules now belong to strict",
-  },
-  node: {
-    currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/node` preset.",
-    goal: [
-      "Remove `adamantite/lint/node` and its `extends` entry. Keep the core `adamantite/lint` preset, which now enables all five Node rules.",
-      "Keep `node/*` rule settings, rule severity, rule options, and all other project settings.",
-      "Remove `--preset node` from init commands. Run `adamantite check`, then run Doctor again.",
-    ],
-    id: "node-preset-migration",
-    integration: "oxlint",
-    title: "Node rules now belong to core",
-  },
-  "react-doctor": {
-    currentState: "`oxlint.config.ts` imports the retired `adamantite/lint/react-doctor` preset.",
-    goal: [
-      "Replace `adamantite/lint/react-doctor` with `adamantite/lint/react-strict`. If react-strict is already imported, use its existing binding and remove the old import.",
-      "Keep the `react` preset and exactly one `react-strict` entry in extends. Keep `oxlint-plugin-react-doctor` as a devDependency. Run `adamantite update` if the package is missing or off its managed version.",
-      "Preserve project settings, custom rules, rule severity, and rule options, including `react-doctor/*` overrides. The upstream rule namespace stays the same.",
-      "The react-strict preset also reports state, effect, and memoization hooks outside hook modules. Follow those reports when updating feature code.",
-      "Run `adamantite check`, then run Doctor again.",
-    ],
-    id: "react-doctor-preset-migration",
-    integration: "oxlint",
-    title: "React Doctor rules now belong to react-strict",
-  },
-  shadcn: {
-    currentState: "`oxlint.config.ts` imports the removed `adamantite/lint/shadcn` preset.",
-    goal: [
-      "Replace `adamantite/lint/shadcn` with `adamantite/lint/tailwind` in `oxlint.config.ts`. Keep the local import name and its `extends` entry.",
-      "Keep the managed `@shadcn/lint` package, `shadcn/*` rule names, `settings.shadcn` keys, rule severity, rule options, and all other project settings.",
-      "Use `--preset tailwind` in init commands. Run `adamantite check`, then run `adamantite doctor` again.",
-    ],
-    id: "tailwind-preset-migration",
-    integration: "oxlint",
-    title: "The shadcn preset was renamed to tailwind",
-  },
-} as const satisfies Record<RetiredLintPreset, Finding>
 
 /**
  * The finding for a config that lists an Adamantite preset before the core preset in `extends`.
@@ -165,7 +103,6 @@ export default defineIntegration({
 
       const state = yield* detect(cwd)
       const runtimeFindings = yield* assessOxlintRuntime(project)
-      const migration = yield* assessRuleMigrations(project)
 
       const declared =
         project.packageJson.devDependencies?.["oxlint"]
@@ -214,10 +151,6 @@ export default defineIntegration({
 
       const configContent = toOxlintTsConfigContent()
 
-      const retiredPresetFindings = RETIRED_LINT_PRESETS.flatMap((retired) =>
-        checkImportsLintPreset(lintConfig, retired) ? [retiredLintPresetFindings[retired]] : []
-      )
-
       const presetOrderFindings = lintConfig.pipe(
         Option.flatMap((content) => inspectExtendsOrder(content)),
         Option.map((misplaced) => toCorePresetOrderFinding(misplaced)),
@@ -238,8 +171,6 @@ export default defineIntegration({
           ...pkg.findings,
           ...runtimeFindings,
           ...loadFindings,
-          ...migration.findings,
-          ...retiredPresetFindings,
           ...presetOrderFindings,
           ...excludedPresetsFindings,
           ...getConfigFindings(state, {
@@ -250,7 +181,7 @@ export default defineIntegration({
           }),
         ],
         packageActions: pkg.packageActions,
-        warnings: [...pkg.warnings, ...state.warnings, ...migration.warnings],
+        warnings: [...pkg.warnings, ...state.warnings],
       } satisfies IntegrationAssessment
     }),
   check: commands.check,

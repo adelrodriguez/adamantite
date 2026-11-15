@@ -87,18 +87,6 @@ const definitions = {
 export const lintPresets = LINT_PRESETS.map((name) => ({ ...definitions[name], name }))
 
 /**
- * Presets that Adamantite no longer publishes, in the order that Doctor reports them.
- */
-export const RETIRED_RULE_NAMESPACES = {
-  "anti-slop": "antislop",
-  "anti-slop-effect": "antislop-effect",
-} as const
-
-export const RETIRED_LINT_PRESETS = ["shadcn", "react-doctor", "antislop", "node"] as const
-
-export type RetiredLintPreset = (typeof RETIRED_LINT_PRESETS)[number]
-
-/**
  * The init hint: what the rules check, then the package that init installs, the presets that it
  * selects, and the presets that it excludes, so the user knows what a choice adds before selecting
  * it.

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
 import * as Order from "effect/Order"
-import { RETIRED_LINT_PRESETS } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/project/custom-rules/inspect.ts"
 import packageJson from "../../package.json" with { type: "json" }
 import readme from "../../README.md?raw"
@@ -26,12 +25,7 @@ describe("package exports", () => {
     )
   })
 
-  it("keep removed and retired imports private, so Doctor can ask projects to migrate", () => {
-    expect(
-      [
-        LEGACY_CUSTOM_RULES_MODULE,
-        ...RETIRED_LINT_PRESETS.map((preset) => `adamantite/lint/${preset}`),
-      ].filter((specifier) => exportedImports.includes(specifier))
-    ).toStrictEqual([])
+  it("keep the removed custom rules import private, so Doctor can ask projects to migrate", () => {
+    expect(exportedImports).not.toContain(LEGACY_CUSTOM_RULES_MODULE)
   })
 })

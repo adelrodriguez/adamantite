@@ -11,7 +11,6 @@ import {
   type PropertyKey,
 } from "oxc-parser"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
-import type { RetiredLintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { LintPreset } from "#lib/project/selection.ts"
 import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/project/custom-rules/inspect.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
@@ -117,7 +116,7 @@ export function getImportedLintPresets(content: string): string[] {
  */
 export function checkImportsLintPreset(
   lintConfig: Option.Option<string>,
-  preset: LintPreset | RetiredLintPreset
+  preset: LintPreset
 ): boolean {
   return Option.exists(lintConfig, (content) => getImportedLintPresets(content).includes(preset))
 }

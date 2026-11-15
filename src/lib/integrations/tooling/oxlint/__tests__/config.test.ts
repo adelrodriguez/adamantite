@@ -1,6 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest"
 import * as Option from "effect/Option"
-import type { RetiredLintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import {
   checkImportsLintPreset,
   getExtendedLintPresets,
@@ -272,10 +271,8 @@ describe("getImportedLintPresets", () => {
 })
 
 describe("checkImportsLintPreset", () => {
-  it("take only the name of a current or retired preset", () => {
+  it("take only the name of a current preset", () => {
     // A renamed preset must fail every check that names it, instead of matching nothing.
-    expectTypeOf(checkImportsLintPreset)
-      .parameter(1)
-      .toEqualTypeOf<LintPreset | RetiredLintPreset>()
+    expectTypeOf(checkImportsLintPreset).parameter(1).toEqualTypeOf<LintPreset>()
   })
 })

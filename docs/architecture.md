@@ -95,10 +95,9 @@ target project. A later Doctor run confirms whether the project reached the goal
 Tooling config generators produce only the current setup for `init` and Doctor reference
 content. They do not convert existing configs or generate patches.
 
-Doctor also lists the files that Oxlint lints and reads their suppression comments. The shared
-comment reader is in `project/suppressions.ts`, and the shared Oxlint process operations are in
-`integrations/tooling/oxlint/files.ts`. Config discovery keeps the source of each local module
-that it reaches, so the rule migration can read config keys without executing project code.
+Doctor also asks Oxlint to list the files that it lints. Oxlint loads every config of the project
+first, so a config that fails to load fails the list, and Doctor reports the error that Oxlint
+printed. The shared Oxlint process operations are in `integrations/tooling/oxlint/files.ts`.
 
 An assessment reads the target project one time. `readProject` in `src/lib/project/project.ts`
 reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
@@ -308,13 +307,6 @@ package, and its type fails when a package has no version. Init installs the pac
 selected presets. Doctor and update maintain a package while the root config imports its
 preset.
 
-Doctor reports imports of retired presets from the `retiredLintPresets` table in
-`tooling/oxlint/index.ts`: `shadcn`, renamed to `tailwind`, `antislop`, merged into `strict`,
-`node`, merged into core, and `react-doctor`. The `react-doctor` repair
-prompt moves the config to `react-strict`, keeps one extends entry when both presets were
-present, and preserves project settings and `react-doctor/*` overrides. Assessment does not
-write the config.
-
 Doctor also reports an Adamantite preset that comes before the last core entry in the `extends`
 array. Oxlint applies the entries in order, so core then replaces the rules that the preset
 changes. `inspectExtendsOrder` in `tooling/oxlint/config.ts` reads the order from the config
@@ -427,8 +419,7 @@ effect.
 
 The rules in `presets/lint/plugins/antislop/` ship in the `strict` preset, and the rules in
 `presets/lint/plugins/antislop-effect/` ship in the `effect` preset. Both plugins use Adamantite's spelling. Both started as a copy of
-[anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Doctor reports old rule names
-in project settings and suppression comments, with their replacements. Their rules follow the same conventions as the
+[anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Their rules follow the same conventions as the
 `adamantite` rules. `presets/__tests__/require-readable-spacing.test.ts` runs the spacing fix
 through the Oxlint CLI twice. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
 copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in

@@ -153,13 +153,6 @@ function findLegacyPluginLanguages(config: Schema.JsonObject) {
   })
 }
 
-const STALE_OXFMT_SETTINGS = {
-  configPath: null,
-  "fmt.experimental": true,
-  typeAware: false,
-  unusedDisableDirectives: false,
-} as const satisfies Record<string, Schema.Json>
-
 const TYPESCRIPT_SERVERS = new Set(["typescript-ls", "tsgo", "vtsls", "typescript-language-server"])
 
 // Keep the logical node_modules path. The resolver's real path can point into a machine's pnpm
@@ -275,29 +268,6 @@ const setEffectSettings = Effect.fn("setEffectSettings")(function* (
     ],
   ])
 })
-
-function findStaleOxfmtSettingKeys(config: Schema.JsonObject): string[] {
-  const lsp = config.lsp
-  const oxfmt = checkIsJsonObject(lsp) ? lsp.oxfmt : undefined
-  const initializationOptions = checkIsJsonObject(oxfmt) ? oxfmt.initialization_options : undefined
-
-  const settings = checkIsJsonObject(initializationOptions)
-    ? initializationOptions.settings
-    : undefined
-
-  if (!checkIsJsonObject(settings)) {
-    return []
-  }
-
-  const staleEntries: ReadonlyArray<readonly [string, Schema.Json]> =
-    Object.entries(STALE_OXFMT_SETTINGS)
-
-  return Object.entries(settings)
-    .filter(([key, value]) =>
-      staleEntries.some(([staleKey, staleValue]) => staleKey === key && staleValue === value)
-    )
-    .map(([key]) => key)
-}
 
 // The merge concatenates preset and user arrays, so managed languages dedupe their `formatter`
 // arrays to keep repeated updates idempotent.
@@ -428,7 +398,6 @@ export default defineIntegration({
         return yield* new InvalidConfigFormat({ path: settingsPath })
       }
 
-      const staleKeys = findStaleOxfmtSettingKeys(config)
       const lsp = checkIsJsonObject(config.lsp) ? config.lsp : undefined
       const oxlint = checkIsJsonObject(lsp?.oxlint) ? lsp.oxlint : undefined
       const binary = oxlint?.binary
@@ -487,20 +456,6 @@ export default defineIntegration({
               ),
             { concurrency: 1 }
           )),
-          ...(staleKeys.length === 0
-            ? []
-            : [
-                {
-                  currentState: `\`${files[0].path}\` contains stale oxfmt settings: ${staleKeys.map((key) => `\`${key}\``).join(", ")}.`,
-                  goal: [
-                    "Remove only the stale oxfmt entries that still have Adamantite's old default values.",
-                    "Preserve entries that the project changed.",
-                  ],
-                  id: "legacy-zed-oxfmt-settings",
-                  integration: "zed",
-                  title: "Legacy Zed oxfmt settings",
-                },
-              ]),
           ...(usesEntry
             ? []
             : [

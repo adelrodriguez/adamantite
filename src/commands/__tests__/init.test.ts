@@ -21,6 +21,7 @@ import { lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import {
   INIT_EDITORS,
@@ -1782,6 +1783,46 @@ describe("init", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         const error = Option.getOrThrow(Exit.findErrorOption(exit))
         expect(error).toBeInstanceOf(NoPackageManager)
+      })
+    )
+
+    it.effect.each([
+      { content: "{", error: "InvalidLockfile", name: "does not decode" },
+      {
+        content: JSON.stringify({ schemaVersion: 2, version: "9.0.0" }),
+        error: "UnsupportedLockfile",
+        name: "has a newer schema version",
+      },
+    ])("fail before it changes a file when the lockfile $name", ({ content, error }) =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({
+          [LOCKFILE_PATH]: content,
+          "tsconfig.json": EXISTING_MONOREPO_TSCONFIG,
+        })
+
+        const listHashes = () =>
+          Object.fromEntries(files.list().map((file) => [file, hashContent(files.read(file))]))
+
+        const before = listHashes()
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(
+          initCommand,
+          [
+            "--non-interactive",
+            "--script",
+            "check",
+            "--typescript",
+            "typescript",
+            "--editor",
+            "vscode",
+          ],
+          { files, layers: [installer.layer] }
+        )
+
+        expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({ _tag: error })
+        expect(installer.calls).toStrictEqual([])
+        expect(listHashes()).toStrictEqual(before)
       })
     )
 

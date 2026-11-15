@@ -11,7 +11,7 @@ import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
-import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { LOCKFILE_PATH, readLockfile } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import { readPackageJson, checkRunsTool, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { readProject } from "#lib/project/project.ts"
@@ -67,6 +67,9 @@ export default Command.make("init", initCommandOptions).pipe(
       yield* printTitle
 
       yield* Output.intro("💠 adamantite init")
+
+      // First, so a lockfile that does not read fails init before it changes a file.
+      const recorded = yield* readLockfile(cwd)
 
       const dependencyInstaller = yield* DependencyInstaller
       const packageManager = yield* dependencyInstaller.detectPackageManager(cwd)
@@ -240,13 +243,13 @@ export default Command.make("init", initCommandOptions).pipe(
         typescript: Option.getOrNull(initOptions.typescript),
       } satisfies Selection
 
-      // Last, so `written` records the files that the steps above wrote.
-      const project = yield* readProject(cwd)
-
-      const selection = Option.match(project.lockfile, {
+      const selection = Option.match(recorded, {
         onNone: () => asked,
         onSome: (lockfile) => addSelection(lockfile.selection, asked),
       })
+
+      // Last, so `written` records the files that the steps above wrote.
+      const project = yield* readProject(cwd)
 
       const lockfile = yield* recordLockfile(project, selection)
 

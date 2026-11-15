@@ -110,8 +110,8 @@ decodes it once into `project.lockfile`, an `Option`, and the rest of the code t
 lockfile with an unknown `schemaVersion` fails with `UnsupportedLockfile`, and one that does not
 decode fails with `InvalidLockfile`. Both name the file. Doctor catches both and reports an
 `unsupported-lockfile` or `invalid-lockfile` finding alone, because the other assessments need the
-selection. `init` and `update` fail, so they do not overwrite a lockfile that they cannot read, and
-the error says to run `adamantite doctor`. With a lockfile, an integration applies
+selection. `init` and `update` read the lockfile before they change a file, and fail, so they do not
+overwrite a lockfile that they cannot read. The error says to run `adamantite doctor`. With a lockfile, an integration applies
 when the selection includes it, so a selected integration whose file is missing gets a finding.
 Without one, each integration applies to the files that exist, and the assessment adds one
 `lockfile-missing` finding when any integration applies.

@@ -24,6 +24,7 @@ import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type LintPreset, type Selection } from "#lib/project/selection.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 
 const CONFIG = {
@@ -59,6 +60,25 @@ function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Findin
     id: "core-preset-order",
     integration: "oxlint",
     title: "The core preset must come before the other Adamantite presets in extends",
+  }
+}
+
+/**
+ * The finding for a config that does not apply a lint preset that the lockfile selects. Assessment
+ * does not write the config.
+ */
+function toMissingPresetFinding(preset: LintPreset): Finding {
+  const module = publicImport(`./lint/${preset}`)
+
+  return {
+    currentState: `The lockfile selects the \`${preset}\` preset, and \`oxlint.config.ts\` does not apply \`${module}\`.`,
+    goal: [
+      `Import \`${module}\` in \`oxlint.config.ts\`, and add it to \`extends\` after the core preset. Keep all other project settings.`,
+      "Run `adamantite check`, and correct the code that the added rules report. Then run `adamantite doctor` again. It must not report this finding.",
+    ],
+    id: "missing-lint-preset",
+    integration: "oxlint",
+    title: "The config does not apply a selected lint preset",
   }
 }
 
@@ -147,6 +167,17 @@ export default {
         Option.toArray
       )
 
+      const missingPresetFindings = Option.match(loaded, {
+        onNone: () => [],
+        onSome: (config) => {
+          const applied = listLintPresets(config)
+
+          return listPresets(selection)
+            .filter((preset) => !applied.includes(preset))
+            .map((preset) => toMissingPresetFinding(preset))
+        },
+      })
+
       const excludedPresetsFindings = loaded.pipe(
         Option.flatMap((config) => Array.head(findExcludedPresets(listLintPresets(config)))),
         Option.map((excluded) => toExcludedPresetsFinding(excluded)),
@@ -158,6 +189,7 @@ export default {
           ...pkg.findings,
           ...runtimeFindings,
           ...loadFindings,
+          ...missingPresetFindings,
           ...presetOrderFindings,
           ...excludedPresetsFindings,
           ...configFindings,

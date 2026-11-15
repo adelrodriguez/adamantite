@@ -104,6 +104,15 @@ describe("Oxlint setup", () => {
       finding: "`oxlint.config.ts` extends the `jest` and `vitest` presets",
     },
     {
+      change: "a selected preset removed",
+      config: RENDERED.replace('import vitest from "adamantite/lint/vitest"\n', "").replace(
+        "[core, vitest, custom()]",
+        "[core, custom()]"
+      ),
+      finding:
+        "The lockfile selects the `vitest` preset, and `oxlint.config.ts` does not apply `adamantite/lint/vitest`.",
+    },
+    {
       change: "a required option turned off",
       config: RENDERED.replace("typeCheck: true", "typeCheck: false"),
       finding: "The required Oxlint options are missing or are not set to true.",

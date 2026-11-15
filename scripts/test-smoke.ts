@@ -18,6 +18,10 @@ import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 
 const repoRoot = join(import.meta.dirname, "..")
+
+// The commands decode their own documents in the unit tests. This checks that the packed CLI
+// prints only the document on standard output.
+const JsonDocument = Schema.fromJsonString(Schema.Struct({ schemaVersion: Schema.Literal(1) }))
 const cliPath = join(repoRoot, "bin", "adamantite")
 
 interface RunOptions {
@@ -541,6 +545,16 @@ try {
     if (!line.endsWith("is up to date.") && !line.endsWith("already records this setup.")) {
       throw new Error(`Expected a second \`adamantite init\` to change nothing, received: ${line}`)
     }
+  }
+
+  // `--json` prints one document on standard output, so an agent can parse the whole stream.
+  console.info("Running `adamantite init --json` and `adamantite doctor --json`...")
+
+  for (const args of [
+    ["init", "--json", ...initArgs.slice(3)],
+    ["doctor", "--json"],
+  ]) {
+    Schema.decodeSync(JsonDocument)(run(process.execPath, [cliPath, ...args], { cwd: fixture }))
   }
 
   console.info("Checking the public and private imports of the installed package...")

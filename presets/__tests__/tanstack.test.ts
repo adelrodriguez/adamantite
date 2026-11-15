@@ -5,7 +5,7 @@ import * as Order from "effect/Order"
 import tanstack from "#presets/lint/tanstack.ts"
 import { listFixtureRules } from "./rule-fixtures.ts"
 
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/tanstack")
+const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/tanstack")
 const NAMESPACE = "adamantite"
 
 const presetRules = Object.keys(tanstack.rules ?? {}).filter((name) =>

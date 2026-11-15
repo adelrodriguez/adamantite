@@ -12,10 +12,10 @@ import effect from "#presets/lint/effect.ts"
 import antislopEffectPlugin from "#presets/lint/plugins/antislop-effect/index.ts"
 import { listFixtureRules } from "./rule-fixtures.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 const NAMESPACE = "effecttsgo"
 const ANTISLOP_NAMESPACE = "antislop-effect"
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/effect")
+const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/effect")
 const CATEGORY_PRESETS = ["correctness", "antipattern", "effect-native", "style"] as const
 
 // Every upstream rule that the preset does not enable. ADR 0007 gives the criteria.

@@ -13,7 +13,7 @@ import { join } from "node:path"
 import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 
-const REPO = join(import.meta.dirname, "../../..")
+const REPO = join(import.meta.dirname, "../..")
 
 describe("antislop rename codemod", () => {
   it("remove empty old folders and preserve untracked files and license text", () => {

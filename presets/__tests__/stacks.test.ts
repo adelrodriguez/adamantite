@@ -187,7 +187,7 @@ function listValidReports(
 }
 
 describe.each(TREES)("$preset rule fixtures", ({ allowedUnstableApis, knownReports, preset }) => {
-  const fixturesDir = join(import.meta.dirname, "fixtures", preset)
+  const fixturesDir = join(import.meta.dirname, "../../src/__tests__/presets/fixtures", preset)
   const fixtures = listRuleFixtures(fixturesDir)
 
   it("have a valid and an invalid fixture for each rule", () => {

@@ -19,7 +19,7 @@ import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")
 const RULES_MODULE = join(REPO_ROOT, "presets/rules/plugin.ts")
 

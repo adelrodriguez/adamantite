@@ -9,22 +9,22 @@ import * as Layer from "effect/Layer"
 import * as Order from "effect/Order"
 import * as EffectRecord from "effect/Record"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import { CommandRunner, type CommandRunOptions } from "#lib/execution/command-runner.ts"
+import * as Toolchain from "#lib/toolchain/index.ts"
 import {
   createFixtureProject,
   type FixtureLint,
   FIXTURES_DIRECTORY,
   lintFixtureProject,
   removeFixtureProject,
-} from "#__tests__/presets/rule-fixtures.ts"
+} from "#presets/__tests__/rule-fixtures.ts"
 import {
   listStackPresets,
   listStacks,
   type Stack,
   STACK_OPTIONS,
   STACKS,
-} from "#__tests__/presets/stacks.ts"
-import { CommandRunner, type CommandRunOptions } from "#lib/execution/command-runner.ts"
-import * as Toolchain from "#lib/toolchain/index.ts"
+} from "#presets/__tests__/stacks.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
 const IDIOMS_DIR = join(REPO_ROOT, "src/__tests__/presets/fixtures/idioms")

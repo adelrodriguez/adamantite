@@ -7,7 +7,7 @@ import { describeModelFixtures } from "./model-fixtures.ts"
 describe("layers rule fixtures", () => {
   describeModelFixtures({
     configFile: "layers.json",
-    fixturesDir: join(import.meta.dirname, "fixtures/layers"),
+    fixturesDir: join(import.meta.dirname, "../../src/__tests__/presets/fixtures/layers"),
     ruleCode: "adamantite(layers)",
   })
 })

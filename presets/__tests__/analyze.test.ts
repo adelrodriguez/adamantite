@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema"
 import analyze from "#presets/analyze.ts"
 import { DEFAULT_DIRECTORY, RULE_FILE_EXTENSIONS } from "#presets/rules/folder.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 const ANALYZE_PRESET = join(REPO_ROOT, "presets/analyze.ts")
 
 const KnipJsonOutput = Schema.Struct({

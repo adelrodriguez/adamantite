@@ -12,14 +12,14 @@ import reactStrict from "#presets/lint/react-strict.ts"
 import strict from "#presets/lint/strict.ts"
 import tanstack from "#presets/lint/tanstack.ts"
 import { testFiles as vitestTestFiles } from "#presets/lint/vitest.ts"
-import packageJson from "../../../package.json" with { type: "json" }
+import packageJson from "../../package.json" with { type: "json" }
 import { lintFixtureTree, listFixtureRules } from "./rule-fixtures.ts"
 import { STACK_OPTIONS } from "./stacks.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 const CORE_PRESET = join(REPO_ROOT, "presets/lint/core.ts")
 const STRICT_PRESET = join(REPO_ROOT, "presets/lint/strict.ts")
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/strict")
+const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/strict")
 const NAMESPACE = "adamantite"
 
 function getFirstPartyRules(rules: OxlintConfig["rules"]) {

@@ -315,7 +315,7 @@ declaration into one built-in interface, and `index.d.ts` references every file.
 when a file that the built preset loads is missing.
 
 The fixtures in `src/__tests__/presets/fixtures/typescript/` hold one file of type tests for each
-reset. `src/__tests__/presets/typescript.test.ts` type checks them in one run with
+reset. `presets/__tests__/typescript.test.ts` type checks them in one run with
 `adamantite/typescript`, where they must pass, and in one run with `adamantite/tsconfig`, where
 every fixture must fail. The second run proves that each fixture tests a reset. The tests also
 fail when a reset has no fixture or `index.d.ts` does not reference it. The resets and the
@@ -363,11 +363,11 @@ Each rule has a `RuleTester` test under `presets/lint/plugins/<namespace>/__test
 messages, locations, and options, and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
 Oxlint run. Each fixture file holds one case. The namespace folder, such as `antislop`, lets one
-preset hold fixtures for several plugins. The harness in `src/__tests__/presets/rule-fixtures.ts`
+preset hold fixtures for several plugins. The harness in `presets/__tests__/rule-fixtures.ts`
 starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the effect preset loads the
 Effect build of Oxlint.
 
-A valid fixture is code that a target project can keep. `src/__tests__/presets/stacks.ts` lists the
+A valid fixture is code that a target project can keep. `presets/__tests__/stacks.ts` lists the
 stacks, and `stacks.test.ts` lints each fixture tree with each stack that has its preset, with the
 options that init writes. Each invalid fixture must still get the report of its rule, and no rule of
 the stack can report a valid fixture. A report that stays is in the `knownReports` list of the tree,
@@ -376,7 +376,7 @@ with the issue of the conflict. A case that some other rule always reports belon
 import.
 
 A fixture that imports a package, such as React or TanStack Query, gets the real types of the
-package from the fixture packages. `src/__tests__/presets/fixture-packages/` has its own
+package from the fixture packages. `presets/__tests__/fixture-packages/` has its own
 `package.json`, `pnpm-lock.yaml`, and `pnpm-workspace.yaml`, so pnpm installs it as a separate
 workspace, and the root manifest lists only what Adamantite builds, publishes, and tests itself
 against. Its `pnpm-workspace.yaml` holds the pnpm settings of the fixture packages, such as
@@ -396,7 +396,7 @@ The rules in `presets/lint/plugins/antislop/` ship in the `strict` preset, and t
 `presets/lint/plugins/antislop-effect/` ship in the `effect` preset. Both plugins use Adamantite's spelling. Both started as a copy of
 [anti-slop](https://github.com/dmmulroy/anti-slop) at commit `13909c9`. Doctor reports old rule names
 in project settings and suppression comments, with their replacements. Their rules follow the same conventions as the
-`adamantite` rules. `src/__tests__/presets/require-readable-spacing.test.ts` runs the spacing fix
+`adamantite` rules. `presets/__tests__/require-readable-spacing.test.ts` runs the spacing fix
 through the Oxlint CLI twice. Each `license.md`, and `antislop/stylistic/license.md`, keeps the MIT notice of the
 copied code. The build copies each `license.md` under `presets/lint/plugins/` to the same path in
 `dist/presets/`, and `scripts/test-build.ts` fails when a license file under `presets/` does not
@@ -411,7 +411,7 @@ It is the one rule that resolves imports: it resolves each
 import with `oxc-resolver`, including `#` imports and `tsconfig.json` `paths`. `createLayersRule`
 takes what the rule reads from the file system, so its `RuleTester` test passes fakes. Its fixtures are small projects under
 `src/__tests__/presets/fixtures/layers/`, one for each layer model, and
-`src/__tests__/presets/layers.test.ts` lints each one in a real Oxlint run.
+`presets/__tests__/layers.test.ts` lints each one in a real Oxlint run.
 
 Nested maps activate from the concrete matched parent folder before any parent exemption.
 Each active map checks imports with its own entries, ignores, isolation, type-import policy,
@@ -422,7 +422,7 @@ root and the declaration path.
 as written, so it reads no module, but it reads `package.json` and `pnpm-workspace.yaml` files to
 find the workspace root that owner paths are relative to. `createImportOwnersRule` takes that
 lookup, so its `RuleTester` test passes a fake. Its fixtures are small projects under
-`src/__tests__/presets/fixtures/import-owners/`. `src/__tests__/presets/model-fixtures.ts` lints
+`src/__tests__/presets/fixtures/import-owners/`. `presets/__tests__/model-fixtures.ts` lints
 the fixture projects of both rules.
 
 ## Custom rules
@@ -481,7 +481,7 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
 The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`
 extend the root config, so type-aware lint sees the Node.js types and the `.ts` import
-extensions. `src/__tests__/presets/custom.test.ts` lints temporary projects in real Oxlint
+extensions. `presets/__tests__/custom.test.ts` lints temporary projects in real Oxlint
 runs, including a monorepo with a shared tooling package, and runs `custom()` under Bun
 when Bun is installed.
 

@@ -6,7 +6,7 @@ import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 const CORE_PRESET = join(REPO_ROOT, "presets/lint/core.ts")
 
 const decodeOxlintJsonOutput = Schema.decodeUnknownSync(

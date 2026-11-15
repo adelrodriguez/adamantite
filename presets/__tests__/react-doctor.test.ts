@@ -6,8 +6,8 @@ import { beforeAll, describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 import reactStrict from "#presets/lint/react-strict.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/react-doctor")
+const REPO_ROOT = join(import.meta.dirname, "../..")
+const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/react-doctor")
 const NAMESPACE = "react-doctor"
 const CLEAN_FIXTURE = "clean.tsx"
 

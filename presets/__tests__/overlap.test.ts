@@ -23,9 +23,9 @@ import {
 } from "./rule-fixtures.ts"
 import { type LintPreset, STACK_OPTIONS } from "./stacks.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 const CORE_PRESET = join(REPO_ROOT, "presets/lint/core.ts")
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/overlap")
+const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/overlap")
 
 const PRESETS = {
   architecture,

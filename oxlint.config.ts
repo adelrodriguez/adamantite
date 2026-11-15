@@ -10,7 +10,7 @@ export default defineConfig({
   extends: [core, effect, strict, vitest],
   ignorePatterns: [
     ...ignorePatterns,
-    // Rule fixtures break rules on purpose; see src/__tests__/presets/rule-fixtures.ts.
+    // Rule fixtures break rules on purpose; see presets/__tests__/rule-fixtures.ts.
     "src/__tests__/presets/fixtures/",
   ],
   options: {

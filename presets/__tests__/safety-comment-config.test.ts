@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { describe, expect, it } from "@effect/vitest"
 
-const REPO = join(import.meta.dirname, "../../..")
+const REPO = join(import.meta.dirname, "../..")
 
 function lint(options: Readonly<Options>) {
   const fixture = mkdtempSync(join(tmpdir(), "adamantite-safety-comment-config-"))

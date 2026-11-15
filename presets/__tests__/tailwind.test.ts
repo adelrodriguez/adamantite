@@ -7,8 +7,8 @@ import { plugin as shadcnPlugin } from "@shadcn/lint"
 import * as Schema from "effect/Schema"
 import tailwind from "#presets/lint/tailwind.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/shadcn-overlap")
+const REPO_ROOT = join(import.meta.dirname, "../..")
+const FIXTURES_DIR = join(REPO_ROOT, "src/__tests__/presets/fixtures/shadcn-overlap")
 const NAMESPACE = "shadcn"
 
 const presetRules = Object.keys(tailwind.rules ?? {})

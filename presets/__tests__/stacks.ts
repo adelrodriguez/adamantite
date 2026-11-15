@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs"
 import { basename, join } from "node:path"
 import type { OxlintConfig } from "oxlint"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 const LINT_PRESETS_DIR = join(REPO_ROOT, "presets/lint")
 
 /**

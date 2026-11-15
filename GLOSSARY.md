@@ -20,7 +20,7 @@ _Avoid_: Combination, preset group
 **Fixture packages**:
 The npm packages that the preset test fixtures import, such as React and TanStack Query, so a
 type-aware run gets their real types. They have their own manifest and lockfile in
-`src/__tests__/presets/fixture-packages/`, apart from the packages of the repository.
+`presets/__tests__/fixture-packages/`, apart from the packages of the repository.
 _Avoid_: Target project, test project, sandbox
 
 **Vendored bundle**:

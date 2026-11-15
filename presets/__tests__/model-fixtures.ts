@@ -7,7 +7,7 @@ import * as EffectArray from "effect/Array"
 import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 
 /**
  * A rule's model fixtures live in one directory, with one small project for each model. Each model

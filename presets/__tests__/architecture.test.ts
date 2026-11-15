@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(Schema.Struct({ code: Schema.optional(Schema.String) })),

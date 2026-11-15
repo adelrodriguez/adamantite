@@ -169,7 +169,7 @@ jobs:
               oxlint_dir="${RUNNER_TEMP}/adamantite-minimum-oxlint"
               mkdir "${oxlint_dir}"
               npm install --prefix "${oxlint_dir}" "oxlint@${oxlint_version}"
-              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run presets/lint/plugins src/__tests__/presets/stacks.test.ts src/__tests__/presets/strict.test.ts src/__tests__/presets/effect.test.ts
+              ADAMANTITE_TEST_OXLINT="${oxlint_dir}/node_modules/oxlint" pnpm exec vitest run presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts presets/__tests__/effect.test.ts
 
     steps:
       - name: Checkout
@@ -186,7 +186,7 @@ jobs:
           # The preset tests install the fixture packages from their own lockfile.
           cache-dependency-path: |
             pnpm-lock.yaml
-            src/__tests__/presets/fixture-packages/pnpm-lock.yaml
+            presets/__tests__/fixture-packages/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

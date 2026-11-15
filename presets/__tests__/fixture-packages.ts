@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, readdirSync, symlinkSync } from "node:fs"
 import { join } from "node:path"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 
 /**
  * The folder of the fixture packages: the packages that the fixtures import, such as React and

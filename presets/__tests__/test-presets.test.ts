@@ -7,7 +7,7 @@ import * as Schema from "effect/Schema"
 import jest from "#presets/lint/jest.ts"
 import vitest from "#presets/lint/vitest.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 
 const OxlintJsonOutput = Schema.Struct({
   diagnostics: Schema.Array(

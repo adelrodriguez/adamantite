@@ -79,8 +79,8 @@ its package folder in `ADAMANTITE_TEST_OXLINT`:
 ```sh
 npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
 ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest run \
-  presets/lint/plugins src/__tests__/presets/stacks.test.ts src/__tests__/presets/strict.test.ts \
-  src/__tests__/presets/effect.test.ts
+  presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts \
+  presets/__tests__/effect.test.ts
 ```
 
 A fixture that imports a package, such as `vue`, needs the package in the fixture packages, not in
@@ -88,7 +88,7 @@ the root `package.json`. Add it with an exact version, and commit the lockfile o
 packages:
 
 ```sh
-pnpm --dir src/__tests__/presets/fixture-packages add -E vue@<version>
+pnpm --dir presets/__tests__/fixture-packages add -E vue@<version>
 ```
 
 Dependabot does not yet support pnpm 12. Use `pnpm run bump:deps` for package dependency

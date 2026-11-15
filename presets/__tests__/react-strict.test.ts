@@ -5,7 +5,7 @@ import * as Order from "effect/Order"
 import reactStrict from "#presets/lint/react-strict.ts"
 import { listFixtureRules } from "./rule-fixtures.ts"
 
-const FIXTURES_DIR = join(import.meta.dirname, "fixtures/react-strict")
+const FIXTURES_DIR = join(import.meta.dirname, "../../src/__tests__/presets/fixtures/react-strict")
 const NAMESPACE = "adamantite"
 
 const presetRules = Object.keys(reactStrict.rules ?? {}).filter((name) =>

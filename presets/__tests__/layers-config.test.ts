@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { describe, expect, it } from "@effect/vitest"
 
-const REPO = join(import.meta.dirname, "../../..")
+const REPO = join(import.meta.dirname, "../..")
 
 const MAP = {
   layers: {

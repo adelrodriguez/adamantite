@@ -17,7 +17,7 @@ import * as Order from "effect/Order"
 import * as Schema from "effect/Schema"
 import { linkFixturePackages } from "./fixture-packages.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 
 /**
  * The folder of a fixture project that holds the copy of the fixture tree.

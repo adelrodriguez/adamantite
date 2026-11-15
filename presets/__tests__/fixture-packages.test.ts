@@ -4,7 +4,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Schema from "effect/Schema"
 import { FIXTURE_PACKAGES_DIR } from "./fixture-packages.ts"
 
-const REPO_ROOT = join(import.meta.dirname, "../../..")
+const REPO_ROOT = join(import.meta.dirname, "../..")
 
 const Dependencies = Schema.optionalKey(Schema.Record(Schema.String, Schema.String))
 

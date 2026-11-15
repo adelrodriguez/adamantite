@@ -10,7 +10,7 @@ import { describeModelFixtures, lintModel } from "./model-fixtures.ts"
 // config fragment that turns on `adamantite/import-owners`.
 const OPTIONS = {
   configFile: "import-owners.json",
-  fixturesDir: join(import.meta.dirname, "fixtures/import-owners"),
+  fixturesDir: join(import.meta.dirname, "../../src/__tests__/presets/fixtures/import-owners"),
   ruleCode: "adamantite(import-owners)",
 }
 

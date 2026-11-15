@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import type { InitOptions } from "#commands/init/options.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
@@ -27,6 +28,7 @@ import { type Script, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
 import * as Setup from "#lib/setup/index.ts"
 import {
+  CommandFailed,
   FailedToInstallDependency,
   InvalidInitOptions,
   NoPackageManager,
@@ -1013,7 +1015,7 @@ describe("init", () => {
         expect(logLines).toStrictEqual([
           "💠 adamantite init",
           "● Detected package manager: bun",
-          "💠 No setup selected, so Adamantite made no changes.",
+          "✅ No setup selected, so Adamantite made no changes.",
         ])
       })
     )
@@ -1395,7 +1397,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("gracefully handle prompt cancellation", () =>
+    it.effect("exit 1 when the user cancels a prompt", () =>
       Effect.gen(function* () {
         const logLines: unknown[] = []
 
@@ -1410,7 +1412,9 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(
+          new CommandFailed({ command: "init", exitCode: ChildProcessSpawner.ExitCode(1) })
+        )
         expect(logLines).toStrictEqual([
           "💠 adamantite init",
           "● Detected package manager: bun",
@@ -1486,7 +1490,7 @@ describe("init", () => {
           expect(logLines.slice(-3)).toStrictEqual([
             "● Handing the terminal to Claude Code. Exit the agent to return to Init.",
             "✔ Nothing remains to resolve after the Claude Code session.",
-            "💠 Setup finished.",
+            "✅ Setup finished.",
           ])
         })
     )

@@ -1,12 +1,11 @@
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import * as Predicate from "effect/Predicate"
+import { applySetup, offerRepair } from "#commands/setup.ts"
 import { readProject } from "#lib/project/project.ts"
 import { Cwd } from "#lib/shared/cwd.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
-import { applySetup, offerRepair } from "./setup.ts"
 
 export default Command.make("update", { json: Mode.json }).pipe(
   Command.withDescription(
@@ -27,12 +26,6 @@ export default Command.make("update", { json: Mode.json }).pipe(
       })
 
       yield* Output.outro(changed ? "✅ Update finished." : "✅ No managed updates were applied.")
-    }).pipe(
-      // Findings that remain end the update with their own outro.
-      Effect.tapError((error) =>
-        Predicate.isTagged(error, "CommandFailed") ? Effect.void : Output.outro("❌ Update failed")
-      ),
-      Mode.provide({ json })
-    )
+    }).pipe(Mode.provide({ json }))
   )
 )

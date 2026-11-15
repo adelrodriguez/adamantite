@@ -55,8 +55,8 @@ const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
   ),
   Command.withHandler(({ file, json }) =>
     Effect.gen(function* () {
-      const path = yield* Path.Path
       const cwd = yield* Cwd
+      const path = yield* Path.Path
       const relative = path.relative(cwd, path.resolve(cwd, file))
       const program = yield* Toolchain.ast({ cwd, file: relative })
 
@@ -91,8 +91,8 @@ const add = Command.make("add", { dir, name: ruleName }).pipe(
   ),
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
-      const path = yield* Path.Path
       const cwd = yield* Cwd
+      const path = yield* Path.Path
       const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
       yield* Output.success(`Wrote ${path.relative(cwd, rulePath)}.`)
@@ -111,9 +111,9 @@ const addTest = Command.make("add", {
   Command.withDescription("Create a test for an existing rule. Omit the name to choose a rule"),
   Command.withHandler(({ dir, name, path: target }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const path = yield* Path.Path
       const directory = Option.getOrElse(dir, () => DEFAULT_DIRECTORY)
-      const cwd = yield* Cwd
       let selected = Option.getOrUndefined(name)
 
       if (selected === undefined) {
@@ -175,9 +175,9 @@ const test = Command.make("test", { path: testPath }).pipe(
   ),
   Command.withHandler(({ path: target }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const path = yield* Path.Path
       const runner = yield* CommandRunner
-      const cwd = yield* Cwd
 
       if (Option.isSome(target)) {
         return yield* runner.run({
@@ -310,8 +310,9 @@ const trial = Command.make("try", {
   Command.withDescription(
     "Test a rule against cases in a project copy. Exit codes: 0 for expected results, 1 for a mismatch, and 2 if a case could not be checked. Project files stay unchanged"
   ),
-  Command.withHandler((flags) =>
+  Command.withHandler(({ json, ...flags }) =>
     Effect.gen(function* () {
+      const cwd = yield* Cwd
       const { accept, current, options, report, rule } = flags
 
       const setting = current
@@ -332,8 +333,6 @@ const trial = Command.make("try", {
           ],
           { concurrency: 1 }
         )
-
-        const cwd = yield* Cwd
 
         return yield* tryRule({ cases, cwd, rule, setting, workspace: yield* readWorkspace(cwd) })
       }).pipe(
@@ -365,7 +364,7 @@ const trial = Command.make("try", {
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
       }
-    }).pipe(Mode.provide({ json: flags.json }))
+    }).pipe(Mode.provide({ json }))
   )
 )
 

@@ -18,6 +18,8 @@ Continue when you have identified the loaded rules folder and its plugin name.
 
 If Doctor reports the previous API, replace `adamantite/lint/custom` with the default import
 from `adamantite/rules`. Move authoring imports to `adamantite/rules/plugin`.
+That module does not export `eslintCompatPlugin`. Remove its calls, because Oxlint runs
+`createOnce` rules without them.
 Move the old default folder to `.adamantite/lint`, or set its path with `dir`.
 Preserve rule behavior, plugin names, severity, and options.
 
@@ -33,6 +35,7 @@ Apply these authoring constraints:
 
 - Export the rule as default with `defineRule` from `adamantite/rules/plugin`.
   Import `Context`, `Rule`, `Visitor`, and `ESTree` types from that module when needed.
+  Adamantite ships these types, so do not add `@oxlint/plugins` to the project.
 - Use `createOnce`, which runs once for the lint run. Reset per-file state in `before` and
   report collected results in `after`. Read `context.filename`, `context.sourceCode`, and
   `context.settings` in `before` or a visitor. They are unavailable in the `createOnce` body.

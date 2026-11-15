@@ -462,7 +462,7 @@ the imports in this table, and Node.js rejects any other path in the package:
 | `adamantite/lint/strict`       | Framework-neutral opinions: no type assertions outside tests, no `unknown` in signatures, no module mocks, no deep or wide destructuring, a reason on each suppression, no console calls, and no task comments. See [the strict preset](#the-strict-preset).                               |
 | `adamantite/lint/tailwind`     | [@shadcn/lint](https://github.com/shadcn-ui/lint) rules for Tailwind v4 design systems: no restyled components, raw colors, arbitrary values, inline styles, unknown classes, or unreadable class expressions. shadcn/ui is not required. See [the tailwind preset](#the-tailwind-preset). |
 | `adamantite/rules`             | A function, `custom()`, that loads the project's own rules from `.adamantite/lint/`. See [custom rules](#custom-rules).                                                                                                                                                                    |
-| `adamantite/rules/plugin`      | `definePlugin`, `defineRule`, `eslintCompatPlugin`, and all Oxlint authoring types.                                                                                                                                                                                                        |
+| `adamantite/rules/plugin`      | `definePlugin`, `defineRule`, and all Oxlint authoring types.                                                                                                                                                                                                                              |
 | `adamantite/rules/testing`     | `RuleTester` and its types for temporary agent verification and optional saved tests.                                                                                                                                                                                                      |
 | `adamantite/format`            | Oxfmt configuration. Formats Astro files with Astro 7 and later, and Svelte files with Svelte 5 and later.                                                                                                                                                                                 |
 | `adamantite/analyze`           | Knip configuration. The `ignoreDependencies` named export groups suggested ignore lists; `init` sets `ignoreDependencies.monorepo` in a monorepo and `ignoreDependencies.effect` with the effect preset.                                                                                   |
@@ -1104,9 +1104,10 @@ it to every generated config. It takes these options:
 - `rules`: severity or options for a rule, by rule name without the prefix, such as
   `{ "no-process-env": "warn" }`.
 
-`adamantite/rules/plugin` re-exports the helpers and types from Adamantite's pinned
-`@oxlint/plugins` dependency. Use `definePlugin` from that module if you write a plugin
-that you register in `jsPlugins` yourself. You do not need to add `@oxlint/plugins` to your project.
+`adamantite/rules/plugin` exports `definePlugin`, `defineRule`, and the authoring types of
+the Oxlint version that Adamantite pins. The package ships the types itself, so you do not need
+to add `@oxlint/plugins` to your project. Use `definePlugin` from that module if you write a
+plugin that you register in `jsPlugins` yourself.
 
 Optional saved RuleTester tests use `node:test`. Exclude them from Vitest or Jest discovery
 so those runners do not also try to run them. Keep the runner's default and existing

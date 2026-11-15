@@ -177,7 +177,7 @@ export default defineIntegration({
           ].join("\n"),
           goal: [
             'Import the rules-folder preset as `import custom from "adamantite/rules"`. Replace `adamantite/lint/custom` imports and keep `custom()` in the Oxlint config extends.',
-            "Import `definePlugin`, `defineRule`, `eslintCompatPlugin`, and the Oxlint authoring types from `adamantite/rules/plugin`. Keep `RuleTester` at `adamantite/rules/testing`.",
+            "Import `definePlugin`, `defineRule`, and the Oxlint authoring types from `adamantite/rules/plugin`. Remove `eslintCompatPlugin` calls, because Oxlint runs `createOnce` rules without them. Keep `RuleTester` at `adamantite/rules/testing`.",
             'Move `.adamantite/rules` to `.adamantite/lint`, or keep its path with `custom({ dir: ".adamantite/rules" })` and `rule add --dir .adamantite/rules`. A relative `dir` resolves from the file that calls `custom()`.',
             "If you keep `.adamantite/rules` or another explicit rules folder, add its rule and optional test patterns to Knip oxlint.entry. The preset defaults cover only `.adamantite/lint`.",
             "Update relative imports, tsconfig include paths, and Knip oxlint.entry patterns when a folder moves. Keep explicit rules folders and their options.",

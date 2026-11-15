@@ -515,8 +515,9 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   from `presets/rules/custom.ts`. `presets/rules/load.ts` holds the internal `loadRules`, which
   the entry module calls to import every rule file and assemble them with `definePlugin`.
   `presets/rules/plugin.ts`, published as
-  `adamantite/rules/plugin`, re-exports `definePlugin`, `defineRule`, `eslintCompatPlugin`, and
-  all authoring types from `@oxlint/plugins`. `presets/rules/folder.ts` says what a rules folder
+  `adamantite/rules/plugin`, defines `definePlugin` and `defineRule`, which return their
+  argument, and re-exports all authoring types from `@oxlint/plugins`. The build inlines those
+  types into the published declarations, so `@oxlint/plugins` stays a devDependency. `presets/rules/folder.ts` says what a rules folder
   holds: the default folder and plugin name, and which files are rules. Both `custom()` and
   `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
   `adamantite/rules/testing`. It re-exports `RuleTester` by name from `oxlint/plugins-dev`, with

@@ -6,13 +6,18 @@ import * as rules from "#presets/rules/index.ts"
 import * as plugin from "#presets/rules/plugin.ts"
 
 describe("rules/plugin", () => {
-  it("expose the pinned Oxlint helpers separately from the rules-folder preset", () => {
-    expect(plugin).toMatchObject(upstream)
+  it("expose the authoring helpers separately from the rules-folder preset", () => {
+    const rule = { create: () => ({}) }
+
+    expect(Object.keys(plugin)).toStrictEqual(["definePlugin", "defineRule"])
+    expect(plugin.defineRule(rule)).toBe(rule)
+    expect(plugin.definePlugin({ rules: { example: rule } }).rules["example"]).toBe(rule)
     expect(Object.keys(rules)).toStrictEqual(["default"])
   })
 
   it("preserve the Oxlint authoring types and visitor types", () => {
-    expectTypeOf<typeof plugin>().toEqualTypeOf<typeof upstream>()
+    expectTypeOf(plugin.definePlugin).toEqualTypeOf(upstream.definePlugin)
+    expectTypeOf(plugin.defineRule).toEqualTypeOf(upstream.defineRule)
     expectTypeOf<Plugin>().toEqualTypeOf<upstream.Plugin>()
     expectTypeOf<RuleOptionsSchema>().toEqualTypeOf<upstream.RuleOptionsSchema>()
     expectTypeOf<CustomRulesOptions>().toEqualTypeOf<

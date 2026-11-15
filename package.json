@@ -130,7 +130,6 @@
   },
   "dependencies": {
     "@effect/platform-node": "4.1.2",
-    "@oxlint/plugins": "1.93.0",
     "effect": "4.1.2",
     "oxc-parser": "0.154.0",
     "oxc-resolver": "11.24.2"
@@ -140,6 +139,7 @@
     "@changesets/cli": "3.0.3",
     "@effect/tsgo": "0.69.0",
     "@effect/vitest": "4.1.2",
+    "@oxlint/plugins": "1.93.0",
     "@shadcn/lint": "0.2.1",
     "@tanstack/intent": "0.5.5",
     "@types/figlet": "1.7.0",

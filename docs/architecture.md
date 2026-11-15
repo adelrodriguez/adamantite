@@ -135,11 +135,12 @@ selection that `inferSelection` in `integrations/selection.ts` reads from the pr
 
 `apply` writes the lockfile last, formatted the same way, and only `init` and `update` call it: `adamantite/import-owners`
 keeps `#lib/setup` and `writeLockfile` to them. `written` records the hash of each managed file
-that `apply` created, replaced, or found unchanged. The integrations that have not moved to a folder
-yet keep their setup steps in `src/commands/init/setup.ts`. For their files, the Oxlint config and
-`tsconfig.json`, `written` records the hash when the file equals what this version
-writes, or when its hash equals the hash that the lockfile recorded, and `apply` never writes or
-deletes them. Each run computes `written` again, so a file that the user changed leaves it.
+that `apply` created, replaced, or found unchanged. Each run computes `written` again, so a file
+that the user changed leaves it. In a project without a lockfile, a file that an earlier version
+wrote gets a hash only when it equals what this version renders. `apply` installs only the packages
+that `package.json` does not declare at the managed version, and leaves a pnpm catalog entry to the
+integration's finding. A recorded file that the selection no longer renders is deleted when its
+hash still matches.
 
 A command that reads the workspace outside an assessment reads it one time for each phase and
 passes the `Workspace` down. `harden` reads it before the session, and takes `project.workspace`
@@ -171,8 +172,8 @@ runtime finding, although the entry still runs stock Oxlint without tsrs.
 Package drift also stays structured so that `update` can install current managed package
 versions. Doctor renders package drift as findings that tell the user to run `update`.
 
-`init` creates selected setup for a target project. If it preserves existing setup, it
-warns the user and points to `adamantite doctor`.
+`init` sets up the selection for a target project. It prints a line for each managed file, and a
+file that the project changed is kept, with a pointer to `adamantite doctor`.
 
 The editor integrations select the installed Effect language server when `@effect/tsgo` is
 present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, which the

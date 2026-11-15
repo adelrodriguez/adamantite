@@ -150,16 +150,18 @@ in a library, to each package's `tsconfig.json` or to a shared base config. A ro
 `tsconfig.json` that Adamantite wrote before the project became a monorepo stays managed.
 
 `init` and `update` write each managed file whole: `oxlint.config.ts`, `oxfmt.config.ts`,
-`knip.config.ts`, `tsconfig.json`, `.vscode/settings.json`, `.vscode/extensions.json`, and
-`.zed/settings.json`. The
-`tsconfig.json` extends the selected preset, and adds the Effect language service entry for the
-`effect` preset. They write a file only when it does not exist or still holds what
-Adamantite wrote, by the hash in the lockfile, and they format it with the project's Oxfmt first, so
-`adamantite fix` leaves it as it is. A file that you changed stays as it is, and `adamantite doctor`
-reports a change that breaks the setup, such as a missing extension recommendation. A file that the
-setup no longer needs is deleted when nobody changed it. A project that keeps a legacy
-JSON config, such as `.oxlintrc.json`, `.oxfmtrc.json`, or `knip.json`, gets no TypeScript config beside it, because
-the tool would not load both, and Doctor reports the migration. `.vscode/extensions.json` recommends the Oxc
+`knip.config.ts`, `tsconfig.json`, `.vscode/settings.json`, `.vscode/extensions.json`,
+`.zed/settings.json`, `.github/workflows/adamantite.yml`, a new `AGENTS.md`, and the Adamantite
+skill. They write a file only when it does not exist or still holds what Adamantite wrote, by the
+hash in the lockfile. They format it with the project's Oxfmt first, so `adamantite fix` leaves
+it as it is. A file that you changed stays as it is, and `adamantite doctor` reports a change that
+breaks the setup, such as a missing extension recommendation. A file that the setup no longer
+needs is deleted when nobody changed it.
+
+The `tsconfig.json` extends the selected preset, and adds the Effect language service entry for
+the `effect` preset. A project that keeps a legacy JSON config, such as `.oxlintrc.json`,
+`.oxfmtrc.json`, or `knip.json`, gets no TypeScript config beside it, because the tool would not
+load both, and Doctor reports the migration. `.vscode/extensions.json` recommends the Oxc
 extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
 for the `effect` preset, so VS Code offers to install them.
 

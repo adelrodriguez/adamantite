@@ -137,11 +137,14 @@ Agents verify custom rules with temporary cases while they work. CI runs the rul
 `check` by default. Users can add an explicit `adamantite rule test` step for optional saved tests.
 Init preserves a workflow with an explicit rule-test command, including its setup and other settings.
 
-Existing package scripts whose commands differ from Adamantite's are kept and reported
-instead of being replaced. The interactive initializer asks before overwriting them; in
-non-interactive mode, pass `--overwrite-scripts` to replace them. To keep custom flags,
-forward them to the Adamantite command after `--`, e.g.
-`adamantite analyze -- --directory packages/app`.
+Each script that you select is a managed script. `init` and `update` set it in `package.json` to
+its Adamantite command, such as `"check": "adamantite check"`, and replace what it ran before.
+They print each script that they added or replaced, with its earlier command. A script that you
+did not select stays as it is. To keep custom flags, put them in a script of your own name and
+forward them to the Adamantite command after `--`, such as
+`adamantite analyze -- --directory packages/app`. When `init` or `update` changes
+`package.json`, it formats the file with the project's Oxfmt, so `adamantite fix` leaves it as it
+is.
 
 In a detected monorepo, TypeScript setup does not write a root `tsconfig.json`, because a
 catch-all root config makes TypeScript treat all packages as one project. Doctor reports the

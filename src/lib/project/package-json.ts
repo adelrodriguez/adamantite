@@ -8,10 +8,9 @@ import * as Jsonc from "effect/encoding/Jsonc"
 import { pipe } from "effect/Function"
 import * as Path from "effect/Path"
 import * as Record from "effect/Record"
-import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import { FailedToParseFile, InvalidPackageJson } from "#lib/shared/errors.ts"
-import { readFile, writeJsonFile } from "#lib/shared/filesystem.ts"
+import { readFile } from "#lib/shared/filesystem.ts"
 
 const WORKSPACE_PREFIX_REGEX = /^workspace:/
 const RANGE_PREFIX_REGEX = /^[\^~]/
@@ -94,20 +93,9 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
 
     // SAFETY: the decode above checked that the manifest is an object and that each field that
     // Adamantite reads has the type that `PackageJson` gives it. The manifest is returned whole,
-    // because `writePackageJson` writes every field back.
+    // because `Setup.apply` writes every field back when it sets the managed scripts.
     // oxlint-disable-next-line typescript/consistent-type-assertions -- `PackageJson` from type-fest has no schema; see the SAFETY note.
     return parsed as PackageJson
-  })
-
-/**
- * Writes the changed fields of `packageJson` into the existing `package.json`, and keeps the file's
- * formatting.
- */
-export const writePackageJson = (cwd: string, packageJson: PackageJson) =>
-  Effect.gen(function* () {
-    const path = yield* Path.Path
-    const packagePath = path.join(cwd, "package.json")
-    yield* writeJsonFile(packagePath, packageJson)
   })
 
 /**
@@ -193,29 +181,4 @@ export function getManagedScripts(packageJson: PackageJson): Script[] {
     Record.keys(MANAGED_SCRIPT_COMMANDS),
     Array.filter((name) => scripts[name] === MANAGED_SCRIPT_COMMANDS[name])
   )
-}
-
-export interface ScriptConflict {
-  readonly command: string
-  readonly script: Script
-}
-
-/**
- * Finds requested scripts whose existing `package.json` command differs from the managed Adamantite
- * command. Missing, empty, and already-managed scripts are not conflicts, so re-running `adamantite
- * init` stays idempotent.
- */
-export function getConflictingScripts(
-  packageJson: PackageJson,
-  scripts: readonly Script[]
-): ScriptConflict[] {
-  const existing = packageJson.scripts ?? {}
-
-  return Array.filterMap(scripts, (script) => {
-    const command = existing[script]
-
-    return command !== undefined && command !== "" && command !== MANAGED_SCRIPT_COMMANDS[script]
-      ? Result.succeed({ command, script })
-      : Result.failVoid
-  })
 }

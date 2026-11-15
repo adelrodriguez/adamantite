@@ -24,7 +24,7 @@ import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
-import { formatJson, stringifyJson } from "#lib/shared/json.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
   type DependencyInstallerTestContext,
@@ -191,7 +191,7 @@ describe("init", () => {
         expect(listInstalls(installer)).toStrictEqual({
           options: [{ silent: true, workspace: false }],
           packages: sortPackages([
-            "adamantite",
+            `adamantite@${getPackageVersion()}`,
             `oxlint@${oxlint.version}`,
             `tsrs@${tsrs.version}`,
             `oxfmt@${oxfmt.version}`,
@@ -639,7 +639,11 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(listInstalls(installer).packages).toStrictEqual(
-          sortPackages(["adamantite", `sherif@${sherif.version}`, `knip@${knip.version}`])
+          sortPackages([
+            `adamantite@${getPackageVersion()}`,
+            `sherif@${sherif.version}`,
+            `knip@${knip.version}`,
+          ])
         )
         expect(files.read("knip.config.ts")).toContain(
           "ignoreDependencies: ignoreDependencies.monorepo"
@@ -703,7 +707,7 @@ describe("init", () => {
         expect(listInstalls(installer)).toStrictEqual({
           options: [{ silent: true, workspace: false }],
           packages: sortPackages([
-            "adamantite",
+            `adamantite@${getPackageVersion()}`,
             `oxlint@${oxlint.version}`,
             `tsrs@${tsrs.version}`,
             `oxfmt@${oxfmt.version}`,
@@ -756,7 +760,10 @@ describe("init", () => {
           ].join("\n")
         )
         expect(installer.calls).toStrictEqual([
-          { options: { silent: true, workspace: false }, packages: ["adamantite"] },
+          {
+            options: { silent: true, workspace: false },
+            packages: [`adamantite@${getPackageVersion()}`],
+          },
         ])
         expect(files.list()).toStrictEqual([
           ".adamantite/adamantite-lock.json",
@@ -869,7 +876,7 @@ describe("init", () => {
         expect(listInstalls(installer)).toStrictEqual({
           options: [{ silent: true, workspace: false }],
           packages: sortPackages([
-            "adamantite",
+            `adamantite@${getPackageVersion()}`,
             `oxlint@${oxlint.version}`,
             `tsrs@${tsrs.version}`,
             `oxfmt@${oxfmt.version}`,
@@ -978,11 +985,6 @@ describe("init", () => {
         name: "setup flags without non-interactive mode",
         reason: "Setup flags require `--non-interactive`.",
       },
-      {
-        args: ["--overwrite-scripts"],
-        name: "script overwriting without non-interactive mode",
-        reason: "Setup flags require `--non-interactive`.",
-      },
     ])("reject $name before changing the project", ({ args, reason }) =>
       Effect.gen(function* () {
         const files = createInitTestContext()
@@ -1033,206 +1035,6 @@ describe("init", () => {
           expect(installer.calls).toStrictEqual([])
           expect(files.read("package.json")).toBe(originalPackageJson)
           expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-        })
-    )
-  })
-
-  describe("existing scripts", () => {
-    const conflictingMonorepoPackageJson = JSON.stringify(
-      {
-        name: "test-project",
-        scripts: {
-          analyze: "knip --directory packages/app",
-        },
-        version: "1.0.0",
-        workspaces: ["packages/*"],
-      },
-      null,
-      2
-    )
-
-    it.effect("preserve conflicting scripts and warn in non-interactive mode", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": conflictingMonorepoPackageJson,
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const terminal = createTerminalTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "analyze", "--script", "fix"],
-          { files, layers: [installer.layer], logLines, terminal }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(terminal.output()).toBe("")
-
-        expect(readJson(files, "package.json").scripts).toStrictEqual({
-          analyze: "knip --directory packages/app",
-          fix: "adamantite fix",
-        })
-
-        expect(logLines).toContainEqual(
-          "▲ Kept existing `analyze` script (`knip --directory packages/app`) instead of `adamantite analyze`. Use `--overwrite-scripts` to replace it."
-        )
-        expect(logLines).toContainEqual(
-          "● Pass custom tool arguments after `--`, such as `adamantite analyze -- --directory packages/app`."
-        )
-      })
-    )
-
-    it.effect("replace conflicting scripts when --overwrite-scripts is passed", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": conflictingMonorepoPackageJson,
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "analyze", "--script", "fix", "--overwrite-scripts"],
-          { files, layers: [installer.layer], logLines }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-
-        expect(readJson(files, "package.json").scripts).toStrictEqual({
-          analyze: "adamantite analyze",
-          fix: "adamantite fix",
-        })
-        expect(logLines).not.toContainEqual(expect.stringContaining("Kept existing"))
-      })
-    )
-
-    it.effect("replace conflicting scripts when overwriting is confirmed interactively", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": yield* formatJson({
-            name: "test-project",
-            scripts: { check: "tsc && eslint ." },
-            version: "1.0.0",
-          }),
-        })
-
-        const logLines: unknown[] = []
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          "y",
-          ...pickMany(LINT_PRESETS, []),
-          "n",
-          ...pickMany(INIT_EDITORS, []),
-          "n",
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(logLines).toContainEqual(
-          "▲ `check` runs `tsc && eslint .`. Adamantite would replace it with `adamantite check`."
-        )
-        expect(terminal.output()).toContain(
-          "? Replace this script with Adamantite's command? › (y/N)✔ Replace this script with Adamantite's command? … yes\n"
-        )
-
-        expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "adamantite check" })
-      })
-    )
-
-    it.effect("preserve conflicting scripts when overwriting is declined interactively", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": yield* formatJson({
-            name: "test-project",
-            scripts: { check: "tsc && eslint ." },
-            version: "1.0.0",
-          }),
-        })
-
-        const logLines: unknown[] = []
-
-        // Keep the script, which the confirm offers by default. A kept script runs no CI, so no workflow question follows.
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          "enter",
-          ...pickMany(LINT_PRESETS, []),
-          "n",
-          ...pickMany(INIT_EDITORS, []),
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-
-        expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "tsc && eslint ." })
-        expect(logLines).toContainEqual(
-          "▲ Kept existing `check` script (`tsc && eslint .`) instead of `adamantite check`. Run `adamantite init` again and choose to replace the script."
-        )
-      })
-    )
-
-    it.effect(
-      "do not prompt or warn when existing scripts already match the managed commands",
-      () =>
-        Effect.gen(function* () {
-          const files = createInitTestContext({
-            "package.json": yield* formatJson({
-              name: "test-project",
-              scripts: { check: "adamantite check" },
-              version: "1.0.0",
-            }),
-          })
-
-          const logLines: unknown[] = []
-
-          // Only the TypeScript, CI, and agent questions follow the presets.
-          const terminal = createTerminalTestContext([
-            ...pickMany(SCRIPT_ORDER, ["check"]),
-            ...pickMany(LINT_PRESETS, []),
-            "n",
-            ...pickMany(INIT_EDITORS, []),
-            "n",
-            "n",
-          ])
-
-          const installer = createDependencyInstallerTestContext()
-
-          const exit = yield* runCommand(initCommand, [], {
-            files,
-            layers: [installer.layer, promptingLayer],
-            logLines,
-            terminal,
-          })
-
-          expect(Exit.isSuccess(exit)).toBe(true)
-          expect(terminal.output()).not.toContain("Replace this script")
-          expect(logLines).not.toContainEqual(expect.stringContaining("Kept existing"))
-
-          expect(readJson(files, "package.json").scripts).toStrictEqual({
-            check: "adamantite check",
-          })
         })
     )
   })
@@ -1361,41 +1163,6 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
-      })
-    )
-
-    it.effect("not offer GitHub Actions when the user keeps every conflicting CI script", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": yield* stringifyJson({
-            name: "test-project",
-            scripts: { check: "eslint ." },
-          }),
-        })
-
-        const logLines: unknown[] = []
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          "enter",
-          ...pickMany(LINT_PRESETS, []),
-          "n",
-          ...pickMany(INIT_EDITORS, []),
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
-        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
       })
     )
 

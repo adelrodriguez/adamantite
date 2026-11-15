@@ -331,7 +331,7 @@ describe("update", () => {
           // Knip loads the JSON config before `knip.config.ts`, so update writes no config.
           "knip.json": "{}\n",
           "package.json": manifest({
-            devDependencies: { knip: knip.version },
+            devDependencies: { adamantite: "0.0.0", knip: knip.version },
             scripts: { analyze: "adamantite analyze" },
           }),
         },
@@ -349,6 +349,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
+        "● `analyze` script is up to date.",
         "✔ `.adamantite/adamantite-lock.json` written with the setup that the project files show. Commit it.",
         // The lockfile selects no agent guidance, so Doctor checks no `AGENTS.md`.
         expect.stringMatching(/^\n1\. Legacy knip configuration\n/u),

@@ -33,8 +33,10 @@ Continue when each selected option serves the requested setup.
 
 Run `init` with those options. It records the selection in `.adamantite/adamantite-lock.json`,
 and a later `init` adds its options to that selection. Commit the lockfile with the setup.
-It preserves existing package scripts whose commands differ
-from its managed commands. Use `--overwrite-scripts` only when the task includes replacing them.
+It sets each selected script in `package.json` to its Adamantite command and replaces what the
+script ran. Before you select a script that already runs another command, check that the task
+includes replacing it. Otherwise, leave that script out, or move its command to a script of
+another name first.
 It writes each managed config, such as `oxlint.config.ts`, whole, and keeps a config that the
 project changed. Do not merge the reference config into a kept file. Read the output for kept or
 legacy configuration, and run Doctor for the repairs that it needs.

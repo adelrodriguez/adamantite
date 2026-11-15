@@ -13,19 +13,12 @@ import {
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,
-  getConflictingScripts,
-  readPackageJson,
-  MANAGED_SCRIPT_COMMANDS,
-  type ScriptConflict,
   checkRunsTool,
   listSupportedPackageManagers,
 } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, type LintPreset, type TypeScriptPreset } from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
 import { INIT_EDITOR_CHOICES, type InitOptionsInput } from "./options.ts"
-
-const describeScriptConflict = (conflict: ScriptConflict) =>
-  `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`
 
 /**
  * Asks which preset to keep of each selected pair that excludes each other, and removes the other
@@ -76,7 +69,6 @@ const promptPresets = Effect.gen(function* () {
 })
 
 export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOptions")(function* (
-  cwd: string,
   isMonorepo: boolean,
   packageManager: PackageManagerName
 ) {
@@ -99,26 +91,9 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
         value: "analyze",
       },
     ],
-    message: "Which scripts should Adamantite add to `package.json`?",
+    message:
+      "Which scripts should Adamantite set in `package.json`? It replaces what a selected script runs.",
   })
-
-  const packageJson = yield* readPackageJson(cwd)
-  const conflicts = getConflictingScripts(packageJson, selectedScripts)
-
-  for (const conflict of conflicts) {
-    yield* Output.warning(describeScriptConflict(conflict))
-  }
-
-  const shouldOverwriteScripts =
-    conflicts.length > 0
-      ? yield* Prompt.Confirm({
-          initial: false,
-          message:
-            conflicts.length === 1
-              ? "Replace this script with Adamantite's command?"
-              : "Replace these scripts with Adamantite's commands?",
-        })
-      : false
 
   const hasOxlint = checkRunsTool(selectedScripts, "oxlint")
   const selectedPresets = hasOxlint ? yield* promptPresets : []
@@ -154,20 +129,15 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
   })
 
   const canEnableGitHubActions = checkIsSupportedPackageManager(packageManager)
-  const keptConflicts = shouldOverwriteScripts ? [] : conflicts.map((conflict) => conflict.script)
 
-  // The workflow runs the selected scripts that init makes managed. A conflicting script that the
-  // user keeps does not run Adamantite, and init accepts the workflow only for a selected script.
-  const writtenScripts = selectedScripts.filter((script) => !keptConflicts.includes(script))
-
-  if (hasCICompatibleScripts(writtenScripts) && !canEnableGitHubActions) {
+  if (hasCICompatibleScripts(selectedScripts) && !canEnableGitHubActions) {
     yield* Output.info(
       `Adamantite cannot generate a GitHub Actions workflow for \`${packageManager}\`. It supports ${listSupportedPackageManagers("conjunction")}.`
     )
   }
 
   const shouldEnableGitHubActions =
-    hasCICompatibleScripts(writtenScripts) && canEnableGitHubActions
+    hasCICompatibleScripts(selectedScripts) && canEnableGitHubActions
       ? yield* Prompt.Confirm({
           initial: true,
           message: "Add a GitHub Actions workflow to run the selected checks?",
@@ -184,7 +154,6 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     agents: shouldSetupAgents,
     editors: selectedEditors,
     githubActions: shouldEnableGitHubActions,
-    overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,
     typescript: typescriptPreset,

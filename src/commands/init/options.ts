@@ -64,7 +64,9 @@ export interface InitOptions {
   readonly lint: Option.Option<{
     readonly presets: readonly LintPreset[]
   }>
-  readonly overwriteScripts: boolean
+  /**
+   * The managed scripts. `Setup.apply` sets each one in `package.json` and overwrites what it held.
+   */
   readonly scripts: readonly Script[]
   /**
    * The TypeScript preset that `tsconfig.json` extends. It needs no script.
@@ -76,7 +78,6 @@ export interface InitOptionsInput {
   readonly agents: boolean
   readonly editors: readonly InitEditor[]
   readonly githubActions: boolean
-  readonly overwriteScripts: boolean
   readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
   readonly typescript: Option.Option<TypeScriptPreset>
@@ -93,7 +94,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     agents: input.agents,
     editors: Array.dedupe(input.editors),
     githubActions: input.githubActions,
-    overwriteScripts: input.overwriteScripts,
     presets: Array.dedupe(input.presets),
     scripts: Array.dedupe(input.scripts),
     typescript: input.typescript,
@@ -148,7 +148,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
       ? Option.liftPredicate(packageManager, checkIsSupportedPackageManager)
       : Option.none(),
     lint: hasOxlint ? Option.some({ presets: options.presets }) : Option.none(),
-    overwriteScripts: options.overwriteScripts,
     scripts: options.scripts,
     typescript: options.typescript,
   } satisfies InitOptions
@@ -161,7 +160,9 @@ const nonInteractive = Flag.Boolean(INIT_FLAGS.nonInteractive).pipe(
 
 const scripts = Flag.Literals(INIT_FLAGS.script, SCRIPT_ORDER).pipe(
   Flag.atMost(SCRIPT_ORDER.length),
-  Flag.withDescription("Add a package script. Repeat --script to add more")
+  Flag.withDescription(
+    "Set a package script to its Adamantite command, replacing what it ran. Repeat --script to add more"
+  )
 )
 
 const presets = Flag.Literals(INIT_FLAGS.preset, LINT_PRESETS).pipe(
@@ -197,19 +198,11 @@ const agents = Flag.Boolean(INIT_FLAGS.agents).pipe(
   )
 )
 
-const overwriteScripts = Flag.Boolean("overwrite-scripts").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription(
-    "Replace existing package scripts that conflict with Adamantite's managed commands"
-  )
-)
-
 export const initCommandOptions = {
   agents,
   editors,
   githubActions,
   nonInteractive,
-  overwriteScripts,
   presets,
   scripts,
   typescript,

@@ -10,7 +10,7 @@ import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { printFindings } from "#terminal/findings.ts"
 import * as Output from "#terminal/output.ts"
-import { printFileWrites, printInstalls } from "#terminal/setup.ts"
+import { printFileWrites, printInstalls, printScriptWrites } from "#terminal/setup.ts"
 
 /**
  * What one step of update did. `idle` means that the step found nothing to update. A step that
@@ -68,6 +68,10 @@ export default Command.make("update").pipe(
         Option.match(setup, { onNone: () => [], onSome: ({ installs }) => installs })
       )
 
+      yield* printScriptWrites(
+        Option.match(setup, { onNone: () => [], onSome: ({ scripts }) => scripts })
+      )
+
       yield* printFileWrites(
         Option.match(setup, { onNone: () => [], onSome: ({ files }) => files })
       )
@@ -77,8 +81,11 @@ export default Command.make("update").pipe(
         ? "applied"
         : "idle"
 
-      const files: StepOutcome = Option.exists(setup, ({ files }) =>
-        files.some(({ _tag }) => _tag !== "Kept" && _tag !== "Unchanged")
+      const files: StepOutcome = Option.exists(
+        setup,
+        ({ files, scripts }) =>
+          files.some(({ _tag }) => _tag !== "Kept" && _tag !== "Unchanged")
+          || scripts.some(({ _tag }) => _tag !== "Unchanged")
       )
         ? "applied"
         : "idle"

@@ -5,11 +5,12 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import type { ManagedFile } from "#lib/integrations/base.ts"
+import type { ManagedFile, PackageAction } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 import { integrations } from "#lib/integrations/index.ts"
@@ -18,9 +19,10 @@ import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { writeLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { MANAGED_SCRIPT_COMMANDS, readPackageJson, type Script } from "#lib/project/package-json.ts"
 import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
-import { stringifyJson } from "#lib/shared/json.ts"
+import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import formatPreset from "#presets/format.ts"
 
@@ -55,6 +57,26 @@ export type FileWrite =
   | { readonly _tag: "Deleted"; readonly path: string }
 
 const { Created, Deleted, Kept, Replaced, Unchanged } = Data.taggedEnum<FileWrite>()
+
+/**
+ * What `apply` did with one managed script in `package.json`. A managed script is the one exception
+ * to whole files: `apply` sets the key to its command and overwrites what it held.
+ */
+export type ScriptWrite =
+  /**
+   * `package.json` had no such script, so Adamantite added it.
+   */
+  | { readonly _tag: "Added"; readonly script: Script }
+  /**
+   * The script ran `command`, so Adamantite replaced it with the managed command.
+   */
+  | { readonly _tag: "Replaced"; readonly command: string; readonly script: Script }
+  /**
+   * The script already ran the managed command.
+   */
+  | { readonly _tag: "Unchanged"; readonly script: Script }
+
+const ScriptWrites = Data.taggedEnum<ScriptWrite>()
 
 /**
  * Whether `selection` sets up nothing.
@@ -238,12 +260,81 @@ const makeFormatter = Effect.fn("makeFormatter")(function* (cwd: string) {
 })
 
 /**
- * Sets up `selection` in `project`, the backend of `init` and `update`. It installs the packages of
- * every selected integration in one install, prepares what they need in `node_modules`, formats
- * their managed files with the project's Oxfmt, writes them under the write rule, deletes the
- * managed files that the selection dropped, and writes the lockfile last, formatted the same way.
- * Each hash in `written` is the hash of the bytes on disk. Running it twice leaves the project
- * unchanged.
+ * Sets each managed script of the selection to its command in the root `package.json`, and
+ * overwrites what the key held. `apply` writes `package.json` in the layout that `format` gives it,
+ * so `adamantite fix` leaves it unchanged. It writes only when a script changed or the install
+ * changed the file, so a second run leaves `package.json` byte-identical.
+ */
+const writeScripts = Effect.fn("writeScripts")(function* (
+  cwd: string,
+  scripts: readonly Script[],
+  installed: boolean,
+  format: Format
+) {
+  const path = yield* Path.Path
+  const target = path.join(cwd, "package.json")
+  const packageJson = yield* readPackageJson(cwd)
+  const current = packageJson.scripts ?? {}
+
+  const writes = scripts.map((script) => {
+    const command = current[script]
+
+    return Predicate.isUndefined(command)
+      ? ScriptWrites.Added({ script })
+      : command === MANAGED_SCRIPT_COMMANDS[script]
+        ? ScriptWrites.Unchanged({ script })
+        : ScriptWrites.Replaced({ command, script })
+  })
+
+  if (!installed && writes.every(ScriptWrites.$is("Unchanged"))) {
+    return writes
+  }
+
+  const managed = Object.fromEntries(
+    scripts.map((script) => [script, MANAGED_SCRIPT_COMMANDS[script]])
+  )
+
+  const content = yield* format(
+    "package.json",
+    `${yield* formatJson(
+      scripts.length === 0 ? packageJson : { ...packageJson, scripts: { ...current, ...managed } }
+    ).pipe(Effect.orDie)}\n`
+  )
+
+  if (!Option.contains(yield* readFileIfExists(target), content)) {
+    yield* writeFile(target, content)
+  }
+
+  return writes
+})
+
+/**
+ * The install of `adamantite` itself, at the version that runs, when the project does not depend on
+ * it. A project that depends on it keeps the version or source that it chose.
+ */
+function getAdamantiteInstall({ packageJson }: Project): readonly PackageAction[] {
+  const declared = packageJson.devDependencies?.adamantite ?? packageJson.dependencies?.adamantite
+
+  return Predicate.isUndefined(declared)
+    ? [
+        {
+          description: `Install \`adamantite@${version}\`, which the presets and the managed scripts run.`,
+          package: "adamantite",
+          targetVersion: version,
+          type: "install_package",
+        },
+      ]
+    : []
+}
+
+/**
+ * Sets up `selection` in `project`, the backend of `init` and `update`, and the only code that
+ * writes target-project files. It installs `adamantite` and the packages of every selected
+ * integration in one install, sets the managed scripts, prepares what the integrations need in
+ * `node_modules`, formats their managed files with the project's Oxfmt, writes them under the write
+ * rule, deletes the managed files that the selection dropped, and writes the lockfile last,
+ * formatted the same way. Each hash in `written` is the hash of the bytes on disk. Running it twice
+ * leaves the project unchanged.
  */
 export const apply = Effect.fn("Setup.apply")(function* (project: Project, selection: Selection) {
   const { cwd } = project
@@ -252,13 +343,16 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
   // Only the packages that the project does not declare at the managed version. A version from a
   // pnpm catalog stays, because `pnpm add` would replace the `catalog:` specifier, and the
   // integration's `assess` reports an outdated catalog entry.
-  const installs = selected.flatMap((integration) =>
-    integration
-      .packages(project, selection)
-      .flatMap(
-        (pkg) => assessPackage(project, pkg, integration.name, integration.name).packageActions
-      )
-  )
+  const installs = [
+    ...getAdamantiteInstall(project),
+    ...selected.flatMap((integration) =>
+      integration
+        .packages(project, selection)
+        .flatMap(
+          (pkg) => assessPackage(project, pkg, integration.name, integration.name).packageActions
+        )
+    ),
+  ]
 
   if (installs.length > 0) {
     yield* addRootDevDependencies(
@@ -290,6 +384,9 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
     { concurrency: "unbounded" }
   )
 
+  // After every managed file formats, so a config that Oxfmt cannot load fails before a write.
+  const scripts = yield* writeScripts(cwd, selection.scripts, installs.length > 0, format)
+
   const writes = yield* Effect.forEach(
     rendered,
     (file) => writeManagedFile(cwd, file, Option.fromNullishOr(recorded[file.path])),
@@ -318,5 +415,6 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
     files: [...writes.map(({ write }) => write), ...Array.getSomes(deletes)],
     installs,
     lockfile,
+    scripts,
   }
 }, Effect.scoped)

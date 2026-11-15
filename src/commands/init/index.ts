@@ -7,7 +7,7 @@ import * as Predicate from "effect/Predicate"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, readLockfile } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
-import { readPackageJson, SCRIPT_ORDER } from "#lib/project/package-json.ts"
+import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { readProject } from "#lib/project/project.ts"
 import {
   addSelection,
@@ -19,11 +19,15 @@ import {
 import * as Setup from "#lib/setup/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Output from "#terminal/output.ts"
-import { printFileWrites, printInstalls } from "#terminal/setup.ts"
+import {
+  printFileWrites,
+  printInstalls,
+  printScriptWrites,
+  printZedExtensions,
+} from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
-import { addScripts, installDependencies, printZedExtensions } from "./setup.ts"
 
 export default Command.make("init", initCommandOptions).pipe(
   Command.withDescription(
@@ -86,7 +90,6 @@ export default Command.make("init", initCommandOptions).pipe(
             Option.isSome(options.typescript),
             options.githubActions,
             options.agents,
-            options.overwriteScripts,
           ],
           Predicate.isTruthy
         )
@@ -109,7 +112,7 @@ export default Command.make("init", initCommandOptions).pipe(
 
       const input = options.nonInteractive
         ? options
-        : yield* collectInteractiveInitOptions(cwd, isMonorepo, packageManager.name)
+        : yield* collectInteractiveInitOptions(isMonorepo, packageManager.name)
 
       const initOptions = yield* validateInitOptions(input, packageManager.name)
 
@@ -126,35 +129,12 @@ export default Command.make("init", initCommandOptions).pipe(
         return
       }
 
-      const selectedScripts = [...initOptions.scripts]
       const { lint } = initOptions
 
       const presets = Option.match(lint, {
         onNone: (): readonly LintPreset[] => [],
         onSome: (setup) => setup.presets,
       })
-
-      const packageJson = yield* readPackageJson(cwd)
-
-      // A project that already depends on Adamantite keeps the version or source that it chose.
-      const dependsOnAdamantite = Predicate.isNotUndefined(
-        packageJson.devDependencies?.adamantite ?? packageJson.dependencies?.adamantite
-      )
-
-      // `Setup.apply` installs the tools of the selection below.
-      if (!dependsOnAdamantite) {
-        yield* installDependencies(cwd, ["adamantite"])
-      }
-
-      yield* addScripts(cwd, selectedScripts, {
-        nonInteractive: options.nonInteractive,
-        overwriteScripts: initOptions.overwriteScripts,
-      })
-
-      // Zed installs extensions only from the user settings, so init links them.
-      if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
-        yield* printZedExtensions(presets)
-      }
 
       // What init was asked to set up, in the order of each source list.
       const asked = {
@@ -167,7 +147,7 @@ export default Command.make("init", initCommandOptions).pipe(
         presets: Option.isSome(lint)
           ? ["core", ...LINT_PRESETS.filter((preset) => presets.includes(preset))]
           : [],
-        scripts: SCRIPT_ORDER.filter((script) => selectedScripts.includes(script)),
+        scripts: SCRIPT_ORDER.filter((script) => initOptions.scripts.includes(script)),
         typescript: Option.getOrNull(initOptions.typescript),
       } satisfies Selection
 
@@ -176,13 +156,16 @@ export default Command.make("init", initCommandOptions).pipe(
         onSome: (lockfile) => addSelection(lockfile.selection, asked),
       })
 
-      // Last, so the lockfile records the files that the steps above wrote.
-      const project = yield* readProject(cwd)
-
-      const setup = yield* Setup.apply(project, selection)
+      const setup = yield* Setup.apply(yield* readProject(cwd), selection)
 
       yield* printInstalls(setup.installs)
+      yield* printScriptWrites(setup.scripts)
       yield* printFileWrites(setup.files)
+
+      // Zed installs extensions only from the user settings, so init links them.
+      if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
+        yield* printZedExtensions(presets)
+      }
 
       yield* Output.success(
         setup.lockfile === "written"

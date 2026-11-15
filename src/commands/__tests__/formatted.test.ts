@@ -32,10 +32,11 @@ const REPO_ROOT = join(import.meta.dirname, "../../..")
 // repository.
 const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
 
-// The files that `Setup.apply` writes. Each integration that moves to `src/lib/integrations/<name>/`
-// adds its managed files.
+// The files that `Setup.apply` writes: the lockfile, `package.json` with the managed scripts, and
+// the managed files of every integration.
 const FORMATTED_FILES = [
   LOCKFILE_PATH,
+  "package.json",
   "oxlint.config.ts",
   "oxfmt.config.ts",
   "knip.config.ts",
@@ -188,13 +189,17 @@ describe("the files that Setup writes", () => {
   it.effect("fail without writing a file when the project's Oxfmt config does not load", () =>
     Effect.gen(function* () {
       writeFileSync(join(project, ".oxfmtrc.json"), '{ "printWidth": "wide" }\n')
+      const packageJson = readFileSync(join(project, "package.json"), "utf8")
 
       const error = yield* Effect.flip(apply(project))
 
       expect({
+        packageJson: readFileSync(join(project, "package.json"), "utf8"),
         tag: error._tag,
-        written: FORMATTED_FILES.filter((file) => existsSync(join(project, file))),
-      }).toStrictEqual({ tag: "FailedToFormatFile", written: [] })
+        written: FORMATTED_FILES.filter(
+          (file) => file !== "package.json" && existsSync(join(project, file))
+        ),
+      }).toStrictEqual({ packageJson, tag: "FailedToFormatFile", written: [] })
     })
   )
 })

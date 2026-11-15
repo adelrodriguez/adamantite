@@ -26,14 +26,14 @@ export function runResult<A, E, R>(
   return provided.pipe(Effect.result)
 }
 
-// Prefer: the editor tests create an in-memory context.
+// Prefer: the agent reach tests create an in-memory context.
 function makeFiles(files?: Record<string, string>) {
   return createFileSystemTestContext({ files, root: ROOT })
 }
 ```
 
 The [filesystem helper](src/__tests__/filesystem.ts) exposes fixture operations and a layer.
-The [Zed tests](src/lib/integrations/editors/__tests__/zed.test.ts) provide that layer with
+The [agent reach tests](src/lib/hardening/__tests__/agent-reach.test.ts) provide that layer with
 `Path.layer`. [PR #378](https://github.com/adelrodriguez/adamantite/pull/378) replaced host-backed
 unit tests so they could run independently without changing the machine.
 

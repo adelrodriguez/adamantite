@@ -30,8 +30,8 @@ Read [CODING_STANDARDS.md](CODING_STANDARDS.md) for coding choices that require 
 pnpm run build         # Bundle the CLI and published presets into dist.
 pnpm run dev           # Rebuild when source files change.
 pnpm run test          # Run the Vitest suite: the unit and presets projects.
-pnpm run test:unit     # Run only the package's unit tests.
-pnpm run test:presets  # Run only the preset tests, which lint fixtures with real Oxlint.
+pnpm run test:unit     # Run only the tests that start no process.
+pnpm run test:presets  # Run only the tests that start real processes, such as Oxlint.
 pnpm run test:build    # Build the package and verify the packaged CLI.
 pnpm run test:watch    # Rerun tests when files change.
 pnpm run check         # Check lint rules and TypeScript types.
@@ -57,8 +57,33 @@ pnpm run test:build
 
 ## Make a change
 
-- Add or update tests for behavior changes. Tests are colocated in `__tests__` directories.
+- Add or update tests for behavior changes, in the folder that [Place a test](#place-a-test)
+  names.
 - Update user documentation when CLI behavior, presets, exports, or requirements change.
+
+## Place a test
+
+Each kind of test has one place:
+
+- Stack and fixture tests go in `presets/__tests__/`. They lint the rule fixtures in
+  `src/__tests__/presets/fixtures/` with real Oxlint. The fixtures stay below `src/`, because below
+  `presets/` the published `presets/tsconfig.json` would include them, and the Oxlint type check of
+  `presets/analyze.ts` reports each file of that project, also a file that `ignorePatterns`
+  ignores.
+- RuleTester tests of a first-party rule go in
+  `presets/lint/plugins/<plugin>/__tests__/<rule>.test.ts`. Tests of the helpers that several
+  plugins share go in `presets/lint/plugins/shared/__tests__/`.
+- Tests of the `custom()` helpers and the authoring API go in `presets/rules/__tests__/`.
+  `presets/__tests__/custom.test.ts` lints projects that call `custom()` in real Oxlint runs.
+- Command-behavior tests go in `src/commands/__tests__/`. They run a command against an in-memory
+  project, such as `runLifecycle` in `lifecycle.ts` for `init`, `update`, and `doctor`.
+- A test of one `src` module goes in the `__tests__` folder beside it. The helpers that several
+  tests share are in `src/__tests__/`.
+
+A test that starts a real process, such as Oxlint, Oxfmt, Node.js, or Vitest, belongs in the
+`PROCESS_RUN_TESTS` list of `vitest.config.ts`. That list is the `presets` Vitest project, which
+`pnpm run test:presets` runs. Every other test runs in the `unit` project, which must not touch the
+host filesystem.
 
 ## Validate a change
 
@@ -71,8 +96,9 @@ pnpm run fix
 pnpm run format
 ```
 
-The first-party rules must work with each Oxlint version that `peerDependencies` allows. CI runs
-the RuleTester tests and the preset fixtures of every stack with the minimum version. To do
+The first-party rules and the probe plugin must work with each Oxlint version that
+`peerDependencies` allows. CI runs the RuleTester tests, the preset fixtures of every stack, and the
+probe tests with the minimum version. To do
 that locally, install the version from `peerDependencies.oxlint` in a temporary folder, and name
 its package folder in `ADAMANTITE_TEST_OXLINT`:
 
@@ -80,7 +106,8 @@ its package folder in `ADAMANTITE_TEST_OXLINT`:
 npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
 ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest run \
   presets/lint/plugins presets/__tests__/stacks.test.ts presets/__tests__/strict.test.ts \
-  presets/__tests__/effect.test.ts
+  presets/__tests__/effect.test.ts src/commands/__tests__/rule-ast.test.ts \
+  src/lib/hardening/__tests__/suppressions.test.ts
 ```
 
 A fixture that imports a package, such as `vue`, needs the package in the fixture packages, not in

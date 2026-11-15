@@ -3,17 +3,15 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import * as Schema from "effect/Schema"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
-import ruleCommand, { AstReport, renderTrial } from "#commands/rule.ts"
+import ruleCommand, { renderTrial } from "#commands/rule.ts"
 import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
 import { toCustomRuleStub } from "#lib/project/custom-rules/index.ts"
 import {
   CommandFailed,
   CustomRuleExists,
   CustomRuleNotFound,
-  FailedToParseSource,
   InvalidRuleName,
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -565,77 +563,6 @@ describe("rule test", () => {
       expect(logLines).toStrictEqual([
         "● No tests were found for loaded custom rules. Run `adamantite doctor` to check rule setup, or `adamantite rule test add` to add a test.",
       ])
-    })
-  )
-})
-
-describe("rule ast", () => {
-  it.effect("print the ESTree-shaped AST without parenthesized expressions", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "src/value.ts": "export const value = (1 + 2) as number\n" },
-      })
-
-      const logLines: unknown[] = []
-
-      const exit = yield* runCommand(ruleCommand, ["ast", "src/value.ts"], {
-        files,
-        logLines,
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-
-      const [output] = logLines
-
-      expect(output).toContain('"type": "TSAsExpression"')
-      expect(output).toContain('"type": "BinaryExpression"')
-      expect(output).not.toContain("ParenthesizedExpression")
-    })
-  )
-
-  it.effect("print the file and its tree as JSON that decodes with the report schema", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "src/value.ts": "export const value = (1 + 2) as number\n" },
-      })
-
-      const logLines: unknown[] = []
-
-      const exit = yield* runCommand(ruleCommand, ["ast", "src/value.ts", "--json"], {
-        files,
-        logLines,
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(logLines).toHaveLength(1)
-      expect(
-        yield* Schema.decodeUnknownEffect(Schema.fromJsonString(AstReport))(logLines[0])
-      ).toMatchObject({
-        file: "src/value.ts",
-        program: { body: [{ type: "ExportNamedDeclaration" }], type: "Program" },
-        schemaVersion: 1,
-      })
-    })
-  )
-
-  it.effect("fail with the parse errors of a file that does not parse", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "src/broken.ts": "export const = 1\n" },
-      })
-
-      const logLines: unknown[] = []
-
-      const exit = yield* runCommand(ruleCommand, ["ast", "src/broken.ts"], {
-        files,
-        logLines,
-      })
-
-      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toBeInstanceOf(FailedToParseSource)
-      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toMatchObject({
-        path: `${files.root}/src/broken.ts`,
-      })
-      expect(logLines).toStrictEqual([])
     })
   )
 })

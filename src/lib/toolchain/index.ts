@@ -1,16 +1,19 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { FixLevel } from "#lib/integrations/oxlint/command.ts"
 import * as knip from "#lib/integrations/knip/command.ts"
 import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
 import * as oxlint from "#lib/integrations/oxlint/command.ts"
+import { probeAst } from "#lib/integrations/oxlint/probe.ts"
 import * as sherif from "#lib/integrations/sherif/command.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import {
   CliNotFound,
+  FailedToParseSource,
   InvalidAnalyzeOptions,
   InvalidCheckOptions,
   InvalidFixOptions,
@@ -194,4 +197,32 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
         : error
     )
   )
+})
+
+/**
+ * The syntax tree that Oxlint gives rules for `file`, relative to `cwd`, from the Oxlint runtime of
+ * the project. Fails with the parse errors of a file that does not parse, and for a file that
+ * Oxlint does not lint.
+ */
+export const ast = Effect.fn("Toolchain.ast")(function* ({
+  cwd,
+  file,
+}: {
+  readonly cwd: string
+  readonly file: string
+}) {
+  const { errors, program } = yield* probeAst(cwd, file)
+
+  if (errors.length > 0) {
+    return yield* new FailedToParseSource({ errors, path: file })
+  }
+
+  if (Option.isNone(program)) {
+    return yield* new FailedToParseSource({
+      errors: ["Oxlint does not lint the file, so it gives rules no syntax tree."],
+      path: file,
+    })
+  }
+
+  return program.value
 })

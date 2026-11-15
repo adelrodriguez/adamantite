@@ -10,7 +10,6 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
-import { parseSync } from "oxc-parser"
 import {
   CurrentSetting,
   ErrorSetting,
@@ -19,20 +18,20 @@ import {
   TrialSetting,
   tryRule,
 } from "#lib/hardening/trial.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import {
   addCustomRule,
   addCustomRuleTest,
   listCustomRules,
   readCustomRuleTestCommand,
 } from "#lib/project/custom-rules/index.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import { readWorkspace } from "#lib/project/monorepo.ts"
 import { readProject } from "#lib/project/project.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
-import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/shared/errors.ts"
-import { readFile } from "#lib/shared/filesystem.ts"
+import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import * as Toolchain from "#lib/toolchain/index.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -57,21 +56,14 @@ const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
   Command.withHandler(({ file, json }) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      const content = yield* readFile(file)
-      // Oxlint gives rules an AST without parenthesized expressions.
-      const result = parseSync(file, content, { preserveParens: false })
-
-      if (result.errors.length > 0) {
-        return yield* new FailedToParseSource({
-          errors: result.errors.map((error) => error.message),
-          path: file,
-        })
-      }
+      const cwd = process.cwd()
+      const relative = path.relative(cwd, path.resolve(cwd, file))
+      const program = yield* Toolchain.ast({ cwd, file: relative })
 
       yield* Output.result(
         AstReport,
-        { file: path.relative(process.cwd(), file), program: result.program, schemaVersion: 1 },
-        yield* formatJson(result.program)
+        { file: relative, program, schemaVersion: 1 },
+        yield* formatJson(program)
       )
     }).pipe(Mode.provide({ json }))
   )
@@ -195,9 +187,7 @@ const test = Command.make("test", { path: testPath }).pipe(
         })
       }
 
-      const { command, unloadedConfigs } = yield* readCustomRuleTestCommand(
-        yield* readProject(cwd)
-      )
+      const { command, unloadedConfigs } = yield* readCustomRuleTestCommand(yield* readProject(cwd))
 
       for (const { file, reason } of unloadedConfigs) {
         yield* Output.warning(

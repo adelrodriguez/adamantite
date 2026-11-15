@@ -65,7 +65,8 @@ export const HardenContext = Schema.Struct({
    */
   scope: Schema.NullOr(ProjectPath),
   /**
-   * The disable comments of each rule, or none when Oxlint cannot list the files that it lints.
+   * The disable comments of each rule, or none when Oxlint cannot list the files that it lints or
+   * read their comments.
    */
   suppressions: Schema.OptionFromNullOr(Schema.Array(RuleSuppressions)),
   /**
@@ -302,7 +303,7 @@ const SHOWN_SUPPRESSIONS = 5
 function renderSuppressions(suppressions: Option.Option<readonly RuleSuppressions[]>) {
   return Option.match(suppressions, {
     onNone: () =>
-      'Adamantite could not count the comments that turn a rule off, because Oxlint could not list the files that it lints. Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`, and leave out the files that the config ignores.',
+      'Adamantite could not count the comments that turn a rule off, because Oxlint could not list the files that it lints or read their comments. Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`, and leave out the files that the config ignores.',
     onSome: (rules) => {
       if (rules.length === 0) {
         return "No `oxlint-disable` or `eslint-disable` comment turns a rule off."

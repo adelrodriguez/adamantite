@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Option from "effect/Option"
-import { isReportOf, parseOxlintReport } from "#lib/hardening/oxlint.ts"
+import { isReportOf } from "#lib/hardening/oxlint.ts"
+import { parseOxlintReport } from "#lib/integrations/oxlint/files.ts"
 
 describe("isReportOf", () => {
   it.each([

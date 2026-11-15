@@ -104,6 +104,7 @@ export function createFileSystemTestContext(options?: {
   const directories = new Set<string>([root])
   const readOnlyPaths = new Set<string>()
   const unreadablePaths = new Set<string>()
+  let temporaryDirectories = 0
 
   // Register every ancestor so strict parent-directory checks pass for roots.
   for (let current = root; dirname(current) !== current; current = dirname(current)) {
@@ -227,7 +228,33 @@ export function createFileSystemTestContext(options?: {
         return Effect.void
       }),
     makeTempDirectory: makeUnimplemented("makeTempDirectory"),
-    makeTempDirectoryScoped: makeUnimplemented("makeTempDirectoryScoped"),
+    // A temporary folder outside the root, which the scope removes with its entries.
+    makeTempDirectoryScoped: (makeOptions) =>
+      Effect.acquireRelease(
+        Effect.sync(() => {
+          temporaryDirectories += 1
+
+          const target = resolve("/tmp", `${makeOptions?.prefix ?? "tmp-"}${temporaryDirectories}`)
+
+          addDirectoryRecursive(target)
+
+          return target
+        }),
+        (target) =>
+          Effect.sync(() => {
+            for (const file of files.keys()) {
+              if (file.startsWith(`${target}/`)) {
+                files.delete(file)
+              }
+            }
+
+            for (const directory of directories) {
+              if (directory === target || directory.startsWith(`${target}/`)) {
+                directories.delete(directory)
+              }
+            }
+          })
+      ),
     makeTempFile: makeUnimplemented("makeTempFile"),
     makeTempFileScoped: makeUnimplemented("makeTempFileScoped"),
     open: makeUnimplemented("open"),

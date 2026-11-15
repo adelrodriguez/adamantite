@@ -1,11 +1,59 @@
 import process from "node:process"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
+import * as SchemaTransformation from "effect/SchemaTransformation"
 import * as Stream from "effect/Stream"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { CliNotFound, TrialLintFailed } from "#lib/shared/errors.ts"
+
+/**
+ * Oxlint prints a line, such as "No files found to lint.", before its JSON report.
+ */
+const JSON_REPORT_START = /^\{/mu
+
+/**
+ * A path in an Oxlint report, with `/` between folders. Oxlint prints the separators of the
+ * platform, and the trial and the overrides compare the path with project paths that git prints.
+ */
+const ReportPath = Schema.String.pipe(
+  Schema.decodeTo(
+    Schema.String,
+    SchemaTransformation.transform({
+      decode: (path) => path.replaceAll("\\", "/"),
+      encode: (path) => path,
+    })
+  )
+)
+
+const OxlintReport = Schema.Struct({
+  diagnostics: Schema.Array(
+    Schema.Struct({
+      // A parse error has no rule, so it has no code.
+      code: Schema.optional(Schema.String),
+      filename: ReportPath,
+      labels: Schema.Array(
+        Schema.Struct({ span: Schema.Struct({ column: Schema.Int, line: Schema.Int }) })
+      ),
+      message: Schema.String,
+    })
+  ),
+  number_of_files: Schema.Int,
+})
+
+const decodeOxlintReport = Schema.decodeUnknownOption(Schema.fromJsonString(OxlintReport))
+
+/**
+ * The JSON report in the output of `oxlint -f json`, or none when the output has no report.
+ */
+export function parseOxlintReport(stdout: string) {
+  const start = stdout.search(JSON_REPORT_START)
+
+  return start === -1 ? Option.none() : decodeOxlintReport(stdout.slice(start))
+}
 
 export const OxlintCommand = Context.Reference<typeof getOxlintCommand>(
   "adamantite/OxlintCommand",

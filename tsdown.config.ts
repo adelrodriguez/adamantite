@@ -11,7 +11,7 @@ export default defineConfig([
       onlyImport: Object.keys(packageJson.dependencies),
     },
     dts: false,
-    entry: ["src/index.ts", "src/oxlint.ts"],
+    entry: ["src/index.ts", "src/oxlint.ts", "src/probe.ts"],
     fixedExtension: false,
     minify: true,
     plugins: [Macros.rolldown()],

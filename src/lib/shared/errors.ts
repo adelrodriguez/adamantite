@@ -487,6 +487,17 @@ export class ConfigLoadFailed extends Data.TaggedError("ConfigLoadFailed")<{
   }
 }
 
+/**
+ * Oxlint could not run the probe plugin that reads the comments or the syntax tree of the files.
+ */
+export class OxlintProbeFailed extends Data.TaggedError("OxlintProbeFailed")<{
+  output: string
+}> {
+  override get message() {
+    return `Oxlint could not read the files. Fix the errors below and run the command again.\n${this.output}`
+  }
+}
+
 export class TrialLintFailed extends Data.TaggedError("TrialLintFailed")<{
   output: string
 }> {

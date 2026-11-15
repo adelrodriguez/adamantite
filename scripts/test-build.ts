@@ -9,6 +9,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import packageJson from "../package.json" with { type: "json" }
 import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/oxlint/entry.ts"
+import { PROBE_FILE } from "../src/lib/integrations/oxlint/probe.ts"
 
 const cliPath = join(import.meta.dirname, "..", "bin", "adamantite")
 
@@ -32,6 +33,12 @@ if (!existsSync(join(import.meta.dirname, "..", "dist", OXLINT_ENTRY_FILE))) {
 }
 
 console.info(`Verified the Oxlint entry: dist/${OXLINT_ENTRY_FILE}`)
+
+if (!existsSync(join(import.meta.dirname, "..", "dist", PROBE_FILE))) {
+  throw new Error(`Expected the build to write the Oxlint probe plugin dist/${PROBE_FILE}.`)
+}
+
+console.info(`Verified the Oxlint probe plugin: dist/${PROBE_FILE}`)
 
 const fixture = mkdtempSync(join(tmpdir(), "adamantite-cli-"))
 

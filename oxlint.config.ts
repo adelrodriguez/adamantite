@@ -146,8 +146,9 @@ export default defineConfig({
       },
       // Only Setup writes target-project files and the lockfile. Each other owner writes outside the
       // managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's
-      // `prepare`, which Setup runs, writes the Effect SDK copy in `node_modules`, and a trial
-      // writes cases and configs in a temporary copy of the project.
+      // `prepare`, which Setup runs, writes the Effect SDK copy in `node_modules`, a trial writes
+      // cases and configs in a temporary copy of the project, and the Oxlint probe writes its config
+      // to a temporary folder.
       {
         import: "#lib/shared/filesystem.ts",
         names: ["ensureDirectory", "writeFile", "writeJsonFile"],
@@ -157,6 +158,7 @@ export default defineConfig({
           "src/lib/integrations/effect-sdk.ts",
           "src/lib/hardening/trial.ts",
           "src/lib/hardening/oxlint.ts",
+          "src/lib/integrations/oxlint/probe.ts",
           "src/lib/shared/__tests__/filesystem.test.ts",
         ],
       },
@@ -188,7 +190,7 @@ export default defineConfig({
       // Terminal interaction belongs to `commands` and the entries. Lib code returns data for
       // commands to render. Tests share the helpers in `src/__tests__`, so this map skips them.
       {
-        entries: ["cli.ts", "index.ts", "oxlint.ts"],
+        entries: ["cli.ts", "index.ts", "oxlint.ts", "probe.ts"],
         ignore: ["**/__tests__/**"],
         layers: {
           lib: {

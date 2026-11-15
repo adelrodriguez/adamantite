@@ -238,6 +238,11 @@ interface ProcessOptions {
    */
   readonly lintIgnoredFiles?: readonly string[]
   readonly oxlintExitCode?: number
+  /**
+   * What the Oxlint probe prints for the files that it parses. The process tests in
+   * `src/lib/hardening/__tests__/suppressions.test.ts` run the probe.
+   */
+  readonly probeReport?: string
 }
 
 function makeHandle(exitCode: number, stdout: string) {
@@ -263,6 +268,7 @@ function makeProcessLayer(
     indexOnlyFiles = [],
     lintIgnoredFiles = [],
     oxlintExitCode = 0,
+    probeReport = '{ "diagnostics": [], "number_of_files": 0 }',
   }: ProcessOptions = {}
 ) {
   const listFiles = () =>
@@ -302,7 +308,18 @@ function makeProcessLayer(
         )
       }
 
-      return Effect.die("Harden tests spawn only git, and oxlint to list the files")
+      if (
+        ChildProcess.isStandardCommand(command)
+        && command.command === OXLINT.command
+        && command.args[0] === OXLINT.args[0]
+        && command.args.includes("--disable-nested-config")
+      ) {
+        return Effect.succeed(makeHandle(0, probeReport))
+      }
+
+      return Effect.die(
+        "Harden tests spawn only git, and oxlint to list the files or to probe them"
+      )
     })
   )
 }
@@ -515,6 +532,23 @@ function getContext(prompt: string) {
 
 const decodeReport = Schema.decodeUnknownSync(Schema.fromJsonString(Report))
 
+// What the Oxlint probe prints for `src/index.ts`, whose first line turns off `no-console`.
+const INDEX_PROBE_REPORT = JSON.stringify({
+  diagnostics: [
+    {
+      code: "adamantite-probe(comments)",
+      filename: "src/index.ts",
+      labels: [{ span: { column: 1, line: 1 } }],
+      message: JSON.stringify({
+        anchor: "start",
+        comments: [{ line: 1, value: " oxlint-disable-next-line no-console" }],
+        lines: 3,
+      }),
+    },
+  ],
+  number_of_files: 1,
+})
+
 describe("harden", () => {
   it.effect("print the harden context as JSON that decodes with the report schema", () =>
     Effect.gen(function* () {
@@ -525,7 +559,10 @@ describe("harden", () => {
           "docs/unreached.md": "# Unreached\n",
           "src/index.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
         },
-        ["--json", "--commits", "20"]
+        ["--json", "--commits", "20"],
+        {
+          probeReport: INDEX_PROBE_REPORT,
+        }
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
@@ -846,51 +883,6 @@ describe("harden", () => {
     })
   )
 
-  it.effect("count the disable comments of each rule in the source files", () =>
-    Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt({
-        "docs/rules.md": "Use `// oxlint-disable-next-line no-console` with a reason.\n",
-        "oxlint.config.ts": CORE_CONFIG,
-        "src/a.ts": [
-          "// oxlint-disable-next-line no-console -- the CLI prints",
-          "console.log(1)",
-          "// eslint-disable-next-line no-console, typescript/no-explicit-any",
-          "export const value: any = console.log(2)",
-          'export const text = "// oxlint-disable-line no-console"',
-          "",
-        ].join("\n"),
-        "src/b.tsx": "/* oxlint-disable */\nexport const b = <div />\n",
-        ...INSTALLED,
-      })
-
-      expect(getListItems(getSection(prompt, "### Suppressions"))).toStrictEqual([
-        "- `no-console`: 2 comments, in `src/a.ts:1`, `src/a.ts:3`",
-        "- All rules: 1 comment, in `src/b.tsx:1`",
-        "- `typescript/no-explicit-any`: 1 comment, in `src/a.ts:3`",
-      ])
-    })
-  )
-
-  it.effect("leave out the disable comments of the files that the Oxlint config ignores", () =>
-    Effect.gen(function* () {
-      const { exit, logLines } = yield* runHarden(
-        {
-          "oxlint.config.ts": CORE_CONFIG,
-          "src/a.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
-          "src/fixtures/bad.ts": "// oxlint-disable-next-line no-alert\nalert(1)\n",
-          ...INSTALLED,
-        },
-        [],
-        { lintIgnoredFiles: ["src/fixtures/bad.ts"] }
-      )
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(getListItems(getSection(logLines[0] ?? "", "### Suppressions"))).toStrictEqual([
-        "- `no-console`: 1 comment, in `src/a.ts:1`",
-      ])
-    })
-  )
-
   it.effect("tell the agent to count the disable comments when Oxlint cannot list its files", () =>
     Effect.gen(function* () {
       const { exit, logLines } = yield* runHarden(
@@ -906,21 +898,22 @@ describe("harden", () => {
     })
   )
 
-  it.effect("count only the disable comments inside the folder that --path selects", () =>
+  it.effect("tell the agent to count the disable comments when Oxlint cannot read them", () =>
     Effect.gen(function* () {
-      const prompt = yield* runHardenPrompt(
+      const { exit, logLines } = yield* runHarden(
         {
           "oxlint.config.ts": CORE_CONFIG,
-          "packages/api/src/a.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
-          "packages/web/src/a.ts": "// oxlint-disable-next-line no-alert\nalert(1)\n",
+          "src/index.ts": "// oxlint-disable-next-line no-console\nconsole.log(1)\n",
           ...INSTALLED,
         },
-        ["--path", "packages/web"]
+        [],
+        { probeReport: "Failed to load JS plugin: dist/probe.js" }
       )
 
-      expect(getListItems(getSection(prompt, "### Suppressions"))).toStrictEqual([
-        "- `no-alert`: 1 comment, in `packages/web/src/a.ts:1`",
-      ])
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getSection(logLines[0] ?? "", "### Suppressions")).toContain(
+        'Count them yourself, for example with `rg -n "(oxlint|eslint)-disable"`'
+      )
     })
   )
 

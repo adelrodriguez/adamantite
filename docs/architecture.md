@@ -348,7 +348,7 @@ such as `firstPartyPlugin("antislop")`. The function builds a file URL from its 
 The source tree has `<name>/index.ts` and the dist tree has `<name>/index.js`, so it takes the
 extension from its own module URL. Its parameter type accepts only the three namespaces.
 `entry.ts` imports no plugin code, so a preset loads no rule module.
-`src/__tests__/plugins/entry.test.ts` loads each plugin from its entry and fails when a plugin
+`presets/lint/plugins/__tests__/entry.test.ts` loads each plugin from its entry and fails when a plugin
 name and its folder name disagree. Tsdown builds the plugins with the presets, so the
 `adamantite` plugin ships at `dist/presets/lint/plugins/adamantite/index.js`.
 
@@ -359,7 +359,7 @@ uses, and which has Node-API bindings for Node.js and Bun. `presets/lint/plugins
 lets the source import rule modules with their `.ts` extension, which Node.js needs to load the
 source plugin.
 
-Each rule has a `RuleTester` test under `src/__tests__/plugins/<namespace>/<rule>.test.ts` for
+Each rule has a `RuleTester` test under `presets/lint/plugins/<namespace>/__tests__/<rule>.test.ts` for
 messages, locations, and options, and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
 Oxlint run. Each fixture file holds one case. The namespace folder, such as `antislop`, lets one

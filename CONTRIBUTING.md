@@ -79,7 +79,7 @@ its package folder in `ADAMANTITE_TEST_OXLINT`:
 ```sh
 npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
 ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest run \
-  src/__tests__/plugins src/__tests__/presets/stacks.test.ts src/__tests__/presets/strict.test.ts \
+  presets/lint/plugins src/__tests__/presets/stacks.test.ts src/__tests__/presets/strict.test.ts \
   src/__tests__/presets/effect.test.ts
 ```
 

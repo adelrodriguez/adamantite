@@ -43,7 +43,9 @@ const INIT_ARGS = [
   "vscode",
 ]
 
-const RECOMMENDATIONS = '{\n  "recommendations": ["oxc.oxc-vscode", "webpro.vscode-knip"]\n}\n'
+// The tests install no Oxfmt, so Setup writes each file as rendered. `formatted.test.ts` covers the
+// layout that the project's Oxfmt gives it.
+const RECOMMENDATIONS = `${Effect.runSync(formatJson({ recommendations: ["oxc.oxc-vscode", "webpro.vscode-knip"] }))}\n`
 
 function makeProject(files: Record<string, string> = {}) {
   return createFileSystemTestContext({ files: { ...files, "package.json": PACKAGE_JSON } })
@@ -228,7 +230,9 @@ describe("VS Code setup", () => {
       const { exit, output } = yield* run("update", files)
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(files.read(EXTENSIONS)).toBe('{\n  "recommendations": ["webpro.vscode-knip"]\n}\n')
+      expect(files.read(EXTENSIONS)).toBe(
+        `${yield* formatJson({ recommendations: ["webpro.vscode-knip"] })}\n`
+      )
       expect(readLockfile(files).written[EXTENSIONS]).toBe(hashContent(files.read(EXTENSIONS)))
       expect(output).toContain(`✔ \`${EXTENSIONS}\` replaced with the current version.`)
     })
@@ -243,9 +247,11 @@ describe("VS Code setup", () => {
         files.write(EXTENSIONS, '{ "recommendations": [] }\n')
 
         // The selection no longer names VS Code.
+        const { selection, written } = readLockfile(files)
+
         files.write(
           LOCKFILE_PATH,
-          files.read(LOCKFILE_PATH).replace('"editors": ["vscode"]', '"editors": []')
+          makeLockfileFile({ ...selection, editors: [] }, written)[LOCKFILE_PATH]
         )
 
         const { exit, output } = yield* run("update", files)

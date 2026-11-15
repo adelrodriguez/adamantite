@@ -121,7 +121,11 @@ lists the integrations that own a folder, such as `integrations/vscode/`, and ea
 `Integration` from `integrations/base.ts`: whether the selection includes it, its packages, its
 managed files, a `prepare` step for `node_modules`, and its `assess`. `apply` installs the
 packages of every selected integration in one install, runs each `prepare`, renders the managed
-files, and applies the write rule to each one. It writes a file only whole, and only when the file
+files, formats each one, and applies the write rule to each one. `apply` formats a file
+with the project's Oxfmt from stdin, with the project's Oxfmt config, or with a copy of the format
+preset in a temporary folder when the project has none. `adamantite fix` then leaves the file
+unchanged, so its hash still matches. A project without Oxfmt gets the file as rendered, and a config
+that Oxfmt cannot load fails `apply` with `FailedToFormatFile`. It writes a file only whole, and only when the file
 does not exist or its hash equals the hash in the lockfile's `written` map. It never merges or
 edits a file. Each file gets a `FileWrite`: `Created`, `Replaced`, `Unchanged`, `Kept` when the
 user changed it, or `Deleted` when the selection no longer renders it and its hash still matches.
@@ -130,7 +134,7 @@ integration's `assess` reads it and reports only a change that breaks the setup.
 runs each listed integration that the selection includes, and without a lockfile it uses the
 selection that `inferSelection` in `integrations/selection.ts` reads from the project files.
 
-`apply` writes the lockfile last, and only `init` and `update` call it: `adamantite/import-owners`
+`apply` writes the lockfile last, formatted the same way, and only `init` and `update` call it: `adamantite/import-owners`
 keeps `#lib/setup` and `writeLockfile` to them. `written` records the hash of each managed file
 that `apply` created, replaced, or found unchanged. The integrations that have not moved to a folder
 yet keep their setup steps in `src/commands/init/setup.ts`. For their files, the Oxlint, Oxfmt, and

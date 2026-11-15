@@ -181,6 +181,18 @@ export class FailedToCreateDirectory extends Data.TaggedError("FailedToCreateDir
   }
 }
 
+/**
+ * The project's Oxfmt failed to format a file that `init` or `update` was about to write.
+ */
+export class FailedToFormatFile extends Data.TaggedError("FailedToFormatFile")<{
+  output: string
+  path: string
+}> {
+  override get message() {
+    return `The project's Oxfmt could not format \`${this.path}\`. Fix the Oxfmt config, then run the command again.${this.output === "" ? "" : `\n${this.output}`}`
+  }
+}
+
 export class FailedToInstallDependency extends Data.TaggedError("FailedToInstallDependency")<{
   packages?: string[]
   cause?: unknown

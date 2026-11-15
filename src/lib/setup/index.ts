@@ -5,20 +5,29 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as ChildProcess from "effect/process/ChildProcess"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
+import * as Stream from "effect/Stream"
 import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import { format as formatCommand } from "#lib/integrations/tooling/oxfmt/command.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { writeLockfile } from "#lib/project/lockfile.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type Selection } from "#lib/project/selection.ts"
+import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+import formatPreset from "#presets/format.ts"
 
 export { inferSelection } from "#lib/integrations/selection.ts"
 
@@ -206,10 +215,112 @@ const deleteDroppedFile = Effect.fn("deleteDroppedFile")(function* (
 })
 
 /**
+ * The config files that Oxfmt reads from the project root.
+ */
+const OXFMT_CONFIGS = ["oxfmt.config.ts", "oxfmt.config.mts", ".oxfmtrc.json", ".oxfmtrc.jsonc"]
+
+const OxfmtManifest = Schema.fromJsonString(
+  Schema.Struct({ bin: Schema.Struct({ oxfmt: Schema.String }) })
+)
+
+/**
+ * Formats `content` as the project's Oxfmt formats the file at `file`, from the project root.
+ */
+type Format = (file: string, content: string) => Effect.Effect<string, FailedToFormatFile>
+
+/**
+ * The config that the project's Oxfmt formats with: the project's own config, or a copy of
+ * Adamantite's format preset in a temporary folder when the project has none, such as before `init`
+ * writes `oxfmt.config.ts`.
+ */
+const findConfig = Effect.fn("findConfig")(function* (cwd: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+
+  const own = yield* Effect.findFirst(OXFMT_CONFIGS, (file) => fs.exists(path.join(cwd, file)))
+
+  if (Option.isSome(own)) {
+    return path.join(cwd, own.value)
+  }
+
+  const config = path.join(yield* fs.makeTempDirectoryScoped(), ".oxfmtrc.json")
+
+  yield* fs.writeFileString(config, yield* stringifyJson(formatPreset).pipe(Effect.orDie))
+
+  return config
+})
+
+/**
+ * The formatter of the managed files in the project at `cwd`: the project's Oxfmt, which
+ * `adamantite fix` runs too, so `fix` leaves a managed file unchanged and its hash still matches
+ * the lockfile. A project that installs no Oxfmt, because the selection runs none, gets each file
+ * as rendered. The temporary config lives as long as the scope.
+ */
+const makeFormatter = Effect.fn("makeFormatter")(function* (cwd: string) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+  const oxfmt = yield* resolvePackageDirectory(cwd, "oxfmt")
+
+  if (Option.isNone(oxfmt)) {
+    return ((_file, content) => Effect.succeed(content)) satisfies Format
+  }
+
+  const manifestPath = path.join(oxfmt.value, "package.json")
+
+  const { bin } = yield* fs.readFileString(manifestPath).pipe(
+    Effect.flatMap(Schema.decodeUnknownEffect(OxfmtManifest)),
+    Effect.mapError((cause) => new FailedToParseFile({ cause, path: manifestPath }))
+  )
+
+  const config = yield* findConfig(cwd)
+
+  return ((file, content) => {
+    const command = formatCommand({
+      bin: path.join(oxfmt.value, bin.oxfmt),
+      config,
+      cwd,
+      path: file,
+    })
+
+    return Effect.gen(function* () {
+      const handle = yield* spawner.spawn(
+        ChildProcess.make(command.command, command.args, {
+          cwd: command.cwd,
+          stdin: Stream.make(new TextEncoder().encode(content)),
+        })
+      )
+
+      const [stdout, stderr, exitCode] = yield* Effect.all(
+        [
+          Stream.mkString(Stream.decodeText(handle.stdout)),
+          Stream.mkString(Stream.decodeText(handle.stderr)),
+          handle.exitCode,
+        ],
+        { concurrency: "unbounded" }
+      )
+
+      if (exitCode !== ChildProcessSpawner.ExitCode(0)) {
+        return yield* new FailedToFormatFile({ output: stderr.trim(), path: file })
+      }
+
+      return stdout
+    }).pipe(
+      Effect.scoped,
+      Effect.catchTag("PlatformError", (error) =>
+        Effect.fail(new FailedToFormatFile({ output: error.message, path: file }))
+      )
+    )
+  }) satisfies Format
+})
+
+/**
  * Sets up `selection` in `project`, the backend of `init` and `update`. It installs the packages of
- * every selected integration in one install, prepares what they need in `node_modules`, writes
- * their managed files under the write rule, deletes the managed files that the selection dropped,
- * and writes the lockfile last. Running it twice leaves the project unchanged.
+ * every selected integration in one install, prepares what they need in `node_modules`, formats
+ * their managed files with the project's Oxfmt, writes them under the write rule, deletes the
+ * managed files that the selection dropped, and writes the lockfile last, formatted the same way.
+ * Each hash in `written` is the hash of the bytes on disk. Running it twice leaves the project
+ * unchanged.
  */
 export const apply = Effect.fn("Setup.apply")(function* (project: Project, selection: Selection) {
   const { cwd } = project
@@ -233,10 +344,17 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
     onSome: (lockfile) => lockfile.written,
   })
 
-  const rendered = Array.flatten(
-    yield* Effect.forEach(selected, (integration) => integration.files(project, selection), {
-      concurrency: "unbounded",
-    })
+  // After the install, so a project that this setup gives Oxfmt formats with it.
+  const format = yield* makeFormatter(cwd)
+
+  const rendered = yield* Effect.forEach(
+    Array.flatten(
+      yield* Effect.forEach(selected, (integration) => integration.files(project, selection), {
+        concurrency: "unbounded",
+      })
+    ),
+    (file) => Effect.map(format(file.path, file.content), (content) => ({ ...file, content })),
+    { concurrency: "unbounded" }
   )
 
   const writes = yield* Effect.forEach(
@@ -262,15 +380,14 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
     ),
   ]
 
-  const lockfile = yield* writeLockfile(cwd, {
-    schemaVersion: 1,
-    selection,
-    version,
-    written: Object.fromEntries(written),
-  })
+  const lockfile = yield* writeLockfile(
+    cwd,
+    { schemaVersion: 1, selection, version, written: Object.fromEntries(written) },
+    format
+  )
 
   return {
     files: [...writes.map(({ write }) => write), ...Array.getSomes(deletes)],
     lockfile,
   }
-})
+}, Effect.scoped)

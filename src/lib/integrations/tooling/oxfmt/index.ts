@@ -11,6 +11,7 @@ import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type:
 export default {
   check: commands.check,
   fix: commands.fix,
+  format: commands.format,
   ...defineConfigTooling({
     assessRuntime: assessPluginLanguages,
     configContent: toOxfmtTsConfigContent,

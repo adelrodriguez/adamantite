@@ -8,8 +8,15 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import checkCommand from "#commands/check.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { CommandFailed, InvalidCheckOptions } from "#lib/shared/errors.ts"
-import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { CommandFailed, InvalidCheckOptions, ToolNotSelected } from "#lib/shared/errors.ts"
+import {
+  createRunnerTestContext,
+  getFailure,
+  makeLockfileFile,
+  runCommand,
+} from "./command-test-helpers.ts"
+import { makeSelection } from "./lifecycle.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
 
@@ -189,6 +196,87 @@ describe("check", () => {
             title: "🔍 Linting",
           },
         ])
+      })
+    )
+  })
+
+  describe("selection", () => {
+    it.effect("name the init command that adds check when the lockfile selects no script", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
+          layers: [runner.layer],
+        })
+
+        const error = getFailure(exit)
+
+        expect(error).toStrictEqual(
+          new ToolNotSelected({ script: "check", tools: ["oxfmt", "oxlint"] })
+        )
+        expect(error?.message).toBe(
+          "The lockfile selects no script that runs `oxfmt` or `oxlint`, so Adamantite does not install them. Run `adamantite init --non-interactive --script check` to add the script and install them."
+        )
+        expect(runner.invocations).toStrictEqual([])
+      })
+    )
+
+    it.effect("name only the tool of the stage that --only selects", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, ["--only", "lint"], {
+          files: createFileSystemTestContext({
+            files: makeLockfileFile(makeSelection({ scripts: ["analyze"] })),
+          }),
+          layers: [runner.layer],
+        })
+
+        const error = getFailure(exit)
+
+        expect(error).toStrictEqual(new ToolNotSelected({ script: "check", tools: ["oxlint"] }))
+        expect(error?.message).toBe(
+          "The lockfile selects no script that runs `oxlint`, so Adamantite does not install it. Run `adamantite init --non-interactive --script check` to add the script and install it."
+        )
+        expect(runner.invocations).toStrictEqual([])
+      })
+    )
+
+    // A selected tool that is missing fails in its own stage, where Oxlint names
+    // `adamantite update`, which installs it.
+    it.effect("run each stage when the lockfile selects a script that runs its tool", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext([0, 1])
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files: createFileSystemTestContext({
+            files: makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] })),
+          }),
+          layers: [runner.layer],
+        })
+
+        expect(getFailure(exit)).toMatchObject({ command: "node", exitCode: 1 })
+        expect(
+          runner.invocations.map((invocation) => invocation.name ?? invocation.command)
+        ).toStrictEqual(["oxfmt", "oxlint"])
+      })
+    )
+
+    // Doctor reports the lockfile, and the tools can still run.
+    it.effect("run each stage when the lockfile does not decode", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(checkCommand, [], {
+          files: createFileSystemTestContext({ files: { [LOCKFILE_PATH]: "<<<<<<< HEAD\n" } }),
+          layers: [runner.layer],
+        })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(
+          runner.invocations.map((invocation) => invocation.name ?? invocation.command)
+        ).toStrictEqual(["oxfmt", "oxlint"])
       })
     )
   })

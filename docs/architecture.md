@@ -320,6 +320,10 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
+- `check`, `fix`, and `analyze` read the lockfile selection and pass it to Toolchain. Before any
+  stage runs, Toolchain fails with `ToolNotSelected` when no selected script runs the tool of a
+  stage, because Setup did not install the tool. The error names the `init` command that adds the
+  script. Without a lockfile, each stage runs.
 - `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
   runs `applySetup`, as "Setup and the write rule" describes. `init --json` takes the selection
   from the flags and asks nothing. When the selection includes coding agents, the `agents`

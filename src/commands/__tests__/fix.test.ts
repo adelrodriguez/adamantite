@@ -7,8 +7,14 @@ import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import fixCommand from "#commands/fix.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
-import { CommandFailed, InvalidFixOptions } from "#lib/shared/errors.ts"
-import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
+import { CommandFailed, InvalidFixOptions, ToolNotSelected } from "#lib/shared/errors.ts"
+import {
+  createRunnerTestContext,
+  getFailure,
+  makeLockfileFile,
+  runCommand,
+} from "./command-test-helpers.ts"
+import { makeSelection } from "./lifecycle.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
 
@@ -173,6 +179,29 @@ describe("fix", () => {
             title: "✨ Formatting",
           },
         ])
+      })
+    )
+  })
+
+  describe("selection", () => {
+    it.effect("name the init command that adds fix when the lockfile selects no script", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(fixCommand, [], {
+          files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
+          layers: [runner.layer],
+        })
+
+        const error = getFailure(exit)
+
+        expect(error).toStrictEqual(
+          new ToolNotSelected({ script: "fix", tools: ["oxlint", "oxfmt"] })
+        )
+        expect(error?.message).toBe(
+          "The lockfile selects no script that runs `oxlint` or `oxfmt`, so Adamantite does not install them. Run `adamantite init --non-interactive --script fix` to add the script and install them."
+        )
+        expect(runner.invocations).toStrictEqual([])
       })
     )
   })

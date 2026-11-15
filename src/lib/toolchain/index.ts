@@ -4,12 +4,14 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { FixLevel } from "#lib/integrations/oxlint/command.ts"
+import type { Selection } from "#lib/project/selection.ts"
 import * as knip from "#lib/integrations/knip/command.ts"
 import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
 import * as oxlint from "#lib/integrations/oxlint/command.ts"
 import { probeAst } from "#lib/integrations/oxlint/probe.ts"
 import * as sherif from "#lib/integrations/sherif/command.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
+import { checkRunsTool, type ManagedTool, type Script } from "#lib/project/package-json.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import {
   CliNotFound,
@@ -17,29 +19,69 @@ import {
   InvalidAnalyzeOptions,
   InvalidCheckOptions,
   InvalidFixOptions,
+  ToolNotSelected,
 } from "#lib/shared/errors.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 
 export type { FixLevel } from "#lib/integrations/oxlint/command.ts"
 
 /**
+ * The tool that each stage runs.
+ */
+const STAGE_TOOLS = {
+  format: "oxfmt",
+  lint: "oxlint",
+  monorepo: "sherif",
+  unused: "knip",
+} as const satisfies Record<string, ManagedTool>
+
+type Stage = keyof typeof STAGE_TOOLS
+
+/**
+ * Fails when `selection` includes no script that runs the tool of one of `stages`, because Setup
+ * then installs no such tool. The managed script named `script` runs the tool of each stage of the
+ * command of the same name. Without a selection, as in a project without a lockfile, each tool
+ * runs, and a missing one reports itself.
+ */
+const requireSelectedTools = Effect.fn("requireSelectedTools")(function* (
+  selection: Option.Option<Selection>,
+  script: Script,
+  stages: readonly Stage[]
+) {
+  const unselected = Option.match(selection, {
+    onNone: () => [],
+    onSome: ({ scripts }) =>
+      stages.flatMap((stage) => {
+        const tool = STAGE_TOOLS[stage]
+
+        return checkRunsTool(scripts, tool) ? [] : [tool]
+      }),
+  })
+
+  if (Array.isReadonlyArrayNonEmpty(unselected)) {
+    return yield* new ToolNotSelected({ script, tools: unselected })
+  }
+})
+
+/**
  * Checks the formatting with Oxfmt, then lints with Oxlint. Both stages run, and the operation
  * fails with the first failure. The forwarded arguments go to the lint stage, or to the stage that
  * `only` selects.
  */
-export const check = Effect.fn("Toolchain.check")(function* ({
-  allowWarnings = false,
-  cwd,
-  files = [],
-  forwardedArguments = [],
-  only,
-}: {
+export const check = Effect.fn("Toolchain.check")(function* (options: {
   readonly allowWarnings?: boolean
   readonly cwd: string
   readonly files?: readonly string[]
   readonly forwardedArguments?: readonly string[]
   readonly only?: "format" | "lint"
+  /**
+   * The selection that the lockfile records. A stage whose tool no selected script runs fails
+   * before any stage runs. Without it, each stage runs.
+   */
+  readonly selection?: Option.Option<Selection>
 }) {
+  const { allowWarnings = false, cwd, files = [], forwardedArguments = [], only } = options
+
   if (only === "format" && allowWarnings) {
     return yield* new InvalidCheckOptions({
       reason: "`--allow-warnings` applies to the lint stage. Remove it or `--only format`.",
@@ -63,7 +105,10 @@ export const check = Effect.fn("Toolchain.check")(function* ({
     }),
   }
 
-  yield* runner.runAll(only === undefined ? [stages.format, stages.lint] : [stages[only]])
+  const order = only === undefined ? (["format", "lint"] as const) : [only]
+
+  yield* requireSelectedTools(options.selection ?? Option.none(), "check", order)
+  yield* runner.runAll(order.map((stage) => stages[stage]))
 })
 
 /**
@@ -71,19 +116,20 @@ export const check = Effect.fn("Toolchain.check")(function* ({
  * with the first failure. The forwarded arguments go to the lint stage, or to the stage that `only`
  * selects.
  */
-export const fix = Effect.fn("Toolchain.fix")(function* ({
-  cwd,
-  files = [],
-  forwardedArguments = [],
-  level = "safe",
-  only,
-}: {
+export const fix = Effect.fn("Toolchain.fix")(function* (options: {
   readonly cwd: string
   readonly files?: readonly string[]
   readonly forwardedArguments?: readonly string[]
   readonly level?: FixLevel
   readonly only?: "format" | "lint"
+  /**
+   * The selection that the lockfile records. A stage whose tool no selected script runs fails
+   * before any stage runs. Without it, each stage runs.
+   */
+  readonly selection?: Option.Option<Selection>
 }) {
+  const { cwd, files = [], forwardedArguments = [], level = "safe", only } = options
+
   if (only === "format" && level !== "safe") {
     return yield* new InvalidFixOptions({
       reason:
@@ -113,7 +159,10 @@ export const fix = Effect.fn("Toolchain.fix")(function* ({
   // past the print width as multiline. Oxlint applies one pass of fixes, so a fix that causes a new
   // report still needs a second `fix` until Oxlint repeats its passes:
   // https://github.com/oxc-project/oxc/issues/16118
-  yield* runner.runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])
+  const order = only === undefined ? (["lint", "format"] as const) : [only]
+
+  yield* requireSelectedTools(options.selection ?? Option.none(), "fix", order)
+  yield* runner.runAll(order.map((stage) => stages[stage]))
 })
 
 /**
@@ -121,19 +170,20 @@ export const fix = Effect.fn("Toolchain.fix")(function* ({
  * The forwarded arguments go to the unused stage, or to the stage that `only` selects. With `fix`,
  * the operation stops at the first failure.
  */
-export const analyze = Effect.fn("Toolchain.analyze")(function* ({
-  cwd,
-  fix = false,
-  forwardedArguments = [],
-  only,
-  strict = false,
-}: {
+export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
   readonly cwd: string
   readonly fix?: boolean
   readonly forwardedArguments?: readonly string[]
   readonly only?: "monorepo" | "unused"
+  /**
+   * The selection that the lockfile records. A stage whose tool no selected script runs fails
+   * before any stage runs. Without it, each stage runs.
+   */
+  readonly selection?: Option.Option<Selection>
   readonly strict?: boolean
 }) {
+  const { cwd, fix = false, forwardedArguments = [], only, strict = false } = options
+
   const runner = yield* CommandRunner
 
   const path = yield* Path.Path
@@ -182,8 +232,14 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
     }),
   }
 
-  const steps =
-    only === undefined ? [...(isMonorepo ? [stages.monorepo] : []), stages.unused] : [stages[only]]
+  const order =
+    only === undefined
+      ? [...(isMonorepo ? (["monorepo"] as const) : []), "unused" as const]
+      : [only]
+
+  yield* requireSelectedTools(options.selection ?? Option.none(), "analyze", order)
+
+  const steps = order.map((stage) => stages[stage])
 
   // A failed Sherif fix means no install happened, and Knip would then delete from a stale
   // dependency graph.

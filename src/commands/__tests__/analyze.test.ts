@@ -10,8 +10,15 @@ import {
   CommandFailed,
   FailedToReadFile,
   InvalidAnalyzeOptions,
+  ToolNotSelected,
 } from "#lib/shared/errors.ts"
-import { createRunnerTestContext, runCommand } from "./command-test-helpers.ts"
+import {
+  createRunnerTestContext,
+  getFailure,
+  makeLockfileFile,
+  runCommand,
+} from "./command-test-helpers.ts"
+import { makeSelection } from "./lifecycle.ts"
 
 function createMonorepoFiles() {
   return createFileSystemTestContext({
@@ -205,6 +212,55 @@ describe("analyze", () => {
         expect(error.message).toBe(
           "The command `sherif` was not found on PATH. Run `adamantite update` to install it."
         )
+      })
+    )
+  })
+
+  describe("selection", () => {
+    it.effect("name the init command that adds analyze when the lockfile does not select it", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(analyzeCommand, [], {
+          files: createFileSystemTestContext({
+            files: makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] })),
+          }),
+          layers: [runner.layer],
+        })
+
+        const error = getFailure(exit)
+
+        expect(error).toStrictEqual(new ToolNotSelected({ script: "analyze", tools: ["knip"] }))
+        expect(error?.message).toBe(
+          "The lockfile selects no script that runs `knip`, so Adamantite does not install it. Run `adamantite init --non-interactive --script analyze` to add the script and install it."
+        )
+        expect(runner.invocations).toStrictEqual([])
+      })
+    )
+
+    it.effect("name Sherif too in a monorepo", () =>
+      Effect.gen(function* () {
+        const runner = createRunnerTestContext()
+
+        const exit = yield* runCommand(analyzeCommand, [], {
+          files: createFileSystemTestContext({
+            files: {
+              ...makeLockfileFile(makeSelection({})),
+              "package.json": '{ "workspaces": ["packages/*"] }',
+            },
+          }),
+          layers: [runner.layer],
+        })
+
+        const error = getFailure(exit)
+
+        expect(error).toStrictEqual(
+          new ToolNotSelected({ script: "analyze", tools: ["sherif", "knip"] })
+        )
+        expect(error?.message).toBe(
+          "The lockfile selects no script that runs `sherif` or `knip`, so Adamantite does not install them. Run `adamantite init --non-interactive --script analyze` to add the script and install them."
+        )
+        expect(runner.invocations).toStrictEqual([])
       })
     )
   })

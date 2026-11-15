@@ -432,6 +432,22 @@ export class PackageNotInstalled extends Data.TaggedError("PackageNotInstalled")
   }
 }
 
+/**
+ * A command runs a tool that no script of the lockfile selection runs, so Setup did not install the
+ * tool. `script` is the managed script that runs each of `tools`.
+ */
+export class ToolNotSelected extends Data.TaggedError("ToolNotSelected")<{
+  script: string
+  tools: Array.NonEmptyReadonlyArray<string>
+}> {
+  override get message() {
+    const tools = this.tools.map((tool) => `\`${tool}\``).join(" or ")
+    const pronoun = this.tools.length === 1 ? "it" : "them"
+
+    return `The lockfile selects no script that runs ${tools}, so Adamantite does not install ${pronoun}. Run \`adamantite init --non-interactive --script ${this.script}\` to add the script and install ${pronoun}.`
+  }
+}
+
 export class PassthroughNotSupported extends Data.TaggedError("PassthroughNotSupported")<{
   command: string
 }> {

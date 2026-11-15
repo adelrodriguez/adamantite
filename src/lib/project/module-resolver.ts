@@ -1,3 +1,4 @@
+import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
@@ -50,13 +51,23 @@ export class ModuleResolver extends Context.Service<
 
     // TypeScript's config lookup for a package `extends` entry, which shares the cache: the
     // conditions of a CommonJS import, the `tsconfig` field of `package.json`, the `.json`
-    // extension, and `tsconfig.json` as the file of a folder.
-    const config = resolver.cloneWithOptions({
-      conditionNames: ["require", "types", "node", "default"],
-      extensions: [".json"],
-      mainFields: ["tsconfig"],
-      mainFiles: ["tsconfig"],
-    })
+    // extension, and `tsconfig.json` as the file of a folder. TypeScript skips an export target
+    // that is not JSON, such as a `types` declaration file, and tries the next condition, while the
+    // resolver returns the first target whose condition matches. So the lookup retries with fewer
+    // conditions until it reaches a JSON file.
+    const configs = [
+      ["require", "types", "node", "default"],
+      ["require", "node", "default"],
+      ["node", "default"],
+      ["default"],
+    ].map((conditionNames) =>
+      resolver.cloneWithOptions({
+        conditionNames,
+        extensions: [".json"],
+        mainFields: ["tsconfig"],
+        mainFiles: ["tsconfig"],
+      })
+    )
 
     return {
       clearCache: Effect.sync(() => {
@@ -65,7 +76,13 @@ export class ModuleResolver extends Context.Service<
       resolve: (directory, specifier) =>
         Effect.sync(() => Option.fromUndefinedOr(resolver.sync(directory, specifier).path)),
       resolveConfig: (directory, specifier) =>
-        Effect.sync(() => Option.fromUndefinedOr(config.sync(directory, specifier).path)),
+        Effect.sync(() =>
+          Array.findFirst(configs, (config) =>
+            Option.filter(Option.fromUndefinedOr(config.sync(directory, specifier).path), (file) =>
+              file.endsWith(".json")
+            )
+          )
+        ),
     }
   })
 }

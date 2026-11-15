@@ -51,6 +51,8 @@ describe("ModuleResolver.resolveConfig", () => {
   beforeEach(() => {
     project = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-module-resolver-")))
     write("src/index.ts", "export const value = 1\n")
+    // A declaration file that an export can name, which TypeScript skips in a config lookup.
+    write(`${PACKAGE}/index.d.ts`, "export declare const value: number\n")
   })
 
   afterEach(() => {
@@ -81,6 +83,18 @@ describe("ModuleResolver.resolveConfig", () => {
       layout: "the require condition of exports",
       manifest: { exports: { "./base": { import: "./import.json", require: "./require.json" } } },
       specifier: "@company/config/base",
+    },
+    {
+      bases: ["base.json"],
+      layout: "a JSON default after a declaration types target",
+      // Conditions match in key order, so `types` must come before `default`.
+      manifest: {
+        exports: Object.fromEntries([
+          ["types", "./index.d.ts"],
+          ["default", "./base.json"],
+        ]),
+      },
+      specifier: "@company/config",
     },
   ])(
     "resolve $specifier through $layout to the base config that TypeScript applies",

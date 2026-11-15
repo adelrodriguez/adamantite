@@ -86,6 +86,12 @@ export default defineConfig({
           "scripts/test-build.ts",
         ],
       },
+      // Commands reach an integration that owns a folder through `lib/setup` and the assessment.
+      // Each integration that moves to its own folder adds an entry.
+      {
+        import: "#lib/integrations/vscode",
+        owners: ["src/lib"],
+      },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
       // integration takes them from the `Project`. Harden discovers the custom rules of its own
       // scope.

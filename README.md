@@ -111,7 +111,6 @@ npx adamantite init \
   --preset react \
   --editor vscode \
   --typescript typescript \
-  --install-extensions \
   --github-actions \
   --agents
 ```
@@ -126,9 +125,8 @@ Available setup values:
 - Editors: `vscode` and `zed`.
 - TypeScript presets: `typescript` and `tsconfig`. See [the TypeScript presets](#the-typescript-presets).
 
-Presets require the `check` or `fix` script. Editor extension installation
-requires an editor. GitHub Actions requires a compatible script and a supported package
-manager. Omitted boolean flags are disabled.
+Presets require the `check` or `fix` script. GitHub Actions requires a compatible script and a
+supported package manager. Omitted boolean flags are disabled.
 
 The GitHub Actions workflow runs the `check` and `analyze` scripts that you select.
 Its job sits between `# ADAMANTITE:START` and `# ADAMANTITE:END` comments. Adamantite owns
@@ -150,9 +148,16 @@ catch-all root config makes TypeScript treat all packages as one project. Adaman
 prints guidance instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
 in a library, to each package's `tsconfig.json` or to a shared base config.
 
-Init rewrites an existing `tsconfig.json`, `.vscode/settings.json`, or `.zed/settings.json` only
-when the file is plain JSON. A file with comments or trailing commas stays as it is, and init
-prints the change to make by hand.
+`init` and `update` write `.vscode/settings.json` and `.vscode/extensions.json` whole, and only
+when the file does not exist or still holds what Adamantite wrote, by the hash in the lockfile. A
+file that you changed stays as it is, and `adamantite doctor` reports a change that breaks the
+setup, such as a missing extension recommendation. `.vscode/extensions.json` recommends the Oxc
+extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
+for the `effect` preset, so VS Code offers to install them.
+
+Init rewrites an existing `tsconfig.json` or `.zed/settings.json` only when the file is plain
+JSON. A file with comments or trailing commas stays as it is, and init prints the change to make
+by hand.
 
 ## Commands
 
@@ -796,16 +801,15 @@ To upgrade an existing editor setup, run:
 
 ```sh
 adamantite update
-adamantite init --non-interactive --script check --preset effect --editor vscode --editor zed --install-extensions
+adamantite init --non-interactive --script check --preset effect --editor vscode --editor zed
 ```
 
-Init installs the TypeScript 7 extension for VS Code when `--install-extensions` is set.
+`.vscode/extensions.json` recommends the TypeScript 7 extension for VS Code.
 In VS Code, run **TypeScript: Select TypeScript Version...**, then select **Use Workspace Version**
 to use the Effect SDK. Install Zed's TypeScript language server extension (`zed://extension/tsgo`);
 the managed server ID is `typescript-ls`.
 
-After a fresh dependency install or an update, run
-`adamantite init --non-interactive --script check --editor vscode` to prepare or refresh the SDK cache.
+After a fresh dependency install, run `adamantite update` to prepare or refresh the SDK cache.
 Doctor reports missing editor settings and a missing, incomplete, or stale SDK. It does not
 write files. Install scripts can stay disabled.
 

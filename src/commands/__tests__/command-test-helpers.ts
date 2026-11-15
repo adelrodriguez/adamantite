@@ -44,15 +44,18 @@ export function readLockfile(files: FileSystemTestContext): Lockfile {
 }
 
 /**
- * A lockfile with `selection` and no written files, as a fixture file.
+ * A lockfile with `selection` and the hashes of `written`, as a fixture file.
  */
-export function makeLockfileFile(selection: Selection) {
+export function makeLockfileFile(
+  selection: Selection,
+  written: Readonly<Record<string, string>> = {}
+) {
   return {
     [LOCKFILE_PATH]: Schema.encodeSync(LockfileJson)({
       schemaVersion: 1,
       selection,
       version: "0.0.0",
-      written: {},
+      written,
     }),
   }
 }

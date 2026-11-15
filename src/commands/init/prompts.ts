@@ -153,14 +153,6 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     message: "Which editors should Adamantite configure?",
   })
 
-  const shouldInstallExtensions =
-    selectedEditors.length > 0
-      ? yield* Prompt.Confirm({
-          initial: true,
-          message: "Install the recommended editor extensions?",
-        })
-      : false
-
   const canEnableGitHubActions = checkIsSupportedPackageManager(packageManager)
   const keptConflicts = shouldOverwriteScripts ? [] : conflicts.map((conflict) => conflict.script)
 
@@ -192,7 +184,6 @@ export const collectInteractiveInitOptions = Effect.fn("collectInteractiveInitOp
     agents: shouldSetupAgents,
     editors: selectedEditors,
     githubActions: shouldEnableGitHubActions,
-    installExtensions: shouldInstallExtensions,
     overwriteScripts: shouldOverwriteScripts,
     presets: selectedPresets,
     scripts: selectedScripts,

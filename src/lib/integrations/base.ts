@@ -104,9 +104,9 @@ export interface Integration<E = unknown, R = unknown> {
   /**
    * Builds what the integration needs outside the files that the project commits, after the
    * install, such as the Effect editor SDK in `node_modules`. A failure that `assess` reports as a
-   * finding does not fail the setup.
+   * finding does not fail the setup. `Effect.void` when the integration needs nothing.
    */
-  readonly prepare?: (project: Project) => Effect.Effect<void, E, R>
+  readonly prepare: (project: Project) => Effect.Effect<void, E, R>
   /**
    * Whether the selection includes this integration.
    */

@@ -7,6 +7,10 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import initCommand from "#commands/init/index.ts"
+import {
+  effectEditorFiles,
+  effectEditorResolver,
+} from "#lib/integrations/editors/__tests__/effect-fixture.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { createDependencyInstallerTestContext, runCommand } from "./command-test-helpers.ts"
@@ -22,7 +26,7 @@ const OXFMT_CONFIG = toOxfmtTsConfigContent().replace(
 
 // The files that `Setup.apply` writes. Each integration that moves to `src/lib/integrations/<name>/`
 // adds its managed files.
-const FORMATTED_FILES = [LOCKFILE_PATH]
+const FORMATTED_FILES = [LOCKFILE_PATH, ".vscode/settings.json", ".vscode/extensions.json"]
 
 // Every option of init that makes it write a file.
 const FULL_SETUP = [
@@ -59,14 +63,23 @@ describe("the files that init writes", () => {
   // `adamantite fix` must leave each file as init wrote it, so its hash still matches the lockfile.
   it.effect("keep their content when Oxfmt formats them with the format preset", () =>
     Effect.gen(function* () {
+      // The installed Effect packages give the VS Code settings their longest render.
       const files = createFileSystemTestContext({
-        files: { "package.json": '{ "name": "test-project" }\n' },
+        files: { ...effectEditorFiles(), "package.json": '{ "name": "test-project" }\n' },
       })
 
       const installer = createDependencyInstallerTestContext()
-      const exit = yield* runCommand(initCommand, FULL_SETUP, { files, layers: [installer.layer] })
+
+      const exit = yield* runCommand(initCommand, FULL_SETUP, {
+        files,
+        layers: [installer.layer, effectEditorResolver(files.root, true)],
+      })
 
       expect(Exit.isSuccess(exit)).toBe(true)
+      // The longest renders: the settings hide the Effect rules, and every extension is recommended.
+      expect(
+        `${files.read(".vscode/settings.json")}${files.read(".vscode/extensions.json")}`
+      ).toMatch(/"oxc\.lint\.customization"[\s\S]*"TypeScriptTeam\.native-preview"/u)
 
       const project = join(folder, "project")
 

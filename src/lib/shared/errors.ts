@@ -192,21 +192,6 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
   }
 }
 
-export class FailedToInstallExtension extends Data.TaggedError("FailedToInstallExtension")<{
-  extension?: string
-  cause?: unknown
-}> {
-  override get message() {
-    const target = this.extension ? `\`${this.extension}\`` : "the target extension"
-
-    if (Predicate.isNumber(this.cause)) {
-      return `Failed to install ${target}. The \`code\` CLI exited with code ${this.cause}.`
-    }
-
-    return `Failed to install ${target}.${formatCauseDetail(this.cause)}`
-  }
-}
-
 export class FailedToMergeConfig extends Data.TaggedError("FailedToMergeConfig")<{
   cause?: unknown
 }> {
@@ -519,13 +504,5 @@ export class TrialRuleNotFound extends Data.TaggedError("TrialRuleNotFound")<{
 }> {
   override get message() {
     return `The rule \`${this.rule}\` is not available. Check that the Oxlint config loads it. Oxlint reports: ${this.detail}`
-  }
-}
-
-export class VscodeCliNotFound extends Data.TaggedError("VscodeCliNotFound")<{
-  cause?: unknown
-}> {
-  override get message() {
-    return `VS Code's \`code\` command was not found on PATH. Add it to PATH to manage extensions.${formatCauseDetail(this.cause)}`
   }
 }

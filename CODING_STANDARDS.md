@@ -33,7 +33,7 @@ function makeFiles(files?: Record<string, string>) {
 ```
 
 The [filesystem helper](src/__tests__/filesystem.ts) exposes fixture operations and a layer.
-The [editor tests](src/lib/integrations/editors/__tests__/vscode.test.ts) provide that layer with
+The [Zed tests](src/lib/integrations/editors/__tests__/zed.test.ts) provide that layer with
 `Path.layer`. [PR #378](https://github.com/adelrodriguez/adamantite/pull/378) replaced host-backed
 unit tests so they could run independently without changing the machine.
 

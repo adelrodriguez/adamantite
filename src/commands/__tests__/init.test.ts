@@ -1,15 +1,13 @@
 import type { JsonObject } from "type-fest"
-import { describe, expect, expectTypeOf, it } from "@effect/vitest"
+import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import type { InitOptions } from "#commands/init/options.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
-import { installEditorExtensions, setupEditors } from "#commands/init/setup.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
@@ -23,14 +21,8 @@ import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
-import {
-  INIT_EDITORS,
-  type InitEditor,
-  LINT_PRESETS,
-  type LintPreset,
-  TYPESCRIPT_PRESET_NAMES,
-} from "#lib/project/selection.ts"
-import { CliNotFound, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
+import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
+import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
@@ -129,8 +121,7 @@ function runFreshSetup() {
       "enter",
       ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
       ...pickMany(INIT_EDITORS, ["vscode"]),
-      // Decline the extensions, the GitHub Actions workflow, and the agent guidance.
-      "n",
+      // Decline the GitHub Actions workflow and the agent guidance.
       "n",
       "n",
     ])
@@ -218,9 +209,14 @@ describe("init", () => {
             },
             version: getPackageVersion(),
             written: Object.fromEntries(
-              ["knip.config.ts", "oxfmt.config.ts", "oxlint.config.ts", "tsconfig.json"].map(
-                (file) => [file, hashContent(files.read(file))]
-              )
+              [
+                "knip.config.ts",
+                "oxfmt.config.ts",
+                "oxlint.config.ts",
+                "tsconfig.json",
+                ".vscode/settings.json",
+                ".vscode/extensions.json",
+              ].map((file) => [file, hashContent(files.read(file))])
             ),
           })
         })
@@ -256,6 +252,7 @@ describe("init", () => {
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.list()).toStrictEqual([
           ".adamantite/adamantite-lock.json",
+          ".vscode/extensions.json",
           ".vscode/settings.json",
           "knip.config.ts",
           "oxfmt.config.ts",
@@ -317,7 +314,6 @@ describe("init", () => {
         ...pickMany(INIT_EDITORS, ["vscode", "zed"]),
         "n",
         "n",
-        "n",
       ])
 
       const exit = yield* runCommand(initCommand, [], {
@@ -328,7 +324,7 @@ describe("init", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(terminal.output()).toContain(
-        "Universal - creates .vscode/settings.json for VS Code, Cursor, Windsurf, and more"
+        "Universal - creates .vscode/settings.json and .vscode/extensions.json for VS Code, Cursor, Windsurf, and more"
       )
       expect(terminal.output()).toContain("Zed - creates .zed/settings.json")
       expect(files.exists(".vscode/settings.json")).toBe(true)
@@ -541,7 +537,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("keep configs with comments, warn with the change to make, and continue", () =>
+    it.effect("keep configs with comments and continue", () =>
       Effect.gen(function* () {
         const tsconfigContent =
           '{\n  // Visit https://aka.ms/tsconfig\n  "compilerOptions": {},\n}\n'
@@ -574,7 +570,7 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        // Init keeps both files with comments and still creates the Zed settings after them.
+        // Init keeps both files with comments and still creates the Zed settings.
         expect({
           tsconfig: files.read("tsconfig.json"),
           vscode: files.read(".vscode/settings.json"),
@@ -586,9 +582,7 @@ describe("init", () => {
           )
         )
         expect(logLines).toContainEqual(
-          expect.stringMatching(
-            /^▲ `.+\/\.vscode\/settings\.json` has comments or trailing commas, so Adamantite does not rewrite it\. Add these settings, and keep the others:\n/u
-          )
+          "● `.vscode/settings.json` kept, because it has changes that Adamantite did not write. `adamantite doctor` reports a change that breaks the setup."
         )
         // A kept file is not an updated file, and not a failed step.
         expect(logLines).not.toContainEqual(
@@ -820,7 +814,6 @@ describe("init", () => {
           ...pickMany(INIT_EDITORS, ["vscode"]),
           "n",
           "n",
-          "n",
         ])
 
         const installer = createDependencyInstallerTestContext()
@@ -837,10 +830,8 @@ describe("init", () => {
           compilerOptions: { paths: { "@/*": ["src/*"] } },
           extends: "adamantite/typescript",
         })
-        expect(readJson(files, ".vscode/settings.json")).toMatchObject({
-          "editor.defaultFormatter": "oxc.oxc-vscode",
-          "editor.tabSize": 4,
-        })
+        // The user wrote the VS Code settings, so init keeps them. Doctor reports what they lack.
+        expect(readJson(files, ".vscode/settings.json")).toStrictEqual({ "editor.tabSize": 4 })
         expect(files.exists("oxlint.config.ts")).toBe(true)
       })
     )
@@ -856,7 +847,6 @@ describe("init", () => {
           ...pickMany(LINT_PRESETS, []),
           "n",
           ...pickMany(INIT_EDITORS, ["zed"]),
-          "n",
           "n",
           "n",
         ])
@@ -1032,7 +1022,6 @@ describe("init", () => {
             "zed",
             "--typescript",
             "typescript",
-            "--install-extensions",
             "--github-actions",
             "--agents",
           ],
@@ -1146,11 +1135,6 @@ describe("init", () => {
         name: "the jest and vitest presets together",
         reason:
           "`--preset jest` and `--preset vitest` report the same defects. Select one of them.",
-      },
-      {
-        args: ["--non-interactive", "--script", "analyze", "--install-extensions"],
-        name: "extension installation without an editor",
-        reason: "`--install-extensions` requires at least one `--editor`.",
       },
       {
         args: ["--non-interactive", "--script", "fix", "--github-actions"],
@@ -1840,7 +1824,6 @@ describe("init", () => {
           ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
           ...pickMany(INIT_EDITORS, ["zed"]),
           "enter",
-          "enter",
           "n",
         ])
 
@@ -2144,106 +2127,14 @@ describe("init", () => {
         expect(installer.calls).toStrictEqual([])
       })
     )
-
-    it.effect("continue successfully and show the exit code when the extension install fails", () =>
-      Effect.gen(function* () {
-        const logLines: unknown[] = []
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          ...pickMany(LINT_PRESETS, []),
-          "n",
-          ...pickMany(INIT_EDITORS, ["vscode"]),
-          "enter",
-          "n",
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const runner = createRunnerTestContext({
-          implementation: (options) =>
-            Effect.succeed(ChildProcessSpawner.ExitCode(options.command === "code" ? 1 : 0)),
-        })
-
-        const exit = yield* runCommand(initCommand, [], {
-          files: createInitTestContext(),
-          layers: [installer.layer, runner.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-
-        expect(logLines).toContainEqual(
-          "▲ Failed to install `oxc.oxc-vscode`. The `code` CLI exited with code 1."
-        )
-        expect(logLines).toContainEqual("▲ Install the extension manually after setup finishes.")
-      })
-    )
-
-    it.effect("continue successfully and show guidance when the VS Code CLI is unavailable", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-
-        const logLines: unknown[] = []
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          ...pickMany(LINT_PRESETS, []),
-          "n",
-          ...pickMany(INIT_EDITORS, ["vscode"]),
-          "enter",
-          "n",
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const runner = createRunnerTestContext({
-          implementation: (options) =>
-            options.command === "code"
-              ? Effect.fail(new CliNotFound({ command: "code" }))
-              : Effect.succeed(ChildProcessSpawner.ExitCode(0)),
-        })
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, runner.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(logLines).toStrictEqual(
-          expect.arrayContaining([
-            "✖ VS Code's `code` command was not found on PATH.",
-            "● Add the code command to PATH:",
-          ])
-        )
-        expect(logLines.at(-1)).toBe("💠 Setup finished.")
-        expect(files.exists(".vscode/settings.json")).toBe(true)
-      })
-    )
   })
 })
 
 describe("InitOptions", () => {
   it("require an editor for an editor setup", () => {
     // @ts-expect-error - An editor setup names at least one editor.
-    const editors: InitOptions["editors"] = Option.some({ installExtensions: true, names: [] })
+    const editors: InitOptions["editors"] = Option.some([])
 
     expect(Option.isSome(editors)).toBe(true)
-  })
-})
-
-describe("editor setup", () => {
-  it("take only the editors and presets that init knows", () => {
-    // A typo or a renamed editor must fail the type check, instead of setting up nothing.
-    expectTypeOf(setupEditors).parameter(1).toEqualTypeOf<readonly InitEditor[]>()
-    expectTypeOf(installEditorExtensions).parameter(0).toEqualTypeOf<readonly InitEditor[]>()
-    expectTypeOf(installEditorExtensions)
-      .parameter(2)
-      .toEqualTypeOf<readonly LintPreset[] | undefined>()
   })
 })

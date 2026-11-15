@@ -5,9 +5,9 @@ import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import * as Match from "effect/Match"
+import type { LintPreset, TypeScriptPreset } from "#lib/project/selection.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
-import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import {
   LegacyToolingConfig,
@@ -31,12 +31,6 @@ import {
   type Script,
   type SupportedPackageManager,
 } from "#lib/project/package-json.ts"
-import {
-  INIT_EDITORS,
-  type InitEditor,
-  type LintPreset,
-  type TypeScriptPreset,
-} from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
 
 export const installDependencies = (cwd: string, packages: string[]) =>
@@ -186,69 +180,32 @@ export const setupEffectTsgo = (cwd: string) =>
     }
   })
 
-const editorIntegrations = { vscode, zed } as const satisfies Record<
-  InitEditor,
-  typeof vscode | typeof zed
->
-
-export const setupEditors = (cwd: string, editors: readonly InitEditor[]) =>
+/**
+ * Set up Zed's settings. `Setup.apply` writes the VS Code files.
+ */
+export const setupZed = (cwd: string) =>
   Effect.gen(function* () {
-    // The editors run in the order of INIT_EDITORS, whatever order the flags give.
-    for (const editor of INIT_EDITORS.filter((candidate) => editors.includes(candidate))) {
-      const integration = editorIntegrations[editor]
-      const exists = yield* integration.detect(cwd)
+    const exists = yield* zed.detect(cwd)
 
-      yield* Effect.gen(function* () {
-        yield* exists ? integration.update(cwd) : integration.create(cwd)
-        yield* Output.success(
-          `\`${integration.config}\` ${exists ? "updated" : "created"} with Adamantite preset.`
-        )
-      }).pipe(Effect.catchTag("JsoncNotEditable", (error) => Output.warning(error.message)))
-    }
+    yield* Effect.gen(function* () {
+      yield* exists ? zed.update(cwd) : zed.create(cwd)
+      yield* Output.success(
+        `\`${zed.config}\` ${exists ? "updated" : "created"} with Adamantite preset.`
+      )
+    }).pipe(Effect.catchTag("JsoncNotEditable", (error) => Output.warning(error.message)))
   })
 
-export const installEditorExtensions = (
-  editors: readonly InitEditor[],
-  scripts: Script[],
-  presets: readonly LintPreset[] = []
-) =>
+/**
+ * Print the links that install the Zed extensions of the setup.
+ */
+export const printZedExtensions = (presets: readonly LintPreset[]) =>
   Effect.gen(function* () {
-    const hasZed = editors.includes("zed")
-    const hasVscode = editors.includes("vscode")
+    yield* Output.info("Install the Zed `oxc` extension: zed://extension/oxc")
 
-    yield* (hasVscode ? vscode.extension(scripts, presets) : Effect.void).pipe(
-      Effect.andThen(
-        Output.success(
-          hasVscode
-            ? "Editor extensions installed."
-            : "Install the Zed extensions using the links below."
-        )
-      ),
-      Effect.catchTags({
-        FailedToInstallExtension: (error) =>
-          Effect.gen(function* () {
-            yield* Output.warning(error.message)
-            yield* Output.warning("Install the extension manually after setup finishes.")
-          }),
-        VscodeCliNotFound: () =>
-          Effect.gen(function* () {
-            yield* Output.error("VS Code's `code` command was not found on PATH.")
-            yield* Output.info("Add the code command to PATH:")
-            yield* Output.info("  1. Open VS Code")
-            yield* Output.info("  2. Press Cmd+Shift+P (macOS) or Ctrl+Shift+P (Windows/Linux)")
-            yield* Output.info("  3. Run 'Shell Command: Install \"code\" command in PATH'")
-          }),
-      })
-    )
-
-    if (hasZed) {
-      yield* Output.info("Install the Zed `oxc` extension: zed://extension/oxc")
-
-      if (presets.includes("effect")) {
-        yield* Output.info(
-          "Install the Zed TypeScript language server extension: zed://extension/tsgo"
-        )
-      }
+    if (presets.includes("effect")) {
+      yield* Output.info(
+        "Install the Zed TypeScript language server extension: zed://extension/tsgo"
+      )
     }
   })
 

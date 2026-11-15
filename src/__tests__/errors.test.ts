@@ -2,7 +2,6 @@ import { describe, expect, it } from "@effect/vitest"
 import {
   CustomRuleExists,
   FailedToInstallDependency,
-  FailedToInstallExtension,
   FailedToParseFile,
   FailedToReadFile,
   FailedToWriteFile,
@@ -146,16 +145,6 @@ describe("errors", () => {
 
       expect(error.message).toBe(
         "Could not read `/repo/tsconfig.json`. Check that the file exists and is readable, then try again."
-      )
-    })
-  })
-
-  describe("FailedToInstallExtension", () => {
-    it("report the exit code when the cause is a number", () => {
-      const error = new FailedToInstallExtension({ cause: 1, extension: "oxc.oxc-vscode" })
-
-      expect(error.message).toBe(
-        "Failed to install `oxc.oxc-vscode`. The `code` CLI exited with code 1."
       )
     })
   })

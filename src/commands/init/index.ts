@@ -32,14 +32,14 @@ import { collectInteractiveInitOptions } from "./prompts.ts"
 import {
   addScripts,
   installDependencies,
-  installEditorExtensions,
+  printZedExtensions,
   setupAgentsGuidance,
-  setupEditors,
   setupEffectTsgo,
   setupGitHubActions,
   setupSkill,
   setupToolConfig,
   setupTypescript,
+  setupZed,
 } from "./setup.ts"
 
 export default Command.make("init", initCommandOptions).pipe(
@@ -53,7 +53,7 @@ export default Command.make("init", initCommandOptions).pipe(
     },
     {
       command:
-        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript typescript --install-extensions --github-actions --agents",
+        "adamantite init --non-interactive --script check --preset react --editor vscode --typescript typescript --github-actions --agents",
       description:
         "Configure a React project with VS Code, TypeScript, CI, agent guidance, and the Adamantite skill",
     },
@@ -101,7 +101,6 @@ export default Command.make("init", initCommandOptions).pipe(
             options.presets.length > 0,
             options.editors.length > 0,
             Option.isSome(options.typescript),
-            options.installExtensions,
             options.githubActions,
             options.agents,
             options.overwriteScripts,
@@ -215,14 +214,10 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupEffectTsgo(cwd)
       }
 
-      if (Option.isSome(initOptions.editors)) {
-        const { installExtensions, names } = initOptions.editors.value
-
-        yield* setupEditors(cwd, names)
-
-        if (installExtensions) {
-          yield* installEditorExtensions(names, selectedScripts, presets)
-        }
+      // `Setup.apply` writes the VS Code files below.
+      if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
+        yield* setupZed(cwd)
+        yield* printZedExtensions(presets)
       }
 
       if (Option.isSome(initOptions.githubActions)) {
@@ -235,7 +230,7 @@ export default Command.make("init", initCommandOptions).pipe(
         ci: Option.isSome(initOptions.githubActions) ? "github" : null,
         editors: Option.match(initOptions.editors, {
           onNone: () => [],
-          onSome: ({ names }) => INIT_EDITORS.filter((editor) => names.includes(editor)),
+          onSome: (names) => INIT_EDITORS.filter((editor) => names.includes(editor)),
         }),
         presets: Option.isSome(lint)
           ? ["core", ...LINT_PRESETS.filter((preset) => presets.includes(preset))]

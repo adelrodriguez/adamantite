@@ -119,7 +119,7 @@ Without one, each integration applies to the files that exist, and the assessmen
 `init` and `update` share one backend, `apply` in `src/lib/setup/`. `src/lib/integrations/index.ts`
 lists the integrations that own a folder, such as `integrations/vscode/`, and each one implements
 `Integration` from `integrations/base.ts`: whether the selection includes it, its packages, its
-managed files, an optional `prepare` step for `node_modules`, and its `assess`. `apply` installs the
+managed files, a `prepare` step for `node_modules`, and its `assess`. `apply` installs the
 packages of every selected integration in one install, runs each `prepare`, renders the managed
 files, and applies the write rule to each one. It writes a file only whole, and only when the file
 does not exist or its hash equals the hash in the lockfile's `written` map. It never merges or
@@ -172,9 +172,11 @@ versions. Doctor renders package drift as findings that tell the user to run `up
 warns the user and points to `adamantite doctor`.
 
 The editor integrations select the installed Effect language server when `@effect/tsgo` is
-present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, prepared by
-`init`. The editor helper matches the installed TypeScript `gitHead` to the Effect build and copies
-its compiler and standard libraries. Zed starts the upstream CLI through Node.js. Both editor
+present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, which the
+`prepare` step of the `vscode` integration builds in `init` and `update`. The editor helper
+matches the installed TypeScript `gitHead` to the Effect build and copies its compiler and
+standard libraries. A project without a matching build gets the SDK finding, and the setup
+continues. Zed starts the upstream CLI through Node.js. Both editor
 integrations hide duplicate Oxlint Effect reports, so the Effect server can supply diagnostics
 and semantic quick fixes. Doctor reports missing settings and a stale or incomplete SDK without
 writing files.
@@ -216,7 +218,8 @@ writing files.
   a rule off, after a trial that turns the rule on again. The prompt shows both as data.
 - `update` updates managed dependencies, writes the Adamantite skill again to each skill folder
   whose copy differs from the bundled skill in any file, removes the `adamantite` entry from
-  `skills-lock.json`, writes the lockfile, then emits any remaining doctor findings. In a project
+  `skills-lock.json`, runs `Setup.apply` with the recorded selection, which writes the managed
+  files and the lockfile, then emits any remaining doctor findings. In a project
   without a lockfile, `inferSelection` reads the selection from the same files that Doctor
   applies the integrations to without one. Doctor does not assess the skill: many CI projects do
   not need it.

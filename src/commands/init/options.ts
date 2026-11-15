@@ -34,7 +34,8 @@ import { InvalidInitOptions } from "#lib/shared/errors.ts"
  */
 export const INIT_EDITOR_CHOICES = {
   vscode: {
-    description: "creates .vscode/settings.json for VS Code, Cursor, Windsurf, and more",
+    description:
+      "creates .vscode/settings.json and .vscode/extensions.json for VS Code, Cursor, Windsurf, and more",
     title: "Universal",
   },
   zed: { description: "creates .zed/settings.json", title: "Zed" },
@@ -42,7 +43,7 @@ export const INIT_EDITOR_CHOICES = {
 
 /**
  * The setup that init applies. Each optional part exists only with the parts that it needs, so the
- * options cannot select a preset without linting or an extension install without an editor.
+ * options cannot select a preset without linting.
  */
 export interface InitOptions {
   /**
@@ -50,12 +51,9 @@ export interface InitOptions {
    */
   readonly agents: boolean
   /**
-   * The editors to configure, and whether to install their recommended extensions.
+   * The editors to configure.
    */
-  readonly editors: Option.Option<{
-    readonly installExtensions: boolean
-    readonly names: Array.NonEmptyReadonlyArray<InitEditor>
-  }>
+  readonly editors: Option.Option<Array.NonEmptyReadonlyArray<InitEditor>>
   /**
    * The package manager that the GitHub Actions workflow runs.
    */
@@ -78,7 +76,6 @@ export interface InitOptionsInput {
   readonly agents: boolean
   readonly editors: readonly InitEditor[]
   readonly githubActions: boolean
-  readonly installExtensions: boolean
   readonly overwriteScripts: boolean
   readonly presets: readonly LintPreset[]
   readonly scripts: readonly Script[]
@@ -96,7 +93,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     agents: input.agents,
     editors: Array.dedupe(input.editors),
     githubActions: input.githubActions,
-    installExtensions: input.installExtensions,
     overwriteScripts: input.overwriteScripts,
     presets: Array.dedupe(input.presets),
     scripts: Array.dedupe(input.scripts),
@@ -131,12 +127,6 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
     })
   }
 
-  if (options.installExtensions && options.editors.length === 0) {
-    return yield* new InvalidInitOptions({
-      reason: "`--install-extensions` requires at least one `--editor`.",
-    })
-  }
-
   if (options.githubActions && !hasCICompatibleScripts(options.scripts)) {
     return yield* new InvalidInitOptions({
       reason: "`--github-actions` requires --script check or --script analyze.",
@@ -152,7 +142,7 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   return {
     agents: options.agents,
     editors: Array.isReadonlyArrayNonEmpty(options.editors)
-      ? Option.some({ installExtensions: options.installExtensions, names: options.editors })
+      ? Option.some(options.editors)
       : Option.none(),
     githubActions: options.githubActions
       ? Option.liftPredicate(packageManager, checkIsSupportedPackageManager)
@@ -193,11 +183,6 @@ const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
   )
 )
 
-const installExtensions = Flag.Boolean("install-extensions").pipe(
-  Flag.withDefault(false),
-  Flag.withDescription("Install recommended editor extensions. Select at least one --editor")
-)
-
 const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
@@ -223,7 +208,6 @@ export const initCommandOptions = {
   agents,
   editors,
   githubActions,
-  installExtensions,
   nonInteractive,
   overwriteScripts,
   presets,

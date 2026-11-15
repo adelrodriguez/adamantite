@@ -8,7 +8,6 @@ import type { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
 import github from "#lib/integrations/ci/github.ts"
-import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import { inferSelection } from "#lib/integrations/selection.ts"
@@ -28,7 +27,8 @@ const repairPromptTemplate = getRepairPromptTemplate()
 const warningReportTemplate = getWarningReportTemplate()
 
 /**
- * Every integration assessed against a project. The order fixes how findings are numbered in the
+ * The integrations that have not moved to a folder of their own yet, assessed against a project
+ * before the ones in `integrations/index.ts`. The order fixes how findings are numbered in the
  * rendered output.
  */
 const managedIntegrations = [
@@ -42,7 +42,6 @@ const managedIntegrations = [
   tsconfig,
   agents,
   github,
-  vscode,
   zed,
 ] as const
 

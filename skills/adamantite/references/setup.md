@@ -53,10 +53,9 @@ If the selected presets include a managed plugin, check its setup:
   Keep `{ "name": "@effect/language-service", "diagnostics": true }` in
   `compilerOptions.plugins`. In a monorepo, add it to each package's tsconfig or a shared base.
   Use `ignoreDependencies.effect` from `adamantite/analyze` in `knip.config.ts`.
-- For Effect editor support, follow Doctor's editor findings. After a dependency install or
-  update, run `adamantite init --non-interactive --script check --editor vscode` to prepare
-  or refresh the VS Code SDK cache. Keep the project's other setup options when needed.
-  Select the workspace TypeScript version in VS Code. Zed uses the installed Effect CLI.
+- For Effect editor support, follow Doctor's editor findings. After a dependency install, run
+  `adamantite update` to prepare or refresh the VS Code SDK cache. Select the workspace
+  TypeScript version in VS Code. Zed uses the installed Effect CLI.
 - For `tailwind`, check that the project uses Tailwind v4. Init installs `@shadcn/lint`.
   If components are outside the directories that `components.json` identifies, set
   `settings.shadcn.ui` in `oxlint.config.ts`.

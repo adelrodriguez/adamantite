@@ -567,6 +567,30 @@ describe("doctor", () => {
       })
   )
 
+  it.effect("report the preset of a tsconfig.json that differs from the lockfile selection", () =>
+    Effect.gen(function* () {
+      const logLines: unknown[] = []
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files: createFileSystemTestContext({
+          files: {
+            ...HEALTHY_FILES,
+            ...makeLockfileFile({ ...ANALYZE_SELECTION, typescript: "typescript" }),
+            "tsconfig.json": '{ "extends": "adamantite/tsconfig" }\n',
+          },
+        }),
+        logLines,
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(logLines).toStrictEqual([
+        expect.stringMatching(
+          /^# Adamantite doctor findings\n[\s\S]*## 1\. Mismatched TypeScript preset\n[\s\S]*Make `tsconfig\.json` extend `adamantite\/typescript` instead of `adamantite\/tsconfig`/u
+        ),
+      ])
+    })
+  )
+
   it.effect("report the missing lockfile of a managed project", () =>
     Effect.gen(function* () {
       const { [LOCKFILE_PATH]: _lockfile, ...files } = HEALTHY_FILES

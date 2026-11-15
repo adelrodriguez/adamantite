@@ -275,11 +275,30 @@ function toMissingPresetFinding(
     : finding
 }
 
+function toMismatchedPresetFinding(
+  configPath: string,
+  selected: TypeScriptPreset,
+  used: TypeScriptPreset
+): Finding {
+  return {
+    currentState: `The lockfile selects \`${TYPESCRIPT_PRESETS[selected]}\`, and \`${configPath}\` extends \`${TYPESCRIPT_PRESETS[used]}\`, directly or through a base config.`,
+    goal: [
+      `Make \`${configPath}\` extend \`${TYPESCRIPT_PRESETS[selected]}\` instead of \`${TYPESCRIPT_PRESETS[used]}\`, directly or through a base config. Keep a shared base for the packages that use it, and preserve every other setting.`,
+      "Run `adamantite doctor` again. It must not report this finding.",
+    ],
+    id: "mismatched-typescript-preset",
+    integration: "tsconfig",
+    title: "Mismatched TypeScript preset",
+  }
+}
+
 export default defineIntegration({
-  // With a lockfile, the integration applies when the selection includes TypeScript. Without one,
-  // Doctor checks only the packages that chose a preset, so a project that declined it in init
-  // gets no finding. Oxlint's type check runs without a `tsconfig.json`. A config without
-  // `extends` cannot load the type resets, so Doctor runs TypeScript only for the others.
+  // With a lockfile, the integration applies when the selection includes TypeScript, and each
+  // configured package must use the selected preset. A library uses `adamantite/tsconfig` whatever
+  // the selection, and the library finding covers it. Without a lockfile, Doctor checks only the
+  // packages that chose a preset, so a project that declined it in init gets no finding. Oxlint's
+  // type check runs without a `tsconfig.json`. A config without `extends` cannot load the type
+  // resets, so Doctor runs TypeScript only for the others.
   assess: (project: Project) =>
     Effect.gen(function* () {
       const { cwd, packageJson } = project
@@ -313,16 +332,21 @@ export default defineIntegration({
 
       const findings = yield* Effect.forEach(
         configured,
-        ({ directory, loadsResets }) =>
-          loadsResets
-            ? (directory === cwd ? Effect.succeed(packageJson) : readPackageJson(directory)).pipe(
-                Effect.map((manifest) =>
-                  checkPublishesTypes(manifest)
-                    ? [toLibraryFinding(path.relative(cwd, path.join(directory, files[0].path)))]
-                    : []
-                )
-              )
-            : Effect.succeed([]),
+        ({ directory, loadsResets, presets }) =>
+          Effect.gen(function* () {
+            const configPath = path.relative(cwd, path.join(directory, files[0].path))
+            const manifest = directory === cwd ? packageJson : yield* readPackageJson(directory)
+
+            if (checkPublishesTypes(manifest)) {
+              return loadsResets ? [toLibraryFinding(configPath)] : []
+            }
+
+            const used = loadsResets || presets.includes("typescript") ? "typescript" : "tsconfig"
+
+            return Option.isSome(selected) && selected.value !== used
+              ? [toMismatchedPresetFinding(configPath, selected.value, used)]
+              : []
+          }),
         { concurrency: "unbounded" }
       )
 

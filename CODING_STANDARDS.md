@@ -205,7 +205,7 @@ const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
     if (parent === directory) {
       return yield* new EffectEditorUnavailable({
         reason:
-          "Zed cannot find the installed Effect CLI in node_modules. Install @effect/tsgo, then run `adamantite init --non-interactive --script check --editor zed`.",
+          "Zed cannot find the installed Effect CLI in node_modules. Install @effect/tsgo, then run `adamantite update`.",
       })
     }
     directory = parent
@@ -213,6 +213,6 @@ const resolveEffectCli = Effect.fn("resolveEffectCli")(function* (cwd: string) {
 })
 ```
 
-The [Zed resolver](src/lib/integrations/editors/zed.ts) walks ancestor folders without saving a
+The [Zed resolver](src/lib/integrations/zed/index.ts) walks ancestor folders without saving a
 real package-store path. [PR #633's review](https://github.com/adelrodriguez/adamantite/pull/633#discussion_r4503357503)
 found the broken nested-workspace command and the assessment that accepted it.

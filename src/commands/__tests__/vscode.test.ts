@@ -15,7 +15,7 @@ import {
   EFFECT_SDK,
   effectEditorFiles,
   effectEditorResolver,
-} from "#lib/integrations/editors/__tests__/effect-fixture.ts"
+} from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import {

@@ -112,6 +112,10 @@ export default defineConfig({
         import: "#lib/integrations/vscode",
         owners: ["src/lib"],
       },
+      {
+        import: "#lib/integrations/zed",
+        owners: ["src/lib"],
+      },
       // An assessment reads the workspace and the custom rules one time, in `readProject`, and every
       // integration takes them from the `Project`. Harden discovers the custom rules of its own
       // scope.

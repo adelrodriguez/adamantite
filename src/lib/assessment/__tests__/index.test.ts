@@ -11,7 +11,6 @@ import {
   type ProjectAssessment,
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
-import zed from "#lib/integrations/editors/zed.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -193,73 +192,6 @@ describe("renderAssessmentMarkdown", () => {
 })
 
 describe("assessProject", () => {
-  it.effect.each([zed])("clear the $name finding after the settings are repaired", (editor) =>
-    Effect.gen(function* () {
-      const settingsPath = `.${editor.name}/settings.json`
-
-      const files = createFileSystemTestContext({
-        files: {
-          "package.json": "{}",
-          [settingsPath]: '{ "projectSetting": true }',
-        },
-        root: ROOT,
-      })
-
-      const provideFiles = Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)])
-
-      const assess = Effect.gen(function* () {
-        const project = yield* readProject(ROOT)
-
-        return yield* editor.assess(project)
-      }).pipe(provideFiles)
-
-      expect(yield* assess).toMatchObject({
-        applicable: true,
-        findings: [
-          {
-            currentState: expect.stringContaining("no value"),
-            goal: [expect.stringContaining("Preserve every other setting")],
-            id: `${editor.name}-oxlint-entry`,
-            reference: {
-              content: expect.stringContaining("node_modules/adamantite/dist/oxlint.js"),
-              language: "json",
-            },
-          },
-        ],
-      })
-
-      yield* editor.update(ROOT).pipe(provideFiles)
-
-      expect(yield* assess).toMatchObject({ applicable: true, findings: [] })
-      expect(files.read(settingsPath)).toContain('"projectSetting": true')
-    })
-  )
-
-  it.effect.each([zed])("reject invalid $name settings", (editor) =>
-    Effect.gen(function* () {
-      for (const { content, error } of [
-        { content: "[]", error: "InvalidConfigFormat" },
-        { content: "{", error: "FailedToParseFile" },
-      ]) {
-        const files = createFileSystemTestContext({
-          files: { "package.json": "{}", [`.${editor.name}/settings.json`]: content },
-          root: ROOT,
-        })
-
-        const result = yield* Effect.gen(function* () {
-          const project = yield* readProject(ROOT)
-
-          return yield* editor.assess(project)
-        }).pipe(
-          Effect.provide([files.layer, Path.layer, makeModuleResolverLayer(ROOT)]),
-          Effect.flip
-        )
-
-        expect(result).toMatchObject({ _tag: error })
-      }
-    })
-  )
-
   it.effect.each([
     { editor: "vscode", finding: "vscode-oxlint-entry", settings: "{}" },
     {

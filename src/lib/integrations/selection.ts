@@ -6,17 +6,17 @@ import * as Predicate from "effect/Predicate"
 import * as String from "effect/String"
 import type { Project } from "#lib/project/project.ts"
 import github from "#lib/integrations/ci/github.ts"
-import zed from "#lib/integrations/editors/zed.ts"
 import { getImportedLintPresets } from "#lib/integrations/oxlint/config.ts"
 import { detectPreset } from "#lib/integrations/typescript/index.ts"
 import { SETTINGS_PATH as VSCODE_SETTINGS_PATH } from "#lib/integrations/vscode/index.ts"
+import { SETTINGS_PATH as ZED_SETTINGS_PATH } from "#lib/integrations/zed/index.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
 import { checkRunsTool, getManagedScripts, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, type Selection } from "#lib/project/selection.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 // The settings file of each editor, whose existence selects the editor.
-const EDITOR_SETTINGS = { vscode: VSCODE_SETTINGS_PATH, zed: zed.config } as const
+const EDITOR_SETTINGS = { vscode: VSCODE_SETTINGS_PATH, zed: ZED_SETTINGS_PATH } as const
 
 /**
  * The selection that `init` would record for a project that an earlier Adamantite version set up.

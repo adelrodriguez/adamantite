@@ -6,6 +6,7 @@ import oxlint from "#lib/integrations/oxlint/index.ts"
 import sherif from "#lib/integrations/sherif/index.ts"
 import typescript from "#lib/integrations/typescript/index.ts"
 import vscode from "#lib/integrations/vscode/index.ts"
+import zed from "#lib/integrations/zed/index.ts"
 
 const list = [
   oxlint,
@@ -14,6 +15,7 @@ const list = [
   sherif,
   typescript,
   vscode,
+  zed,
 ] as const satisfies readonly Integration[]
 
 type Member = (typeof list)[number]

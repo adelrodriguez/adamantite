@@ -3,7 +3,6 @@ import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
@@ -15,7 +14,7 @@ import {
   readPackageJson,
 } from "#lib/project/package-json.ts"
 import { FailedToParseFile, FailedToReadFile, InvalidPackageJson } from "#lib/shared/errors.ts"
-import { checkIsPlainJson, mergeConfig, stringifyJson } from "#lib/shared/json.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import { printTitle } from "#terminal/title.ts"
 
 const ROOT = "/project"
@@ -117,80 +116,6 @@ describe("readPackageJson parse errors", () => {
         expect(result.failure.message).toContain("Cause: Invalid JSONC at line 3, column 3.")
       }
     })
-  )
-})
-
-describe("checkIsPlainJson", () => {
-  it.each([
-    { content: '{ "a": [1, 2] }', expected: true, name: "plain JSON" },
-    { content: '{\n  // note\n  "a": 1\n}', expected: false, name: "a line comment" },
-    { content: '{ /* note */ "a": 1 }', expected: false, name: "a block comment" },
-    { content: '{ "a": 1, }', expected: false, name: "a trailing comma" },
-    {
-      content: '{ "a": "// not a comment" }',
-      expected: true,
-      name: "a comment marker in a string",
-    },
-    { content: '{ "a": }', expected: false, name: "invalid JSON" },
-  ])("return $expected for $name", ({ content, expected }) => {
-    expect(checkIsPlainJson(content)).toBe(expected)
-  })
-})
-
-describe("mergeConfig", () => {
-  it.effect(
-    "keep the preferred keys in their order, then add the keys that only the fallback has",
-    () =>
-      Effect.gen(function* () {
-        // The project's file lists `m`, `b`, and `a` in that order. Entries keep the order, which an
-        // object literal would lose to the key sort.
-        const preferred = Object.fromEntries([
-          ["m", true],
-          ["b", false],
-          ["a", 3],
-        ])
-
-        const merged = yield* mergeConfig({ fallback: { a: 1, z: 2 }, preferred })
-
-        expect(Object.keys(merged)).toStrictEqual(["m", "b", "a", "z"])
-      })
-  )
-
-  // mergeConfig concatenates arrays on conflicts, so this property holds on array-free configs.
-  const jsonPrimitive = Schema.Union([Schema.String, Schema.Int, Schema.Boolean, Schema.Null])
-
-  const arrayFreeConfig = Schema.Record(
-    Schema.String,
-    Schema.Union([
-      jsonPrimitive,
-      Schema.Record(Schema.String, jsonPrimitive).check(Schema.isMaxProperties(4)),
-    ])
-  ).check(Schema.isMaxProperties(8))
-
-  it.effect.prop(
-    "keep every key from both inputs and prefer the preferred values on conflicts",
-    { fallback: arrayFreeConfig, preferred: arrayFreeConfig },
-    ({ fallback, preferred }) =>
-      Effect.gen(function* () {
-        const merged = yield* mergeConfig({ fallback, preferred })
-
-        for (const key of [...Object.keys(preferred), ...Object.keys(fallback)]) {
-          expect(Object.hasOwn(merged, key)).toBe(true)
-        }
-
-        for (const [key, value] of Object.entries(preferred)) {
-          if (!Predicate.isObject(value)) {
-            expect(merged[key]).toBe(value)
-          }
-        }
-
-        for (const key of Object.keys(fallback)) {
-          if (!Object.hasOwn(preferred, key)) {
-            expect(merged[key]).toStrictEqual(fallback[key])
-          }
-        }
-      }),
-    { arbitrary: { runs: 200 } }
   )
 })
 

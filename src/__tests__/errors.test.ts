@@ -5,7 +5,6 @@ import {
   FailedToParseFile,
   FailedToReadFile,
   FailedToWriteFile,
-  JsoncNotEditable,
   ProjectCopyFailed,
 } from "#lib/shared/errors.ts"
 
@@ -45,19 +44,6 @@ describe("errors", () => {
 
       expect(error.message).toBe(
         "Failed to parse `tsconfig.json`. Fix the JSON or JSONC syntax and run the command again. Cause: Invalid JSONC at line 4, column 5."
-      )
-    })
-  })
-
-  describe("JsoncNotEditable", () => {
-    it("say why the file stays as it is and what to do", () => {
-      const error = new JsoncNotEditable({
-        change: 'Set `extends` to `"adamantite/typescript"`.',
-        path: "tsconfig.json",
-      })
-
-      expect(error.message).toBe(
-        '`tsconfig.json` has comments or trailing commas, so Adamantite does not rewrite it. Set `extends` to `"adamantite/typescript"`.'
       )
     })
   })

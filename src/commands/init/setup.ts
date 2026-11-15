@@ -4,7 +4,6 @@ import * as Match from "effect/Match"
 import type { LintPreset } from "#lib/project/selection.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
-import zed from "#lib/integrations/editors/zed.ts"
 import { writeAgentsGuidance } from "#lib/project/agents.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
@@ -78,21 +77,6 @@ export const addScripts = (
     // The scripts that package.json now manages, including scripts from earlier runs. A conflicting
     // script that init kept is not managed.
     return getManagedScripts(packageJson)
-  })
-
-/**
- * Set up Zed's settings. `Setup.apply` writes the VS Code files.
- */
-export const setupZed = (cwd: string) =>
-  Effect.gen(function* () {
-    const exists = yield* zed.detect(cwd)
-
-    yield* Effect.gen(function* () {
-      yield* exists ? zed.update(cwd) : zed.create(cwd)
-      yield* Output.success(
-        `\`${zed.config}\` ${exists ? "updated" : "created"} with Adamantite preset.`
-      )
-    }).pipe(Effect.catchTag("JsoncNotEditable", (error) => Output.warning(error.message)))
   })
 
 /**

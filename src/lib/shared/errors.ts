@@ -204,35 +204,12 @@ export class FailedToInstallDependency extends Data.TaggedError("FailedToInstall
   }
 }
 
-export class FailedToMergeConfig extends Data.TaggedError("FailedToMergeConfig")<{
-  cause?: unknown
-}> {
-  override get message() {
-    return `Failed to merge configuration.${formatCauseDetail(this.cause)}`
-  }
-}
-
 export class FailedToParseFile extends Data.TaggedError("FailedToParseFile")<{
   path: string
   cause: unknown
 }> {
   override get message() {
     return `Failed to parse \`${this.path}\`. Fix the JSON or JSONC syntax and run the command again.${formatCauseDetail(this.cause)}`
-  }
-}
-
-/**
- * The file has comments or trailing commas, and a rewrite would delete them.
- */
-export class JsoncNotEditable extends Data.TaggedError("JsoncNotEditable")<{
-  /**
-   * The change to make by hand, as a sentence.
-   */
-  change: string
-  path: string
-}> {
-  override get message() {
-    return `\`${this.path}\` has comments or trailing commas, so Adamantite does not rewrite it. ${this.change}`
   }
 }
 

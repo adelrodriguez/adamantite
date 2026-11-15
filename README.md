@@ -150,7 +150,8 @@ in a library, to each package's `tsconfig.json` or to a shared base config. A ro
 `tsconfig.json` that Adamantite wrote before the project became a monorepo stays managed.
 
 `init` and `update` write each managed file whole: `oxlint.config.ts`, `oxfmt.config.ts`,
-`knip.config.ts`, `tsconfig.json`, `.vscode/settings.json`, and `.vscode/extensions.json`. The
+`knip.config.ts`, `tsconfig.json`, `.vscode/settings.json`, `.vscode/extensions.json`, and
+`.zed/settings.json`. The
 `tsconfig.json` extends the selected preset, and adds the Effect language service entry for the
 `effect` preset. They write a file only when it does not exist or still holds what
 Adamantite wrote, by the hash in the lockfile, and they format it with the project's Oxfmt first, so
@@ -162,8 +163,8 @@ the tool would not load both, and Doctor reports the migration. `.vscode/extensi
 extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
 for the `effect` preset, so VS Code offers to install them.
 
-Init rewrites an existing `.zed/settings.json` only when the file is plain JSON. A file with comments or trailing commas stays as it is, and init prints the change to make
-by hand.
+Zed installs extensions only from its user settings, so `init` prints a link to each Zed
+extension that the setup needs.
 
 ## Commands
 

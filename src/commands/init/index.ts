@@ -30,7 +30,6 @@ import {
   setupAgentsGuidance,
   setupGitHubActions,
   setupSkill,
-  setupZed,
 } from "./setup.ts"
 
 export default Command.make("init", initCommandOptions).pipe(
@@ -164,9 +163,8 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupSkill(cwd)
       }
 
-      // `Setup.apply` writes the VS Code files below.
+      // Zed installs extensions only from the user settings, so init links them.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
-        yield* setupZed(cwd)
         yield* printZedExtensions(presets)
       }
 

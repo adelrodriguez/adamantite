@@ -17,7 +17,7 @@ import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { Selection } from "#lib/project/selection.ts"
-import { effectEditorFiles } from "#lib/integrations/editors/__tests__/effect-fixture.ts"
+import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
@@ -40,6 +40,7 @@ const FORMATTED_FILES = [
   "tsconfig.json",
   ".vscode/settings.json",
   ".vscode/extensions.json",
+  ".zed/settings.json",
 ]
 
 // Every part of the selection that makes Setup write a file, with the longest renders: the VS Code

@@ -113,7 +113,8 @@ reports a project that does not install a version of the package that Oxfmt supp
 _Avoid_: Framework language, plugin format
 
 **Managed script**:
-A `package.json` script whose command is owned by Adamantite.
+A `package.json` script whose command is owned by Adamantite, such as `check`. Setup sets each
+selected one to its command and replaces what it ran, the one exception to whole files.
 _Avoid_: User script, package command
 
 **Selection**:
@@ -167,18 +168,11 @@ _Avoid_: Handoff menu
 
 ## Integration lifecycle
 
-**Detect**:
-Inspect whether a managed integration is present and identify its supported or legacy
-configuration state.
-_Avoid_: Assess, create
-
-**Create**:
-Write the latest supported configuration when it is missing.
-_Avoid_: Migrate, update
-
-**Update**:
-Rewrite an existing supported configuration into the latest supported shape.
-_Avoid_: Migration, dependency update
+**Setup**:
+What `Setup.apply` does for a selection, the one backend of `init` and `update`: one install of the
+managed packages, the managed scripts, the managed files under the write rule, and the lockfile
+last. `init` takes the selection from its prompts or flags, and `update` from the lockfile.
+_Avoid_: Create, migrate, repair
 
 **Assess**:
 Classify package drift and managed configuration differences without changing the target

@@ -31,9 +31,9 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `execution`    | Run child commands, hand off to coding agents, find the skill folders of the agents, and carry forwarded arguments.                               |
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
 | `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
-| `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.                                         |
-| `project`      | Read and write target-project files, install dependencies, derive workspace state, and read the lockfile.                                         |
-| `setup`        | Apply a selection: install the packages, write the managed files under the write rule, and write the lockfile last.                               |
+| `integrations` | Render the packages and managed files of each tool, editor, workspace feature, and CI provider, and assess each one against its supported state.  |
+| `project`      | Read target-project files, install dependencies, derive workspace state, and read the lockfile.                                                   |
+| `setup`        | Apply a selection: install the packages, set the managed scripts, write the managed files under the write rule, and write the lockfile last.      |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                                                              |
 | `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                                                             |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
@@ -80,7 +80,7 @@ and `setup` import each `command.ts` directly.
 
 ```mermaid
 flowchart TD
-  A[Detect current state] --> B[Assess without mutation]
+  A[Read the project] --> B[Assess without mutation]
   B --> C{Findings exist}
   C -->|No| D[Report healthy]
   C -->|Yes| E[Render terminal findings or one Markdown agent prompt]
@@ -211,8 +211,9 @@ writing files.
   ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
-- `init` adds the managed scripts, then runs `Setup.apply` with the selection, which writes the
-  managed files and the lockfile. A later `init` adds its options to the selection. When the
+- `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
+  runs `applySetup`, which installs the packages, sets the managed scripts, writes the managed
+  files and the lockfile through `Setup.apply`, then reports the findings that remain. When the
   selection includes coding agents, the `agents` integration renders `AGENTS.md` with the
   Adamantite section, and the Adamantite skill in `.agents/skills` and in each other skill folder
   whose agent folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/`
@@ -235,11 +236,11 @@ writing files.
   verification. `hardening/suppressions.ts` counts the disable comments of each rule in the
   files that Oxlint lints, and `hardening/overrides.ts` marks each file of an override that turns
   a rule off, after a trial that turns the rule on again. The prompt shows both as data.
-- `update` removes the `adamantite` entry from `skills-lock.json`, runs `Setup.apply` with the
-  recorded selection, which installs the managed packages and writes the managed files and the
-  lockfile, then emits any remaining doctor findings. In a project without a lockfile,
-  `inferSelection` reads the selection from the same files that Doctor applies the integrations to
-  without one.
+- `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a
+  project without a lockfile, `inferSelection` reads the selection one time from the same files
+  that Doctor applies the integrations to without one. `update` does not edit `skills-lock.json`,
+  which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
+  finding.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit.
   Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
   Temporary verification cases do not stay in the target project. Users can opt in to saved

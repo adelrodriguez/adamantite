@@ -1194,9 +1194,9 @@ The Adamantite CLI bundles the skill, so the copy matches the Adamantite version
 it. Each file of the skill is a managed file: after you update Adamantite, `adamantite update`
 writes the skill of the new version over each copy that nobody changed. Doctor reports a copy
 that differs from the skill of the installed version, such as one that an earlier version wrote
-before the lockfile. Delete that copy, and run `adamantite update`. It also removes the `adamantite` entry from `skills-lock.json`, so the
-`skills` CLI does not write the same folders. Commit the skill folders, so every clone has
-the skill.
+before the lockfile. Delete that copy, and run `adamantite update`. Doctor also reports an
+`adamantite` entry in `skills-lock.json`, so the `skills` CLI does not write the same folders.
+Commit the skill folders, so every clone has the skill.
 
 To install the skill from GitHub instead, with the
 [`skills` CLI](https://github.com/vercel-labs/skills):

@@ -120,12 +120,14 @@ modules, the plugin registry, and shared infrastructure.
 
 ### Keep lifecycle writes within their command
 
-Keep `init` deterministic and independent from assessment, keep `assess` and `doctor` read-only,
-and limit `update` to managed dependencies and the installed Adamantite skill. A finding describes
-a repair for an agent or a human, and does not authorize another command to make that repair.
+Keep `init` and `update` deterministic: each applies its selection through `Setup.apply` and
+reports the assessment afterward, without choosing its work from it. Keep `assess` and `doctor`
+read-only. A finding describes a repair for an agent or a human, and does not authorize another
+command to make that repair.
 
-Spot it: An assessment repairs a file, init chooses its work from Doctor findings, or an update
-fails because unrelated findings remain.
+Spot it: An assessment repairs a file, init or update chooses its work from Doctor findings, an
+update fails because unrelated findings remain, or code outside `src/lib/setup/` writes a file
+of the target project.
 
 ```ts
 // Avoid: Doctor installed packages before #393.

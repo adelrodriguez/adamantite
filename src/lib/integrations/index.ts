@@ -1,9 +1,10 @@
 import type * as Effect from "effect/Effect"
 import type { Integration } from "#lib/integrations/base.ts"
+import knip from "#lib/integrations/knip/index.ts"
 import oxfmt from "#lib/integrations/oxfmt/index.ts"
 import vscode from "#lib/integrations/vscode/index.ts"
 
-const list = [oxfmt, vscode] as const satisfies readonly Integration[]
+const list = [oxfmt, knip, vscode] as const satisfies readonly Integration[]
 
 type Member = (typeof list)[number]
 
@@ -15,7 +16,6 @@ type MemberEffect = ReturnType<Member["assess" | "files" | "prepare"]>
  * files and installs their packages, and the assessment runs each one that the selection includes.
  * The integrations that have not moved here yet keep their own setup steps in `init`.
  */
-export const integrations: ReadonlyArray<Integration<
-  Effect.Error<MemberEffect>,
-  Effect.Services<MemberEffect>
->> = list
+export const integrations: ReadonlyArray<
+  Integration<Effect.Error<MemberEffect>, Effect.Services<MemberEffect>>
+> = list

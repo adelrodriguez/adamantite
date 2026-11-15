@@ -4,7 +4,6 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
-import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
@@ -150,7 +149,6 @@ export default Command.make("init", initCommandOptions).pipe(
         onSome: (setup) => setup.presets,
       })
 
-      const hasKnip = checkRunsTool(selectedScripts, "knip")
       // `adamantite analyze` runs Sherif in a monorepo.
       const hasSherif = checkRunsTool(selectedScripts, "sherif") && isMonorepo
 
@@ -178,9 +176,6 @@ export default Command.make("init", initCommandOptions).pipe(
         dependencies.push(`${sherif.name}@${sherif.version}`)
       }
 
-      if (hasKnip) {
-        dependencies.push(`${knip.name}@${knip.version}`)
-      }
 
       yield* installDependencies(cwd, dependencies)
 
@@ -188,9 +183,6 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* setupToolConfig(cwd, oxlint, oxlint.create(cwd, presets))
       }
 
-      if (hasKnip) {
-        yield* setupToolConfig(cwd, knip, knip.create(cwd))
-      }
 
       const managedScripts = yield* addScripts(cwd, selectedScripts, {
         nonInteractive: options.nonInteractive,

@@ -18,7 +18,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import hardenCommand from "#commands/harden.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
+import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"

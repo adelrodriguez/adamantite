@@ -77,21 +77,21 @@ Spot it: A standalone helper uses an arrow even though its body is not an Effect
 
 ```ts
 // Avoid: turning the standalone Knip workspace helper into an arrow.
-const toKnipWorkspace = ({ isMonorepo, lintConfig }: ToolingFacts): KnipWorkspace => ({
-  isMonorepo,
-  usesEffectPreset: checkImportsLintPreset(lintConfig, "effect"),
+const toKnipWorkspace = ({ workspace }: Project, { presets }: Selection): KnipWorkspace => ({
+  isMonorepo: workspace.isMonorepo,
+  usesEffectPreset: presets.includes("effect"),
 })
 
 // Prefer: the declaration in knip/config.ts.
-export function toKnipWorkspace({ isMonorepo, lintConfig }: ToolingFacts): KnipWorkspace {
+export function toKnipWorkspace({ workspace }: Project, { presets }: Selection): KnipWorkspace {
   return {
-    isMonorepo,
-    usesEffectPreset: checkImportsLintPreset(lintConfig, "effect"),
+    isMonorepo: workspace.isMonorepo,
+    usesEffectPreset: presets.includes("effect"),
   }
 }
 ```
 
-[Knip's config helper](src/lib/integrations/tooling/knip/config.ts) shows the declaration form.
+[Knip's config helper](src/lib/integrations/knip/config.ts) shows the declaration form.
 [Filesystem helpers](src/lib/shared/filesystem.ts) show the Effect-chain exception. This moves the
 existing rule retained by [PR #344](https://github.com/adelrodriguez/adamantite/pull/344).
 

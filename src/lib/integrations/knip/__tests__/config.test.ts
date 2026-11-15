@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { IGNORED_ENTRIES } from "#lib/integrations/tooling/knip/config.ts"
+import { IGNORED_ENTRIES } from "#lib/integrations/knip/config.ts"
 import { ignoreDependencies } from "#presets/analyze.ts"
 
 describe("Knip ignore lists", () => {

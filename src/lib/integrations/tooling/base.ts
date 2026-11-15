@@ -10,18 +10,15 @@ import {
   defineIntegration,
   type Finding,
   type IntegrationAssessment,
-  type IntegrationFile,
   type PackageAction,
   type ToolingPackage,
 } from "#lib/integrations/base.ts"
-import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   matchDeclaredVersion,
   parseDependencySpecifier,
   type Script,
 } from "#lib/project/package-json.ts"
 import { getSelectedScripts, type Project } from "#lib/project/project.ts"
-import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 
 export type ToolingConfigFormat = "ts" | "json" | "jsonc"
 
@@ -460,140 +457,6 @@ export function definePackageTooling(options: {
       }),
     kind: "tooling",
     name: options.name,
-    version: options.version,
-  })
-}
-
-/**
- * The target-project facts that a managed config file depends on.
- */
-export interface ToolingWorkspace {
-  readonly isMonorepo: boolean
-}
-
-/**
- * The project facts that a tooling integration derives its workspace from. An assessment takes them
- * from the project, and `init` reads them when it creates a config.
- */
-export interface ToolingFacts {
-  readonly isMonorepo: boolean
-  /**
-   * The content of the root `oxlint.config.ts`, or none when it does not exist.
-   */
-  readonly lintConfig: Option.Option<string>
-}
-
-const readToolingFacts = Effect.fn("readToolingFacts")(function* (cwd: string) {
-  const path = yield* Path.Path
-
-  const [isMonorepo, lintConfig] = yield* Effect.all(
-    [checkIsMonorepo(cwd), readFileIfExists(path.join(cwd, "oxlint.config.ts"))],
-    { concurrency: "unbounded" }
-  )
-
-  return { isMonorepo, lintConfig } satisfies ToolingFacts
-})
-
-/**
- * A tooling integration that manages a package version and a TypeScript config file with legacy
- * JSON predecessors (Knip, Oxfmt).
- */
-export function defineConfigTooling<
-  Workspace extends ToolingWorkspace,
-  RuntimeError = never,
-  RuntimeRequirements = never,
->(options: {
-  /**
-   * Findings for the parts that the tool loads from the project when it runs, such as a package
-   * that a plugin of the tool imports. Assessment adds them while the integration is applicable.
-   */
-  readonly assessRuntime?: (
-    project: Project
-  ) => Effect.Effect<readonly Finding[], RuntimeError, RuntimeRequirements>
-  /**
-   * The config file content `init` writes and doctor findings reference. It can depend on the
-   * workspace.
-   */
-  readonly configContent: (workspace: Workspace) => string
-  readonly configFiles: ToolingConfigFiles
-  readonly inspectConfig: (content: string, workspace: Workspace) => RequiredConfigInspection
-  readonly name: string
-  readonly purpose: string
-  readonly scripts: readonly Script[]
-  readonly version: string
-  /**
-   * Derive the workspace for `configContent` and `inspectConfig` from the project facts.
-   */
-  readonly workspace: (facts: ToolingFacts) => Workspace
-}) {
-  const files: readonly IntegrationFile[] = [
-    { path: options.configFiles.config, type: "config" },
-    ...options.configFiles.legacyConfigs.map(
-      (path) => ({ path, type: "legacy_config" }) satisfies IntegrationFile
-    ),
-  ]
-
-  const detect = (cwd: string) => detectToolingConfig(cwd, options.name, options.configFiles)
-
-  // The config that `create` writes for the project facts.
-  const render = (facts: ToolingFacts) => options.configContent(options.workspace(facts))
-
-  return defineIntegration({
-    assess: (project: Project) =>
-      Effect.gen(function* () {
-        const {
-          cwd,
-          lintConfig,
-          workspace: { isMonorepo },
-        } = project
-
-        if (!checkHasSelectedScript(project, options.scripts)) {
-          return { applicable: false } satisfies IntegrationAssessment
-        }
-
-        const state = yield* detect(cwd)
-        const workspace = options.workspace({ isMonorepo, lintConfig })
-        const pkg = assessPackage(project, options, options.purpose, options.name)
-        const configContent = options.configContent(workspace)
-
-        const inspection =
-          state.active instanceof CurrentToolingConfig
-            ? options.inspectConfig(yield* readFile(state.active.file.path), workspace)
-            : undefined
-
-        const runtimeFindings =
-          options.assessRuntime === undefined ? [] : yield* options.assessRuntime(project)
-
-        return {
-          applicable: true,
-          findings: [
-            ...pkg.findings,
-            ...getConfigFindings(state, {
-              configContent,
-              configFile: options.configFiles.config,
-              inspection,
-              toolName: options.name,
-            }),
-            ...runtimeFindings,
-          ],
-          packageActions: pkg.packageActions,
-          warnings: [...pkg.warnings, ...state.warnings],
-        } satisfies IntegrationAssessment
-      }),
-    config: options.configFiles.config,
-    create: (cwd: string) =>
-      Effect.gen(function* () {
-        const path = yield* Path.Path
-        yield* writeFile(
-          path.join(cwd, options.configFiles.config),
-          render(yield* readToolingFacts(cwd))
-        )
-      }),
-    detect,
-    files,
-    kind: "tooling",
-    name: options.name,
-    render,
     version: options.version,
   })
 }

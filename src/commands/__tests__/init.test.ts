@@ -11,10 +11,10 @@ import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
+import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
+import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
 import { PACKAGE as oxfmt } from "#lib/integrations/oxfmt/index.ts"
-import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
 import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
@@ -360,13 +360,6 @@ describe("init", () => {
         modernConfig: "oxlint.config.ts",
         script: "check",
         tool: "oxlint",
-      },
-      {
-        content: '{\n  "entry": ["src/index.ts"],\n  "ignore": ["bunup.config.ts"],\n}\n',
-        legacyConfig: "knip.jsonc",
-        modernConfig: "knip.config.ts",
-        script: "analyze",
-        tool: "knip",
       },
     ])(
       "keep a legacy $tool config in place during init",
@@ -1710,43 +1703,6 @@ describe("init", () => {
           )
         )
         expect(logLines.at(-1)).toBe("💠 Setup finished.")
-      })
-    )
-  })
-
-  describe("dual-config warnings", () => {
-    it.effect("warn when both legacy and modern knip configs exist", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "knip.config.ts":
-            'import type { KnipConfig } from "knip"\n\nconst config: KnipConfig = { entry: ["src/index.ts"] }\n\nexport default config\n',
-          "knip.json": yield* formatJson({ entry: ["src/main.ts"] }),
-        })
-
-        const logLines: unknown[] = []
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["analyze"]),
-          "n",
-          ...pickMany(INIT_EDITORS, []),
-          "n",
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(logLines).toContainEqual(
-          "▲ Found both `knip.config.ts` and `knip.json(c)`. Adamantite will use `knip.config.ts`."
-        )
-        expect(files.exists("knip.json")).toBe(true)
       })
     )
   })

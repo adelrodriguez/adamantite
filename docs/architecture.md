@@ -139,8 +139,8 @@ selection that `inferSelection` in `integrations/selection.ts` reads from the pr
 `apply` writes the lockfile last, formatted the same way, and only `init` and `update` call it: `adamantite/import-owners`
 keeps `#lib/setup` and `writeLockfile` to them. `written` records the hash of each managed file
 that `apply` created, replaced, or found unchanged. The integrations that have not moved to a folder
-yet keep their setup steps in `src/commands/init/setup.ts`. For their files, the Oxlint and Knip
-configs and `tsconfig.json`, `written` records the hash when the file equals what this version
+yet keep their setup steps in `src/commands/init/setup.ts`. For their files, the Oxlint config and
+`tsconfig.json`, `written` records the hash when the file equals what this version
 writes, or when its hash equals the hash that the lockfile recorded, and `apply` never writes or
 deletes them. Each run computes `written` again, so a file that the user changed leaves it.
 

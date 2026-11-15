@@ -1,17 +1,15 @@
 import * as EffectRegExp from "effect/RegExp"
-import type {
-  RequiredConfigInspection,
-  ToolingFacts,
-  ToolingWorkspace,
-} from "#lib/integrations/tooling/base.ts"
-import { checkImportsLintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
+import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
+import type { Project } from "#lib/project/project.ts"
+import type { Selection } from "#lib/project/selection.ts"
 import { inspectRequiredPresetConfig } from "#lib/integrations/tooling/preset-config.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 
-export interface KnipWorkspace extends ToolingWorkspace {
+export interface KnipWorkspace {
+  readonly isMonorepo: boolean
   /**
-   * Whether `oxlint.config.ts` imports the `effect` preset, which names the
-   * `@effect/language-service` plugin in `tsconfig.json`.
+   * Whether the selection includes the `effect` preset, which names the `@effect/language-service`
+   * plugin in `tsconfig.json`.
    */
   readonly usesEffectPreset: boolean
 }
@@ -43,8 +41,6 @@ const IGNORE_REASON = {
     "the `effect` lint preset names the `@effect/language-service` plugin in `tsconfig.json`, and no package has that name",
   monorepo: "Knip cannot see that `adamantite analyze` runs Sherif in a monorepo",
 } as const satisfies Record<IgnoreList, string>
-
-const DEFAULT_WORKSPACE: KnipWorkspace = { isMonorepo: false, usesEffectPreset: false }
 
 // Bounded by the array's closing bracket, so an entry in a later property does not count. Matches
 // a string or a regular expression entry, which Knip both accepts.
@@ -86,10 +82,10 @@ function formatIgnoreDependencies(lists: readonly IgnoreList[]) {
     : `[${lists.map((list) => `...ignoreDependencies.${list}`).join(", ")}]`
 }
 
-export function toKnipWorkspace({ isMonorepo, lintConfig }: ToolingFacts): KnipWorkspace {
+export function toKnipWorkspace({ workspace }: Project, { presets }: Selection): KnipWorkspace {
   return {
-    isMonorepo,
-    usesEffectPreset: checkImportsLintPreset(lintConfig, "effect"),
+    isMonorepo: workspace.isMonorepo,
+    usesEffectPreset: presets.includes("effect"),
   }
 }
 
@@ -126,6 +122,8 @@ export function inspectRequiredKnipConfig(
     reason: `The file must set ${setting} from \`adamantite/analyze\`, because ${missingLists.map((list) => IGNORE_REASON[list]).join(", and ")}.`,
   }
 }
+
+const DEFAULT_WORKSPACE: KnipWorkspace = { isMonorepo: false, usesEffectPreset: false }
 
 export function toKnipTsConfigContent(workspace: KnipWorkspace = DEFAULT_WORKSPACE) {
   const lists = getRequiredLists(workspace)

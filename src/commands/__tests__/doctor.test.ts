@@ -10,8 +10,8 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintLoadFailureLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import doctorCommand from "#commands/doctor.ts"
-import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
+import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
+import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
@@ -77,7 +77,7 @@ function runResolution(keys: readonly TestKey[], runner = makeHandoffRunner()) {
 const INTRO = "💠 adamantite doctor"
 
 const FINDING_NOTE = expect.stringMatching(
-  /^\n1\. Missing knip configuration\n {2}Current state\n {2}The managed `knip\.config\.ts` file is missing\./u
+  /^\n1\. Missing knip configuration\n {2}Current state\n {2}The selection runs knip, and `knip\.config\.ts` does not exist\./u
 )
 
 const FINDINGS_MARKDOWN = expect.stringMatching(

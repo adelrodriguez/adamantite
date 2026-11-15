@@ -138,7 +138,7 @@ describe("Oxfmt setup", () => {
         legacy,
       })
       expect(doctor.output).toContain(
-        "The project configures Oxfmt in the legacy `.oxfmtrc.json`, so Adamantite does not write `oxfmt.config.ts`."
+        "The project configures oxfmt in the legacy `.oxfmtrc.json`, so Adamantite does not write `oxfmt.config.ts`."
       )
     })
   )

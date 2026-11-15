@@ -7,7 +7,6 @@ import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
@@ -21,12 +20,7 @@ import { printFileWrites } from "#terminal/setup.ts"
 
 // Managed plugins stay out of this fallback: a plugin is updated only while its preset is imported,
 // which the assessment already covers.
-const knownPackages = [
-  oxlint,
-  tsrs,
-  sherif,
-  knip,
-] as const satisfies readonly ToolingPackage[]
+const knownPackages = [oxlint, tsrs, sherif] as const satisfies readonly ToolingPackage[]
 
 /**
  * What one step of update did. `idle` means that the step found nothing to update. A step that

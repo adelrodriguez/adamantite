@@ -13,14 +13,12 @@ import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
-import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { writeLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
-import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type Selection } from "#lib/project/selection.ts"
 import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
@@ -79,11 +77,7 @@ export function checkIsEmptySelection(selection: Selection): boolean {
  * setup steps in `init` write them, so `apply` records their hashes, and never writes or deletes
  * them.
  */
-const LEGACY_PATHS: ReadonlySet<string> = new Set([
-  oxlint.config,
-  knip.config,
-  tsconfig.config,
-])
+const LEGACY_PATHS: ReadonlySet<string> = new Set([oxlint.config, tsconfig.config])
 
 /**
  * The files that the setup steps of `init` write for `selection`, with the content that this
@@ -93,17 +87,11 @@ const renderLegacyFiles = Effect.fn("renderLegacyFiles")(function* (
   project: Project,
   selection: Selection
 ) {
-  const facts = { isMonorepo: project.workspace.isMonorepo, lintConfig: project.lintConfig }
   const presets = LINT_PRESETS.filter((preset) => selection.presets.includes(preset))
   const lints = selection.presets.length > 0
 
   return [
-    ...(lints
-      ? [{ content: toOxlintTsConfigContent(presets), path: oxlint.config }]
-      : []),
-    ...(checkRunsTool(selection.scripts, "knip")
-      ? [{ content: knip.render(facts), path: knip.config }]
-      : []),
+    ...(lints ? [{ content: toOxlintTsConfigContent(presets), path: oxlint.config }] : []),
     // In a monorepo, init leaves the root `tsconfig.json` to the project.
     ...(selection.typescript === null || project.workspace.isMonorepo
       ? []

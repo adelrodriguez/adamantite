@@ -89,6 +89,10 @@ export default defineConfig({
       // Commands reach an integration that owns a folder through `lib/setup` and the assessment.
       // Each integration that moves to its own folder adds an entry.
       {
+        import: "#lib/integrations/knip",
+        owners: ["src/lib", "src/commands/__tests__"],
+      },
+      {
         import: "#lib/integrations/oxfmt",
         owners: ["src/lib", "src/commands/__tests__"],
       },

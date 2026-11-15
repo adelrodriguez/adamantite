@@ -35,6 +35,7 @@ const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
 const FORMATTED_FILES = [
   LOCKFILE_PATH,
   "oxfmt.config.ts",
+  "knip.config.ts",
   ".vscode/settings.json",
   ".vscode/extensions.json",
 ]

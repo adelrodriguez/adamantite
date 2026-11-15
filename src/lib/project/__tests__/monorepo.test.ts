@@ -2,13 +2,13 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { stringifyJson } from "#lib/shared/json.ts"
 import {
   checkIsMonorepo,
   readPnpmWorkspacePatterns,
   readWorkspace,
   workspacePatternToRegExp,
-} from "#lib/workspace/monorepo.ts"
+} from "#lib/project/monorepo.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 

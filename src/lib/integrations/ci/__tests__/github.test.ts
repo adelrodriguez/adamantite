@@ -11,19 +11,19 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { Block, readBlock } from "#lib/integrations/ci/github-block.ts"
 import github from "#lib/integrations/ci/github.ts"
-import { stringifyJson } from "#lib/shared/json.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import {
   NodeVersion,
   NodeVersionFile,
   NodeVersionResolver,
   type NodeVersionSource,
-} from "#lib/workspace/node-version-resolver.ts"
+} from "#lib/project/node-version-resolver.ts"
 import {
   SUPPORTED_PACKAGE_MANAGERS,
   type SupportedPackageManager,
-} from "#lib/workspace/package-json.ts"
-import { readProject } from "#lib/workspace/project.ts"
+} from "#lib/project/package-json.ts"
+import { readProject } from "#lib/project/project.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 import testWorkflow from "../../../../../.github/workflows/test.yml?raw"
 
 const ROOT = "/project"

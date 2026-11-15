@@ -12,8 +12,8 @@ import {
   type OxlintPlugin,
 } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { NativeRuntimeConflict, PackageNotInstalled } from "#lib/shared/errors.ts"
-import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 
 /**
  * Oxlint finds its own file.

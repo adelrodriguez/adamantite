@@ -9,8 +9,8 @@ import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
+import { readProject } from "#lib/project/project.ts"
 import { FailedToParseFile } from "#lib/shared/errors.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 const PLATFORM_PACKAGE = `@effect/tsgo-${process.platform}-${process.arch}`

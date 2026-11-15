@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
-import { addRootDevDependencies, DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
+import { addRootDevDependencies, DependencyInstaller } from "#lib/project/dependency-installer.ts"
 
 const ROOT = "/project"
 

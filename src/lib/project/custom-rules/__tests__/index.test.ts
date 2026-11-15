@@ -4,8 +4,8 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { addCustomRule, addCustomRuleTest } from "#lib/project/custom-rules/index.ts"
 import { CustomRuleExists } from "#lib/shared/errors.ts"
-import { addCustomRule, addCustomRuleTest } from "#lib/workspace/custom-rules/index.ts"
 
 // `ROOT` is the real path, as `process.cwd()` reports it. `/link` is a symlink to it at a different
 // depth, as `/var` is to `/private/var` on macOS.

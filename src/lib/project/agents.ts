@@ -4,12 +4,12 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as String from "effect/String"
 import { runScriptCommand, type PackageManagerName } from "nypm"
-import type { Script } from "#lib/workspace/package-json.ts"
+import type { Script } from "#lib/project/package-json.ts"
+import { getAgentsSectionTemplate } from "#lib/project/agents-section.macro.ts" with { type: "macro" }
+import { SCRIPT_ORDER, checkRunsTool } from "#lib/project/package-json.ts"
 import { readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
-import { getAgentsSectionTemplate } from "#lib/workspace/agents-section.macro.ts" with { type: "macro" }
-import { SCRIPT_ORDER, checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const AGENTS_NAME = "AGENTS.md"
 const agentsSectionTemplate = getAgentsSectionTemplate()

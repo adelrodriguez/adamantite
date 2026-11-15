@@ -5,8 +5,8 @@ import {
   toKnipTsConfigContent,
   toKnipWorkspace,
 } from "#lib/integrations/tooling/knip/config.ts"
+import { getScriptsThatRun } from "#lib/project/package-json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
 export default {
   analyze: commands.analyze,

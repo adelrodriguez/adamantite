@@ -4,11 +4,11 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import { parseSync, Visitor } from "oxc-parser"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import { listLintedFiles } from "#lib/integrations/tooling/oxlint/files.ts"
 import { RETIRED_RULE_NAMESPACES } from "#lib/integrations/tooling/oxlint/presets.ts"
+import { findSuppressions, SOURCE_FILE } from "#lib/project/suppressions.ts"
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
-import { findSuppressions, SOURCE_FILE } from "#lib/workspace/suppressions.ts"
 
 function replacement(rule: string): string | undefined {
   for (const [old, current] of Object.entries(RETIRED_RULE_NAMESPACES)) {

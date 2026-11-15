@@ -6,7 +6,7 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
-import { readProject } from "#lib/workspace/project.ts"
+import { readProject } from "#lib/project/project.ts"
 
 const shadcnLint = managedPlugin("@shadcn/lint")
 

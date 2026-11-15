@@ -4,8 +4,8 @@ import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
+import { readProject } from "#lib/project/project.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 

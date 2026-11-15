@@ -1,10 +1,10 @@
 import * as Effect from "effect/Effect"
 import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
 import { checkImportsLintPreset } from "#lib/integrations/tooling/oxlint/config.ts"
-import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
+import { getScriptsThatRun } from "#lib/project/package-json.ts"
 
 interface ManagedPluginOptions<AssessError, AssessRequirements> {
   /**

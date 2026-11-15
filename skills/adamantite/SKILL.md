@@ -12,7 +12,7 @@ sources:
   - "adelrodriguez/adamantite:src/lib/toolchain/index.ts"
   - "adelrodriguez/adamantite:src/lib/integrations/tooling/oxlint/plugins/**/*.ts"
   - "adelrodriguez/adamantite:src/lib/integrations/tooling/knip/config.ts"
-  - "adelrodriguez/adamantite:src/lib/workspace/custom-rules/*"
+  - "adelrodriguez/adamantite:src/lib/project/custom-rules/*"
   - "adelrodriguez/adamantite:presets/lint/*.ts"
   - "adelrodriguez/adamantite:presets/rules/*.ts"
 ---

@@ -12,7 +12,7 @@ import {
   type Program,
 } from "oxc-parser"
 import type { ProjectPath } from "#lib/hardening/project-files.ts"
-import type { Workspace } from "#lib/workspace/monorepo.ts"
+import type { Workspace } from "#lib/project/monorepo.ts"
 import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfigs } from "#lib/hardening/trial.ts"
 import { checkExists, readFile } from "#lib/shared/filesystem.ts"

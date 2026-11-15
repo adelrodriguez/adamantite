@@ -6,7 +6,8 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
+import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import { FailedToParseFile, InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
 import { readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import {
@@ -15,7 +16,6 @@ import {
   checkIsPlainJson,
   stringifyJson,
 } from "#lib/shared/json.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 const TSCONFIG_FILE = "tsconfig.json"
 const LANGUAGE_SERVICE = "@effect/language-service"

@@ -8,6 +8,7 @@ import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
+import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   CliNotFound,
   InvalidAnalyzeOptions,
@@ -15,7 +16,6 @@ import {
   InvalidFixOptions,
 } from "#lib/shared/errors.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
 

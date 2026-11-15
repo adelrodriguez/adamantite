@@ -13,12 +13,14 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import {
   defineIntegration,
   type Finding,
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
 import { FailedToParseFile, InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import {
@@ -28,8 +30,6 @@ import {
   stringifyJson,
 } from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
-import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
 

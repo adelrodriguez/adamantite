@@ -11,7 +11,7 @@ import {
   SCRIPT_ORDER,
   type Script,
   type ScriptConflict,
-} from "#lib/workspace/package-json.ts"
+} from "#lib/project/package-json.ts"
 
 describe("getConflictingScripts", () => {
   it("handles a package.json without a scripts field", () => {

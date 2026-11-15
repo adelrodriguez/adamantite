@@ -8,14 +8,14 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Terminal from "effect/Terminal"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { FailedToParseFile, FailedToReadFile, InvalidPackageJson } from "#lib/shared/errors.ts"
-import { checkIsPlainJson, mergeConfig, stringifyJson } from "#lib/shared/json.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
+import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   matchDeclaredVersion,
   parseDependencySpecifier,
   readPackageJson,
-} from "#lib/workspace/package-json.ts"
+} from "#lib/project/package-json.ts"
+import { FailedToParseFile, FailedToReadFile, InvalidPackageJson } from "#lib/shared/errors.ts"
+import { checkIsPlainJson, mergeConfig, stringifyJson } from "#lib/shared/json.ts"
 import { printTitle } from "#terminal/title.ts"
 
 const ROOT = "/project"

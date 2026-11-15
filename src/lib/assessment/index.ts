@@ -1,7 +1,7 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import type { Finding, PackageAction } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
 import github from "#lib/integrations/ci/github.ts"

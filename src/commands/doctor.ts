@@ -10,10 +10,10 @@ import {
   renderAssessmentMarkdown,
   type ProjectAssessment,
 } from "#lib/assessment/index.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
+import { readProject } from "#lib/project/project.ts"
 import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 import { printFindings } from "#terminal/findings.ts"
 import * as Output from "#terminal/output.ts"
 import { AgentSessionEnded, chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"

@@ -6,7 +6,7 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import { NativeRuntime } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { oxlintPlugins } from "#lib/integrations/tooling/oxlint/plugins/index.ts"
 import {
@@ -17,9 +17,9 @@ import {
   TsrsBackend,
   type OxlintRuntime,
 } from "#lib/integrations/tooling/oxlint/runtime.ts"
+import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { PackageNotInstalled } from "#lib/shared/errors.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
-import { ModuleResolver, resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
 
 const decodeReport = Schema.decodeUnknownOption(
   Schema.Struct({

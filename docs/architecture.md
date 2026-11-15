@@ -32,7 +32,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
 | `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.                                         |
-| `workspace`    | Read and write target-project files, install dependencies, and derive workspace state.                                                            |
+| `project`      | Read and write target-project files, install dependencies, and derive workspace state.                                                            |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                                                              |
 | `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                                                             |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
@@ -51,9 +51,9 @@ An `adamantite/import-owners` entry lets only `src` and `scripts` import a modul
 no preset and no preset test imports the CLI code.
 
 The nested `lib.layers` map holds the lib layers, with its root derived as `src/lib`.
-A layer that the map does not connect to another layer is its sibling, so `workspace` and
+A layer that the map does not connect to another layer is its sibling, so `project` and
 `execution` do not import each other, and
-`assessment` does not import `hardening`: harden is not an assessment. `workspace` knows
+`assessment` does not import `hardening`: harden is not an assessment. `project` knows
 target-project files and package state, but not integration types such as `Finding`. An import
 that breaks a map, or a folder that is not in its map, fails `pnpm run check`.
 
@@ -95,11 +95,11 @@ Tooling config generators produce only the current setup for `init` and Doctor r
 content. They do not convert existing configs or generate patches.
 
 Doctor also lists the files that Oxlint lints and reads their suppression comments. The shared
-comment reader is in `workspace/suppressions.ts`, and the shared Oxlint process operations are in
+comment reader is in `project/suppressions.ts`, and the shared Oxlint process operations are in
 `integrations/tooling/oxlint/files.ts`. Config discovery keeps the source of each local module
 that it reaches, so the rule migration can read config keys without executing project code.
 
-An assessment reads the target project one time. `readProject` in `src/lib/workspace/project.ts`
+An assessment reads the target project one time. `readProject` in `src/lib/project/project.ts`
 reads `package.json`, the workspace packages, the root `oxlint.config.ts`, and the custom rules
 that the Oxlint configs load, and each integration's `assess` takes that `Project`. A `Project`
 is a snapshot, so a reassessment after a handoff or an install reads a new one.
@@ -222,7 +222,7 @@ src/
   commands/         CLI workflows
   lib/
     shared/         errors, filesystem, and JSON helpers (bottom layer)
-    workspace/      target-project state and file operations
+    project/        target-project state and file operations
       custom-rules/ rules folders, custom() discovery, rule file checks, and rule scaffolding
     execution/      child command runs, coding-agent detection and handoff, the Adamantite skill, forwarded arguments
     integrations/   integration types, then tooling, editor, workspace, and CI adapters
@@ -451,11 +451,11 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
   `adamantite/rules/testing`. It re-exports `RuleTester` by name from `oxlint/plugins-dev`, with
   the test types in its namespace, connected to `node:test`.
-- `src/lib/workspace/custom-rules/` holds the target project's custom-rules state. It reads
+- `src/lib/project/custom-rules/` holds the target project's custom-rules state. It reads
   `custom()` calls and rule files with `oxc-parser`, without running them. `discover.ts`
   finds the Oxlint configs and follows their imports to the `custom()` calls. It also records
   old API imports for Doctor's migration finding. Old calls do not load rules. The
-  `ModuleResolver` service in `src/lib/workspace/module-resolver.ts` resolves each import
+  `ModuleResolver` service in `src/lib/project/module-resolver.ts` resolves each import
   with `oxc-resolver`, as Node.js loads a config, so a workspace package resolves only after an
   install. Tests pass a fake from `src/__tests__/module-resolver.ts`, and the smoke test
   covers the real resolver. `harden` uses

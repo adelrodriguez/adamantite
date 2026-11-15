@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from "@effect/vitest"
-import { readProject } from "#lib/workspace/project.ts"
+import { readProject } from "#lib/project/project.ts"
 
 describe("readProject", () => {
   it("read every part of the snapshot itself", () => {

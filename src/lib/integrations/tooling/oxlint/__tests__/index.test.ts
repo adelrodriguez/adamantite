@@ -8,8 +8,8 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { readProject } from "#lib/project/project.ts"
 import { formatJson } from "#lib/shared/json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }

@@ -12,8 +12,8 @@ import {
 } from "oxc-parser"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 import type { LintPreset, RetiredLintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/project/custom-rules/inspect.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
-import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/workspace/custom-rules/inspect.ts"
 
 const REQUIRED_BOOLEAN_OPTIONS = [
   "respectEslintDisableDirectives",

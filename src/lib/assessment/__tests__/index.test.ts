@@ -13,9 +13,9 @@ import {
 } from "#lib/assessment/index.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 

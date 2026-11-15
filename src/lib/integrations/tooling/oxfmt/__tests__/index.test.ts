@@ -5,8 +5,8 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
+import { readProject } from "#lib/project/project.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 

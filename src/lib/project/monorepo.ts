@@ -7,9 +7,9 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
+import { readPackageJson } from "#lib/project/package-json.ts"
 import { FailedToParseYaml, type FailedToReadFile } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists, readFileIfExists } from "#lib/shared/filesystem.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const PnpmWorkspace = Schema.Struct({ packages: Schema.Array(Schema.String) })
 

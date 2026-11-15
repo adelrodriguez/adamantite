@@ -7,7 +7,7 @@ import {
   runCommand,
 } from "#commands/__tests__/command-test-helpers.ts"
 import initCommand from "#commands/init/index.ts"
-import { formatInitCommand } from "#lib/workspace/init-command.ts"
+import { formatInitCommand } from "#lib/project/init-command.ts"
 
 describe("formatInitCommand", () => {
   it.effect.each([

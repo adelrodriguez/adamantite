@@ -8,7 +8,7 @@ import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { addCustomRuleTest, toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
+import { addCustomRuleTest, toCustomRuleStub } from "#lib/project/custom-rules/index.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../../..")
 const CUSTOM_PRESET = join(REPO_ROOT, "presets/rules/index.ts")

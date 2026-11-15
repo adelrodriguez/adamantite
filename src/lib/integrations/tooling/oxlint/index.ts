@@ -2,7 +2,7 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import {
   defineIntegration,
   type Finding,
@@ -31,9 +31,9 @@ import {
   type RetiredLintPreset,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { assessOxlintRuntime } from "#lib/integrations/tooling/oxlint/runtime-assessment.ts"
+import { getManagedScripts, checkRunsTool } from "#lib/project/package-json.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { getManagedScripts, checkRunsTool } from "#lib/workspace/package-json.ts"
 
 import { assessRuleMigrations } from "#lib/integrations/tooling/oxlint/rule-migrations.ts"
 

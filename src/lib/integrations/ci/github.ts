@@ -8,8 +8,8 @@ import * as Path from "effect/Path"
 import * as Record from "effect/Record"
 import * as Schema from "effect/Schema"
 import { runScriptCommand } from "nypm"
-import type { Script, SupportedPackageManager } from "#lib/workspace/package-json.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Script, SupportedPackageManager } from "#lib/project/package-json.ts"
+import type { Project } from "#lib/project/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
 import {
   Block,
@@ -20,6 +20,23 @@ import {
   replaceBlock,
 } from "#lib/integrations/ci/github-block.ts"
 import { getWorkflowTemplate } from "#lib/integrations/ci/github-workflow.macro.ts" with { type: "macro" }
+import {
+  getCIScriptSets,
+  getCIWorkflowEntries,
+  hasCICompatibleScripts,
+} from "#lib/project/ci-scripts.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import {
+  NODE_VERSION_SOURCES,
+  NodeVersionFile,
+  NodeVersionResolver,
+  type NodeVersionSource,
+} from "#lib/project/node-version-resolver.ts"
+import {
+  checkIsSupportedPackageManager,
+  getManagedScripts,
+  SUPPORTED_PACKAGE_MANAGERS,
+} from "#lib/project/package-json.ts"
 import { FailedToParseYaml } from "#lib/shared/errors.ts"
 import {
   ensureDirectory,
@@ -28,23 +45,6 @@ import {
   writeFile,
 } from "#lib/shared/filesystem.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
-import {
-  getCIScriptSets,
-  getCIWorkflowEntries,
-  hasCICompatibleScripts,
-} from "#lib/workspace/ci-scripts.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import {
-  NODE_VERSION_SOURCES,
-  NodeVersionFile,
-  NodeVersionResolver,
-  type NodeVersionSource,
-} from "#lib/workspace/node-version-resolver.ts"
-import {
-  checkIsSupportedPackageManager,
-  getManagedScripts,
-  SUPPORTED_PACKAGE_MANAGERS,
-} from "#lib/workspace/package-json.ts"
 
 /**
  * A pattern that matches a package manager command that runs a script that `script` matches, as

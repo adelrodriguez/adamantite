@@ -5,16 +5,16 @@ import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import { readFileIfFile } from "#lib/shared/filesystem.ts"
 import {
   CUSTOM_RULES_MODULE,
   DynamicCustomRulesCall,
   findCustomRulesCalls,
   findRuntimeImports,
   hasLegacyRuleImports,
-} from "#lib/workspace/custom-rules/inspect.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
+} from "#lib/project/custom-rules/inspect.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
+import { readFileIfFile } from "#lib/shared/filesystem.ts"
 
 export const CONFIG_FILES = [
   "oxlint.config.ts",

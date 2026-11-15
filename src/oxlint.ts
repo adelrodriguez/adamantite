@@ -12,7 +12,7 @@ import {
   toBackendEnv,
   TsrsBackend,
 } from "#lib/integrations/tooling/oxlint/runtime.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
 
 // Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
 // `adamantite check` start this file in place of `oxlint`.

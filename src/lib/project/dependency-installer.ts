@@ -6,9 +6,9 @@ import {
   detectPackageManager as detectNypmPackageManager,
   type PackageManagerName,
 } from "nypm"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import { FailedToInstallDependency, NoPackageManager } from "#lib/shared/errors.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
 
 export interface DetectedPackageManager {
   readonly name: PackageManagerName

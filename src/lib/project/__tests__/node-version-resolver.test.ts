@@ -10,13 +10,13 @@ import {
   createFileSystemTestContext,
   makeSystemError,
 } from "#__tests__/filesystem.ts"
-import { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
-import { stringifyJson } from "#lib/shared/json.ts"
 import {
   NodeVersion,
   NodeVersionFile,
   NodeVersionResolver,
-} from "#lib/workspace/node-version-resolver.ts"
+} from "#lib/project/node-version-resolver.ts"
+import { FailedToParseFile, FailedToReadFile } from "#lib/shared/errors.ts"
+import { stringifyJson } from "#lib/shared/json.ts"
 
 const ROOT = "/project"
 

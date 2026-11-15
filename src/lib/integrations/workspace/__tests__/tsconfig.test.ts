@@ -12,9 +12,9 @@ import * as Stream from "effect/Stream"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
+import { readProject } from "#lib/project/project.ts"
 import { InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 

@@ -4,8 +4,17 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
-import type { CustomRuleDiscovery } from "#lib/workspace/custom-rules/discover.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { CustomRuleDiscovery } from "#lib/project/custom-rules/discover.ts"
+import type { Project } from "#lib/project/project.ts"
+import {
+  CUSTOM_RULES_DIRECTORY,
+  isRuleFile,
+  isRuleTestFile,
+} from "#lib/project/custom-rules/inspect.ts"
+import {
+  getStubTemplate,
+  getTestStubTemplate,
+} from "#lib/project/custom-rules/stub.macro.ts" with { type: "macro" }
 import {
   CustomRuleExists,
   CustomRuleNotFound,
@@ -14,15 +23,6 @@ import {
 } from "#lib/shared/errors.ts"
 import { ensureDirectory, readDirectoryIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import {
-  CUSTOM_RULES_DIRECTORY,
-  isRuleFile,
-  isRuleTestFile,
-} from "#lib/workspace/custom-rules/inspect.ts"
-import {
-  getStubTemplate,
-  getTestStubTemplate,
-} from "#lib/workspace/custom-rules/stub.macro.ts" with { type: "macro" }
 
 const stubTemplate = getStubTemplate()
 const testStubTemplate = getTestStubTemplate()

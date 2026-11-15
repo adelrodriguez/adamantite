@@ -7,8 +7,8 @@ import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
-import type { Script } from "#lib/workspace/package-json.ts"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Script } from "#lib/project/package-json.ts"
+import type { Project } from "#lib/project/project.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
   defineIntegration,
@@ -18,6 +18,8 @@ import {
 import { EFFECT_SDK_PATH, readEffectEditor } from "#lib/integrations/editors/effect.ts"
 import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { formatInitCommand } from "#lib/project/init-command.ts"
+import { checkRunsTool } from "#lib/project/package-json.ts"
 import {
   FailedToInstallExtension,
   FailedToParseFile,
@@ -39,8 +41,6 @@ import {
   pickChangedEntries,
   stringifyJson,
 } from "#lib/shared/json.ts"
-import { formatInitCommand } from "#lib/workspace/init-command.ts"
-import { checkRunsTool } from "#lib/workspace/package-json.ts"
 
 const files = [{ path: ".vscode/settings.json", type: "config" }] as const
 

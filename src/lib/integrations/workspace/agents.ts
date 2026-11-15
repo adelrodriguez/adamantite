@@ -1,10 +1,10 @@
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import { defineIntegration, type IntegrationAssessment } from "#lib/integrations/base.ts"
-import { formatInitCommand } from "#lib/workspace/init-command.ts"
-import { getManagedScripts } from "#lib/workspace/package-json.ts"
+import { formatInitCommand } from "#lib/project/init-command.ts"
+import { getManagedScripts } from "#lib/project/package-json.ts"
 
 const files = [{ path: "AGENTS.md", type: "config" }] as const
 

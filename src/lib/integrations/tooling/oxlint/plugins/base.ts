@@ -2,6 +2,7 @@ import type * as Effect from "effect/Effect"
 import type * as FileSystem from "effect/FileSystem"
 import type * as Path from "effect/Path"
 import * as Data from "effect/Data"
+import type { ModuleResolver } from "#lib/project/module-resolver.ts"
 import type {
   EffectBuildMissing,
   EffectPlatformUnsupported,
@@ -10,7 +11,6 @@ import type {
   InvalidPackageJson,
   PackageNotInstalled,
 } from "#lib/shared/errors.ts"
-import type { ModuleResolver } from "#lib/workspace/module-resolver.ts"
 
 /**
  * The native binding file that Oxlint loads in place of its own.

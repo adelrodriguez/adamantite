@@ -6,8 +6,8 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
+import { readProject } from "#lib/project/project.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 

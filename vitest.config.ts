@@ -19,7 +19,7 @@ const PROCESS_RUN_TESTS = [
   "src/lib/integrations/tooling/oxfmt/__tests__/format-preset.test.ts",
   "src/lib/integrations/tooling/oxlint/__tests__/rule-migrations-assessment.test.ts",
   "src/lib/toolchain/__tests__/idioms.test.ts",
-  "src/lib/workspace/custom-rules/__tests__/stub.test.ts",
+  "src/lib/project/custom-rules/__tests__/stub.test.ts",
 ]
 
 // Fixtures are code that the preset tests lint, not tests of this repository. Vitest cannot run some

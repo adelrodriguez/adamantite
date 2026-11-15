@@ -67,7 +67,7 @@ export default defineConfig({
       {
         import: "oxc-resolver",
         owners: [
-          "src/lib/workspace/module-resolver.ts",
+          "src/lib/project/module-resolver.ts",
           "presets/lint/plugins/adamantite/shared/resolver.ts",
         ],
       },
@@ -90,21 +90,21 @@ export default defineConfig({
       // integration takes them from the `Project`. Harden discovers the custom rules of its own
       // scope.
       {
-        import: "#lib/workspace/custom-rules/discover.ts",
+        import: "#lib/project/custom-rules/discover.ts",
         names: ["discoverCustomRules"],
-        owners: ["src/lib/workspace/project.ts", "src/lib/hardening/index.ts"],
+        owners: ["src/lib/project/project.ts", "src/lib/hardening/index.ts"],
       },
       // A command that reads the workspace outside an assessment reads it one time for each phase,
       // and passes the `Workspace` down. Harden reads again after the session, because the agent
       // can change the project.
       {
-        import: "#lib/workspace/monorepo.ts",
+        import: "#lib/project/monorepo.ts",
         names: ["readWorkspace"],
         owners: [
-          "src/lib/workspace/project.ts",
+          "src/lib/project/project.ts",
           "src/commands/harden.ts",
           "src/commands/rule.ts",
-          "src/lib/workspace/__tests__/monorepo.test.ts",
+          "src/lib/project/__tests__/monorepo.test.ts",
         ],
       },
       // The package builds the presets apart from the CLI, so no file below `presets/` imports
@@ -132,10 +132,10 @@ export default defineConfig({
               execution: { imports: ["shared"] },
               // These layers independently compose integrations.
               hardening: { imports: ["integrations"] },
-              integrations: { imports: ["workspace", "execution"] },
+              integrations: { imports: ["execution", "project"] },
+              project: { imports: ["shared"] },
               shared: { imports: [] },
               toolchain: { imports: ["integrations"] },
-              workspace: { imports: ["shared"] },
             },
           },
 

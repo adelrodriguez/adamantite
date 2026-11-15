@@ -5,9 +5,9 @@ import * as Result from "effect/Result"
 import * as SemVer from "effect/SemVer"
 import * as SemVerRange from "effect/SemVerRange"
 import type { Finding } from "#lib/integrations/base.ts"
-import type { Project } from "#lib/workspace/project.ts"
-import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
+import type { Project } from "#lib/project/project.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
 
 /**
  * A language that Oxfmt formats only through a bundled Prettier plugin, which imports a package

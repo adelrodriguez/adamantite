@@ -5,8 +5,8 @@ import * as Path from "effect/Path"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
+import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 

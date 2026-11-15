@@ -22,10 +22,10 @@ import { LINT_PRESETS, lintPresets } from "#lib/integrations/tooling/oxlint/pres
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { TYPESCRIPT_PRESET_NAMES } from "#lib/integrations/workspace/tsconfig.ts"
+import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
+import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { CliNotFound, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
-import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/workspace/agents.ts"
-import { SCRIPT_ORDER } from "#lib/workspace/package-json.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,

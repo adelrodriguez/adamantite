@@ -13,9 +13,8 @@ import {
   TYPESCRIPT_PRESET_NAMES,
   type TypeScriptPreset,
 } from "#lib/integrations/workspace/tsconfig.ts"
-import { InvalidInitOptions } from "#lib/shared/errors.ts"
-import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
-import { INIT_FLAGS } from "#lib/workspace/init-command.ts"
+import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
+import { INIT_FLAGS } from "#lib/project/init-command.ts"
 import {
   checkIsSupportedPackageManager,
   type Script,
@@ -23,7 +22,8 @@ import {
   SCRIPT_ORDER,
   checkRunsTool,
   listSupportedPackageManagers,
-} from "#lib/workspace/package-json.ts"
+} from "#lib/project/package-json.ts"
+import { InvalidInitOptions } from "#lib/shared/errors.ts"
 
 export const INIT_EDITORS = ["vscode", "zed"] as const
 

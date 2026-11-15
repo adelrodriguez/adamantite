@@ -7,6 +7,9 @@ import * as Path from "effect/Path"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as SemVer from "effect/SemVer"
+import { formatInitCommand } from "#lib/project/init-command.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
 import {
   EffectEditorUnavailable,
   FailedToParseFile,
@@ -14,9 +17,6 @@ import {
 } from "#lib/shared/errors.ts"
 import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
 import { checkIsJsonObject } from "#lib/shared/json.ts"
-import { formatInitCommand } from "#lib/workspace/init-command.ts"
-import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const VSCODE_REPAIR_COMMAND = formatInitCommand({ editors: ["vscode"], scripts: ["check"] })
 

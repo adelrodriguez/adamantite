@@ -8,7 +8,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
-import type { Workspace } from "#lib/workspace/monorepo.ts"
+import type { Workspace } from "#lib/project/monorepo.ts"
 import {
   isReportOf,
   lintFiles,
@@ -17,6 +17,7 @@ import {
   splitRuleName,
 } from "#lib/hardening/oxlint.ts"
 import { listIgnoredFiles, listProjectFiles } from "#lib/hardening/project-files.ts"
+import { CONFIG_FILES } from "#lib/project/custom-rules/discover.ts"
 import {
   type CliNotFound,
   ProjectCopyFailed,
@@ -29,7 +30,6 @@ import {
   TrialRuleNotFound,
 } from "#lib/shared/errors.ts"
 import { checkExists, readDirectoryIfExists, readFile, writeFile } from "#lib/shared/filesystem.ts"
-import { CONFIG_FILES } from "#lib/workspace/custom-rules/discover.ts"
 
 /**
  * What a case must get from the rule: a report, because it has the mistake, or no report, because

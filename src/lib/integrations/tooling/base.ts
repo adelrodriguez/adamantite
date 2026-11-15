@@ -6,7 +6,7 @@ import * as FileSystem from "effect/FileSystem"
 import { pipe } from "effect/Function"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import {
   defineIntegration,
   type Finding,
@@ -15,14 +15,14 @@ import {
   type PackageAction,
   type ToolingPackage,
 } from "#lib/integrations/base.ts"
-import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
-import { checkIsMonorepo } from "#lib/workspace/monorepo.ts"
+import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   getManagedScripts,
   matchDeclaredVersion,
   parseDependencySpecifier,
   type Script,
-} from "#lib/workspace/package-json.ts"
+} from "#lib/project/package-json.ts"
+import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 
 export type ToolingConfigFormat = "ts" | "json" | "jsonc"
 

@@ -10,14 +10,14 @@ import {
   BindingOverride,
   type NativeOverride,
 } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
 import {
   EffectBuildMissing,
   EffectPlatformUnsupported,
   PackageNotInstalled,
 } from "#lib/shared/errors.ts"
 import { readDirectoryIfExists } from "#lib/shared/filesystem.ts"
-import { resolvePackageDirectory } from "#lib/workspace/module-resolver.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
 
 const NAME = "@effect/tsgo"
 

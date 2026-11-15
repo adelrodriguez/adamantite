@@ -6,7 +6,7 @@ import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import {
   defineIntegration,
   type Finding,
@@ -15,6 +15,7 @@ import {
 import { readEffectEditor } from "#lib/integrations/editors/effect.ts"
 import { pluginLanguages } from "#lib/integrations/tooling/oxfmt/languages.ts"
 import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { formatInitCommand } from "#lib/project/init-command.ts"
 import {
   EffectEditorUnavailable,
   FailedToParseFile,
@@ -36,7 +37,6 @@ import {
   pickChangedEntries,
   stringifyJson,
 } from "#lib/shared/json.ts"
-import { formatInitCommand } from "#lib/workspace/init-command.ts"
 
 const files = [{ path: ".zed/settings.json", type: "config" }] as const
 

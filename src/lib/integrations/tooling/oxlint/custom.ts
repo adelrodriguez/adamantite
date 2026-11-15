@@ -2,21 +2,21 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import {
   defineIntegration,
   type Finding,
   type IntegrationAssessment,
 } from "#lib/integrations/base.ts"
-import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
-import { publicImport } from "#lib/shared/package-exports.ts"
-import { isDiscoveryComplete } from "#lib/workspace/custom-rules/discover.ts"
+import { isDiscoveryComplete } from "#lib/project/custom-rules/discover.ts"
 import {
   CUSTOM_RULES_DIRECTORY,
   hasLegacyRuleImports,
   inspectRuleFile,
   isRuleFile,
-} from "#lib/workspace/custom-rules/inspect.ts"
+} from "#lib/project/custom-rules/inspect.ts"
+import { readDirectoryIfExists, readFile } from "#lib/shared/filesystem.ts"
+import { publicImport } from "#lib/shared/package-exports.ts"
 
 const NAME = "oxlint-custom"
 

@@ -1,4 +1,4 @@
-import type { Script } from "#lib/workspace/package-json.ts"
+import type { Script } from "#lib/project/package-json.ts"
 
 /**
  * The names of the `adamantite init` flags that a repair command uses. `commands/init/options.ts`

@@ -22,12 +22,12 @@ import {
   CommandRunner,
 } from "#lib/execution/command-runner.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
-import { CliNotFound, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 import {
   type DetectedPackageManager,
   DependencyInstaller,
-} from "#lib/workspace/dependency-installer.ts"
-import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
+} from "#lib/project/dependency-installer.ts"
+import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
+import { CliNotFound, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 
 export interface DependencyInstallerCall {
   readonly options?: {

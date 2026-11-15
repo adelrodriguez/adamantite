@@ -1,6 +1,6 @@
 import { definePackageTooling } from "#lib/integrations/tooling/base.ts"
+import { getScriptsThatRun } from "#lib/project/package-json.ts"
 import { getDependencyVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { getScriptsThatRun } from "#lib/workspace/package-json.ts"
 
 // Oxlint ran its type-aware rules on oxlint-tsgolint before tsrs replaced it.
 const RETIRED_BACKEND = "oxlint-tsgolint"

@@ -9,8 +9,8 @@ import * as Layer from "effect/Layer"
 import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
 import { OxlintCommand } from "#lib/integrations/tooling/oxlint/files.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { readProject } from "#lib/workspace/project.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { readProject } from "#lib/project/project.ts"
 
 const REPO = join(import.meta.dirname, "../../../../../..")
 

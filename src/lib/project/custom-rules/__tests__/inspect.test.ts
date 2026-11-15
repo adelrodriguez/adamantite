@@ -9,7 +9,7 @@ import {
   isRuleFile,
   LiteralCustomRulesCall,
   RULE_FILE_EXTENSIONS,
-} from "#lib/workspace/custom-rules/inspect.ts"
+} from "#lib/project/custom-rules/inspect.ts"
 import {
   DEFAULT_DIRECTORY,
   DEFAULT_PLUGIN_NAME,

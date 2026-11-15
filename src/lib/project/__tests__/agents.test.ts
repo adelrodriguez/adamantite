@@ -2,13 +2,13 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import type { Script } from "#lib/workspace/package-json.ts"
+import type { Script } from "#lib/project/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   ADAMANTITE_AGENTS_END_MARKER,
   ADAMANTITE_AGENTS_START_MARKER,
   writeAgentsGuidance,
-} from "#lib/workspace/agents.ts"
+} from "#lib/project/agents.ts"
 
 const ROOT = "/project"
 

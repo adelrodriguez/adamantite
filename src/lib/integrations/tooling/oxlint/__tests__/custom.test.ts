@@ -8,10 +8,10 @@ import { type FileSystemTestContext, createFileSystemTestContext } from "#__test
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { readProject } from "#lib/project/project.ts"
 import { FailedToReadFile } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { readProject } from "#lib/workspace/project.ts"
 
 const ROOT = "/project"
 

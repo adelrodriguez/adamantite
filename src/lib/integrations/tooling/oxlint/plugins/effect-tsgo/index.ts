@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect"
-import type { Project } from "#lib/workspace/project.ts"
+import type { Project } from "#lib/project/project.ts"
 import { defineOxlintPlugin, NativeRuntime } from "#lib/integrations/tooling/oxlint/plugins/base.ts"
 import { resolveEffectRuntime } from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/runtime.ts"
 import {

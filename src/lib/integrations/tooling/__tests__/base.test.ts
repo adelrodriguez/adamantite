@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
-import type { Catalogs } from "#lib/workspace/monorepo.ts"
+import type { Catalogs } from "#lib/project/monorepo.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import {
   CurrentToolingConfig,

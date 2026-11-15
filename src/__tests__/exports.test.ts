@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
 import * as Order from "effect/Order"
 import { RETIRED_LINT_PRESETS } from "#lib/integrations/tooling/oxlint/presets.ts"
-import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/workspace/custom-rules/inspect.ts"
+import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/project/custom-rules/inspect.ts"
 import packageJson from "../../package.json" with { type: "json" }
 import readme from "../../README.md?raw"
 

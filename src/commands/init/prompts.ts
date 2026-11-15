@@ -12,7 +12,7 @@ import {
   type LintPreset,
   lintPresets,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
-import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
+import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,
   getConflictingScripts,
@@ -21,7 +21,7 @@ import {
   type ScriptConflict,
   checkRunsTool,
   listSupportedPackageManagers,
-} from "#lib/workspace/package-json.ts"
+} from "#lib/project/package-json.ts"
 import * as Output from "#terminal/output.ts"
 import { INIT_EDITOR_CHOICES, INIT_EDITORS, type InitOptionsInput } from "./options.ts"
 

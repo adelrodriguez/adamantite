@@ -2,13 +2,13 @@ import type * as Option from "effect/Option"
 import type { PackageJson } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
 import {
   type CustomRuleDiscovery,
   discoverCustomRules,
-} from "#lib/workspace/custom-rules/discover.ts"
-import { readWorkspace, type Workspace } from "#lib/workspace/monorepo.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
+} from "#lib/project/custom-rules/discover.ts"
+import { readWorkspace, type Workspace } from "#lib/project/monorepo.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 const LINT_CONFIG_FILE = "oxlint.config.ts"
 

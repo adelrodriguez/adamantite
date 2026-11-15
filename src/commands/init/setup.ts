@@ -21,9 +21,9 @@ import tsconfig, {
   TYPESCRIPT_PRESETS,
   type TypeScriptPreset,
 } from "#lib/integrations/workspace/tsconfig.ts"
-import { writeAgentsGuidance } from "#lib/workspace/agents.ts"
-import { hasCICompatibleScripts } from "#lib/workspace/ci-scripts.ts"
-import { addRootDevDependencies } from "#lib/workspace/dependency-installer.ts"
+import { writeAgentsGuidance } from "#lib/project/agents.ts"
+import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
+import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import {
   getConflictingScripts,
   getManagedScripts,
@@ -32,7 +32,7 @@ import {
   MANAGED_SCRIPT_COMMANDS,
   type Script,
   type SupportedPackageManager,
-} from "#lib/workspace/package-json.ts"
+} from "#lib/project/package-json.ts"
 import * as Output from "#terminal/output.ts"
 import { INIT_EDITORS, type InitEditor } from "./options.ts"
 

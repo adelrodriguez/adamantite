@@ -3,12 +3,13 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Path from "effect/Path"
 import * as Result from "effect/Result"
-import type { Script } from "#lib/workspace/package-json.ts"
+import type { Script } from "#lib/project/package-json.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { decodeJson } from "#__tests__/json.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { createRunnerTestContext } from "#commands/__tests__/command-test-helpers.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
+import { readProject } from "#lib/project/project.ts"
 import {
   CliNotFound,
   EffectEditorUnavailable,
@@ -17,7 +18,6 @@ import {
   VscodeCliNotFound,
 } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 import {
   EFFECT_COMPILER,
   EFFECT_EDITOR_PACKAGES,

@@ -15,10 +15,10 @@ import ruleCommand from "#commands/rule.ts"
 import updateCommand from "#commands/update.ts"
 import { CodingAgents } from "#lib/execution/coding-agents.ts"
 import { ForwardedArguments } from "#lib/execution/forwarded-arguments.ts"
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { PassthroughNotSupported } from "#lib/shared/errors.ts"
-import { DependencyInstaller } from "#lib/workspace/dependency-installer.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { NodeVersionResolver } from "#lib/workspace/node-version-resolver.ts"
 import * as NodeTerminal from "#terminal/node-terminal.ts"
 
 const passthroughCommands = [analyzeCommand, checkCommand, fixCommand] as const

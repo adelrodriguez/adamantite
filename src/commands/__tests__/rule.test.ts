@@ -7,6 +7,7 @@ import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
 import ruleCommand, { renderTrial } from "#commands/rule.ts"
 import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
+import { toCustomRuleStub } from "#lib/project/custom-rules/index.ts"
 import {
   CommandFailed,
   CustomRuleExists,
@@ -15,7 +16,6 @@ import {
   InvalidRuleName,
 } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
-import { toCustomRuleStub } from "#lib/workspace/custom-rules/index.ts"
 import { createRunnerTestContext, promptingLayer, runCommand } from "./command-test-helpers.ts"
 
 describe("rule add", () => {

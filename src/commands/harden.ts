@@ -21,6 +21,10 @@ import {
 } from "#lib/hardening/index.ts"
 import { readOverrides } from "#lib/hardening/overrides.ts"
 import { readSuppressions } from "#lib/hardening/suppressions.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { readWorkspace } from "#lib/project/monorepo.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
+import { readProject } from "#lib/project/project.ts"
 import {
   AdamantiteNotInNodeModules,
   AdamantiteNotInstalled,
@@ -32,10 +36,6 @@ import {
 import { publicImport } from "#lib/shared/package-exports.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import * as Toolchain from "#lib/toolchain/index.ts"
-import { ModuleResolver } from "#lib/workspace/module-resolver.ts"
-import { readWorkspace } from "#lib/workspace/monorepo.ts"
-import { readPackageJson } from "#lib/workspace/package-json.ts"
-import { readProject } from "#lib/workspace/project.ts"
 import { printFindings } from "#terminal/findings.ts"
 import * as Output from "#terminal/output.ts"
 import { AgentSessionEnded, chooseResolution } from "#terminal/resolution-menu.ts"

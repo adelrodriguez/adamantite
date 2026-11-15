@@ -20,19 +20,19 @@ import {
   type TrialSetting,
   tryRule,
 } from "#lib/hardening/trial.ts"
-import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/shared/errors.ts"
-import { readFile } from "#lib/shared/filesystem.ts"
-import { formatJson } from "#lib/shared/json.ts"
-import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import {
   addCustomRule,
   addCustomRuleTest,
   listCustomRules,
   readCustomRuleTestCommand,
-} from "#lib/workspace/custom-rules/index.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/workspace/custom-rules/inspect.ts"
-import { readWorkspace } from "#lib/workspace/monorepo.ts"
-import { readProject } from "#lib/workspace/project.ts"
+} from "#lib/project/custom-rules/index.ts"
+import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/inspect.ts"
+import { readWorkspace } from "#lib/project/monorepo.ts"
+import { readProject } from "#lib/project/project.ts"
+import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/shared/errors.ts"
+import { readFile } from "#lib/shared/filesystem.ts"
+import { formatJson } from "#lib/shared/json.ts"
+import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import * as Output from "#terminal/output.ts"
 
 const astFile = Argument.File("file", { mustExist: true }).pipe(

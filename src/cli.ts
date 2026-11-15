@@ -2,6 +2,7 @@ import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
+import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import type { CommandRunner } from "#lib/execution/command-runner.ts"
@@ -59,7 +60,8 @@ export const makeAppLayer = (
     NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
     ModuleResolver.layer,
     CodingAgents.layer.pipe(Layer.provideMerge(runner), Layer.provide(NodeServices.layer)),
-    DependencyInstaller.layer
+    DependencyInstaller.layer,
+    Digest.layerWebCrypto
   )
 
 export const runCli = Effect.fn("runCli")(function* (args: readonly string[], version: string) {

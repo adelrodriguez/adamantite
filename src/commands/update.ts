@@ -2,6 +2,7 @@ import process from "node:process"
 import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
@@ -12,7 +13,9 @@ import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readProject } from "#lib/project/project.ts"
+import { checkIsEmptySelection, inferSelection, recordLockfile } from "#lib/setup/index.ts"
 import { printFindings } from "#terminal/findings.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -131,8 +134,33 @@ export default Command.make("update").pipe(
         )
       )
 
+      // A project from before the lockfile gets the selection that its files show, one time.
+      const selection = yield* Option.match(project.lockfile, {
+        onNone: () => inferSelection(project),
+        onSome: (lockfile) => Effect.succeed(lockfile.selection),
+      })
+
+      // A project with no lockfile and no setup to record stays without one.
+      const lockfile: StepOutcome =
+        Option.isNone(project.lockfile) && checkIsEmptySelection(selection)
+          ? "idle"
+          : (yield* recordLockfile(project, selection)) === "written"
+            ? "applied"
+            : "idle"
+
+      if (lockfile === "applied") {
+        yield* Output.success(
+          Option.isNone(project.lockfile)
+            ? `\`${LOCKFILE_PATH}\` written with the setup that the project files show. Commit it.`
+            : `\`${LOCKFILE_PATH}\` updated. Commit it.`
+        )
+      }
+
+      // The lockfile decides which integrations apply, so a new lockfile needs a new assessment.
       const finalAssessment =
-        packages === "idle" ? assessment : yield* assessProject(yield* readProject(cwd))
+        packages === "idle" && lockfile === "idle"
+          ? assessment
+          : yield* assessProject(yield* readProject(cwd))
 
       const findingIds = new Set(finalAssessment.findings.map((finding) => finding.id))
 
@@ -157,7 +185,7 @@ export default Command.make("update").pipe(
         yield* Output.info("Run `adamantite doctor` for the remaining repairs and an agent prompt.")
       }
 
-      const foundWork = [packages, skill, lock].some(
+      const foundWork = [packages, skill, lock, lockfile].some(
         (outcome) => outcome === "applied" || outcome === "applyFailed"
       )
 

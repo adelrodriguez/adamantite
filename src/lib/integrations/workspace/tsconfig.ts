@@ -14,7 +14,6 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { Project } from "#lib/project/project.ts"
-import type { TypeScriptPreset } from "#lib/project/selection.ts"
 import {
   defineIntegration,
   type Finding,
@@ -22,11 +21,13 @@ import {
 } from "#lib/integrations/base.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
+import { TYPESCRIPT_PRESET_NAMES, type TypeScriptPreset } from "#lib/project/selection.ts"
 import { FailedToParseFile, InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
-import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
+import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import {
   checkIsJsonObject,
   checkIsPlainJson,
+  formatJson,
   mergeConfig,
   stringifyJson,
 } from "#lib/shared/json.ts"
@@ -190,45 +191,67 @@ function toLibraryFinding(configPath: string): Finding {
   }
 }
 
+/**
+ * The root and the workspace packages whose `tsconfig.json` names an Adamantite preset or loads its
+ * type resets, with the presets that `extends` names.
+ */
+const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
+  cwd,
+  workspace,
+}: Project) {
+  const path = yield* Path.Path
+
+  const packages = yield* Effect.forEach(
+    [cwd, ...workspace.packageDirectories],
+    (directory) =>
+      Effect.gen(function* () {
+        const content = yield* readFileIfExists(path.join(directory, files[0].path))
+
+        if (Option.isNone(content)) {
+          return []
+        }
+
+        const config = Result.getSuccess(
+          Json5.parse(content.value).pipe(Result.flatMap(Schema.decodeUnknownResult(Schema.Json)))
+        )
+
+        const entries: readonly string[] = Option.match(config, {
+          onNone: () => [],
+          onSome: readExtends,
+        })
+
+        const loadsResets =
+          entries.length === 0
+            ? false
+            : Option.getOrElse(yield* readLoadsResets(directory), () => false)
+
+        const presets = TYPESCRIPT_PRESET_NAMES.filter((preset) =>
+          entries.includes(TYPESCRIPT_PRESETS[preset])
+        )
+
+        return presets.length > 0 || loadsResets ? [{ directory, loadsResets, presets }] : []
+      }),
+    { concurrency: 4 }
+  )
+
+  return packages.flat()
+})
+
+/**
+ * The `tsconfig.json` that `create` writes for `preset`.
+ */
+const render = (preset: TypeScriptPreset) =>
+  formatJson({ extends: TYPESCRIPT_PRESETS[preset] }).pipe(Effect.map((content) => `${content}\n`))
+
 export default defineIntegration({
   // Doctor checks only the packages that chose a preset, so a project that declined it in init
   // gets no finding. Oxlint's type check runs without a `tsconfig.json`. A config without
   // `extends` cannot load the type resets, so Doctor runs TypeScript only for the others.
-  assess: ({ cwd, packageJson, workspace }: Project) =>
+  assess: (project: Project) =>
     Effect.gen(function* () {
+      const { cwd, packageJson } = project
       const path = yield* Path.Path
-
-      const packages = yield* Effect.forEach(
-        [cwd, ...workspace.packageDirectories],
-        (directory) =>
-          Effect.gen(function* () {
-            const content = yield* readFileIfExists(path.join(directory, files[0].path))
-
-            if (Option.isNone(content)) {
-              return []
-            }
-
-            const config = Result.getSuccess(
-              Json5.parse(content.value).pipe(
-                Result.flatMap(Schema.decodeUnknownResult(Schema.Json))
-              )
-            )
-
-            const entries = Option.match(config, { onNone: () => [], onSome: readExtends })
-
-            const loadsResets =
-              entries.length === 0
-                ? false
-                : Option.getOrElse(yield* readLoadsResets(directory), () => false)
-
-            const namesPreset = entries.some((entry) => PRESET_IMPORTS.includes(entry))
-
-            return namesPreset || loadsResets ? [{ directory, loadsResets }] : []
-          }),
-        { concurrency: 4 }
-      )
-
-      const configured = packages.flat()
+      const configured = yield* readConfiguredPackages(project)
 
       if (configured.length === 0) {
         return { applicable: false } satisfies IntegrationAssessment
@@ -260,7 +283,7 @@ export default defineIntegration({
   create: (cwd: string, preset: TypeScriptPreset) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      yield* writeJsonFile(path.join(cwd, files[0].path), { extends: TYPESCRIPT_PRESETS[preset] })
+      yield* writeFile(path.join(cwd, files[0].path), yield* render(preset))
     }),
   detect: (cwd: string) =>
     Effect.gen(function* () {
@@ -269,9 +292,29 @@ export default defineIntegration({
 
       return yield* fs.exists(path.join(cwd, files[0].path))
     }),
+  /**
+   * The preset that the project's configs set up: `typescript` when a config names it or loads its
+   * type resets, `tsconfig` when a config names only `tsconfig`. Doctor applies the integration to
+   * the same configs.
+   */
+  detectPreset: (project: Project) =>
+    readConfiguredPackages(project).pipe(
+      Effect.map((configured) =>
+        configured.length === 0
+          ? Option.none<TypeScriptPreset>()
+          : Option.some<TypeScriptPreset>(
+              configured.some(
+                ({ presets, loadsResets }) => loadsResets || presets.includes("typescript")
+              )
+                ? "typescript"
+                : "tsconfig"
+            )
+      )
+    ),
   files,
   kind: "workspace",
   name: "tsconfig",
+  render,
   update: (cwd: string, preset: TypeScriptPreset) =>
     Effect.gen(function* () {
       const path = yield* Path.Path

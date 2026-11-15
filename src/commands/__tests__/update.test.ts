@@ -5,16 +5,20 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { decodeJson } from "#__tests__/json.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
+import initCommand from "#commands/init/index.ts"
 import updateCommand from "#commands/update.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { FailedToInstallDependency } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
+  hashContent,
+  readLockfile,
   runCommand,
 } from "./command-test-helpers.ts"
 
@@ -70,6 +74,66 @@ function makeSkillFiles(files: Record<string, string>) {
 }
 
 describe("update", () => {
+  it.effect(
+    "record the selection that init would record, and the files that equal the current render, in a project without a lockfile",
+    () =>
+      Effect.gen(function* () {
+        const initialized = createFileSystemTestContext({ files: { "package.json": manifest({}) } })
+        const installer = createDependencyInstallerTestContext()
+
+        const init = yield* runCommand(
+          initCommand,
+          [
+            "--non-interactive",
+            "--script",
+            "check",
+            "--script",
+            "analyze",
+            "--preset",
+            "react",
+            "--typescript",
+            "typescript",
+            "--editor",
+            "vscode",
+            "--github-actions",
+            "--agents",
+          ],
+          { files: initialized, layers: [installer.layer] }
+        )
+
+        expect(Exit.isSuccess(init)).toBe(true)
+
+        // The project as an earlier version left it: no lockfile, and a Knip config that the user
+        // changed.
+        const files = createFileSystemTestContext({
+          files: Object.fromEntries(
+            initialized
+              .list()
+              .filter((file) => file !== LOCKFILE_PATH)
+              .map((file) => [file, initialized.read(file)])
+          ),
+        })
+
+        files.write("knip.config.ts", `${files.read("knip.config.ts")}// Changed by the user.\n`)
+
+        const exit = yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+
+        const recorded = readLockfile(initialized)
+
+        expect(recorded.written["knip.config.ts"]).toBe(
+          hashContent(initialized.read("knip.config.ts"))
+        )
+        expect(readLockfile(files)).toStrictEqual({
+          ...recorded,
+          written: Object.fromEntries(
+            Object.entries(recorded.written).filter(([file]) => file !== "knip.config.ts")
+          ),
+        })
+      })
+  )
+
   it.effect("report no changes when managed packages are current", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
@@ -270,6 +334,7 @@ describe("update", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
+        "✔ `.adamantite/adamantite-lock.json` written with the setup that the project files show. Commit it.",
         expect.stringMatching(/^\n1\. Missing knip configuration\n/u),
         expect.stringMatching(/^\n2\. Missing AGENTS\.md\n/u),
         "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",

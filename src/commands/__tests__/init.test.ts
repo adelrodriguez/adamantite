@@ -31,10 +31,13 @@ import {
 } from "#lib/project/selection.ts"
 import { CliNotFound, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
+import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
+  hashContent,
   promptingLayer,
+  readLockfile,
   runCommand,
 } from "./command-test-helpers.ts"
 
@@ -195,12 +198,40 @@ describe("init", () => {
       })
     )
 
+    it.effect(
+      "record the selection, the version, and the files it wrote whole in the lockfile",
+      () =>
+        Effect.gen(function* () {
+          const { exit, files } = yield* runFreshSetup()
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(readLockfile(files)).toStrictEqual({
+            schemaVersion: 1,
+            selection: {
+              agents: false,
+              ci: null,
+              editors: ["vscode"],
+              presets: ["core", "react"],
+              scripts: ["check", "analyze"],
+              typescript: "typescript",
+            },
+            version: getPackageVersion(),
+            written: Object.fromEntries(
+              ["knip.config.ts", "oxfmt.config.ts", "oxlint.config.ts", "tsconfig.json"].map(
+                (file) => [file, hashContent(files.read(file))]
+              )
+            ),
+          })
+        })
+    )
+
     it.effect("write the configs for the selected tools, preset, and editor", () =>
       Effect.gen(function* () {
         const { exit, files } = yield* runFreshSetup()
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.list()).toStrictEqual([
+          ".adamantite/adamantite-lock.json",
           ".vscode/settings.json",
           "knip.config.ts",
           "oxfmt.config.ts",
@@ -829,6 +860,7 @@ describe("init", () => {
 
         expect(readJson(files, "package.json").scripts).toStrictEqual({ check: "adamantite check" })
         expect(files.list()).toStrictEqual([
+          ".adamantite/adamantite-lock.json",
           ".zed/settings.json",
           "oxfmt.config.ts",
           "oxlint.config.ts",
@@ -874,7 +906,11 @@ describe("init", () => {
         expect(installer.calls).toStrictEqual([
           { options: { silent: true, workspace: false }, packages: ["adamantite"] },
         ])
-        expect(files.list()).toStrictEqual(["package.json", "tsconfig.json"])
+        expect(files.list()).toStrictEqual([
+          ".adamantite/adamantite-lock.json",
+          "package.json",
+          "tsconfig.json",
+        ])
         expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: "adamantite/tsconfig" })
       })
     )
@@ -998,6 +1034,7 @@ describe("init", () => {
           check: "adamantite check",
         })
         expect(files.list()).toStrictEqual([
+          ".adamantite/adamantite-lock.json",
           ...Object.keys(shippedSkill).map((file) => `.agents/skills/adamantite/${file}`),
           ".github/workflows/adamantite.yml",
           ".zed/settings.json",

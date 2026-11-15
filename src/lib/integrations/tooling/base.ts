@@ -535,6 +535,9 @@ export function defineConfigTooling<
 
   const detect = (cwd: string) => detectToolingConfig(cwd, options.name, options.configFiles)
 
+  // The config that `create` writes for the project facts.
+  const render = (facts: ToolingFacts) => options.configContent(options.workspace(facts))
+
   return defineIntegration({
     assess: (project: Project) =>
       Effect.gen(function* () {
@@ -584,13 +587,14 @@ export function defineConfigTooling<
         const path = yield* Path.Path
         yield* writeFile(
           path.join(cwd, options.configFiles.config),
-          options.configContent(options.workspace(yield* readToolingFacts(cwd)))
+          render(yield* readToolingFacts(cwd))
         )
       }),
     detect,
     files,
     kind: "tooling",
     name: options.name,
+    render,
     version: options.version,
   })
 }

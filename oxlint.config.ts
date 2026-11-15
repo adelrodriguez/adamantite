@@ -94,6 +94,16 @@ export default defineConfig({
         names: ["discoverCustomRules"],
         owners: ["src/lib/project/project.ts", "src/lib/hardening/index.ts"],
       },
+      // Only `init` and `update` write the lockfile, through `lib/setup`.
+      {
+        import: "#lib/setup",
+        owners: ["src/commands/init", "src/commands/update.ts", "src/commands/__tests__"],
+      },
+      {
+        import: "#lib/project/lockfile.ts",
+        names: ["writeLockfile"],
+        owners: ["src/lib/setup"],
+      },
       // A command that reads the workspace outside an assessment reads it one time for each phase,
       // and passes the `Workspace` down. Harden reads again after the session, because the agent
       // can change the project.
@@ -134,6 +144,7 @@ export default defineConfig({
               hardening: { imports: ["integrations"] },
               integrations: { imports: ["execution", "project"] },
               project: { imports: ["shared"] },
+              setup: { imports: ["integrations"] },
               shared: { imports: [] },
               toolchain: { imports: ["integrations"] },
             },

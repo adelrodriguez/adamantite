@@ -4,7 +4,6 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
-import type { LintPreset } from "#lib/project/selection.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
@@ -12,8 +11,17 @@ import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
-import { readPackageJson, checkRunsTool } from "#lib/project/package-json.ts"
+import { readPackageJson, checkRunsTool, SCRIPT_ORDER } from "#lib/project/package-json.ts"
+import { readProject } from "#lib/project/project.ts"
+import {
+  INIT_EDITORS,
+  LINT_PRESETS,
+  type LintPreset,
+  type Selection,
+} from "#lib/project/selection.ts"
+import { recordLockfile } from "#lib/setup/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Output from "#terminal/output.ts"
 import { printTitle } from "#terminal/title.ts"
@@ -215,6 +223,30 @@ export default Command.make("init", initCommandOptions).pipe(
       if (Option.isSome(initOptions.githubActions)) {
         yield* setupGitHubActions(cwd, initOptions.githubActions.value, managedScripts)
       }
+
+      // What init was asked to set up, in the order of each source list.
+      const selection = {
+        agents: initOptions.agents,
+        ci: Option.isSome(initOptions.githubActions) ? "github" : null,
+        editors: Option.match(initOptions.editors, {
+          onNone: () => [],
+          onSome: ({ names }) => INIT_EDITORS.filter((editor) => names.includes(editor)),
+        }),
+        presets: Option.isSome(lint)
+          ? ["core", ...LINT_PRESETS.filter((preset) => presets.includes(preset))]
+          : [],
+        scripts: SCRIPT_ORDER.filter((script) => selectedScripts.includes(script)),
+        typescript: Option.getOrNull(initOptions.typescript),
+      } satisfies Selection
+
+      // Last, so `written` records the files that the steps above wrote.
+      const lockfile = yield* recordLockfile(yield* readProject(cwd), selection)
+
+      yield* Output.success(
+        lockfile === "written"
+          ? `\`${LOCKFILE_PATH}\` written. Commit it with the setup.`
+          : `\`${LOCKFILE_PATH}\` already records this setup.`
+      )
 
       yield* Output.outro("💠 Setup finished.")
     }).pipe(Effect.catchTag("QuitError", () => Output.cancel("Setup was cancelled.")))

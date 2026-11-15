@@ -1,10 +1,13 @@
+import { createHash } from "node:crypto"
 import * as Command from "effect/cli/Command"
 import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
+import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import * as Stdio from "effect/Stdio"
 import { TestConsole } from "effect/testing"
 import {
@@ -26,8 +29,25 @@ import {
   type DetectedPackageManager,
   DependencyInstaller,
 } from "#lib/project/dependency-installer.ts"
+import { LOCKFILE_PATH, Lockfile } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { CliNotFound, type FailedToInstallDependency } from "#lib/shared/errors.ts"
+
+const LockfileJson = Schema.fromJsonString(Lockfile)
+
+/**
+ * The lockfile that a command wrote, decoded.
+ */
+export function readLockfile(files: FileSystemTestContext): Lockfile {
+  return Schema.decodeSync(LockfileJson)(files.read(LOCKFILE_PATH))
+}
+
+/**
+ * The hash that the lockfile records for `content`.
+ */
+export function hashContent(content: string): string {
+  return `sha256-${createHash("sha256").update(content).digest("hex")}`
+}
 
 export interface DependencyInstallerCall {
   readonly options?: {
@@ -249,6 +269,7 @@ function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestCo
       canPrompt: false,
     }),
     Stdio.layerTest({}),
+    Digest.layerWebCrypto,
     failingSpawnerLayer,
     unexpectedRunnerLayer,
     // Fresh, so this default does not memoize `CodingAgents` ahead of a test's runner layer.

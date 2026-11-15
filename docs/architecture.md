@@ -33,7 +33,7 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.                                         |
 | `project`      | Read and write target-project files, install dependencies, derive workspace state, and read the lockfile.                                         |
-| `setup`        | Write the lockfile: infer the selection of a project from before the lockfile, and record the managed files that Adamantite wrote whole.          |
+| `setup`        | Apply a selection: install the packages, write the managed files under the write rule, and write the lockfile last.                               |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                                                              |
 | `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                                                             |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
@@ -116,12 +116,27 @@ when the selection includes it, so a selected integration whose file is missing 
 Without one, each integration applies to the files that exist, and the assessment adds one
 `lockfile-missing` finding when any integration applies.
 
-Only `init` and `update` write the lockfile, through `recordLockfile` in `src/lib/setup/`, and
-`adamantite/import-owners` keeps `#lib/setup` and `writeLockfile` to them. `written` maps each
-managed file to the hash of its content when the file equals what this version writes, or when its
-hash equals the hash that the lockfile recorded. The Oxlint, Oxfmt, and Knip configs and
-`tsconfig.json` have renders. Each run computes `written` again, so a managed file that gets a
-render later enters `written` on the next `update` while it still equals the render.
+`init` and `update` share one backend, `apply` in `src/lib/setup/`. `src/lib/integrations/index.ts`
+lists the integrations that own a folder, such as `integrations/vscode/`, and each one implements
+`Integration` from `integrations/base.ts`: whether the selection includes it, its packages, its
+managed files, an optional `prepare` step for `node_modules`, and its `assess`. `apply` installs the
+packages of every selected integration in one install, runs each `prepare`, renders the managed
+files, and applies the write rule to each one. It writes a file only whole, and only when the file
+does not exist or its hash equals the hash in the lockfile's `written` map. It never merges or
+edits a file. Each file gets a `FileWrite`: `Created`, `Replaced`, `Unchanged`, `Kept` when the
+user changed it, or `Deleted` when the selection no longer renders it and its hash still matches.
+`src/terminal/setup.ts` prints one line for each. A `Kept` file is not handed off. Its
+integration's `assess` reads it and reports only a change that breaks the setup. The assessment
+runs each listed integration that the selection includes, and without a lockfile it uses the
+selection that `inferSelection` in `integrations/selection.ts` reads from the project files.
+
+`apply` writes the lockfile last, and only `init` and `update` call it: `adamantite/import-owners`
+keeps `#lib/setup` and `writeLockfile` to them. `written` records the hash of each managed file
+that `apply` created, replaced, or found unchanged. The integrations that have not moved to a folder
+yet keep their setup steps in `src/commands/init/setup.ts`. For their files, the Oxlint, Oxfmt, and
+Knip configs and `tsconfig.json`, `written` records the hash when the file equals what this version
+writes, or when its hash equals the hash that the lockfile recorded, and `apply` never writes or
+deletes them. Each run computes `written` again, so a file that the user changed leaves it.
 
 A command that reads the workspace outside an assessment reads it one time for each phase and
 passes the `Workspace` down. `harden` reads it before the session, and takes `project.workspace`
@@ -252,7 +267,7 @@ src/
     assessment/     integration registry, project assessment, agent prompt
     toolchain/      check, fix, and analyze operations
     hardening/      harden context, harden prompt, rule facts, and rule trials
-    setup/          lockfile writes: the inferred selection and the written hashes
+    setup/          Setup.apply: the write rule, the package install, and the lockfile write
   terminal/         status output, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary

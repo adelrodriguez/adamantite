@@ -22,9 +22,10 @@ import {
   type LintPreset,
   type Selection,
 } from "#lib/project/selection.ts"
-import { recordLockfile } from "#lib/setup/index.ts"
+import * as Setup from "#lib/setup/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Output from "#terminal/output.ts"
+import { printFileWrites } from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
@@ -248,13 +249,15 @@ export default Command.make("init", initCommandOptions).pipe(
         onSome: (lockfile) => addSelection(lockfile.selection, asked),
       })
 
-      // Last, so `written` records the files that the steps above wrote.
+      // Last, so the lockfile records the files that the steps above wrote.
       const project = yield* readProject(cwd)
 
-      const lockfile = yield* recordLockfile(project, selection)
+      const setup = yield* Setup.apply(project, selection)
+
+      yield* printFileWrites(setup.files)
 
       yield* Output.success(
-        lockfile === "written"
+        setup.lockfile === "written"
           ? `\`${LOCKFILE_PATH}\` written. Commit it with the setup.`
           : `\`${LOCKFILE_PATH}\` already records this setup.`
       )

@@ -134,6 +134,17 @@ monorepo. It records the selection, the Adamantite version that last wrote it, a
 file that Adamantite wrote whole. Only `init` and `update` write it, and the project commits it.
 _Avoid_: Manifest, state file, `skills-lock.json`
 
+**Managed file**:
+A file that Adamantite renders whole for a selection, such as `.vscode/extensions.json`. `init` and
+`update` write it under the write rule, and the lockfile records the hash of what they wrote.
+_Avoid_: Generated file, template
+
+**Write rule**:
+Adamantite writes a managed file only whole, and only when the file does not exist or its hash
+equals the hash in the lockfile. A file that the user changed is kept, and Doctor reports a change
+that breaks the setup. Adamantite never merges, splices, or edits a config.
+_Avoid_: Merge, overwrite policy
+
 **Assessment**:
 A read-only classification of a managed integration against its latest supported state.
 _Avoid_: Check result, diagnostic

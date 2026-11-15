@@ -1,73 +1,56 @@
 import * as Array from "effect/Array"
 import * as Digest from "effect/crypto/Digest"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
-import * as String from "effect/String"
+import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
-import github from "#lib/integrations/ci/github.ts"
-import vscode from "#lib/integrations/editors/vscode.ts"
-import zed from "#lib/integrations/editors/zed.ts"
+import { integrations } from "#lib/integrations/index.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
-import {
-  getImportedLintPresets,
-  toOxlintTsConfigContent,
-} from "#lib/integrations/tooling/oxlint/config.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
-import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
+import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { writeLockfile } from "#lib/project/lockfile.ts"
-import { checkRunsTool, getManagedScripts, SCRIPT_ORDER } from "#lib/project/package-json.ts"
-import { INIT_EDITORS, LINT_PRESETS, type Selection } from "#lib/project/selection.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { checkRunsTool } from "#lib/project/package-json.ts"
+import { LINT_PRESETS, type Selection } from "#lib/project/selection.ts"
+import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
+
+export { inferSelection } from "#lib/integrations/selection.ts"
 
 const version = getPackageVersion()
 
-const editorIntegrations = { vscode, zed } as const
-
 /**
- * The selection that `init` would record for a project that an earlier Adamantite version set up.
- * Each part comes from the detection that Doctor applies without a lockfile: the managed scripts,
- * the presets that the root Oxlint config imports, the TypeScript configs that name a preset, the
- * editor settings and the workflow that exist, and the Adamantite section of `AGENTS.md`.
+ * What `apply` did with one managed file.
  */
-export const inferSelection = Effect.fn("inferSelection")(function* (project: Project) {
-  const fs = yield* FileSystem.FileSystem
-  const path = yield* Path.Path
-  const { cwd, lintConfig, packageJson } = project
+export type FileWrite =
+  /**
+   * The file did not exist, so Adamantite wrote it.
+   */
+  | { readonly _tag: "Created"; readonly path: string }
+  /**
+   * The file's hash equaled the hash that the lockfile recorded, so Adamantite wrote the current
+   * version over it.
+   */
+  | { readonly _tag: "Replaced"; readonly path: string }
+  /**
+   * The file already held the current version.
+   */
+  | { readonly _tag: "Unchanged"; readonly path: string }
+  /**
+   * The user changed the file, so Adamantite kept it. Its integration's `assess` judges it.
+   */
+  | { readonly _tag: "Kept"; readonly path: string }
+  /**
+   * The selection no longer renders the file, and its hash still equaled the recorded hash.
+   */
+  | { readonly _tag: "Deleted"; readonly path: string }
 
-  const managedScripts = getManagedScripts(packageJson)
-  const scripts = SCRIPT_ORDER.filter((script) => managedScripts.includes(script))
-
-  const imported: readonly string[] = Option.match(lintConfig, {
-    onNone: () => [],
-    onSome: getImportedLintPresets,
-  })
-
-  const editors = yield* Effect.filter(
-    INIT_EDITORS,
-    (editor) => fs.exists(path.join(cwd, editorIntegrations[editor].config)),
-    { concurrency: "unbounded" }
-  )
-
-  const workflow = yield* github.detect(cwd)
-  const agents = yield* readFileIfExists(path.join(cwd, "AGENTS.md"))
-
-  return {
-    agents: Option.exists(agents, String.includes(ADAMANTITE_AGENTS_START_MARKER)),
-    ci: Predicate.isTagged(workflow, "Missing") ? null : "github",
-    editors,
-    presets: checkRunsTool(scripts, "oxlint")
-      ? ["core", ...LINT_PRESETS.filter((preset) => imported.includes(preset))]
-      : [],
-    scripts,
-    typescript: Option.getOrNull(yield* tsconfig.detectPreset(project)),
-  } satisfies Selection
-})
+const { Created, Deleted, Kept, Replaced, Unchanged } = Data.taggedEnum<FileWrite>()
 
 /**
  * Whether `selection` sets up nothing.
@@ -84,10 +67,22 @@ export function checkIsEmptySelection(selection: Selection): boolean {
 }
 
 /**
- * The files that Adamantite writes whole for `selection`, with the content that this version
- * writes, by their path from the project root.
+ * The managed files of the integrations that have not moved to a folder of their own yet. Their own
+ * setup steps in `init` write them, so `apply` records their hashes, and never writes or deletes
+ * them.
  */
-const renderManagedFiles = Effect.fn("renderManagedFiles")(function* (
+const LEGACY_PATHS: ReadonlySet<string> = new Set([
+  oxlint.config,
+  oxfmt.config,
+  knip.config,
+  tsconfig.config,
+])
+
+/**
+ * The files that the setup steps of `init` write for `selection`, with the content that this
+ * version writes, by their path from the project root.
+ */
+const renderLegacyFiles = Effect.fn("renderLegacyFiles")(function* (
   project: Project,
   selection: Selection
 ) {
@@ -109,7 +104,7 @@ const renderManagedFiles = Effect.fn("renderManagedFiles")(function* (
     ...(selection.typescript === null || project.workspace.isMonorepo
       ? []
       : [{ content: yield* tsconfig.render(selection.typescript), path: tsconfig.config }]),
-  ]
+  ] satisfies readonly ManagedFile[]
 })
 
 const hashContent = (content: string) =>
@@ -118,24 +113,18 @@ const hashContent = (content: string) =>
   ).pipe(Effect.map((hex) => `sha256-${hex}`))
 
 /**
- * Writes the lockfile of `project` with `selection` and this Adamantite version. `written` records
- * each managed file that is still Adamantite's: the file equals what this version writes, or its
- * hash equals the hash that the lockfile recorded. A file that the user changed drops out. Running
- * it twice gives the same lockfile.
+ * The `written` entries of the files that the setup steps of `init` wrote: each file that equals
+ * what this version writes, or whose hash equals the hash that the lockfile recorded.
  */
-export const recordLockfile = Effect.fn("recordLockfile")(function* (
+const recordLegacyFiles = Effect.fn("recordLegacyFiles")(function* (
   project: Project,
-  selection: Selection
+  selection: Selection,
+  recorded: Readonly<Record<string, string>>
 ) {
   const path = yield* Path.Path
 
-  const recorded: Readonly<Record<string, string>> = Option.match(project.lockfile, {
-    onNone: () => ({}),
-    onSome: (lockfile) => lockfile.written,
-  })
-
-  const written = yield* Effect.forEach(
-    yield* renderManagedFiles(project, selection),
+  const entries = yield* Effect.forEach(
+    yield* renderLegacyFiles(project, selection),
     ({ content, path: file }) =>
       Effect.gen(function* () {
         const current = yield* readFileIfExists(path.join(project.cwd, file))
@@ -151,10 +140,137 @@ export const recordLockfile = Effect.fn("recordLockfile")(function* (
     { concurrency: "unbounded" }
   )
 
-  return yield* writeLockfile(project.cwd, {
+  return Array.flatten(entries)
+})
+
+/**
+ * Applies the write rule to one managed file: write it when it does not exist, or when its hash
+ * equals the hash that the lockfile recorded. `hash` is what `written` records, and none for a file
+ * that the user changed.
+ */
+const writeManagedFile = Effect.fn("writeManagedFile")(function* (
+  cwd: string,
+  file: ManagedFile,
+  recorded: Option.Option<string>
+) {
+  const path = yield* Path.Path
+  const target = path.join(cwd, file.path)
+  const current = yield* readFileIfExists(target)
+  const hash = Option.some(yield* hashContent(file.content))
+
+  const write = Effect.gen(function* () {
+    yield* ensureDirectory(path.dirname(target))
+    yield* writeFile(target, file.content)
+  })
+
+  if (Option.isNone(current)) {
+    yield* write
+
+    return { hash, write: Created({ path: file.path }) }
+  }
+
+  if (current.value === file.content) {
+    return { hash, write: Unchanged({ path: file.path }) }
+  }
+
+  if (Option.contains(recorded, yield* hashContent(current.value))) {
+    yield* write
+
+    return { hash, write: Replaced({ path: file.path }) }
+  }
+
+  return { hash: Option.none<string>(), write: Kept({ path: file.path }) }
+})
+
+/**
+ * Deletes a file that Adamantite wrote and the selection no longer renders, when its hash still
+ * equals the recorded hash. A file that the user changed stays, and leaves the lockfile.
+ */
+const deleteDroppedFile = Effect.fn("deleteDroppedFile")(function* (
+  cwd: string,
+  file: string,
+  recorded: string
+) {
+  const fs = yield* FileSystem.FileSystem
+  const path = yield* Path.Path
+  const target = path.join(cwd, file)
+  const current = yield* readFileIfExists(target)
+
+  if (Option.isNone(current) || (yield* hashContent(current.value)) !== recorded) {
+    return Option.none<FileWrite>()
+  }
+
+  yield* fs.remove(target)
+
+  return Option.some(Deleted({ path: file }))
+})
+
+/**
+ * Sets up `selection` in `project`, the backend of `init` and `update`. It installs the packages of
+ * every selected integration in one install, prepares what they need in `node_modules`, writes
+ * their managed files under the write rule, deletes the managed files that the selection dropped,
+ * and writes the lockfile last. Running it twice leaves the project unchanged.
+ */
+export const apply = Effect.fn("Setup.apply")(function* (project: Project, selection: Selection) {
+  const { cwd } = project
+  const selected = integrations.filter((integration) => integration.selected(selection))
+  const packages = selected.flatMap((integration) => integration.packages(selection))
+
+  if (packages.length > 0) {
+    yield* addRootDevDependencies(
+      cwd,
+      packages.map(({ name, version: target }) => `${name}@${target}`)
+    )
+  }
+
+  yield* Effect.forEach(selected, (integration) => integration.prepare?.(project) ?? Effect.void, {
+    concurrency: 1,
+    discard: true,
+  })
+
+  const recorded: Readonly<Record<string, string>> = Option.match(project.lockfile, {
+    onNone: () => ({}),
+    onSome: (lockfile) => lockfile.written,
+  })
+
+  const rendered = Array.flatten(
+    yield* Effect.forEach(selected, (integration) => integration.files(project, selection), {
+      concurrency: "unbounded",
+    })
+  )
+
+  const writes = yield* Effect.forEach(
+    rendered,
+    (file) => writeManagedFile(cwd, file, Option.fromNullishOr(recorded[file.path])),
+    { concurrency: "unbounded" }
+  )
+
+  const renderedPaths = new Set(rendered.map((file) => file.path))
+
+  const deletes = yield* Effect.forEach(
+    Object.entries(recorded).filter(
+      ([file]) => !renderedPaths.has(file) && !LEGACY_PATHS.has(file)
+    ),
+    ([file, hash]) => deleteDroppedFile(cwd, file, hash),
+    { concurrency: "unbounded" }
+  )
+
+  const written = [
+    ...(yield* recordLegacyFiles(project, selection, recorded)),
+    ...writes.flatMap(({ hash, write }) =>
+      Option.match(hash, { onNone: () => [], onSome: (value) => [[write.path, value] as const] })
+    ),
+  ]
+
+  const lockfile = yield* writeLockfile(cwd, {
     schemaVersion: 1,
     selection,
     version,
-    written: Object.fromEntries(Array.flatten(written)),
+    written: Object.fromEntries(written),
   })
+
+  return {
+    files: [...writes.map(({ write }) => write), ...Array.getSomes(deletes)],
+    lockfile,
+  }
 })

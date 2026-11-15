@@ -15,9 +15,10 @@ import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readProject } from "#lib/project/project.ts"
-import { checkIsEmptySelection, inferSelection, recordLockfile } from "#lib/setup/index.ts"
+import * as Setup from "#lib/setup/index.ts"
 import { printFindings } from "#terminal/findings.ts"
 import * as Output from "#terminal/output.ts"
+import { printFileWrites } from "#terminal/setup.ts"
 
 // Managed plugins stay out of this fallback: a plugin is updated only while its preset is imported,
 // which the assessment already covers.
@@ -136,17 +137,29 @@ export default Command.make("update").pipe(
 
       // A project from before the lockfile gets the selection that its files show, one time.
       const selection = yield* Option.match(project.lockfile, {
-        onNone: () => inferSelection(project),
+        onNone: () => Setup.inferSelection(project),
         onSome: (lockfile) => Effect.succeed(lockfile.selection),
       })
 
       // A project with no lockfile and no setup to record stays without one.
-      const lockfile: StepOutcome =
-        Option.isNone(project.lockfile) && checkIsEmptySelection(selection)
-          ? "idle"
-          : (yield* recordLockfile(project, selection)) === "written"
-            ? "applied"
-            : "idle"
+      const setup =
+        Option.isNone(project.lockfile) && Setup.checkIsEmptySelection(selection)
+          ? Option.none()
+          : Option.some(yield* Setup.apply(project, selection))
+
+      yield* printFileWrites(
+        Option.match(setup, { onNone: () => [], onSome: ({ files }) => files })
+      )
+
+      const files: StepOutcome = Option.exists(setup, ({ files }) =>
+        files.some(({ _tag }) => _tag !== "Kept" && _tag !== "Unchanged")
+      )
+        ? "applied"
+        : "idle"
+
+      const lockfile: StepOutcome = Option.exists(setup, (result) => result.lockfile === "written")
+        ? "applied"
+        : "idle"
 
       if (lockfile === "applied") {
         yield* Output.success(
@@ -158,7 +171,7 @@ export default Command.make("update").pipe(
 
       // The lockfile decides which integrations apply, so a new lockfile needs a new assessment.
       const finalAssessment =
-        packages === "idle" && lockfile === "idle"
+        packages === "idle" && files === "idle" && lockfile === "idle"
           ? assessment
           : yield* assessProject(yield* readProject(cwd))
 
@@ -185,7 +198,7 @@ export default Command.make("update").pipe(
         yield* Output.info("Run `adamantite doctor` for the remaining repairs and an agent prompt.")
       }
 
-      const foundWork = [packages, skill, lock, lockfile].some(
+      const foundWork = [packages, skill, lock, files, lockfile].some(
         (outcome) => outcome === "applied" || outcome === "applyFailed"
       )
 

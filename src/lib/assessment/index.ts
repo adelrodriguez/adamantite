@@ -10,6 +10,8 @@ import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.t
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
 import zed from "#lib/integrations/editors/zed.ts"
+import { integrations } from "#lib/integrations/index.ts"
+import { inferSelection } from "#lib/integrations/selection.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
@@ -132,7 +134,23 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
     { concurrency: "unbounded" }
   )
 
-  const applicable = Array.flatten(assessments)
+  // Without a lockfile, an integration applies to the files that exist, which the inferred
+  // selection names.
+  const selection = yield* Option.match(project.lockfile, {
+    onNone: () => inferSelection(project),
+    onSome: (lockfile) => Effect.succeed(lockfile.selection),
+  })
+
+  const parts = yield* Effect.forEach(
+    integrations.filter((integration) => integration.selected(selection)),
+    (integration) =>
+      integration
+        .assess(project, selection)
+        .pipe(Effect.map((assessment) => ({ assessment, name: integration.name }))),
+    { concurrency: "unbounded" }
+  )
+
+  const applicable = [...Array.flatten(assessments), ...parts]
 
   // A project that Adamantite does not manage needs no lockfile.
   const lockfileFindings =

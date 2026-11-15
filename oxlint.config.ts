@@ -94,10 +94,16 @@ export default defineConfig({
         names: ["discoverCustomRules"],
         owners: ["src/lib/project/project.ts", "src/lib/hardening/index.ts"],
       },
-      // Only `init` and `update` write the lockfile, through `lib/setup`.
+      // Only `init` and `update` write the lockfile and the managed files, through `lib/setup`. The
+      // terminal prints what it wrote.
       {
         import: "#lib/setup",
-        owners: ["src/commands/init", "src/commands/update.ts", "src/commands/__tests__"],
+        owners: [
+          "src/commands/init",
+          "src/commands/update.ts",
+          "src/commands/__tests__",
+          "src/terminal/setup.ts",
+        ],
       },
       {
         import: "#lib/project/lockfile.ts",

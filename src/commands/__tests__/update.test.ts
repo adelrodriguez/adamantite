@@ -123,6 +123,55 @@ describe("update", () => {
       })
   )
 
+  // Inference reads the presets from the lint config, so a lockfile from a failed load would
+  // record a selection without them, and later updates would keep it.
+  it.effect(
+    "record no selection while the lint config fails to load, and infer it after the repair",
+    () =>
+      Effect.gen(function* () {
+        const config = toOxlintTsConfigContent(["vitest"])
+
+        const files = createFileSystemTestContext({
+          files: {
+            "oxlint.config.ts": `import "./missing.ts"\n${config}`,
+            "package.json": manifest({
+              devDependencies: { adamantite: "1.0.0" },
+              scripts: { check: "adamantite check" },
+            }),
+          },
+        })
+
+        const installer = createDependencyInstallerTestContext()
+        const logLines: unknown[] = []
+
+        const failed = yield* runCommand(updateCommand, ["--json"], {
+          files,
+          layers: [installer.layer],
+          logLines,
+        })
+
+        const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
+
+        expect({
+          failure: getFailure(failed),
+          findings: report.assessment.findings.map(({ id }) => id),
+          lockfile: files.exists(LOCKFILE_PATH),
+          setup: report.setup,
+        }).toStrictEqual({
+          failure: findingsLeft("update"),
+          findings: expect.arrayContaining(["invalid-oxlint-config"]),
+          lockfile: false,
+          setup: null,
+        })
+
+        files.write("oxlint.config.ts", config)
+
+        yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
+
+        expect(readLockfile(files).selection.presets).toStrictEqual(["core", "vitest"])
+      })
+  )
+
   it.effect("change nothing in a project that Adamantite does not manage", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({

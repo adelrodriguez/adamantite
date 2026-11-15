@@ -90,9 +90,9 @@ Run `adamantite update --json`. It installs the managed packages of the recorded
 managed files of the recorded setup, such as `.vscode/extensions.json` and this skill, that are
 missing or unchanged since Adamantite wrote them, and writes
 `.adamantite/adamantite-lock.json`. In a project without a lockfile, it records the setup that the
-project files show. Commit the lockfile. The JSON lists the file writes, the script writes, and the
-installs in `setup`, and the findings that remain in `assessment`. It exits 1 while findings
-remain.
+project files show, and records nothing while `oxlint.config.ts` does not load. Commit the
+lockfile. The JSON lists the file writes, the script writes, and the installs in `setup`, and the
+findings that remain in `assessment`. It exits 1 while findings remain.
 
 Follow the repair step above. The update is complete when Doctor reports no findings and
 the project's checks pass.

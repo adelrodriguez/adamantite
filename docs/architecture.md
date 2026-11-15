@@ -348,7 +348,9 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   `src/lib/hardening` take the `Workspace` as a parameter and do not read it.
 - `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a
   project without a lockfile, `inferSelection` reads the selection one time from the same files
-  that Doctor applies the integrations to without one. `update` does not edit `skills-lock.json`,
+  that Doctor applies the integrations to without one. While the root `oxlint.config.ts` does not
+  load, the selection misses the lint presets, so `update` runs no setup, records no lockfile, and
+  offers the repair of the load finding. `update` does not edit `skills-lock.json`,
   which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
   finding.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit,

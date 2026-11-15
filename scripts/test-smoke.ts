@@ -463,6 +463,9 @@ try {
     ),
     join(effectFixture, "index.ts")
   )
+  // Init in the package wrote a root Oxlint config there. Oxlint rejects the type-aware options of
+  // that config as a nested config of the fixture, so the fixture's lint and Doctor need it gone.
+  rmSync(effectWorkspacePackage, { force: true, recursive: true })
 
   rmSync(sdkDirectory, { force: true, recursive: true })
   assertIncludes(

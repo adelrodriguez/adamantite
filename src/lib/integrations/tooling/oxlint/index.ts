@@ -24,6 +24,7 @@ import {
   type MisplacedCorePreset,
   toOxlintTsConfigContent,
 } from "#lib/integrations/tooling/oxlint/config.ts"
+import { listLintedFiles } from "#lib/integrations/tooling/oxlint/files.ts"
 import {
   findExcludedPresets,
   RETIRED_LINT_PRESETS,
@@ -166,6 +167,35 @@ export default defineIntegration({
       const runtimeFindings = yield* assessOxlintRuntime(project)
       const migration = yield* assessRuleMigrations(project)
 
+      const declared =
+        project.packageJson.devDependencies?.["oxlint"]
+        ?? project.packageJson.dependencies?.["oxlint"]
+
+      // Oxlint loads every config of the project before it lists the files to lint, so a failed list
+      // is a config that every lint run fails to load. A missing package or runtime has its own
+      // finding, and Oxlint does not run without it.
+      const loadFindings: readonly Finding[] =
+        declared && runtimeFindings.length === 0
+          ? yield* listLintedFiles(cwd).pipe(
+              Effect.as([]),
+              Effect.catchTag("TrialLintFailed", ({ output }) =>
+                Effect.succeed([
+                  {
+                    currentState: `Oxlint fails to load the lint config, so \`adamantite check\` and \`adamantite fix\` stop before they lint a file. Oxlint printed:\n\n\`\`\`text\n${output}\n\`\`\``,
+                    goal: [
+                      "Repair the config that the error names. Keep its rules and all other project settings.",
+                      "When the config imports an Adamantite preset that the installed package does not export, replace the import with the preset that the changelog at https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md names for it.",
+                      "Run `adamantite check --only lint`, then run `adamantite doctor` again.",
+                    ],
+                    id: "oxlint-config-load-failure",
+                    integration: "oxlint",
+                    title: "Oxlint cannot load the lint config",
+                  },
+                ])
+              )
+            )
+          : []
+
       const pkg = assessPackage(
         project,
         { name: "oxlint", version: VERSION },
@@ -207,6 +237,7 @@ export default defineIntegration({
         findings: [
           ...pkg.findings,
           ...runtimeFindings,
+          ...loadFindings,
           ...migration.findings,
           ...retiredPresetFindings,
           ...presetOrderFindings,

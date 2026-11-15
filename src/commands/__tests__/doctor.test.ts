@@ -1,3 +1,4 @@
+import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -5,10 +6,13 @@ import * as Exit from "effect/Exit"
 import * as Schema from "effect/Schema"
 import type { Selection } from "#lib/project/selection.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
+import { makeOxlintLoadFailureLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import doctorCommand from "#commands/doctor.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   makeHandoffRunner,
@@ -87,6 +91,17 @@ const FOUND_ISSUES = "⚠️ Doctor found issues."
 const NO_INTEGRATION_FILES = {
   "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
 }
+
+const BINDING_SUFFIXES: Partial<Record<NodeJS.Platform, string>> = { linux: "-gnu", win32: "-msvc" }
+
+// What Oxlint prints for a config that imports a preset that the package does not export.
+const SHADCN_LOAD_ERROR = [
+  "Failed to parse oxlint configuration file.",
+  "",
+  "  x Failed to load config: /project/oxlint.config.ts",
+  "  | ",
+  "  | Error [ERR_PACKAGE_PATH_NOT_EXPORTED]: Package subpath './lint/shadcn' is not defined by \"exports\" in /project/node_modules/adamantite/package.json imported from /project/oxlint.config.ts",
+].join("\n")
 
 // A lockfile that a newer Adamantite version wrote.
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
@@ -584,6 +599,51 @@ describe("doctor", () => {
       expect(logLines).toStrictEqual([
         expect.stringMatching(
           /^# Adamantite doctor findings\n[\s\S]*## 1\. Mismatched TypeScript preset\n[\s\S]*Make `tsconfig\.json` extend `adamantite\/typescript` instead of `adamantite\/tsconfig`/u
+        ),
+      ])
+    })
+  )
+
+  it.effect("report the error of an Oxlint config that fails to load", () =>
+    Effect.gen(function* () {
+      const target = `${process.platform}-${process.arch}${BINDING_SUFFIXES[process.platform] ?? ""}`
+
+      const files = createFileSystemTestContext({
+        files: {
+          ...makeLockfileFile({ ...ANALYZE_SELECTION, agents: false, scripts: ["check"] }),
+          "/usr/bin/ldd": "GNU libc",
+          [`node_modules/oxlint/dist/oxlint.${target}.node`]: "",
+          "oxlint.config.ts": [
+            'import core from "adamantite/lint"',
+            'import shadcn from "adamantite/lint/shadcn"',
+            "",
+            "export default { extends: [core, shadcn] }",
+            "",
+          ].join("\n"),
+          "package.json": manifest({
+            devDependencies: { adamantite: "1.0.0", oxlint: oxlint.version },
+            scripts: { check: "adamantite check" },
+          }),
+        },
+      })
+
+      const logLines: unknown[] = []
+
+      const exit = yield* runCommand(doctorCommand, [], {
+        files,
+        layers: [
+          makeOxlintLoadFailureLayer(SHADCN_LOAD_ERROR),
+          makeModuleResolverLayer(files.root, {
+            "oxlint/package.json": "node_modules/oxlint/package.json",
+          }),
+        ],
+        logLines,
+      })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(logLines).toStrictEqual([
+        expect.stringMatching(
+          /\n## \d+\. Oxlint cannot load the lint config\n\n- \*\*Current state:\*\* [^\n]*\n\n```text\nFailed to parse oxlint configuration file\.\n[\s\S]*Package subpath '\.\/lint\/shadcn' is not defined by "exports"[\s\S]*\n```\n/u
         ),
       ])
     })

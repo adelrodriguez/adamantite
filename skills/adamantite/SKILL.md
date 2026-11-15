@@ -74,6 +74,10 @@ Without a terminal, it prints a Markdown repair prompt and exits 1 when findings
 Follow each finding's current state, goal, reference, and verification command.
 For a finding about the previous custom-rules API, use the migration step in
 [How to write and verify custom rules](references/custom-rules.md#repair-an-existing-rules-folder).
+For a finding that Oxlint cannot load the lint config, repair the config that the error names.
+When the config imports an Adamantite preset that the installed package does not export, use the
+replacement that the [changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md)
+names for it.
 
 Run Doctor again after the repair. This step is complete when Doctor exits 0 with no
 findings. Report assessment warnings separately, because warnings alone also exit 0.

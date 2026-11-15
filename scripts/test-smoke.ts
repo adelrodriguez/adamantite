@@ -580,6 +580,56 @@ try {
   console.info("Running `adamantite rule add` and temporary RuleTester verification...")
   addRuleAndVerify(fixture, fixtureEnv)
 
+  // The rule authoring types ship inside the package, so a custom rule type-checks in a project
+  // that does not install `@oxlint/plugins`. The expected error proves that the types did not
+  // resolve to `any`.
+  console.info("Type-checking a custom rule without `@oxlint/plugins` installed...")
+
+  if (existsSync(join(fixture, "node_modules", "@oxlint", "plugins"))) {
+    throw new Error("Expected the package to install without `@oxlint/plugins`")
+  }
+
+  const ruleTypesProbe = join(fixture, "rule-types-probe.mts")
+  writeFileSync(
+    ruleTypesProbe,
+    [
+      'import { type Context, type ESTree, defineRule } from "adamantite/rules/plugin"',
+      "",
+      "export default defineRule({",
+      "  create(context: Context) {",
+      "    return {",
+      "      DebuggerStatement(node: ESTree.DebuggerStatement) {",
+      '        context.report({ message: "Remove the debugger statement.", node })',
+      "      },",
+      "    }",
+      "  },",
+      "})",
+      "",
+      "// @ts-expect-error - A rule must supply create or createOnce.",
+      'defineRule({ meta: { type: "problem" } })',
+      "",
+    ].join("\n")
+  )
+
+  try {
+    run(
+      "tsc",
+      [
+        "--ignoreConfig",
+        "--noEmit",
+        "--strict",
+        "--module",
+        "nodenext",
+        "--target",
+        "esnext",
+        ruleTypesProbe,
+      ],
+      { cwd: fixture, env: fixtureEnv }
+    )
+  } finally {
+    rmSync(ruleTypesProbe)
+  }
+
   // Check the generated config and custom rule, and keep the rule as a Knip entry file.
   for (const command of ["fix", "check", "analyze"]) {
     console.info(`Running \`adamantite ${command}\` with the real tool binaries...`)

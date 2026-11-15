@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Schema from "effect/Schema"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
+import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { Report } from "#commands/doctor.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson } from "#lib/shared/json.ts"
@@ -114,6 +115,61 @@ describe("TypeScript setup", () => {
           finding === undefined ? [] : [finding]
         )
       })
+  )
+
+  // TypeScript finds a package base config by its config lookup: `tsconfig.json` in the package
+  // folder, and the `.json` file of an extensionless subpath. Node.js resolves neither.
+  it.effect.each([
+    { file: "tsconfig.json", specifier: "@company/config" },
+    { file: "base.json", specifier: "@company/config/base" },
+  ])(
+    "infer and find adamantite/tsconfig through the package base $specifier",
+    ({ file, specifier }) =>
+      Effect.gen(function* () {
+        const files = makeProject({
+          [CONFIG]: `{ "extends": "${specifier}", "include": ["src"] }\n`,
+          "node_modules/@company/config/package.json": '{ "name": "@company/config" }\n',
+          [`node_modules/@company/config/${file}`]: '{ "extends": "adamantite/tsconfig" }\n',
+        })
+
+        const layers = [
+          makeModuleResolverLayer(
+            files.root,
+            {},
+            {
+              configs: { [specifier]: `node_modules/@company/config/${file}` },
+            }
+          ),
+        ]
+
+        yield* runLifecycle("update", files, [], layers)
+        const doctor = yield* runLifecycle("doctor", files, ["--json"], layers)
+
+        expect({
+          findings: decodeReport(doctor.output).findings.map(({ title }) => title),
+          typescript: readLockfile(files).selection.typescript,
+        }).toStrictEqual({ findings: [], typescript: "tsconfig" })
+      })
+  )
+
+  // TypeScript adds `.json` to a relative entry that names no file, and a folder is not a file.
+  it.effect("find adamantite/tsconfig through ./base.json beside a base folder", () =>
+    Effect.gen(function* () {
+      const files = makeProject({
+        ...makeLockfileFile(makeSelection({ typescript: "tsconfig" })),
+        [CONFIG]: '{ "extends": "./base", "include": ["src"] }\n',
+        "base.json": '{ "extends": "adamantite/tsconfig" }\n',
+        "base/index.ts": "export {}\n",
+      })
+
+      const doctor = yield* runLifecycle("doctor", files)
+      const json = yield* runLifecycle("doctor", files, ["--json"])
+
+      expect({
+        findings: decodeReport(json.output).findings.map(({ title }) => title),
+        succeeded: Exit.isSuccess(doctor.exit),
+      }).toStrictEqual({ findings: [], succeeded: true })
+    })
   )
 
   // An earlier version wrote the config before the selection added the effect preset (#837).

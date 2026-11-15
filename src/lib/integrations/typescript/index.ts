@@ -1,9 +1,9 @@
-import type * as FileSystem from "effect/FileSystem"
 import type { JsonValue, PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Json5 from "effect/encoding/Json5"
 import * as Jsonc from "effect/encoding/Jsonc"
+import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
@@ -14,7 +14,6 @@ import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
-import type { FailedToReadFile } from "#lib/shared/errors.ts"
 import { LANGUAGE_SERVICE_PLUGIN } from "#lib/integrations/effect-language-service.ts"
 import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
@@ -23,7 +22,7 @@ import {
   TYPESCRIPT_PRESET_NAMES,
   type TypeScriptPreset,
 } from "#lib/project/selection.ts"
-import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { readFile } from "#lib/shared/filesystem.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 
@@ -122,47 +121,47 @@ function readExtends(config: JsonValue) {
 const ADAMANTITE_PRESETS: readonly string[] = Object.values(TYPESCRIPT_PRESETS)
 
 /**
+ * Whether `file` is a file, as TypeScript checks it before it reads a config. A folder, a missing
+ * path, and a path that cannot be checked are not.
+ */
+const checkIsFile = (file: string) =>
+  FileSystem.FileSystem.pipe(
+    Effect.flatMap((fs) => fs.stat(file)),
+    Effect.map(({ type }) => type === "File"),
+    Effect.orElseSucceed(() => false)
+  )
+
+/**
  * The `extends` entries of the TypeScript config at `file` and of each base config that they reach,
  * as TypeScript follows them: a relative or absolute entry names a file, with `.json` added when
- * the file does not exist, and Node.js resolves a package entry that names a `.json` file. The
- * chain stops at an Adamantite preset, and at a base config that does not exist, does not decode,
- * or comes again.
+ * that path is not a file and does not end in `.json`, and TypeScript's config lookup resolves a
+ * package entry. The chain stops at an Adamantite preset, and at a base config that is not a file,
+ * cannot be read, does not decode, or comes again. TypeScript reports a base config that it cannot
+ * load, so Doctor reads such a base as one that names no preset.
  */
 const readExtendsChain = (
   file: string,
   visited: ReadonlySet<string> = new Set()
-): Effect.Effect<
-  readonly string[],
-  FailedToReadFile,
-  FileSystem.FileSystem | ModuleResolver | Path.Path
-> =>
+): Effect.Effect<readonly string[], never, FileSystem.FileSystem | ModuleResolver | Path.Path> =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const resolver = yield* ModuleResolver
 
-    const own = yield* readFileIfExists(file)
-
-    // TypeScript adds `.json` to an entry whose file does not exist.
-    const found =
-      Option.isSome(own) || file.endsWith(".json")
-        ? Option.map(own, (text) => ({ file, text }))
-        : Option.map(yield* readFileIfExists(`${file}.json`), (text) => ({
-            file: `${file}.json`,
-            text,
-          }))
-
-    if (Option.isNone(found) || visited.has(found.value.file)) {
-      return []
-    }
+    const text =
+      visited.has(file) || !(yield* checkIsFile(file))
+        ? Option.none<string>()
+        : yield* Effect.option(readFile(file))
 
     const entries: readonly string[] = Option.match(
-      Result.getSuccess(
-        Json5.parse(found.value.text).pipe(Result.flatMap(Schema.decodeUnknownResult(Schema.Json)))
+      Option.flatMap(text, (value) =>
+        Result.getSuccess(
+          Json5.parse(value).pipe(Result.flatMap(Schema.decodeUnknownResult(Schema.Json)))
+        )
       ),
       { onNone: () => [], onSome: readExtends }
     )
 
-    const directory = path.dirname(found.value.file)
+    const directory = path.dirname(file)
 
     const bases = yield* Effect.forEach(
       entries,
@@ -172,16 +171,19 @@ const readExtendsChain = (
             return []
           }
 
+          // The file that a relative or absolute entry names.
+          const named = path.resolve(directory, entry)
+
           const base =
             path.isAbsolute(entry) || entry.startsWith("./") || entry.startsWith("../")
-              ? Option.some(path.resolve(directory, entry))
-              : Option.filter(yield* resolver.resolve(directory, entry), (resolved) =>
-                  resolved.endsWith(".json")
+              ? Option.some(
+                  named.endsWith(".json") || (yield* checkIsFile(named)) ? named : `${named}.json`
                 )
+              : yield* resolver.resolveConfig(directory, entry)
 
           return Option.isNone(base)
             ? []
-            : yield* readExtendsChain(base.value, new Set([...visited, found.value.file]))
+            : yield* readExtendsChain(base.value, new Set([...visited, file]))
         }),
       { concurrency: "unbounded" }
     )

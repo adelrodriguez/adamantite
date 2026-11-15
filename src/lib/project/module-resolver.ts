@@ -12,7 +12,8 @@ export class ModuleResolver extends Context.Service<
     /**
      * Forget the files and package manifests that earlier resolutions read. Custom rule discovery
      * calls it before each traversal, because a coding agent can change the project between two
-     * assessments in one command, and `addRootDevDependencies` calls it after each install.
+     * assessments in one command, and `addRootDevDependencies` calls it after each install. The
+     * cache serves `resolveConfig` too.
      */
     readonly clearCache: Effect.Effect<void>
     /**
@@ -22,6 +23,15 @@ export class ModuleResolver extends Context.Service<
      * importing file passes its folder.
      */
     readonly resolve: (directory: string, specifier: string) => Effect.Effect<Option.Option<string>>
+    /**
+     * The config file that TypeScript extends for the package `specifier` in a config in
+     * `directory`. None when the specifier does not resolve. TypeScript resolves a relative or
+     * absolute `extends` entry by its own path rules, so a caller resolves those itself.
+     */
+    readonly resolveConfig: (
+      directory: string,
+      specifier: string
+    ) => Effect.Effect<Option.Option<string>>
   }
 >()("ModuleResolver") {
   static readonly layer = Layer.sync(this, () => {
@@ -38,12 +48,24 @@ export class ModuleResolver extends Context.Service<
       extensions: [".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"],
     })
 
+    // TypeScript's config lookup for a package `extends` entry, which shares the cache: the
+    // conditions of a CommonJS import, the `tsconfig` field of `package.json`, the `.json`
+    // extension, and `tsconfig.json` as the file of a folder.
+    const config = resolver.cloneWithOptions({
+      conditionNames: ["require", "types", "node", "default"],
+      extensions: [".json"],
+      mainFields: ["tsconfig"],
+      mainFiles: ["tsconfig"],
+    })
+
     return {
       clearCache: Effect.sync(() => {
         resolver.clearCache()
       }),
       resolve: (directory, specifier) =>
         Effect.sync(() => Option.fromUndefinedOr(resolver.sync(directory, specifier).path)),
+      resolveConfig: (directory, specifier) =>
+        Effect.sync(() => Option.fromUndefinedOr(config.sync(directory, specifier).path)),
     }
   })
 }

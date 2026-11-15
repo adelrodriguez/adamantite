@@ -23,9 +23,11 @@ describe("addRootDevDependencies", () => {
           makeModuleResolverLayer(
             ROOT,
             {},
-            Effect.sync(() => {
-              events.push("clear cache")
-            })
+            {
+              onClearCache: Effect.sync(() => {
+                events.push("clear cache")
+              }),
+            }
           ),
           Layer.succeed(DependencyInstaller)({
             addDevDependencies: () =>

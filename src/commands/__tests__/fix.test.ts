@@ -11,6 +11,7 @@ import { CommandFailed, InvalidFixOptions, ToolNotSelected } from "#lib/shared/e
 import {
   createRunnerTestContext,
   getFailure,
+  makeHandoffRunner,
   makeLockfileFile,
   runCommand,
 } from "./command-test-helpers.ts"
@@ -184,25 +185,21 @@ describe("fix", () => {
   })
 
   describe("selection", () => {
-    it.effect("name the init command that adds fix when the lockfile selects no script", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
+    it.effect(
+      "name the init command that adds check when the lockfile selects no script and Oxfmt is missing",
+      () =>
+        Effect.gen(function* () {
+          const runner = makeHandoffRunner({ commandExits: { oxfmt: "not-found" } })
 
-        const exit = yield* runCommand(fixCommand, [], {
-          files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
-          layers: [runner.layer],
+          const exit = yield* runCommand(fixCommand, [], {
+            files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
+            layers: [runner.layer],
+          })
+
+          expect(getFailure(exit)).toStrictEqual(
+            new ToolNotSelected({ script: "check", tool: "oxfmt" })
+          )
         })
-
-        const error = getFailure(exit)
-
-        expect(error).toStrictEqual(
-          new ToolNotSelected({ script: "fix", tools: ["oxlint", "oxfmt"] })
-        )
-        expect(error?.message).toBe(
-          "The lockfile selects no script that runs `oxlint` or `oxfmt`, so Adamantite does not install them. Run `adamantite init --non-interactive --script fix` to add the script and install them."
-        )
-        expect(runner.invocations).toStrictEqual([])
-      })
     )
   })
 

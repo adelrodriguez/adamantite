@@ -182,9 +182,9 @@ extension that the setup needs.
 
 Run `adamantite --help` or `adamantite <command> --help` for the complete CLI reference.
 
-`check`, `fix`, and `analyze` fail before they run a tool that no script of the lockfile selection
-runs, such as Oxlint without the `check` or `fix` script, because the setup did not install it. The
-error names the command that adds the script, such as
+When `check`, `fix`, or `analyze` needs a tool that is not installed and that no script of the
+lockfile selection runs, such as Oxlint without the `check` or `fix` script, the error names the
+command that adds the script and installs the tool, such as
 `adamantite init --non-interactive --script check`.
 
 ### `adamantite check`

@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url"
 import * as NodeFileSystem from "@effect/platform-node/NodeFileSystem"
 import * as NodePath from "@effect/platform-node/NodePath"
 import * as Effect from "effect/Effect"
+import * as Option from "effect/Option"
 import * as Result from "effect/Result"
 import { getProjectDirectory, PROJECT_VARIABLE } from "#lib/integrations/oxlint/entry.ts"
 import {
@@ -12,7 +13,9 @@ import {
   toBackendEnv,
   TsrsBackend,
 } from "#lib/integrations/oxlint/runtime.ts"
+import { readSelection } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { toToolNotSelected } from "#lib/project/selection.ts"
 
 // Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
 // `adamantite check` start this file in place of `oxlint`.
@@ -25,6 +28,17 @@ const project = getProjectDirectory(
 
 const result = await Effect.runPromise(
   resolveOxlintRuntime(project).pipe(
+    // Without a selected script that runs Oxlint, Setup did not install it, and
+    // `adamantite update` would not either, so the failure names the script to add.
+    Effect.catchTag("PackageNotInstalled", (error) =>
+      readSelection(project).pipe(
+        Effect.flatMap((selection) =>
+          Effect.fail(
+            Option.getOrElse(toToolNotSelected(selection, error.packageName), () => error)
+          )
+        )
+      )
+    ),
     Effect.result,
     Effect.provide([NodeFileSystem.layer, NodePath.layer, ModuleResolver.layer])
   )

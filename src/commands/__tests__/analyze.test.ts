@@ -15,6 +15,7 @@ import {
 import {
   createRunnerTestContext,
   getFailure,
+  makeHandoffRunner,
   makeLockfileFile,
   runCommand,
 } from "./command-test-helpers.ts"
@@ -217,50 +218,61 @@ describe("analyze", () => {
   })
 
   describe("selection", () => {
-    it.effect("name the init command that adds analyze when the lockfile does not select it", () =>
-      Effect.gen(function* () {
-        const runner = createRunnerTestContext()
+    it.effect(
+      "name the init command that adds analyze when the lockfile does not select it and Knip is missing",
+      () =>
+        Effect.gen(function* () {
+          const runner = makeHandoffRunner({ commandExits: { knip: "not-found" } })
 
-        const exit = yield* runCommand(analyzeCommand, [], {
-          files: createFileSystemTestContext({
-            files: makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] })),
-          }),
-          layers: [runner.layer],
+          const exit = yield* runCommand(analyzeCommand, [], {
+            files: createFileSystemTestContext({
+              files: makeLockfileFile(makeSelection({ presets: ["core"], scripts: ["check"] })),
+            }),
+            layers: [runner.layer],
+          })
+
+          const error = getFailure(exit)
+
+          expect(error).toStrictEqual(new ToolNotSelected({ script: "analyze", tool: "knip" }))
+          expect(error?.message).toBe(
+            "The lockfile selects no script that runs `knip`, so `knip` is not installed. Run `adamantite init --non-interactive --script analyze` to add the script and install it."
+          )
         })
-
-        const error = getFailure(exit)
-
-        expect(error).toStrictEqual(new ToolNotSelected({ script: "analyze", tools: ["knip"] }))
-        expect(error?.message).toBe(
-          "The lockfile selects no script that runs `knip`, so Adamantite does not install it. Run `adamantite init --non-interactive --script analyze` to add the script and install it."
-        )
-        expect(runner.invocations).toStrictEqual([])
-      })
     )
 
-    it.effect("name Sherif too in a monorepo", () =>
+    it.effect(
+      "name the init command instead of update when Sherif is missing and not selected",
+      () =>
+        Effect.gen(function* () {
+          const runner = makeHandoffRunner({ commandExits: { sherif: "not-found" } })
+
+          const exit = yield* runCommand(analyzeCommand, [], {
+            files: createFileSystemTestContext({
+              files: {
+                ...makeLockfileFile(makeSelection({})),
+                "package.json": '{ "workspaces": ["packages/*"] }',
+              },
+            }),
+            layers: [runner.layer],
+          })
+
+          expect(getFailure(exit)).toStrictEqual(
+            new ToolNotSelected({ script: "analyze", tool: "sherif" })
+          )
+        })
+    )
+
+    it.effect("run Knip when the lockfile selects no script and Knip is installed", () =>
       Effect.gen(function* () {
         const runner = createRunnerTestContext()
 
         const exit = yield* runCommand(analyzeCommand, [], {
-          files: createFileSystemTestContext({
-            files: {
-              ...makeLockfileFile(makeSelection({})),
-              "package.json": '{ "workspaces": ["packages/*"] }',
-            },
-          }),
+          files: createFileSystemTestContext({ files: makeLockfileFile(makeSelection({})) }),
           layers: [runner.layer],
         })
 
-        const error = getFailure(exit)
-
-        expect(error).toStrictEqual(
-          new ToolNotSelected({ script: "analyze", tools: ["sherif", "knip"] })
-        )
-        expect(error?.message).toBe(
-          "The lockfile selects no script that runs `sherif` or `knip`, so Adamantite does not install them. Run `adamantite init --non-interactive --script analyze` to add the script and install them."
-        )
-        expect(runner.invocations).toStrictEqual([])
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(runner.invocations).toStrictEqual([{ ...knipStep, args: [] }])
       })
     )
   })

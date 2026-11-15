@@ -4,14 +4,13 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import type { FixLevel } from "#lib/integrations/oxlint/command.ts"
-import type { Selection } from "#lib/project/selection.ts"
 import * as knip from "#lib/integrations/knip/command.ts"
 import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
 import * as oxlint from "#lib/integrations/oxlint/command.ts"
 import { probeAst } from "#lib/integrations/oxlint/probe.ts"
 import * as sherif from "#lib/integrations/sherif/command.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
-import { checkRunsTool, type ManagedTool, type Script } from "#lib/project/package-json.ts"
+import { type Selection, toToolNotSelected } from "#lib/project/selection.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
 import {
   CliNotFound,
@@ -19,49 +18,20 @@ import {
   InvalidAnalyzeOptions,
   InvalidCheckOptions,
   InvalidFixOptions,
-  ToolNotSelected,
 } from "#lib/shared/errors.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 
 export type { FixLevel } from "#lib/integrations/oxlint/command.ts"
 
 /**
- * The tool that each stage runs.
+ * Replaces the failure of a tool that is not on `PATH` with `ToolNotSelected` when `selection`
+ * includes no script that runs the tool, because `adamantite update` would not install it. The
+ * Oxlint entry does the same for Oxlint.
  */
-const STAGE_TOOLS = {
-  format: "oxfmt",
-  lint: "oxlint",
-  monorepo: "sherif",
-  unused: "knip",
-} as const satisfies Record<string, ManagedTool>
-
-type Stage = keyof typeof STAGE_TOOLS
-
-/**
- * Fails when `selection` includes no script that runs the tool of one of `stages`, because Setup
- * then installs no such tool. The managed script named `script` runs the tool of each stage of the
- * command of the same name. Without a selection, as in a project without a lockfile, each tool
- * runs, and a missing one reports itself.
- */
-const requireSelectedTools = Effect.fn("requireSelectedTools")(function* (
-  selection: Option.Option<Selection>,
-  script: Script,
-  stages: readonly Stage[]
-) {
-  const unselected = Option.match(selection, {
-    onNone: () => [],
-    onSome: ({ scripts }) =>
-      stages.flatMap((stage) => {
-        const tool = STAGE_TOOLS[stage]
-
-        return checkRunsTool(scripts, tool) ? [] : [tool]
-      }),
-  })
-
-  if (Array.isReadonlyArrayNonEmpty(unselected)) {
-    return yield* new ToolNotSelected({ script, tools: unselected })
-  }
-})
+function explainMissingTool(selection: Option.Option<Selection>) {
+  return (error: CliNotFound) =>
+    Effect.fail(Option.getOrElse(toToolNotSelected(selection, error.command), () => error))
+}
 
 /**
  * Checks the formatting with Oxfmt, then lints with Oxlint. Both stages run, and the operation
@@ -75,8 +45,8 @@ export const check = Effect.fn("Toolchain.check")(function* (options: {
   readonly forwardedArguments?: readonly string[]
   readonly only?: "format" | "lint"
   /**
-   * The selection that the lockfile records. A stage whose tool no selected script runs fails
-   * before any stage runs. Without it, each stage runs.
+   * The selection that the lockfile records. A tool that is not installed, and that no selected
+   * script runs, fails with `ToolNotSelected`. Without it, a missing tool fails as it reports.
    */
   readonly selection?: Option.Option<Selection>
 }) {
@@ -105,10 +75,9 @@ export const check = Effect.fn("Toolchain.check")(function* (options: {
     }),
   }
 
-  const order = only === undefined ? (["format", "lint"] as const) : [only]
-
-  yield* requireSelectedTools(options.selection ?? Option.none(), "check", order)
-  yield* runner.runAll(order.map((stage) => stages[stage]))
+  yield* runner
+    .runAll(only === undefined ? [stages.format, stages.lint] : [stages[only]])
+    .pipe(Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())))
 })
 
 /**
@@ -123,8 +92,8 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
   readonly level?: FixLevel
   readonly only?: "format" | "lint"
   /**
-   * The selection that the lockfile records. A stage whose tool no selected script runs fails
-   * before any stage runs. Without it, each stage runs.
+   * The selection that the lockfile records. A tool that is not installed, and that no selected
+   * script runs, fails with `ToolNotSelected`. Without it, a missing tool fails as it reports.
    */
   readonly selection?: Option.Option<Selection>
 }) {
@@ -159,10 +128,9 @@ export const fix = Effect.fn("Toolchain.fix")(function* (options: {
   // past the print width as multiline. Oxlint applies one pass of fixes, so a fix that causes a new
   // report still needs a second `fix` until Oxlint repeats its passes:
   // https://github.com/oxc-project/oxc/issues/16118
-  const order = only === undefined ? (["lint", "format"] as const) : [only]
-
-  yield* requireSelectedTools(options.selection ?? Option.none(), "fix", order)
-  yield* runner.runAll(order.map((stage) => stages[stage]))
+  yield* runner
+    .runAll(only === undefined ? [stages.lint, stages.format] : [stages[only]])
+    .pipe(Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())))
 })
 
 /**
@@ -176,8 +144,8 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
   readonly forwardedArguments?: readonly string[]
   readonly only?: "monorepo" | "unused"
   /**
-   * The selection that the lockfile records. A stage whose tool no selected script runs fails
-   * before any stage runs. Without it, each stage runs.
+   * The selection that the lockfile records. A tool that is not installed, and that no selected
+   * script runs, fails with `ToolNotSelected`. Without it, a missing tool fails as it reports.
    */
   readonly selection?: Option.Option<Selection>
   readonly strict?: boolean
@@ -232,18 +200,13 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* (options: {
     }),
   }
 
-  const order =
-    only === undefined
-      ? [...(isMonorepo ? (["monorepo"] as const) : []), "unused" as const]
-      : [only]
-
-  yield* requireSelectedTools(options.selection ?? Option.none(), "analyze", order)
-
-  const steps = order.map((stage) => stages[stage])
+  const steps =
+    only === undefined ? [...(isMonorepo ? [stages.monorepo] : []), stages.unused] : [stages[only]]
 
   // A failed Sherif fix means no install happened, and Knip would then delete from a stale
   // dependency graph.
   yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
+    Effect.catchTag("CliNotFound", explainMissingTool(options.selection ?? Option.none())),
     Effect.mapError((error) =>
       Predicate.isTagged(error, "CliNotFound") && error.command === stages.monorepo.command
         ? new CliNotFound({

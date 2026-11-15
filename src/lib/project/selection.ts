@@ -52,3 +52,27 @@ export const Selection = Schema.Struct({
 })
 
 export type Selection = typeof Selection.Type
+
+const PRESET_ORDER = ["core", ...LINT_PRESETS] as const
+
+/**
+ * The selection after `init` sets up `next` in a project that `previous` describes. Init adds setup
+ * and removes none, so each part keeps what `previous` selected, and `next` replaces the TypeScript
+ * preset that it names.
+ */
+export function addSelection(previous: Selection, next: Selection): Selection {
+  return {
+    agents: previous.agents || next.agents,
+    ci: next.ci ?? previous.ci,
+    editors: INIT_EDITORS.filter((editor) =>
+      [...previous.editors, ...next.editors].includes(editor)
+    ),
+    presets: PRESET_ORDER.filter((preset) =>
+      [...previous.presets, ...next.presets].includes(preset)
+    ),
+    scripts: SCRIPT_ORDER.filter((script) =>
+      [...previous.scripts, ...next.scripts].includes(script)
+    ),
+    typescript: next.typescript ?? previous.typescript,
+  }
+}

@@ -16,6 +16,7 @@ import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import { readPackageJson, checkRunsTool, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { readProject } from "#lib/project/project.ts"
 import {
+  addSelection,
   INIT_EDITORS,
   LINT_PRESETS,
   type LintPreset,
@@ -225,7 +226,7 @@ export default Command.make("init", initCommandOptions).pipe(
       }
 
       // What init was asked to set up, in the order of each source list.
-      const selection = {
+      const asked = {
         agents: initOptions.agents,
         ci: Option.isSome(initOptions.githubActions) ? "github" : null,
         editors: Option.match(initOptions.editors, {
@@ -240,7 +241,14 @@ export default Command.make("init", initCommandOptions).pipe(
       } satisfies Selection
 
       // Last, so `written` records the files that the steps above wrote.
-      const lockfile = yield* recordLockfile(yield* readProject(cwd), selection)
+      const project = yield* readProject(cwd)
+
+      const selection = Option.match(project.lockfile, {
+        onNone: () => asked,
+        onSome: (lockfile) => addSelection(lockfile.selection, asked),
+      })
+
+      const lockfile = yield* recordLockfile(project, selection)
 
       yield* Output.success(
         lockfile === "written"

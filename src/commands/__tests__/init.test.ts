@@ -225,6 +225,29 @@ describe("init", () => {
         })
     )
 
+    it.effect("add to the recorded selection when init runs again with other options", () =>
+      Effect.gen(function* () {
+        const { files, installer } = yield* runFreshSetup()
+
+        // The repair that prepares the VS Code SDK cache runs init with one script and one editor.
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--script", "fix", "--editor", "zed"],
+          { files, layers: [installer.layer] }
+        )
+
+        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(readLockfile(files).selection).toStrictEqual({
+          agents: false,
+          ci: null,
+          editors: ["vscode", "zed"],
+          presets: ["core", "react"],
+          scripts: ["check", "fix", "analyze"],
+          typescript: "typescript",
+        })
+      })
+    )
+
     it.effect("write the configs for the selected tools, preset, and editor", () =>
       Effect.gen(function* () {
         const { exit, files } = yield* runFreshSetup()

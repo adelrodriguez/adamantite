@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import process from "node:process"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -14,6 +15,15 @@ import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import { OxlintProbe } from "#lib/integrations/oxlint/probe.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../../..")
+
+// The Oxlint package folder of the project. CI sets `ADAMANTITE_TEST_OXLINT` to run the probe with
+// the minimum Oxlint version that `peerDependencies` allows.
+const OXLINT_OVERRIDE = process.env["ADAMANTITE_TEST_OXLINT"]
+
+const TEST_OXLINT =
+  OXLINT_OVERRIDE === undefined || OXLINT_OVERRIDE === ""
+    ? join(REPO_ROOT, "node_modules/oxlint")
+    : OXLINT_OVERRIDE
 
 // The build writes the Oxlint entry and the probe beside the CLI, so a run from source starts their
 // source.
@@ -50,7 +60,7 @@ describe("readSuppressions", () => {
   beforeEach(() => {
     project = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-suppressions-")))
     mkdirSync(join(project, "node_modules"))
-    symlinkSync(join(REPO_ROOT, "node_modules/oxlint"), join(project, "node_modules/oxlint"))
+    symlinkSync(TEST_OXLINT, join(project, "node_modules/oxlint"))
     write("package.json", JSON.stringify({ name: "app", type: "module" }))
     write("oxlint.config.ts", 'export default { ignorePatterns: ["src/fixtures/**"] }\n')
   })

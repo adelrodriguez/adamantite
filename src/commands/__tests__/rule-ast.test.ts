@@ -23,6 +23,15 @@ import { FailedToParseSource } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 
+// The Oxlint package folder of the project. CI sets `ADAMANTITE_TEST_OXLINT` to run the probe with
+// the minimum Oxlint version that `peerDependencies` allows.
+const OXLINT_OVERRIDE = process.env["ADAMANTITE_TEST_OXLINT"]
+
+const TEST_OXLINT =
+  OXLINT_OVERRIDE === undefined || OXLINT_OVERRIDE === ""
+    ? join(REPO_ROOT, "node_modules/oxlint")
+    : OXLINT_OVERRIDE
+
 // The build writes the Oxlint entry and the probe beside the CLI, so a run from source starts their
 // source.
 const TEST_LAYER = Layer.mergeAll(
@@ -75,7 +84,7 @@ describe("rule ast", () => {
   beforeEach(() => {
     project = realpathSync(mkdtempSync(join(tmpdir(), "adamantite-rule-ast-")))
     mkdirSync(join(project, "node_modules"))
-    symlinkSync(join(REPO_ROOT, "node_modules/oxlint"), join(project, "node_modules/oxlint"))
+    symlinkSync(TEST_OXLINT, join(project, "node_modules/oxlint"))
     write("package.json", JSON.stringify({ name: "app", type: "module" }))
     // The project config does not apply to the tree, so a rule that it turns on reports nothing.
     write("oxlint.config.ts", 'export default { rules: { "no-debugger": "error" } }\n')

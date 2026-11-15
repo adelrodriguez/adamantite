@@ -14,96 +14,275 @@ invoke target-project operations.
 services. Other external behavior, such as prompts and child commands, is also behind
 services so command behavior can be tested without changing a real project.
 
-Tsdown bundles the CLI, the Oxlint entry, and the presets into `dist`. Unplugin macros expands
-compile-time package metadata and terminal-title values during builds and Vitest source
-transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint.ts` builds to
+Tsdown bundles the CLI, the Oxlint entry, the probe plugin, and the presets into `dist`. Unplugin
+macros expands compile-time package metadata and terminal-title values during builds and Vitest
+source transforms. The `bin/adamantite` executable loads the bundled CLI. `src/oxlint.ts` builds to
 `dist/oxlint.js`, beside the CLI bundle, and runs Oxlint with the project's Oxlint runtime. The
 entry imports no macro module, so this repository runs it from source with
-`node src/oxlint.ts`. Repository tests run with Vitest
+`node src/oxlint.ts`. `src/probe.ts` builds to `dist/probe.js`, the Oxlint plugin that
+"Reading configs, comments, and syntax trees" describes. Repository tests run with Vitest
 under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
-
-## Module seams
-
-| Module         | Responsibility                                                                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `commands`     | Define Effect CLI input, command composition, and user-facing output.                                                                             |
-| `toolchain`    | Coordinate check, fix, and analyze stages, argument routing, and failure policy.                                                                  |
-| `handoff`      | Detect the installed coding agent CLIs, and hand the terminal to one of them.                                                                     |
-| `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
-| `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
-| `integrations` | Render the packages and managed files of each tool, editor, workspace feature, and CI provider, and assess each one against its supported state.  |
-| `project`      | Read target-project files, install dependencies, derive workspace state, and read the lockfile.                                                   |
-| `setup`        | Apply a selection: install the packages, set the managed scripts, write the managed files under the write rule, and write the lockfile last.      |
-| `shared`       | Define errors, filesystem helpers, JSON helpers, the command runner, and the forwarded arguments.                                                 |
-| `terminal`     | Decide the output mode, prompt the user, render findings and JSON documents, hand prompts off through `Resolution.offer`, and render the title.   |
-| `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
 
 ## Layers
 
 The layer maps in `adamantite/layers` in `oxlint.config.ts` are the only statement of the
 layers. Each layer has an explicit `imports` list and can contain another map in `layers`.
-Imports are transitive within each map. Declaration order does not change permissions.
-
-The `src` map puts `lib` below `terminal`, and `terminal` below `commands`. Lib code returns
-data, and commands render it, so no lib module imports `terminal`. `cli.ts` and `index.ts` are
-entries. Tests share the helpers in `src/__tests__`, so this map does not check them.
-That ignore does not exempt tests from the child map.
-An `adamantite/import-owners` entry lets only `src` and `scripts` import a module of `src`, so
-no preset and no preset test imports the CLI code.
-
-The nested `lib.layers` map holds the lib layers, with its root derived as `src/lib`.
-A layer that the map does not connect to another layer is its sibling, so `project` and
-`handoff` do not import each other, and
-`assessment` does not import `hardening`: harden is not an assessment. `project` knows
-target-project files and package state, but not integration types such as `Finding`. An import
+Imports are transitive within each map. Declaration order does not change permissions. An import
 that breaks a map, or a folder that is not in its map, fails `pnpm run check`.
 
-`toolchain`, `assessment`, `hardening`, and `setup` are siblings above `integrations`. The `check`,
-`fix`, and `analyze` commands call `toolchain/index.ts`, and `harden` calls its `check`
-operation after a handoff. Doctor calls `assessment`. The Oxlint integration and the Oxlint
-entry use one Oxlint runtime resolver. `hardening` starts the Oxlint entry through
-`oxlint/entry.ts` to capture the lint output. An `adamantite/import-owners` entry lets
-only `src/lib`, `init`, the tests, and the Oxlint entry import `integrations/oxlint`, so the other
-commands go through Toolchain.
+This table lists each layer of the `src` map and of its nested `lib` map, with the layers that it
+imports directly. `src/__tests__/architecture-doc.test.ts` fails when the table and the map
+disagree.
 
-Inside `integrations`, `base.ts` defines the integration and finding types, and each integration
-that owns a folder, such as `oxlint/`, `oxfmt/`, `knip/`, `sherif/`, and `vscode/`, exports it from
-`index.ts` as a default export. Helper modules beside it, such as `knip/config.ts`, hold the logic
-that only that integration uses. `config-file.ts` holds the findings of a managed tool config that
-Oxlint, Oxfmt, and Knip share, and `tooling/base.ts` holds the package checks that several tools
-share. The `assessment` layer runs every integration. Oxlint,
-Oxfmt, Knip, and Sherif also have command builders in `command.ts`, which return
-`CommandRunOptions` and start no process. The builders stay out of the `Integration`, and Toolchain
-and `setup` import each `command.ts` directly.
+| Folder                 | Job                                                                                                                                                                                          | Imports              |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `src/commands`         | Define the Effect CLI input of each command, decide its output mode, and compose the lib operations.                                                                                         | `terminal`           |
+| `src/terminal`         | Print status lines, findings, setup lines, and JSON documents, prompt the user, hand prompts off through `Resolution.offer`, and print the title.                                            | `lib`                |
+| `src/lib`              | Hold the library. Lib code returns data, and never prints a line or asks a question.                                                                                                         | None                 |
+| `src/lib/setup`        | Apply a selection with `Setup.apply`: install the packages, set the managed scripts, write the managed files under the write rule, and write the lockfile last.                              | `integrations`       |
+| `src/lib/assessment`   | Assess the project with each integration that the selection includes, and render the repair prompt and the warning report.                                                                   | `integrations`       |
+| `src/lib/toolchain`    | Run the check, fix, and analyze stages, route forwarded arguments, and decide the failure policy.                                                                                            | `integrations`       |
+| `src/lib/hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, count the suppressions, find the discovery gaps, run rule trials, and render the harden prompt.            | `integrations`       |
+| `src/lib/integrations` | Hold the `Integration` list and one folder for each integration: its packages, its managed files, its `assess`, and its command builder.                                                     | `handoff`, `project` |
+| `src/lib/handoff`      | Detect the installed coding agent CLIs, and hand the terminal to one of them.                                                                                                                | `shared`             |
+| `src/lib/project`      | Read the target project: `package.json`, the workspace, the lockfile and its selection, the configs through the config loader, and the custom rules. Detect the package manager and install. | `shared`             |
+| `src/lib/shared`       | Define errors, filesystem and JSON helpers, the command runner, the forwarded arguments, the public imports, and templates.                                                                  | None                 |
 
-## Integration lifecycle
+`setup`, `assessment`, `toolchain`, and `hardening` are siblings above `integrations`, so none of
+them imports another. `assessment` does not import `hardening`, because harden is not an
+assessment. `project` and `handoff` are siblings too. `project` knows target-project files and
+package state, but not integration types such as `Finding`. Lib code returns data, and commands
+render it, so no lib module imports `terminal`.
+
+`cli.ts`, `index.ts`, `oxlint.ts`, and `probe.ts` are entries of the `src` map. An entry imports any
+layer, and no layer imports an entry. Tests share the helpers in `src/__tests__`, so the `src` map
+does not check them. That ignore does not exempt tests from the `lib` map.
+
+The folders inside the layers belong to the layer that holds them:
+
+| Folder                                            | Job                                                                                                                                                                                                  |
+| ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/commands/init`                               | The `init` command: its flags, its prompts, and the checks that turn them into a selection.                                                                                                          |
+| `src/lib/integrations/agents`                     | The `agents` integration: `AGENTS.md` with the Adamantite section, and the Adamantite skill in each skill folder.                                                                                    |
+| `src/lib/integrations/github`                     | The `github` integration: `.github/workflows/adamantite.yml`.                                                                                                                                        |
+| `src/lib/integrations/knip`                       | The `knip` integration: `knip.config.ts`, its Knip config schema, and the Knip command builder.                                                                                                      |
+| `src/lib/integrations/oxfmt`                      | The `oxfmt` integration: `oxfmt.config.ts`, the plugin languages, and the Oxfmt command builder.                                                                                                     |
+| `src/lib/integrations/oxlint`                     | The `oxlint` integration: `oxlint.config.ts`, the preset catalog, the Oxlint runtime, the Oxlint entry, the probe runner, and the command builder. Also the `oxlint-custom` and `tsrs` integrations. |
+| `src/lib/integrations/oxlint/plugins`             | The managed plugins: one definition for each, and the registry that the preset catalog derives.                                                                                                      |
+| `src/lib/integrations/oxlint/plugins/effect-tsgo` | The `@effect/tsgo` managed plugin and its runtime resolver.                                                                                                                                          |
+| `src/lib/integrations/sherif`                     | The `sherif` integration and the Sherif command builder.                                                                                                                                             |
+| `src/lib/integrations/tooling`                    | The package checks that several tools share.                                                                                                                                                         |
+| `src/lib/integrations/typescript`                 | The `tsconfig` integration: `tsconfig.json`, and the checks that ask TypeScript which files a config loads.                                                                                          |
+| `src/lib/integrations/vscode`                     | The `vscode` integration: `.vscode/settings.json` and `.vscode/extensions.json`.                                                                                                                     |
+| `src/lib/integrations/zed`                        | The `zed` integration: `.zed/settings.json`.                                                                                                                                                         |
+| `src/lib/project/custom-rules`                    | The rules folders, the `custom()` calls that the loaded configs reach, and the rule stubs of `rule add`.                                                                                             |
+
+`adamantite/import-owners` in `oxlint.config.ts` narrows these imports further:
+
+- Only `src` and `scripts` import a module of `src`, so no preset and no preset test imports the
+  CLI code.
+- Only `src/lib` and the tests import an integration folder. `init` also imports
+  `integrations/oxlint` for the preset catalog, and the Oxlint entry imports it for the runtime.
+  The other commands go through `lib/setup`, the assessment, and Toolchain.
+- Only `src/commands/setup.ts`, `src/commands/update.ts`, and `src/terminal/setup.ts` import
+  `#lib/setup`.
+- Only `lib/setup` imports the file writers of `src/lib/shared/filesystem.ts`, besides the writers
+  of files outside the managed files: `rule add` writes a custom rule stub, the VS Code
+  integration's `prepare` writes the Effect SDK copy in `node_modules`, a trial writes in a
+  temporary copy of the project, and the Oxlint probe and the rule list of `harden` write their
+  Oxlint configs to a temporary folder.
+- Only `src/commands` and `src/terminal` import `effect/cli/Prompt`, so lib code never asks.
+- Only `project.ts`, `commands/harden.ts`, and `commands/rule.ts` import `readWorkspace`, and only
+  `project.ts` and `hardening/index.ts` import `discoverCustomRules`.
+
+## Integrations
+
+An integration is one folder in `src/lib/integrations/` and one line in the list of
+`integrations/index.ts`. Each one implements `Integration` from `integrations/base.ts`:
+
+```ts
+export interface Integration<E = unknown, R = unknown> {
+  readonly assess: (project: Project, selection: Selection) => Effect.Effect<AssessmentPart, E, R>
+  readonly files: (
+    project: Project,
+    selection: Selection
+  ) => Effect.Effect<readonly ManagedFile[], E, R>
+  readonly name: string
+  readonly packages: (project: Project, selection: Selection) => readonly ToolingPackage[]
+  readonly prepare: (project: Project) => Effect.Effect<void, E, R>
+  readonly selected: (selection: Selection) => boolean
+}
+```
+
+- `selected` says whether the selection includes the integration, such as `oxlint` for a selection
+  with the `check` or `fix` script.
+- `packages` lists the packages to install at their managed versions. The Oxlint integration
+  installs Oxlint, tsrs, and the managed plugin of each selected preset.
+- `files` renders the managed files whole, such as `.vscode/extensions.json`.
+- `prepare` builds what the integration needs outside the committed files, after the install,
+  such as the Effect SDK copy in `node_modules`.
+- `assess` reads the project and returns its findings, warnings, and package actions. It never
+  writes. A file that the user changed gets a finding only when the change breaks the setup.
+
+The list holds `oxlint`, `oxfmt`, `knip`, `sherif`, `tsconfig`, `vscode`, `zed`, `github`, and
+`agents`. Three more integrations only assess, and the assessment runs them first: `oxlint-custom`
+in `oxlint/custom.ts`, the managed plugins in `oxlint/plugins/managed.ts`, and `tsrs` in
+`oxlint/tsrs.ts`. Each one decides from the project whether it applies, and the Oxlint integration
+installs their packages.
+
+`config-file.ts` holds the findings of a managed tool config that Oxlint, Oxfmt, and Knip share:
+a legacy JSON config, a missing config, and a config that does not load. `tooling/base.ts` holds the
+package checks that several tools share. Helper modules beside an integration, such as
+`knip/config.ts`, hold the logic that only that integration uses. Oxlint, Oxfmt, Knip, and Sherif
+also have command builders in `command.ts`, which return `CommandRunOptions` and start no process.
+The builders stay out of the `Integration`, and Toolchain and `setup` import each `command.ts`
+directly. The Oxlint integration and the Oxlint entry use one Oxlint runtime resolver, and
+`hardening` starts the Oxlint entry through `oxlint/entry.ts` to capture the lint output.
+
+The editor integrations select the installed Effect language server when `@effect/tsgo` is
+present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, which the
+`prepare` step of the `vscode` integration builds in `init` and `update`. The editor helper in
+`integrations/effect-sdk.ts` matches the installed TypeScript `gitHead` to the Effect build and
+copies its compiler and standard libraries. A project without a matching build gets the SDK
+finding, and the setup continues. Zed starts the upstream CLI through Node.js. Both editor
+integrations hide duplicate Oxlint Effect reports, so the Effect server can supply diagnostics and
+semantic quick fixes. Doctor reports missing settings and a stale or incomplete SDK without writing
+files.
+
+## Setup and the write rule
+
+`init` and `update` differ only in where the selection comes from. `init` takes it from the prompts
+or the flags and adds it to the recorded selection. `update` takes it from the lockfile, or from
+`inferSelection` in `integrations/selection.ts` once when there is no lockfile. Both hand it to
+`applySetup` in `src/commands/setup.ts`, which runs `Setup.apply` from `src/lib/setup/`, prints
+what it did through `src/terminal/setup.ts`, and offers the repair of the findings that remain
+through `Resolution.offer`. Both exit 1 while findings remain.
+
+`Setup.apply` is the only code that writes target-project files. It takes the integrations that
+the selection includes, and does these steps in order:
+
+1. Install `adamantite`, when the project does not depend on it, and the packages of every selected
+   integration in one install. It installs only the packages that `package.json` does not declare
+   at the managed version, and leaves a pnpm catalog entry to the integration's finding.
+2. Run each `prepare`.
+3. Render the managed files, and format each one with the project's Oxfmt from stdin, with the
+   project's Oxfmt config, or with a copy of the format preset in a temporary folder when the
+   project has none. A project without Oxfmt gets the file as rendered. A config that Oxfmt cannot
+   load fails `apply` with `FailedToFormatFile` before any write.
+4. Set the managed scripts.
+5. Apply the write rule to each managed file, and delete each recorded file that the selection no
+   longer renders.
+6. Write the lockfile.
+
+The write rule: `apply` writes a managed file only whole, and only when the file does not exist or
+its hash equals the hash in the lockfile's `written` map. It never merges or edits a file. Each file
+gets a `FileWrite`:
+
+- `Created` when the file did not exist.
+- `Replaced` when its hash equaled the recorded hash, so `apply` wrote the current version over it.
+- `Unchanged` when it already held the current version.
+- `Kept` when the user changed it. `apply` does not hand it off. Its integration's `assess` reads it
+  and reports only a change that breaks the setup.
+- `Deleted` when the selection no longer renders it and its hash still matched.
+
+Formatting makes `adamantite fix` leave each written file unchanged, so its hash still matches on
+the next run. In a project without a lockfile, a file that an earlier version wrote gets a hash
+only when it equals what this version renders.
+
+A managed script is the one exception to whole files. `apply` sets each selected `check`, `fix`, or
+`analyze` key of the root `package.json` to its command, overwrites what it held, and returns a
+`ScriptWrite` for each: `Added`, `Replaced` with the command that it held, or `Unchanged`. It
+writes `package.json`, formatted like a managed file, only when a script changed or the install
+changed it.
+
+## Lockfile
+
+The lockfile is `.adamantite/adamantite-lock.json` at the project root, the workspace root in a
+monorepo. `Lockfile` and `Selection` in `src/lib/project/` are its Effect schemas: a
+`schemaVersion`, the `selection`, the Adamantite `version` that last wrote it, and `written`, which
+maps the path of each managed file to the hash of what Adamantite wrote. `apply` writes it last,
+formatted like a managed file, and only when its content changes. Each run computes `written`
+again from the files that it created, replaced, or found unchanged, so a file that the user changed
+leaves it.
+
+`readProject` decodes the lockfile once into `project.lockfile`, an `Option`, and the rest of the
+code trusts it. A lockfile with an unknown `schemaVersion` fails with `UnsupportedLockfile`, and one
+that does not decode fails with `InvalidLockfile`. Both name the file. `init` and `update` read the
+lockfile before they change a file, and fail, so they do not overwrite a lockfile that they cannot
+read. The error says to run `adamantite doctor`.
+
+## Assessment
+
+An assessment reads the target project one time. `readProject` in `src/lib/project/project.ts`
+reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
+custom rules that the Oxlint configs load, and each integration's `assess` takes that `Project`. A
+`Project` is a snapshot, so a reassessment after a handoff or an install reads a new one. A command
+that reads the workspace outside an assessment, such as `harden` or `rule try`, reads it one time for
+each phase and passes the `Workspace` down.
+
+`assessProject` in `src/lib/assessment/` runs each integration that the selection includes. With a
+lockfile, the selection is the recorded one, so a selected integration whose file is missing gets a
+finding. Without one, it is the selection that `inferSelection` reads from the project files, and
+the assessment adds one `lockfile-missing` finding when any integration applies. Doctor catches
+`UnsupportedLockfile` and `InvalidLockfile` and reports an `unsupported-lockfile` or
+`invalid-lockfile` finding alone, because the other assessments need the selection. A project that
+does not declare `adamantite` gets the `adamantite-not-installed` finding alone, and an unmanaged
+project gets a warning, so both go through the same offer.
 
 ```mermaid
 flowchart TD
   A[Read the project] --> B[Assess without mutation]
   B --> C{Findings exist}
   C -->|No| D[Report healthy]
-  C -->|Yes| E[Render terminal findings or one Markdown agent prompt]
-  E --> F[Agent or human repairs the target project]
+  C -->|Yes| E[Offer one Markdown repair prompt through Resolution.offer]
+  E --> F[A coding agent repairs the target project]
   F --> A
 ```
 
-`assess` and `doctor` are always read-only. Each finding contains the current state, the
-goal criteria, and optional reference content or notes. The agent or the human changes the
-target project. A later Doctor run confirms whether the project reached the goal state.
-Tooling config generators produce only the current setup for `init` and Doctor reference
-content. They do not convert existing configs or generate patches.
+`assess` and `doctor` are always read-only. Each finding contains the current state, the goal
+criteria, and optional reference content or notes. A coding agent or the user changes the target
+project, and a later assessment confirms whether the project reached the latest supported state.
 
 Doctor also asks Oxlint to list the files that it lints. Oxlint loads every config of the project
 first, so a config that fails to load fails the list, and Doctor reports the error that Oxlint
-printed. The shared Oxlint process operations are in `integrations/oxlint/files.ts`.
+printed as the `oxlint-config-load-failure` finding. The shared Oxlint process operations are in
+`integrations/oxlint/files.ts`.
 
-An assessment reads the target project one time. `readProject` in `src/lib/project/project.ts`
-reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
-custom rules that the Oxlint configs load, and each integration's `assess` takes that `Project`. A
-`Project` is a snapshot, so a reassessment after a handoff or an install reads a new one.
+Runtime findings check the installed packages. Package findings check the declarations and
+the managed versions. A project that declares tsrs, but cannot resolve its backend, gets a
+runtime finding, although the entry still runs stock Oxlint without tsrs. Package drift stays
+structured as package actions, so `update` can install the managed versions, and Doctor renders it
+as findings that tell the user to run `update`.
 
-### Reading configs and source facts
+## Resolution and output modes
+
+`Resolution.offer` in `src/terminal/resolution.ts` is the one way that a command hands a prompt to
+a coding agent. `doctor`, `init`, and `update` offer the repair prompt of an assessment as a
+`Repair`, and `harden` offers its prompt as a `Task`. A `Repair` fails the command while findings
+remain. A `Task` is work that the user can decline.
+
+The command decides its mode once, in `src/terminal/mode.ts`:
+
+- `Json` with `--json`. The offer prints the command's JSON document on standard output, which an
+  Effect Schema that the command exports describes, and `Output` writes every other line on
+  standard error. The command never asks and never starts an agent.
+- `Menu` when the terminal can prompt and the user allows it. `init --non-interactive` turns it
+  off. The offer prints the findings as terminal notes, then the resolution menu in
+  `src/terminal/resolution-menu.ts` offers to hand off to an installed coding agent CLI or to copy
+  the combined Markdown prompt.
+- `Plain` otherwise. The offer prints the Markdown prompt, or a Markdown warning report when an
+  assessment reports only warnings, and the command exits 0 with only warnings.
+
+After an agent session the offer runs the command's `verify`, and the command exits 0 only when no
+finding or failed check remains. `CodingAgents` in `src/lib/handoff` detects the agents and does
+the handoff. It probes the version command of each supported CLI, bounded by a timeout, and only
+agents whose probe command starts appear in the menu. A handoff gives the terminal to the agent CLI
+with inherited stdio and a per-agent seed argument that carries the combined Markdown prompt.
+Adamantite passes no provider permission, sandbox, or trust flags. The agent's exit code is
+ignored, and only the verification decides success. An agent CLI that does not start leaves the
+prompt printed and copied.
+
+## Reading configs, comments, and syntax trees
 
 Adamantite reads a tool config the way the tool reads it, and does not parse its source. The
 `ConfigLoader` service in `src/lib/project/config-loader.ts` imports the config with Node.js in a
@@ -117,116 +296,11 @@ and every installed copy of Adamantite shares it, so a preset counts also throug
 shared config package. The tools ignore symbol keys. The unit tests evaluate the in-memory configs
 in process with `src/__tests__/config-loader.ts`, and the process tests run the real loader.
 
-A fact that only the parser knows, such as the disable comments of a file or its syntax tree, comes
-from Oxlint itself. `src/probe.ts`, built as `dist/probe.js`, is a small JS plugin whose rules
-report the comments or the tree of each source that Oxlint parses, as JSON.
+The disable comments of a file and its syntax tree come from Oxlint itself, because only the parser
+knows them. `src/probe.ts`, built as `dist/probe.js`, is the probe plugin: a small JS plugin whose
+rules report the comments or the tree of each source that Oxlint parses, as JSON.
 `integrations/oxlint/probe.ts` runs Oxlint with a config that loads only that plugin, and decodes
 the reports. `harden` counts the suppressions from them, and `rule ast` prints the tree.
-
-The lockfile is `.adamantite/adamantite-lock.json` at the project root, the workspace root in a
-monorepo. `Lockfile` and `Selection` in `src/lib/project/` are its Effect schemas. `readProject`
-decodes it once into `project.lockfile`, an `Option`, and the rest of the code trusts it. A
-lockfile with an unknown `schemaVersion` fails with `UnsupportedLockfile`, and one that does not
-decode fails with `InvalidLockfile`. Both name the file. Doctor catches both and reports an
-`unsupported-lockfile` or `invalid-lockfile` finding alone, because the other assessments need the
-selection. `init` and `update` read the lockfile before they change a file, and fail, so they do not
-overwrite a lockfile that they cannot read. The error says to run `adamantite doctor`. With a lockfile, an integration applies
-when the selection includes it, so a selected integration whose file is missing gets a finding.
-Without one, each integration applies to the files that exist, and the assessment adds one
-`lockfile-missing` finding when any integration applies.
-
-`init` and `update` differ only in where the selection comes from. `init` takes it from the prompts
-or the flags and adds it to the recorded selection, and `update` takes it from the lockfile, or
-from `inferSelection` once when there is none. Both hand it to `applySetup` in
-`src/commands/setup.ts`, which runs `apply` in `src/lib/setup/`, prints what it did, and offers the
-repair of the findings that remain in the project that it left through `Resolution.offer`. Both
-exit 1 while findings remain. `src/lib/integrations/index.ts`
-lists the integrations that own a folder, such as `integrations/vscode/`, and each one implements
-`Integration` from `integrations/base.ts`: whether the selection includes it, its packages, its
-managed files, a `prepare` step for `node_modules`, and its `assess`. `apply` installs
-`adamantite` when the project does not depend on it and the packages of every selected
-integration in one install, runs each `prepare`, renders the managed files, formats each one, sets
-the managed scripts, and applies the write rule to each file. A managed script is the one
-exception to whole files: `apply` sets each selected `check`, `fix`, or `analyze` key of the root
-`package.json` to its command, overwrites what it held, and returns a `ScriptWrite` for each:
-`Added`, `Replaced` with the command that it held, or `Unchanged`. It writes `package.json`,
-formatted like a managed file, only when a script changed or the install changed it. `apply` formats a file
-with the project's Oxfmt from stdin, with the project's Oxfmt config, or with a copy of the format
-preset in a temporary folder when the project has none. `adamantite fix` then leaves the file
-unchanged, so its hash still matches. A project without Oxfmt gets the file as rendered, and a config
-that Oxfmt cannot load fails `apply` with `FailedToFormatFile`. It writes a file only whole, and only when the file
-does not exist or its hash equals the hash in the lockfile's `written` map. It never merges or
-edits a file. Each file gets a `FileWrite`: `Created`, `Replaced`, `Unchanged`, `Kept` when the
-user changed it, or `Deleted` when the selection no longer renders it and its hash still matches.
-`src/terminal/setup.ts` prints one line for each. A `Kept` file is not handed off. Its
-integration's `assess` reads it and reports only a change that breaks the setup. The assessment
-runs each listed integration that the selection includes, and without a lockfile it uses the
-selection that `inferSelection` in `integrations/selection.ts` reads from the project files.
-
-`apply` writes the lockfile last, formatted the same way, and only `init` and `update` call it:
-`adamantite/import-owners` keeps `#lib/setup` to them, and keeps the file writers of
-`src/lib/shared/filesystem.ts` to `src/lib/setup/`. The other owners of the writers write outside
-the managed files: `rule add` writes a custom rule stub, the VS Code integration's `prepare` writes
-the Effect SDK copy in `node_modules`, and a trial writes in a temporary copy of the project. `written` records the hash of each managed file
-that `apply` created, replaced, or found unchanged. Each run computes `written` again, so a file
-that the user changed leaves it. In a project without a lockfile, a file that an earlier version
-wrote gets a hash only when it equals what this version renders. `apply` installs only the packages
-that `package.json` does not declare at the managed version, and leaves a pnpm catalog entry to the
-integration's finding. A recorded file that the selection no longer renders is deleted when its
-hash still matches.
-
-A command that reads the workspace outside an assessment reads it one time for each phase and
-passes the `Workspace` down. `harden` reads it before the session, and takes `project.workspace`
-from its `readProject` after the session, because the agent can change the project. `rule try`
-reads it one time. The functions in `src/lib/hardening` take the `Workspace` as a parameter and
-do not read it. Only `project.ts`, `commands/harden.ts`, and `commands/rule.ts` import
-`readWorkspace`, and only `project.ts` and `hardening/index.ts` import `discoverCustomRules`, for
-the scope of a harden session. `adamantite/import-owners` enforces both lists.
-
-`Resolution.offer` in `src/terminal/resolution.ts` is the one way that a command hands a prompt to
-a coding agent. `doctor`, `init`, and `update` offer the repair prompt of an assessment, and
-`harden` offers its prompt. The command decides its mode once, in `src/terminal/mode.ts`: `Json`
-with `--json`, `Menu` when the terminal can prompt, and `Plain` otherwise. In `Json`, the offer
-prints the command's JSON document, which an Effect Schema that the command exports describes, and
-`Output` writes every other line on standard error. In `Menu`, interactive runs render findings as
-terminal notes, then the resolution menu in `src/terminal/resolution-menu.ts` offers to hand off
-to an installed coding agent CLI or to copy the combined Markdown prompt. In `Plain`, the offer
-prints the prompt. After a session the offer runs the command's `verify`, and the command exits 0
-only when no finding or failed check remains. A repair fails the command while findings remain; a
-harden prompt is a task that the user can decline. `CodingAgents` in `src/lib/handoff` detects the
-agents and does the handoff. Installation is
-detected by probing each supported CLI's version command, bounded by a timeout; only
-agents whose probe command starts appear in the menu. A handoff hands the terminal to
-the agent CLI with inherited stdio
-and a per-agent seed argument carrying the combined Markdown prompt; Adamantite
-passes no provider permission, sandbox, or trust flags, and reassesses once after the
-agent session ends.
-The agent's exit code is ignored: only the reassessment decides success. An agent CLI that does
-not start leaves the prompt printed. Non-interactive runs print the Markdown prompt directly when
-findings remain. If an assessment reports only warnings, a non-interactive run prints a Markdown
-warning report and exits 0. Doctor reports a project that does not declare `adamantite` as one
-finding, and an unmanaged project as a warning, so both go through the same offer.
-
-Runtime findings check the installed packages. Package findings check the declarations and
-the managed versions. A project that declares tsrs, but cannot resolve its backend, gets a
-runtime finding, although the entry still runs stock Oxlint without tsrs.
-
-Package drift also stays structured so that `update` can install current managed package
-versions. Doctor renders package drift as findings that tell the user to run `update`.
-
-`init` sets up the selection for a target project. It prints a line for each managed file, and a
-file that the project changed is kept, with a pointer to `adamantite doctor`. `init --json` takes
-the selection from the flags and asks nothing.
-
-The editor integrations select the installed Effect language server when `@effect/tsgo` is
-present. VS Code uses a native SDK copy in `node_modules/.cache/adamantite/effect/`, which the
-`prepare` step of the `vscode` integration builds in `init` and `update`. The editor helper
-matches the installed TypeScript `gitHead` to the Effect build and copies its compiler and
-standard libraries. A project without a matching build gets the SDK finding, and the setup
-continues. Zed starts the upstream CLI through Node.js. Both editor
-integrations hide duplicate Oxlint Effect reports, so the Effect server can supply diagnostics
-and semantic quick fixes. Doctor reports missing settings and a stale or incomplete SDK without
-writing files.
 
 ## Command boundaries
 
@@ -243,66 +317,68 @@ writing files.
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
 - `init` reads the selection from its prompts or flags, adds it to the recorded selection, and
-  runs `applySetup`, which installs the packages, sets the managed scripts, writes the managed
-  files and the lockfile through `Setup.apply`, then offers the repair of the findings that remain
-  through `Resolution.offer` and exits 1 while they remain. When the
-  selection includes coding agents, the `agents` integration renders `AGENTS.md` with the
-  Adamantite section, and the Adamantite skill in `.agents/skills` and in each other skill folder
-  whose agent folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/`
-  into the CLI, so the copy matches the running Adamantite version without `node_modules` or the
-  network. Doctor reports an `AGENTS.md` without the section, and a skill copy that differs from
-  the bundled skill.
-- `doctor` assesses managed integrations, emits repair findings, and offers their repair through
-  `Resolution.offer`, which reassesses after a handoff. The Oxlint assessment
-  resolves the same runtime as the entry and reports missing installed packages, unsupported
-  native builds or platforms, and conflicting overrides. Resolution neither launches a tool
-  nor changes files or process variables. Unexpected read and parse failures still propagate.
+  runs `applySetup`, as "Setup and the write rule" describes. `init --json` takes the selection
+  from the flags and asks nothing. When the selection includes coding agents, the `agents`
+  integration renders `AGENTS.md` with the Adamantite section, and the Adamantite skill in
+  `.agents/skills` and in each other skill folder whose agent folder exists, such as
+  `.claude/skills`. A build macro bundles `skills/adamantite/` into the CLI, so the copy matches the
+  running Adamantite version without `node_modules` or the network. Doctor reports an `AGENTS.md`
+  without the section, and a skill copy that differs from the bundled skill.
+- `doctor` assesses the integrations, reports the findings, and offers their repair through
+  `Resolution.offer`, which assesses again after a handoff. The Oxlint assessment resolves the
+  same runtime as the entry and reports missing installed packages, unsupported native builds or
+  platforms, and conflicting overrides. Resolution neither launches a tool nor changes files or
+  process variables. Unexpected read and parse failures still propagate.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
   into custom rules and instructions, and offers it through `Resolution.offer`. Its `verify` runs
   Oxfmt and Oxlint as `check` does after a handoff, then assesses the project as Doctor does.
   The agent verifies new and changed custom rules with temporary RuleTester cases during the
-  session and removes the cases before handback. Harden never produces findings, so it never changes Doctor's
-  result. The prompt lists each Markdown file that `git ls-files` gives, except the changesets
-  and the changelogs, so the agent reads all the documentation. `hardening/agent-reach.ts`
-  finds the files that no chain of links from an `AGENTS.md` reaches, and the links to missing
-  files. After a handoff, a link to a missing file that the session added fails the
-  verification. `hardening/suppressions.ts` counts the disable comments of each rule in the
-  files that Oxlint lints, and `hardening/overrides.ts` marks each file of an override that turns
-  a rule off, after a trial that turns the rule on again. The prompt shows both as data.
+  session and removes the cases before handback. Harden never produces findings, so it never
+  changes Doctor's result. The prompt lists each Markdown file that `git ls-files` gives, except
+  the changesets and the changelogs, so the agent reads all the documentation.
+  `hardening/agent-reach.ts` finds the discovery gaps: the files that no chain of links from an
+  `AGENTS.md` reaches, and the links to missing files. After a handoff, a link to a missing file
+  that the session added fails the verification. `hardening/suppressions.ts` counts the disable
+  comments of each rule in the files that Oxlint lints, and `hardening/overrides.ts` marks each file
+  of an override that turns a rule off, after a trial that turns the rule on again. The prompt shows
+  both as data. `harden` reads the workspace before the session, and takes `project.workspace` from
+  its `readProject` after the session, because the agent can change the project. The functions in
+  `src/lib/hardening` take the `Workspace` as a parameter and do not read it.
 - `update` runs `applySetup` with the recorded selection, the same backend as `init`. In a
   project without a lockfile, `inferSelection` reads the selection one time from the same files
   that Doctor applies the integrations to without one. `update` does not edit `skills-lock.json`,
   which the `skills` CLI owns. The agents integration reports an `adamantite` entry there as a
   finding.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit,
-  from the Oxlint probe that "Reading configs and source facts" describes, and `rule ast --json`
-  and `rule try --json` print their results through `Output.result`.
-  Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
-  Temporary verification cases do not stay in the target project. Users can opt in to saved
-  `.test.*` files beside their rules, add them with `rule test add [name]`, and run them explicitly
-  with `rule test`. `--path` selects another test location. Init, CI,
-  and harden do not run them by default.
+  from the probe plugin, and `rule ast --json` and `rule try --json` print their results through
+  `Output.result`. Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a
+  temporary file. Temporary verification cases do not stay in the target project. Users can opt in
+  to saved `.test.*` files beside their rules, add them with `rule test add [name]`, and run them
+  explicitly with `rule test`. `--path` selects another test location. Init, CI, and harden do not
+  run them by default.
 - `rule try` runs a trial: `hardening/trial.ts` copies the files that git lists to a temporary
   folder, puts a trial config in place of the config that lints the cases, and lints the cases
-  with Oxlint from the root of the copy. The copy gets a real `node_modules` folder with a link
-  to each entry of the project folder, so the entry module that `custom()` writes stays in the
-  copy. A link to a workspace package goes to the copy of the package, with the files that git
-  ignores in it, such as build output. It exits 0 when each case
+  with Oxlint from the root of the copy. It reads the workspace one time. The copy gets a real
+  `node_modules` folder with a link to each entry of the project folder, so the entry module that
+  `custom()` writes stays in the copy. A link to a workspace package goes to the copy of the
+  package, with the files that git ignores in it, such as build output. It exits 0 when each case
   is as expected, 1 when a case is not, and 2 when the trial is not evidence.
 
 Commands that wrap one underlying tool can forward arguments after `--`. Lifecycle
 commands do not forward arguments because they coordinate multiple operations.
 
-## Source layout
+## Preset layout
 
 ```text
 presets/
+  __tests__/        the stack and fixture tests, and the fixture packages
+  identity.ts       the symbol key under which each preset and custom() result names itself
   lint/             published Oxlint presets
     plugins/        first-party Oxlint plugins, one folder for each rule namespace
       entry.ts      the jsPlugins entry of each plugin, for the presets
       shared/       helpers that more than one plugin uses
       adamantite/   the adamantite rules
-      antislop/    the antislop rules of the strict preset
+      antislop/     the antislop rules of the strict preset
       antislop-effect/ the antislop-effect rules of the effect preset
   rules/            published rules-folder preset, authoring API, loader, and test API
   analyze.ts        published Knip preset
@@ -311,23 +387,6 @@ presets/
   typescript.json   published TypeScript preset with strict options and ts-reset types
   typescript/
     resets/         first-party type resets
-src/
-  commands/         CLI workflows
-  lib/
-    shared/         errors, filesystem and JSON helpers, the command runner, and forwarded arguments (bottom layer)
-    project/        target-project state and file operations
-      custom-rules/ rules folders, custom() discovery, and rule scaffolding
-    handoff/        coding-agent detection and handoff
-    integrations/   integration types, one folder for each integration, and the helpers they share
-      tooling/      the package and preset checks that several tools share
-    assessment/     integration registry, project assessment, agent prompt
-    toolchain/      check, fix, and analyze operations
-    hardening/      harden context, harden prompt, rule facts, and rule trials
-    setup/          Setup.apply: the write rule, the package install, and the lockfile write
-  terminal/         output mode, status output, JSON documents, findings, Resolution.offer, resolution menu, and title output
-  cli.ts            command definition
-  index.ts          composition root and runtime boundary
-  oxlint.ts         entry that runs Oxlint with the project's Oxlint runtime
 ```
 
 ## Dependency version invariant
@@ -358,9 +417,7 @@ test rejects each built module that the export map does not list.
 CLI code that writes, resolves, or compares a public import gets it from `publicImport()` in
 `src/lib/shared/package-exports.ts`, such as `publicImport("./format")`. Its parameter type is the
 set of keys in the export map, so the type checker rejects a private or removed subpath. Prose in
-findings and prompts keeps literal imports. A removed import, such as `adamantite/lint/custom`,
-stays a constant in the module that reports its migration, and a test keeps it out of the export
-map.
+findings and prompts keeps literal imports.
 
 ## Managed plugins
 
@@ -372,9 +429,9 @@ native runtime capability. The preset catalog links each plugin to its preset, a
 version macro, so the Oxlint entry can load them from source. JavaScript plugins
 still load through the preset's `jsPlugins` entries, which resolve from the target project.
 
-`plugins/managed.ts` derives the managed integrations from the catalog entries that have a
-plugin, with `defineManagedPlugin`. Its version table holds the build-time version of each registered
-package, and its type fails when a package has no version. Init installs the packages of the
+`plugins/managed.ts` derives one integration for each catalog entry that has a plugin, with
+`defineManagedPlugin`. Its version table holds the build-time version of each registered
+package, and its type fails when a package has no version. Setup installs the packages of the
 selected presets. Doctor and update maintain a package while the root config imports its
 preset.
 

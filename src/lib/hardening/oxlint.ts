@@ -5,13 +5,13 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import * as SchemaTransformation from "effect/SchemaTransformation"
-import { runOxlint } from "#lib/integrations/tooling/oxlint/files.ts"
+import { runOxlint } from "#lib/integrations/oxlint/files.ts"
 
 import { TrialLintFailed } from "#lib/shared/errors.ts"
 import { writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
-export { OxlintCommand, listLintedFiles } from "#lib/integrations/tooling/oxlint/files.ts"
+export { OxlintCommand, listLintedFiles } from "#lib/integrations/oxlint/files.ts"
 
 /**
  * Oxlint prints a line, such as "No files found to lint.", before its JSON report.

@@ -62,22 +62,19 @@ that breaks a map, or a folder that is not in its map, fails `pnpm run check`.
 `fix`, and `analyze` commands call `toolchain/index.ts`, and `harden` calls its `check`
 operation after a handoff. Doctor calls `assessment`. The Oxlint integration and the Oxlint
 entry use one Oxlint runtime resolver. `hardening` starts the Oxlint entry through
-`tooling/oxlint/entry.ts` to capture the lint output. An `adamantite/import-owners` entry lets
-only `src/lib`, `init`, `update`, the tests, and the Oxlint entry import the tooling
-integrations, so the other commands go through Toolchain.
+`oxlint/entry.ts` to capture the lint output. An `adamantite/import-owners` entry lets
+only `src/lib`, `init`, the tests, and the Oxlint entry import `integrations/oxlint`, so the other
+commands go through Toolchain.
 
-Inside `integrations`, `base.ts` defines the integration and finding types.
-`tooling/base.ts` and `tooling/preset-config.ts` hold the logic that several tools share.
-Each tool has a folder: `index.ts` exports only the integration as a default export, and
-helper modules beside it, such as `knip/config.ts`, hold the logic that only that tool
-uses. The `assessment` layer registers every managed integration. The tooling integrations
-that Toolchain runs also have command builders, which return `CommandRunOptions` and start no
-process. Each of these tools keeps its builders and their option types in `command.ts`. An
-integration that owns a folder, such as `integrations/oxfmt/`, keeps its builders out of the
-`Integration`, and Toolchain and `setup` import its `command.ts` directly. In `tooling/`, `index.ts`
-attaches each builder to the integration by name, and `tooling/__tests__/command.test.ts` fails
-when an `index.ts` holds a builder, or when the integration does not have a builder of its
-`command.ts`.
+Inside `integrations`, `base.ts` defines the integration and finding types, and each integration
+that owns a folder, such as `oxlint/`, `oxfmt/`, `knip/`, `sherif/`, and `vscode/`, exports it from
+`index.ts` as a default export. Helper modules beside it, such as `knip/config.ts`, hold the logic
+that only that integration uses. `config-file.ts` holds the findings of a managed tool config that
+Oxlint, Oxfmt, and Knip share, and `tooling/base.ts` and `tooling/preset-config.ts` hold the package
+and preset checks that several tools share. The `assessment` layer runs every integration. Oxlint,
+Oxfmt, Knip, and Sherif also have command builders in `command.ts`, which return
+`CommandRunOptions` and start no process. The builders stay out of the `Integration`, and Toolchain
+and `setup` import each `command.ts` directly.
 
 ## Integration lifecycle
 
@@ -99,7 +96,7 @@ content. They do not convert existing configs or generate patches.
 
 Doctor also asks Oxlint to list the files that it lints. Oxlint loads every config of the project
 first, so a config that fails to load fails the list, and Doctor reports the error that Oxlint
-printed. The shared Oxlint process operations are in `integrations/tooling/oxlint/files.ts`.
+printed. The shared Oxlint process operations are in `integrations/oxlint/files.ts`.
 
 An assessment reads the target project one time. `readProject` in `src/lib/project/project.ts`
 reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
@@ -271,8 +268,8 @@ src/
     project/        target-project state and file operations
       custom-rules/ rules folders, custom() discovery, rule file checks, and rule scaffolding
     execution/      child command runs, coding-agent detection and handoff, the Adamantite skill, forwarded arguments
-    integrations/   integration types, then tooling, editor, workspace, and CI adapters
-      tooling/      shared tooling infrastructure and one folder for each tool
+    integrations/   integration types, one folder for each integration, and the helpers they share
+      tooling/      the package and preset checks that several tools share
     assessment/     integration registry, project assessment, agent prompt
     toolchain/      check, fix, and analyze operations
     hardening/      harden context, harden prompt, rule facts, and rule trials
@@ -285,16 +282,16 @@ src/
 
 ## Dependency version invariant
 
-A tooling integration records the version that Adamantite installs in target projects.
-When the corresponding dependency version in `package.json` increases, update the version
-in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit under
-`tooling/oxlint/`: tsrs beside the integration, managed plugins in `plugins/`.
+An integration records the version of each package that Adamantite installs in target projects,
+from the build-time version of the dependency in `package.json`. Packages that belong to Oxlint sit
+under `integrations/oxlint/`: tsrs beside the integration, managed plugins in `plugins/`. The
+Oxlint integration installs tsrs and the managed plugin of each selected preset.
 
 ## Lint presets
 
 `LINT_PRESETS` in `project/selection.ts` is the one list of the presets that a target project can
 select besides core, because the `Selection` schema needs it below the integrations.
-`tooling/oxlint/presets.ts` gives each one a definition, and `lintPresets` lists them in the order
+`oxlint/presets.ts` gives each one a definition, and `lintPresets` lists them in the order
 of `LINT_PRESETS`. The type checker rejects a preset without a definition. Each entry has the
 preset name, the init label, a hint that describes the rules, the presets it requires, and its
 managed plugin. Init builds its choices,
@@ -319,7 +316,7 @@ map.
 
 A preset can need a third-party Oxlint plugin published on npm, such as `@shadcn/lint`
 for `tailwind` and `oxlint-plugin-react-doctor` for `react-strict`. Each definition under
-`tooling/oxlint/plugins/` uses `defineOxlintPlugin` and declares its package and JavaScript or
+`oxlint/plugins/` uses `defineOxlintPlugin` and declares its package and JavaScript or
 native runtime capability. The preset catalog links each plugin to its preset, and
 `plugins/index.ts` derives the one registry of definitions from the catalog. Neither imports a
 version macro, so the Oxlint entry can load them from source. JavaScript plugins
@@ -333,7 +330,7 @@ preset.
 
 Doctor also reports an Adamantite preset that comes before the last core entry in the `extends`
 array. Oxlint applies the entries in order, so core then replaces the rules that the preset
-changes. `inspectExtendsOrder` in `tooling/oxlint/config.ts` reads the order from the config
+changes. `inspectExtendsOrder` in `oxlint/config.ts` reads the order from the config
 source. An entry that is not an Adamantite preset can come before core, and the finding keeps its
 place.
 
@@ -344,7 +341,7 @@ overrides when the target project installs `@effect/tsgo`. The installed package
 Effect builds on, so nested configs and relative preset imports get them too. The managed
 package requirement depends on the root config import instead.
 
-`tooling/oxlint/runtime.ts` resolves the installed Oxlint package and applies the native
+`oxlint/runtime.ts` resolves the installed Oxlint package and applies the native
 overrides. Two overrides for the same part fail with `NativeRuntimeConflict`. A backend
 override replaces all default backend variables. Without a backend override, Oxlint starts the
 installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
@@ -510,7 +507,7 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   `adamantite rule test`. The command accepts `--path` to run a test saved elsewhere.
   The shipped skill tells the agent how to run temporary
   RuleTester cases, remove its temporary files, and preserve user-owned tests.
-- The `oxlint-custom` integration in `src/lib/integrations/tooling/oxlint/custom.ts` uses
+- The `oxlint-custom` integration in `src/lib/integrations/oxlint/custom.ts` uses
   that module to report rules folders that no `custom()` call loads, rule files that cannot
   load, and rules folders that share a plugin name. It also reports old imports, old default
   folders with migration instructions. Optional saved tests do not produce a finding.

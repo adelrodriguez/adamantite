@@ -5,6 +5,7 @@ import type { Selection } from "#lib/project/selection.ts"
 import {
   assessConfigFile,
   type ConfigFile,
+  readConfigFile,
   renderConfigFile,
 } from "#lib/integrations/config-file.ts"
 import {
@@ -34,6 +35,7 @@ export default {
       const config = yield* assessConfigFile(
         project.cwd,
         CONFIG,
+        yield* readConfigFile(project.cwd, CONFIG),
         toKnipTsConfigContent(workspace),
         (content) => inspectRequiredKnipConfig(content, workspace)
       )

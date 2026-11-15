@@ -4,7 +4,7 @@ import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
 import type { ProjectPath } from "#lib/hardening/project-files.ts"
-import { listLintedFiles } from "#lib/integrations/tooling/oxlint/files.ts"
+import { listLintedFiles } from "#lib/integrations/oxlint/files.ts"
 import { findSuppressions, SOURCE_FILE } from "#lib/project/suppressions.ts"
 import { readFileIfFile } from "#lib/shared/filesystem.ts"
 

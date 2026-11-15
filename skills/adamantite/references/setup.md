@@ -33,7 +33,9 @@ Run `init` with those options. It records the selection in `.adamantite/adamanti
 and a later `init` adds its options to that selection. Commit the lockfile with the setup.
 It preserves existing package scripts whose commands differ
 from its managed commands. Use `--overwrite-scripts` only when the task includes replacing them.
-Read the output for preserved configuration that needs a Doctor repair.
+It writes each managed config, such as `oxlint.config.ts`, whole, and keeps a config that the
+project changed. Do not merge the reference config into a kept file. Read the output for kept or
+legacy configuration, and run Doctor for the repairs that it needs.
 
 Adamantite requires TypeScript 7 or later in the target project's own `package.json`.
 Check that declaration if npm cannot install or update a managed plugin.

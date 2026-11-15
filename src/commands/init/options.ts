@@ -6,7 +6,7 @@ import * as Option from "effect/Option"
 import {
   findExcludedPresets,
   findMissingRequiredPresets,
-} from "#lib/integrations/tooling/oxlint/presets.ts"
+} from "#lib/integrations/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import { INIT_FLAGS } from "#lib/project/init-command.ts"
 import {

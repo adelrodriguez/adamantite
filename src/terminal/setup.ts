@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect"
+import type { PackageAction } from "#lib/integrations/base.ts"
 import type { FileWrite } from "#lib/setup/index.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -22,3 +23,19 @@ export const printFileWrites = (writes: readonly FileWrite[]) =>
     concurrency: 1,
     discard: true,
   })
+
+/**
+ * Prints the packages that `Setup.apply` installed or updated, with the version that each one had.
+ */
+export const printInstalls = (installs: readonly PackageAction[]) =>
+  installs.length === 0
+    ? Effect.void
+    : Output.success(
+        [
+          "Packages installed:",
+          ...installs.map(
+            (action) =>
+              `${action.package}: ${action.type === "install_package" ? "not installed" : action.currentVersion} → ${action.targetVersion}`
+          ),
+        ].join("\n")
+      )

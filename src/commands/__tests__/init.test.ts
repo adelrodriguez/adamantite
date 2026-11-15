@@ -15,11 +15,11 @@ import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { toOxfmtTsConfigContent } from "#lib/integrations/oxfmt/config.ts"
 import { PACKAGE as oxfmt } from "#lib/integrations/oxfmt/index.ts"
+import { getExtendedLintPresets } from "#lib/integrations/oxlint/config.ts"
+import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
+import { lintPresets } from "#lib/integrations/oxlint/presets.ts"
+import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"
-import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
-import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
@@ -283,7 +283,7 @@ describe("init", () => {
         expect({
           "knip.config.ts": files.read("knip.config.ts"),
           "oxfmt.config.ts": files.read("oxfmt.config.ts"),
-          presets: getImportedLintPresets(files.read("oxlint.config.ts")),
+          presets: getExtendedLintPresets(files.read("oxlint.config.ts")),
         }).toStrictEqual({
           "knip.config.ts": toKnipTsConfigContent(),
           "oxfmt.config.ts": toOxfmtTsConfigContent(),
@@ -352,39 +352,6 @@ describe("init", () => {
     })
   )
 
-  describe("legacy config handling", () => {
-    it.effect.each([
-      {
-        content: JSON.stringify({ extends: ["adamantite/lint/node"], rules: { semi: "error" } }),
-        legacyConfig: ".oxlintrc.json",
-        modernConfig: "oxlint.config.ts",
-        script: "check",
-        tool: "oxlint",
-      },
-    ])(
-      "keep a legacy $tool config in place during init",
-      ({ content, legacyConfig, modernConfig, script, tool }) =>
-        Effect.gen(function* () {
-          const files = createInitTestContext({ [legacyConfig]: content })
-          const logLines: unknown[] = []
-          const installer = createDependencyInstallerTestContext()
-
-          const exit = yield* runCommand(initCommand, ["--non-interactive", "--script", script], {
-            files,
-            layers: [installer.layer],
-            logLines,
-          })
-
-          expect(Exit.isSuccess(exit)).toBe(true)
-          expect(files.read(legacyConfig)).toBe(content)
-          expect(files.exists(modernConfig)).toBe(false)
-          expect(logLines).toContainEqual(
-            `● Legacy \`${legacyConfig}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool} config.`
-          )
-        })
-    )
-  })
-
   it.effect("configure the first-party plugin presets without extra packages", () =>
     Effect.gen(function* () {
       const files = createInitTestContext({ "package.json": basePackageJson })
@@ -408,12 +375,12 @@ describe("init", () => {
       )
 
       expect(Exit.isSuccess(exit)).toBe(true)
-      expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
+      expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
+        "tanstack",
         "architecture",
         "strict",
-        "tanstack",
       ])
-      expect(installer.calls[0]?.packages).toStrictEqual(
+      expect(listInstalls(installer).packages).toStrictEqual(
         expect.not.arrayContaining([expect.stringMatching(/architecture|strict|tanstack/)])
       )
     })
@@ -433,7 +400,7 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls[0]?.packages).toContain(`@shadcn/lint@${shadcnLint.version}`)
+        expect(listInstalls(installer).packages).toContain(`@shadcn/lint@${shadcnLint.version}`)
         expect(files.read("oxlint.config.ts")).toContain(
           'import tailwind from "adamantite/lint/tailwind"'
         )
@@ -461,7 +428,7 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls[0]?.packages).toContain(
+        expect(listInstalls(installer).packages).toContain(
           `oxlint-plugin-react-doctor@${reactDoctor.version}`
         )
         expect(files.read("oxlint.config.ts")).toContain(
@@ -475,7 +442,7 @@ describe("init", () => {
         const { exit, files, installer, runner } = yield* runEffectSetup()
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(installer.calls[0]?.packages).toContain(`@effect/tsgo@${effectTsgo.version}`)
+        expect(listInstalls(installer).packages).toContain(`@effect/tsgo@${effectTsgo.version}`)
         expect(readJson(files, "package.json")).not.toHaveProperty("scripts.prepare")
         expect(runner.invocations).toStrictEqual([])
       })
@@ -486,7 +453,7 @@ describe("init", () => {
         const { exit, files } = yield* runEffectSetup()
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["effect"])
+        expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["effect"])
         expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
             plugins: [{ diagnostics: true, name: "@effect/language-service" }],
@@ -684,7 +651,7 @@ describe("init", () => {
         expect(terminal.output()).toContain(
           "✔ The jest and vitest presets report the same defects. Which one should Adamantite use? …  vitest"
         )
-        expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
+        expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
           "vitest",
           "strict",
         ])
@@ -1105,7 +1072,7 @@ describe("init", () => {
         )
 
         expect(Exit.isSuccess(exit)).toBe(true)
-        expect(getImportedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["react"])
+        expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["react"])
       })
     )
 

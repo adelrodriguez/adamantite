@@ -21,7 +21,7 @@ import {
   type TrialSetting,
   tryRule,
 } from "#lib/hardening/trial.ts"
-import { getOxlintCommand } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { InvalidTrialCase } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")

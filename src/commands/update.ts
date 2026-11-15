@@ -3,23 +3,14 @@ import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import type { ToolingPackage } from "#lib/integrations/base.ts"
 import { assessProject } from "#lib/assessment/index.ts"
 import { findStaleSkillFolders, removeSkillsLockEntry, writeSkill } from "#lib/execution/skill.ts"
-import { assessPackage } from "#lib/integrations/tooling/base.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
-import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { printFindings } from "#terminal/findings.ts"
 import * as Output from "#terminal/output.ts"
-import { printFileWrites } from "#terminal/setup.ts"
-
-// Managed plugins stay out of this fallback: a plugin is updated only while its preset is imported,
-// which the assessment already covers.
-const knownPackages = [oxlint, tsrs] as const satisfies readonly ToolingPackage[]
+import { printFileWrites, printInstalls } from "#terminal/setup.ts"
 
 /**
  * What one step of update did. `idle` means that the step found nothing to update. A step that
@@ -42,47 +33,6 @@ export default Command.make("update").pipe(
 
       const project = yield* readProject(cwd)
       const assessment = yield* assessProject(project)
-      const packageActions = assessment.packageActions
-      const coveredPackages = new Set(packageActions.map((action) => action.package))
-
-      // A known package that no integration action covers. One that the project does not install
-      // stays uninstalled.
-      const fallback = knownPackages.flatMap((pkg) =>
-        coveredPackages.has(pkg.name)
-          ? []
-          : [assessPackage(project, pkg, "Adamantite", "adamantite")]
-      )
-
-      const updates = [
-        ...packageActions,
-        ...fallback
-          .flatMap((pkg) => pkg.packageActions)
-          .filter((action) => action.type === "update_package"),
-      ]
-
-      // A catalog entry or a specifier that update cannot change keeps its finding or warning.
-      const unchanged = fallback.filter((pkg) => pkg.packageActions.length === 0)
-
-      if (updates.length > 0) {
-        yield* Output.info(
-          [
-            "Packages to install or update:",
-            ...updates.map(
-              (action) =>
-                `${action.package}: ${action.type === "install_package" ? "not installed" : action.currentVersion} → ${action.targetVersion}`
-            ),
-          ].join("\n")
-        )
-
-        yield* addRootDevDependencies(
-          cwd,
-          updates.map((action) => `${action.package}@${action.targetVersion}`)
-        )
-        yield* Output.success("Dependencies updated.")
-      }
-
-      // A failed package update fails the whole command.
-      const packages: StepOutcome = updates.length === 0 ? "idle" : "applied"
 
       // The skill that init wrote is a copy, so it stays at the Adamantite version that wrote it.
       const skill: StepOutcome = yield* findStaleSkillFolders(cwd).pipe(
@@ -138,9 +88,18 @@ export default Command.make("update").pipe(
           ? Option.none()
           : Option.some(yield* Setup.apply(project, selection))
 
+      yield* printInstalls(
+        Option.match(setup, { onNone: () => [], onSome: ({ installs }) => installs })
+      )
+
       yield* printFileWrites(
         Option.match(setup, { onNone: () => [], onSome: ({ files }) => files })
       )
+
+      // A failed package install fails the whole command.
+      const packages: StepOutcome = Option.exists(setup, ({ installs }) => installs.length > 0)
+        ? "applied"
+        : "idle"
 
       const files: StepOutcome = Option.exists(setup, ({ files }) =>
         files.some(({ _tag }) => _tag !== "Kept" && _tag !== "Unchanged")
@@ -166,23 +125,11 @@ export default Command.make("update").pipe(
           ? assessment
           : yield* assessProject(yield* readProject(cwd))
 
-      const findingIds = new Set(finalAssessment.findings.map((finding) => finding.id))
-
-      const warnings = Array.dedupe([
-        ...finalAssessment.warnings,
-        ...unchanged.flatMap((pkg) => pkg.warnings),
-      ])
-
-      for (const warning of warnings) {
+      for (const warning of Array.dedupe(finalAssessment.warnings)) {
         yield* Output.warning(warning)
       }
 
-      const findings = [
-        ...finalAssessment.findings,
-        ...unchanged
-          .flatMap((pkg) => pkg.findings)
-          .filter((finding) => !findingIds.has(finding.id)),
-      ]
+      const { findings } = finalAssessment
 
       if (findings.length > 0) {
         yield* printFindings(findings)

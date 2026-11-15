@@ -406,8 +406,8 @@ function checkHasSelectedScript(project: Project, scripts: readonly Script[]) {
 }
 
 /**
- * A tooling integration that only manages a package version, with no config file, such as
- * tsrs. Oxlint's managed plugins build on it through `defineManagedPlugin`.
+ * A tooling integration that only manages a package version, with no config file, such as tsrs.
+ * Oxlint's managed plugins build on it through `defineManagedPlugin`.
  */
 export function definePackageTooling(options: {
   /**

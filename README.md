@@ -148,13 +148,13 @@ catch-all root config makes TypeScript treat all packages as one project. Adaman
 prints guidance instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
 in a library, to each package's `tsconfig.json` or to a shared base config.
 
-`init` and `update` write each managed file whole: `oxfmt.config.ts`, `knip.config.ts`,
-`.vscode/settings.json`, and `.vscode/extensions.json`. They write a file only when it does not exist or still holds what
+`init` and `update` write each managed file whole: `oxlint.config.ts`, `oxfmt.config.ts`,
+`knip.config.ts`, `.vscode/settings.json`, and `.vscode/extensions.json`. They write a file only when it does not exist or still holds what
 Adamantite wrote, by the hash in the lockfile, and they format it with the project's Oxfmt first, so
 `adamantite fix` leaves it as it is. A file that you changed stays as it is, and `adamantite doctor`
 reports a change that breaks the setup, such as a missing extension recommendation. A file that the
 setup no longer needs is deleted when nobody changed it. A project that keeps a legacy
-JSON config, such as `.oxfmtrc.json` or `knip.json`, gets no TypeScript config beside it, because
+JSON config, such as `.oxlintrc.json`, `.oxfmtrc.json`, or `knip.json`, gets no TypeScript config beside it, because
 the tool would not load both, and Doctor reports the migration. `.vscode/extensions.json` recommends the Oxc
 extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
 for the `effect` preset, so VS Code offers to install them.
@@ -319,8 +319,11 @@ adamantite update
 adamantite doctor
 ```
 
-`update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
-`adamantite doctor` as the CI gate. It also refreshes each copy of the
+`update` installs each package of the recorded setup that the project does not declare at the
+managed version, such as Oxlint, tsrs, and the managed plugin of each selected preset. A version
+from a pnpm catalog stays as it is, and Doctor reports an outdated catalog entry. `update` exits 0
+when the install succeeds, even if doctor findings remain. Use `adamantite doctor` as the CI gate.
+It also refreshes each copy of the
 [Adamantite skill](#agent-skill) that differs from the skill of the installed Adamantite version,
 and writes the lockfile again with the installed version. In a project that an earlier version
 set up, `update` writes the lockfile one time with the setup that the project files show: the

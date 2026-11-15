@@ -34,6 +34,7 @@ const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
 // adds its managed files.
 const FORMATTED_FILES = [
   LOCKFILE_PATH,
+  "oxlint.config.ts",
   "oxfmt.config.ts",
   "knip.config.ts",
   ".vscode/settings.json",
@@ -46,7 +47,18 @@ const FULL_SELECTION = {
   agents: true,
   ci: "github",
   editors: ["vscode", "zed"],
-  presets: ["core", "react", "effect"],
+  presets: [
+    "core",
+    "react",
+    "react-strict",
+    "tanstack",
+    "nextjs",
+    "effect",
+    "vitest",
+    "architecture",
+    "strict",
+    "tailwind",
+  ],
   scripts: ["check", "fix", "analyze"],
   typescript: "typescript",
 } as const satisfies Selection

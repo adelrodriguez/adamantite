@@ -4,9 +4,6 @@ import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
-import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, readLockfile } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
@@ -22,7 +19,7 @@ import {
 import * as Setup from "#lib/setup/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Output from "#terminal/output.ts"
-import { printFileWrites } from "#terminal/setup.ts"
+import { printFileWrites, printInstalls } from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
@@ -34,7 +31,6 @@ import {
   setupEffectTsgo,
   setupGitHubActions,
   setupSkill,
-  setupToolConfig,
   setupTypescript,
   setupZed,
 } from "./setup.ts"
@@ -155,23 +151,9 @@ export default Command.make("init", initCommandOptions).pipe(
         packageJson.devDependencies?.adamantite ?? packageJson.dependencies?.adamantite
       )
 
-      const dependencies = dependsOnAdamantite ? [] : ["adamantite"]
-
-      if (Option.isSome(lint)) {
-        dependencies.push(
-          `${oxlint.name}@${oxlint.version}`,
-          `${tsrs.name}@${tsrs.version}`,
-          // A preset with a managed plugin loads that plugin from the target project.
-          ...managedPlugins
-            .filter((plugin) => presets.includes(plugin.preset))
-            .map((plugin) => `${plugin.name}@${plugin.version}`)
-        )
-      }
-
-      yield* installDependencies(cwd, dependencies)
-
-      if (Option.isSome(lint)) {
-        yield* setupToolConfig(cwd, oxlint, oxlint.create(cwd, presets))
+      // `Setup.apply` installs the tools of the selection below.
+      if (!dependsOnAdamantite) {
+        yield* installDependencies(cwd, ["adamantite"])
       }
 
       const managedScripts = yield* addScripts(cwd, selectedScripts, {
@@ -228,6 +210,7 @@ export default Command.make("init", initCommandOptions).pipe(
 
       const setup = yield* Setup.apply(project, selection)
 
+      yield* printInstalls(setup.installs)
       yield* printFileWrites(setup.files)
 
       yield* Output.success(

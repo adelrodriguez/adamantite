@@ -55,21 +55,29 @@ function listFiles(files: readonly string[]) {
 }
 
 /**
- * The findings for a managed config: a legacy JSON config, a missing config, and a kept config that
- * `inspect` rejects. `reference` is what Adamantite writes.
+ * The content of the managed config of the project at `cwd`, or none when it does not exist.
+ */
+export const readConfigFile = Effect.fn("readConfigFile")(function* (
+  cwd: string,
+  config: ConfigFile
+) {
+  const path = yield* Path.Path
+
+  return yield* readFileIfExists(path.join(cwd, config.path))
+})
+
+/**
+ * The findings for a managed config whose content is `content`: a legacy JSON config, a missing
+ * config, and a kept config that `inspect` rejects. `reference` is what Adamantite writes.
  */
 export const assessConfigFile = Effect.fn("assessConfigFile")(function* (
   cwd: string,
   config: ConfigFile,
+  content: Option.Option<string>,
   reference: string,
   inspect: (content: string) => RequiredConfigInspection
 ) {
-  const path = yield* Path.Path
-
-  const [content, legacy] = yield* Effect.all(
-    [readFileIfExists(path.join(cwd, config.path)), findLegacyConfigs(cwd, config)],
-    { concurrency: "unbounded" }
-  )
+  const legacy = yield* findLegacyConfigs(cwd, config)
 
   const code = { content: reference, language: "ts" } as const
 

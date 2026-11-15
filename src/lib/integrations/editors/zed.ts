@@ -14,7 +14,7 @@ import {
 } from "#lib/integrations/base.ts"
 import { readEffectEditor } from "#lib/integrations/editors/effect.ts"
 import { pluginLanguages } from "#lib/integrations/oxfmt/languages.ts"
-import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/tooling/oxlint/entry.ts"
+import { EDITOR_OXLINT_ENTRY } from "#lib/integrations/oxlint/entry.ts"
 import { formatInitCommand } from "#lib/project/init-command.ts"
 import {
   EffectEditorUnavailable,

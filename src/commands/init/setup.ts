@@ -1,6 +1,3 @@
-import type * as FileSystem from "effect/FileSystem"
-import type * as Path from "effect/Path"
-import type * as PlatformError from "effect/PlatformError"
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
@@ -9,12 +6,7 @@ import type { LintPreset, TypeScriptPreset } from "#lib/project/selection.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
-import {
-  LegacyToolingConfig,
-  MissingToolingConfig,
-  type ToolingConfigState,
-} from "#lib/integrations/tooling/base.ts"
-import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
+import effectTsgo from "#lib/integrations/oxlint/plugins/effect-tsgo/index.ts"
 import tsconfig, {
   getMonorepoGuidance,
   TYPESCRIPT_PRESETS,
@@ -38,44 +30,6 @@ export const installDependencies = (cwd: string, packages: string[]) =>
     yield* addRootDevDependencies(cwd, packages)
     yield* Output.success("Dependencies installed.")
   })
-
-export function setupToolConfig<E, R>(
-  cwd: string,
-  tool: {
-    readonly config: string
-    readonly detect: (
-      cwd: string
-    ) => Effect.Effect<
-      ToolingConfigState,
-      PlatformError.PlatformError,
-      FileSystem.FileSystem | Path.Path
-    >
-    readonly name: string
-  },
-  create: Effect.Effect<void, E, R>
-) {
-  return Effect.gen(function* () {
-    const { active, warnings } = yield* tool.detect(cwd)
-
-    for (const warning of warnings) {
-      yield* Output.warning(warning)
-    }
-
-    // Init creates only a missing config.
-    if (active instanceof MissingToolingConfig) {
-      yield* create
-      yield* Output.success(`${tool.name} config created.`)
-    } else {
-      yield* Output.success(`Existing ${tool.name} config kept.`)
-    }
-
-    if (active instanceof LegacyToolingConfig) {
-      yield* Output.info(
-        `Legacy \`${active.file.file}\` was kept during \`adamantite init\`. Run \`adamantite doctor\` for instructions to migrate to the current ${tool.name} config.`
-      )
-    }
-  })
-}
 
 export const addScripts = (
   cwd: string,

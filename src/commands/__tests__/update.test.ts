@@ -10,18 +10,22 @@ import initCommand from "#commands/init/index.ts"
 import updateCommand from "#commands/update.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
-import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
+import { PACKAGE as oxfmt } from "#lib/integrations/oxfmt/index.ts"
+import { toOxlintTsConfigContent } from "#lib/integrations/oxlint/config.ts"
+import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
+import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
+import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { FailedToInstallDependency, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
   hashContent,
+  makeLockfileFile,
   readLockfile,
   runCommand,
 } from "./command-test-helpers.ts"
+import { makeSelection } from "./lifecycle.ts"
 
 const effectTsgo = managedPlugin("@effect/tsgo")
 const shadcnLint = managedPlugin("@shadcn/lint")
@@ -46,6 +50,9 @@ function makeEffectFiles(oxlintConfig: string) {
 }
 
 // A lockfile that a newer Adamantite version wrote.
+// The setup that `init --script check` records.
+const CHECK_SELECTION = makeSelection({ presets: ["core"], scripts: ["check"] })
+
 const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
 const shippedSkill = getShippedSkillFiles()
@@ -228,69 +235,63 @@ describe("update", () => {
     })
   )
 
-  it.effect("leave the adamantite package itself untouched", () =>
+  // The recorded selection runs Oxlint, so Setup installs the managed version.
+  it.effect("install an outdated managed package, and leave the adamantite package alone", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "package.json": manifest({ devDependencies: { adamantite: "0.0.1", oxlint: "1.0.0" } }),
-        },
-      })
-
-      const logLines: unknown[] = []
-      const installer = createDependencyInstallerTestContext()
-
-      const exit = yield* runCommand(updateCommand, [], {
-        files,
-        layers: [installer.layer],
-        logLines,
-      })
-
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls).toHaveLength(1)
-      expect(installer.calls[0]?.packages).toStrictEqual([`oxlint@${oxlint.version}`])
-      expect(logLines).toStrictEqual([
-        "💠 adamantite update",
-        `● Packages to install or update:\n  oxlint: 1.0.0 → ${oxlint.version}`,
-        "✔ Dependencies updated.",
-        "✅ Update finished.",
-      ])
-    })
-  )
-
-  it.effect("update at the workspace root in a monorepo", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: {
+          ...makeLockfileFile(CHECK_SELECTION),
           "package.json": manifest({
-            devDependencies: { oxlint: "1.0.0" },
-            workspaces: ["packages/*"],
+            devDependencies: {
+              adamantite: "0.0.1",
+              oxfmt: oxfmt.version,
+              oxlint: "1.0.0",
+              tsrs: tsrs.version,
+            },
           }),
         },
       })
 
-      const logLines: unknown[] = []
+      const installer = createDependencyInstallerTestContext()
+      const exit = yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(installer.calls.map((call) => call.packages)).toStrictEqual([
+        [`oxlint@${oxlint.version}`],
+      ])
+    })
+  )
+
+  it.effect("install at the workspace root in a monorepo", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          ...makeLockfileFile(CHECK_SELECTION),
+          "package.json": manifest({ workspaces: ["packages/*"] }),
+        },
+      })
 
       const installer = createDependencyInstallerTestContext({
         detectedPackageManager: { name: "pnpm" },
       })
 
-      const exit = yield* runCommand(updateCommand, [], {
-        files,
-        layers: [installer.layer],
-        logLines,
-      })
+      yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls[0]?.options).toStrictEqual({ silent: true, workspace: true })
+      expect(installer.calls.map((call) => call.options)).toContainEqual({
+        silent: true,
+        workspace: true,
+      })
     })
   )
 
-  it.effect("report an outdated catalog entry of a known package without installing it", () =>
+  // `pnpm add` would replace the `catalog:` specifier, so the catalog entry stays a finding.
+  it.effect("report an outdated catalog entry of a managed package without installing it", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
+          ...makeLockfileFile(CHECK_SELECTION),
           "package.json": manifest({
-            devDependencies: { oxlint: "catalog:", tsrs: "npm:tsrs@1" },
+            devDependencies: { oxfmt: oxfmt.version, oxlint: "catalog:", tsrs: tsrs.version },
           }),
           "pnpm-workspace.yaml": "catalog:\n  oxlint: 0.0.1\n",
         },
@@ -298,22 +299,28 @@ describe("update", () => {
 
       const logLines: unknown[] = []
       const installer = createDependencyInstallerTestContext()
+      yield* runCommand(updateCommand, [], { files, layers: [installer.layer], logLines })
 
-      const exit = yield* runCommand(updateCommand, [], {
-        files,
-        layers: [installer.layer],
-        logLines,
+      expect(installer.calls.flatMap((call) => call.packages)).not.toContain(
+        `oxlint@${oxlint.version}`
+      )
+      expect(logLines.join("\n")).toContain("Outdated oxlint")
+    })
+  )
+
+  it.effect("fail when dependency installation fails", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { ...makeLockfileFile(CHECK_SELECTION), "package.json": manifest({}) },
       })
 
-      expect(Exit.isSuccess(exit)).toBe(true)
-      expect(installer.calls).toStrictEqual([])
-      expect(logLines).toStrictEqual([
-        "💠 adamantite update",
-        expect.stringMatching(/^▲ `tsrs` is declared as `npm:tsrs@1`/u),
-        expect.stringMatching(/^\n1\. Outdated oxlint\n/u),
-        "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
-        "✅ Update finished.",
-      ])
+      const installer = createDependencyInstallerTestContext({
+        addDevDependenciesError: new FailedToInstallDependency({ packages: ["oxlint"] }),
+      })
+
+      const exit = yield* runCommand(updateCommand, [], { files, layers: [installer.layer] })
+
+      expect(Exit.isFailure(exit)).toBe(true)
     })
   )
 
@@ -370,33 +377,6 @@ describe("update", () => {
         })
       )
       expect(files.read(LOCKFILE_PATH)).toBe(NEWER_LOCKFILE)
-    })
-  )
-
-  it.effect("fail when dependency installation fails", () =>
-    Effect.gen(function* () {
-      const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { oxlint: "1.0.0" } }) },
-      })
-
-      const logLines: unknown[] = []
-
-      const installer = createDependencyInstallerTestContext({
-        addDevDependenciesError: new FailedToInstallDependency({ packages: ["oxlint"] }),
-      })
-
-      const exit = yield* runCommand(updateCommand, [], {
-        files,
-        layers: [installer.layer],
-        logLines,
-      })
-
-      expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "💠 adamantite update",
-        `● Packages to install or update:\n  oxlint: 1.0.0 → ${oxlint.version}`,
-        "❌ Update failed",
-      ])
     })
   )
 

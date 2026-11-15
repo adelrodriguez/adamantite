@@ -413,7 +413,6 @@ describe("assessProject", () => {
       )
 
       expect(assessment.applicableIntegrations).toStrictEqual([
-        "oxlint",
         "oxlint-custom",
         "@effect/tsgo",
         "@shadcn/lint",
@@ -421,6 +420,7 @@ describe("assessProject", () => {
         "tsconfig",
         "agents",
         "github",
+        "oxlint",
         "oxfmt",
         "knip",
         "sherif",

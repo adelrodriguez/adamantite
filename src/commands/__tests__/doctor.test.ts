@@ -12,7 +12,7 @@ import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import doctorCommand from "#commands/doctor.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
   makeHandoffRunner,

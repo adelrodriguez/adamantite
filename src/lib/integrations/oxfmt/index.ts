@@ -5,6 +5,7 @@ import type { Selection } from "#lib/project/selection.ts"
 import {
   assessConfigFile,
   type ConfigFile,
+  readConfigFile,
   renderConfigFile,
 } from "#lib/integrations/config-file.ts"
 import {
@@ -32,11 +33,16 @@ export default {
 
       const [config, languages] = yield* Effect.all(
         [
-          assessConfigFile(
-            project.cwd,
-            CONFIG,
-            toOxfmtTsConfigContent(),
-            inspectRequiredOxfmtConfig
+          readConfigFile(project.cwd, CONFIG).pipe(
+            Effect.flatMap((content) =>
+              assessConfigFile(
+                project.cwd,
+                CONFIG,
+                content,
+                toOxfmtTsConfigContent(),
+                inspectRequiredOxfmtConfig
+              )
+            )
           ),
           assessPluginLanguages(project),
         ],

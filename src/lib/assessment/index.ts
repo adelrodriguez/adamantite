@@ -10,11 +10,10 @@ import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.t
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import { integrations } from "#lib/integrations/index.ts"
+import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
+import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
+import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { inferSelection } from "#lib/integrations/selection.ts"
-import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
-import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import agents from "#lib/integrations/workspace/agents.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
@@ -29,7 +28,6 @@ const warningReportTemplate = getWarningReportTemplate()
  * rendered output.
  */
 const managedIntegrations = [
-  oxlint,
   oxlintCustom,
   ...managedPlugins,
   tsrs,

@@ -8,7 +8,7 @@ import * as Predicate from "effect/Predicate"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import packageJson from "../package.json" with { type: "json" }
-import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/tooling/oxlint/entry.ts"
+import { OXLINT_ENTRY_FILE } from "../src/lib/integrations/oxlint/entry.ts"
 
 const cliPath = join(import.meta.dirname, "..", "bin", "adamantite")
 

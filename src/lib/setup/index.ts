@@ -13,13 +13,12 @@ import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
-import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
-import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
+import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { writeLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
-import { LINT_PRESETS, type Selection } from "#lib/project/selection.ts"
+import type { Selection } from "#lib/project/selection.ts"
 import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -77,7 +76,7 @@ export function checkIsEmptySelection(selection: Selection): boolean {
  * setup steps in `init` write them, so `apply` records their hashes, and never writes or deletes
  * them.
  */
-const LEGACY_PATHS: ReadonlySet<string> = new Set([oxlint.config, tsconfig.config])
+const LEGACY_PATHS: ReadonlySet<string> = new Set([tsconfig.config])
 
 /**
  * The files that the setup steps of `init` write for `selection`, with the content that this
@@ -87,16 +86,12 @@ const renderLegacyFiles = Effect.fn("renderLegacyFiles")(function* (
   project: Project,
   selection: Selection
 ) {
-  const presets = LINT_PRESETS.filter((preset) => selection.presets.includes(preset))
-  const lints = selection.presets.length > 0
-
-  return [
-    ...(lints ? [{ content: toOxlintTsConfigContent(presets), path: oxlint.config }] : []),
-    // In a monorepo, init leaves the root `tsconfig.json` to the project.
-    ...(selection.typescript === null || project.workspace.isMonorepo
+  // In a monorepo, init leaves the root `tsconfig.json` to the project.
+  return (
+    selection.typescript === null || project.workspace.isMonorepo
       ? []
-      : [{ content: yield* tsconfig.render(selection.typescript), path: tsconfig.config }]),
-  ] satisfies readonly ManagedFile[]
+      : [{ content: yield* tsconfig.render(selection.typescript), path: tsconfig.config }]
+  ) satisfies readonly ManagedFile[]
 })
 
 const hashContent = (content: string) =>
@@ -308,12 +303,22 @@ const makeFormatter = Effect.fn("makeFormatter")(function* (cwd: string) {
 export const apply = Effect.fn("Setup.apply")(function* (project: Project, selection: Selection) {
   const { cwd } = project
   const selected = integrations.filter((integration) => integration.selected(selection))
-  const packages = selected.flatMap((integration) => integration.packages(project, selection))
 
-  if (packages.length > 0) {
+  // Only the packages that the project does not declare at the managed version. A version from a
+  // pnpm catalog stays, because `pnpm add` would replace the `catalog:` specifier, and the
+  // integration's `assess` reports an outdated catalog entry.
+  const installs = selected.flatMap((integration) =>
+    integration
+      .packages(project, selection)
+      .flatMap(
+        (pkg) => assessPackage(project, pkg, integration.name, integration.name).packageActions
+      )
+  )
+
+  if (installs.length > 0) {
     yield* addRootDevDependencies(
       cwd,
-      packages.map(({ name, version: target }) => `${name}@${target}`)
+      installs.map((action) => `${action.package}@${action.targetVersion}`)
     )
   }
 
@@ -371,6 +376,7 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
 
   return {
     files: [...writes.map(({ write }) => write), ...Array.getSomes(deletes)],
+    installs,
     lockfile,
   }
 }, Effect.scoped)

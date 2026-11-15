@@ -9,7 +9,7 @@ import {
   findExcludedPresets,
   findMissingRequiredPresets,
   lintPresets,
-} from "#lib/integrations/tooling/oxlint/presets.ts"
+} from "#lib/integrations/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import {
   checkIsSupportedPackageManager,

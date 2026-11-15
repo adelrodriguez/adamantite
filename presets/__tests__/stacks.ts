@@ -34,8 +34,8 @@ export const STACK_OPTIONS = {
 
 /**
  * The name of each lint preset module besides core, which the package publishes as
- * `adamantite/lint/<name>`. `src/lib/integrations/tooling/oxlint/__tests__/presets.test.ts` checks
- * that the catalog of init lists the same presets.
+ * `adamantite/lint/<name>`. `src/lib/integrations/oxlint/__tests__/presets.test.ts` checks that the
+ * catalog of init lists the same presets.
  */
 export function listLintPresets(): string[] {
   return readdirSync(LINT_PRESETS_DIR)

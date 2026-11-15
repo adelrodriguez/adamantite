@@ -34,9 +34,15 @@ const REPLACEMENTS: ReadonlyArray<readonly [pattern: RegExp, replacement: string
   [new RegExp(`${escape(FROM)}${END}`, "g"), TO],
 ]
 
-// The other scripts are codemods of earlier moves, and released history keeps its paths.
+// The codemods of earlier moves keep their paths, and so does released history. The rule fixtures
+// model other projects, whose paths only look like the ones of this repository.
 function checkIsKept(file: string) {
-  return file.startsWith("scripts/") || file.startsWith(".changeset/") || file === "CHANGELOG.md"
+  return (
+    (file.startsWith("scripts/") && !file.startsWith("scripts/test-"))
+    || file.startsWith(".changeset/")
+    || file.startsWith("src/__tests__/presets/fixtures/")
+    || file === "CHANGELOG.md"
+  )
 }
 
 const TEXT_EXTENSIONS = new Set([".json", ".md", ".ts", ".yaml", ".yml"])

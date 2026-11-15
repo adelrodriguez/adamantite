@@ -75,10 +75,14 @@ export default defineConfig({
       // the tooling integrations directly.
       {
         import: "#lib/integrations/tooling",
+        owners: ["src/lib"],
+      },
+      {
+        import: "#lib/integrations/oxlint",
         owners: [
           "src/lib",
+          // Init offers the lint presets from the preset catalog.
           "src/commands/init",
-          "src/commands/update.ts",
           "src/commands/__tests__",
           "src/__tests__",
           "src/oxlint.ts",

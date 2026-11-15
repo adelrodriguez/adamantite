@@ -2,6 +2,7 @@ import type { JsonObject, JsonValue } from "type-fest"
 
 import * as Effect from "effect/Effect"
 import * as Equal from "effect/Equal"
+import { flow } from "effect/Function"
 import * as Option from "effect/Option"
 
 import * as Predicate from "effect/Predicate"
@@ -9,19 +10,12 @@ import * as Schema from "effect/Schema"
 import { FailedToMergeConfig } from "#lib/shared/errors.ts"
 
 const JsonText = Schema.fromJsonString(Schema.Unknown)
-const IndentedJsonText = Schema.fromJsonString(Schema.Unknown, { space: 2 })
 
 /**
  * Encodes a value as JSON text on one line. A value that JSON cannot hold fails with a
  * `SchemaError`.
  */
 export const stringifyJson = Schema.encodeEffect(JsonText)
-
-/**
- * Encodes a value as JSON text with two-space indentation, the format of every file that Adamantite
- * creates. A value that JSON cannot hold fails with a `SchemaError`.
- */
-export const formatJson = Schema.encodeEffect(IndentedJsonText)
 
 export const checkIsJsonObject = (
   value: JsonValue | Schema.Json | undefined
@@ -30,6 +24,83 @@ export const checkIsJsonObject = (
 export const checkIsJsonArray = (
   value: JsonValue | Schema.Json | undefined
 ): value is JsonValue[] => Array.isArray(value)
+
+// The `printWidth` of the format preset.
+const PRINT_WIDTH = 100
+
+const INDENT = "  "
+
+/**
+ * The value on one line, as Oxfmt prints an array that fits. None when the value holds an object
+ * with keys, which Oxfmt always prints on several lines.
+ */
+function printFlat(value: Schema.Json): Option.Option<string> {
+  if (checkIsJsonArray(value)) {
+    return Option.map(Option.all(value.map(printFlat)), (items) => `[${items.join(", ")}]`)
+  }
+
+  if (checkIsJsonObject(value)) {
+    return Object.keys(value).length === 0 ? Option.some("{}") : Option.none()
+  }
+
+  return Option.some(JSON.stringify(value))
+}
+
+/**
+ * The value as Oxfmt prints JSON with the format preset. An object with keys takes one line for
+ * each key. An array stays on one line when it fits in the print width, with `column` characters
+ * before it and `trailing` characters after it on its line, and takes one line for each item
+ * otherwise.
+ */
+function printJson(value: Schema.Json, indent: string, column: number, trailing: number): string {
+  const inner = `${indent}${INDENT}`
+
+  if (checkIsJsonArray(value)) {
+    const flat = printFlat(value)
+
+    if (Option.isSome(flat) && column + flat.value.length + trailing <= PRINT_WIDTH) {
+      return flat.value
+    }
+
+    const items = value.map(
+      (item, index) =>
+        `${inner}${printJson(item, inner, inner.length, index === value.length - 1 ? 0 : 1)}`
+    )
+
+    return `[\n${items.join(",\n")}\n${indent}]`
+  }
+
+  if (checkIsJsonObject(value)) {
+    const entries = Object.entries(value)
+
+    if (entries.length === 0) {
+      return "{}"
+    }
+
+    const lines = entries.map(([key, item], index) => {
+      const prefix = `${inner}${JSON.stringify(key)}: `
+
+      return `${prefix}${printJson(item, inner, prefix.length, index === entries.length - 1 ? 0 : 1)}`
+    })
+
+    return `{\n${lines.join(",\n")}\n${indent}}`
+  }
+
+  return JSON.stringify(value)
+}
+
+const decodeJsonText = Schema.decodeEffect(Schema.fromJsonString(Schema.Json))
+
+/**
+ * Encodes a value as JSON text in the layout that Oxfmt gives it with the format preset, the format
+ * of every JSON file that Adamantite writes. `adamantite fix` then leaves the file unchanged, so
+ * its hash still matches the lockfile. A value that JSON cannot hold fails with a `SchemaError`.
+ */
+export const formatJson = flow(
+  stringifyJson,
+  Effect.flatMap(decodeJsonText),
+  Effect.map((json) => printJson(json, "", 0, 0))
+)
 
 interface ConfigLayers {
   /**

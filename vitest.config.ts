@@ -15,6 +15,7 @@ const TEST_OXLINT = process.env["ADAMANTITE_TEST_OXLINT"]
 const PROCESS_RUN_TESTS = [
   "presets/__tests__/**/*.test.ts",
   "src/__tests__/macro-cache.test.ts",
+  "src/commands/__tests__/formatted.test.ts",
   "src/__tests__/trial.test.ts",
   "src/lib/integrations/tooling/oxfmt/__tests__/format-preset.test.ts",
   "src/lib/integrations/tooling/oxlint/__tests__/config-load.test.ts",

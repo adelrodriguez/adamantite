@@ -6,6 +6,7 @@ import * as Schema from "effect/Schema"
 import { Selection } from "#lib/project/selection.ts"
 import { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { formatJson } from "#lib/shared/json.ts"
 
 /**
  * The lockfile, relative to the project root. In a monorepo, the root is the workspace root.
@@ -43,7 +44,7 @@ const decodeSchemaVersion = Schema.decodeUnknownEffect(
 
 const decodeLockfile = Schema.decodeUnknownEffect(Schema.fromJsonString(Lockfile))
 
-const encodeLockfile = Schema.encodeEffect(Schema.fromJsonString(Lockfile, { space: 2 }))
+const encodeLockfile = Schema.encodeEffect(Lockfile)
 
 /**
  * Reads the lockfile of the project at `root`. None when the project has no lockfile.
@@ -85,7 +86,9 @@ export const writeLockfile = Effect.fn("writeLockfile")(function* (
 ) {
   const path = yield* Path.Path
   const lockfilePath = path.join(root, LOCKFILE_PATH)
-  const content = `${yield* encodeLockfile(lockfile).pipe(Effect.orDie)}\n`
+
+  const content = `${yield* encodeLockfile(lockfile).pipe(Effect.flatMap(formatJson), Effect.orDie)}\n`
+
   const current = yield* readFileIfExists(lockfilePath)
 
   if (Option.contains(current, content)) {

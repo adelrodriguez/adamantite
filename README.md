@@ -144,12 +144,15 @@ forward them to the Adamantite command after `--`, e.g.
 `adamantite analyze -- --directory packages/app`.
 
 In a detected monorepo, TypeScript setup does not write a root `tsconfig.json`, because a
-catch-all root config makes TypeScript treat all packages as one project. Adamantite
-prints guidance instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
-in a library, to each package's `tsconfig.json` or to a shared base config.
+catch-all root config makes TypeScript treat all packages as one project. Doctor reports the
+packages instead: add `"extends": "adamantite/typescript"`, or `"extends": "adamantite/tsconfig"`
+in a library, to each package's `tsconfig.json` or to a shared base config. A root
+`tsconfig.json` that Adamantite wrote before the project became a monorepo stays managed.
 
 `init` and `update` write each managed file whole: `oxlint.config.ts`, `oxfmt.config.ts`,
-`knip.config.ts`, `.vscode/settings.json`, and `.vscode/extensions.json`. They write a file only when it does not exist or still holds what
+`knip.config.ts`, `tsconfig.json`, `.vscode/settings.json`, and `.vscode/extensions.json`. The
+`tsconfig.json` extends the selected preset, and adds the Effect language service entry for the
+`effect` preset. They write a file only when it does not exist or still holds what
 Adamantite wrote, by the hash in the lockfile, and they format it with the project's Oxfmt first, so
 `adamantite fix` leaves it as it is. A file that you changed stays as it is, and `adamantite doctor`
 reports a change that breaks the setup, such as a missing extension recommendation. A file that the
@@ -159,8 +162,7 @@ the tool would not load both, and Doctor reports the migration. `.vscode/extensi
 extension for `check` and `fix`, the Knip extension for `analyze`, and the TypeScript 7 extension
 for the `effect` preset, so VS Code offers to install them.
 
-Init rewrites an existing `tsconfig.json` or `.zed/settings.json` only when the file is plain
-JSON. A file with comments or trailing commas stays as it is, and init prints the change to make
+Init rewrites an existing `.zed/settings.json` only when the file is plain JSON. A file with comments or trailing commas stays as it is, and init prints the change to make
 by hand.
 
 ## Commands

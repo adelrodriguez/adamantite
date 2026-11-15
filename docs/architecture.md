@@ -334,8 +334,10 @@ changes. `inspectExtendsOrder` in `oxlint/config.ts` reads the order from the co
 source. An entry that is not an Adamantite preset can come before core, and the finding keeps its
 place.
 
-The Effect definition also assesses the language service entry in `tsconfig.json`, and its
-`update` method writes the language service entry for init.
+The Effect definition also assesses the language service entry in `tsconfig.json`, through
+`integrations/effect-language-service.ts`. The `typescript` integration writes the entry in the
+`tsconfig.json` that it renders for the `effect` preset, and never adds it to a config that the
+project changed.
 Its runtime resolver, in `plugins/effect-tsgo/runtime.ts`, returns binding and backend
 overrides when the target project installs `@effect/tsgo`. The installed package turns the
 Effect builds on, so nested configs and relative preset imports get them too. The managed
@@ -363,7 +365,7 @@ every fixture must fail. The second run proves that each fixture tests a reset. 
 fail when a reset has no fixture or `index.d.ts` does not reference it. The resets and the
 fixtures started from ts-reset, so `license.md` keeps its MIT notice.
 
-Doctor's tsconfig integration asks the project's TypeScript which files a config loads. For each
+Doctor's `typescript` integration, in `integrations/typescript/`, asks the project's TypeScript which files a config loads. For each
 package whose `tsconfig.json` has `extends`, it runs `tsc --showConfig` through the
 `ChildProcessSpawner`, and it reports a library that loads the type resets.
 

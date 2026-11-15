@@ -1,10 +1,8 @@
-import type { JsonObject, JsonValue, PackageJson } from "type-fest"
+import type { JsonValue, PackageJson } from "type-fest"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Json5 from "effect/encoding/Json5"
 import * as Jsonc from "effect/encoding/Jsonc"
-import * as Equal from "effect/Equal"
-import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
@@ -13,27 +11,21 @@ import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
+import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
-import {
-  defineIntegration,
-  type Finding,
-  type IntegrationAssessment,
-} from "#lib/integrations/base.ts"
+import { LANGUAGE_SERVICE_PLUGIN } from "#lib/integrations/effect-language-service.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
-import { TYPESCRIPT_PRESET_NAMES, type TypeScriptPreset } from "#lib/project/selection.ts"
-import { FailedToParseFile, InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
-import { readFile, readFileIfExists, writeFile, writeJsonFile } from "#lib/shared/filesystem.ts"
 import {
-  checkIsJsonObject,
-  checkIsPlainJson,
-  formatJson,
-  mergeConfig,
-  stringifyJson,
-} from "#lib/shared/json.ts"
+  type Selection,
+  TYPESCRIPT_PRESET_NAMES,
+  type TypeScriptPreset,
+} from "#lib/project/selection.ts"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { formatJson } from "#lib/shared/json.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 
-const files = [{ path: "tsconfig.json", type: "config" }] as const
+const CONFIG_PATH = "tsconfig.json"
 
 /**
  * The import that `extends` names for each TypeScript preset.
@@ -42,48 +34,6 @@ export const TYPESCRIPT_PRESETS = {
   tsconfig: publicImport("./tsconfig"),
   typescript: publicImport("./typescript"),
 } as const satisfies Record<TypeScriptPreset, string>
-
-const PRESET_IMPORTS: readonly string[] = Object.values(TYPESCRIPT_PRESETS)
-
-export function getMonorepoGuidance(preset: TypeScriptPreset) {
-  const guidance = [
-    "Adamantite leaves the root `tsconfig.json` unchanged in a monorepo.",
-    `Add \`"extends": "${TYPESCRIPT_PRESETS[preset]}"\` to each package's \`tsconfig.json\` or to a shared base config.`,
-  ]
-
-  if (preset === "typescript") {
-    guidance.push(`In a library package, extend \`${TYPESCRIPT_PRESETS.tsconfig}\` instead.`)
-  }
-
-  return guidance
-}
-
-// Later entries in an `extends` array override earlier ones, so the preset is appended last when
-// Adamantite adds it. An array that already contains the preset is kept in the user's order, even
-// when the preset is not last. The other Adamantite preset is removed, because a config extends
-// one of them.
-function mergeExtends(existing: JsonValue | undefined, preset: TypeScriptPreset) {
-  const presetImport = TYPESCRIPT_PRESETS[preset]
-
-  if (Predicate.isString(existing)) {
-    if (existing === presetImport || PRESET_IMPORTS.includes(existing)) {
-      return presetImport
-    }
-
-    return [existing, presetImport]
-  }
-
-  if (Array.isArray(existing)) {
-    const kept = existing.filter(
-      (entry) =>
-        entry === presetImport || !Predicate.isString(entry) || !PRESET_IMPORTS.includes(entry)
-    )
-
-    return kept.includes(presetImport) ? kept : [...kept, presetImport]
-  }
-
-  return presetImport
-}
 
 // The type resets that `adamantite/typescript` lists in `files`, at the end of their path in the
 // installed package.
@@ -205,7 +155,7 @@ const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
     [cwd, ...workspace.packageDirectories],
     (directory) =>
       Effect.gen(function* () {
-        const content = yield* readFileIfExists(path.join(directory, files[0].path))
+        const content = yield* readFileIfExists(path.join(directory, CONFIG_PATH))
 
         if (Option.isNone(content)) {
           return []
@@ -238,10 +188,18 @@ const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
 })
 
 /**
- * The `tsconfig.json` that `create` writes for `preset`.
+ * The `tsconfig.json` that Adamantite writes for the selection, with the Effect language service
+ * entry when the selection includes the `effect` preset.
  */
-const render = (preset: TypeScriptPreset) =>
-  formatJson({ extends: TYPESCRIPT_PRESETS[preset] }).pipe(Effect.map((content) => `${content}\n`))
+const render = (selection: Selection, preset: TypeScriptPreset) =>
+  formatJson(
+    selection.presets.includes("effect")
+      ? {
+          compilerOptions: { plugins: [LANGUAGE_SERVICE_PLUGIN] },
+          extends: TYPESCRIPT_PRESETS[preset],
+        }
+      : { extends: TYPESCRIPT_PRESETS[preset] }
+  ).pipe(Effect.map((content) => `${content}\n`))
 
 function toMissingPresetFinding(
   preset: TypeScriptPreset,
@@ -292,149 +250,99 @@ function toMismatchedPresetFinding(
   }
 }
 
-export default defineIntegration({
-  // With a lockfile, the integration applies when the selection includes TypeScript, and each
-  // configured package must use the selected preset. A library uses `adamantite/tsconfig` whatever
-  // the selection, and the library finding covers it. Without a lockfile, Doctor checks only the
-  // packages that chose a preset, so a project that declined it in init gets no finding. Oxlint's
-  // type check runs without a `tsconfig.json`. A config without `extends` cannot load the type
-  // resets, so Doctor runs TypeScript only for the others.
-  assess: (project: Project) =>
-    Effect.gen(function* () {
-      const { cwd, packageJson } = project
-      const path = yield* Path.Path
-      const configured = yield* readConfiguredPackages(project)
-
-      const applies = Option.match(project.lockfile, {
-        onNone: () => configured.length > 0,
-        onSome: ({ selection }) => selection.typescript !== null,
-      })
-
-      if (!applies) {
-        return { applicable: false } satisfies IntegrationAssessment
-      }
-
-      const selected = Option.flatMapNullishOr(
-        project.lockfile,
-        ({ selection }) => selection.typescript
-      )
-
-      const missing =
-        configured.length === 0 && Option.isSome(selected)
-          ? [
-              toMissingPresetFinding(
-                selected.value,
-                project.workspace.isMonorepo,
-                yield* render(selected.value)
-              ),
-            ]
-          : []
-
-      const findings = yield* Effect.forEach(
-        configured,
-        ({ directory, loadsResets, presets }) =>
-          Effect.gen(function* () {
-            const configPath = path.relative(cwd, path.join(directory, files[0].path))
-            const manifest = directory === cwd ? packageJson : yield* readPackageJson(directory)
-
-            if (checkPublishesTypes(manifest)) {
-              return loadsResets ? [toLibraryFinding(configPath)] : []
-            }
-
-            const used = loadsResets || presets.includes("typescript") ? "typescript" : "tsconfig"
-
-            return Option.isSome(selected) && selected.value !== used
-              ? [toMismatchedPresetFinding(configPath, selected.value, used)]
-              : []
-          }),
-        { concurrency: "unbounded" }
-      )
-
-      return {
-        applicable: true,
-        findings: [...missing, ...findings.flat()],
-        packageActions: [],
-        warnings: [],
-      } satisfies IntegrationAssessment
-    }),
-  config: files[0].path,
-  create: (cwd: string, preset: TypeScriptPreset) =>
-    Effect.gen(function* () {
-      const path = yield* Path.Path
-      yield* writeFile(path.join(cwd, files[0].path), yield* render(preset))
-    }),
-  detect: (cwd: string) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem
-      const path = yield* Path.Path
-
-      return yield* fs.exists(path.join(cwd, files[0].path))
-    }),
-  /**
-   * The preset that the project's configs set up: `typescript` when a config names it or loads its
-   * type resets, `tsconfig` when a config names only `tsconfig`. Doctor applies the integration to
-   * the same configs.
-   */
-  detectPreset: (project: Project) =>
-    readConfiguredPackages(project).pipe(
-      Effect.map((configured) =>
-        configured.length === 0
-          ? Option.none<TypeScriptPreset>()
-          : Option.some<TypeScriptPreset>(
-              configured.some(
-                ({ presets, loadsResets }) => loadsResets || presets.includes("typescript")
-              )
-                ? "typescript"
-                : "tsconfig"
+/**
+ * The preset that the project's configs set up: `typescript` when a config names it or loads its
+ * type resets, `tsconfig` when a config names only `tsconfig`. Doctor applies the integration to
+ * the same configs.
+ */
+export const detectPreset = (project: Project) =>
+  readConfiguredPackages(project).pipe(
+    Effect.map((configured) =>
+      configured.length === 0
+        ? Option.none<TypeScriptPreset>()
+        : Option.some<TypeScriptPreset>(
+            configured.some(
+              ({ presets, loadsResets }) => loadsResets || presets.includes("typescript")
             )
-      )
-    ),
-  files,
-  kind: "workspace",
-  name: "tsconfig",
-  render,
-  update: (cwd: string, preset: TypeScriptPreset) =>
-    Effect.gen(function* () {
-      const path = yield* Path.Path
-      const configPath = path.join(cwd, files[0].path)
+              ? "typescript"
+              : "tsconfig"
+          )
+    )
+  )
 
-      const tsconfigFile = yield* readFile(configPath)
+/**
+ * Each configured package must use the selected preset. A library uses `adamantite/tsconfig`
+ * whatever the selection, and the library finding covers it. Oxlint's type check runs without a
+ * `tsconfig.json`. A config without `extends` cannot load the type resets, so Doctor runs
+ * TypeScript only for the others.
+ */
+const assess = Effect.fn("assess")(function* (
+  project: Project,
+  preset: TypeScriptPreset,
+  selection: Selection
+) {
+  const { cwd, packageJson } = project
+  const path = yield* Path.Path
+  const configured = yield* readConfiguredPackages(project)
 
-      const existingConfig = yield* Effect.fromResult(Json5.parse(tsconfigFile)).pipe(
-        Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
-        Effect.mapError((cause) => new FailedToParseFile({ cause, path: configPath }))
-      )
+  const missing =
+    configured.length === 0
+      ? [
+          toMissingPresetFinding(
+            preset,
+            project.workspace.isMonorepo,
+            yield* render(selection, preset)
+          ),
+        ]
+      : []
 
-      if (!checkIsJsonObject(existingConfig)) {
-        return yield* new InvalidConfigFormat({ path: configPath })
-      }
+  const findings = yield* Effect.forEach(
+    configured,
+    ({ directory, loadsResets, presets }) =>
+      Effect.gen(function* () {
+        const configPath = path.relative(cwd, path.join(directory, CONFIG_PATH))
+        const manifest = directory === cwd ? packageJson : yield* readPackageJson(directory)
 
-      const merged = yield* mergeConfig({
-        fallback: { extends: TYPESCRIPT_PRESETS[preset] },
-        preferred: existingConfig,
-      })
+        if (checkPublishesTypes(manifest)) {
+          return loadsResets ? [toLibraryFinding(configPath)] : []
+        }
 
-      // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON object.
-      const newConfig: JsonObject = Object.fromEntries([
-        ...Object.entries(merged),
-        [
-          "extends",
-          mergeExtends("extends" in existingConfig ? existingConfig.extends : undefined, preset),
-        ],
-      ])
+        const used = loadsResets || presets.includes("typescript") ? "typescript" : "tsconfig"
 
-      // A file that already holds the managed values needs no write, also when it has comments.
-      if (Equal.equals(existingConfig, newConfig)) {
-        return
-      }
+        return preset === used ? [] : [toMismatchedPresetFinding(configPath, preset, used)]
+      }),
+    { concurrency: "unbounded" }
+  )
 
-      if (!checkIsPlainJson(tsconfigFile)) {
-        return yield* new JsoncNotEditable({
-          change: `Set \`extends\` to \`${yield* stringifyJson(newConfig.extends)}\`.`,
-          path: configPath,
-        })
-      }
-
-      yield* writeJsonFile(configPath, newConfig)
-    }),
+  return { findings: [...missing, ...findings.flat()], packageActions: [], warnings: [] }
 })
+
+/**
+ * Whether Adamantite manages the root `tsconfig.json`. In a monorepo, a root config that extends a
+ * preset makes TypeScript treat all packages as one project, so Adamantite creates none, and Doctor
+ * asks for the preset in each package. A root config that Adamantite wrote before the project
+ * became a monorepo stays managed, because other configs can extend it.
+ */
+function checkIsManaged({ lockfile, workspace }: Project) {
+  return (
+    !workspace.isMonorepo
+    || Option.exists(lockfile, ({ written }) => Object.hasOwn(written, CONFIG_PATH))
+  )
+}
+
+export default {
+  assess: (project: Project, selection: Selection) =>
+    selection.typescript === null
+      ? Effect.succeed({ findings: [], packageActions: [], warnings: [] })
+      : assess(project, selection.typescript, selection),
+  files: (project: Project, selection: Selection) =>
+    selection.typescript === null || !checkIsManaged(project)
+      ? Effect.succeed([])
+      : Effect.map(render(selection, selection.typescript), (content) => [
+          { content, path: CONFIG_PATH },
+        ]),
+  name: "tsconfig",
+  packages: (_project: Project, _selection: Selection) => [],
+  prepare: (_project: Project) => Effect.void,
+  selected: ({ typescript }: Selection) => typescript !== null,
+} satisfies Integration

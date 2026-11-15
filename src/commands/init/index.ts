@@ -28,10 +28,8 @@ import {
   installDependencies,
   printZedExtensions,
   setupAgentsGuidance,
-  setupEffectTsgo,
   setupGitHubActions,
   setupSkill,
-  setupTypescript,
   setupZed,
 } from "./setup.ts"
 
@@ -164,15 +162,6 @@ export default Command.make("init", initCommandOptions).pipe(
       if (initOptions.agents) {
         yield* setupAgentsGuidance(cwd, packageManager.name, managedScripts, isMonorepo)
         yield* setupSkill(cwd)
-      }
-
-      if (Option.isSome(initOptions.typescript)) {
-        yield* setupTypescript(cwd, isMonorepo, initOptions.typescript.value)
-      }
-
-      // After the TypeScript setup, so a `tsconfig.json` that init creates gets the plugin entry.
-      if (presets.includes("effect")) {
-        yield* setupEffectTsgo(cwd)
       }
 
       // `Setup.apply` writes the VS Code files below.

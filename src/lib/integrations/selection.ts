@@ -8,8 +8,8 @@ import type { Project } from "#lib/project/project.ts"
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
 import { getImportedLintPresets } from "#lib/integrations/oxlint/config.ts"
+import { detectPreset } from "#lib/integrations/typescript/index.ts"
 import { SETTINGS_PATH as VSCODE_SETTINGS_PATH } from "#lib/integrations/vscode/index.ts"
-import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
 import { checkRunsTool, getManagedScripts, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, type Selection } from "#lib/project/selection.ts"
@@ -54,6 +54,6 @@ export const inferSelection = Effect.fn("inferSelection")(function* (project: Pr
       ? ["core", ...LINT_PRESETS.filter((preset) => imported.includes(preset))]
       : [],
     scripts,
-    typescript: Option.getOrNull(yield* tsconfig.detectPreset(project)),
+    typescript: Option.getOrNull(yield* detectPreset(project)),
   } satisfies Selection
 })

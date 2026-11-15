@@ -37,6 +37,7 @@ const FORMATTED_FILES = [
   "oxlint.config.ts",
   "oxfmt.config.ts",
   "knip.config.ts",
+  "tsconfig.json",
   ".vscode/settings.json",
   ".vscode/extensions.json",
 ]

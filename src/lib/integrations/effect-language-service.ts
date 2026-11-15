@@ -1,28 +1,21 @@
 import type { JsonObject, JsonValue } from "type-fest"
 import * as Effect from "effect/Effect"
 import * as Json5 from "effect/encoding/Json5"
-import * as Equal from "effect/Equal"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Schema from "effect/Schema"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
-import { checkIsMonorepo } from "#lib/project/monorepo.ts"
-import { FailedToParseFile, InvalidConfigFormat, JsoncNotEditable } from "#lib/shared/errors.ts"
-import { readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
-import {
-  checkIsJsonArray,
-  checkIsJsonObject,
-  checkIsPlainJson,
-  stringifyJson,
-} from "#lib/shared/json.ts"
+import { FailedToParseFile } from "#lib/shared/errors.ts"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
+import { checkIsJsonArray, checkIsJsonObject, stringifyJson } from "#lib/shared/json.ts"
 
 const TSCONFIG_FILE = "tsconfig.json"
 const LANGUAGE_SERVICE = "@effect/language-service"
 
 // Semantic quick fixes need the language service diagnostics. Editor integrations hide the
 // corresponding Oxlint reports; CLI Oxlint still uses the Effect preset.
-const LANGUAGE_SERVICE_PLUGIN = { diagnostics: true, name: LANGUAGE_SERVICE }
+export const LANGUAGE_SERVICE_PLUGIN = { diagnostics: true, name: LANGUAGE_SERVICE }
 
 const TSCONFIG_REFERENCE = `${JSON.stringify(
   { compilerOptions: { plugins: [LANGUAGE_SERVICE_PLUGIN] } },
@@ -96,75 +89,4 @@ export const assessTsconfigPlugin = Effect.fn("assessTsconfigPlugin")(function* 
   }
 
   return { findings: [finding], warnings: [] }
-})
-
-/**
- * Add the language service entry to the root `tsconfig.json`, or set `diagnostics` to `true` in an
- * existing entry. A monorepo has no root config to change.
- */
-export const updateTsconfigPlugin = Effect.fn("updateTsconfigPlugin")(function* (cwd: string) {
-  if (yield* checkIsMonorepo(cwd)) {
-    return "monorepo" as const
-  }
-
-  const path = yield* Path.Path
-  const configPath = path.join(cwd, TSCONFIG_FILE)
-  const content = yield* readFileIfExists(configPath)
-
-  if (Option.isNone(content)) {
-    return "missing" as const
-  }
-
-  const config = yield* Effect.fromResult(Json5.parse(content.value)).pipe(
-    Effect.flatMap(Schema.decodeUnknownEffect(Schema.Json)),
-    Effect.mapError((cause) => new FailedToParseFile({ cause, path: configPath }))
-  )
-
-  if (!checkIsJsonObject(config)) {
-    return yield* new InvalidConfigFormat({ path: configPath })
-  }
-
-  const compilerOptions = config["compilerOptions"] ?? {}
-
-  if (!checkIsJsonObject(compilerOptions)) {
-    return yield* new InvalidConfigFormat({ path: configPath })
-  }
-
-  const plugins = compilerOptions["plugins"] ?? []
-
-  if (!checkIsJsonArray(plugins)) {
-    return yield* new InvalidConfigFormat({ path: configPath })
-  }
-
-  const existing = findLanguageServicePlugin(plugins)
-
-  const nextPlugins = existing
-    ? plugins.map((entry) => (entry === existing ? { ...existing, diagnostics: true } : entry))
-    : [...plugins, LANGUAGE_SERVICE_PLUGIN]
-
-  // A file that already holds the managed values needs no write, also when it has comments.
-  if (Equal.equals(plugins, nextPlugins)) {
-    return "unchanged" as const
-  }
-
-  if (!checkIsPlainJson(content.value)) {
-    return yield* new JsoncNotEditable({
-      change: `Add \`${yield* stringifyJson(LANGUAGE_SERVICE_PLUGIN)}\` to \`compilerOptions.plugins\`, or set \`diagnostics\` to \`true\` in the existing entry.`,
-      path: configPath,
-    })
-  }
-
-  // Effect's JsonObject interface triggers no-misused-spread, so rebuild the plain JSON objects.
-  yield* writeJsonFile(
-    configPath,
-    Object.fromEntries([
-      ...Object.entries(config),
-      [
-        "compilerOptions",
-        Object.fromEntries([...Object.entries(compilerOptions), ["plugins", nextPlugins]]),
-      ],
-    ])
-  )
-
-  return "updated" as const
 })

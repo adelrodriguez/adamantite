@@ -98,10 +98,6 @@ function readJson(files: FileSystemTestContext, path: string): JsonObject {
   return JSON.parse(files.read(path)) as JsonObject
 }
 
-function readOptionalFile(files: FileSystemTestContext, path: string): string | null {
-  return files.exists(path) ? files.read(path) : null
-}
-
 const EXISTING_MONOREPO_TSCONFIG = JSON.stringify(
   {
     extends: "./tooling/tsconfig.base.json",
@@ -504,9 +500,6 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(readJson(files, "package.json")).toMatchObject({ scripts: { prepare: "husky" } })
-        expect(logLines).toContainEqual(
-          "▲ No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry."
-        )
       })
     )
 
@@ -550,9 +543,7 @@ describe("init", () => {
           zed: files.exists(".zed/settings.json"),
         }).toStrictEqual({ tsconfig: tsconfigContent, vscode: vscodeContent, zed: true })
         expect(logLines).toContainEqual(
-          expect.stringMatching(
-            /^▲ `.+\/tsconfig\.json` has comments or trailing commas, so Adamantite does not rewrite it\. Set `extends` to `"adamantite\/typescript"`\.$/
-          )
+          "● `tsconfig.json` kept, because it has changes that Adamantite did not write. `adamantite doctor` reports a change that breaks the setup."
         )
         expect(logLines).toContainEqual(
           "● `.vscode/settings.json` kept, because it has changes that Adamantite did not write. `adamantite doctor` reports a change that breaks the setup."
@@ -560,31 +551,6 @@ describe("init", () => {
         // A kept file is not an updated file, and not a failed step.
         expect(logLines).not.toContainEqual(
           expect.stringMatching(/`(tsconfig\.json|\.vscode\/settings\.json)` updated|Failed/u)
-        )
-      })
-    )
-
-    it.effect("give tsconfig guidance instead of editing it in a monorepo", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": monorepoPackageJson,
-          "tsconfig.json": "{}",
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-        const runner = createRunnerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--preset", "effect"],
-          { files, layers: [installer.layer, runner.layer], logLines }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("tsconfig.json")).toBe("{}")
-        expect(logLines).toContainEqual(
-          expect.stringContaining("In a monorepo, add the Effect language service entry")
         )
       })
     )
@@ -710,100 +676,6 @@ describe("init", () => {
         })
       )
     }
-  })
-
-  describe("monorepo TypeScript setup", () => {
-    it.effect.each<{
-      readonly files: Record<string, string>
-      readonly name: string
-      readonly tsconfig: string | null
-    }>([
-      { files: {}, name: "no root tsconfig.json", tsconfig: null },
-      {
-        files: { "tsconfig.json": EXISTING_MONOREPO_TSCONFIG },
-        name: "an existing root tsconfig.json",
-        tsconfig: EXISTING_MONOREPO_TSCONFIG,
-      },
-    ])("leave $name as it is and print guidance in a monorepo", ({ files: rootFiles, tsconfig }) =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({ "package.json": monorepoPackageJson, ...rootFiles })
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--typescript", "typescript"],
-          { files, layers: [installer.layer], logLines }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(readOptionalFile(files, "tsconfig.json")).toBe(tsconfig)
-        expect(logLines).toStrictEqual(
-          expect.arrayContaining([
-            "● Adamantite leaves the root `tsconfig.json` unchanged in a monorepo.",
-            '● Add `"extends": "adamantite/typescript"` to each package\'s `tsconfig.json` or to a shared base config.',
-            "● In a library package, extend `adamantite/tsconfig` instead.",
-          ])
-        )
-      })
-    )
-  })
-
-  describe("existing config updates", () => {
-    it.effect("update existing configs without dropping preserved user settings", () =>
-      Effect.gen(function* () {
-        const originalOxfmtConfig = [
-          'import { defineConfig } from "oxfmt"',
-          'import format from "adamantite/format"',
-          "",
-          "export default defineConfig({",
-          "  ...format,",
-          "  semi: false,",
-          "})",
-          "",
-        ].join("\n")
-
-        const files = createInitTestContext({
-          ".vscode/settings.json": yield* formatJson({ "editor.tabSize": 4 }),
-          "oxfmt.config.ts": originalOxfmtConfig,
-          "tsconfig.json": yield* formatJson({
-            compilerOptions: {
-              paths: {
-                "@/*": ["src/*"],
-              },
-            },
-          }),
-        })
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          ...pickMany(LINT_PRESETS, []),
-          "enter",
-          ...pickOne(TYPESCRIPT_PRESET_NAMES, "typescript"),
-          ...pickMany(INIT_EDITORS, ["vscode"]),
-          "n",
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, promptingLayer],
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read("oxfmt.config.ts")).toBe(originalOxfmtConfig)
-        expect(readJson(files, "tsconfig.json")).toStrictEqual({
-          compilerOptions: { paths: { "@/*": ["src/*"] } },
-          extends: "adamantite/typescript",
-        })
-        // The user wrote the VS Code settings, so init keeps them. Doctor reports what they lack.
-        expect(readJson(files, ".vscode/settings.json")).toStrictEqual({ "editor.tabSize": 4 })
-        expect(files.exists("oxlint.config.ts")).toBe(true)
-      })
-    )
   })
 
   describe("selective setup", () => {
@@ -1053,9 +925,7 @@ describe("init", () => {
         expect(readJson(files, "tsconfig.json")).toStrictEqual({ extends: `adamantite/${preset}` })
         expect(readJson(files, "package.json").scripts).toStrictEqual(scripts)
         expect(files.exists("oxlint.config.ts")).toBe(false)
-        expect(logLines).toContainEqual(
-          `✔ \`tsconfig.json\` created with \`adamantite/${preset}\`.`
-        )
+        expect(logLines).toContainEqual("✔ `tsconfig.json` created.")
       })
     )
 

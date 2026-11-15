@@ -4,9 +4,17 @@ import knip from "#lib/integrations/knip/index.ts"
 import oxfmt from "#lib/integrations/oxfmt/index.ts"
 import oxlint from "#lib/integrations/oxlint/index.ts"
 import sherif from "#lib/integrations/sherif/index.ts"
+import typescript from "#lib/integrations/typescript/index.ts"
 import vscode from "#lib/integrations/vscode/index.ts"
 
-const list = [oxlint, oxfmt, knip, sherif, vscode] as const satisfies readonly Integration[]
+const list = [
+  oxlint,
+  oxfmt,
+  knip,
+  sherif,
+  typescript,
+  vscode,
+] as const satisfies readonly Integration[]
 
 type Member = (typeof list)[number]
 

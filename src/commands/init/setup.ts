@@ -1,16 +1,10 @@
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
-import { pipe } from "effect/Function"
 import * as Match from "effect/Match"
-import type { LintPreset, TypeScriptPreset } from "#lib/project/selection.ts"
+import type { LintPreset } from "#lib/project/selection.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import zed from "#lib/integrations/editors/zed.ts"
-import effectTsgo from "#lib/integrations/oxlint/plugins/effect-tsgo/index.ts"
-import tsconfig, {
-  getMonorepoGuidance,
-  TYPESCRIPT_PRESETS,
-} from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/project/agents.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
@@ -84,54 +78,6 @@ export const addScripts = (
     // The scripts that package.json now manages, including scripts from earlier runs. A conflicting
     // script that init kept is not managed.
     return getManagedScripts(packageJson)
-  })
-
-export const setupTypescript = (cwd: string, isMonorepo: boolean, preset: TypeScriptPreset) =>
-  Effect.gen(function* () {
-    if (isMonorepo) {
-      yield* pipe(
-        getMonorepoGuidance(preset),
-        Effect.forEach((line) => Output.info(line), { concurrency: 1 })
-      )
-
-      return
-    }
-
-    const exists = yield* tsconfig.detect(cwd)
-
-    yield* Effect.gen(function* () {
-      yield* exists ? tsconfig.update(cwd, preset) : tsconfig.create(cwd, preset)
-      yield* Output.success(
-        `\`${tsconfig.config}\` ${exists ? "updated" : "created"} with \`${TYPESCRIPT_PRESETS[preset]}\`.`
-      )
-    }).pipe(Effect.catchTag("JsoncNotEditable", (error) => Output.warning(error.message)))
-  })
-
-/**
- * Set up the part of the `effect` preset that is not the package: the language service entry in
- * `tsconfig.json`.
- */
-export const setupEffectTsgo = (cwd: string) =>
-  Effect.gen(function* () {
-    const result = yield* effectTsgo
-      .update(cwd)
-      .pipe(
-        Effect.catchTag("JsoncNotEditable", (error) =>
-          Output.warning(error.message).pipe(Effect.as("kept" as const))
-        )
-      )
-
-    if (result === "monorepo") {
-      yield* Output.info(
-        "In a monorepo, add the Effect language service entry to each package's `tsconfig.json` or to a shared base config. Run `adamantite doctor` for the reference entry."
-      )
-    }
-
-    if (result === "missing") {
-      yield* Output.warning(
-        "No `tsconfig.json` found, so the Effect language service is not configured. Run `adamantite doctor` for the reference entry."
-      )
-    }
   })
 
 /**

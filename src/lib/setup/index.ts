@@ -11,14 +11,13 @@ import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
+import type { Selection } from "#lib/project/selection.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
-import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { writeLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
-import type { Selection } from "#lib/project/selection.ts"
 import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
@@ -71,64 +70,10 @@ export function checkIsEmptySelection(selection: Selection): boolean {
   )
 }
 
-/**
- * The managed files of the integrations that have not moved to a folder of their own yet. Their own
- * setup steps in `init` write them, so `apply` records their hashes, and never writes or deletes
- * them.
- */
-const LEGACY_PATHS: ReadonlySet<string> = new Set([tsconfig.config])
-
-/**
- * The files that the setup steps of `init` write for `selection`, with the content that this
- * version writes, by their path from the project root.
- */
-const renderLegacyFiles = Effect.fn("renderLegacyFiles")(function* (
-  project: Project,
-  selection: Selection
-) {
-  // In a monorepo, init leaves the root `tsconfig.json` to the project.
-  return (
-    selection.typescript === null || project.workspace.isMonorepo
-      ? []
-      : [{ content: yield* tsconfig.render(selection.typescript), path: tsconfig.config }]
-  ) satisfies readonly ManagedFile[]
-})
-
 const hashContent = (content: string) =>
   Digest.Digest.use((digest) =>
     digest.digestHex(Digest.sha256, new TextEncoder().encode(content))
   ).pipe(Effect.map((hex) => `sha256-${hex}`))
-
-/**
- * The `written` entries of the files that the setup steps of `init` wrote: each file that equals
- * what this version writes, or whose hash equals the hash that the lockfile recorded.
- */
-const recordLegacyFiles = Effect.fn("recordLegacyFiles")(function* (
-  project: Project,
-  selection: Selection,
-  recorded: Readonly<Record<string, string>>
-) {
-  const path = yield* Path.Path
-
-  const entries = yield* Effect.forEach(
-    yield* renderLegacyFiles(project, selection),
-    ({ content, path: file }) =>
-      Effect.gen(function* () {
-        const current = yield* readFileIfExists(path.join(project.cwd, file))
-
-        if (Option.isNone(current)) {
-          return []
-        }
-
-        const hash = yield* hashContent(current.value)
-
-        return current.value === content || recorded[file] === hash ? [[file, hash] as const] : []
-      }),
-    { concurrency: "unbounded" }
-  )
-
-  return Array.flatten(entries)
-})
 
 /**
  * Applies the write rule to one managed file: write it when it does not exist, or when its hash
@@ -354,19 +299,14 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
   const renderedPaths = new Set(rendered.map((file) => file.path))
 
   const deletes = yield* Effect.forEach(
-    Object.entries(recorded).filter(
-      ([file]) => !renderedPaths.has(file) && !LEGACY_PATHS.has(file)
-    ),
+    Object.entries(recorded).filter(([file]) => !renderedPaths.has(file)),
     ([file, hash]) => deleteDroppedFile(cwd, file, hash),
     { concurrency: "unbounded" }
   )
 
-  const written = [
-    ...(yield* recordLegacyFiles(project, selection, recorded)),
-    ...writes.flatMap(({ hash, write }) =>
-      Option.match(hash, { onNone: () => [], onSome: (value) => [[write.path, value] as const] })
-    ),
-  ]
+  const written = writes.flatMap(({ hash, write }) =>
+    Option.match(hash, { onNone: () => [], onSome: (value) => [[write.path, value] as const] })
+  )
 
   const lockfile = yield* writeLockfile(
     cwd,

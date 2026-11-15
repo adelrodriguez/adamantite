@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import {
   assessProject,
+  assessUnreadableLockfile,
   renderAssessmentMarkdown,
   type ProjectAssessment,
 } from "#lib/assessment/index.ts"
@@ -41,13 +42,23 @@ const {
   Unmanaged,
 } = Data.taggedEnum<DoctorOutcome>()
 
+// A finding needs repair even when no integration applies, as when the lockfile does not read.
 function classifyAssessment(assessment: ProjectAssessment): DoctorOutcome {
-  if (assessment.applicableIntegrations.length === 0) {
-    return Unmanaged()
+  if (assessment.findings.length > 0) {
+    return NeedsRepair({ assessment })
   }
 
-  return assessment.findings.length === 0 ? Converged({ assessment }) : NeedsRepair({ assessment })
+  return assessment.applicableIntegrations.length === 0 ? Unmanaged() : Converged({ assessment })
 }
+
+// Doctor hands a lockfile that does not read to an agent, so it is a finding and not a failure.
+const assess = (cwd: string) =>
+  readProject(cwd).pipe(
+    Effect.flatMap(assessProject),
+    Effect.catchTag(["InvalidLockfile", "UnsupportedLockfile"], (error) =>
+      Effect.succeed(assessUnreadableLockfile(error))
+    )
+  )
 
 function doctorFailed() {
   return new CommandFailed({ command: "doctor", exitCode: ChildProcessSpawner.ExitCode(1) })
@@ -102,7 +113,7 @@ export default Command.make("doctor").pipe(
         }
 
         const { agent } = resolution
-        const after = yield* assessProject(yield* readProject(cwd))
+        const after = yield* assess(cwd)
 
         if (after.findings.length === 0) {
           return yield* finish(`All findings were resolved by ${agent.name}.`)
@@ -150,7 +161,7 @@ export default Command.make("doctor").pipe(
 
       const outcome =
         packageJson.devDependencies?.adamantite || packageJson.dependencies?.adamantite
-          ? classifyAssessment(yield* assessProject(yield* readProject(cwd)))
+          ? classifyAssessment(yield* assess(cwd))
           : NotInstalled()
 
       yield* canPrompt ? reportInteractive(outcome) : reportPlain(outcome)

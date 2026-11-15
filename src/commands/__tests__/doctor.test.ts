@@ -2,7 +2,6 @@ import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
-import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import type { Selection } from "#lib/project/selection.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
@@ -11,7 +10,6 @@ import doctorCommand from "#commands/doctor.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { UnsupportedLockfile } from "#lib/shared/errors.ts"
 import {
   makeHandoffRunner,
   makeLockfileFile,
@@ -91,7 +89,7 @@ const NO_INTEGRATION_FILES = {
 }
 
 // A lockfile that a newer Adamantite version wrote.
-const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2 })
+const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
 const HEALTHY_FILES = {
   ...makeLockfileFile(ANALYZE_SELECTION),
@@ -610,20 +608,50 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("fail with an error that names the lockfile when its schema version is unknown", () =>
+  it.effect("report a lockfile that a newer Adamantite version wrote as its only finding", () =>
     Effect.gen(function* () {
-      const exit = yield* runCommand(doctorCommand, [], {
-        files: createFileSystemTestContext({
-          files: {
-            ...HEALTHY_FILES,
-            ".adamantite/adamantite-lock.json": NEWER_LOCKFILE,
-          },
-        }),
-      })
+      const files = makeFindingsFixture()
+      const logLines: unknown[] = []
 
-      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
-        new UnsupportedLockfile({ path: ".adamantite/adamantite-lock.json", schemaVersion: 2 })
-      )
+      files.write(LOCKFILE_PATH, NEWER_LOCKFILE)
+
+      const exit = yield* runCommand(doctorCommand, [], { files, logLines })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+        [
+          "# Adamantite doctor findings",
+          "## 1. Unsupported Adamantite lockfile",
+          "## Verify",
+          "## Check the repair",
+        ],
+      ])
+      expect(logLines).toStrictEqual([
+        expect.stringContaining(
+          "Update the project's `adamantite` dependency to 9.0.0 or newer, and install it."
+        ),
+      ])
+    })
+  )
+
+  it.effect("report a lockfile that does not decode as its only finding", () =>
+    Effect.gen(function* () {
+      const files = makeFindingsFixture()
+      const logLines: unknown[] = []
+
+      files.write(LOCKFILE_PATH, "<<<<<<< HEAD\n{}\n=======\n{}\n>>>>>>> main\n")
+
+      const exit = yield* runCommand(doctorCommand, [], { files, logLines })
+
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+        [
+          "# Adamantite doctor findings",
+          "## 1. Invalid Adamantite lockfile",
+          "## Verify",
+          "## Check the repair",
+        ],
+      ])
     })
   )
 })

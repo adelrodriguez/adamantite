@@ -2,6 +2,7 @@ import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Option from "effect/Option"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { decodeJson } from "#__tests__/json.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
@@ -13,7 +14,7 @@ import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { FailedToInstallDependency } from "#lib/shared/errors.ts"
+import { FailedToInstallDependency, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import {
   createDependencyInstallerTestContext,
   createRunnerTestContext,
@@ -43,6 +44,9 @@ function makeEffectFiles(oxlintConfig: string) {
     },
   })
 }
+
+// A lockfile that a newer Adamantite version wrote.
+const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2, version: "9.0.0" })
 
 const shippedSkill = getShippedSkillFiles()
 
@@ -340,6 +344,28 @@ describe("update", () => {
         "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
         "✅ Update finished.",
       ])
+    })
+  )
+
+  it.effect("fail without writing a lockfile that a newer Adamantite version wrote", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: {
+          [LOCKFILE_PATH]: NEWER_LOCKFILE,
+          "package.json": manifest({ devDependencies: { knip: knip.version } }),
+        },
+      })
+
+      const exit = yield* runCommand(updateCommand, [], { files })
+
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
+        new UnsupportedLockfile({
+          path: LOCKFILE_PATH,
+          schemaVersion: 2,
+          version: Option.some("9.0.0"),
+        })
+      )
+      expect(files.read(LOCKFILE_PATH)).toBe(NEWER_LOCKFILE)
     })
   )
 

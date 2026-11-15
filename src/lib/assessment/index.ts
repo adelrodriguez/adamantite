@@ -1,8 +1,10 @@
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
+import * as Match from "effect/Match"
 import * as Option from "effect/Option"
 import type { Finding, PackageAction } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
+import type { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
 import github from "#lib/integrations/ci/github.ts"
@@ -52,6 +54,52 @@ const lockfileMissing: Finding = {
   id: "lockfile-missing",
   integration: "lockfile",
   title: "Missing Adamantite lockfile",
+}
+
+/**
+ * The assessment of a project whose lockfile does not read. The other assessments need the
+ * selection, so the lockfile finding is the only one. Doctor reports it, and the commands that
+ * write the lockfile fail instead, so they do not overwrite it.
+ */
+export function assessUnreadableLockfile(
+  error: InvalidLockfile | UnsupportedLockfile
+): ProjectAssessment {
+  const finding = Match.valueTags(error, {
+    InvalidLockfile: ({ issue, path }): Finding => ({
+      currentState: `\`${path}\` does not decode as an Adamantite lockfile. ${issue}`,
+      goal: [
+        `Make \`${path}\` decode again, for example by resolving a merge conflict. Preserve the recorded \`selection\` and the hashes in \`written\`.`,
+        "Run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "invalid-lockfile",
+      integration: "lockfile",
+      notes: ["Doctor reports the other findings after the lockfile decodes."],
+      title: "Invalid Adamantite lockfile",
+    }),
+    UnsupportedLockfile: ({ path, schemaVersion, version }): Finding => ({
+      currentState: Option.match(version, {
+        onNone: () =>
+          `\`${path}\` has schema version ${JSON.stringify(schemaVersion)}, which a newer Adamantite version wrote.`,
+        onSome: (writer) =>
+          `\`${path}\` has schema version ${JSON.stringify(schemaVersion)}, which Adamantite ${writer} wrote.`,
+      }),
+      goal: [
+        Option.match(version, {
+          onNone: () =>
+            "Update the project's `adamantite` dependency to the version that wrote the lockfile, or newer, and install it.",
+          onSome: (writer) =>
+            `Update the project's \`adamantite\` dependency to ${writer} or newer, and install it.`,
+        }),
+        "Run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "unsupported-lockfile",
+      integration: "lockfile",
+      notes: ["Doctor reports the other findings after the lockfile decodes."],
+      title: "Unsupported Adamantite lockfile",
+    }),
+  })
+
+  return { applicableIntegrations: [], findings: [finding], packageActions: [], warnings: [] }
 }
 
 export interface ProjectAssessment {

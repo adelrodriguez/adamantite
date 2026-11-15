@@ -313,27 +313,36 @@ export class InvalidPackageJson extends Data.TaggedError("InvalidPackageJson")<{
 }
 
 /**
- * The lockfile does not decode, such as after a merge conflict.
+ * The lockfile does not decode, such as after a merge conflict. Doctor reports it as a finding, and
+ * the commands that write the lockfile fail, so they do not overwrite it.
  */
 export class InvalidLockfile extends Data.TaggedError("InvalidLockfile")<{
   issue: string
   path: string
 }> {
   override get message() {
-    return `\`${this.path}\` is not a valid Adamantite lockfile. Restore the committed version of the file. ${this.issue}`
+    return `\`${this.path}\` does not decode as an Adamantite lockfile. Run \`adamantite doctor\` to hand the repair to a coding agent. ${this.issue}`
   }
 }
 
 /**
  * The lockfile has a schema version that this Adamantite version cannot read, because a newer
- * Adamantite wrote it.
+ * Adamantite wrote it. `version` is the Adamantite version that the file names, when it names one.
+ * Doctor reports it as a finding, and the commands that write the lockfile fail, so they do not
+ * overwrite it.
  */
 export class UnsupportedLockfile extends Data.TaggedError("UnsupportedLockfile")<{
   path: string
   schemaVersion: unknown
+  version: Option.Option<string>
 }> {
   override get message() {
-    return `\`${this.path}\` has schema version ${JSON.stringify(this.schemaVersion)}, which this Adamantite version cannot read. Install the Adamantite version that wrote it, then run the command again.`
+    const writer = Option.match(this.version, {
+      onNone: () => "A newer Adamantite version wrote it.",
+      onSome: (version) => `Adamantite ${version} wrote it.`,
+    })
+
+    return `\`${this.path}\` has schema version ${JSON.stringify(this.schemaVersion)}, which this Adamantite version cannot read. ${writer} Run \`adamantite doctor\` to hand the repair to a coding agent.`
   }
 }
 

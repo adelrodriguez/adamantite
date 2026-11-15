@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import { Selection } from "#lib/project/selection.ts"
 import { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
@@ -32,9 +33,12 @@ export const Lockfile = Schema.Struct({
 
 export type Lockfile = typeof Lockfile.Type
 
-// The schema version decides which schema reads the rest, so it decodes first.
+// The schema version decides which schema reads the rest, so it decodes first. The Adamantite
+// version decodes leniently, because a newer schema can change its type.
 const decodeSchemaVersion = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(Schema.Struct({ schemaVersion: Schema.Unknown }))
+  Schema.fromJsonString(
+    Schema.Struct({ schemaVersion: Schema.Unknown, version: Schema.optional(Schema.Unknown) })
+  )
 )
 
 const decodeLockfile = Schema.decodeUnknownEffect(Schema.fromJsonString(Lockfile))
@@ -52,12 +56,16 @@ export const readLockfile = Effect.fn("readLockfile")(function* (root: string) {
     return Option.none<Lockfile>()
   }
 
-  const { schemaVersion } = yield* decodeSchemaVersion(content.value).pipe(
+  const { schemaVersion, version } = yield* decodeSchemaVersion(content.value).pipe(
     Effect.mapError((error) => new InvalidLockfile({ issue: error.message, path: LOCKFILE_PATH }))
   )
 
   if (schemaVersion !== SCHEMA_VERSION) {
-    return yield* new UnsupportedLockfile({ path: LOCKFILE_PATH, schemaVersion })
+    return yield* new UnsupportedLockfile({
+      path: LOCKFILE_PATH,
+      schemaVersion,
+      version: Option.liftPredicate(version, Predicate.isString),
+    })
   }
 
   return Option.some(

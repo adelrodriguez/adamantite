@@ -22,6 +22,10 @@ const PROCESS_RUN_TESTS = [
   "src/lib/workspace/custom-rules/__tests__/stub.test.ts",
 ]
 
+// Fixtures are code that the preset tests lint, not tests of this repository. Vitest cannot run some
+// of them, such as a Jest test that imports `@jest/globals`.
+const FIXTURES = "src/__tests__/presets/fixtures/**"
+
 const MACRO_IMPORT = /with\s*\{\s*type:\s*["']macro["']\s*\}/
 
 export default defineConfig({
@@ -58,17 +62,14 @@ export default defineConfig({
       {
         extends: true,
         test: {
-          exclude: PROCESS_RUN_TESTS,
-          include: ["src/**/*.test.ts"],
+          exclude: [...PROCESS_RUN_TESTS, FIXTURES],
+          include: ["presets/**/*.test.ts", "src/**/*.test.ts"],
           name: "unit",
         },
       },
       {
         extends: true,
         test: {
-          // Fixtures are code that the preset tests lint, not tests of this repository. Vitest
-          // cannot run some of them, such as a Jest test that imports `@jest/globals`.
-          exclude: ["src/__tests__/presets/fixtures/**"],
           // The fixture projects link the fixture packages, which have their own lockfile.
           globalSetup: ["presets/__tests__/fixture-packages.ts"],
           // A real Oxlint or Vitest run takes up to 3.4 seconds alone and more than 5 seconds

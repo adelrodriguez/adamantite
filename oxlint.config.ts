@@ -141,12 +141,13 @@ export default defineConfig({
       // Each plugin uses the helpers of all plugins in `shared`, and no plugin imports another
       // plugin's code. `shared` imports no plugin. `entry.ts` gives the presets the `jsPlugins` entry
       // of each plugin. In a plugin, `index.ts` registers the rules, and the rules use the helpers
-      // of the plugin.
+      // of the plugin. The tests in each `__tests__` folder are entries: they load a plugin through
+      // its entry, and no rule imports a test.
       {
-        entries: ["entry.ts"],
+        entries: ["entry.ts", "__tests__/**"],
         layers: {
           adamantite: {
-            entries: ["index.ts"],
+            entries: ["index.ts", "__tests__/**"],
             imports: ["shared"],
             layers: {
               rules: { imports: ["shared"] },
@@ -154,7 +155,7 @@ export default defineConfig({
             },
           },
           antislop: {
-            entries: ["index.ts"],
+            entries: ["index.ts", "__tests__/**"],
             imports: ["shared"],
             layers: {
               rules: { imports: ["shared", "stylistic"] },
@@ -163,7 +164,7 @@ export default defineConfig({
             },
           },
           "antislop-effect": {
-            entries: ["index.ts"],
+            entries: ["index.ts", "__tests__/**"],
             imports: ["shared"],
             layers: {
               rules: { imports: ["shared"] },

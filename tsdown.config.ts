@@ -29,8 +29,9 @@ export default defineConfig([
     // layers rule loads oxc-resolver's native bindings at runtime, so it stays external too.
     deps: { neverBundle: ["@oxlint/plugins", "knip", "oxc-resolver", "oxfmt", "oxlint"] },
     dts: { generator: "oxc" },
-    // The type resets are declaration files that the build copies.
-    entry: ["presets/**/*.ts", "!presets/**/*.d.ts"],
+    // The type resets are declaration files that the build copies. The tests stay out of the
+    // package.
+    entry: ["presets/**/*.ts", "!presets/**/*.d.ts", "!presets/**/__tests__/**"],
     fixedExtension: false,
     outDir: "dist/presets",
   },

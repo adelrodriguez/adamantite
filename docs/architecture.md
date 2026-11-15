@@ -341,7 +341,8 @@ when a second plugin needs it.
 The layer map for `presets/lint/plugins` in the repository's `oxlint.config.ts` lets each plugin
 import `plugins/shared`, and rejects an import of another plugin's code. Each plugin has its own
 map below it: `index.ts` is the entry, and `rules` imports `shared`. In `antislop`, `rules` also
-imports `stylistic`.
+imports `stylistic`. The tests in each `__tests__` folder are entries of their map, so a test can
+load a plugin through its entry, and no rule can import a test.
 
 A preset gets the `jsPlugins` entry of a plugin from `firstPartyPlugin` in `plugins/entry.ts`,
 such as `firstPartyPlugin("antislop")`. The function builds a file URL from its own location.
@@ -359,10 +360,13 @@ uses, and which has Node-API bindings for Node.js and Bun. `presets/lint/plugins
 lets the source import rule modules with their `.ts` extension, which Node.js needs to load the
 source plugin.
 
-Each rule has a `RuleTester` test under `presets/lint/plugins/<namespace>/__tests__/<rule>.test.ts` for
-messages, locations, and options, and `valid/` and `invalid/` fixtures under
+Each rule has a `RuleTester` test under
+`presets/lint/plugins/<namespace>/__tests__/<rule>.test.ts` for messages, locations, and options,
+and `valid/` and `invalid/` fixtures under
 `src/__tests__/presets/fixtures/<preset>/<namespace>/<rule>/` that the preset test lints in one real
-Oxlint run. Each fixture file holds one case. The namespace folder, such as `antislop`, lets one
+Oxlint run. The fixtures stay below `src/`: below `presets/`, the published `presets/tsconfig.json`
+would include them, and the Oxlint type check of `presets/analyze.ts` reports each file of that
+project, also a file that `ignorePatterns` ignores. Each fixture file holds one case. The namespace folder, such as `antislop`, lets one
 preset hold fixtures for several plugins. The harness in `presets/__tests__/rule-fixtures.ts`
 starts the Oxlint entry `src/oxlint.ts`, as `adamantite check` does, so the effect preset loads the
 Effect build of Oxlint.

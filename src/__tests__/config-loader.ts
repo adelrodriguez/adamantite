@@ -162,7 +162,7 @@ export const configLoaderLayer = Layer.effect(
       })
 
     return {
-      load: (file: string) =>
+      load: (_cwd: string, file: string) =>
         evaluate(file).pipe(
           Effect.flatMap((url) =>
             Effect.tryPromise({

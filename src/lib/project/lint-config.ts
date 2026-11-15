@@ -63,8 +63,8 @@ export function listRulesFolders(config: LintConfig): readonly RulesFolderIdenti
 }
 
 /**
- * The Oxlint config at `file`, loaded and decoded, or none when it does not exist.
+ * The Oxlint config at `file`, loaded in `cwd` and decoded, or none when it does not exist.
  */
-export function readLintConfig(file: string) {
-  return readConfig(file, LintConfig)
+export function readLintConfig(cwd: string, file: string) {
+  return readConfig(cwd, file, LintConfig)
 }

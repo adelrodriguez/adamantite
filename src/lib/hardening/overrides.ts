@@ -155,7 +155,7 @@ export const readOverrides = Effect.fn("readOverrides")(
     const found = yield* Effect.forEach(
       configs,
       (config) =>
-        readConfig(path.join(cwd, config), OverridesConfig).pipe(
+        readConfig(cwd, path.join(cwd, config), OverridesConfig).pipe(
           Effect.map((loaded) => ({
             config,
             overrides: loaded.pipe(

@@ -48,13 +48,13 @@ export const readProject = Effect.fn("readProject")(function* (cwd: string) {
     [
       readPackageJson(cwd),
       readWorkspace(cwd),
-      readLintConfig(path.join(cwd, LINT_CONFIG_FILE)),
+      readLintConfig(cwd, path.join(cwd, LINT_CONFIG_FILE)),
       readLockfile(cwd),
     ],
     { concurrency: "unbounded" }
   )
 
-  const customRules = yield* discoverCustomRules([cwd, ...workspace.packageDirectories])
+  const customRules = yield* discoverCustomRules(cwd, [cwd, ...workspace.packageDirectories])
 
   return { customRules, cwd, lintConfig, lockfile, packageJson, workspace } satisfies Project
 })

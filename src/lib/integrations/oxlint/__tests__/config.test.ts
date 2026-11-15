@@ -21,7 +21,7 @@ const ROOT = "/project"
 function loadConfig(content: string) {
   const files = createFileSystemTestContext({ files: { "oxlint.config.ts": content }, root: ROOT })
 
-  return readLintConfig(`${ROOT}/oxlint.config.ts`).pipe(
+  return readLintConfig(ROOT, `${ROOT}/oxlint.config.ts`).pipe(
     Effect.map((loaded) => loaded.pipe(Option.flatMap(Result.getSuccess), Option.getOrThrow)),
     Effect.provide(withConfigLoader(Layer.mergeAll(files.layer, makeModuleResolverLayer(ROOT))))
   )

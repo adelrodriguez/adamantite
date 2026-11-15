@@ -62,7 +62,7 @@ describe("ConfigLoader", () => {
           ].join("\n")
         )
 
-        const config = (yield* readLintConfig(join(project, "oxlint.config.ts"))).pipe(
+        const config = (yield* readLintConfig(project, join(project, "oxlint.config.ts"))).pipe(
           Option.flatMap(Result.getSuccess),
           Option.getOrThrow
         )
@@ -93,9 +93,36 @@ describe("ConfigLoader", () => {
         'console.log("loading")\nexport default { rules: { "no-debugger": "error" } }\n'
       )
 
-      expect(yield* (yield* ConfigLoader).load(join(project, "oxlint.config.ts"))).toStrictEqual({
+      expect(
+        yield* (yield* ConfigLoader).load(project, join(project, "oxlint.config.ts"))
+      ).toStrictEqual({
         rules: { "no-debugger": "error" },
       })
+    }).pipe(Effect.provide(LAYER))
+  )
+
+  // Oxlint imports a nested config in the process that `adamantite check` starts at the project
+  // root, so `process.cwd()` in the config names the root.
+  it.live("load a nested config in the project root, as Oxlint does", () =>
+    Effect.gen(function* () {
+      write("package.json", '{ "name": "root" }\n')
+      write("packages/web/package.json", '{ "name": "web" }\n')
+      write(
+        "packages/web/oxlint.config.ts",
+        [
+          'import { readFileSync } from "node:fs"',
+          'import { join } from "node:path"',
+          "",
+          'const manifest = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"))',
+          "",
+          "export default { settings: { package: manifest.name } }",
+          "",
+        ].join("\n")
+      )
+
+      expect(
+        yield* (yield* ConfigLoader).load(project, join(project, "packages/web/oxlint.config.ts"))
+      ).toStrictEqual({ settings: { package: "root" } })
     }).pipe(Effect.provide(LAYER))
   )
 
@@ -112,7 +139,7 @@ describe("ConfigLoader", () => {
 
       const file = join(project, "oxlint.config.ts")
 
-      expect(yield* Effect.result((yield* ConfigLoader).load(file))).toStrictEqual(
+      expect(yield* Effect.result((yield* ConfigLoader).load(project, file))).toStrictEqual(
         Result.fail(new ConfigLoadFailed({ file, reason }))
       )
     }).pipe(Effect.provide(LAYER))

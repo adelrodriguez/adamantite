@@ -213,7 +213,7 @@ export const readHardenContext = Effect.fn("readHardenContext")(function* (
   // Git lists the Markdown files while discovery reads the workspace packages.
   const [{ calls, configs, unloadedConfigs }, instructionFiles, documentation] = yield* Effect.all(
     [
-      discoverCustomRules(packageDirectories, selectedPackages),
+      discoverCustomRules(cwd, packageDirectories, selectedPackages),
       Effect.filter(instructionCandidates, (file) => checkExists(file), {
         concurrency: "unbounded",
       }),

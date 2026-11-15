@@ -286,7 +286,9 @@ prompt printed and copied.
 
 Adamantite reads a tool config the way the tool reads it, and does not parse its source. The
 `ConfigLoader` service in `src/lib/project/config-loader.ts` imports the config with Node.js in a
-separate process, as Oxlint imports it, and prints the default export as JSON. The process keeps
+separate process, as Oxlint imports it, and prints the default export as JSON. The process runs in
+the project root, where `adamantite check` starts Oxlint, so a nested config that reads a file
+through `process.cwd()` reads the same file as when Oxlint loads it. The process keeps
 the output of the config apart, and reads the files again after a coding agent changes a module
 that the config imports. Each reader decodes the JSON with a Schema: `lint-config.ts` for Oxlint,
 and `config.ts` of `oxfmt/` and `knip/`. The trials of `harden` decode the overrides the same way.

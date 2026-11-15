@@ -50,8 +50,10 @@ const findConfigFile = Effect.fn("findConfigFile")(function* (directory: string)
  * as the entry module of a shared tooling package, counts, and a call in a module that no config
  * imports does not. As in Oxlint, a directory uses the config of the innermost package that
  * contains it and has one. A config that does not load is in `unloadedConfigs`, with the reason.
+ * Every config loads in `cwd`, the project root that `adamantite check` starts Oxlint in.
  */
 export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
+  cwd: string,
   packageDirectories: readonly string[],
   lintedDirectories: readonly string[] = packageDirectories
 ) {
@@ -81,7 +83,7 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   const loaded = yield* Effect.forEach(
     configs,
     (config) =>
-      readLintConfig(config).pipe(
+      readLintConfig(cwd, config).pipe(
         Effect.map((read) => ({ config, read: Option.getOrUndefined(read) }))
       ),
     { concurrency: "unbounded" }

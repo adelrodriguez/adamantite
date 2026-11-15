@@ -3,7 +3,6 @@ import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
-import * as Path from "effect/Path"
 import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
@@ -94,9 +93,11 @@ export class ConfigLoader extends Context.Service<
   {
     /**
      * The default export of the module at `file`, as `ENCODE_SOURCE` writes it, decoded from JSON.
-     * Fails when the module does not load or has no default export.
+     * The module runs in `cwd`, the folder that `adamantite check` starts Oxlint in, so a config
+     * that reads a file through `process.cwd()` reads the file that the tool reads. Fails when the
+     * module does not load or has no default export.
      */
-    readonly load: (file: string) => Effect.Effect<unknown, ConfigLoadFailed>
+    readonly load: (cwd: string, file: string) => Effect.Effect<unknown, ConfigLoadFailed>
   }
 >()("ConfigLoader") {
   // A config runs project code, as it does when Oxlint imports it. Each load runs in its own Node.js
@@ -106,11 +107,10 @@ export class ConfigLoader extends Context.Service<
     this,
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
-      const path = yield* Path.Path
 
       return {
         load: Effect.fn("ConfigLoader.load")(
-          function* (file: string) {
+          function* (cwd: string, file: string) {
             const handle = yield* spawner.spawn(
               // `custom()` writes the entry module of a rules folder outside the project when the
               // arguments include `--debug=files`, as in Oxlint's read-only file listing, so a load
@@ -119,7 +119,7 @@ export class ConfigLoader extends Context.Service<
                 "node",
                 ["--input-type=module", "--eval", LOAD_SCRIPT, file, "--debug=files"],
                 {
-                  cwd: path.dirname(file),
+                  cwd,
                   extendEnv: true,
                   stdin: "ignore",
                 }
@@ -163,7 +163,7 @@ export class ConfigLoader extends Context.Service<
             return result.value.value
           },
           Effect.scoped,
-          (effect, file) =>
+          (effect, _cwd, file) =>
             effect.pipe(
               Effect.catchTag("PlatformError", (error) =>
                 Effect.fail(new ConfigLoadFailed({ file, reason: error.message }))
@@ -176,11 +176,12 @@ export class ConfigLoader extends Context.Service<
 }
 
 /**
- * The config at `file`, loaded and decoded with `schema`, or none when the file does not exist. A
- * config that does not load, or does not fit `schema`, is a failed `Result`, because a finding
- * reports it.
+ * The config at `file`, loaded in `cwd` and decoded with `schema`, or none when the file does not
+ * exist. A config that does not load, or does not fit `schema`, is a failed `Result`, because a
+ * finding reports it.
  */
 export const readConfig = Effect.fn("readConfig")(function* <A>(
+  cwd: string,
   file: string,
   schema: Schema.Decoder<A>
 ) {
@@ -191,7 +192,7 @@ export const readConfig = Effect.fn("readConfig")(function* <A>(
     return Option.none<Result.Result<A, ConfigLoadFailed>>()
   }
 
-  return yield* loader.load(file).pipe(
+  return yield* loader.load(cwd, file).pipe(
     Effect.flatMap((value) =>
       Schema.decodeUnknownEffect(schema)(value).pipe(
         Effect.mapError((error) => new ConfigLoadFailed({ file, reason: error.message }))

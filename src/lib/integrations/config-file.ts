@@ -68,7 +68,7 @@ export const readConfigFile = Effect.fn("readConfigFile")(function* <A>(
 ) {
   const path = yield* Path.Path
 
-  return yield* readConfig(path.join(cwd, config.path), schema)
+  return yield* readConfig(cwd, path.join(cwd, config.path), schema)
 })
 
 /**

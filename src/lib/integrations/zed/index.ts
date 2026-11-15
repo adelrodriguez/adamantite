@@ -350,6 +350,5 @@ export default {
     }),
   name: "zed",
   packages: (_project: Project, _selection: Selection) => [],
-  prepare: (_project: Project) => Effect.void,
   selected: ({ editors }: Selection) => editors.includes("zed"),
 } satisfies Integration

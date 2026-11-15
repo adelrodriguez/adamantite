@@ -32,7 +32,7 @@ const CONFIG_PATH = "tsconfig.json"
 /**
  * The import that `extends` names for each TypeScript preset.
  */
-export const TYPESCRIPT_PRESETS = {
+const TYPESCRIPT_PRESETS = {
   tsconfig: publicImport("./tsconfig"),
   typescript: publicImport("./typescript"),
 } as const satisfies Record<TypeScriptPreset, string>
@@ -449,6 +449,5 @@ export default {
         ]),
   name: "tsconfig",
   packages: (_project: Project, _selection: Selection) => [],
-  prepare: (_project: Project) => Effect.void,
   selected: ({ typescript }: Selection) => typescript !== null,
 } satisfies Integration

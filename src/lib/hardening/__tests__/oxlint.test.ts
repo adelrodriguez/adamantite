@@ -1,24 +1,6 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Option from "effect/Option"
-import { isReportOf } from "#lib/hardening/oxlint.ts"
 import { parseOxlintReport } from "#lib/integrations/oxlint/files.ts"
-
-describe("isReportOf", () => {
-  it.each([
-    ["count a report of a built-in rule", "eslint(no-console)", "eslint", "no-console", true],
-    ["count a report of a custom rule", "project(no-console)", "project", "no-console", true],
-    [
-      "skip a rule with the same name in another plugin",
-      "eslint(no-console)",
-      "project",
-      "no-console",
-      false,
-    ],
-    ["skip another rule of the plugin", "eslint(no-alert)", "eslint", "no-console", false],
-  ])("%s", (_, code, plugin, name, expected) => {
-    expect(isReportOf(code, { builtIn: plugin === "eslint", name, plugin })).toBe(expected)
-  })
-})
 
 describe("parseOxlintReport", () => {
   it("give each file name with / between folders, as on Windows Oxlint prints \\", () => {

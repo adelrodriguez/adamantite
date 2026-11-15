@@ -149,7 +149,7 @@ export default defineConfig({
       // to a temporary folder.
       {
         import: "#lib/shared/filesystem.ts",
-        names: ["ensureDirectory", "writeFile", "writeJsonFile"],
+        names: ["ensureDirectory", "writeFile"],
         owners: [
           "src/lib/setup",
           "src/lib/project/custom-rules/index.ts",

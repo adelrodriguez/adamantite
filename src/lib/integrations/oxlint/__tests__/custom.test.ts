@@ -298,7 +298,7 @@ describe("oxlint-custom", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "oxlint.config.ts": toOxlintTsConfigContent(),
+          "oxlint.config.ts": toOxlintTsConfigContent([]),
           "package.json": MONOREPO_PACKAGE_JSON,
           "packages/web/.adamantite/lint/no-window.ts": RULE,
           "packages/web/package.json": yield* stringifyJson({ name: "web" }),
@@ -320,7 +320,7 @@ describe("oxlint-custom", () => {
       const files = createFileSystemTestContext({
         files: {
           ".adamantite/lint/no-process-env.ts": RULE,
-          "oxlint.config.ts": toOxlintTsConfigContent(),
+          "oxlint.config.ts": toOxlintTsConfigContent([]),
           "package.json": MONOREPO_PACKAGE_JSON,
           "packages/web/.adamantite/lint/no-window.ts": RULE,
           "packages/web/oxlint.config.ts": makeConfig("root, custom()", [
@@ -348,7 +348,7 @@ describe("oxlint-custom", () => {
       const files = createFileSystemTestContext({
         files: {
           ".adamantite/lint/no-process-env.ts": RULE,
-          "oxlint.config.ts": toOxlintTsConfigContent(),
+          "oxlint.config.ts": toOxlintTsConfigContent([]),
           "package.json": MONOREPO_PACKAGE_JSON,
           "packages/web/.adamantite/lint/no-window.ts": RULE,
           "packages/web/oxlint.config.ts": makeConfig('root, custom({ name: "web" })', [

@@ -14,8 +14,8 @@ import {
   FailedToParseFile,
   InvalidConfigFormat,
 } from "#lib/shared/errors.ts"
-import { readFile, readFileIfExists, writeJsonFile } from "#lib/shared/filesystem.ts"
-import { checkIsJsonObject } from "#lib/shared/json.ts"
+import { readFile, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { checkIsJsonObject, formatJson } from "#lib/shared/json.ts"
 
 export const EFFECT_SDK_PATH = "node_modules/.cache/adamantite/effect"
 const SDK_METADATA = "adamantite-sdk.json"
@@ -219,7 +219,8 @@ export const readEffectEditor = Effect.fn("readEffectEditor")(function* (cwd: st
       yield* fs.remove(sdk, { force: true, recursive: true })
       yield* fs.makeDirectory(path.dirname(sdk), { recursive: true })
       yield* fs.copy(resolved.source, sdk)
-      yield* writeJsonFile(path.join(sdk, SDK_METADATA), resolved)
+      const metadata = yield* formatJson(resolved)
+      yield* writeFile(path.join(sdk, SDK_METADATA), `${metadata}\n`)
     }),
     rulesCustomization,
     sdkIsCurrent: source.pipe(Effect.flatMap((resolved) => sdkIsCurrent(cwd, resolved))),

@@ -199,12 +199,6 @@ export const assessOxlintRuntime = Effect.fn("assessOxlintRuntime")(function* (p
             "Lint on a platform that `@effect/tsgo` has builds for, or remove `@effect/tsgo` and the effect preset.",
           ])
         ),
-      NativeRuntimeConflict: (error) =>
-        Effect.succeed(
-          finding(error.message, [
-            "Install at most one Oxlint plugin that replaces each native part of the Oxlint runtime.",
-          ])
-        ),
       PackageNotInstalled: (error) =>
         Effect.succeed(
           declared(error.packageName)

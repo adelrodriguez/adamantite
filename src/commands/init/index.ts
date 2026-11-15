@@ -20,7 +20,6 @@ import {
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
-import { printZedExtensions } from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
@@ -147,7 +146,13 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
 
       // Zed installs extensions only from the user settings, so init links them.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
-        yield* printZedExtensions(presets)
+        yield* Output.info("Install the Zed `oxc` extension: zed://extension/oxc")
+
+        if (presets.includes("effect")) {
+          yield* Output.info(
+            "Install the Zed TypeScript language server extension: zed://extension/tsgo"
+          )
+        }
       }
 
       yield* applySetup("init", yield* readProject(cwd), selection)

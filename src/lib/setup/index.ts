@@ -367,7 +367,7 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
     )
   }
 
-  yield* Effect.forEach(selected, (integration) => integration.prepare(project), {
+  yield* Effect.forEach(selected, (integration) => integration.prepare?.(project) ?? Effect.void, {
     concurrency: 1,
     discard: true,
   })

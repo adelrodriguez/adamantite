@@ -1,4 +1,3 @@
-import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
@@ -7,7 +6,6 @@ import * as Result from "effect/Result"
 import type { Finding } from "#lib/integrations/base.ts"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
 import type { ConfigLoadFailed } from "#lib/shared/errors.ts"
-import { readConfig } from "#lib/project/config-loader.ts"
 
 /**
  * A TypeScript config that a tool integration renders whole, and the tool's own JSON configs, which
@@ -27,7 +25,7 @@ export interface ConfigFile {
 /**
  * The conflicting JSON configs of `config` that the project at `cwd` has.
  */
-export const findConflictingConfigs = Effect.fn("findConflictingConfigs")(function* (
+const findConflictingConfigs = Effect.fn("findConflictingConfigs")(function* (
   cwd: string,
   config: ConfigFile
 ) {
@@ -59,23 +57,9 @@ function listFiles(files: readonly string[]) {
 }
 
 /**
- * The managed config of the project at `cwd`, loaded as the tool loads it and decoded with
- * `schema`, or none when it does not exist.
- */
-export const readConfigFile = Effect.fn("readConfigFile")(function* <A>(
-  cwd: string,
-  config: ConfigFile,
-  schema: Schema.Decoder<A>
-) {
-  const path = yield* Path.Path
-
-  return yield* readConfig(cwd, path.join(cwd, config.path), schema)
-})
-
-/**
- * The findings for a managed config, as `readConfigFile` reads it: a conflicting JSON config, a
- * missing config, a config that does not load, and a loaded config that `inspect` rejects.
- * `reference` is what Adamantite writes.
+ * The findings for a managed config, as `readConfig` loads it: a conflicting JSON config, a missing
+ * config, a config that does not load, and a loaded config that `inspect` rejects. `reference` is
+ * what Adamantite writes.
  */
 export const assessConfigFile = Effect.fn("assessConfigFile")(function* <A>(
   cwd: string,

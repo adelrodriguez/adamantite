@@ -6,7 +6,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import type { ProjectPath } from "#lib/hardening/project-files.ts"
 import type { Workspace } from "#lib/project/monorepo.ts"
-import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
+import { lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfigs } from "#lib/hardening/trial.ts"
 import { IDENTITY_KEY, readConfig } from "#lib/project/config-loader.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
@@ -14,7 +14,7 @@ import { checkExists } from "#lib/shared/filesystem.ts"
 /**
  * An entry of `overrides` in an Oxlint config that turns one or more rules off.
  */
-export interface RuleOffOverride {
+interface RuleOffOverride {
   /**
    * The `files` of the override, as the config writes them, relative to the folder of the config.
    */
@@ -252,9 +252,8 @@ export const readOverrides = Effect.fn("readOverrides")(
           const breaks = report.diagnostics.some(
             (diagnostic) =>
               diagnostic.filename === file
-              && diagnostic.code !== undefined
               && rule !== undefined
-              && isReportOf(diagnostic.code, rule)
+              && diagnostic.code === `${rule.plugin}(${rule.name})`
           )
 
           const mark: OverrideFileMark = listed.has(file)

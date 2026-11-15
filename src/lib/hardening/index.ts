@@ -11,10 +11,10 @@ import { OverridesLintFailed, OverridesReport, readOverrides } from "#lib/harden
 import { listProjectFiles, ProjectPath, toProjectPath } from "#lib/hardening/project-files.ts"
 import { readSuppressions, RuleSuppressions } from "#lib/hardening/suppressions.ts"
 import { discoverCustomRules } from "#lib/project/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
+import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 
 const hardenPromptTemplate = getHardenPromptTemplate()
 
@@ -282,7 +282,7 @@ function renderAgentReach(reach: AgentReach) {
 
 function renderRulesFolders(context: HardenContext) {
   if (context.rulesFolders.length === 0 && context.unloadedConfigs.length === 0) {
-    return `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/rules\` to the \`extends\` of the Oxlint config. It loads \`${CUSTOM_RULES_DIRECTORY}\` by default.`
+    return `No \`custom()\` call loads a rules folder. Before you write the first custom rule, add \`custom()\` from \`adamantite/rules\` to the \`extends\` of the Oxlint config. It loads \`${DEFAULT_DIRECTORY}\` by default.`
   }
 
   return [

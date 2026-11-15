@@ -25,7 +25,7 @@ const list = [
 type Member = (typeof list)[number]
 
 // The effects of every member, so a caller that iterates the list keeps their errors and services.
-type MemberEffect = ReturnType<Member["assess" | "files" | "prepare"]>
+type MemberEffect = ReturnType<Member["assess" | "files"] | typeof vscode.prepare>
 
 /**
  * The integrations that own a folder in `src/lib/integrations/`. `Setup.apply` writes their managed

@@ -18,7 +18,6 @@ import {
   TrialSetting,
   tryRule,
 } from "#lib/hardening/trial.ts"
-import { CUSTOM_RULES_DIRECTORY } from "#lib/project/custom-rules/folder.ts"
 import {
   addCustomRule,
   addCustomRuleTest,
@@ -32,6 +31,7 @@ import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
 import * as Toolchain from "#lib/toolchain/index.ts"
+import { DEFAULT_DIRECTORY } from "#presets/rules/folder.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -76,7 +76,7 @@ const ruleName = Argument.String("name").pipe(
 const dir = Flag.String("dir").pipe(
   Flag.optional,
   Flag.withDescription(
-    `The rules folder, relative to the current directory. Default: ${CUSTOM_RULES_DIRECTORY}. Pass the folder that \`custom({ dir })\` loads, such as a rules folder in a monorepo tooling package`
+    `The rules folder, relative to the current directory. Default: ${DEFAULT_DIRECTORY}. Pass the folder that \`custom({ dir })\` loads, such as a rules folder in a monorepo tooling package`
   )
 )
 
@@ -112,7 +112,7 @@ const addTest = Command.make("add", {
   Command.withHandler(({ dir, name, path: target }) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      const directory = Option.getOrElse(dir, () => CUSTOM_RULES_DIRECTORY)
+      const directory = Option.getOrElse(dir, () => DEFAULT_DIRECTORY)
       const cwd = process.cwd()
       let selected = Option.getOrUndefined(name)
 
@@ -238,12 +238,6 @@ const current = Flag.Boolean("current").pipe(
   Flag.withDescription("Use the project's current rule setting to see what it reports")
 )
 
-function describeSetting(rule: string, setting: TrialSetting) {
-  return Schema.is(CurrentSetting)(setting)
-    ? `\`${rule}\` as the project config sets it`
-    : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
-}
-
 function isAsExpected(result: TrialCaseResult) {
   return result.diagnostics.length > 0 === (result.case.expected === "reported")
 }
@@ -257,6 +251,10 @@ export function renderTrial(
   results: readonly TrialCaseResult[]
 ): string {
   const configs = [...new Set(results.map((result) => `\`${result.config}\``))].join(", ")
+
+  const described = Schema.is(CurrentSetting)(setting)
+    ? `\`${rule}\` as the project config sets it`
+    : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
 
   const lines = results.map((result) => {
     const name = Option.match(result.case.source, {
@@ -287,13 +285,7 @@ export function renderTrial(
         ? "The case did not produce the expected result."
         : `${failures.toLocaleString("en-US")} of ${results.length.toLocaleString("en-US")} cases ${failures === 1 ? "is" : "are"} different from the expected result.`
 
-  return [
-    `Trial of ${describeSetting(rule, setting)}, in ${configs}.`,
-    "",
-    ...lines,
-    "",
-    summary,
-  ].join("\n")
+  return [`Trial of ${described}, in ${configs}.`, "", ...lines, "", summary].join("\n")
 }
 
 /**

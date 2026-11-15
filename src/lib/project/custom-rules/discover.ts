@@ -113,10 +113,3 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
 })
 
 export type CustomRuleDiscovery = Effect.Success<ReturnType<typeof discoverCustomRules>>
-
-/**
- * Whether every config loaded. A config that does not load can load any rules folder.
- */
-export function isDiscoveryComplete(discovery: Pick<CustomRuleDiscovery, "unloadedConfigs">) {
-  return discovery.unloadedConfigs.length === 0
-}

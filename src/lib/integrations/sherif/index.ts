@@ -20,6 +20,5 @@ export default {
   name: "sherif",
   packages: ({ workspace }: Project, _selection: Selection) =>
     workspace.isMonorepo ? [PACKAGE] : [],
-  prepare: (_project: Project) => Effect.void,
   selected: ({ scripts }: Selection) => checkRunsTool(scripts, "sherif"),
 } satisfies Integration

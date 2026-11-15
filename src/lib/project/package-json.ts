@@ -17,7 +17,7 @@ const CATALOG_PROTOCOL = "catalog:"
 /**
  * What a dependency specifier in `package.json` says about the version of the package.
  */
-export type DeclaredVersion =
+type DeclaredVersion =
   /**
    * A pnpm catalog entry, such as `catalog:` for the default catalog or `catalog:tools`.
    */
@@ -100,7 +100,7 @@ export const readPackageJson = (cwd: string = process.cwd()) =>
  */
 export const MANAGED_TOOLS = ["knip", "oxfmt", "oxlint", "sherif"] as const
 
-export type ManagedTool = (typeof MANAGED_TOOLS)[number]
+type ManagedTool = (typeof MANAGED_TOOLS)[number]
 
 /**
  * The package scripts that Adamantite manages: the command of each, the tools that it runs, and
@@ -130,6 +130,13 @@ export const SCRIPT_ORDER = ["check", "fix", "analyze"] as const satisfies reado
 export const CI_SCRIPTS: readonly Script[] = SCRIPT_ORDER.filter(
   (script) => MANAGED_SCRIPTS[script].ci
 )
+
+/**
+ * Whether one of `scripts` runs in CI.
+ */
+export function hasCICompatibleScripts(scripts: readonly Script[]): boolean {
+  return CI_SCRIPTS.some((script) => scripts.includes(script))
+}
 
 /**
  * The managed scripts that run `tool`, in `SCRIPT_ORDER`.

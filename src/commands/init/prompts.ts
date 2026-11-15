@@ -9,8 +9,7 @@ import {
   findMissingRequiredPresets,
   lintPresets,
 } from "#lib/integrations/oxlint/presets.ts"
-import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
-import { checkRunsTool } from "#lib/project/package-json.ts"
+import { checkRunsTool, hasCICompatibleScripts } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, type LintPreset, type TypeScriptPreset } from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
 import { INIT_EDITOR_CHOICES, type InitOptionsInput } from "./options.ts"

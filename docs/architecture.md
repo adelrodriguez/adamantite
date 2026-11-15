@@ -109,7 +109,7 @@ export interface Integration<E = unknown, R = unknown> {
   ) => Effect.Effect<readonly ManagedFile[], E, R>
   readonly name: string
   readonly packages: (project: Project, selection: Selection) => readonly ToolingPackage[]
-  readonly prepare: (project: Project) => Effect.Effect<void, E, R>
+  readonly prepare?: (project: Project) => Effect.Effect<void, E, R>
   readonly selected: (selection: Selection) => boolean
 }
 ```
@@ -119,8 +119,8 @@ export interface Integration<E = unknown, R = unknown> {
 - `packages` lists the packages to install at their managed versions. The Oxlint integration
   installs Oxlint, tsrs, and the managed plugin of each selected preset.
 - `files` renders the managed files whole, such as `.vscode/extensions.json`.
-- `prepare` builds what the integration needs outside the committed files, after the install,
-  such as the Effect SDK copy in `node_modules`.
+- `prepare`, which only `vscode` has, builds what the integration needs outside the committed
+  files, after the install, such as the Effect SDK copy in `node_modules`.
 - `assess` reads the project and returns its findings, warnings, and package actions. It never
   writes. A file that the user changed gets a finding only when the change breaks the setup.
 
@@ -164,7 +164,7 @@ the selection includes, and does these steps in order:
 1. Install `adamantite`, when the project does not depend on it, and the packages of every selected
    integration in one install. It installs only the packages that `package.json` does not declare
    at the managed version, and leaves a pnpm catalog entry to the integration's finding.
-2. Run each `prepare`.
+2. Run the `prepare` of each integration that has one.
 3. Render the managed files, and format each one with the project's Oxfmt from stdin, with the
    project's Oxfmt config, or with a copy of the format preset in a temporary folder when the
    project has none. A project without Oxfmt gets the file as rendered. A config that Oxfmt cannot
@@ -334,9 +334,9 @@ the reports. `harden` counts the suppressions from them, and `rule ast` prints t
   without the section, and a skill copy that differs from the bundled skill.
 - `doctor` assesses the integrations, reports the findings, and offers their repair through
   `Resolution.offer`, which assesses again after a handoff. The Oxlint assessment resolves the
-  same runtime as the entry and reports missing installed packages, unsupported native builds or
-  platforms, and conflicting overrides. Resolution neither launches a tool nor changes files or
-  process variables. Unexpected read and parse failures still propagate.
+  same runtime as the entry and reports missing installed packages, and unsupported native builds
+  or platforms. Resolution neither launches a tool nor changes files or process variables.
+  Unexpected read and parse failures still propagate.
 - `harden` renders a prompt that tells a coding agent to turn the project's coding standards
   into custom rules and instructions, and offers it through `Resolution.offer`. Its `verify` runs
   Oxfmt and Oxlint as `check` does after a handoff, then assesses the project as Doctor does.
@@ -457,9 +457,9 @@ overrides when the target project installs `@effect/tsgo`. The installed package
 Effect builds on, so nested configs and relative preset imports get them too. The managed
 package requirement depends on the root config import instead.
 
-`oxlint/runtime.ts` resolves the installed Oxlint package and applies the native
-overrides. Two overrides for the same part fail with `NativeRuntimeConflict`. A backend
-override replaces all default backend variables. Without a backend override, Oxlint starts the
+`oxlint/runtime.ts` resolves the installed Oxlint package and applies the native overrides. Only
+the Effect plugin replaces native parts, so no two overrides replace one part. A backend override
+replaces all default backend variables. Without a backend override, Oxlint starts the
 installed tsrs through the nearest `tsrs-lint` launcher in `node_modules/.bin`. Oxlint finds the
 launcher itself, and only Windows still names it in `OXLINT_TSGOLINT_PATH`. A project without tsrs
 runs stock Oxlint. Only the entry `src/oxlint.ts` sets the variables and loads the binding and the
@@ -603,8 +603,8 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   `adamantite/rules/plugin`, defines `definePlugin` and `defineRule`, which return their
   argument, and re-exports all authoring types from `@oxlint/plugins`. The build inlines those
   types into the published declarations, so `@oxlint/plugins` stays a devDependency. `presets/rules/folder.ts` says what a rules folder
-  holds: the default folder and plugin name, and which files are rules. Both `custom()` and
-  `loadRules` read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
+  holds: the default folder and plugin name, and which files are rules. `custom()`, `loadRules`,
+  and the CLI read it, and the exports map does not list it. `presets/rules/testing.ts` is published as
   `adamantite/rules/testing`. It re-exports `RuleTester` by name from `oxlint/plugins-dev`, with
   the test types in its namespace, connected to `node:test`.
 - `src/lib/project/custom-rules/` holds the target project's custom-rules state. `discover.ts`
@@ -613,8 +613,8 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   folder, the plugin name, and the calling file. A call in a module that the config imports counts,
   and a call that no config reaches loads no rules. A config that does not load leaves the
   discovery incomplete, and Doctor and `rule test` warn about it. `harden` uses it too, to list the
-  configs and rules folders in its prompt. `folder.ts` keeps its own copy of the rule file test and
-  the defaults, and a unit test keeps them equal to `presets/rules/folder.ts`.
+  configs and rules folders in its prompt. The CLI imports the default folder and the rule file
+  test from `presets/rules/folder.ts`.
   `index.ts` writes only the rule stub for `adamantite rule add`, from the template beside it.
   It also lists existing rules for `rule test add`, writes an optional sibling `<name>.test.ts`
   or the file that `--path` names, and finds `.test.*` files in each loaded rules folder for

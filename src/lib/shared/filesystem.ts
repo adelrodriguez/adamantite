@@ -1,9 +1,7 @@
-import type * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import { FailedToCreateDirectory, FailedToReadFile, FailedToWriteFile } from "#lib/shared/errors.ts"
-import { formatJson } from "#lib/shared/json.ts"
 
 export const ensureDirectory = (path: string) =>
   FileSystem.FileSystem.pipe(
@@ -87,10 +85,3 @@ export const writeFile = (path: string, content: string) =>
     Effect.flatMap((fs) => fs.writeFileString(path, content)),
     Effect.mapError((cause) => new FailedToWriteFile({ cause, path }))
   )
-
-/**
- * Writes a value as two-space-indented JSON with a trailing newline, the format every
- * Adamantite-managed JSON file uses.
- */
-export const writeJsonFile = (path: string, value: Schema.Json) =>
-  formatJson(value).pipe(Effect.flatMap((content) => writeFile(path, `${content}\n`)))

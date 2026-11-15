@@ -2,16 +2,11 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
+import type { Finding, IntegrationAssessment } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
-import {
-  defineIntegration,
-  type Finding,
-  type IntegrationAssessment,
-} from "#lib/integrations/base.ts"
-import { isDiscoveryComplete } from "#lib/project/custom-rules/discover.ts"
-import { CUSTOM_RULES_DIRECTORY, isRuleFile } from "#lib/project/custom-rules/folder.ts"
 import { readDirectoryIfExists } from "#lib/shared/filesystem.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
+import { DEFAULT_DIRECTORY, isRuleFile } from "#presets/rules/folder.ts"
 
 const NAME = "oxlint-custom"
 
@@ -40,7 +35,7 @@ const readRulesFolder = Effect.fn("readRulesFolder")(function* (dir: string) {
   )
 })
 
-export default defineIntegration({
+export default {
   assess: ({ customRules, cwd, workspace }: Project) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
@@ -48,10 +43,10 @@ export default defineIntegration({
       const packageDirectories = [cwd, ...workspace.packageDirectories]
       const { calls, unloadedConfigs } = customRules
       // A config that does not load can load any folder.
-      const isComplete = isDiscoveryComplete(customRules)
+      const isComplete = customRules.unloadedConfigs.length === 0
 
       const defaultFolders = packageDirectories.map((directory) =>
-        path.join(directory, CUSTOM_RULES_DIRECTORY)
+        path.join(directory, DEFAULT_DIRECTORY)
       )
 
       const loadedFolders = Array.dedupe(calls.map((call) => call.dir))
@@ -70,7 +65,7 @@ export default defineIntegration({
       const missingFolderCalls = Array.dedupeWith(
         calls.filter(
           (call) =>
-            call.dir !== path.join(path.dirname(call.source), CUSTOM_RULES_DIRECTORY)
+            call.dir !== path.join(path.dirname(call.source), DEFAULT_DIRECTORY)
             && !existingFolders.some((folder) => folder.dir === call.dir)
         ),
         (first, second) => first.dir === second.dir
@@ -148,6 +143,5 @@ export default defineIntegration({
         warnings,
       } satisfies IntegrationAssessment
     }),
-  kind: "tooling",
   name: NAME,
-})
+}

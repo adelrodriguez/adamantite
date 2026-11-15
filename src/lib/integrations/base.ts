@@ -3,15 +3,6 @@ import * as Schema from "effect/Schema"
 import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 
-export type IntegrationKind = "tooling" | "workspace" | "editor" | "ci"
-
-export type IntegrationFileType = "config" | "legacy_config" | "ci"
-
-export interface IntegrationFile {
-  readonly path: string
-  readonly type: IntegrationFileType
-}
-
 export interface ToolingPackage {
   readonly name: string
   readonly version: string
@@ -63,7 +54,7 @@ export type Finding = typeof Finding.Type
 /**
  * What the assessment of one selected integration found.
  */
-export interface AssessmentPart {
+interface AssessmentPart {
   readonly findings: readonly Finding[]
   readonly packageActions: readonly PackageAction[]
   readonly warnings: readonly string[]
@@ -119,24 +110,11 @@ export interface Integration<E = unknown, R = unknown> {
   /**
    * Builds what the integration needs outside the files that the project commits, after the
    * install, such as the Effect editor SDK in `node_modules`. A failure that `assess` reports as a
-   * finding does not fail the setup. `Effect.void` when the integration needs nothing.
+   * finding does not fail the setup. An integration that needs nothing has none.
    */
-  readonly prepare: (project: Project) => Effect.Effect<void, E, R>
+  readonly prepare?: (project: Project) => Effect.Effect<void, E, R>
   /**
    * Whether the selection includes this integration.
    */
   readonly selected: (selection: Selection) => boolean
-}
-
-export interface IntegrationBase<Kind extends IntegrationKind> {
-  readonly config?: string
-  readonly files?: readonly IntegrationFile[]
-  readonly kind: Kind
-  readonly name: string
-}
-
-export function defineIntegration<const T extends IntegrationBase<IntegrationKind>>(
-  integration: T
-): T {
-  return integration
 }

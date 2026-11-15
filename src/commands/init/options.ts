@@ -6,11 +6,15 @@ import {
   findExcludedPresets,
   findMissingRequiredPresets,
 } from "#lib/integrations/oxlint/presets.ts"
-import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
-import { type Script, SCRIPT_ORDER, checkRunsTool } from "#lib/project/package-json.ts"
+import {
+  type Script,
+  SCRIPT_ORDER,
+  checkRunsTool,
+  hasCICompatibleScripts,
+} from "#lib/project/package-json.ts"
 import {
   type SupportedPackageManager,
-  listSupportedPackageManagers,
+  SUPPORTED_PACKAGE_MANAGERS,
 } from "#lib/project/package-manager.ts"
 import {
   INIT_EDITORS,
@@ -174,7 +178,7 @@ const typescript = Flag.Literals("typescript", TYPESCRIPT_PRESET_NAMES).pipe(
 const githubActions = Flag.Boolean("github-actions").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
-    `Add a GitHub Actions workflow. Requires --script check or --script analyze and ${listSupportedPackageManagers("disjunction")}`
+    `Add a GitHub Actions workflow. Requires --script check or --script analyze and ${new Intl.ListFormat("en-US", { type: "disjunction" }).format(SUPPORTED_PACKAGE_MANAGERS)}`
   )
 )
 

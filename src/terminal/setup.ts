@@ -1,7 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as Match from "effect/Match"
 import type { PackageAction } from "#lib/integrations/base.ts"
-import type { LintPreset } from "#lib/project/selection.ts"
 import type { FileWrite, ScriptWrite } from "#lib/setup/index.ts"
 import { MANAGED_SCRIPT_COMMANDS } from "#lib/project/package-json.ts"
 import * as Output from "#terminal/output.ts"
@@ -61,18 +60,3 @@ export const printScriptWrites = (writes: readonly ScriptWrite[]) =>
       }),
     { concurrency: 1, discard: true }
   )
-
-/**
- * Prints the links that install the Zed extensions of the setup. Zed installs extensions only from
- * the user settings, so the project settings cannot install them.
- */
-export const printZedExtensions = (presets: readonly LintPreset[]) =>
-  Effect.gen(function* () {
-    yield* Output.info("Install the Zed `oxc` extension: zed://extension/oxc")
-
-    if (presets.includes("effect")) {
-      yield* Output.info(
-        "Install the Zed TypeScript language server extension: zed://extension/tsgo"
-      )
-    }
-  })

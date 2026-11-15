@@ -129,16 +129,6 @@ const runProbe = Effect.fn("runProbe")(function* (
 }, Effect.scoped)
 
 /**
- * The line of the file where the source of a report starts, from 1.
- */
-function findFirstLine(
-  { line }: ProbeReport,
-  { anchor, lines }: { readonly anchor: "end" | "start"; readonly lines: number }
-) {
-  return anchor === "start" ? line : line - lines + 1
-}
-
-/**
  * The disable comments of each of `files`, relative to `cwd`, with their lines in the file and
  * their text. Oxlint parses each file as it lints it, so a Vue, Svelte, or Astro file gives the
  * comments of its scripts, and a file that does not parse has none. Each comment comes once.
@@ -155,7 +145,9 @@ export const probeComments = Effect.fn("probeComments")(function* (
         decodeCommentsFact(report.message).pipe(
           Option.map((fact) =>
             fact.comments.map(({ line, value }) => ({
-              line: findFirstLine(report, fact) + line - 1,
+              // The line of the file where the source of the report starts, from 1.
+              line:
+                (fact.anchor === "start" ? report.line : report.line - fact.lines + 1) + line - 1,
               value,
             }))
           ),

@@ -51,7 +51,7 @@ function makeFiles(overrides: Record<string, string> = {}) {
       "node_modules/@effect/tsgo/package.json": JSON.stringify({ version: "0.67.1" }),
       "node_modules/oxlint/package.json": JSON.stringify({ version: "1.91.0" }),
       "node_modules/tsrs/package.json": JSON.stringify({ version: TSRS_VERSION }),
-      "oxlint.config.ts": toOxlintTsConfigContent(),
+      "oxlint.config.ts": toOxlintTsConfigContent([]),
       "package.json": JSON.stringify({
         devDependencies: { "@effect/tsgo": "0.67.1", oxlint: oxlint.version, tsrs: TSRS_VERSION },
         scripts: { check: "adamantite check" },

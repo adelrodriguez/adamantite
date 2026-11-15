@@ -16,13 +16,6 @@ export const SUPPORTED_PACKAGE_MANAGERS = ["bun", "deno", "npm", "pnpm", "yarn"]
 export type SupportedPackageManager = (typeof SUPPORTED_PACKAGE_MANAGERS)[number]
 
 /**
- * The supported package managers as prose, such as "bun, deno, npm, pnpm, or yarn".
- */
-export function listSupportedPackageManagers(type: "conjunction" | "disjunction"): string {
-  return new Intl.ListFormat("en-US", { type }).format(SUPPORTED_PACKAGE_MANAGERS)
-}
-
-/**
  * The package manager of a project, with the version that the `packageManager` field of
  * `package.json` pins, or else the major version that the format of its lockfile shows, when either
  * does.

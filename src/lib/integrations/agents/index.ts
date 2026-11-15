@@ -251,6 +251,5 @@ export default {
     }),
   name: "agents",
   packages: (_project: Project, _selection: Selection) => [],
-  prepare: (_project: Project) => Effect.void,
   selected: ({ agents }: Selection) => agents,
 } satisfies Integration

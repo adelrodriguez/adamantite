@@ -9,7 +9,7 @@ import { FailedToReadFile } from "#lib/shared/errors.ts"
 /**
  * A project folder that coding agents load skills from, such as `.agents/skills`.
  */
-export type SkillFolder = (typeof codingAgents)[number]["skillsFolder"]
+type SkillFolder = (typeof codingAgents)[number]["skillsFolder"]
 
 /**
  * Each skill folder once, in alphabetical order, which puts the shared `.agents/skills` first.

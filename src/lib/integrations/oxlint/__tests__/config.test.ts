@@ -7,7 +7,6 @@ import { withConfigLoader } from "#__tests__/config-loader.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import {
-  checkAppliesLintPreset,
   findMisplacedCorePreset,
   inspectRequiredOxlintConfig,
   listLintPresets,
@@ -53,21 +52,12 @@ describe("toOxlintTsConfigContent", () => {
   })
 
   it("accept only Adamantite preset names", () => {
-    expectTypeOf(toOxlintTsConfigContent)
-      .parameter(0)
-      .toEqualTypeOf<readonly LintPreset[] | undefined>()
+    expectTypeOf(toOxlintTsConfigContent).parameter(0).toEqualTypeOf<readonly LintPreset[]>()
     expectTypeOf<Extract<LintPreset, "tailwind">>().toEqualTypeOf<"tailwind">()
     expectTypeOf<Extract<LintPreset, "shadcn">>().toEqualTypeOf<never>()
   })
 
   it("extend core and custom() in the default config", () => {
-    expect(toOxlintTsConfigContent()).toContain("  extends: [core, custom()],")
-  })
-})
-
-describe("checkAppliesLintPreset", () => {
-  it("take only the name of a current preset", () => {
-    // A renamed preset must fail every check that names it, instead of matching nothing.
-    expectTypeOf(checkAppliesLintPreset).parameter(1).toEqualTypeOf<LintPreset>()
+    expect(toOxlintTsConfigContent([])).toContain("  extends: [core, custom()],")
   })
 })

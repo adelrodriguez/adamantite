@@ -107,6 +107,13 @@ export default defineConfig({
           "src/lib/workspace/__tests__/monorepo.test.ts",
         ],
       },
+      // The package builds the presets apart from the CLI, so no file below `presets/` imports
+      // `src/`, tests included. A path module also covers each import that resolves into it, such
+      // as `#lib/...`.
+      {
+        import: "./src",
+        owners: ["src", "scripts"],
+      },
     ],
     // Each scope states its dependency graph. Child maps keep their own settings and checks.
     // See "Layers" in docs/architecture.md.

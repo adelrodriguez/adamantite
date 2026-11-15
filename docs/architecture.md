@@ -47,6 +47,8 @@ The `src` map puts `lib` below `terminal`, and `terminal` below `commands`. Lib 
 data, and commands render it, so no lib module imports `terminal`. `cli.ts` and `index.ts` are
 entries. Tests share the helpers in `src/__tests__`, so this map does not check them.
 That ignore does not exempt tests from the child map.
+An `adamantite/import-owners` entry lets only `src` and `scripts` import a module of `src`, so
+no preset and no preset test imports the CLI code.
 
 The nested `lib.layers` map holds the lib layers, with its root derived as `src/lib`.
 A layer that the map does not connect to another layer is its sibling, so `workspace` and

@@ -7,6 +7,9 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { ResolverFactory } from "oxc-resolver"
 
+// A JavaScript or TypeScript file, declaration files included, which a config lookup skips.
+const SOURCE_FILE = /\.[cm]?[jt]sx?$/u
+
 export class ModuleResolver extends Context.Service<
   ModuleResolver,
   {
@@ -54,7 +57,8 @@ export class ModuleResolver extends Context.Service<
     // extension, and `tsconfig.json` as the file of a folder. TypeScript skips an export target
     // that is not JSON, such as a `types` declaration file, and tries the next condition, while the
     // resolver returns the first target whose condition matches. So the lookup retries with fewer
-    // conditions until it reaches a JSON file.
+    // conditions until it reaches a file that is not JavaScript or TypeScript. The resolver
+    // returns the real path, so a JSON export can be a symlink to a `.jsonc` file.
     const configs = [
       ["require", "types", "node", "default"],
       ["require", "node", "default"],
@@ -78,8 +82,9 @@ export class ModuleResolver extends Context.Service<
       resolveConfig: (directory, specifier) =>
         Effect.sync(() =>
           Array.findFirst(configs, (config) =>
-            Option.filter(Option.fromUndefinedOr(config.sync(directory, specifier).path), (file) =>
-              file.endsWith(".json")
+            Option.filter(
+              Option.fromUndefinedOr(config.sync(directory, specifier).path),
+              (file) => !SOURCE_FILE.test(file)
             )
           )
         ),

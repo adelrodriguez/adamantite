@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
@@ -96,15 +96,25 @@ describe("ModuleResolver.resolveConfig", () => {
       },
       specifier: "@company/config",
     },
+    {
+      bases: ["base.jsonc"],
+      layout: "a JSON export that is a symlink to a .jsonc file",
+      links: [{ link: "base.json", target: "base.jsonc" }],
+      manifest: { exports: "./base.json" },
+      specifier: "@company/config",
+    },
   ])(
     "resolve $specifier through $layout to the base config that TypeScript applies",
-    ({ bases, manifest, specifier }) =>
+    ({ bases, links = [], manifest, specifier }) =>
       Effect.gen(function* () {
         write(
           `${PACKAGE}/package.json`,
           yield* stringifyJson({ name: "@company/config", ...manifest })
         )
         bases.forEach(writeBase)
+        links.forEach(({ link, target }) => {
+          symlinkSync(target, join(project, PACKAGE, link))
+        })
         write("tsconfig.json", yield* stringifyJson({ extends: specifier, include: ["src"] }))
 
         const resolver = yield* ModuleResolver

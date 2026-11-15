@@ -169,9 +169,6 @@ importers:
       '@effect/platform-node':
         specifier: 4.1.2
         version: 4.1.2(effect@4.1.2)(redis@6.2.1)
-      '@effect/platform-node-shared':
-        specifier: 4.1.2
-        version: 4.1.2(effect@4.1.2)
       '@oxlint/plugins':
         specifier: 1.93.0
         version: 1.93.0

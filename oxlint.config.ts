@@ -144,10 +144,21 @@ export default defineConfig({
           "src/terminal/setup.ts",
         ],
       },
+      // Only Setup writes target-project files and the lockfile. Each other owner writes outside the
+      // managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's
+      // `prepare`, which Setup runs, writes the Effect SDK copy in `node_modules`, and a trial
+      // writes cases and configs in a temporary copy of the project.
       {
-        import: "#lib/project/lockfile.ts",
-        names: ["writeLockfile"],
-        owners: ["src/lib/setup"],
+        import: "#lib/shared/filesystem.ts",
+        names: ["ensureDirectory", "writeFile", "writeJsonFile"],
+        owners: [
+          "src/lib/setup",
+          "src/lib/project/custom-rules/index.ts",
+          "src/lib/integrations/effect-sdk.ts",
+          "src/lib/hardening/trial.ts",
+          "src/lib/hardening/oxlint.ts",
+          "src/lib/shared/__tests__/filesystem.test.ts",
+        ],
       },
       // A command that reads the workspace outside an assessment reads it one time for each phase,
       // and passes the `Workspace` down. Harden reads again after the session, because the agent

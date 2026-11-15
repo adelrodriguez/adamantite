@@ -5,7 +5,7 @@ import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
 import { Selection } from "#lib/project/selection.ts"
 import { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
-import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
+import { readFileIfExists } from "#lib/shared/filesystem.ts"
 
 /**
  * The lockfile, relative to the project root. In a monorepo, the root is the workspace root.
@@ -76,31 +76,11 @@ export const readLockfile = Effect.fn("readLockfile")(function* (root: string) {
 })
 
 /**
- * Writes `lockfile` to the project at `root` in the layout that `format` gives it, unless the file
- * already holds it. `unchanged` means that the file already held it. Only `init` and `update` write
- * the lockfile, through `lib/setup`, which formats it as it formats a managed file.
+ * The JSON text of `lockfile`. Only `init` and `update` write the lockfile, through `lib/setup`,
+ * which formats it as it formats a managed file.
  */
-export const writeLockfile = Effect.fn("writeLockfile")(function* <E, R>(
-  root: string,
-  lockfile: Lockfile,
-  format: (path: string, content: string) => Effect.Effect<string, E, R>
-) {
-  const path = yield* Path.Path
-  const lockfilePath = path.join(root, LOCKFILE_PATH)
-
-  const content = yield* format(
-    LOCKFILE_PATH,
-    `${yield* encodeLockfile(lockfile).pipe(Effect.orDie)}\n`
+export const renderLockfile = (lockfile: Lockfile) =>
+  encodeLockfile(lockfile).pipe(
+    Effect.orDie,
+    Effect.map((text) => `${text}\n`)
   )
-
-  const current = yield* readFileIfExists(lockfilePath)
-
-  if (Option.contains(current, content)) {
-    return "unchanged" as const
-  }
-
-  yield* ensureDirectory(path.dirname(lockfilePath))
-  yield* writeFile(lockfilePath, content)
-
-  return "written" as const
-})

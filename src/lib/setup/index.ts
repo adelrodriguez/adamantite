@@ -17,7 +17,7 @@ import { integrations } from "#lib/integrations/index.ts"
 import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
-import { writeLockfile } from "#lib/project/lockfile.ts"
+import { LOCKFILE_PATH, renderLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { MANAGED_SCRIPT_COMMANDS, readPackageJson, type Script } from "#lib/project/package-json.ts"
 import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
@@ -337,6 +337,7 @@ function getAdamantiteInstall({ packageJson }: Project): readonly PackageAction[
  * leaves the project unchanged.
  */
 export const apply = Effect.fn("Setup.apply")(function* (project: Project, selection: Selection) {
+  const path = yield* Path.Path
   const { cwd } = project
   const selected = integrations.filter((integration) => integration.selected(selection))
 
@@ -405,11 +406,27 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
     Option.match(hash, { onNone: () => [], onSome: (value) => [[write.path, value] as const] })
   )
 
-  const lockfile = yield* writeLockfile(
-    cwd,
-    { schemaVersion: 1, selection, version, written: Object.fromEntries(written) },
-    format
+  // Last, so the lockfile records what the steps above wrote.
+  const lockfilePath = path.join(cwd, LOCKFILE_PATH)
+
+  const lockfileContent = yield* format(
+    LOCKFILE_PATH,
+    yield* renderLockfile({
+      schemaVersion: 1,
+      selection,
+      version,
+      written: Object.fromEntries(written),
+    })
   )
+
+  const lockfile = Option.contains(yield* readFileIfExists(lockfilePath), lockfileContent)
+    ? "unchanged"
+    : "written"
+
+  if (lockfile === "written") {
+    yield* ensureDirectory(path.dirname(lockfilePath))
+    yield* writeFile(lockfilePath, lockfileContent)
+  }
 
   return {
     files: [...writes.map(({ write }) => write), ...Array.getSomes(deletes)],

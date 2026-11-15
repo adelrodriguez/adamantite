@@ -115,12 +115,21 @@ when the selection includes it, so a selected integration whose file is missing 
 Without one, each integration applies to the files that exist, and the assessment adds one
 `lockfile-missing` finding when any integration applies.
 
-`init` and `update` share one backend, `apply` in `src/lib/setup/`. `src/lib/integrations/index.ts`
+`init` and `update` differ only in where the selection comes from. `init` takes it from the prompts
+or the flags and adds it to the recorded selection, and `update` takes it from the lockfile, or
+from `inferSelection` once when there is none. Both hand it to `applySetup` in
+`src/commands/setup.ts`, which runs `apply` in `src/lib/setup/`, prints what it did, and reports
+the assessment of the project that it left. `src/lib/integrations/index.ts`
 lists the integrations that own a folder, such as `integrations/vscode/`, and each one implements
 `Integration` from `integrations/base.ts`: whether the selection includes it, its packages, its
-managed files, a `prepare` step for `node_modules`, and its `assess`. `apply` installs the
-packages of every selected integration in one install, runs each `prepare`, renders the managed
-files, formats each one, and applies the write rule to each one. `apply` formats a file
+managed files, a `prepare` step for `node_modules`, and its `assess`. `apply` installs
+`adamantite` when the project does not depend on it and the packages of every selected
+integration in one install, runs each `prepare`, renders the managed files, formats each one, sets
+the managed scripts, and applies the write rule to each file. A managed script is the one
+exception to whole files: `apply` sets each selected `check`, `fix`, or `analyze` key of the root
+`package.json` to its command, overwrites what it held, and returns a `ScriptWrite` for each:
+`Added`, `Replaced` with the command that it held, or `Unchanged`. It writes `package.json`,
+formatted like a managed file, only when a script changed or the install changed it. `apply` formats a file
 with the project's Oxfmt from stdin, with the project's Oxfmt config, or with a copy of the format
 preset in a temporary folder when the project has none. `adamantite fix` then leaves the file
 unchanged, so its hash still matches. A project without Oxfmt gets the file as rendered, and a config
@@ -133,8 +142,11 @@ integration's `assess` reads it and reports only a change that breaks the setup.
 runs each listed integration that the selection includes, and without a lockfile it uses the
 selection that `inferSelection` in `integrations/selection.ts` reads from the project files.
 
-`apply` writes the lockfile last, formatted the same way, and only `init` and `update` call it: `adamantite/import-owners`
-keeps `#lib/setup` and `writeLockfile` to them. `written` records the hash of each managed file
+`apply` writes the lockfile last, formatted the same way, and only `init` and `update` call it:
+`adamantite/import-owners` keeps `#lib/setup` to them, and keeps the file writers of
+`src/lib/shared/filesystem.ts` to `src/lib/setup/`. The other owners of the writers write outside
+the managed files: `rule add` writes a custom rule stub, the VS Code integration's `prepare` writes
+the Effect SDK copy in `node_modules`, and a trial writes in a temporary copy of the project. `written` records the hash of each managed file
 that `apply` created, replaced, or found unchanged. Each run computes `written` again, so a file
 that the user changed leaves it. In a project without a lockfile, a file that an earlier version
 wrote gets a hash only when it equals what this version renders. `apply` installs only the packages

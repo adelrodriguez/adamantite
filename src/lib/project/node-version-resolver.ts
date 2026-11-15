@@ -77,17 +77,6 @@ function hasNodeDeclaration(packageJson: JsonValue): boolean {
   return Schema.is(EnginesDeclaration)(packageJson)
 }
 
-/**
- * Every source that the resolver can return, so a caller can tell whether a workflow uses one that
- * Adamantite wrote.
- */
-export const NODE_VERSION_SOURCES: readonly NodeVersionSource[] = [
-  ...VERSION_FILES.map((file) => new NodeVersionFile({ path: file })),
-  new NodeVersionFile({ path: ".tool-versions" }),
-  new NodeVersionFile({ path: "package.json" }),
-  new NodeVersion({ value: "lts/*" }),
-]
-
 export class NodeVersionResolver extends Context.Service<
   NodeVersionResolver,
   {

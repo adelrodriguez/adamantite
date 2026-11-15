@@ -8,7 +8,6 @@ import {
   findMissingRequiredPresets,
 } from "#lib/integrations/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
-import { INIT_FLAGS } from "#lib/project/init-command.ts"
 import {
   checkIsSupportedPackageManager,
   type Script,
@@ -153,26 +152,26 @@ export const validateInitOptions = Effect.fn("validateInitOptions")(function* (
   } satisfies InitOptions
 })
 
-const nonInteractive = Flag.Boolean(INIT_FLAGS.nonInteractive).pipe(
+const nonInteractive = Flag.Boolean("non-interactive").pipe(
   Flag.withDefault(false),
   Flag.withDescription("Configure without prompts. Select at least one --script or --typescript")
 )
 
-const scripts = Flag.Literals(INIT_FLAGS.script, SCRIPT_ORDER).pipe(
+const scripts = Flag.Literals("script", SCRIPT_ORDER).pipe(
   Flag.atMost(SCRIPT_ORDER.length),
   Flag.withDescription(
     "Set a package script to its Adamantite command, replacing what it ran. Repeat --script to add more"
   )
 )
 
-const presets = Flag.Literals(INIT_FLAGS.preset, LINT_PRESETS).pipe(
+const presets = Flag.Literals("preset", LINT_PRESETS).pipe(
   Flag.atMost(LINT_PRESETS.length),
   Flag.withDescription(
     "Select an Oxlint preset. Repeat --preset to add more. Requires --script check or --script fix"
   )
 )
 
-const editors = Flag.Literals(INIT_FLAGS.editor, INIT_EDITORS).pipe(
+const editors = Flag.Literals("editor", INIT_EDITORS).pipe(
   Flag.atMost(INIT_EDITORS.length),
   Flag.withDescription("Configure an editor. Repeat --editor to add more")
 )
@@ -191,7 +190,7 @@ const githubActions = Flag.Boolean("github-actions").pipe(
   )
 )
 
-const agents = Flag.Boolean(INIT_FLAGS.agents).pipe(
+const agents = Flag.Boolean("agents").pipe(
   Flag.withDefault(false),
   Flag.withDescription(
     "Add Adamantite guidance to AGENTS.md and the Adamantite skill to the skill folders of your coding agents"

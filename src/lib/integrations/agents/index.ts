@@ -86,45 +86,73 @@ const assess = Effect.fn("assess")(function* (cwd: string) {
 })
 
 /**
- * The findings for each copy of the Adamantite skill that differs from the skill of this version,
- * in the skill folders of the agents that the project uses. An earlier version wrote the copy
- * before the lockfile recorded it, or the project changed it, so `update` keeps it.
+ * The findings for each copy of the Adamantite skill in the skill folders of the agents that the
+ * project uses: a copy that misses a file of the skill, which `update` writes, and a copy whose file
+ * differs from the skill of this version. An earlier version wrote that file before the lockfile
+ * recorded it, or the project changed it, so `update` keeps it.
  */
 const assessSkill = Effect.fn("assessSkill")(function* (cwd: string) {
   const path = yield* Path.Path
   const folders = yield* detectSkillFolders(cwd)
 
-  const stale = yield* Effect.filter(
+  const copies = yield* Effect.forEach(
     folders,
     (folder) =>
-      Effect.gen(function* () {
-        const copy = yield* Effect.forEach(
+      Effect.map(
+        Effect.forEach(
           Object.entries(shippedSkill),
           ([file, content]) =>
-            Effect.map(readFileIfExists(path.join(cwd, folder, "adamantite", file)), (current) =>
-              Option.contains(current, content)
-            ),
+            Effect.map(readFileIfExists(path.join(cwd, folder, "adamantite", file)), (current) => ({
+              file,
+              state: Option.match(current, {
+                onNone: () => "missing" as const,
+                onSome: (value) => (value === content ? ("current" as const) : ("changed" as const)),
+              }),
+            })),
           { concurrency: "unbounded" }
-        )
-
-        const exists = yield* readFileIfExists(path.join(cwd, folder, "adamantite", "SKILL.md"))
-
-        return Option.isSome(exists) && copy.includes(false)
-      }),
+        ),
+        (files) => ({ files, folder })
+      ),
     { concurrency: "unbounded" }
   )
 
-  return stale.map((folder): Finding => ({
-    currentState: `\`${folder}/adamantite\` differs from the Adamantite skill of the installed version.`,
-    goal: [
-      `Delete \`${folder}/adamantite\`, then run \`adamantite update\`. It writes the skill of the installed version.`,
-      "Run `adamantite doctor` again. It must not report this finding.",
-    ],
-    id: "stale-adamantite-skill",
-    integration: "agents",
-    notes: ["Keep the changes that the project made to the skill only when they are still needed."],
-    title: "Stale Adamantite skill",
-  }))
+  return copies.flatMap(({ files, folder }): Finding[] => {
+    const missing = files.filter(({ state }) => state === "missing").map(({ file }) => `\`${file}\``)
+
+    return [
+      ...(missing.length === 0
+        ? []
+        : [
+            {
+              currentState: `The selection includes agent guidance, and \`${folder}/adamantite\` has no ${missing.join(", ")}.`,
+              goal: [
+                `Run \`adamantite update\`. It writes the missing files of the skill to \`${folder}/adamantite\`.`,
+                "Run `adamantite doctor` again. It must not report this finding.",
+              ],
+              id: "missing-adamantite-skill",
+              integration: "agents",
+              title: "Missing Adamantite skill",
+            },
+          ]),
+      ...(files.some(({ state }) => state === "changed")
+        ? [
+            {
+              currentState: `\`${folder}/adamantite\` differs from the Adamantite skill of the installed version.`,
+              goal: [
+                `Delete \`${folder}/adamantite\`, then run \`adamantite update\`. It writes the skill of the installed version.`,
+                "Run `adamantite doctor` again. It must not report this finding.",
+              ],
+              id: "stale-adamantite-skill",
+              integration: "agents",
+              notes: [
+                "Keep the changes that the project made to the skill only when they are still needed.",
+              ],
+              title: "Stale Adamantite skill",
+            },
+          ]
+        : []),
+    ]
+  })
 })
 
 const SKILLS_LOCK_PATH = "skills-lock.json"

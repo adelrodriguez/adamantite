@@ -32,6 +32,7 @@ import {
   promptingLayer,
   nonProbeInvocations,
   runCommand,
+  SKILL_FILES,
 } from "./command-test-helpers.ts"
 
 const OXLINT = getOxlintCommand(process.cwd())
@@ -1478,6 +1479,7 @@ describe("harden", () => {
         files: {
           ...ADAMANTITE_MODULE,
           ...makeLockfileFile({ ...NO_SELECTION, agents: true, scripts: ["analyze"] }),
+          ...SKILL_FILES,
           "AGENTS.md": "# AGENTS.md\n\n<!-- ADAMANTITE:START -->\n<!-- ADAMANTITE:END -->\n",
           "package.json": manifest({
             devDependencies: { adamantite: "1.0.0", knip: knip.version },

@@ -111,6 +111,32 @@ describe("agent guidance setup", () => {
     })
   )
 
+  it.effect("report a deleted skill file, and write it again in update", () =>
+    Effect.gen(function* () {
+      const initialized = makeProject()
+      yield* runLifecycle("init", initialized, INIT_ARGS)
+
+      // The project after the user deleted the skill file.
+      const files = createFileSystemTestContext({
+        files: Object.fromEntries(
+          initialized
+            .list()
+            .filter((file) => file !== SKILL)
+            .map((file) => [file, initialized.read(file)])
+        ),
+      })
+
+      const doctor = yield* runLifecycle("doctor", files)
+      const update = yield* runLifecycle("update", files)
+
+      expect(doctor.output).toContain(
+        "The selection includes agent guidance, and `.agents/skills/adamantite` has no `SKILL.md`."
+      )
+      expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
+      expect(update.output).toContain(`✔ \`${SKILL}\` created.`)
+    })
+  )
+
   // `npx skills update` would write the folders that Adamantite owns. The lock belongs to the
   // `skills` CLI, so update leaves it as it is, and Doctor hands the edit off.
   it.effect("keep a skills lock that records the skill, and report its entry", () =>

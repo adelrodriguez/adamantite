@@ -28,6 +28,7 @@ import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintFilesLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TerminalTestContext } from "#__tests__/terminal.ts"
 import { type CodingAgent, CodingAgents, codingAgents } from "#lib/handoff/coding-agents.ts"
+import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, Lockfile } from "#lib/project/lockfile.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
@@ -64,6 +65,16 @@ export function makeLockfileFile(
     }),
   }
 }
+
+/**
+ * The Adamantite skill in `.agents/skills`, as Setup writes it in a project without Oxfmt.
+ */
+export const SKILL_FILES: Readonly<Record<string, string>> = Object.fromEntries(
+  Object.entries(getShippedSkillFiles()).map(([file, content]) => [
+    `.agents/skills/adamantite/${file}`,
+    content,
+  ])
+)
 
 /**
  * The hash that the lockfile records for `content`.

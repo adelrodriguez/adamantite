@@ -312,6 +312,31 @@ export class InvalidPackageJson extends Data.TaggedError("InvalidPackageJson")<{
   }
 }
 
+/**
+ * The lockfile does not decode, such as after a merge conflict.
+ */
+export class InvalidLockfile extends Data.TaggedError("InvalidLockfile")<{
+  issue: string
+  path: string
+}> {
+  override get message() {
+    return `\`${this.path}\` is not a valid Adamantite lockfile. Restore the committed version of the file. ${this.issue}`
+  }
+}
+
+/**
+ * The lockfile has a schema version that this Adamantite version cannot read, because a newer
+ * Adamantite wrote it.
+ */
+export class UnsupportedLockfile extends Data.TaggedError("UnsupportedLockfile")<{
+  path: string
+  schemaVersion: unknown
+}> {
+  override get message() {
+    return `\`${this.path}\` has schema version ${JSON.stringify(this.schemaVersion)}, which this Adamantite version cannot read. Install the Adamantite version that wrote it, then run the command again.`
+  }
+}
+
 export class InvalidAnalyzeOptions extends Data.TaggedError("InvalidAnalyzeOptions")<{
   reason: string
 }> {

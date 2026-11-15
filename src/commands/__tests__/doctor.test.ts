@@ -2,12 +2,14 @@ import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import doctorCommand from "#commands/doctor.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
 import knip from "#lib/integrations/tooling/knip/index.ts"
+import { UnsupportedLockfile } from "#lib/shared/errors.ts"
 import {
   makeHandoffRunner,
   nonProbeInvocations,
@@ -73,6 +75,9 @@ const FOUND_ISSUES = "⚠️ Doctor found issues."
 const NO_INTEGRATION_FILES = {
   "package.json": manifest({ devDependencies: { adamantite: "1.0.0" } }),
 }
+
+// A lockfile that a newer Adamantite version wrote.
+const NEWER_LOCKFILE = JSON.stringify({ schemaVersion: 2 })
 
 const HEALTHY_FILES = {
   "AGENTS.md": "# AGENTS.md\n",
@@ -512,6 +517,23 @@ describe("doctor", () => {
         })
       )
       expect(terminal.output()).toContain("❯ Hand off to Gemini CLI \n  Copy the agent prompt ")
+    })
+  )
+
+  it.effect("fail with an error that names the lockfile when its schema version is unknown", () =>
+    Effect.gen(function* () {
+      const exit = yield* runCommand(doctorCommand, [], {
+        files: createFileSystemTestContext({
+          files: {
+            ...HEALTHY_FILES,
+            ".adamantite/adamantite-lock.json": NEWER_LOCKFILE,
+          },
+        }),
+      })
+
+      expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
+        new UnsupportedLockfile({ path: ".adamantite/adamantite-lock.json", schemaVersion: 2 })
+      )
     })
   )
 })

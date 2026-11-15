@@ -6,6 +6,7 @@ import {
   type CustomRuleDiscovery,
   discoverCustomRules,
 } from "#lib/project/custom-rules/discover.ts"
+import { type Lockfile, readLockfile } from "#lib/project/lockfile.ts"
 import { readWorkspace, type Workspace } from "#lib/project/monorepo.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import { readFileIfExists } from "#lib/shared/filesystem.ts"
@@ -26,6 +27,10 @@ export interface Project {
    * The content of the root `oxlint.config.ts`, or none when it does not exist.
    */
   readonly lintConfig: Option.Option<string>
+  /**
+   * The lockfile that `init` or `update` wrote, or none when the project has no lockfile.
+   */
+  readonly lockfile: Option.Option<Lockfile>
   readonly packageJson: PackageJson
   readonly workspace: Workspace
 }
@@ -37,12 +42,17 @@ export interface Project {
 export const readProject = Effect.fn("readProject")(function* (cwd: string) {
   const path = yield* Path.Path
 
-  const [packageJson, workspace, lintConfig] = yield* Effect.all(
-    [readPackageJson(cwd), readWorkspace(cwd), readFileIfExists(path.join(cwd, LINT_CONFIG_FILE))],
+  const [packageJson, workspace, lintConfig, lockfile] = yield* Effect.all(
+    [
+      readPackageJson(cwd),
+      readWorkspace(cwd),
+      readFileIfExists(path.join(cwd, LINT_CONFIG_FILE)),
+      readLockfile(cwd),
+    ],
     { concurrency: "unbounded" }
   )
 
   const customRules = yield* discoverCustomRules([cwd, ...workspace.packageDirectories])
 
-  return { customRules, cwd, lintConfig, packageJson, workspace } satisfies Project
+  return { customRules, cwd, lintConfig, lockfile, packageJson, workspace } satisfies Project
 })

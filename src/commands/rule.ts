@@ -1,4 +1,3 @@
-import process from "node:process"
 import * as Argument from "effect/cli/Argument"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
@@ -27,6 +26,7 @@ import {
 import { readWorkspace } from "#lib/project/monorepo.ts"
 import { readProject } from "#lib/project/project.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import { CommandFailed, InvalidTrialOptions } from "#lib/shared/errors.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
@@ -56,7 +56,7 @@ const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
   Command.withHandler(({ file, json }) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
       const relative = path.relative(cwd, path.resolve(cwd, file))
       const program = yield* Toolchain.ast({ cwd, file: relative })
 
@@ -92,7 +92,7 @@ const add = Command.make("add", { dir, name: ruleName }).pipe(
   Command.withHandler(({ dir, name }) =>
     Effect.gen(function* () {
       const path = yield* Path.Path
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
       const rulePath = yield* addCustomRule(cwd, name, Option.getOrUndefined(dir))
 
       yield* Output.success(`Wrote ${path.relative(cwd, rulePath)}.`)
@@ -113,7 +113,7 @@ const addTest = Command.make("add", {
     Effect.gen(function* () {
       const path = yield* Path.Path
       const directory = Option.getOrElse(dir, () => DEFAULT_DIRECTORY)
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
       let selected = Option.getOrUndefined(name)
 
       if (selected === undefined) {
@@ -177,7 +177,7 @@ const test = Command.make("test", { path: testPath }).pipe(
     Effect.gen(function* () {
       const path = yield* Path.Path
       const runner = yield* CommandRunner
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
 
       if (Option.isSome(target)) {
         return yield* runner.run({
@@ -333,7 +333,7 @@ const trial = Command.make("try", {
           { concurrency: 1 }
         )
 
-        const cwd = process.cwd()
+        const cwd = yield* Cwd
 
         return yield* tryRule({ cases, cwd, rule, setting, workspace: yield* readWorkspace(cwd) })
       }).pipe(

@@ -1,9 +1,9 @@
-import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Predicate from "effect/Predicate"
 import { readProject } from "#lib/project/project.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 import { applySetup, offerRepair } from "./setup.ts"
@@ -14,7 +14,7 @@ export default Command.make("update", { json: Mode.json }).pipe(
   ),
   Command.withHandler(({ json }) =>
     Effect.gen(function* () {
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
       yield* Output.intro("💠 adamantite update")
 
       const project = yield* readProject(cwd)

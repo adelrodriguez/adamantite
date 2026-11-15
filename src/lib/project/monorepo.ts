@@ -1,5 +1,4 @@
 import type * as FileSystem from "effect/FileSystem"
-import process from "node:process"
 import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Yaml from "effect/encoding/Yaml"
@@ -99,7 +98,7 @@ const readWorkspaceDeclarations = (cwd: string) =>
     }
   })
 
-export const checkIsMonorepo = (cwd: string = process.cwd()) =>
+export const checkIsMonorepo = (cwd: string) =>
   readWorkspaceDeclarations(cwd).pipe(Effect.map(({ patterns }) => patterns.length > 0))
 
 function escapeRegExp(text: string) {

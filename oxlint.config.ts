@@ -136,11 +136,7 @@ export default defineConfig({
       // the backend that they share. The terminal prints what Setup wrote.
       {
         import: "#lib/setup",
-        owners: [
-          "src/commands/setup.ts",
-          "src/commands/__tests__",
-          "src/terminal/setup.ts",
-        ],
+        owners: ["src/commands/setup.ts", "src/commands/__tests__", "src/terminal/setup.ts"],
       },
       // Only Setup writes target-project files and the lockfile. Each other owner writes outside the
       // managed files: `rule add` writes the stub of a new custom rule, the VS Code integration's
@@ -172,6 +168,13 @@ export default defineConfig({
           "src/commands/rule.ts",
           "src/lib/project/__tests__/monorepo.test.ts",
         ],
+      },
+      // `Cwd` reads the working directory in one place, so a test provides the folder instead of
+      // changing the process. `eslint/no-restricted-properties` rejects `process.cwd` elsewhere.
+      {
+        import: "node:process",
+        names: ["chdir", "cwd"],
+        owners: ["src/lib/shared/cwd.ts"],
       },
       // The package builds the presets apart from the CLI, so no file below `presets/` imports
       // `src/`, tests included. A path module also covers each import that resolves into it, such
@@ -248,6 +251,22 @@ export default defineConfig({
           shared: { imports: [] },
         },
         root: "presets/lint/plugins",
+      },
+    ],
+    // Commands read the working directory with `yield* Cwd`, and tests provide it. `Cwd` takes it
+    // from its named `cwd` import, which `adamantite/import-owners` allows only there.
+    "eslint/no-restricted-properties": [
+      "error",
+      {
+        message: "Read the working directory with `yield* Cwd` from `#lib/shared/cwd.ts`.",
+        object: "process",
+        property: "cwd",
+      },
+      {
+        message:
+          "Provide `Cwd` from `#lib/shared/cwd.ts` instead of changing the working directory.",
+        object: "process",
+        property: "chdir",
       },
     ],
     // A `?raw` import gives the source text of a module, not the module, so a test can import both.

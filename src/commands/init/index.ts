@@ -1,4 +1,3 @@
-import process from "node:process"
 import * as Array from "effect/Array"
 import * as Command from "effect/cli/Command"
 import * as Effect from "effect/Effect"
@@ -17,6 +16,7 @@ import {
   type LintPreset,
   type Selection,
 } from "#lib/project/selection.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
@@ -46,7 +46,7 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
   ]),
   Command.withHandler(({ json, ...options }) =>
     Effect.gen(function* () {
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
       // Only a terminal that can prompt asks for the selection. With `--json`,
       // `--non-interactive`, or no such terminal, init sets up from the flags.
       const prompts = Mode.is("Menu")(yield* Mode.CurrentMode)

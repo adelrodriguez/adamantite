@@ -1,5 +1,4 @@
 import { join } from "node:path"
-import process from "node:process"
 import { stripVTControlCharacters } from "node:util"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -24,7 +23,7 @@ import {
 } from "./command-test-helpers.ts"
 import { makeSelection } from "./lifecycle.ts"
 
-const OXLINT = getOxlintCommand(process.cwd())
+const OXLINT = getOxlintCommand("/project")
 
 describe("check", () => {
   describe("stage flags", () => {
@@ -62,7 +61,7 @@ describe("check", () => {
           {
             args: ["--check", "--no-error-on-unmatched-pattern"],
             command: "oxfmt",
-            cwd: process.cwd(),
+            cwd: "/project",
             title: "✨ Checking formatting",
           },
         ])
@@ -187,7 +186,7 @@ describe("check", () => {
           {
             args: ["--check", join(files.root, "index.ts")],
             command: "oxfmt",
-            cwd: process.cwd(),
+            cwd: "/project",
             title: "✨ Checking formatting",
           },
           {

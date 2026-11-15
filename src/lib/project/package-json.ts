@@ -1,4 +1,3 @@
-import process from "node:process"
 import type { PackageJson } from "type-fest"
 import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
@@ -72,7 +71,7 @@ const PackageManifest = Schema.Struct({
   ),
 })
 
-export const readPackageJson = (cwd: string = process.cwd()) =>
+export const readPackageJson = (cwd: string) =>
   Effect.gen(function* () {
     const path = yield* Path.Path
     const packagePath = path.join(cwd, "package.json")

@@ -1,4 +1,3 @@
-import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -29,14 +28,14 @@ function createMonorepoFiles() {
 
 const sherifStep = {
   command: "sherif",
-  cwd: process.cwd(),
+  cwd: "/project",
   stdin: "inherit",
   title: "📦 Analyzing the monorepo",
 }
 
 const knipStep = {
   command: "knip",
-  cwd: process.cwd(),
+  cwd: "/project",
   stdin: "ignore",
   title: "🧹 Analyzing unused code",
 }

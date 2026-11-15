@@ -10,6 +10,12 @@ domain terms live in [GLOSSARY.md](../GLOSSARY.md).
 options. Command modules validate command-specific input, obtain Effect services, and
 invoke target-project operations.
 
+A command runs in the target project, the folder that `yield* Cwd` gives. `Cwd` in
+`src/lib/shared/cwd.ts` is a `Context.Reference` that reads the working directory of the process,
+and a test provides the folder instead of changing the process. Lib code takes the folder as a
+`cwd` parameter. `eslint/no-restricted-properties` and `adamantite/import-owners` reject every
+other read of the working directory.
+
 `@effect/platform-node` supplies the production filesystem, path, process, and terminal
 services. Other external behavior, such as prompts and child commands, is also behind
 services so command behavior can be tested without changing a real project.
@@ -46,7 +52,7 @@ disagree.
 | `src/lib/integrations` | Hold the `Integration` list and one folder for each integration: its packages, its managed files, its `assess`, and its command builder.                                                     | `handoff`, `project` |
 | `src/lib/handoff`      | Detect the installed coding agent CLIs, and hand the terminal to one of them.                                                                                                                | `shared`             |
 | `src/lib/project`      | Read the target project: `package.json`, the workspace, the lockfile and its selection, the configs through the config loader, and the custom rules. Detect the package manager and install. | `shared`             |
-| `src/lib/shared`       | Define errors, filesystem and JSON helpers, the command runner, the forwarded arguments, the public imports, and templates.                                                                  | None                 |
+| `src/lib/shared`       | Define errors, filesystem and JSON helpers, the command runner, the working directory, the forwarded arguments, the public imports, and templates.                                           | None                 |
 
 `setup`, `assessment`, `toolchain`, and `hardening` are siblings above `integrations`, so none of
 them imports another. `assessment` does not import `hardening`, because harden is not an

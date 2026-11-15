@@ -37,6 +37,7 @@ import {
   type CommandRunOptions,
   CommandRunner,
 } from "#lib/shared/command-runner.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import { CliNotFound, CommandFailed, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 
@@ -398,8 +399,23 @@ export interface RunCommandOptions<Layers extends readonly TestLayer[]> {
   readonly terminal?: TerminalTestContext
 }
 
+/**
+ * The test filesystem and a `Path` that resolves a relative path from the project root, as the CLI
+ * resolves it from the working directory. The command runs in the root, which `Cwd` names.
+ */
+function makePlatformLayer(files: FileSystemTestContext) {
+  const path = Layer.effect(Path.Path)(
+    Effect.map(Path.Path, (posix) => ({
+      ...posix,
+      resolve: (...segments: readonly string[]) => posix.resolve(files.root, ...segments),
+    }))
+  ).pipe(Layer.provide(Path.layer))
+
+  return Layer.mergeAll(files.layer, path)
+}
+
 function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestContext) {
-  const platformLayer = Layer.mergeAll(files.layer, Path.layer)
+  const platformLayer = makePlatformLayer(files)
 
   return Layer.mergeAll(
     platformLayer,
@@ -443,7 +459,7 @@ export function runCommand<
 ) {
   const files = options.files ?? createFileSystemTestContext()
 
-  const platformLayer = Layer.mergeAll(files.layer, Path.layer)
+  const platformLayer = makePlatformLayer(files)
 
   // The config loader reads the files and resolves imports with the services of the test.
   const testLayer = Layer.provideMerge(
@@ -463,6 +479,7 @@ export function runCommand<
         })
       ),
       Effect.provideService(ForwardedArguments, options.forwardedArguments ?? []),
+      Effect.provideService(Cwd, files.root),
       Effect.provide(testLayer)
     )
   )

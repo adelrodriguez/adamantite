@@ -1,5 +1,4 @@
 import { join } from "node:path"
-import process from "node:process"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
@@ -17,7 +16,7 @@ import {
 } from "./command-test-helpers.ts"
 import { makeSelection } from "./lifecycle.ts"
 
-const OXLINT = getOxlintCommand(process.cwd())
+const OXLINT = getOxlintCommand("/project")
 
 describe("fix", () => {
   describe("default invocation", () => {
@@ -37,7 +36,7 @@ describe("fix", () => {
           {
             args: ["--write"],
             command: "oxfmt",
-            cwd: process.cwd(),
+            cwd: "/project",
             title: "✨ Formatting",
           },
         ])
@@ -101,7 +100,7 @@ describe("fix", () => {
           {
             args: ["--write", "--no-error-on-unmatched-pattern"],
             command: "oxfmt",
-            cwd: process.cwd(),
+            cwd: "/project",
             title: "✨ Formatting",
           },
         ])
@@ -148,7 +147,7 @@ describe("fix", () => {
           {
             args: ["--write", join(files.root, "index.ts")],
             command: "oxfmt",
-            cwd: process.cwd(),
+            cwd: "/project",
             title: "✨ Formatting",
           },
         ])
@@ -176,7 +175,7 @@ describe("fix", () => {
           {
             args: ["--write"],
             command: "oxfmt",
-            cwd: process.cwd(),
+            cwd: "/project",
             title: "✨ Formatting",
           },
         ])

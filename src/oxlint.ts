@@ -16,29 +16,32 @@ import {
 import { readSelection } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { toToolNotSelected } from "#lib/project/selection.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 
 // Run Oxlint with the Oxlint runtime of the project, and pass every argument through. Editors and
 // `adamantite check` start this file in place of `oxlint`.
 
-const project = getProjectDirectory(
-  process.argv[1] ?? "",
-  process.cwd(),
-  process.env[PROJECT_VARIABLE]
-)
+const entry = process.argv[1] ?? ""
+const named = process.env[PROJECT_VARIABLE]
 
 const result = await Effect.runPromise(
-  resolveOxlintRuntime(project).pipe(
-    // Without a selected script that runs Oxlint, Setup did not install it, and
-    // `adamantite update` would not either, so the failure names the script to add.
-    Effect.catchTag("PackageNotInstalled", (error) =>
-      readSelection(project).pipe(
-        Effect.flatMap((selection) =>
-          Effect.fail(
-            Option.getOrElse(toToolNotSelected(selection, error.packageName), () => error)
+  Effect.gen(function* () {
+    const project = getProjectDirectory(entry, yield* Cwd, named)
+
+    return yield* resolveOxlintRuntime(project).pipe(
+      // Without a selected script that runs Oxlint, Setup did not install it, and
+      // `adamantite update` would not either, so the failure names the script to add.
+      Effect.catchTag("PackageNotInstalled", (error) =>
+        readSelection(project).pipe(
+          Effect.flatMap((selection) =>
+            Effect.fail(
+              Option.getOrElse(toToolNotSelected(selection, error.packageName), () => error)
+            )
           )
         )
       )
-    ),
+    )
+  }).pipe(
     Effect.result,
     Effect.provide([NodeFileSystem.layer, NodePath.layer, ModuleResolver.layer])
   )

@@ -19,6 +19,7 @@ import { OxlintCommand } from "#lib/integrations/oxlint/files.ts"
 import { OxlintProbe } from "#lib/integrations/oxlint/probe.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import { FailedToParseSource } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
@@ -59,26 +60,21 @@ describe("rule ast", () => {
     writeFileSync(join(project, file), content)
   }
 
-  // `rule ast` reads the file from the current directory, as the CLI does.
-  function runAst(args: readonly string[]) {
-    const cwd = process.cwd()
-
-    return Effect.acquireUseRelease(
-      Effect.sync(() => {
-        process.chdir(project)
-      }),
-      () =>
-        Command.runWith(ruleCommand, { version: "test" })(["ast", ...args]).pipe(
-          Effect.exit,
-          Effect.flatMap((exit) =>
-            TestConsole.logLines.pipe(Effect.map((logLines) => ({ exit, logLines })))
-          )
-        ),
-      () =>
-        Effect.sync(() => {
-          process.chdir(cwd)
-        })
-    ).pipe(Effect.provide(TEST_LAYER))
+  // `rule ast` runs in the project. The CLI checks that the file exists from the process working
+  // directory, so the file path is absolute.
+  function runAst([file = "", ...args]: readonly string[]) {
+    return Command.runWith(ruleCommand, { version: "test" })([
+      "ast",
+      join(project, file),
+      ...args,
+    ]).pipe(
+      Effect.exit,
+      Effect.flatMap((exit) =>
+        TestConsole.logLines.pipe(Effect.map((logLines) => ({ exit, logLines })))
+      ),
+      Effect.provideService(Cwd, project),
+      Effect.provide(TEST_LAYER)
+    )
   }
 
   beforeEach(() => {

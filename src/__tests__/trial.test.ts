@@ -2,7 +2,6 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import process from "node:process"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
@@ -32,6 +31,7 @@ import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
 import { ConfigLoader } from "#lib/project/config-loader.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { CommandRunner } from "#lib/shared/command-runner.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import { InvalidTrialCase } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
@@ -238,31 +238,20 @@ describe("rule trials in a real project", () => {
 
   it.live("print the trial as JSON that decodes with the report schema with --json", () =>
     Effect.gen(function* () {
-      const cwd = process.cwd()
       const before = writeCase("before.ts", 'import fs from "node:fs"\nexport const cart = fs\n')
 
-      // `rule try` runs in the current directory, as the CLI does.
-      const exit = yield* Effect.acquireUseRelease(
-        Effect.sync(() => {
-          process.chdir(project)
-        }),
-        () =>
-          Command.runWith(ruleCommand, { version: "test" })([
-            "try",
-            "no-restricted-imports",
-            "--options",
-            '[{"paths":["node:fs"]}]',
-            "--report",
-            `src/cart.ts=${before}`,
-            "--accept",
-            "src/index.ts",
-            "--json",
-          ]).pipe(Effect.exit),
-        () =>
-          Effect.sync(() => {
-            process.chdir(cwd)
-          })
-      )
+      // `rule try` runs in the project, as the CLI does from the project folder.
+      const exit = yield* Command.runWith(ruleCommand, { version: "test" })([
+        "try",
+        "no-restricted-imports",
+        "--options",
+        '[{"paths":["node:fs"]}]',
+        "--report",
+        `src/cart.ts=${before}`,
+        "--accept",
+        "src/index.ts",
+        "--json",
+      ]).pipe(Effect.exit, Effect.provideService(Cwd, project))
 
       const logLines = yield* TestConsole.logLines
 

@@ -1,4 +1,3 @@
-import process from "node:process"
 import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Array from "effect/Array"
@@ -35,7 +34,7 @@ import {
   SKILL_FILES,
 } from "./command-test-helpers.ts"
 
-const OXLINT = getOxlintCommand(process.cwd())
+const OXLINT = getOxlintCommand("/project")
 
 function manifest(value: PackageJson): string {
   return JSON.stringify({ name: "test-project", version: "1.0.0", ...value }, null, 2)

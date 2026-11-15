@@ -1,4 +1,3 @@
-import process from "node:process"
 import * as Command from "effect/cli/Command"
 import * as Flag from "effect/cli/Flag"
 import * as Effect from "effect/Effect"
@@ -19,6 +18,7 @@ import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readWorkspace } from "#lib/project/monorepo.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import { readProject } from "#lib/project/project.ts"
+import { Cwd } from "#lib/shared/cwd.ts"
 import {
   AdamantiteNotInNodeModules,
   AdamantiteNotInstalled,
@@ -152,7 +152,7 @@ export default Command.make("harden", { commits, json: Mode.json, scope }).pipe(
   ),
   Command.withHandler(({ commits, json, scope }) =>
     Effect.gen(function* () {
-      const cwd = process.cwd()
+      const cwd = yield* Cwd
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
 

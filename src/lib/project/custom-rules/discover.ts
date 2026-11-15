@@ -10,7 +10,6 @@ import {
   DynamicCustomRulesCall,
   findCustomRulesCalls,
   findRuntimeImports,
-  hasLegacyRuleImports,
 } from "#lib/project/custom-rules/inspect.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
@@ -171,7 +170,6 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   const configs = packageConfigs.filter((config) => nearestConfigs.has(config))
   const visited = new Set<string>()
   const calls: ResolvedCall[] = []
-  const legacyImports: string[] = []
   // The module of each call whose `dir` is not a string literal, once for each call.
   const unresolvedCalls: string[] = []
   const unresolvedImports: Array<{ readonly from: string; readonly specifier: string }> = []
@@ -182,10 +180,6 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
 
     for (const module of modules) {
       visited.add(module.file)
-
-      if (hasLegacyRuleImports(module.file, module.content)) {
-        legacyImports.push(module.file)
-      }
 
       if (module.content.includes(CUSTOM_RULES_MODULE)) {
         for (const call of findCustomRulesCalls(module.file, module.content)) {
@@ -231,7 +225,6 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   return {
     calls,
     configs: configs.map((config) => config.file),
-    legacyImports,
     unresolvedCalls,
     unresolvedImports,
   }

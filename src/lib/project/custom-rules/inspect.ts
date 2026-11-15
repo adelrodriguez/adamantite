@@ -9,9 +9,6 @@ import {
   type ObjectExpression,
   type ObjectProperty,
   type Program,
-  type Statement,
-  type TSGlobalDeclaration,
-  type TSModuleDeclaration,
   Visitor,
 } from "oxc-parser"
 import { publicImport } from "#lib/shared/package-exports.ts"
@@ -19,8 +16,7 @@ import { publicImport } from "#lib/shared/package-exports.ts"
 export const CUSTOM_RULES_MODULE = publicImport("./rules")
 
 /**
- * The removed custom-rules module. Doctor asks a project that still imports it to migrate. A test
- * keeps it out of the export map.
+ * The removed custom-rules module. A test keeps it out of the export map.
  */
 export const LEGACY_CUSTOM_RULES_MODULE = "adamantite/lint/custom"
 
@@ -92,52 +88,6 @@ function getCustomImportNames(program: Program) {
     )
     .filter((specifier) => specifier.type === "ImportDefaultSpecifier")
     .map((specifier) => specifier.local.name)
-}
-
-/**
- * Whether a module imports or re-exports the custom-rules API that Doctor must ask the project to
- * migrate. This does not load the old API or treat its custom() calls as current calls.
- */
-export function hasLegacyRuleImports(file: string, content: string): boolean {
-  const parsed = parse(file, content)
-
-  if (parsed.errors.length > 0) {
-    return false
-  }
-
-  return parsed.program.body.some((statement) => {
-    if (statement.type === "ImportDeclaration") {
-      return (
-        statement.source.value === LEGACY_CUSTOM_RULES_MODULE
-        || (statement.source.value === CUSTOM_RULES_MODULE
-          && statement.specifiers.some(
-            (specifier) =>
-              specifier.type === "ImportSpecifier"
-              && (specifier.imported.type === "Identifier"
-                ? specifier.imported.name
-                : specifier.imported.value) !== "CustomRulesOptions"
-          ))
-      )
-    }
-
-    if (statement.type === "ExportNamedDeclaration" && statement.source !== null) {
-      return (
-        statement.source.value === LEGACY_CUSTOM_RULES_MODULE
-        || (statement.source.value === CUSTOM_RULES_MODULE
-          && statement.specifiers.some((specifier) => {
-            const name =
-              specifier.local.type === "Identifier" ? specifier.local.name : specifier.local.value
-
-            return name !== "default" && name !== "CustomRulesOptions"
-          }))
-      )
-    }
-
-    return (
-      statement.type === "ExportAllDeclaration"
-      && statement.source.value === LEGACY_CUSTOM_RULES_MODULE
-    )
-  })
 }
 
 function getStaticString(expression: Expression) {
@@ -240,70 +190,6 @@ export function findCustomRulesCalls(file: string, content: string): CustomRules
   return calls
 }
 
-function getLine(content: string, offset: number) {
-  return content.slice(0, offset).split("\n").length
-}
-
-function checkIsTypeOnlyStatement(statement: Statement): boolean {
-  switch (statement.type) {
-    case "TSInterfaceDeclaration":
-    case "TSTypeAliasDeclaration":
-      return true
-
-    case "TSModuleDeclaration":
-      return checkIsTypeOnlyModule(statement)
-
-    case "ClassDeclaration":
-    case "FunctionDeclaration":
-    case "TSEnumDeclaration":
-    case "VariableDeclaration":
-      return statement.declare === true
-
-    case "ExportNamedDeclaration":
-      return statement.declaration === null
-        ? statement.exportKind === "type"
-        : checkIsTypeOnlyStatement(statement.declaration)
-
-    default:
-      return false
-  }
-}
-
-function checkIsTypeOnlyModule(module: TSGlobalDeclaration | TSModuleDeclaration): boolean {
-  return (
-    module.kind === "global"
-    || module.declare
-    || module.body === null
-    || module.body.body.every(
-      (statement) => statement.type !== "ExpressionStatement" && checkIsTypeOnlyStatement(statement)
-    )
-  )
-}
-
-/**
- * Whether the module has a default export that survives type stripping. `export default interface`
- * and `export type { Rule as default }` are erased.
- */
-function checkHasDefaultExport(program: Program) {
-  return program.body.some((statement) => {
-    if (statement.type === "ExportDefaultDeclaration") {
-      return statement.declaration.type !== "TSInterfaceDeclaration"
-    }
-
-    return (
-      statement.type === "ExportNamedDeclaration"
-      && statement.exportKind !== "type"
-      && statement.specifiers.some(
-        (specifier) =>
-          specifier.exportKind !== "type"
-          && (specifier.exported.type === "Literal"
-            ? specifier.exported.value === "default"
-            : specifier.exported.name === "default")
-      )
-    )
-  })
-}
-
 /**
  * The modules that a module imports or re-exports at runtime. Type-only imports are left out. A
  * module that does not parse imports none.
@@ -330,56 +216,4 @@ export function findRuntimeImports(file: string, content: string): string[] {
         return []
     }
   })
-}
-
-/**
- * The reasons that a rule file cannot load as a rule: syntax errors, TypeScript that type stripping
- * cannot erase, and a missing default export. Empty when the file can load.
- */
-export function inspectRuleFile(file: string, content: string): string[] {
-  const parsed = parse(file, content)
-
-  if (parsed.errors.length > 0) {
-    return parsed.errors.map((error) => `Syntax error: ${error.message}`)
-  }
-
-  const problems: string[] = []
-
-  const report = (offset: number, construct: string) => {
-    problems.push(
-      `Line ${getLine(content, offset)}: ${construct} needs a TypeScript transform, which type stripping does not do.`
-    )
-  }
-
-  const visitor = new Visitor({
-    TSEnumDeclaration(node) {
-      if (!node.declare) {
-        report(node.start, "`enum`")
-      }
-    },
-    TSExportAssignment(node) {
-      report(node.start, "`export =`")
-    },
-    TSImportEqualsDeclaration(node) {
-      if (node.importKind !== "type") {
-        report(node.start, "`import x = ...`")
-      }
-    },
-    TSModuleDeclaration(node) {
-      if (!checkIsTypeOnlyModule(node)) {
-        report(node.start, "A `namespace` with values")
-      }
-    },
-    TSParameterProperty(node) {
-      report(node.start, "A parameter property")
-    },
-  })
-
-  visitor.visit(parsed.program)
-
-  if (!checkHasDefaultExport(parsed.program)) {
-    problems.push("The file has no default export. Export the rule as default.")
-  }
-
-  return problems
 }

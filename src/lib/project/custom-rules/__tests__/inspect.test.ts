@@ -4,8 +4,6 @@ import {
   CUSTOM_RULES_DIRECTORY,
   DynamicCustomRulesCall,
   findCustomRulesCalls,
-  hasLegacyRuleImports,
-  inspectRuleFile,
   isRuleFile,
   LiteralCustomRulesCall,
   RULE_FILE_EXTENSIONS,
@@ -115,95 +113,5 @@ describe("findCustomRulesCalls", () => {
       findCustomRulesCalls("oxlint.config.ts", "export default { extends: [custom()] }")
     ).toStrictEqual([])
     expect(findCustomRulesCalls("oxlint.config.ts", `${IMPORT}export default {`)).toStrictEqual([])
-  })
-})
-
-describe("hasLegacyRuleImports", () => {
-  it.each([
-    'import custom from "adamantite/lint/custom"',
-    'import { defineRule as rule } from "adamantite/rules"',
-    'import type { Rule } from "adamantite/rules"',
-    'export { defineRule } from "adamantite/rules"',
-    'export { default } from "adamantite/lint/custom"',
-    'export * from "adamantite/lint/custom"',
-  ])("report the old import in %s", (content) => {
-    expect(hasLegacyRuleImports("rule.ts", content)).toBe(true)
-  })
-
-  it.each([
-    'import custom, { type CustomRulesOptions } from "adamantite/rules"',
-    'import { defineRule } from "adamantite/rules/plugin"',
-    'export { default, type CustomRulesOptions } from "adamantite/rules"',
-    '// import { defineRule } from "adamantite/rules"',
-    'const text = "adamantite/lint/custom"',
-  ])("accept the current API and ignore text in %s", (content) => {
-    expect(hasLegacyRuleImports("rule.ts", content)).toBe(false)
-  })
-})
-
-describe("inspectRuleFile", () => {
-  const RULE =
-    'import { defineRule } from "adamantite/rules/plugin"\n\nexport default defineRule({ create: () => ({}) })\n'
-
-  it("accept a rule with erasable TypeScript", () => {
-    const content = [
-      "type Options = { readonly names: string[] }",
-      "interface State { count: number }",
-      "declare namespace Types { const value: number }",
-      "namespace Shapes { export type Point = { x: number } }",
-      "declare enum Kind { A }",
-      RULE,
-    ].join("\n")
-
-    expect(inspectRuleFile("rule.ts", content)).toStrictEqual([])
-  })
-
-  it("accept a default export through an export list", () => {
-    expect(
-      inspectRuleFile(
-        "rule.ts",
-        "const rule = { create: () => ({}) }\nexport { rule as default }\n"
-      )
-    ).toStrictEqual([])
-  })
-
-  it("report TypeScript that type stripping cannot erase", () => {
-    const content = [
-      "enum Kind { A }",
-      "namespace Values { export const value = 1 }",
-      "class Store { constructor(private readonly name: string) {} }",
-      'import fs = require("node:fs")',
-      RULE,
-    ].join("\n")
-
-    expect(inspectRuleFile("rule.ts", content)).toStrictEqual([
-      "Line 1: `enum` needs a TypeScript transform, which type stripping does not do.",
-      "Line 2: A `namespace` with values needs a TypeScript transform, which type stripping does not do.",
-      "Line 3: A parameter property needs a TypeScript transform, which type stripping does not do.",
-      "Line 4: `import x = ...` needs a TypeScript transform, which type stripping does not do.",
-    ])
-  })
-
-  it.each([
-    "export default interface Rule { create(): void }\n",
-    "const rule = {}\ntype Rule = typeof rule\nexport type { Rule as default }\n",
-    "const rule = {}\ntype Rule = typeof rule\nexport { type Rule as default }\n",
-  ])("report a default export that type stripping erases: %s", (content) => {
-    expect(inspectRuleFile("rule.ts", content)).toStrictEqual([
-      "The file has no default export. Export the rule as default.",
-    ])
-  })
-
-  it("report a missing default export", () => {
-    expect(inspectRuleFile("rule.ts", "export const rule = {}\n")).toStrictEqual([
-      "The file has no default export. Export the rule as default.",
-    ])
-  })
-
-  it("report syntax errors", () => {
-    const [problem, ...rest] = inspectRuleFile("rule.ts", "export default {\n")
-
-    expect(problem).toMatch(/^Syntax error: /)
-    expect(rest).toStrictEqual([])
   })
 })

@@ -20,6 +20,7 @@ import type { Selection } from "#lib/project/selection.ts"
 import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
 import { createDependencyInstallerTestContext } from "./command-test-helpers.ts"
@@ -41,6 +42,7 @@ const FORMATTED_FILES = [
   ".vscode/settings.json",
   ".vscode/extensions.json",
   ".zed/settings.json",
+  ".github/workflows/adamantite.yml",
 ]
 
 // Every part of the selection that makes Setup write a file, with the longest renders: the VS Code
@@ -68,6 +70,7 @@ const FULL_SELECTION = {
 // The project's Oxfmt, its packages, and the services of Setup on the host filesystem.
 const layer = Layer.mergeAll(
   NodeServices.layer,
+  NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
   ModuleResolver.layer,
   Digest.layerWebCrypto,
   createDependencyInstallerTestContext().layer

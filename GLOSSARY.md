@@ -116,12 +116,6 @@ _Avoid_: Framework language, plugin format
 A `package.json` script whose command is owned by Adamantite.
 _Avoid_: User script, package command
 
-**Managed block**:
-The jobs of a GitHub Actions workflow between the `# ADAMANTITE:START` and `# ADAMANTITE:END`
-comments. Adamantite owns the jobs in it, and the target project owns the rest of the workflow.
-A target project has one managed block.
-_Avoid_: Managed workflow, Adamantite job
-
 **Selection**:
 What `init` was asked to set up in a target project: the lint presets, the TypeScript preset, the
 editors, the CI provider, the agent guidance, and the managed scripts. The lockfile records it, and

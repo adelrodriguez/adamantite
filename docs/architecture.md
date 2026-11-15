@@ -513,17 +513,14 @@ Custom rules are Oxlint rules that the target project writes in a rules folder, 
   that module to report rules folders that no `custom()` call loads, rule files that cannot
   load, and rules folders that share a plugin name. It also reports old imports, old default
   folders with migration instructions. Optional saved tests do not produce a finding.
-- The `github` integration in `src/lib/integrations/ci/github.ts` writes only the selected
-  managed check and analyze scripts into the workflow. It does not add or require a rule-test
-  step. Users can add one themselves, and Doctor preserves it.
-- The generated job sits in a managed block, between `# ADAMANTITE:START` and
-  `# ADAMANTITE:END`. `github-block.ts` finds the block in the text, because the YAML parser
-  drops comments. `github.ts` looks for the block in every file in `.github/workflows`, and
-  `detect` returns one of four states: `Missing`, `Managed`, `Legacy`, or `Malformed`. Assess
-  reads only the jobs in the block, and `update` replaces only the block, when Adamantite
-  generated it. A project has one block. Markers that do not make one block are `Malformed`,
-  and Doctor reports them. An `adamantite.yml` without markers is `Legacy`, from a release
-  before the block, and all its jobs count as managed.
+- The `github` integration in `src/lib/integrations/github/index.ts` renders
+  `.github/workflows/adamantite.yml` whole, with a job for each check and analyze script of the
+  selection. It does not add or require a rule-test step. Users can add one themselves, and the
+  write rule keeps the changed workflow. Doctor then checks that a job of the workflow runs each
+  CI script of the selection. The template keeps the `# ADAMANTITE:START` and `# ADAMANTITE:END`
+  comments of earlier releases as plain text, so a workflow that 0.47.0 wrote equals the render,
+  and the first `update` records its hash. A workflow that an earlier release wrote and the project
+  renamed holds the start comment, so Adamantite writes no second workflow beside it.
 
 The rules-folder preset and loader run under the runtime that executes Oxlint, so they use only Node.js
 APIs that Bun also provides. `presets/lint/tsconfig.json` and `presets/rules/tsconfig.json`

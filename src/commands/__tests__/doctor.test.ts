@@ -311,7 +311,7 @@ describe("doctor", () => {
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(logLines).toStrictEqual([
         expect.stringMatching(
-          /^# Adamantite doctor warnings\n[\s\S]*No CI-compatible managed scripts were found/u
+          /^# Adamantite doctor warnings\n[\s\S]*No CI script runs an Adamantite command/u
         ),
       ])
     })

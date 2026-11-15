@@ -28,7 +28,6 @@ import {
   installDependencies,
   printZedExtensions,
   setupAgentsGuidance,
-  setupGitHubActions,
   setupSkill,
 } from "./setup.ts"
 
@@ -166,10 +165,6 @@ export default Command.make("init", initCommandOptions).pipe(
       // Zed installs extensions only from the user settings, so init links them.
       if (Option.exists(initOptions.editors, (names) => names.includes("zed"))) {
         yield* printZedExtensions(presets)
-      }
-
-      if (Option.isSome(initOptions.githubActions)) {
-        yield* setupGitHubActions(cwd, initOptions.githubActions.value, managedScripts)
       }
 
       // What init was asked to set up, in the order of each source list.

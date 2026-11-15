@@ -1637,7 +1637,7 @@ describe("init", () => {
       })
     )
 
-    it.effect("write AGENTS.md and CI for every managed script, not only this run's", () =>
+    it.effect("write AGENTS.md for every managed script, not only this run's", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
           "package.json": yield* stringifyJson({
@@ -1657,11 +1657,10 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read("AGENTS.md")).toContain("bun run analyze")
-        expect(files.read(".github/workflows/adamantite.yml")).toContain("command: bun run analyze")
       })
     )
 
-    it.effect("leave out a conflicting script that init kept from AGENTS.md and CI", () =>
+    it.effect("leave out a conflicting script that init kept from AGENTS.md", () =>
       Effect.gen(function* () {
         const files = createInitTestContext({
           "package.json": yield* stringifyJson({
@@ -1681,78 +1680,6 @@ describe("init", () => {
 
         expect(Exit.isSuccess(exit)).toBe(true)
         expect(files.read("AGENTS.md")).not.toContain("bun run check")
-        expect(files.read(".github/workflows/adamantite.yml")).not.toContain("bun run check")
-      })
-    )
-
-    it.effect("write no workflow when init kept every CI script as a conflict", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext({
-          "package.json": yield* stringifyJson({
-            name: "test-project",
-            scripts: { check: "eslint ." },
-          }),
-        })
-
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--github-actions"],
-          { files, layers: [installer.layer], logLines }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-        expect(logLines).toContainEqual(
-          "▲ No CI script runs an Adamantite command, so `adamantite init` did not set up the GitHub Actions workflow."
-        )
-      })
-    )
-
-    it.effect("keep a GitHub Actions workflow that the project wrote, and point to doctor", () =>
-      Effect.gen(function* () {
-        const workflowPath = ".github/workflows/adamantite.yml"
-        const workflow = "name: team checks\n"
-        const files = createInitTestContext({ [workflowPath]: workflow })
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--github-actions"],
-          { files, layers: [installer.layer], logLines }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read(workflowPath)).toBe(workflow)
-        expect(logLines).toContainEqual(
-          `● \`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
-        )
-      })
-    )
-
-    it.effect("keep a GitHub Actions workflow whose managed block is malformed", () =>
-      Effect.gen(function* () {
-        const workflowPath = ".github/workflows/checks.yml"
-        const workflow = "jobs:\n  # ADAMANTITE:START\n  verify:\n    runs-on: ubuntu-latest\n"
-        const files = createInitTestContext({ [workflowPath]: workflow })
-        const logLines: unknown[] = []
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(
-          initCommand,
-          ["--non-interactive", "--script", "check", "--github-actions"],
-          { files, layers: [installer.layer], logLines }
-        )
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.read(workflowPath)).toBe(workflow)
-        expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-        expect(logLines).toContainEqual(
-          "▲ Adamantite cannot read the managed block in `.github/workflows/checks.yml`, so `adamantite init` kept the workflow. It has `# ADAMANTITE:START` without `# ADAMANTITE:END` after it. Run `adamantite doctor` for the repair."
-        )
       })
     )
 
@@ -1856,46 +1783,6 @@ describe("init", () => {
           "● Adamantite cannot generate a GitHub Actions workflow for `aube`. It supports bun, deno, npm, pnpm, and yarn."
         )
         expect(files.exists(".github/workflows/adamantite.yml")).toBe(false)
-      })
-    )
-
-    it.effect("continues initialization when the GitHub Actions workflow cannot be written", () =>
-      Effect.gen(function* () {
-        const files = createInitTestContext()
-        const workflowPath = ".github/workflows/adamantite.yml"
-        files.makeReadOnly(workflowPath)
-
-        const logLines: unknown[] = []
-
-        const terminal = createTerminalTestContext([
-          ...pickMany(SCRIPT_ORDER, ["check"]),
-          ...pickMany(LINT_PRESETS, []),
-          "n",
-          ...pickMany(INIT_EDITORS, []),
-          "enter",
-          "n",
-        ])
-
-        const installer = createDependencyInstallerTestContext()
-
-        const exit = yield* runCommand(initCommand, [], {
-          files,
-          layers: [installer.layer, promptingLayer],
-          logLines,
-          terminal,
-        })
-
-        expect(Exit.isSuccess(exit)).toBe(true)
-        expect(files.exists(workflowPath)).toBe(false)
-        expect(logLines).toStrictEqual(
-          expect.arrayContaining([
-            expect.stringMatching(
-              /Could not set up the GitHub Actions workflow\. Could not write `.*adamantite\.yml`\. Check the directory permissions and available disk space, then try again\./
-            ),
-            "▲ Fix the reported problem and run `adamantite init` again, or create the workflow manually.",
-          ])
-        )
-        expect(logLines.at(-1)).toBe("💠 Setup finished.")
       })
     )
 

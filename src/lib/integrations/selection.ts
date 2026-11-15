@@ -2,10 +2,9 @@ import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
-import * as Predicate from "effect/Predicate"
 import * as String from "effect/String"
 import type { Project } from "#lib/project/project.ts"
-import github from "#lib/integrations/ci/github.ts"
+import { findWorkflow } from "#lib/integrations/github/index.ts"
 import { getImportedLintPresets } from "#lib/integrations/oxlint/config.ts"
 import { detectPreset } from "#lib/integrations/typescript/index.ts"
 import { SETTINGS_PATH as VSCODE_SETTINGS_PATH } from "#lib/integrations/vscode/index.ts"
@@ -43,12 +42,12 @@ export const inferSelection = Effect.fn("inferSelection")(function* (project: Pr
     { concurrency: "unbounded" }
   )
 
-  const workflow = yield* github.detect(cwd)
+  const workflow = yield* findWorkflow(cwd)
   const agents = yield* readFileIfExists(path.join(cwd, "AGENTS.md"))
 
   return {
     agents: Option.exists(agents, String.includes(ADAMANTITE_AGENTS_START_MARKER)),
-    ci: Predicate.isTagged(workflow, "Missing") ? null : "github",
+    ci: Option.isSome(workflow) ? "github" : null,
     editors,
     presets: checkRunsTool(scripts, "oxlint")
       ? ["core", ...LINT_PRESETS.filter((preset) => imported.includes(preset))]

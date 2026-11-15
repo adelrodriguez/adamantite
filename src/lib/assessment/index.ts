@@ -7,7 +7,6 @@ import type { Project } from "#lib/project/project.ts"
 import type { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
-import github from "#lib/integrations/ci/github.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
 import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
@@ -25,7 +24,7 @@ const warningReportTemplate = getWarningReportTemplate()
  * before the ones in `integrations/index.ts`. The order fixes how findings are numbered in the
  * rendered output.
  */
-const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs, agents, github] as const
+const managedIntegrations = [oxlintCustom, ...managedPlugins, tsrs, agents] as const
 
 // Without a lockfile, Doctor decides from the files that exist, so it cannot check what init set up.
 const lockfileMissing: Finding = {

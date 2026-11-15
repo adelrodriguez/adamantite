@@ -1,11 +1,8 @@
 import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
-import * as Match from "effect/Match"
 import type { LintPreset } from "#lib/project/selection.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
-import github from "#lib/integrations/ci/github.ts"
 import { writeAgentsGuidance } from "#lib/project/agents.ts"
-import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import {
   getConflictingScripts,
@@ -14,7 +11,6 @@ import {
   writePackageJson,
   MANAGED_SCRIPT_COMMANDS,
   type Script,
-  type SupportedPackageManager,
 } from "#lib/project/package-json.ts"
 import * as Output from "#terminal/output.ts"
 
@@ -92,65 +88,6 @@ export const printZedExtensions = (presets: readonly LintPreset[]) =>
       )
     }
   })
-
-export const setupGitHubActions = (
-  cwd: string,
-  packageManager: SupportedPackageManager,
-  scripts: Script[]
-) =>
-  Effect.gen(function* () {
-    // A conflicting script that init kept is not managed, so it can leave no script to run in CI.
-    if (!hasCICompatibleScripts(scripts)) {
-      return yield* Output.warning(
-        "No CI script runs an Adamantite command, so `adamantite init` did not set up the GitHub Actions workflow."
-      )
-    }
-
-    const state = yield* github.detect(cwd)
-
-    const update = () => github.update(cwd, { packageManager, scripts })
-
-    const result = yield* Match.valueTags(state, {
-      Legacy: update,
-      Malformed: () => Effect.succeed("kept" as const),
-      Managed: update,
-      Missing: () =>
-        github.create(cwd, { packageManager, scripts }).pipe(Effect.as("created" as const)),
-    })
-
-    yield* Output.success(`GitHub Actions workflow ${result}.`)
-
-    const reportKept = (workflowPath: string) =>
-      result === "kept"
-        ? Output.info(
-            `\`${workflowPath}\` has changes that Adamantite did not make, so \`adamantite init\` kept it. Run \`adamantite doctor\` to see what to update.`
-          )
-        : Effect.void
-
-    yield* Match.valueTags(state, {
-      Legacy: ({ path }) => reportKept(path),
-      Malformed: ({ paths, reason }) =>
-        Output.warning(
-          `Adamantite cannot read the managed block in ${paths.map((workflowPath) => `\`${workflowPath}\``).join(", ")}, so \`adamantite init\` kept the workflow. ${reason} Run \`adamantite doctor\` for the repair.`
-        ),
-      Managed: ({ path }) => reportKept(path),
-      Missing: () => Effect.void,
-    })
-  }).pipe(
-    // GitHub Actions setup is optional, so initialization continues; the failure must still
-    // reach the user instead of disappearing. Named tags keep a future error type from
-    // degrading to a warning without an explicit decision.
-    Effect.catchTag(
-      ["FailedToCreateDirectory", "FailedToParseFile", "FailedToReadFile", "FailedToWriteFile"],
-      (error) =>
-        Effect.gen(function* () {
-          yield* Output.warning(`Could not set up the GitHub Actions workflow. ${error.message}`)
-          yield* Output.warning(
-            "Fix the reported problem and run `adamantite init` again, or create the workflow manually."
-          )
-        })
-    )
-  )
 
 export const setupAgentsGuidance = (
   cwd: string,

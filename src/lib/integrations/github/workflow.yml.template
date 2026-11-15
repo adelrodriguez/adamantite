@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  {{start}}
+  # ADAMANTITE:START
   verify:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
@@ -34,4 +34,4 @@ jobs:
 
       - name: Run ${{ matrix.name }}
         run: ${{ matrix.command }}
-  {{end}}
+  # ADAMANTITE:END

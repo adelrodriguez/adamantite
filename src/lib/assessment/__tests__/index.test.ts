@@ -12,6 +12,7 @@ import {
   renderAssessmentMarkdown,
 } from "#lib/assessment/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
+import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 
@@ -261,6 +262,7 @@ describe("assessProject", () => {
           Path.layer,
           makeModuleResolverLayer(ROOT),
           noProcessLayer,
+          NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
           Layer.succeed(DependencyInstaller)({
             addDevDependencies: () => Effect.void,
             detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
@@ -337,6 +339,7 @@ describe("assessProject", () => {
             })
           ),
           noProcessLayer,
+          NodeVersionResolver.layer.pipe(Layer.provide([files.layer, Path.layer])),
           Layer.succeed(DependencyInstaller)({
             addDevDependencies: () => Effect.void,
             detectPackageManager: () => Effect.succeed({ name: "pnpm" }),
@@ -350,12 +353,12 @@ describe("assessProject", () => {
         "@shadcn/lint",
         "tsrs",
         "agents",
-        "github",
         "oxlint",
         "oxfmt",
         "knip",
         "sherif",
         "tsconfig",
+        "github",
       ])
       expect(reads.filter((path) => path === `${ROOT}/pnpm-workspace.yaml`)).toHaveLength(1)
       // The project reads the root config, and custom rule discovery reads it as an Oxlint config.

@@ -157,18 +157,18 @@ Effect.gen(function* () {
   yield* writeWorkflow(cwd, options)
 })
 
-// Prefer: github.update rewrites only a managed block that Adamantite generated.
+// Prefer: Setup.apply writes a managed file only when its hash equals the recorded hash.
 Effect.gen(function* () {
-  if (!checkIsGeneratedBody(state.block.body)) {
-    return "kept" as const
+  if (!Option.contains(recorded, yield* hashContent(current.value))) {
+    return { hash: Option.none<string>(), write: Kept({ path: file.path }) }
   }
-  yield* writeFile(path.join(cwd, state.path), replaceBlock(state.block, body))
-  return "updated" as const
+  yield* write
+  return { hash, write: Replaced({ path: file.path }) }
 })
 ```
 
-The [GitHub integration](src/lib/integrations/ci/github.ts) keeps any managed block that differs
-from every block it can generate, and `init` points to `adamantite doctor`.
+[`Setup.apply`](src/lib/setup/index.ts) keeps a workflow, or any other managed file, that the
+project changed, and the integration's `assess` reports only a change that breaks the setup.
 [PR #636](https://github.com/adelrodriguez/adamantite/pull/636) fixed the repeated-init path after
 review found that it removed the optional test step. A later audit found that the fix matched only
 the literal `adamantite rule test` command, so other edits were still lost.

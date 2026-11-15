@@ -21,14 +21,10 @@ const ROOT = "/project"
 // These assessments resolve no TypeScript package, so the tsconfig integration starts no process.
 const noProcessLayer = makeOxlintFilesLayer()
 
-function makeAssessment(value: Partial<ProjectAssessment>): ProjectAssessment {
-  return {
-    applicableIntegrations: ["tool"],
-    findings: [],
-    packageActions: [],
-    warnings: [],
-    ...value,
-  }
+type RenderedAssessment = Pick<ProjectAssessment, "findings" | "warnings">
+
+function makeAssessment(value: Partial<RenderedAssessment>): RenderedAssessment {
+  return { findings: [], warnings: [], ...value }
 }
 
 describe("renderAssessmentMarkdown", () => {

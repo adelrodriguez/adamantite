@@ -18,15 +18,16 @@ import {
   type Selection,
 } from "#lib/project/selection.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
+import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 import { printZedExtensions } from "#terminal/setup.ts"
 import { printTitle } from "#terminal/title.ts"
 import { initCommandOptions, validateInitOptions } from "./options.ts"
 import { collectInteractiveInitOptions } from "./prompts.ts"
 
-export default Command.make("init", initCommandOptions).pipe(
+export default Command.make("init", { ...initCommandOptions, json: Mode.json }).pipe(
   Command.withDescription(
-    "Configure Adamantite in the current directory. Use --non-interactive with setup flags and select each optional feature explicitly"
+    "Configure Adamantite in the current directory. Use --non-interactive or --json with setup flags and select each optional feature explicitly. Exits 1 when findings remain after setup"
   ),
   Command.withExamples([
     {
@@ -44,8 +45,11 @@ export default Command.make("init", initCommandOptions).pipe(
       description: "Configure analysis, including Sherif checks for a monorepo",
     },
   ]),
-  Command.withHandler((options) =>
-    Effect.gen(function* () {
+  Command.withHandler(({ json, ...flags }) => {
+    // `--json` never prompts, so it sets up from the flags.
+    const options = { ...flags, nonInteractive: flags.nonInteractive || json }
+
+    return Effect.gen(function* () {
       const cwd = process.cwd()
       yield* printTitle
 
@@ -156,9 +160,12 @@ export default Command.make("init", initCommandOptions).pipe(
         yield* printZedExtensions(presets)
       }
 
-      yield* applySetup(yield* readProject(cwd), selection)
+      yield* applySetup("init", yield* readProject(cwd), selection)
 
       yield* Output.outro("💠 Setup finished.")
-    }).pipe(Effect.catchTag("QuitError", () => Output.cancel("Setup was cancelled.")))
-  )
+    }).pipe(
+      Effect.catchTag("QuitError", () => Output.cancel("Setup was cancelled.")),
+      Mode.provide({ interactive: !options.nonInteractive, json })
+    )
+  })
 )

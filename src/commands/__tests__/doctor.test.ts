@@ -3,18 +3,25 @@ import type { PackageJson } from "type-fest"
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
+import * as Fiber from "effect/Fiber"
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
+import { TestClock } from "effect/testing"
 import type { Selection } from "#lib/project/selection.ts"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { makeOxlintLoadFailureLayer } from "#__tests__/oxlint-files.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
-import doctorCommand from "#commands/doctor.ts"
+import doctorCommand, { Report } from "#commands/doctor.ts"
+import { codingAgents } from "#lib/handoff/coding-agents.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { PACKAGE as oxlint } from "#lib/integrations/oxlint/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import {
+  createRunnerTestContext,
+  findingsLeft,
+  getFailure,
   makeHandoffRunner,
   makeLockfileFile,
   nonProbeInvocations,
@@ -116,12 +123,20 @@ const HEALTHY_FILES = {
   }),
 }
 
+function runtimeListener() {
+  // Stands in for the SIGINT listener of the runtime. Only its identity matters.
+}
+
 describe("doctor", () => {
   it.effect.each([
     {
       files: NO_INTEGRATION_FILES,
       layers: [],
-      lines: [],
+      lines: [
+        expect.stringMatching(
+          /^# Adamantite doctor warnings\n[\s\S]*- No Adamantite-managed setup found\. Run `adamantite init` to configure the project\.\n/u
+        ),
+      ],
       name: "no managed integration applies in a non-interactive terminal",
     },
     {
@@ -129,7 +144,7 @@ describe("doctor", () => {
       layers: [promptingLayer],
       lines: [
         INTRO,
-        "✔ No Adamantite-managed setup found. Run `adamantite init` to configure the project.",
+        "▲ No Adamantite-managed setup found. Run `adamantite init` to configure the project.",
         "✅ Doctor finished.",
       ],
       name: "no managed integration applies in an interactive terminal",
@@ -143,7 +158,7 @@ describe("doctor", () => {
     {
       files: HEALTHY_FILES,
       layers: [promptingLayer],
-      lines: [INTRO, "✔ No setup repairs needed.", "✅ Doctor finished."],
+      lines: [INTRO, "✅ Doctor finished."],
       name: "managed state meets the oracle in an interactive terminal",
     },
   ])("report success when $name", ({ files, layers, lines }) =>
@@ -161,36 +176,22 @@ describe("doctor", () => {
     })
   )
 
-  it.effect.each([
-    {
-      layers: [],
-      lines: [
-        "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
-      ],
-      name: "a non-interactive terminal",
-    },
-    {
-      layers: [promptingLayer],
-      lines: [
-        INTRO,
-        "▲ `adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
-        FOUND_ISSUES,
-      ],
-      name: "an interactive terminal",
-    },
-  ])("fail when Adamantite is not installed in $name", ({ layers, lines }) =>
+  it.effect("report a missing install as the only finding", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({ files: { "package.json": manifest({}) } })
       const logLines: unknown[] = []
 
-      const exit = yield* runCommand(doctorCommand, [], {
-        files,
-        layers: [...layers],
-        logLines,
-      })
+      const exit = yield* runCommand(doctorCommand, [], { files, logLines })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual(lines)
+      expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+        [
+          "# Adamantite doctor findings",
+          "## 1. Adamantite is not installed",
+          "## Verify",
+          "## Check the repair",
+        ],
+      ])
     })
   )
 
@@ -209,8 +210,13 @@ describe("doctor", () => {
       const exit = yield* runCommand(doctorCommand, [], { files, logLines })
 
       expect(Exit.isFailure(exit)).toBe(true)
-      expect(logLines).toStrictEqual([
-        "`adamantite` is not installed in this project. Install it before running `adamantite doctor`.",
+      expect(decodeLines(logLines).map((line) => getHeadings(line))).toStrictEqual([
+        [
+          "# Adamantite doctor findings",
+          "## 1. Adamantite is not installed",
+          "## Verify",
+          "## Check the repair",
+        ],
       ])
     })
   )
@@ -417,7 +423,7 @@ describe("doctor", () => {
         INTRO,
         FINDING_NOTE,
         "● Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
-        "✔ All findings were resolved by Claude Code.",
+        "✔ Nothing remains to resolve after the Claude Code session.",
         "✅ Doctor finished.",
       ])
     })
@@ -432,7 +438,7 @@ describe("doctor", () => {
         INTRO,
         FINDING_NOTE,
         "● Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
-        "▲ Doctor still reports 1 unresolved finding after the Claude Code session.",
+        "▲ 1 finding remains after the Claude Code session.",
         FINDING_NOTE,
         FOUND_ISSUES,
       ])
@@ -443,11 +449,11 @@ describe("doctor", () => {
     })
   )
 
-  it.effect("fall back to the prompt copy offer when the agent CLI is missing", () =>
+  it.effect("print and copy the prompt when the agent CLI is missing", () =>
     Effect.gen(function* () {
       // Installed at menu time, gone at spawn time: the race the fallback covers.
       const { exit, logLines, terminal } = yield* runResolution(
-        ["enter", "n"],
+        ["enter"],
         makeHandoffRunner({ agentExit: "not-found" })
       )
 
@@ -457,16 +463,18 @@ describe("doctor", () => {
         FINDING_NOTE,
         "● Handing the terminal to Claude Code. Exit the agent to return to Doctor.",
         "✖ `claude` was not found on PATH. Install Claude Code or copy the prompt instead.",
+        FINDINGS_MARKDOWN,
+        COPIED,
         FOUND_ISSUES,
       ])
-      expect(terminal.output()).toContain("✔ Copy the agent prompt? … no")
+      expect(terminal.copied()).toStrictEqual([logLines[4]])
     })
   )
 
-  it.effect("surface the spawn failure detail and fall back to the copy offer", () =>
+  it.effect("surface the spawn failure detail and print the prompt", () =>
     Effect.gen(function* () {
-      const { exit, logLines, terminal } = yield* runResolution(
-        ["down", "enter", "n"],
+      const { exit, logLines } = yield* runResolution(
+        ["down", "enter"],
         makeHandoffRunner({ agentExit: "spawn-error" })
       )
 
@@ -476,10 +484,142 @@ describe("doctor", () => {
         FINDING_NOTE,
         "● Handing the terminal to Codex. Exit the agent to return to Doctor.",
         expect.stringMatching(/^✖ Failed to start Codex: /u),
+        FINDINGS_MARKDOWN,
+        COPIED,
         FOUND_ISSUES,
       ])
-      expect(terminal.output()).toContain("✔ Copy the agent prompt? … no")
     })
+  )
+
+  // The session inherits stdin, so a Ctrl-C reaches the agent and Adamantite. Adamantite must not
+  // stop the agent mid-edit.
+  it.effect("ignore SIGINT while the agent session runs and restore the listeners after it", () =>
+    Effect.gen(function* () {
+      const listenersBefore = process.listeners("SIGINT")
+
+      process.on("SIGINT", runtimeListener)
+
+      let listenersDuringSession: unknown[] = []
+
+      yield* runResolution(
+        ["enter", "n"],
+        makeHandoffRunner({
+          onAgentRun: () => {
+            listenersDuringSession = process.listeners("SIGINT")
+          },
+        })
+      )
+
+      const listenersAfterSession = process.listeners("SIGINT")
+      process.removeListener("SIGINT", runtimeListener)
+
+      expect({
+        after: listenersAfterSession,
+        during: listenersDuringSession.includes(runtimeListener),
+        duringCount: listenersDuringSession.length,
+      }).toStrictEqual({
+        after: [...listenersBefore, runtimeListener],
+        during: false,
+        duringCount: 1,
+      })
+    })
+  )
+
+  it.effect(
+    "list the installed agents in the catalog order when the probes finish out of order",
+    () =>
+      Effect.gen(function* () {
+        const terminal = createTerminalTestContext([
+          "down",
+          "down",
+          "down",
+          "down",
+          "down",
+          "down",
+          "down",
+          "enter",
+        ])
+
+        // Later catalog entries answer sooner, so the probes finish in the reverse of the menu order.
+        const runner = createRunnerTestContext({
+          implementation: ({ command }) =>
+            Effect.sleep(
+              `${codingAgents.length - codingAgents.findIndex((agent) => agent.command === command)} seconds`
+            ).pipe(Effect.as(ChildProcessSpawner.ExitCode(0))),
+        })
+
+        const fiber = yield* runCommand(doctorCommand, [], {
+          files: makeFindingsFixture(),
+          layers: [runner.layer, promptingLayer],
+          terminal,
+        }).pipe(Effect.forkChild)
+
+        yield* TestClock.adjust("9 seconds")
+        yield* Fiber.join(fiber)
+
+        expect(terminal.output()).toContain(
+          codingAgents.map((agent) => `Hand off to ${agent.name} `).join("\n  ")
+        )
+      })
+  )
+
+  it.effect(
+    "print the assessment as JSON that decodes with the report schema, and ask nothing",
+    () =>
+      Effect.gen(function* () {
+        const logLines: unknown[] = []
+        const errorLines: unknown[] = []
+        const runner = makeHandoffRunner()
+        const terminal = createTerminalTestContext()
+
+        const exit = yield* runCommand(doctorCommand, ["--json"], {
+          errorLines,
+          files: makeFindingsFixture(),
+          // A terminal that can prompt, so the test shows that `--json` opens no menu.
+          layers: [runner.layer, promptingLayer],
+          logLines,
+          terminal,
+        })
+
+        const [document] = decodeLines(logLines)
+        const report = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(document)
+
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("doctor"))
+        expect({
+          findings: report.findings.map(({ id, integration, title }) => ({
+            id,
+            integration,
+            title,
+          })),
+          lines: logLines.length,
+          packageActions: report.packageActions,
+          schemaVersion: report.schemaVersion,
+          selection: report.selection,
+          warnings: report.warnings,
+        }).toStrictEqual({
+          findings: [
+            { id: "missing-knip-config", integration: "knip", title: "Missing knip configuration" },
+          ],
+          lines: 1,
+          packageActions: [],
+          schemaVersion: 1,
+          selection: ANALYZE_SELECTION,
+          warnings: [],
+        })
+        expect(report.findings[0]).toMatchObject({
+          currentState: expect.stringContaining("`knip.config.ts` does not exist"),
+          goal: expect.arrayContaining([expect.any(String)]),
+        })
+        expect({
+          errors: errorLines,
+          invocations: runner.invocations,
+          output: terminal.output(),
+        }).toStrictEqual({
+          errors: [],
+          invocations: [],
+          output: "",
+        })
+      })
   )
 
   it.effect("fail and record the cancellation when the resolve prompt is cancelled", () =>

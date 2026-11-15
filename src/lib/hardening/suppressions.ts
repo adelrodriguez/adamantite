@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
+import * as Schema from "effect/Schema"
 import type { ProjectPath } from "#lib/hardening/project-files.ts"
 import { listLintedFiles } from "#lib/integrations/oxlint/files.ts"
 import { findSuppressions, SOURCE_FILE } from "#lib/project/suppressions.ts"
@@ -11,16 +12,18 @@ import { readFileIfFile } from "#lib/shared/filesystem.ts"
 /**
  * The comments that turn off one rule, or all rules.
  */
-export interface RuleSuppressions {
+export const RuleSuppressions = Schema.Struct({
   /**
    * Each comment as `<file>:<line>`, with the file relative to the project root.
    */
-  readonly locations: readonly string[]
+  locations: Schema.Array(Schema.String),
   /**
    * The rule, or none for a comment that names no rule and so turns off all rules.
    */
-  readonly rule: Option.Option<string>
-}
+  rule: Schema.OptionFromNullOr(Schema.String),
+})
+
+export type RuleSuppressions = typeof RuleSuppressions.Type
 
 /**
  * Counts the disable comments of each rule in the files that Oxlint lints in `scope`, a folder

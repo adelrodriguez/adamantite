@@ -5,11 +5,13 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
+import * as Schema from "effect/Schema"
 import type { InitOptions } from "#commands/init/options.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
+import { Report } from "#commands/setup.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/knip/config.ts"
 import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
@@ -23,6 +25,7 @@ import { PACKAGE as sherif } from "#lib/integrations/sherif/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { INIT_EDITORS, LINT_PRESETS, TYPESCRIPT_PRESET_NAMES } from "#lib/project/selection.ts"
+import * as Setup from "#lib/setup/index.ts"
 import { InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
@@ -30,7 +33,11 @@ import {
   type DependencyInstallerTestContext,
   createDependencyInstallerTestContext,
   createRunnerTestContext,
+  findingsLeft,
+  getFailure,
   hashContent,
+  makeHandoffRunner,
+  nonProbeInvocations,
   promptingLayer,
   readLockfile,
   runCommand,
@@ -86,6 +93,10 @@ function pickOne<const T>(choices: readonly T[], choice: T): TestKey[] {
   return [...Array.from({ length: choices.indexOf(choice) }, (): TestKey => "down"), "enter"]
 }
 
+// After setup, the resolution menu offers the repair of the findings that remain. No agent CLI is
+// installed, so the cursor passes the prompt copy and finishes without an agent.
+const FINISH_WITHOUT_AGENT: readonly TestKey[] = ["down", "enter"]
+
 function createInitTestContext(files?: Record<string, string>) {
   return createFileSystemTestContext({
     files: { "package.json": basePackageJson, ...files },
@@ -122,6 +133,7 @@ function runFreshSetup() {
       // Decline the GitHub Actions workflow and the agent guidance.
       "n",
       "n",
+      ...FINISH_WITHOUT_AGENT,
     ])
 
     const installer = createDependencyInstallerTestContext()
@@ -187,7 +199,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const { exit, files, installer } = yield* runFreshSetup()
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(listInstalls(installer)).toStrictEqual({
           options: [{ silent: true, workspace: false }],
           packages: sortPackages([
@@ -211,7 +223,7 @@ describe("init", () => {
         Effect.gen(function* () {
           const { exit, files } = yield* runFreshSetup()
 
-          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
           expect(readLockfile(files)).toStrictEqual({
             schemaVersion: 1,
             selection: {
@@ -248,7 +260,7 @@ describe("init", () => {
           { files, layers: [installer.layer] }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(readLockfile(files).selection).toStrictEqual({
           agents: false,
           ci: null,
@@ -264,7 +276,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const { exit, files } = yield* runFreshSetup()
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(files.list()).toStrictEqual([
           ".adamantite/adamantite-lock.json",
           ".vscode/extensions.json",
@@ -302,6 +314,7 @@ describe("init", () => {
         ...pickMany(INIT_EDITORS, []),
         "n",
         "n",
+        ...FINISH_WITHOUT_AGENT,
       ])
 
       const exit = yield* runCommand(initCommand, [], {
@@ -310,7 +323,7 @@ describe("init", () => {
         terminal,
       })
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(
         lintPresets.filter((preset) => !terminal.output().includes(preset.label))
       ).toStrictEqual([])
@@ -329,6 +342,7 @@ describe("init", () => {
         ...pickMany(INIT_EDITORS, ["vscode", "zed"]),
         "n",
         "n",
+        ...FINISH_WITHOUT_AGENT,
       ])
 
       const exit = yield* runCommand(initCommand, [], {
@@ -337,7 +351,7 @@ describe("init", () => {
         terminal,
       })
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(terminal.output()).toContain(
         "Universal - creates .vscode/settings.json and .vscode/extensions.json for VS Code, Cursor, Windsurf, and more"
       )
@@ -369,7 +383,7 @@ describe("init", () => {
         { files, layers: [installer.layer], logLines }
       )
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual([
         "tanstack",
         "architecture",
@@ -394,7 +408,7 @@ describe("init", () => {
           { files, layers: [installer.layer], logLines }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(listInstalls(installer).packages).toContain(`@shadcn/lint@${shadcnLint.version}`)
         expect(files.read("oxlint.config.ts")).toContain(
           'import tailwind from "adamantite/lint/tailwind"'
@@ -422,7 +436,7 @@ describe("init", () => {
           { files, layers: [installer.layer], logLines }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(listInstalls(installer).packages).toContain(
           `oxlint-plugin-react-doctor@${reactDoctor.version}`
         )
@@ -436,7 +450,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const { exit, files, installer, runner } = yield* runEffectSetup()
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(listInstalls(installer).packages).toContain(`@effect/tsgo@${effectTsgo.version}`)
         expect(readJson(files, "package.json")).not.toHaveProperty("scripts.prepare")
         expect(runner.invocations).toStrictEqual([])
@@ -447,7 +461,7 @@ describe("init", () => {
       Effect.gen(function* () {
         const { exit, files } = yield* runEffectSetup()
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["effect"])
         expect(readJson(files, "tsconfig.json")).toStrictEqual({
           compilerOptions: {
@@ -471,7 +485,7 @@ describe("init", () => {
           { files, layers: [installer.layer, runner.layer], logLines }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(files.read("knip.config.ts")).toContain(
           "ignoreDependencies: ignoreDependencies.effect,"
         )
@@ -497,7 +511,7 @@ describe("init", () => {
           { files, layers: [installer.layer, runner.layer], logLines }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(readJson(files, "package.json")).toMatchObject({ scripts: { prepare: "husky" } })
       })
     )
@@ -534,7 +548,7 @@ describe("init", () => {
           { files, layers: [installer.layer, runner.layer], logLines }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         // Init keeps both files with comments and still creates the Zed settings.
         expect({
           tsconfig: files.read("tsconfig.json"),
@@ -566,6 +580,7 @@ describe("init", () => {
           ...pickMany(INIT_EDITORS, []),
           "n",
           "n",
+          ...FINISH_WITHOUT_AGENT,
         ])
 
         const installer = createDependencyInstallerTestContext()
@@ -577,7 +592,7 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(files.read("oxlint.config.ts")).toContain(
           'import react from "adamantite/lint/react"'
         )
@@ -599,6 +614,7 @@ describe("init", () => {
           ...pickMany(INIT_EDITORS, []),
           "n",
           "n",
+          ...FINISH_WITHOUT_AGENT,
         ])
 
         const installer = createDependencyInstallerTestContext()
@@ -609,7 +625,7 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(terminal.output()).toContain(
           "? The jest and vitest presets report the same defects. Which one should Adamantite use? › \n❯ jest \n  vitest "
         )
@@ -674,7 +690,7 @@ describe("init", () => {
             logLines,
           })
 
-          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
           expect(listInstalls(installer).options).toStrictEqual([{ silent: true, workspace }])
         })
       )
@@ -693,6 +709,7 @@ describe("init", () => {
           ...pickMany(INIT_EDITORS, ["zed"]),
           "n",
           "n",
+          ...FINISH_WITHOUT_AGENT,
         ])
 
         const installer = createDependencyInstallerTestContext()
@@ -703,7 +720,7 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(listInstalls(installer)).toStrictEqual({
           options: [{ silent: true, workspace: false }],
           packages: sortPackages([
@@ -832,7 +849,7 @@ describe("init", () => {
             logLines,
           })
 
-          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
           expect(listInstalls(installer)).toStrictEqual({
             options: [{ silent: true, workspace: false }],
             packages: sortPackages([
@@ -871,7 +888,7 @@ describe("init", () => {
           { files, layers: [installer.layer], logLines, terminal }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(terminal.output()).toBe("")
         expect(listInstalls(installer)).toStrictEqual({
           options: [{ silent: true, workspace: false }],
@@ -947,7 +964,7 @@ describe("init", () => {
           { files, layers: [installer.layer], logLines }
         )
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(getExtendedLintPresets(files.read("oxlint.config.ts"))).toStrictEqual(["react"])
       })
     )
@@ -1116,6 +1133,7 @@ describe("init", () => {
           ...pickMany(INIT_EDITORS, ["zed"]),
           "enter",
           "n",
+          ...FINISH_WITHOUT_AGENT,
         ])
 
         const installer = createDependencyInstallerTestContext()
@@ -1127,7 +1145,7 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(files.read(".github/workflows/adamantite.yml")).toContain("command: bun run check")
       })
     )
@@ -1150,6 +1168,7 @@ describe("init", () => {
           "n",
           ...pickMany(INIT_EDITORS, []),
           "n",
+          ...FINISH_WITHOUT_AGENT,
         ])
 
         const installer = createDependencyInstallerTestContext()
@@ -1161,7 +1180,7 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
       })
     )
@@ -1178,6 +1197,7 @@ describe("init", () => {
           "n",
           ...pickMany(INIT_EDITORS, []),
           "n",
+          ...FINISH_WITHOUT_AGENT,
         ])
 
         const installer = createDependencyInstallerTestContext({
@@ -1191,7 +1211,7 @@ describe("init", () => {
           terminal,
         })
 
-        expect(Exit.isSuccess(exit)).toBe(true)
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
         expect(terminal.output()).not.toContain("Add a GitHub Actions workflow")
         expect(logLines).toContainEqual(
           "● Adamantite cannot generate a GitHub Actions workflow for `aube`. It supports bun, deno, npm, pnpm, and yarn."
@@ -1223,6 +1243,133 @@ describe("init", () => {
         ])
         expect(installer.calls).toStrictEqual([])
       })
+    )
+  })
+
+  describe("repair after the setup", () => {
+    // Setup keeps a `tsconfig.json` that it did not write, so the preset is missing after it.
+    const USER_TSCONFIG = '{ "compilerOptions": { "strict": true } }\n'
+    const PRESET_TSCONFIG = '{ "extends": "adamantite/tsconfig" }\n'
+
+    it.effect("exit 1 and print the repair prompt without a terminal when findings remain", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext({ "tsconfig.json": USER_TSCONFIG })
+        const logLines: unknown[] = []
+
+        const exit = yield* runCommand(
+          initCommand,
+          ["--non-interactive", "--typescript", "tsconfig"],
+          { files, layers: [createDependencyInstallerTestContext().layer], logLines }
+        )
+
+        expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
+        expect(logLines.at(-1)).toMatch(
+          /^# Adamantite doctor findings\n[\s\S]*## 1\. Missing TypeScript preset\n/u
+        )
+      })
+    )
+
+    it.effect(
+      "hand the findings off after the setup, and succeed when the session resolves them",
+      () =>
+        Effect.gen(function* () {
+          const files = createInitTestContext({ "tsconfig.json": USER_TSCONFIG })
+          const logLines: unknown[] = []
+
+          const runner = makeHandoffRunner({
+            onAgentRun: () => {
+              files.write("tsconfig.json", PRESET_TSCONFIG)
+            },
+          })
+
+          const exit = yield* runCommand(initCommand, [], {
+            files,
+            layers: [createDependencyInstallerTestContext().layer, runner.layer, promptingLayer],
+            logLines,
+            terminal: createTerminalTestContext([
+              ...pickMany(SCRIPT_ORDER, []),
+              "enter",
+              ...pickOne(TYPESCRIPT_PRESET_NAMES, "tsconfig"),
+              ...pickMany(INIT_EDITORS, []),
+              "n",
+              // The resolution menu lists the installed agents first.
+              "enter",
+            ]),
+          })
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect(nonProbeInvocations(runner)).toStrictEqual([
+            expect.objectContaining({
+              args: [
+                expect.stringMatching(
+                  /^# Adamantite doctor findings\n[\s\S]*## 1\. Missing TypeScript preset\n/u
+                ),
+              ],
+              command: "claude",
+            }),
+          ])
+          expect(logLines.slice(-3)).toStrictEqual([
+            "● Handing the terminal to Claude Code. Exit the agent to return to Init.",
+            "✔ Nothing remains to resolve after the Claude Code session.",
+            "💠 Setup finished.",
+          ])
+        })
+    )
+
+    it.effect(
+      "print the setup and the assessment as JSON that decodes with the report schema",
+      () =>
+        Effect.gen(function* () {
+          const files = createInitTestContext()
+          const logLines: unknown[] = []
+          const terminal = createTerminalTestContext()
+
+          // `--json` sets up from the flags, without `--non-interactive`, and asks nothing.
+          const exit = yield* runCommand(initCommand, ["--json", "--typescript", "tsconfig"], {
+            files,
+            layers: [createDependencyInstallerTestContext().layer, promptingLayer],
+            logLines,
+            terminal,
+          })
+
+          expect(Exit.isSuccess(exit)).toBe(true)
+          expect({ lines: logLines.length, output: terminal.output() }).toStrictEqual({
+            lines: 1,
+            output: "",
+          })
+          expect(
+            yield* Schema.decodeUnknownEffect(Schema.fromJsonString(Report))(logLines[0])
+          ).toStrictEqual({
+            assessment: {
+              applicableIntegrations: ["tsconfig"],
+              findings: [],
+              packageActions: [],
+              selection: {
+                agents: false,
+                ci: null,
+                editors: [],
+                presets: [],
+                scripts: [],
+                typescript: "tsconfig",
+              },
+              warnings: [],
+            },
+            schemaVersion: 1,
+            setup: {
+              files: [Setup.FileWrite.cases.Created.make({ path: "tsconfig.json" })],
+              installs: [
+                {
+                  description: expect.any(String),
+                  package: "adamantite",
+                  targetVersion: getPackageVersion(),
+                  type: "install_package",
+                },
+              ],
+              lockfile: "written",
+              scripts: [],
+            },
+          })
+        })
     )
   })
 })

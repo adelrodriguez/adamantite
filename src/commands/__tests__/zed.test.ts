@@ -8,7 +8,13 @@ import {
   effectEditorResolver,
 } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "./command-test-helpers.ts"
 import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const SETTINGS = ".zed/settings.json"
@@ -27,7 +33,7 @@ describe("Zed setup", () => {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(SETTINGS)).toContain('"node_modules/adamantite/dist/oxlint.js"')
       expect(readLockfile(files).written[SETTINGS]).toBe(hashContent(files.read(SETTINGS)))
       expect(output).toContain(`✔ \`${SETTINGS}\` created.`)
@@ -82,9 +88,9 @@ describe("Zed setup", () => {
       const doctor = yield* runLifecycle("doctor", files)
 
       expect({
+        failure: getFailure(init.exit),
         settings: files.read(SETTINGS),
-        succeeded: Exit.isSuccess(init.exit),
-      }).toStrictEqual({ settings: own, succeeded: true })
+      }).toStrictEqual({ failure: findingsLeft("init"), settings: own })
       expect(init.output).toContain(`● \`${SETTINGS}\` kept, because it has changes`)
       expect(doctor.output).toContain(`\`${SETTINGS}\` sets \`lsp.oxlint.binary\` to no value.`)
     })

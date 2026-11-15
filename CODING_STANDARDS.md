@@ -55,13 +55,12 @@ Effect.gen(function* () {
 // Prefer: the installed-agent detection test advances the clock first.
 Effect.gen(function* () {
   yield* TestClock.adjust("9 seconds")
-  const installed = yield* Fiber.join(fiber)
-  return installed
+  yield* Fiber.join(fiber)
 })
 ```
 
-The example comes from
-[coding-agents.test.ts](src/lib/handoff/__tests__/coding-agents.test.ts).
+The example comes from the agent order test in
+[doctor.test.ts](src/commands/__tests__/doctor.test.ts).
 [PR #375](https://github.com/adelrodriguez/adamantite/pull/375) introduced the Effect Vitest setup
 and this repository instruction.
 
@@ -120,14 +119,13 @@ modules, the plugin registry, and shared infrastructure.
 
 ### Keep lifecycle writes within their command
 
-Keep `init` and `update` deterministic: each applies its selection through `Setup.apply` and
-reports the assessment afterward, without choosing its work from it. Keep `assess` and `doctor`
-read-only. A finding describes a repair for an agent or a human, and does not authorize another
-command to make that repair.
+Keep `init` and `update` deterministic: each applies its selection through `Setup.apply`, then
+offers the repair of the findings that remain through `Resolution.offer`, without choosing its
+work from them. Keep `assess` and `doctor` read-only. A finding describes a repair for an agent or
+a human, and does not authorize another command to make that repair.
 
-Spot it: An assessment repairs a file, init or update chooses its work from Doctor findings, an
-update fails because unrelated findings remain, or code outside `src/lib/setup/` writes a file
-of the target project.
+Spot it: An assessment repairs a file, init or update chooses its work from Doctor findings, or
+code outside `src/lib/setup/` writes a file of the target project.
 
 ```ts
 // Avoid: Doctor installed packages before #393.

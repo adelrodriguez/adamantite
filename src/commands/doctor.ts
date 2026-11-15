@@ -1,178 +1,49 @@
 import process from "node:process"
 import * as Command from "effect/cli/Command"
-import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
-import * as Console from "effect/Console"
-import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
-import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import {
-  assessProject,
-  assessUnreadableLockfile,
+  ProjectAssessment,
+  readAssessment,
   renderAssessmentMarkdown,
-  type ProjectAssessment,
 } from "#lib/assessment/index.ts"
-import { readPackageJson } from "#lib/project/package-json.ts"
-import { readProject } from "#lib/project/project.ts"
-import { CommandFailed } from "#lib/shared/errors.ts"
 import { getPackageVersion } from "#lib/shared/version.macro.ts" with { type: "macro" }
-import { printFindings } from "#terminal/findings.ts"
+import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
-import { AgentSessionEnded, chooseResolution, offerPromptCopy } from "#terminal/resolution-menu.ts"
+import * as Resolution from "#terminal/resolution.ts"
 
 const version = getPackageVersion()
 
-const NOT_INSTALLED_MESSAGE =
-  "`adamantite` is not installed in this project. Install it before running `adamantite doctor`."
-
 /**
- * What Doctor found. `Unmanaged` means that no managed integration applies, and `Converged` means
- * that the applicable integrations have no finding. A converged project can still have warnings.
+ * What `doctor --json` prints: the assessment of the project.
  */
-type DoctorOutcome =
-  | { readonly _tag: "Converged"; readonly assessment: ProjectAssessment }
-  | { readonly _tag: "NeedsRepair"; readonly assessment: ProjectAssessment }
-  | { readonly _tag: "NotInstalled" }
-  | { readonly _tag: "Unmanaged" }
+export const Report = Schema.Struct({
+  schemaVersion: Schema.Literal(1),
+  ...ProjectAssessment.fields,
+})
 
-const {
-  $match: matchOutcome,
-  Converged,
-  NeedsRepair,
-  NotInstalled,
-  Unmanaged,
-} = Data.taggedEnum<DoctorOutcome>()
-
-// A finding needs repair even when no integration applies, as when the lockfile does not read.
-function classifyAssessment(assessment: ProjectAssessment): DoctorOutcome {
-  if (assessment.findings.length > 0) {
-    return NeedsRepair({ assessment })
-  }
-
-  return assessment.applicableIntegrations.length === 0 ? Unmanaged() : Converged({ assessment })
-}
-
-// Doctor hands a lockfile that does not read to an agent, so it is a finding and not a failure.
-const assess = (cwd: string) =>
-  readProject(cwd).pipe(
-    Effect.flatMap(assessProject),
-    Effect.catchTag(["InvalidLockfile", "UnsupportedLockfile"], (error) =>
-      Effect.succeed(assessUnreadableLockfile(error))
-    )
-  )
-
-function doctorFailed() {
-  return new CommandFailed({ command: "doctor", exitCode: ChildProcessSpawner.ExitCode(1) })
-}
-
-const finish = (message: string) =>
-  Effect.gen(function* () {
-    yield* Output.success(message)
-    yield* Output.outro("✅ Doctor finished.")
-  })
-
-// The interactive report shows each assessment warning before the outcome.
-const logWarnings = (assessment: ProjectAssessment) =>
-  Effect.forEach(assessment.warnings, (warning) => Output.warning(warning), {
-    concurrency: 1,
-    discard: true,
-  })
-
-export default Command.make("doctor").pipe(
+export default Command.make("doctor", { json: Mode.json }).pipe(
   Command.withDescription("Check Adamantite setup and report what needs repair"),
-  Command.withHandler(() =>
+  Command.withHandler(({ json }) =>
     Effect.gen(function* () {
       const cwd = process.cwd()
-      const { canPrompt } = yield* TerminalCapabilities.TerminalCapabilities
 
-      if (canPrompt) {
-        yield* Output.intro("💠 adamantite doctor")
-      }
+      yield* Output.intro("💠 adamantite doctor")
 
-      const failWithFindings = Effect.gen(function* () {
-        yield* Output.outro("⚠️ Doctor found issues.")
+      const assessment = yield* readAssessment(cwd)
 
-        return yield* doctorFailed()
+      yield* Resolution.offer({
+        command: "doctor",
+        cwd,
+        document: Output.json(Report, { schemaVersion: 1, ...assessment }),
+        message: "How do you want to resolve these findings?",
+        prompt: renderAssessmentMarkdown(assessment, version),
+        subject: "findings",
+        verify: Effect.map(readAssessment(cwd), Resolution.fromAssessment),
+        work: Resolution.Repair({ remaining: Resolution.fromAssessment(assessment) }),
       })
 
-      const resolveFindings = Effect.fn("resolveFindings")(function* (
-        assessment: ProjectAssessment
-      ) {
-        yield* logWarnings(assessment)
-        yield* printFindings(assessment.findings)
-
-        const resolution = yield* chooseResolution({
-          command: "Doctor",
-          cwd,
-          message: "How do you want to resolve these findings?",
-          prompt: renderAssessmentMarkdown(assessment, version),
-          subject: "findings",
-        })
-
-        if (!(resolution instanceof AgentSessionEnded)) {
-          return yield* failWithFindings
-        }
-
-        const { agent } = resolution
-        const after = yield* assess(cwd)
-
-        if (after.findings.length === 0) {
-          return yield* finish(`All findings were resolved by ${agent.name}.`)
-        }
-
-        yield* Output.warning(
-          `Doctor still reports ${after.findings.length.toLocaleString("en-US")} unresolved ${after.findings.length === 1 ? "finding" : "findings"} after the ${agent.name} session.`
-        )
-        yield* printFindings(after.findings)
-        yield* offerPromptCopy(renderAssessmentMarkdown(after, version))
-
-        return yield* failWithFindings
-      })
-
-      const reportInteractive = matchOutcome({
-        Converged: ({ assessment }) =>
-          logWarnings(assessment).pipe(Effect.andThen(finish("No setup repairs needed."))),
-        NeedsRepair: ({ assessment }) => resolveFindings(assessment),
-        NotInstalled: () =>
-          Output.warning(NOT_INSTALLED_MESSAGE).pipe(Effect.andThen(failWithFindings)),
-        Unmanaged: () =>
-          finish(
-            "No Adamantite-managed setup found. Run `adamantite init` to configure the project."
-          ),
-      })
-
-      // Without a terminal, Doctor prints only the Markdown that an agent reads.
-      const reportPlain = matchOutcome({
-        Converged: ({ assessment }) =>
-          assessment.warnings.length > 0
-            ? Console.log(renderAssessmentMarkdown(assessment, version))
-            : Effect.void,
-        NeedsRepair: ({ assessment }) =>
-          Console.log(renderAssessmentMarkdown(assessment, version)).pipe(
-            Effect.andThen(doctorFailed())
-          ),
-        NotInstalled: () => Console.log(NOT_INSTALLED_MESSAGE).pipe(Effect.andThen(doctorFailed())),
-        Unmanaged: () => Effect.void,
-      })
-
-      // The root manifest decides whether Doctor assesses at all, so a project without Adamantite
-      // gets the install instruction even when its workspace packages do not read. The assessment
-      // reads its own snapshot.
-      const packageJson = yield* readPackageJson(cwd)
-
-      const outcome =
-        packageJson.devDependencies?.adamantite || packageJson.dependencies?.adamantite
-          ? classifyAssessment(yield* assess(cwd))
-          : NotInstalled()
-
-      yield* canPrompt ? reportInteractive(outcome) : reportPlain(outcome)
-    }).pipe(
-      Effect.catchTag("QuitError", () =>
-        Effect.gen(function* () {
-          yield* Output.cancel("Doctor was cancelled. The findings remain.")
-
-          return yield* doctorFailed()
-        })
-      )
-    )
+      yield* Output.outro("✅ Doctor finished.")
+    }).pipe(Mode.provide({ json }))
   )
 )

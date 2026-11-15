@@ -3,9 +3,10 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
+import * as Schema from "effect/Schema"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { createTerminalTestContext } from "#__tests__/terminal.ts"
-import ruleCommand, { renderTrial } from "#commands/rule.ts"
+import ruleCommand, { AstReport, renderTrial } from "#commands/rule.ts"
 import { CurrentSetting, ErrorSetting } from "#lib/hardening/trial.ts"
 import { toCustomRuleStub } from "#lib/project/custom-rules/index.ts"
 import {
@@ -590,6 +591,31 @@ describe("rule ast", () => {
       expect(output).toContain('"type": "TSAsExpression"')
       expect(output).toContain('"type": "BinaryExpression"')
       expect(output).not.toContain("ParenthesizedExpression")
+    })
+  )
+
+  it.effect("print the file and its tree as JSON that decodes with the report schema", () =>
+    Effect.gen(function* () {
+      const files = createFileSystemTestContext({
+        files: { "src/value.ts": "export const value = (1 + 2) as number\n" },
+      })
+
+      const logLines: unknown[] = []
+
+      const exit = yield* runCommand(ruleCommand, ["ast", "src/value.ts", "--json"], {
+        files,
+        logLines,
+      })
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(logLines).toHaveLength(1)
+      expect(
+        yield* Schema.decodeUnknownEffect(Schema.fromJsonString(AstReport))(logLines[0])
+      ).toMatchObject({
+        file: "src/value.ts",
+        program: { body: [{ type: "ExportNamedDeclaration" }], type: "Program" },
+        schemaVersion: 1,
+      })
     })
   )
 

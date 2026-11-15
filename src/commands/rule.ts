@@ -15,8 +15,8 @@ import {
   CurrentSetting,
   ErrorSetting,
   parseTrialCase,
-  type TrialCaseResult,
-  type TrialSetting,
+  TrialCaseResult,
+  TrialSetting,
   tryRule,
 } from "#lib/hardening/trial.ts"
 import {
@@ -33,18 +33,30 @@ import { CommandFailed, FailedToParseSource, InvalidTrialOptions } from "#lib/sh
 import { readFile } from "#lib/shared/filesystem.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import { CUSTOM_RULES_SECTION } from "#lib/shared/skill.ts"
+import * as Mode from "#terminal/mode.ts"
 import * as Output from "#terminal/output.ts"
 
 const astFile = Argument.File("file", { mustExist: true }).pipe(
   Argument.withDescription("The JavaScript or TypeScript file to parse")
 )
 
-const ast = Command.make("ast", { file: astFile }).pipe(
+/**
+ * What `rule ast --json` prints: the file, relative to the current directory, and its syntax tree
+ * in the ESTree shape that Oxlint gives rules.
+ */
+export const AstReport = Schema.Struct({
+  file: Schema.String,
+  program: Schema.Unknown,
+  schemaVersion: Schema.Literal(1),
+})
+
+const ast = Command.make("ast", { file: astFile, json: Mode.json }).pipe(
   Command.withDescription(
     "Print the syntax tree Oxlint rules use, with node names for custom rules"
   ),
-  Command.withHandler(({ file }) =>
+  Command.withHandler(({ file, json }) =>
     Effect.gen(function* () {
+      const path = yield* Path.Path
       const content = yield* readFile(file)
       // Oxlint gives rules an AST without parenthesized expressions.
       const result = parseSync(file, content, { preserveParens: false })
@@ -56,8 +68,12 @@ const ast = Command.make("ast", { file: astFile }).pipe(
         })
       }
 
-      yield* Console.log(yield* formatJson(result.program))
-    })
+      yield* Output.result(
+        AstReport,
+        { file: path.relative(process.cwd(), file), program: result.program, schemaVersion: 1 },
+        yield* formatJson(result.program)
+      )
+    }).pipe(Mode.provide({ json }))
   )
 )
 
@@ -239,7 +255,7 @@ const current = Flag.Boolean("current").pipe(
 )
 
 function describeSetting(rule: string, setting: TrialSetting) {
-  return setting instanceof CurrentSetting
+  return Schema.is(CurrentSetting)(setting)
     ? `\`${rule}\` as the project config sets it`
     : `\`${rule}\` at ${JSON.stringify(["error", ...setting.options])}`
 }
@@ -296,9 +312,21 @@ export function renderTrial(
   ].join("\n")
 }
 
+/**
+ * What `rule try --json` prints: the rule, the setting of the trial, and what the rule reported on
+ * each case.
+ */
+export const TrialReport = Schema.Struct({
+  results: Schema.Array(TrialCaseResult),
+  rule: Schema.String,
+  schemaVersion: Schema.Literal(1),
+  setting: TrialSetting,
+})
+
 const trial = Command.make("try", {
   accept,
   current,
+  json: Mode.json,
   options: trialOptions,
   report,
   rule: trialRule,
@@ -306,8 +334,10 @@ const trial = Command.make("try", {
   Command.withDescription(
     "Test a rule against cases in a project copy. Exit codes: 0 for expected results, 1 for a mismatch, and 2 if a case could not be checked. Project files stay unchanged"
   ),
-  Command.withHandler(({ accept, current, options, report, rule }) =>
+  Command.withHandler((flags) =>
     Effect.gen(function* () {
+      const { accept, current, options, report, rule } = flags
+
       const setting = current
         ? new CurrentSetting()
         : new ErrorSetting({ options: Option.getOrElse(options, () => []) })
@@ -347,7 +377,11 @@ const trial = Command.make("try", {
         )
       )
 
-      yield* Console.log(renderTrial(rule, setting, results))
+      yield* Output.result(
+        TrialReport,
+        { results, rule, schemaVersion: 1, setting },
+        renderTrial(rule, setting, results)
+      )
 
       if (!results.every((result) => isAsExpected(result))) {
         return yield* new CommandFailed({
@@ -355,7 +389,7 @@ const trial = Command.make("try", {
           exitCode: ChildProcessSpawner.ExitCode(1),
         })
       }
-    })
+    }).pipe(Mode.provide({ json: flags.json }))
   )
 )
 

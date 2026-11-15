@@ -20,6 +20,8 @@ import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson } from "#lib/shared/json.ts"
 import {
   createDependencyInstallerTestContext,
+  findingsLeft,
+  getFailure,
   hashContent,
   makeLockfileFile,
   readLockfile,
@@ -101,7 +103,7 @@ describe("VS Code setup", () => {
       const files = makeProject()
       const { exit, output } = yield* run("init", files, INIT_ARGS)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(EXTENSIONS)).toBe(RECOMMENDATIONS)
       expect(files.read(SETTINGS)).toContain(
         '"oxc.path.oxlint": "node_modules/adamantite/dist/oxlint.js"'
@@ -123,7 +125,7 @@ describe("VS Code setup", () => {
 
       const { exit, output } = yield* run("init", files, INIT_ARGS)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(LOCKFILE_PATH)).toBe(lockfile)
       expect(listHashes(files)).toStrictEqual(before)
       expect(output).toContain(
@@ -150,9 +152,9 @@ describe("VS Code setup", () => {
 
       expect({
         content: files.read(EXTENSIONS),
+        failure: getFailure(init.exit),
         recorded: Object.hasOwn(readLockfile(files).written, EXTENSIONS),
-        succeeded: Exit.isSuccess(init.exit),
-      }).toStrictEqual({ content: edited, recorded: false, succeeded: true })
+      }).toStrictEqual({ content: edited, failure: findingsLeft("init"), recorded: false })
       expect(init.output).toContain(
         `● \`${EXTENSIONS}\` kept, because it has changes that Adamantite did not write.`
       )
@@ -177,7 +179,7 @@ describe("VS Code setup", () => {
 
       const init = yield* run("init", files, INIT_ARGS)
 
-      expect(Exit.isSuccess(init.exit)).toBe(true)
+      expect(getFailure(init.exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(SETTINGS)).toBe(settings)
       expect(init.output).not.toContain("comments or trailing commas")
 
@@ -258,16 +260,16 @@ describe("VS Code setup", () => {
 
         expect({
           extensions: files.read(EXTENSIONS),
+          failure: getFailure(exit),
           recorded: Object.keys(readLockfile(files).written).filter((file) =>
             file.startsWith(".vscode/")
           ),
           settings: files.exists(SETTINGS),
-          succeeded: Exit.isSuccess(exit),
         }).toStrictEqual({
           extensions: '{ "recommendations": [] }\n',
+          failure: findingsLeft("update"),
           recorded: [],
           settings: false,
-          succeeded: true,
         })
         expect(output).toContain(
           `✔ \`${SETTINGS}\` deleted, because the setup no longer includes it.`
@@ -286,7 +288,7 @@ describe("the Effect editor SDK", () => {
 
       const { exit } = yield* run("init", files, INIT_ARGS, true)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(SETTINGS)).toMatch(
         /"js\/ts\.tsdk\.path": "node_modules\/\.cache\/adamantite\/effect"[\s\S]*"effecttsgo\/global-json-in-effect": \{/u
       )
@@ -349,7 +351,7 @@ describe("the Effect editor SDK", () => {
 
       const update = yield* run("update", files, [], true)
 
-      expect(Exit.isSuccess(update.exit)).toBe(true)
+      expect(getFailure(update.exit)).toStrictEqual(findingsLeft("update"))
       expect(files.read(`${EFFECT_SDK}/${EFFECT_COMPILER.split("/").at(-1)}`)).toBe(
         "updated compiler"
       )
@@ -385,7 +387,7 @@ describe("the Effect editor SDK", () => {
 
       const init = yield* run("init", files, INIT_ARGS, true)
 
-      expect(Exit.isSuccess(init.exit)).toBe(true)
+      expect(getFailure(init.exit)).toStrictEqual(findingsLeft("init"))
       expect(files.exists(EFFECT_SDK)).toBe(false)
 
       const doctor = yield* run("doctor", files, [], true)
@@ -429,7 +431,7 @@ describe("the Effect editor SDK", () => {
         ],
       })
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(`${EFFECT_SDK}/lib.es5.d.ts`)).toBe("interface String {}")
     })
   )

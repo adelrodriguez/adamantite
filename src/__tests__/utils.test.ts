@@ -15,6 +15,7 @@ import {
 } from "#lib/project/package-json.ts"
 import { FailedToParseFile, FailedToReadFile, InvalidPackageJson } from "#lib/shared/errors.ts"
 import { stringifyJson } from "#lib/shared/json.ts"
+import * as Mode from "#terminal/mode.ts"
 import { printTitle } from "#terminal/title.ts"
 
 const ROOT = "/project"
@@ -263,7 +264,10 @@ describe("printTitle", () => {
     Effect.gen(function* () {
       const console = makeConsoleContext()
 
-      yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(120), console.layer)))
+      yield* printTitle.pipe(
+        Effect.provideService(Mode.CurrentMode, Mode.Menu()),
+        Effect.provide(Layer.merge(makeTerminalLayer(120), console.layer))
+      )
 
       expect(console.capturedLogs).toHaveLength(1)
       expect(console.capturedLogs[0]).toContain(".ooooo.")
@@ -274,7 +278,10 @@ describe("printTitle", () => {
     Effect.gen(function* () {
       const console = makeConsoleContext()
 
-      yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(50), console.layer)))
+      yield* printTitle.pipe(
+        Effect.provideService(Mode.CurrentMode, Mode.Menu()),
+        Effect.provide(Layer.merge(makeTerminalLayer(50), console.layer))
+      )
 
       expect(console.capturedLogs).toHaveLength(0)
     })
@@ -284,7 +291,10 @@ describe("printTitle", () => {
     Effect.gen(function* () {
       const console = makeConsoleContext()
 
-      yield* printTitle.pipe(Effect.provide(Layer.merge(makeTerminalLayer(), console.layer)))
+      yield* printTitle.pipe(
+        Effect.provideService(Mode.CurrentMode, Mode.Menu()),
+        Effect.provide(Layer.merge(makeTerminalLayer(), console.layer))
+      )
 
       expect(console.capturedLogs).toHaveLength(0)
     })

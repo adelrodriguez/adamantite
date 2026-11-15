@@ -2,15 +2,22 @@ import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import process from "node:process"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest"
 import * as EffectArray from "effect/Array"
+import * as Command from "effect/cli/Command"
+import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Option from "effect/Option"
 import * as Order from "effect/Order"
 import * as Path from "effect/Path"
+import * as Schema from "effect/Schema"
+import { TestConsole } from "effect/testing"
 import type { Workspace } from "#lib/project/monorepo.ts"
+import ruleCommand, { TrialReport } from "#commands/rule.ts"
 import { LintedOverrides, readOverrides } from "#lib/hardening/overrides.ts"
 import { OxlintCommand } from "#lib/hardening/oxlint.ts"
 import { toProjectPath } from "#lib/hardening/project-files.ts"
@@ -22,6 +29,8 @@ import {
   tryRule,
 } from "#lib/hardening/trial.ts"
 import { getOxlintCommand } from "#lib/integrations/oxlint/entry.ts"
+import { ModuleResolver } from "#lib/project/module-resolver.ts"
+import { CommandRunner } from "#lib/shared/command-runner.ts"
 import { InvalidTrialCase } from "#lib/shared/errors.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../..")
@@ -216,6 +225,74 @@ describe("rule trials in a real project", () => {
     rmSync(project, { force: true, recursive: true })
     rmSync(cases, { force: true, recursive: true })
   })
+
+  it.live("print the trial as JSON that decodes with the report schema with --json", () =>
+    Effect.gen(function* () {
+      const cwd = process.cwd()
+      const before = writeCase("before.ts", 'import fs from "node:fs"\nexport const cart = fs\n')
+
+      // `rule try` runs in the current directory, as the CLI does.
+      const exit = yield* Effect.acquireUseRelease(
+        Effect.sync(() => {
+          process.chdir(project)
+        }),
+        () =>
+          Command.runWith(ruleCommand, { version: "test" })([
+            "try",
+            "no-restricted-imports",
+            "--options",
+            '[{"paths":["node:fs"]}]',
+            "--report",
+            `src/cart.ts=${before}`,
+            "--accept",
+            "src/index.ts",
+            "--json",
+          ]).pipe(Effect.exit),
+        () =>
+          Effect.sync(() => {
+            process.chdir(cwd)
+          })
+      )
+
+      const logLines = yield* TestConsole.logLines
+
+      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(logLines).toHaveLength(1)
+      expect(
+        yield* Schema.decodeUnknownEffect(Schema.fromJsonString(TrialReport))(logLines[0])
+      ).toStrictEqual({
+        results: [
+          {
+            case: { expected: "reported", path: "src/cart.ts", source: Option.some(before) },
+            config: "oxlint.config.ts",
+            diagnostics: [
+              { column: 1, line: 1, message: "'node:fs' import is restricted from being used." },
+            ],
+          },
+          {
+            case: { expected: "accepted", path: "src/index.ts", source: Option.none() },
+            config: "oxlint.config.ts",
+            diagnostics: [],
+          },
+        ],
+        rule: "no-restricted-imports",
+        schemaVersion: 1,
+        setting: new ErrorSetting({ options: [{ paths: ["node:fs"] }] }),
+      })
+    }).pipe(
+      Effect.provide([
+        TEST_LAYER,
+        TestConsole.layer,
+        CommandRunner.layer.pipe(Layer.provide(NodeServices.layer)),
+        ModuleResolver.layer,
+        Layer.succeed(TerminalCapabilities.TerminalCapabilities)({
+          canAnimate: false,
+          canColor: false,
+          canPrompt: false,
+        }),
+      ])
+    )
+  )
 
   it.live("report the case with the mistake and accept the correct code at the same path", () =>
     Effect.gen(function* () {

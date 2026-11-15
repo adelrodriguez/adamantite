@@ -4,7 +4,13 @@ import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson } from "#lib/shared/json.ts"
-import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "./command-test-helpers.ts"
 import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "tsconfig.json"
@@ -129,9 +135,9 @@ describe("TypeScript setup", () => {
       const init = yield* runLifecycle("init", files, INIT_ARGS)
       const doctor = yield* runLifecycle("doctor", files)
 
-      expect({ config: files.exists(CONFIG), succeeded: Exit.isSuccess(init.exit) }).toStrictEqual({
+      expect({ config: files.exists(CONFIG), failure: getFailure(init.exit) }).toStrictEqual({
         config: false,
-        succeeded: true,
+        failure: findingsLeft("init"),
       })
       expect(doctor.output).toContain(
         "no `tsconfig.json` of the root or the workspace packages extends an Adamantite TypeScript preset."

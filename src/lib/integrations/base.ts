@@ -1,4 +1,5 @@
 import type * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
 import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
 
@@ -16,35 +17,48 @@ export interface ToolingPackage {
   readonly version: string
 }
 
-export type PackageAction =
-  | {
-      readonly description: string
-      readonly package: string
-      readonly targetVersion: string
-      readonly type: "install_package"
-    }
-  | {
-      readonly currentVersion: string
-      readonly description: string
-      readonly package: string
-      readonly targetVersion: string
-      readonly type: "update_package"
-    }
+/**
+ * A managed package that the project does not declare at the managed version. `update` installs it,
+ * and `doctor --json` prints it.
+ */
+export const PackageAction = Schema.Union([
+  Schema.Struct({
+    description: Schema.String,
+    package: Schema.String,
+    targetVersion: Schema.String,
+    type: Schema.Literal("install_package"),
+  }),
+  Schema.Struct({
+    currentVersion: Schema.String,
+    description: Schema.String,
+    package: Schema.String,
+    targetVersion: Schema.String,
+    type: Schema.Literal("update_package"),
+  }),
+])
 
-export interface FindingReference {
-  readonly content: string
-  readonly language: "json" | "ts"
-}
+export type PackageAction = typeof PackageAction.Type
 
-export interface Finding {
-  readonly currentState: string
-  readonly goal: readonly string[]
-  readonly id: string
-  readonly integration: string
-  readonly notes?: readonly string[]
-  readonly reference?: FindingReference
-  readonly title: string
-}
+const FindingReference = Schema.Struct({
+  content: Schema.String,
+  language: Schema.Literals(["json", "ts"]),
+})
+
+/**
+ * A difference between the current state and the supported state. `doctor --json` prints each one
+ * as this schema encodes it.
+ */
+export const Finding = Schema.Struct({
+  currentState: Schema.String,
+  goal: Schema.Array(Schema.String),
+  id: Schema.String,
+  integration: Schema.String,
+  notes: Schema.optionalKey(Schema.Array(Schema.String)),
+  reference: Schema.optionalKey(FindingReference),
+  title: Schema.String,
+})
+
+export type Finding = typeof Finding.Type
 
 /**
  * What the assessment of one selected integration found.

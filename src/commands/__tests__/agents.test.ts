@@ -1,10 +1,15 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "./command-test-helpers.ts"
 import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const AGENTS = "AGENTS.md"
@@ -28,7 +33,7 @@ describe("agent guidance setup", () => {
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
       const { written } = readLockfile(files)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(AGENTS)).toContain("- Run `bun run check` to catch formatting")
       expect(files.read(SKILL)).toBe(shippedSkill["SKILL.md"])
       expect({ agents: written[AGENTS], skill: written[SKILL] }).toStrictEqual({

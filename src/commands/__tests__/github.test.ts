@@ -1,9 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "./command-test-helpers.ts"
 import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const WORKFLOW = ".github/workflows/adamantite.yml"
@@ -35,7 +40,7 @@ describe("GitHub Actions setup", () => {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(files.read(WORKFLOW)).toContain("command: bun run check")
       expect(readLockfile(files).written[WORKFLOW]).toBe(hashContent(files.read(WORKFLOW)))
       expect(output).toContain(`✔ \`${WORKFLOW}\` created.`)

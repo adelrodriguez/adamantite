@@ -4,7 +4,10 @@ import * as Prompt from "effect/cli/Prompt"
 import * as TerminalCapabilities from "effect/cli/TerminalCapabilities"
 import * as Digest from "effect/crypto/Digest"
 import * as Effect from "effect/Effect"
+import * as Exit from "effect/Exit"
+import * as FileSystem from "effect/FileSystem"
 import * as Layer from "effect/Layer"
+import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
@@ -31,7 +34,7 @@ import {
   type CommandRunOptions,
   CommandRunner,
 } from "#lib/shared/command-runner.ts"
-import { CliNotFound, type FailedToInstallDependency } from "#lib/shared/errors.ts"
+import { CliNotFound, CommandFailed, type FailedToInstallDependency } from "#lib/shared/errors.ts"
 import { ForwardedArguments } from "#lib/shared/forwarded-arguments.ts"
 
 const LockfileJson = Schema.fromJsonString(Lockfile)
@@ -77,7 +80,7 @@ export interface DependencyInstallerCall {
 
 export interface DependencyInstallerTestContext {
   readonly calls: DependencyInstallerCall[]
-  readonly layer: Layer.Layer<DependencyInstaller>
+  readonly layer: Layer.Layer<DependencyInstaller, never, FileSystem.FileSystem | Path.Path>
 }
 
 export interface RunnerTestContext {
@@ -88,9 +91,9 @@ export interface RunnerTestContext {
   readonly layer: Layer.Layer<CodingAgents | CommandRunner>
 }
 
-// A layer's output type is contravariant, so `never` accepts every layer that neither fails nor
-// requires other services.
-type TestLayer = Layer.Layer<never>
+// A layer's output type is contravariant, so `never` accepts every layer that does not fail.
+// `runCommand` provides the filesystem of the test to each one.
+type TestLayer = Layer.Layer<never, never, FileSystem.FileSystem | Path.Path>
 
 export function createRunnerTestContext(
   options:
@@ -199,6 +202,17 @@ export function agentByCommand(command: string): CodingAgent {
   return agent
 }
 
+// The manifest that an install changes. The install keeps every other field as it is.
+const InstalledManifest = Schema.fromJsonString(
+  Schema.StructWithRest(
+    Schema.Struct({
+      devDependencies: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    }),
+    [Schema.Record(Schema.String, Schema.Json)]
+  ),
+  { space: 2 }
+)
+
 export function createDependencyInstallerTestContext(options?: {
   readonly addDevDependenciesError?: FailedToInstallDependency
   readonly detectedPackageManager?: DetectedPackageManager | null
@@ -212,20 +226,52 @@ export function createDependencyInstallerTestContext(options?: {
 
   return {
     calls,
-    layer: Layer.succeed(DependencyInstaller)({
-      addDevDependencies: (packages, _cwd, installOptions) =>
-        Effect.gen(function* () {
-          calls.push({
-            options: installOptions,
-            packages: [...packages],
-          })
+    layer: Layer.effect(DependencyInstaller)(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem
+        const path = yield* Path.Path
 
-          if (options?.addDevDependenciesError) {
-            return yield* options.addDevDependenciesError
-          }
-        }),
-      detectPackageManager: (_cwd) => Effect.succeed(detectedPackageManager),
-    }),
+        // As a package manager does, the install declares each package in the root manifest.
+        const declare = (packages: readonly string[], cwd: string) =>
+          Effect.gen(function* () {
+            const manifestPath = path.join(cwd, "package.json")
+
+            const manifest = yield* Schema.decodeEffect(InstalledManifest)(
+              yield* fs.readFileString(manifestPath)
+            )
+
+            const installed = packages.map((specifier) => {
+              const at = specifier.lastIndexOf("@")
+
+              return [specifier.slice(0, at), specifier.slice(at + 1)] as const
+            })
+
+            const updated = yield* Schema.encodeEffect(InstalledManifest)({
+              ...manifest,
+              devDependencies: { ...manifest.devDependencies, ...Object.fromEntries(installed) },
+            })
+
+            yield* fs.writeFileString(manifestPath, `${updated}\n`)
+          }).pipe(Effect.orDie)
+
+        return DependencyInstaller.of({
+          addDevDependencies: (packages, cwd, installOptions) =>
+            Effect.gen(function* () {
+              calls.push({
+                options: installOptions,
+                packages: [...packages],
+              })
+
+              if (options?.addDevDependenciesError) {
+                return yield* options.addDevDependenciesError
+              }
+
+              yield* declare(packages, cwd)
+            }),
+          detectPackageManager: (_cwd) => Effect.succeed(detectedPackageManager),
+        })
+      })
+    ),
   }
 }
 
@@ -247,6 +293,16 @@ const unexpectedRunnerLayer = Layer.succeed(
   CommandRunner,
   CommandRunner.make((options) =>
     Effect.die(`Unexpected \`${options.command}\` run: pass a runner layer to runCommand`)
+  )
+)
+
+// No coding agent CLI is on PATH, so the resolution menu offers only the prompt copy.
+const noAgentRunnerLayer = Layer.succeed(
+  CommandRunner,
+  CommandRunner.make((options) =>
+    isProbe(options)
+      ? Effect.fail(new CliNotFound({ command: options.command }))
+      : Effect.die(`Unexpected \`${options.command}\` run: pass a runner layer to runCommand`)
   )
 )
 
@@ -291,7 +347,7 @@ function makeDefaultLayer(files: FileSystemTestContext, terminal: TerminalTestCo
     failingSpawnerLayer,
     unexpectedRunnerLayer,
     // Fresh, so this default does not memoize `CodingAgents` ahead of a test's runner layer.
-    Layer.fresh(CodingAgents.layer).pipe(Layer.provide(unexpectedRunnerLayer)),
+    Layer.fresh(CodingAgents.layer).pipe(Layer.provide(noAgentRunnerLayer)),
     unexpectedInstallerLayer
   )
 }
@@ -315,9 +371,11 @@ export function runCommand<
 ) {
   const files = options.files ?? createFileSystemTestContext()
 
+  const platformLayer = Layer.mergeAll(files.layer, Path.layer)
+
   const testLayer = Layer.mergeAll(
     makeDefaultLayer(files, options.terminal ?? createTerminalTestContext()),
-    ...(options.layers ?? [])
+    ...(options.layers ?? []).map((layer) => layer.pipe(Layer.provide(platformLayer)))
   )
 
   return Effect.exit(
@@ -332,4 +390,20 @@ export function runCommand<
       Effect.provide(testLayer)
     )
   )
+}
+
+/**
+ * The error that a command failed with, or undefined when it succeeded or died.
+ */
+export function getFailure<E>(exit: Exit.Exit<unknown, E>): E | undefined {
+  return Option.getOrUndefined(Exit.findErrorOption(exit))
+}
+
+/**
+ * The failure of a command that finished its work and exits 1 because findings remain. In a test
+ * project, Oxlint has no runtime, so `init` and `update` end with this failure when they set up
+ * Oxlint.
+ */
+export function findingsLeft(command: string): CommandFailed {
+  return new CommandFailed({ command, exitCode: ChildProcessSpawner.ExitCode(1) })
 }

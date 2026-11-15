@@ -1,9 +1,14 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
-import { hashContent, makeLockfileFile, readLockfile } from "./command-test-helpers.ts"
+import {
+  findingsLeft,
+  getFailure,
+  hashContent,
+  makeLockfileFile,
+  readLockfile,
+} from "./command-test-helpers.ts"
 import { listHashes, makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const CONFIG = "oxlint.config.ts"
@@ -59,9 +64,13 @@ describe("Oxlint setup", () => {
 
       expect({
         config: files.read(CONFIG),
+        failure: getFailure(exit),
         recorded: readLockfile(files).written[CONFIG],
-        succeeded: Exit.isSuccess(exit),
-      }).toStrictEqual({ config: RENDERED, recorded: hashContent(RENDERED), succeeded: true })
+      }).toStrictEqual({
+        config: RENDERED,
+        failure: findingsLeft("init"),
+        recorded: hashContent(RENDERED),
+      })
       expect(output).toContain(`✔ \`${CONFIG}\` created.`)
     })
   )

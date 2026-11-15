@@ -2,17 +2,21 @@ import * as Array from "effect/Array"
 import * as Effect from "effect/Effect"
 import * as Match from "effect/Match"
 import * as Option from "effect/Option"
-import type { Finding, PackageAction } from "#lib/integrations/base.ts"
+import * as Schema from "effect/Schema"
 import type { Project } from "#lib/project/project.ts"
 import type { InvalidLockfile, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import { getRepairPromptTemplate } from "#lib/assessment/repair-prompt.macro.ts" with { type: "macro" }
 import { getWarningReportTemplate } from "#lib/assessment/warning-report.macro.ts" with { type: "macro" }
+import { Finding, PackageAction } from "#lib/integrations/base.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import oxlintCustom from "#lib/integrations/oxlint/custom.ts"
 import { managedPlugins } from "#lib/integrations/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { inferSelection } from "#lib/integrations/selection.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
+import { readPackageJson } from "#lib/project/package-json.ts"
+import { readProject } from "#lib/project/project.ts"
+import { Selection } from "#lib/project/selection.ts"
 import { fillTemplate } from "#lib/shared/template.ts"
 
 const repairPromptTemplate = getRepairPromptTemplate()
@@ -42,9 +46,7 @@ const lockfileMissing: Finding = {
  * selection, so the lockfile finding is the only one. Doctor reports it, and the commands that
  * write the lockfile fail instead, so they do not overwrite it.
  */
-export function assessUnreadableLockfile(
-  error: InvalidLockfile | UnsupportedLockfile
-): ProjectAssessment {
+function assessUnreadableLockfile(error: InvalidLockfile | UnsupportedLockfile): ProjectAssessment {
   const finding = Match.valueTags(error, {
     InvalidLockfile: ({ issue, path }): Finding => ({
       currentState: `\`${path}\` does not decode as an Adamantite lockfile. ${issue}`,
@@ -80,21 +82,62 @@ export function assessUnreadableLockfile(
     }),
   })
 
-  return { applicableIntegrations: [], findings: [finding], packageActions: [], warnings: [] }
+  return {
+    applicableIntegrations: [],
+    findings: [finding],
+    packageActions: [],
+    selection: null,
+    warnings: [],
+  }
 }
 
-export interface ProjectAssessment {
+/**
+ * The assessment of a project that does not declare `adamantite`. The other assessments need the
+ * installed version, so this finding is the only one.
+ */
+const notInstalled: ProjectAssessment = {
+  applicableIntegrations: [],
+  findings: [
+    {
+      currentState:
+        "The root `package.json` does not declare `adamantite`, so the project runs no installed Adamantite version.",
+      goal: [
+        "Add `adamantite` to the `devDependencies` of the root `package.json` with the project's package manager, and install it.",
+        "Run `adamantite doctor` again. It must not report this finding.",
+      ],
+      id: "adamantite-not-installed",
+      integration: "adamantite",
+      notes: ["Doctor reports the other findings after the project installs Adamantite."],
+      title: "Adamantite is not installed",
+    },
+  ],
+  packageActions: [],
+  selection: null,
+  warnings: [],
+}
+
+/**
+ * What an assessment found in a project. `doctor --json` prints it as this schema encodes it.
+ */
+export const ProjectAssessment = Schema.Struct({
   /**
    * Names of the integrations that apply to this project. Empty means nothing is managed.
    */
-  readonly applicableIntegrations: readonly string[]
+  applicableIntegrations: Schema.Array(Schema.String),
   /**
    * Empty means the project has converged on the managed state.
    */
-  readonly findings: readonly Finding[]
-  readonly packageActions: readonly PackageAction[]
-  readonly warnings: readonly string[]
-}
+  findings: Schema.Array(Finding),
+  packageActions: Schema.Array(PackageAction),
+  /**
+   * The selection that the assessment checked: the lockfile's, or the one that the project files
+   * show when there is no lockfile. Null when the assessment could not read one.
+   */
+  selection: Schema.NullOr(Selection),
+  warnings: Schema.Array(Schema.String),
+})
+
+export type ProjectAssessment = typeof ProjectAssessment.Type
 
 /**
  * Assess every managed integration against one read of the project. A reassessment after an agent
@@ -131,16 +174,46 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
 
   const applicable = [...Array.flatten(assessments), ...parts]
 
-  // A project that Adamantite does not manage needs no lockfile.
-  const lockfileFindings =
-    Option.isNone(project.lockfile) && applicable.length > 0 ? [lockfileMissing] : []
+  // A project that Adamantite does not manage needs no lockfile, and init sets it up.
+  const isUnmanaged = Option.isNone(project.lockfile) && applicable.length === 0
 
   return {
     applicableIntegrations: applicable.map(({ name }) => name),
-    findings: [...applicable.flatMap(({ assessment }) => assessment.findings), ...lockfileFindings],
+    findings: [
+      ...applicable.flatMap(({ assessment }) => assessment.findings),
+      ...(Option.isNone(project.lockfile) && !isUnmanaged ? [lockfileMissing] : []),
+    ],
     packageActions: applicable.flatMap(({ assessment }) => assessment.packageActions),
-    warnings: applicable.flatMap(({ assessment }) => assessment.warnings),
+    selection,
+    warnings: [
+      ...applicable.flatMap(({ assessment }) => assessment.warnings),
+      ...(isUnmanaged
+        ? ["No Adamantite-managed setup found. Run `adamantite init` to configure the project."]
+        : []),
+    ],
   } satisfies ProjectAssessment
+})
+
+/**
+ * The assessment that Doctor reports for the project at `cwd`, from a new read of it. A project
+ * that does not declare `adamantite`, or whose lockfile does not read, gets one finding for it, so
+ * a coding agent can repair it.
+ */
+export const readAssessment = Effect.fn("readAssessment")(function* (cwd: string) {
+  // The root manifest decides whether Doctor assesses at all, so a project without Adamantite gets
+  // the install finding even when its workspace packages do not read.
+  const packageJson = yield* readPackageJson(cwd)
+
+  if (!packageJson.devDependencies?.adamantite && !packageJson.dependencies?.adamantite) {
+    return notInstalled
+  }
+
+  return yield* readProject(cwd).pipe(
+    Effect.flatMap(assessProject),
+    Effect.catchTag(["InvalidLockfile", "UnsupportedLockfile"], (error) =>
+      Effect.succeed(assessUnreadableLockfile(error))
+    )
+  )
 })
 
 /**
@@ -148,7 +221,7 @@ export const assessProject = Effect.fn("assessProject")(function* (project: Proj
  * folded in; a warning-only assessment produces the warning report.
  */
 export function renderAssessmentMarkdown(
-  assessment: ProjectAssessment,
+  assessment: Pick<ProjectAssessment, "findings" | "warnings">,
   adamantiteVersion: string
 ): string {
   return assessment.findings.length === 0

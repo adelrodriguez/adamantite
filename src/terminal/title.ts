@@ -1,12 +1,22 @@
 import * as Console from "effect/Console"
 import * as Effect from "effect/Effect"
 import * as Terminal from "effect/Terminal"
+import { CurrentMode, is } from "#terminal/mode.ts"
 
 import { getTitle } from "./title.macro.ts" with { type: "macro" }
 
 const title = getTitle()
 
+/**
+ * Prints the wordmark when the command asks in a terminal and the complete wordmark fits.
+ */
 export const printTitle = Effect.gen(function* () {
+  const mode = yield* CurrentMode
+
+  if (!is("Menu")(mode)) {
+    return
+  }
+
   const terminal = yield* Terminal.Terminal
   const terminalColumns = yield* terminal.columns
 

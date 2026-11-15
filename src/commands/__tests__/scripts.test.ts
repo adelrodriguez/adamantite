@@ -1,9 +1,8 @@
 import { describe, expect, it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import * as Schema from "effect/Schema"
 import { createFileSystemTestContext, type FileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeLockfileFile } from "./command-test-helpers.ts"
+import { findingsLeft, getFailure, makeLockfileFile } from "./command-test-helpers.ts"
 import { makeSelection, runLifecycle } from "./lifecycle.ts"
 
 const PACKAGE_JSON = `{
@@ -35,7 +34,7 @@ describe("managed scripts", () => {
       const files = makeProject()
       const { exit, output } = yield* runLifecycle("init", files, INIT_ARGS)
 
-      expect(Exit.isSuccess(exit)).toBe(true)
+      expect(getFailure(exit)).toStrictEqual(findingsLeft("init"))
       expect(readScripts(files)).toStrictEqual({
         analyze: "adamantite analyze",
         check: "adamantite check",

@@ -19,12 +19,12 @@ import * as Layer from "effect/Layer"
 import type { Selection } from "#lib/project/selection.ts"
 import { effectEditorFiles } from "#lib/integrations/__tests__/effect-sdk-fixture.ts"
 import { getShippedSkillFiles } from "#lib/integrations/agents/skill.macro.ts" with { type: "macro" }
+import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { ModuleResolver } from "#lib/project/module-resolver.ts"
 import { NodeVersionResolver } from "#lib/project/node-version-resolver.ts"
 import { readProject } from "#lib/project/project.ts"
 import * as Setup from "#lib/setup/index.ts"
-import { createDependencyInstallerTestContext } from "./command-test-helpers.ts"
 
 const REPO_ROOT = join(import.meta.dirname, "../../..")
 
@@ -77,7 +77,11 @@ const layer = Layer.mergeAll(
   NodeVersionResolver.layer.pipe(Layer.provide(NodeServices.layer)),
   ModuleResolver.layer,
   Digest.layerWebCrypto,
-  createDependencyInstallerTestContext().layer
+  // The project has its packages, so the install changes nothing.
+  Layer.succeed(DependencyInstaller)({
+    addDevDependencies: () => Effect.void,
+    detectPackageManager: () => Effect.succeed({ name: "bun" }),
+  })
 )
 
 const apply = (cwd: string) =>

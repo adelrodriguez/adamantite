@@ -1,8 +1,8 @@
 import * as Array from "effect/Array"
-import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import {
   parseSync,
   type ArrayExpressionElement,
@@ -37,38 +37,50 @@ export interface RuleOffOverride {
  * the file, the rule no longer reports it, the config ignores it, it does not parse, or it does not
  * exist. Only a file that Oxlint linted and parsed can be clean.
  */
-export type OverrideFileMark = "breaks" | "clean" | "ignored" | "missing" | "unparsable"
+const OverrideFileMark = Schema.Literals(["breaks", "clean", "ignored", "missing", "unparsable"])
+
+type OverrideFileMark = typeof OverrideFileMark.Type
 
 /**
  * The files for which an override turns a rule off, with paths relative to the project root.
  */
-export interface OverriddenRule {
+const OverriddenRule = Schema.Struct({
   /**
    * The config of the override, relative to the project root.
    */
-  readonly config: string
-  readonly files: ReadonlyArray<{ readonly file: string; readonly mark: OverrideFileMark }>
+  config: Schema.String,
+  files: Schema.Array(Schema.Struct({ file: Schema.String, mark: OverrideFileMark })),
   /**
    * The globs of the override, as the config writes them. A glob is a scope decision, so Adamantite
    * does not lint its files.
    */
-  readonly globs: readonly string[]
-  readonly rule: string
-}
+  globs: Schema.Array(Schema.String),
+  rule: Schema.String,
+})
 
 /**
  * The overrides that turn a rule off, with a mark for each file that they name.
  */
-export class LintedOverrides extends Data.TaggedClass("Linted")<{
-  readonly rules: readonly OverriddenRule[]
-}> {}
+export class LintedOverrides extends Schema.TaggedClass<
+  LintedOverrides,
+  { readonly brand: unique symbol }
+>()("Linted", {
+  rules: Schema.Array(OverriddenRule),
+}) {}
 
 /**
  * The reason why Adamantite could not lint the files of the overrides.
  */
-export class OverridesLintFailed extends Data.TaggedClass("Failed")<{ readonly reason: string }> {}
+export class OverridesLintFailed extends Schema.TaggedClass<
+  OverridesLintFailed,
+  { readonly brand: unique symbol }
+>()("Failed", {
+  reason: Schema.String,
+}) {}
 
-export type OverridesReport = LintedOverrides | OverridesLintFailed
+export const OverridesReport = Schema.Union([LintedOverrides, OverridesLintFailed])
+
+export type OverridesReport = typeof OverridesReport.Type
 
 const GLOB_CHARACTERS = /[!*?[\]{}]/u
 
@@ -369,7 +381,7 @@ export const readOverrides = Effect.fn("readOverrides")(
     return new LintedOverrides({
       rules: entries
         .filter((entry) => entry.literals.length > 0 || entry.globs.length > 0)
-        .map((entry): OverriddenRule => ({
+        .map((entry): typeof OverriddenRule.Type => ({
           config: entry.config,
           files: entry.literals.map((file) => ({
             file,

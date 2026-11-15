@@ -1,13 +1,12 @@
-import type * as Schema from "effect/Schema"
 import { posix, win32 } from "node:path"
 import * as Array from "effect/Array"
 import * as Brand from "effect/Brand"
-import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
+import * as Schema from "effect/Schema"
 import type { Workspace } from "#lib/project/monorepo.ts"
 import {
   isReportOf,
@@ -35,58 +34,73 @@ import { checkExists, readDirectoryIfExists, readFile, writeFile } from "#lib/sh
  * What a case must get from the rule: a report, because it has the mistake, or no report, because
  * it is correct code.
  */
-export type TrialExpectation = "accepted" | "reported"
+const TrialExpectation = Schema.Literals(["accepted", "reported"])
 
 /**
  * A file that a trial lints.
  */
-export interface TrialCase {
-  readonly expected: TrialExpectation
+export const TrialCase = Schema.Struct({
+  expected: TrialExpectation,
   /**
    * The path of the case in the project, relative to the project root, with `/` between folders.
    */
-  readonly path: string
+  path: Schema.String,
   /**
    * The file whose content the trial puts at `path`, relative to the project root or absolute, or
    * none to lint the project file as it is.
    */
-  readonly source: Option.Option<string>
-}
+  source: Schema.OptionFromNullOr(Schema.String),
+})
+
+export type TrialCase = typeof TrialCase.Type
 
 /**
  * The trial sets the rule as the project config sets it now.
  */
-export class CurrentSetting extends Data.TaggedClass("Current") {}
+export class CurrentSetting extends Schema.TaggedClass<
+  CurrentSetting,
+  { readonly brand: unique symbol }
+>()("Current", {}) {}
 
 /**
  * The trial sets the rule at `error` with the options that come after the severity.
  */
-export class ErrorSetting extends Data.TaggedClass("Error")<{
-  readonly options: readonly Schema.Json[]
-}> {}
+export class ErrorSetting extends Schema.TaggedClass<
+  ErrorSetting,
+  { readonly brand: unique symbol }
+>()("Error", {
+  options: Schema.Array(Schema.Json),
+}) {}
 
 /**
  * How a trial sets the rule.
  */
-export type TrialSetting = CurrentSetting | ErrorSetting
+export const TrialSetting = Schema.Union([CurrentSetting, ErrorSetting])
 
-export interface TrialDiagnostic {
-  readonly column: number
-  readonly line: number
-  readonly message: string
-}
+export type TrialSetting = typeof TrialSetting.Type
 
-export interface TrialCaseResult {
-  readonly case: TrialCase
+const TrialDiagnostic = Schema.Struct({
+  column: Schema.Int,
+  line: Schema.Int,
+  message: Schema.String,
+})
+
+/**
+ * What the rule reported on one case of a trial.
+ */
+export const TrialCaseResult = Schema.Struct({
+  case: TrialCase,
   /**
    * The Oxlint config that lints the case, relative to the project root.
    */
-  readonly config: string
+  config: Schema.String,
   /**
    * The reports of the rule on the case.
    */
-  readonly diagnostics: readonly TrialDiagnostic[]
-}
+  diagnostics: Schema.Array(TrialDiagnostic),
+})
+
+export type TrialCaseResult = typeof TrialCaseResult.Type
 
 /**
  * The file name that a trial gives the config that lints the cases, in the copy. The trial config
@@ -108,7 +122,7 @@ export const TRIAL_SKIPPED_MODULES_ENTRY = ".cache"
  */
 export function parseTrialCase(
   value: string,
-  expected: TrialExpectation
+  expected: typeof TrialExpectation.Type
 ): Effect.Effect<TrialCase, InvalidTrialCase> {
   const separator = value.indexOf("=")
   const target = separator === -1 ? value : value.slice(0, separator)
@@ -455,7 +469,7 @@ export const tryRule = Effect.fn("tryRule")(
         (message) => Predicate.isTagged(error, "TrialLintFailed") && error.output.includes(message)
       )
 
-      return setting instanceof ErrorSetting && detail !== undefined
+      return Schema.is(ErrorSetting)(setting) && detail !== undefined
         ? new TrialRuleNotFound({ detail, rule })
         : error
     }
@@ -495,7 +509,7 @@ export const tryRule = Effect.fn("tryRule")(
       { concurrency: 1 }
     )
 
-    if (setting instanceof ErrorSetting) {
+    if (Schema.is(ErrorSetting)(setting)) {
       yield* replaceConfigs(
         copy,
         new Map(

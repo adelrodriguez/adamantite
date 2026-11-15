@@ -10,16 +10,22 @@ import * as ChildProcess from "effect/process/ChildProcess"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import type { ManagedFile, PackageAction } from "#lib/integrations/base.ts"
+import type { ManagedFile } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import type { Selection } from "#lib/project/selection.ts"
+import { PackageAction } from "#lib/integrations/base.ts"
 import { integrations } from "#lib/integrations/index.ts"
 import { format as formatCommand } from "#lib/integrations/oxfmt/command.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
 import { addRootDevDependencies } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, renderLockfile } from "#lib/project/lockfile.ts"
 import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
-import { MANAGED_SCRIPT_COMMANDS, readPackageJson, type Script } from "#lib/project/package-json.ts"
+import {
+  MANAGED_SCRIPT_COMMANDS,
+  readPackageJson,
+  SCRIPT_ORDER,
+  type Script,
+} from "#lib/project/package-json.ts"
 import { FailedToFormatFile, FailedToParseFile } from "#lib/shared/errors.ts"
 import { ensureDirectory, readFileIfExists, writeFile } from "#lib/shared/filesystem.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
@@ -31,50 +37,59 @@ export { inferSelection } from "#lib/integrations/selection.ts"
 const version = getPackageVersion()
 
 /**
- * What `apply` did with one managed file.
+ * What `apply` did with one managed file. `init --json` and `update --json` print it as this schema
+ * encodes it.
  */
-export type FileWrite =
+export const FileWrite = Schema.TaggedUnion({
   /**
    * The file did not exist, so Adamantite wrote it.
    */
-  | { readonly _tag: "Created"; readonly path: string }
+  Created: { path: Schema.String },
+  /**
+   * The selection no longer renders the file, and its hash still equaled the recorded hash.
+   */
+  Deleted: { path: Schema.String },
+  /**
+   * The user changed the file, so Adamantite kept it. Its integration's `assess` judges it.
+   */
+  Kept: { path: Schema.String },
   /**
    * The file's hash equaled the hash that the lockfile recorded, so Adamantite wrote the current
    * version over it.
    */
-  | { readonly _tag: "Replaced"; readonly path: string }
+  Replaced: { path: Schema.String },
   /**
    * The file already held the current version.
    */
-  | { readonly _tag: "Unchanged"; readonly path: string }
-  /**
-   * The user changed the file, so Adamantite kept it. Its integration's `assess` judges it.
-   */
-  | { readonly _tag: "Kept"; readonly path: string }
-  /**
-   * The selection no longer renders the file, and its hash still equaled the recorded hash.
-   */
-  | { readonly _tag: "Deleted"; readonly path: string }
+  Unchanged: { path: Schema.String },
+})
+
+export type FileWrite = typeof FileWrite.Type
 
 const { Created, Deleted, Kept, Replaced, Unchanged } = Data.taggedEnum<FileWrite>()
+
+const ScriptName = Schema.Literals(SCRIPT_ORDER)
 
 /**
  * What `apply` did with one managed script in `package.json`. A managed script is the one exception
  * to whole files: `apply` sets the key to its command and overwrites what it held.
  */
-export type ScriptWrite =
+export const ScriptWrite = Schema.TaggedUnion({
   /**
    * `package.json` had no such script, so Adamantite added it.
    */
-  | { readonly _tag: "Added"; readonly script: Script }
+  Added: { script: ScriptName },
   /**
    * The script ran `command`, so Adamantite replaced it with the managed command.
    */
-  | { readonly _tag: "Replaced"; readonly command: string; readonly script: Script }
+  Replaced: { command: Schema.String, script: ScriptName },
   /**
    * The script already ran the managed command.
    */
-  | { readonly _tag: "Unchanged"; readonly script: Script }
+  Unchanged: { script: ScriptName },
+})
+
+export type ScriptWrite = typeof ScriptWrite.Type
 
 const ScriptWrites = Data.taggedEnum<ScriptWrite>()
 
@@ -328,6 +343,18 @@ function getAdamantiteInstall({ packageJson }: Project): readonly PackageAction[
 }
 
 /**
+ * What `apply` did. `init --json` and `update --json` print it as this schema encodes it.
+ */
+export const Result = Schema.Struct({
+  files: Schema.Array(FileWrite),
+  installs: Schema.Array(PackageAction),
+  lockfile: Schema.Literals(["unchanged", "written"]),
+  scripts: Schema.Array(ScriptWrite),
+})
+
+export type Result = typeof Result.Type
+
+/**
  * Sets up `selection` in `project`, the backend of `init` and `update`, and the only code that
  * writes target-project files. It installs `adamantite` and the packages of every selected
  * integration in one install, sets the managed scripts, prepares what the integrations need in
@@ -433,5 +460,5 @@ export const apply = Effect.fn("Setup.apply")(function* (project: Project, selec
     installs,
     lockfile,
     scripts,
-  }
+  } satisfies Result
 }, Effect.scoped)

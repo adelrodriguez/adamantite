@@ -187,6 +187,29 @@ function runEffectSetup() {
   })
 }
 
+// Runs init in a terminal that cannot prompt, and returns its failure, the files it wrote, and what
+// the terminal showed.
+function runWithoutPrompts(args: readonly string[]) {
+  return Effect.gen(function* () {
+    const files = createInitTestContext()
+    const terminal = createTerminalTestContext()
+
+    const exit = yield* runCommand(initCommand, args, {
+      files,
+      layers: [createDependencyInstallerTestContext().layer],
+      terminal,
+    })
+
+    return {
+      exit: getFailure(exit),
+      files: ["package.json", "oxlint.config.ts", "oxfmt.config.ts"].map((path) =>
+        files.read(path)
+      ),
+      prompted: terminal.output(),
+    }
+  })
+}
+
 /**
  * The packages that init installed in all its installs, sorted, and the distinct options of the
  * installs. Init installs the tools of the integrations that have not moved to a folder yet, and
@@ -1106,11 +1129,6 @@ describe("init", () => {
         name: "GitHub Actions without a CI-compatible script",
         reason: "`--github-actions` requires --script check or --script analyze.",
       },
-      {
-        args: ["--script", "check"],
-        name: "setup flags without non-interactive mode",
-        reason: "Setup flags require `--non-interactive`.",
-      },
     ])("reject $name before changing the project", ({ args, reason }) =>
       Effect.gen(function* () {
         const files = createInitTestContext()
@@ -1127,6 +1145,60 @@ describe("init", () => {
         expect(Exit.isFailure(exit)).toBe(true)
         expect(Option.getOrThrow(Exit.findErrorOption(exit))).toStrictEqual(
           new InvalidInitOptions({ reason })
+        )
+        expect(installer.calls).toStrictEqual([])
+        expect(files.read("package.json")).toBe(originalPackageJson)
+      })
+    )
+  })
+
+  describe("without a terminal that can prompt", () => {
+    it.effect("set up from the flags, as with `--non-interactive`", () =>
+      Effect.gen(function* () {
+        const plain = yield* runWithoutPrompts(["--script", "check"])
+
+        expect(plain).toStrictEqual(
+          yield* runWithoutPrompts(["--non-interactive", "--script", "check"])
+        )
+        expect(plain.exit).toStrictEqual(findingsLeft("init"))
+        expect(plain.prompted).toBe("")
+      })
+    )
+
+    it.effect("report a missing selection instead of prompting", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const terminal = createTerminalTestContext()
+
+        const exit = yield* runCommand(initCommand, [], {
+          files,
+          layers: [createDependencyInstallerTestContext().layer],
+          terminal,
+        })
+
+        expect(getFailure(exit)).toStrictEqual(
+          new InvalidInitOptions({
+            reason:
+              "Select at least one script with `--script <name>`, or a TypeScript preset with `--typescript <preset>`.",
+          })
+        )
+        expect(terminal.output()).toBe("")
+      })
+    )
+
+    it.effect("reject setup flags in a terminal that can prompt without `--non-interactive`", () =>
+      Effect.gen(function* () {
+        const files = createInitTestContext()
+        const originalPackageJson = files.read("package.json")
+        const installer = createDependencyInstallerTestContext()
+
+        const exit = yield* runCommand(initCommand, ["--script", "check"], {
+          files,
+          layers: [installer.layer, promptingLayer],
+        })
+
+        expect(getFailure(exit)).toStrictEqual(
+          new InvalidInitOptions({ reason: "Setup flags require `--non-interactive`." })
         )
         expect(installer.calls).toStrictEqual([])
         expect(files.read("package.json")).toBe(originalPackageJson)

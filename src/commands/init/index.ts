@@ -45,12 +45,12 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
       description: "Configure analysis, including Sherif checks for a monorepo",
     },
   ]),
-  Command.withHandler(({ json, ...flags }) => {
-    // `--json` never prompts, so it sets up from the flags.
-    const options = { ...flags, nonInteractive: flags.nonInteractive || json }
-
-    return Effect.gen(function* () {
+  Command.withHandler(({ json, ...options }) =>
+    Effect.gen(function* () {
       const cwd = process.cwd()
+      // Only a terminal that can prompt asks for the selection. With `--json`,
+      // `--non-interactive`, or no such terminal, init sets up from the flags.
+      const prompts = Mode.is("Menu")(yield* Mode.CurrentMode)
       yield* printTitle
 
       yield* Output.intro("💠 adamantite init")
@@ -76,7 +76,7 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
       }
 
       if (
-        !options.nonInteractive
+        prompts
         && Array.some(
           [
             options.scripts.length > 0,
@@ -94,20 +94,14 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
         })
       }
 
-      if (
-        options.nonInteractive
-        && options.scripts.length === 0
-        && Option.isNone(options.typescript)
-      ) {
+      if (!prompts && options.scripts.length === 0 && Option.isNone(options.typescript)) {
         return yield* new InvalidInitOptions({
           reason:
             "Select at least one script with `--script <name>`, or a TypeScript preset with `--typescript <preset>`.",
         })
       }
 
-      const input = options.nonInteractive
-        ? options
-        : yield* collectInteractiveInitOptions(isMonorepo)
+      const input = prompts ? yield* collectInteractiveInitOptions(isMonorepo) : options
 
       const initOptions = yield* validateInitOptions(input, packageManager.name)
 
@@ -163,5 +157,5 @@ export default Command.make("init", { ...initCommandOptions, json: Mode.json }).
       Effect.catchTag("QuitError", () => Output.cancel("Setup was cancelled.")),
       Mode.provide({ interactive: !options.nonInteractive, json })
     )
-  })
+  )
 )

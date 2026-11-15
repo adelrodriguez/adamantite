@@ -1,7 +1,7 @@
 <p align="center">
   <h1 align="center">💠 Adamantite</h1>
   <p align="center">
-    <strong>Strict, agent-first code-quality tooling for TypeScript.</strong>
+    <strong>Strict, agent-first code-quality toolchain for TypeScript codebases.</strong>
   </p>
 </p>
 

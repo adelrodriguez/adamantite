@@ -1,7 +1,7 @@
 {
   "name": "adamantite",
   "version": "0.47.0",
-  "description": "Strict, agent-first code-quality tooling for TypeScript",
+  "description": "Strict, agent-first code-quality toolchain for TypeScript codebases",
   "keywords": [
     "adamantite",
     "formatter",

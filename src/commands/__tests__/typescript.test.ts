@@ -3,7 +3,6 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Schema from "effect/Schema"
 import { createFileSystemTestContext } from "#__tests__/filesystem.ts"
-import { makeModuleResolverLayer } from "#__tests__/module-resolver.ts"
 import { Report } from "#commands/doctor.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { formatJson } from "#lib/shared/json.ts"
@@ -117,38 +116,63 @@ describe("TypeScript setup", () => {
       })
   )
 
-  // TypeScript finds a package base config by its config lookup: `tsconfig.json` in the package
-  // folder, and the `.json` file of an extensionless subpath. Node.js resolves neither.
+  // Doctor follows no base config of another package, so it cannot tell which preset the package
+  // uses, and reports neither a missing nor a mismatched preset.
   it.effect.each([
-    { file: "tsconfig.json", specifier: "@company/config" },
-    { file: "base.json", specifier: "@company/config/base" },
-  ])(
-    "infer and find adamantite/tsconfig through the package base $specifier",
-    ({ file, specifier }) =>
+    { preset: "tsconfig", specifier: "@company/config" },
+    { preset: "typescript", specifier: "@company/config" },
+    { preset: "tsconfig", specifier: "@company/config/base" },
+    { preset: "typescript", specifier: "@company/config/base" },
+  ] as const)(
+    "check no preset through the package base $specifier when the lockfile selects $preset",
+    ({ preset, specifier }) =>
       Effect.gen(function* () {
         const files = makeProject({
+          ...makeLockfileFile(makeSelection({ typescript: preset })),
           [CONFIG]: `{ "extends": "${specifier}", "include": ["src"] }\n`,
+          "node_modules/@company/config/base.json": '{ "extends": "adamantite/tsconfig" }\n',
           "node_modules/@company/config/package.json": '{ "name": "@company/config" }\n',
-          [`node_modules/@company/config/${file}`]: '{ "extends": "adamantite/tsconfig" }\n',
+          "node_modules/@company/config/tsconfig.json": '{ "extends": "adamantite/tsconfig" }\n',
         })
 
-        const layers = [
-          makeModuleResolverLayer(
-            files.root,
-            {},
-            {
-              configs: { [specifier]: `node_modules/@company/config/${file}` },
-            }
-          ),
-        ]
+        const doctor = yield* runLifecycle("doctor", files, ["--json"])
 
-        yield* runLifecycle("update", files, [], layers)
-        const doctor = yield* runLifecycle("doctor", files, ["--json"], layers)
+        expect(decodeReport(doctor.output).findings).toStrictEqual([])
+      })
+  )
+
+  // Without a lockfile, update records the preset that a chain names, and none for a chain that
+  // reaches the base config of another package without the type resets. The managed script gives
+  // update a setup to record.
+  it.effect.each([
+    {
+      extendsEntry: "./tsconfig.base.json",
+      inferred: "adamantite/tsconfig",
+      typescript: "tsconfig",
+    },
+    { extendsEntry: "@company/config", inferred: "no TypeScript preset", typescript: null },
+  ] as const)(
+    "infer $inferred from a chain through $extendsEntry",
+    ({ extendsEntry, typescript }) =>
+      Effect.gen(function* () {
+        const files = makeProject({
+          [CONFIG]: `{ "extends": "${extendsEntry}", "include": ["src"] }\n`,
+          "node_modules/@company/config/package.json": '{ "name": "@company/config" }\n',
+          "node_modules/@company/config/tsconfig.json": '{ "extends": "adamantite/tsconfig" }\n',
+          "package.json":
+            '{ "name": "test-project", "scripts": { "analyze": "adamantite analyze" } }\n',
+          "tsconfig.base.json": '{ "extends": "adamantite/tsconfig" }\n',
+        })
+
+        yield* runLifecycle("update", files)
+        const doctor = yield* runLifecycle("doctor", files, ["--json"])
 
         expect({
-          findings: decodeReport(doctor.output).findings.map(({ title }) => title),
+          findings: decodeReport(doctor.output).findings.filter(
+            ({ integration }) => integration === "tsconfig"
+          ),
           typescript: readLockfile(files).selection.typescript,
-        }).toStrictEqual({ findings: [], typescript: "tsconfig" })
+        }).toStrictEqual({ findings: [], typescript })
       })
   )
 

@@ -1,4 +1,3 @@
-import * as Array from "effect/Array"
 import * as Context from "effect/Context"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
@@ -7,17 +6,13 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import { ResolverFactory } from "oxc-resolver"
 
-// A JavaScript or TypeScript file, declaration files included, which a config lookup skips.
-const SOURCE_FILE = /\.[cm]?[jt]sx?$/u
-
 export class ModuleResolver extends Context.Service<
   ModuleResolver,
   {
     /**
      * Forget the files and package manifests that earlier resolutions read. Custom rule discovery
      * calls it before each traversal, because a coding agent can change the project between two
-     * assessments in one command, and `addRootDevDependencies` calls it after each install. The
-     * cache serves `resolveConfig` too.
+     * assessments in one command, and `addRootDevDependencies` calls it after each install.
      */
     readonly clearCache: Effect.Effect<void>
     /**
@@ -27,15 +22,6 @@ export class ModuleResolver extends Context.Service<
      * importing file passes its folder.
      */
     readonly resolve: (directory: string, specifier: string) => Effect.Effect<Option.Option<string>>
-    /**
-     * The config file that TypeScript extends for the package `specifier` in a config in
-     * `directory`. None when the specifier does not resolve. TypeScript resolves a relative or
-     * absolute `extends` entry by its own path rules, so a caller resolves those itself.
-     */
-    readonly resolveConfig: (
-      directory: string,
-      specifier: string
-    ) => Effect.Effect<Option.Option<string>>
   }
 >()("ModuleResolver") {
   static readonly layer = Layer.sync(this, () => {
@@ -52,42 +38,12 @@ export class ModuleResolver extends Context.Service<
       extensions: [".ts", ".mts", ".cts", ".js", ".mjs", ".cjs"],
     })
 
-    // TypeScript's config lookup for a package `extends` entry, which shares the cache: the
-    // conditions of a CommonJS import, the `tsconfig` field of `package.json`, the `.json`
-    // extension, and `tsconfig.json` as the file of a folder. TypeScript skips an export target
-    // that is not JSON, such as a `types` declaration file, and tries the next condition, while the
-    // resolver returns the first target whose condition matches. So the lookup retries with fewer
-    // conditions until it reaches a file that is not JavaScript or TypeScript. The resolver
-    // returns the real path, so a JSON export can be a symlink to a `.jsonc` file.
-    const configs = [
-      ["require", "types", "node", "default"],
-      ["require", "node", "default"],
-      ["node", "default"],
-      ["default"],
-    ].map((conditionNames) =>
-      resolver.cloneWithOptions({
-        conditionNames,
-        extensions: [".json"],
-        mainFields: ["tsconfig"],
-        mainFiles: ["tsconfig"],
-      })
-    )
-
     return {
       clearCache: Effect.sync(() => {
         resolver.clearCache()
       }),
       resolve: (directory, specifier) =>
         Effect.sync(() => Option.fromUndefinedOr(resolver.sync(directory, specifier).path)),
-      resolveConfig: (directory, specifier) =>
-        Effect.sync(() =>
-          Array.findFirst(configs, (config) =>
-            Option.filter(
-              Option.fromUndefinedOr(config.sync(directory, specifier).path),
-              (file) => !SOURCE_FILE.test(file)
-            )
-          )
-        ),
     }
   })
 }

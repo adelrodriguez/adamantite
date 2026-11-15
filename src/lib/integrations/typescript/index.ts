@@ -1,5 +1,6 @@
 import type { JsonValue, PackageJson } from "type-fest"
 import * as Array from "effect/Array"
+import * as Data from "effect/Data"
 import * as Effect from "effect/Effect"
 import * as Json5 from "effect/encoding/Json5"
 import * as Jsonc from "effect/encoding/Jsonc"
@@ -15,7 +16,7 @@ import * as Stream from "effect/Stream"
 import type { Finding, Integration } from "#lib/integrations/base.ts"
 import type { Project } from "#lib/project/project.ts"
 import { LANGUAGE_SERVICE_PLUGIN } from "#lib/integrations/effect-language-service.ts"
-import { ModuleResolver, resolvePackageDirectory } from "#lib/project/module-resolver.ts"
+import { resolvePackageDirectory } from "#lib/project/module-resolver.ts"
 import { readPackageJson } from "#lib/project/package-json.ts"
 import {
   type Selection,
@@ -121,6 +122,14 @@ function readExtends(config: JsonValue) {
 const ADAMANTITE_PRESETS: readonly string[] = Object.values(TYPESCRIPT_PRESETS)
 
 /**
+ * Whether `entry` names a file by a relative or absolute path. TypeScript resolves any other
+ * `extends` entry as a package.
+ */
+function checkIsPath(path: Path.Path, entry: string) {
+  return entry.startsWith("./") || entry.startsWith("../") || path.isAbsolute(entry)
+}
+
+/**
  * Whether `file` is a file, as TypeScript checks it before it reads a config. A folder, a missing
  * path, and a path that cannot be checked are not.
  */
@@ -132,20 +141,18 @@ const checkIsFile = (file: string) =>
   )
 
 /**
- * The `extends` entries of the TypeScript config at `file` and of each base config that they reach,
- * as TypeScript follows them: a relative or absolute entry names a file, with `.json` added when
- * that path is not a file and does not end in `.json`, and TypeScript's config lookup resolves a
- * package entry. The chain stops at an Adamantite preset, and at a base config that is not a file,
- * cannot be read, does not decode, or comes again. TypeScript reports a base config that it cannot
- * load, so Doctor reads such a base as one that names no preset.
+ * The `extends` entries of the TypeScript config at `file` and of each base config that a relative
+ * or absolute entry names. TypeScript adds `.json` to such a path when it is not a file and does
+ * not end in `.json`. Doctor follows no package entry. The chain stops at a base config that is not
+ * a file, cannot be read, does not decode, or comes again. TypeScript reports a base config that it
+ * cannot load, so Doctor reads such a base as one that names no preset.
  */
 const readExtendsChain = (
   file: string,
   visited: ReadonlySet<string> = new Set()
-): Effect.Effect<readonly string[], never, FileSystem.FileSystem | ModuleResolver | Path.Path> =>
+): Effect.Effect<readonly string[], never, FileSystem.FileSystem | Path.Path> =>
   Effect.gen(function* () {
     const path = yield* Path.Path
-    const resolver = yield* ModuleResolver
 
     const text =
       visited.has(file) || !(yield* checkIsFile(file))
@@ -161,35 +168,60 @@ const readExtendsChain = (
       { onNone: () => [], onSome: readExtends }
     )
 
-    const directory = path.dirname(file)
-
     const bases = yield* Effect.forEach(
-      entries,
+      entries.filter((entry) => checkIsPath(path, entry)),
       (entry) =>
         Effect.gen(function* () {
-          if (ADAMANTITE_PRESETS.includes(entry)) {
-            return []
-          }
+          const named = path.resolve(path.dirname(file), entry)
 
-          // The file that a relative or absolute entry names.
-          const named = path.resolve(directory, entry)
-
-          const base =
-            path.isAbsolute(entry) || entry.startsWith("./") || entry.startsWith("../")
-              ? Option.some(
-                  named.endsWith(".json") || (yield* checkIsFile(named)) ? named : `${named}.json`
-                )
-              : yield* resolver.resolveConfig(directory, entry)
-
-          return Option.isNone(base)
-            ? []
-            : yield* readExtendsChain(base.value, new Set([...visited, file]))
+          return yield* readExtendsChain(
+            named.endsWith(".json") || (yield* checkIsFile(named)) ? named : `${named}.json`,
+            new Set([...visited, file])
+          )
         }),
       { concurrency: "unbounded" }
     )
 
     return [...entries, ...bases.flat()]
   })
+
+/**
+ * What the `extends` chain of a `tsconfig.json` shows about the Adamantite preset that it uses.
+ */
+type Chain =
+  /**
+   * The chain names no Adamantite preset and reaches no other package.
+   */
+  | { readonly _tag: "NoPreset" }
+  /**
+   * The chain names `preset`, or `adamantite/typescript` when it names both presets, and reaches no
+   * other package.
+   */
+  | { readonly _tag: "Preset"; readonly preset: TypeScriptPreset }
+  /**
+   * The chain reaches the base config `entry` of another package. Doctor does not follow it, so the
+   * preset that the chain uses is unknown.
+   */
+  | { readonly _tag: "UnknownBase"; readonly entry: string }
+
+const { $is: isChain, $match: matchChain, NoPreset, Preset, UnknownBase } = Data.taggedEnum<Chain>()
+
+/**
+ * What the `extends` entries that a chain reaches show. Doctor follows each path entry, so only the
+ * package entries count. `TYPESCRIPT_PRESET_NAMES` lists `typescript` first.
+ */
+function toChain(path: Path.Path, entries: readonly string[]): Chain {
+  const packages = entries.filter((entry) => !checkIsPath(path, entry))
+  const unknown = packages.find((entry) => !ADAMANTITE_PRESETS.includes(entry))
+
+  if (unknown !== undefined) {
+    return UnknownBase({ entry: unknown })
+  }
+
+  const preset = TYPESCRIPT_PRESET_NAMES.find((name) => packages.includes(TYPESCRIPT_PRESETS[name]))
+
+  return preset === undefined ? NoPreset() : Preset({ preset })
+}
 
 // Another project imports a package that is not private and declares `exports` or `types`, so it
 // can read the declaration files that the package emits.
@@ -217,8 +249,8 @@ function toLibraryFinding(configPath: string): Finding {
 
 /**
  * The root and the workspace packages whose `tsconfig.json` names an Adamantite preset, directly or
- * through a base config, or loads its type resets, with the presets that the `extends` chain
- * names.
+ * through a base config, reaches a base config of another package, or loads the type resets, with
+ * the chain that its `extends` entries show.
  */
 const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
   cwd,
@@ -237,11 +269,9 @@ const readConfiguredPackages = Effect.fn("readConfiguredPackages")(function* ({
             ? false
             : Option.getOrElse(yield* readLoadsResets(directory), () => false)
 
-        const presets = TYPESCRIPT_PRESET_NAMES.filter((preset) =>
-          entries.includes(TYPESCRIPT_PRESETS[preset])
-        )
+        const chain = toChain(path, entries)
 
-        return presets.length > 0 || loadsResets ? [{ directory, loadsResets, presets }] : []
+        return isChain("NoPreset")(chain) && !loadsResets ? [] : [{ chain, directory, loadsResets }]
       }),
     { concurrency: 4 }
   )
@@ -313,23 +343,28 @@ function toMismatchedPresetFinding(
 }
 
 /**
- * The preset that the project's configs set up: `typescript` when a config names it or loads its
- * type resets, `tsconfig` when a config names only `tsconfig`. Doctor applies the integration to
- * the same configs.
+ * The preset that the project's configs set up: `typescript` when a config loads its type resets or
+ * its chain names it, `tsconfig` when a chain names only `tsconfig`. None when each chain is
+ * unknown or names no preset, and no config loads the resets. Doctor applies the integration to the
+ * same configs.
  */
 export const detectPreset = (project: Project) =>
   readConfiguredPackages(project).pipe(
-    Effect.map((configured) =>
-      configured.length === 0
-        ? Option.none<TypeScriptPreset>()
-        : Option.some<TypeScriptPreset>(
-            configured.some(
-              ({ presets, loadsResets }) => loadsResets || presets.includes("typescript")
-            )
-              ? "typescript"
-              : "tsconfig"
-          )
-    )
+    Effect.map((configured) => {
+      const used = new Set(
+        configured.flatMap(({ chain, loadsResets }) =>
+          loadsResets
+            ? ["typescript"]
+            : matchChain(chain, {
+                NoPreset: () => [],
+                Preset: ({ preset }) => [preset],
+                UnknownBase: () => [],
+              })
+        )
+      )
+
+      return Option.fromUndefinedOr(TYPESCRIPT_PRESET_NAMES.find((name) => used.has(name)))
+    })
   )
 
 /**
@@ -360,7 +395,7 @@ const assess = Effect.fn("assess")(function* (
 
   const findings = yield* Effect.forEach(
     configured,
-    ({ directory, loadsResets, presets }) =>
+    ({ chain, directory, loadsResets }) =>
       Effect.gen(function* () {
         const configPath = path.relative(cwd, path.join(directory, CONFIG_PATH))
         const manifest = directory === cwd ? packageJson : yield* readPackageJson(directory)
@@ -369,7 +404,16 @@ const assess = Effect.fn("assess")(function* (
           return loadsResets ? [toLibraryFinding(configPath)] : []
         }
 
-        const used = loadsResets || presets.includes("typescript") ? "typescript" : "tsconfig"
+        // Doctor does not follow the base config of another package, so it cannot tell which
+        // preset the package uses.
+        if (isChain("UnknownBase")(chain)) {
+          return []
+        }
+
+        const used =
+          loadsResets || (isChain("Preset")(chain) && chain.preset === "typescript")
+            ? "typescript"
+            : "tsconfig"
 
         return preset === used ? [] : [toMismatchedPresetFinding(configPath, preset, used)]
       }),

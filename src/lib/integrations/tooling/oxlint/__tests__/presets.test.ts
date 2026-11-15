@@ -8,9 +8,9 @@ import {
   describeLintPreset,
   findExcludedPresets,
   findMissingRequiredPresets,
-  LINT_PRESETS,
   lintPresets,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
+import { LINT_PRESETS } from "#lib/project/selection.ts"
 import packageJson from "../../../../../../package.json" with { type: "json" }
 
 const PRESET_FILES_DIR = join(import.meta.dirname, "../../../../../../presets/lint")

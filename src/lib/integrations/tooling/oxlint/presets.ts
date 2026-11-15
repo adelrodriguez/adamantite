@@ -2,6 +2,7 @@ import type { OxlintPlugin } from "#lib/integrations/tooling/oxlint/plugins/base
 import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/index.ts"
 import reactDoctor from "#lib/integrations/tooling/oxlint/plugins/react-doctor.ts"
 import tailwind from "#lib/integrations/tooling/oxlint/plugins/tailwind.ts"
+import { LINT_PRESETS, type LintPreset } from "#lib/project/selection.ts"
 
 interface LintPresetDefinition {
   /**
@@ -9,7 +10,7 @@ interface LintPresetDefinition {
    * selection of the two gives two reports for each defect. The exclusion goes both ways, so each
    * preset lists the other.
    */
-  readonly excludes?: readonly string[]
+  readonly excludes?: readonly LintPreset[]
   /**
    * What the preset's rules check, for the init choice. `describeLintPreset` adds the plugin
    * package and the required presets.
@@ -17,90 +18,73 @@ interface LintPresetDefinition {
   readonly hint: string
   readonly label: string
   /**
-   * The published module is `adamantite/lint/<name>`.
-   */
-  readonly name: string
-  /**
    * The managed plugin that init installs, and Doctor and update maintain, for this preset.
    */
   readonly plugin?: OxlintPlugin
   /**
    * The presets that must be selected with this one.
    */
-  readonly requires?: readonly string[]
+  readonly requires?: readonly LintPreset[]
 }
 
-/**
- * Every lint preset a target project can select besides core, in the order that init offers them.
- * Each one is published as `adamantite/lint/<name>`.
- */
-export const lintPresets = [
-  {
-    hint: "Check React code, JSX accessibility, and performance.",
-    label: "react",
-    name: "react",
+// `satisfies` fails for a preset without a definition, and for a definition without a preset.
+const definitions = {
+  architecture: {
+    hint: "Check the layer maps and import owners you define.",
+    label: "architecture",
   },
-  {
-    hint: "Keep state, effect, and memo hooks in hook files.",
-    label: "react-strict",
-    name: "react-strict",
-    plugin: reactDoctor,
-    requires: ["react"],
-  },
-  {
-    hint: "Use queryOptions() and keep query data out of state.",
-    label: "tanstack",
-    name: "tanstack",
-  },
-  {
-    hint: "Check Next.js scripts, fonts, images, and head usage.",
-    label: "next.js",
-    name: "nextjs",
-  },
-  {
-    hint: "Check Vue 3 code for errors and deprecated APIs.",
-    label: "vue",
-    name: "vue",
-  },
-  {
+  effect: {
     hint: "Find effects that never run.",
     label: "effect",
-    name: "effect",
     plugin: effectTsgo,
   },
-  {
+  jest: {
     excludes: ["vitest"],
     hint: "Find focused or skipped tests and check assertions.",
     label: "jest",
-    name: "jest",
   },
-  {
+  nextjs: {
+    hint: "Check Next.js scripts, fonts, images, and head usage.",
+    label: "next.js",
+  },
+  react: {
+    hint: "Check React code, JSX accessibility, and performance.",
+    label: "react",
+  },
+  "react-strict": {
+    hint: "Keep state, effect, and memo hooks in hook files.",
+    label: "react-strict",
+    plugin: reactDoctor,
+    requires: ["react"],
+  },
+  strict: {
+    hint: "Ban type assertions, unknown parameters, module mocks, and TODOs.",
+    label: "strict",
+  },
+  tailwind: {
+    hint: "Check Tailwind v4 classes.",
+    label: "tailwind",
+    plugin: tailwind,
+  },
+  tanstack: {
+    hint: "Use queryOptions() and keep query data out of state.",
+    label: "tanstack",
+  },
+  vitest: {
     excludes: ["jest"],
     hint: "Find focused or skipped tests and check assertions.",
     label: "vitest",
-    name: "vitest",
   },
-  {
-    hint: "Check the layer maps and import owners you define.",
-    label: "architecture",
-    name: "architecture",
+  vue: {
+    hint: "Check Vue 3 code for errors and deprecated APIs.",
+    label: "vue",
   },
-  {
-    hint: "Ban type assertions, unknown parameters, module mocks, and TODOs.",
-    label: "strict",
-    name: "strict",
-  },
-  {
-    hint: "Check Tailwind v4 classes.",
-    label: "tailwind",
-    name: "tailwind",
-    plugin: tailwind,
-  },
-] as const satisfies readonly LintPresetDefinition[]
+} as const satisfies Record<LintPreset, LintPresetDefinition>
 
-export type LintPreset = (typeof lintPresets)[number]["name"]
-
-export const LINT_PRESETS = lintPresets.map((preset) => preset.name)
+/**
+ * Each lint preset of `LINT_PRESETS` with its definition, in the order that init offers them.
+ */
+export const lintPresets = LINT_PRESETS.map((name) => ({ ...definitions[name], name }))
 
 /**
  * Presets that Adamantite no longer publishes, in the order that Doctor reports them.

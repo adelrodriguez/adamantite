@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import type { Project } from "#lib/project/project.ts"
+import type { LintPreset } from "#lib/project/selection.ts"
 import {
   defineIntegration,
   type Finding,
@@ -26,7 +27,6 @@ import {
 } from "#lib/integrations/tooling/oxlint/config.ts"
 import {
   findExcludedPresets,
-  type LintPreset,
   RETIRED_LINT_PRESETS,
   type RetiredLintPreset,
 } from "#lib/integrations/tooling/oxlint/presets.ts"

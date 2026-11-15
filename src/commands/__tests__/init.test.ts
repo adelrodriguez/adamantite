@@ -4,12 +4,11 @@ import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import * as Option from "effect/Option"
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner"
-import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import type { InitOptions } from "#commands/init/options.ts"
 import { type FileSystemTestContext, createFileSystemTestContext } from "#__tests__/filesystem.ts"
 import { managedPlugin } from "#__tests__/managed-plugins.ts"
 import { createTerminalTestContext, type TestKey } from "#__tests__/terminal.ts"
 import initCommand from "#commands/init/index.ts"
-import { INIT_EDITORS, type InitEditor, type InitOptions } from "#commands/init/options.ts"
 import { installEditorExtensions, setupEditors } from "#commands/init/setup.ts"
 import { getShippedSkillFiles } from "#lib/execution/skill.macro.ts"
 import { toKnipTsConfigContent } from "#lib/integrations/tooling/knip/config.ts"
@@ -18,12 +17,18 @@ import { toOxfmtTsConfigContent } from "#lib/integrations/tooling/oxfmt/config.t
 import oxfmt from "#lib/integrations/tooling/oxfmt/index.ts"
 import { getImportedLintPresets } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import { LINT_PRESETS, lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
+import { lintPresets } from "#lib/integrations/tooling/oxlint/presets.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
 import sherif from "#lib/integrations/tooling/sherif/index.ts"
-import { TYPESCRIPT_PRESET_NAMES } from "#lib/integrations/workspace/tsconfig.ts"
 import { ADAMANTITE_AGENTS_START_MARKER } from "#lib/project/agents.ts"
 import { SCRIPT_ORDER } from "#lib/project/package-json.ts"
+import {
+  INIT_EDITORS,
+  type InitEditor,
+  LINT_PRESETS,
+  type LintPreset,
+  TYPESCRIPT_PRESET_NAMES,
+} from "#lib/project/selection.ts"
 import { CliNotFound, InvalidInitOptions, NoPackageManager } from "#lib/shared/errors.ts"
 import { formatJson, stringifyJson } from "#lib/shared/json.ts"
 import {

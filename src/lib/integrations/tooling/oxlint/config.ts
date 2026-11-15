@@ -11,7 +11,8 @@ import {
   type PropertyKey,
 } from "oxc-parser"
 import type { RequiredConfigInspection } from "#lib/integrations/tooling/base.ts"
-import type { LintPreset, RetiredLintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import type { RetiredLintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
+import type { LintPreset } from "#lib/project/selection.ts"
 import { LEGACY_CUSTOM_RULES_MODULE } from "#lib/project/custom-rules/inspect.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
 

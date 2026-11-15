@@ -14,6 +14,7 @@ import * as Result from "effect/Result"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
 import type { Project } from "#lib/project/project.ts"
+import type { TypeScriptPreset } from "#lib/project/selection.ts"
 import {
   defineIntegration,
   type Finding,
@@ -32,14 +33,6 @@ import {
 import { publicImport } from "#lib/shared/package-exports.ts"
 
 const files = [{ path: "tsconfig.json", type: "config" }] as const
-
-/**
- * The values of `--typescript`. `typescript` adds the type resets to the strict options of
- * `tsconfig`, so a config that extends both counts as `typescript`.
- */
-export const TYPESCRIPT_PRESET_NAMES = ["typescript", "tsconfig"] as const
-
-export type TypeScriptPreset = (typeof TYPESCRIPT_PRESET_NAMES)[number]
 
 /**
  * The import that `extends` names for each TypeScript preset.

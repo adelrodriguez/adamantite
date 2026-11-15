@@ -4,12 +4,10 @@ import * as Array from "effect/Array"
 import * as Prompt from "effect/cli/Prompt"
 import * as Effect from "effect/Effect"
 import * as Option from "effect/Option"
-import type { TypeScriptPreset } from "#lib/integrations/workspace/tsconfig.ts"
 import {
   describeLintPreset,
   findExcludedPresets,
   findMissingRequiredPresets,
-  type LintPreset,
   lintPresets,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
@@ -22,8 +20,9 @@ import {
   checkRunsTool,
   listSupportedPackageManagers,
 } from "#lib/project/package-json.ts"
+import { INIT_EDITORS, type LintPreset, type TypeScriptPreset } from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
-import { INIT_EDITOR_CHOICES, INIT_EDITORS, type InitOptionsInput } from "./options.ts"
+import { INIT_EDITOR_CHOICES, type InitOptionsInput } from "./options.ts"
 
 const describeScriptConflict = (conflict: ScriptConflict) =>
   `\`${conflict.script}\` runs \`${conflict.command}\`. Adamantite would replace it with \`${MANAGED_SCRIPT_COMMANDS[conflict.script]}\`.`

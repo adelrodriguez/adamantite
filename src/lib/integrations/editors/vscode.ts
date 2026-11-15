@@ -6,9 +6,9 @@ import * as Option from "effect/Option"
 import * as Path from "effect/Path"
 import * as Predicate from "effect/Predicate"
 import * as Schema from "effect/Schema"
-import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import type { Script } from "#lib/project/package-json.ts"
 import type { Project } from "#lib/project/project.ts"
+import type { LintPreset } from "#lib/project/selection.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import {
   defineIntegration,

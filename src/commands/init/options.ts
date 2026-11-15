@@ -6,13 +6,7 @@ import * as Option from "effect/Option"
 import {
   findExcludedPresets,
   findMissingRequiredPresets,
-  LINT_PRESETS,
-  type LintPreset,
 } from "#lib/integrations/tooling/oxlint/presets.ts"
-import {
-  TYPESCRIPT_PRESET_NAMES,
-  type TypeScriptPreset,
-} from "#lib/integrations/workspace/tsconfig.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
 import { INIT_FLAGS } from "#lib/project/init-command.ts"
 import {
@@ -23,11 +17,15 @@ import {
   checkRunsTool,
   listSupportedPackageManagers,
 } from "#lib/project/package-json.ts"
+import {
+  INIT_EDITORS,
+  type InitEditor,
+  LINT_PRESETS,
+  type LintPreset,
+  TYPESCRIPT_PRESET_NAMES,
+  type TypeScriptPreset,
+} from "#lib/project/selection.ts"
 import { InvalidInitOptions } from "#lib/shared/errors.ts"
-
-export const INIT_EDITORS = ["vscode", "zed"] as const
-
-export type InitEditor = (typeof INIT_EDITORS)[number]
 
 /**
  * The title and description that the interactive prompt shows for each editor. The `vscode`

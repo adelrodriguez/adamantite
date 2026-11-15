@@ -5,7 +5,6 @@ import type { PackageManagerName } from "nypm"
 import * as Effect from "effect/Effect"
 import { pipe } from "effect/Function"
 import * as Match from "effect/Match"
-import type { LintPreset } from "#lib/integrations/tooling/oxlint/presets.ts"
 import { detectSkillFolders, writeSkill } from "#lib/execution/skill.ts"
 import github from "#lib/integrations/ci/github.ts"
 import vscode from "#lib/integrations/editors/vscode.ts"
@@ -19,7 +18,6 @@ import effectTsgo from "#lib/integrations/tooling/oxlint/plugins/effect-tsgo/ind
 import tsconfig, {
   getMonorepoGuidance,
   TYPESCRIPT_PRESETS,
-  type TypeScriptPreset,
 } from "#lib/integrations/workspace/tsconfig.ts"
 import { writeAgentsGuidance } from "#lib/project/agents.ts"
 import { hasCICompatibleScripts } from "#lib/project/ci-scripts.ts"
@@ -33,8 +31,13 @@ import {
   type Script,
   type SupportedPackageManager,
 } from "#lib/project/package-json.ts"
+import {
+  INIT_EDITORS,
+  type InitEditor,
+  type LintPreset,
+  type TypeScriptPreset,
+} from "#lib/project/selection.ts"
 import * as Output from "#terminal/output.ts"
-import { INIT_EDITORS, type InitEditor } from "./options.ts"
 
 export const installDependencies = (cwd: string, packages: string[]) =>
   Effect.gen(function* () {

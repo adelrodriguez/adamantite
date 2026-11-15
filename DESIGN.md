@@ -67,8 +67,8 @@ fences for reference content. Paths, package names, and commands retain their li
 
 Output follows a vertical sequence. Interactive lifecycle commands start with an intro heading,
 show status lines and findings, ask the next question when needed, and finish with an outro
-heading. A run without a terminal prints no heading. Each command owns its exact sequence and
-messages.
+heading. Only a run in the `Menu` mode prints the headings. Each command owns its exact sequence
+and messages.
 
 A step prints one line when it finishes, such as `✔ Dependencies installed.` No spinner or
 progress line runs while a step works. A step that fails ends the command with a tagged error, and
@@ -84,9 +84,27 @@ goal or note has its own bullet.
 
 Plain output, such as a Markdown report, a syntax tree, or a list of rule names, goes through
 `Console.log` without a symbol. Effect's `TerminalCapabilities.canPrompt` treats a session as
-interactive only when both standard input and standard output are terminals. A command can also
-expose its own non-interactive option. A command decides its [mode](src/terminal/mode.ts) once:
-`Json` with `--json`, `Menu` in an interactive session, and `Plain` otherwise.
+interactive only when both standard input and standard output are terminals. A command decides its
+[mode](src/terminal/mode.ts) once: `Json` with `--json`, `Menu` in an interactive session, and
+`Plain` otherwise. `init --non-interactive` selects `Plain` in an interactive session too.
+
+`init` and `update` print one status line for each step of the setup, in this order. Before them,
+`init` prints the link of each Zed extension that the setup needs.
+
+1. `Packages installed:`, with one line for each package and the version that it had, such as
+   `oxlint: not installed → 1.93.0`.
+2. One line for each managed script: `` `check` script added: `adamantite check`. ``, a
+   `replaced` line with the command that it ran and the new command, or `` `check` script is up to
+   date. ``
+3. One line for each managed file: `created.`, `replaced with the current version.`, `is up to
+   date.`, `kept, because it has changes that Adamantite did not write.`, or `deleted, because the
+   setup no longer includes it.` Each line starts with the path, and a kept file names
+   `adamantite doctor`.
+4. One line for the lockfile: `written. Commit it with the setup.`, `updated. Commit it.`, or
+   `already records this setup.`
+
+A change prints as a `success` line, and a file or script that stays as it is prints as an `info`
+line. [Setup lines](src/terminal/setup.ts) define the messages.
 
 ## Components
 
@@ -97,6 +115,7 @@ expose its own non-interactive option. A command decides its [mode](src/terminal
 | Choice          | Effect's `Prompt.Confirm`, `Prompt.Select`, and `Prompt.MultiSelect`. A question shows `? message ›`, and its answer `✔ message … answer`. | `effect/cli/Prompt`                                |
 | Cancel          | Ctrl-C or Esc at a prompt fails it with `QuitError`. The command prints a cancel line, such as `■ Setup was cancelled.`                    | The command                                        |
 | Finding         | A numbered note with the current state, goals, and optional repair reference and notes.                                                    | [Findings](src/terminal/findings.ts)               |
+| Setup line      | A status line for each package install, managed script, managed file, and the lockfile that `init` and `update` handled.                   | [Setup lines](src/terminal/setup.ts)               |
 | Resolution menu | Installed agent handoffs, then prompt copy, then `Finish without an agent`.                                                                | [Resolution menu](src/terminal/resolution-menu.ts) |
 | Prompt copy     | Print the Markdown prompt and send it to the terminal clipboard with OSC 52. An agent CLI that does not start prints it too.               | [Resolution menu](src/terminal/resolution-menu.ts) |
 | JSON document   | One JSON document with two-space indentation on standard output, which a command's Effect Schema decodes.                                  | [Output](src/terminal/output.ts)                   |

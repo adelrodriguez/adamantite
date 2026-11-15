@@ -17,7 +17,12 @@ export const testFiles: string[] = ["**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx,mts
 
 const plugins: OxlintConfig["plugins"] = ["vitest"]
 
+const identity: PresetIdentity = { module: "adamantite/lint/vitest" }
+
+// The rules name the preset too, so an override that spreads `vitest.rules`, as the comment of
+// `testFiles` shows, applies the preset for Doctor.
 const rules: OxlintConfig["rules"] = {
+  [PRESET]: identity,
   "vitest/consistent-each-for": "error",
   // TEMPORARY: The fix of the rule renames a test call, such as `test` to `it` in `describe`, but
   // it does not change the import. The file then calls a function that it does not import. Turn the
@@ -130,7 +135,7 @@ const rules: OxlintConfig["rules"] = {
 }
 
 const config: OxlintConfig = {
-  [PRESET]: { module: "adamantite/lint/vitest" } satisfies PresetIdentity,
+  [PRESET]: identity,
   overrides: [{ files: testFiles, plugins, rules }],
 }
 

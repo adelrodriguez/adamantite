@@ -20,7 +20,12 @@ export const testFiles: string[] = [
 
 const plugins: OxlintConfig["plugins"] = ["jest"]
 
+const identity: PresetIdentity = { module: "adamantite/lint/jest" }
+
+// The rules name the preset too, so an override that spreads `jest.rules`, as the comment of
+// `testFiles` shows, applies the preset for Doctor.
 const rules: OxlintConfig["rules"] = {
+  [PRESET]: identity,
   // TEMPORARY: The fix of the rule renames a test call, such as `test` to `it` in `describe`, but
   // it does not change the import. The file then calls a function that it does not import. Turn the
   // rule on again when an Oxlint release keeps the import:
@@ -103,7 +108,7 @@ const rules: OxlintConfig["rules"] = {
 }
 
 const config: OxlintConfig = {
-  [PRESET]: { module: "adamantite/lint/jest" } satisfies PresetIdentity,
+  [PRESET]: identity,
   overrides: [{ files: testFiles, plugins, rules }],
 }
 

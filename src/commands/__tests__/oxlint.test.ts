@@ -40,6 +40,16 @@ const RENDERED = [
   ...OPTIONS,
 ].join("\n")
 
+// The rendered config without the selected vitest preset.
+const WITHOUT_VITEST = RENDERED.replace(
+  'import vitest from "adamantite/lint/vitest"\n',
+  ""
+).replace("[core, vitest, custom()]", "[core, custom()]")
+
+const MISSING_PRESET = "The config does not apply a selected lint preset"
+
+const EXCLUDED_PRESETS = "The config extends two presets that report the same defects"
+
 // The config that Adamantite 0.47.0 wrote, before its imports were in Oxfmt's order.
 const OLDER = [
   'import { defineConfig } from "oxlint"',
@@ -105,12 +115,9 @@ describe("Oxlint setup", () => {
     },
     {
       change: "a selected preset removed",
-      config: RENDERED.replace('import vitest from "adamantite/lint/vitest"\n', "").replace(
-        "[core, vitest, custom()]",
-        "[core, custom()]"
-      ),
+      config: WITHOUT_VITEST,
       finding:
-        "The lockfile selects the `vitest` preset, and `oxlint.config.ts` does not apply `adamantite/lint/vitest`.",
+        "The lockfile selects the `vitest` preset, and no Oxlint config of the project applies `adamantite/lint/vitest`.",
     },
     {
       change: "a required option turned off",
@@ -129,6 +136,63 @@ describe("Oxlint setup", () => {
       expect(files.read(CONFIG)).toBe(config)
       expect(init.output).toContain(`● \`${CONFIG}\` kept, because it has changes`)
       expect(doctor.output).toContain(finding)
+    })
+  )
+
+  // Oxlint loads the config of each workspace package, so a preset that a package applies counts.
+  it.effect("report no missing preset that a workspace package config applies", () =>
+    Effect.gen(function* () {
+      const files = makeProject()
+      yield* runLifecycle("init", files, INIT_ARGS)
+      files.write(CONFIG, WITHOUT_VITEST)
+      files.write("pnpm-workspace.yaml", "packages:\n  - packages/*\n")
+      files.write("packages/web/package.json", '{ "name": "web" }\n')
+      files.write(
+        `packages/web/${CONFIG}`,
+        [
+          'import vitest from "adamantite/lint/vitest"',
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({ extends: [vitest] })",
+          "",
+        ].join("\n")
+      )
+
+      const { output } = yield* runLifecycle("doctor", files)
+
+      expect(output).not.toContain(MISSING_PRESET)
+    })
+  )
+
+  // The `excluded-presets` repair scopes each preset to its own files, as the documentation comment
+  // of each preset shows.
+  it.effect("report neither a missing nor an excluded preset in disjoint overrides", () =>
+    Effect.gen(function* () {
+      const files = makeProject({
+        ...makeLockfileFile(
+          makeSelection({ presets: ["core", "jest", "vitest"], scripts: ["check"] })
+        ),
+        [CONFIG]: [
+          'import core from "adamantite/lint"',
+          'import jest from "adamantite/lint/jest"',
+          'import vitest from "adamantite/lint/vitest"',
+          'import custom from "adamantite/rules"',
+          'import { defineConfig } from "oxlint"',
+          "",
+          "export default defineConfig({",
+          "  extends: [core, custom()],",
+          "  overrides: [",
+          '    { files: ["legacy/**/*.test.ts"], plugins: jest.plugins, rules: { ...jest.rules } },',
+          '    { files: ["src/**/*.test.ts"], plugins: vitest.plugins, rules: { ...vitest.rules } },',
+          "  ],",
+          ...OPTIONS,
+        ].join("\n"),
+      })
+
+      const { output } = yield* runLifecycle("doctor", files)
+
+      expect(output).not.toContain(MISSING_PRESET)
+      expect(output).not.toContain(EXCLUDED_PRESETS)
     })
   )
 

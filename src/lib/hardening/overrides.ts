@@ -8,7 +8,7 @@ import type { ProjectPath } from "#lib/hardening/project-files.ts"
 import type { Workspace } from "#lib/project/monorepo.ts"
 import { isReportOf, lintFiles, listLintedFiles, resolveRule } from "#lib/hardening/oxlint.ts"
 import { makeProjectCopy, renderOverrideTrialConfig, replaceConfigs } from "#lib/hardening/trial.ts"
-import { readConfig } from "#lib/project/config-loader.ts"
+import { IDENTITY_KEY, readConfig } from "#lib/project/config-loader.ts"
 import { checkExists } from "#lib/shared/filesystem.ts"
 
 /**
@@ -92,6 +92,13 @@ const RuleSetting = Schema.Union([
 ])
 
 /**
+ * The name of a rule in the `rules` of a loaded override. The rules of a preset, such as vitest,
+ * name the preset under `IDENTITY_KEY`, which is not a rule, and a record skips each key that its
+ * key schema rejects.
+ */
+const RuleName = Schema.String.check(Schema.makeFilter((key: string) => key !== IDENTITY_KEY))
+
+/**
  * What Adamantite reads from a loaded Oxlint config for the trials: the `files` and `rules` of each
  * override, in the order of `overrides`.
  */
@@ -100,7 +107,7 @@ const OverridesConfig = Schema.Struct({
     Schema.Array(
       Schema.Struct({
         files: Schema.optional(Schema.Array(Schema.String)),
-        rules: Schema.optional(Schema.Record(Schema.String, RuleSetting)),
+        rules: Schema.optional(Schema.Record(RuleName, RuleSetting)),
       })
     )
   ),

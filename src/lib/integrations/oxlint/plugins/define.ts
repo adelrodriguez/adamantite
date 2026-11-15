@@ -28,8 +28,8 @@ interface ManagedPluginOptions<AssessError, AssessRequirements> {
 
 /**
  * A managed plugin: an Oxlint plugin package the target project installs for one lint preset. The
- * package is required only while `oxlint.config.ts` applies that preset. Other options, such as a
- * plugin's own `update` step, become methods of the integration.
+ * package is required only while an Oxlint config of the project applies that preset. Other
+ * options, such as a plugin's own `update` step, become methods of the integration.
  */
 export function defineManagedPlugin<
   const Extensions extends object,
@@ -39,7 +39,7 @@ export function defineManagedPlugin<
   const { assess: assessMore, name, preset, version, ...extensions } = options
 
   const tooling = definePackageTooling({
-    isRequired: ({ lintConfig }) => checkAppliesLintPreset(lintConfig, preset),
+    isRequired: (project) => checkAppliesLintPreset(project, preset),
     name,
     purpose: `the \`adamantite/lint/${preset}\` preset`,
     scripts: getScriptsThatRun("oxlint"),

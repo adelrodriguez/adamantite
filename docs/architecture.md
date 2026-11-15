@@ -295,8 +295,10 @@ and `config.ts` of `oxfmt/` and `knip/`. The trials of `harden` decode the overr
 Each preset object, and each `custom()` result, names itself under the `adamantite.preset` symbol of
 `presets/identity.ts`, and the loader writes that identity into the JSON. A spread keeps the key,
 and every installed copy of Adamantite shares it, so a preset counts also through a spread or a
-shared config package. The tools ignore symbol keys. The unit tests evaluate the in-memory configs
-in process with `src/__tests__/config-loader.ts`, and the process tests run the real loader.
+shared config package. The `rules` of the jest and vitest presets name the preset too, so an
+override that spreads them counts as applying the preset. The tools ignore symbol keys. The unit
+tests evaluate the in-memory configs in process with `src/__tests__/config-loader.ts`, and the
+process tests run the real loader.
 
 The disable comments of a file and its syntax tree come from Oxlint itself, because only the parser
 knows them. `src/probe.ts`, built as `dist/probe.js`, is the probe plugin: a small JS plugin whose

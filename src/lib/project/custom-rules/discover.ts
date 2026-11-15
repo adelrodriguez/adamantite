@@ -49,8 +49,9 @@ const findConfigFile = Effect.fn("findConfigFile")(function* (directory: string)
  * reach. Each config loads as Oxlint loads it, so a call in a module that the config imports, such
  * as the entry module of a shared tooling package, counts, and a call in a module that no config
  * imports does not. As in Oxlint, a directory uses the config of the innermost package that
- * contains it and has one. A config that does not load is in `unloadedConfigs`, with the reason.
- * Every config loads in `cwd`, the project root that `adamantite check` starts Oxlint in.
+ * contains it and has one. A config that loads is in `loadedConfigs`, and a config that does not
+ * load is in `unloadedConfigs`, with the reason. Every config loads in `cwd`, the project root that
+ * `adamantite check` starts Oxlint in.
  */
 export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
   cwd: string,
@@ -100,6 +101,9 @@ export const discoverCustomRules = Effect.fn("discoverCustomRules")(function* (
         : []
     ),
     configs,
+    loadedConfigs: loaded.flatMap(({ read }) =>
+      read !== undefined && Result.isSuccess(read) ? [read.success] : []
+    ),
     unloadedConfigs: loaded.flatMap(({ config, read }) =>
       read !== undefined && Result.isFailure(read)
         ? [{ file: config, reason: read.failure.reason }]

@@ -7,11 +7,22 @@ import {
 } from "#lib/project/config-loader.ts"
 
 /**
+ * An entry of `overrides` in a loaded Oxlint config. An entry that spreads a preset names the
+ * preset itself, and an entry that spreads the `rules` of a preset, as the documentation comment of
+ * the jest and vitest presets shows, names it in `rules`.
+ */
+const OverrideObject = Schema.Struct({
+  [IDENTITY_KEY]: Schema.optional(PresetIdentity),
+  rules: Schema.optional(Schema.Struct({ [IDENTITY_KEY]: Schema.optional(PresetIdentity) })),
+})
+
+/**
  * A config object in a loaded Oxlint config: the config itself or an entry of its `extends`.
  */
 interface ConfigObject {
   readonly [IDENTITY_KEY]?: typeof PresetIdentity.Type | RulesFolderIdentity
   readonly extends?: readonly ConfigObject[]
+  readonly overrides?: ReadonlyArray<typeof OverrideObject.Type>
 }
 
 const CONFIG_OBJECT_FIELDS = {
@@ -19,6 +30,7 @@ const CONFIG_OBJECT_FIELDS = {
   extends: Schema.optional(
     Schema.Array(Schema.suspend((): Schema.Codec<ConfigObject> => ConfigObject))
   ),
+  overrides: Schema.optional(Schema.Array(OverrideObject)),
 }
 
 const ConfigObject: Schema.Codec<ConfigObject> = Schema.Struct(CONFIG_OBJECT_FIELDS)
@@ -49,6 +61,23 @@ function listConfigObjects(config: ConfigObject): readonly ConfigObject[] {
  */
 export function listPresetModules(config: LintConfig): readonly string[] {
   return listConfigObjects(config).flatMap((entry) => entry[IDENTITY_KEY]?.module ?? [])
+}
+
+/**
+ * The modules of the Adamantite presets that `config` applies anywhere: through `extends`, as
+ * `listPresetModules` lists them, or in an entry of `overrides`, which applies the preset only to
+ * the files of the entry.
+ */
+export function listAppliedPresetModules(config: LintConfig): readonly string[] {
+  const scoped = listConfigObjects(config).flatMap(({ overrides = [] }) =>
+    overrides.flatMap((override) =>
+      [override[IDENTITY_KEY], override.rules?.[IDENTITY_KEY]].flatMap(
+        (identity) => identity?.module ?? []
+      )
+    )
+  )
+
+  return [...listPresetModules(config), ...scoped]
 }
 
 /**

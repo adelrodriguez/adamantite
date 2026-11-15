@@ -145,6 +145,14 @@ function makeConfig(body: string) {
   ].join("\n")
 }
 
+// An override that spreads the rules of the vitest preset and turns a project rule off.
+const VITEST_RULES_CONFIG = [
+  `import vitest from ${JSON.stringify(join(REPO_ROOT, "presets/lint/vitest.ts"))}`,
+  makeConfig(
+    '{ extends: [custom()], overrides: [{ files: ["src/legacy.ts"], plugins: vitest.plugins, rules: { ...vitest.rules, "project/no-debugger-here": "off" } }] }'
+  ),
+].join("\n")
+
 // The fixtures without a workspace package declare no workspace.
 const NO_WORKSPACE: Workspace = { catalogs: {}, isMonorepo: false, packageDirectories: [] }
 
@@ -598,6 +606,26 @@ describe("rule trials in a real project", () => {
         })
       )
       expect(listProject()).toStrictEqual(before)
+    })
+  )
+
+  // The rules of the vitest preset name the preset under the identity key, which is not a rule.
+  it.live("read an override that spreads the rules of a preset", () =>
+    Effect.gen(function* () {
+      write("oxlint.config.ts", VITEST_RULES_CONFIG)
+
+      const report = yield* readRootOverrides()
+
+      expect(report).toBeInstanceOf(LintedOverrides)
+      expect(report).toHaveProperty(
+        "rules",
+        expect.arrayContaining([
+          expect.objectContaining({
+            files: [{ file: "src/legacy.ts", mark: "breaks" }],
+            rule: "project/no-debugger-here",
+          }),
+        ])
+      )
     })
   )
 

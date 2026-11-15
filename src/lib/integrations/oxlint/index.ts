@@ -12,6 +12,7 @@ import {
 import {
   findMisplacedCorePreset,
   inspectRequiredOxlintConfig,
+  listAppliedLintPresets,
   listLintPresets,
   type MisplacedCorePreset,
   toOxlintTsConfigContent,
@@ -22,6 +23,7 @@ import { findExcludedPresets } from "#lib/integrations/oxlint/presets.ts"
 import { assessOxlintRuntime } from "#lib/integrations/oxlint/runtime-assessment.ts"
 import tsrs from "#lib/integrations/oxlint/tsrs.ts"
 import { assessPackage } from "#lib/integrations/tooling/base.ts"
+import { isDiscoveryComplete } from "#lib/project/custom-rules/discover.ts"
 import { checkRunsTool } from "#lib/project/package-json.ts"
 import { LINT_PRESETS, type LintPreset, type Selection } from "#lib/project/selection.ts"
 import { publicImport } from "#lib/shared/package-exports.ts"
@@ -64,16 +66,17 @@ function toCorePresetOrderFinding({ before, core }: MisplacedCorePreset): Findin
 }
 
 /**
- * The finding for a config that does not apply a lint preset that the lockfile selects. Assessment
- * does not write the config.
+ * The finding for a lint preset that the lockfile selects and no Oxlint config of the project
+ * applies. Assessment does not write the config.
  */
 function toMissingPresetFinding(preset: LintPreset): Finding {
   const module = publicImport(`./lint/${preset}`)
 
   return {
-    currentState: `The lockfile selects the \`${preset}\` preset, and \`oxlint.config.ts\` does not apply \`${module}\`.`,
+    currentState: `The lockfile selects the \`${preset}\` preset, and no Oxlint config of the project applies \`${module}\`.`,
     goal: [
       `Import \`${module}\` in \`oxlint.config.ts\`, and add it to \`extends\` after the core preset. Keep all other project settings.`,
+      "If only some workspace packages need the preset, apply it in the Oxlint config of each of those packages instead.",
       "Run `adamantite check`, and correct the code that the added rules report. Then run `adamantite doctor` again. It must not report this finding.",
     ],
     id: "missing-lint-preset",
@@ -167,16 +170,16 @@ export default {
         Option.toArray
       )
 
-      const missingPresetFindings = Option.match(loaded, {
-        onNone: () => [],
-        onSome: (config) => {
-          const applied = listLintPresets(config)
+      // A preset counts where any config that Oxlint loads applies it, also in an override or a
+      // workspace package config. A config that does not load can apply any preset.
+      const applied = listAppliedLintPresets(project)
 
-          return listPresets(selection)
-            .filter((preset) => !applied.includes(preset))
-            .map((preset) => toMissingPresetFinding(preset))
-        },
-      })
+      const missingPresetFindings =
+        Option.isSome(loaded) && isDiscoveryComplete(project.customRules)
+          ? listPresets(selection)
+              .filter((preset) => !applied.includes(preset))
+              .map((preset) => toMissingPresetFinding(preset))
+          : []
 
       const excludedPresetsFindings = loaded.pipe(
         Option.flatMap((config) => Array.head(findExcludedPresets(listLintPresets(config)))),

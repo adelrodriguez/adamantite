@@ -29,7 +29,9 @@ Continue when each selected option serves the requested setup.
 
 ## Create the selected setup
 
-Run `init` with those options. It preserves existing package scripts whose commands differ
+Run `init` with those options. It records the selection in `.adamantite/adamantite-lock.json`,
+and a later `init` adds its options to that selection. Commit the lockfile with the setup.
+It preserves existing package scripts whose commands differ
 from its managed commands. Use `--overwrite-scripts` only when the task includes replacing them.
 Read the output for preserved configuration that needs a Doctor repair.
 
@@ -66,5 +68,6 @@ Continue when Doctor reports no findings for the selected plugins and editors.
 ## Check the setup
 
 - Each selected managed script runs successfully.
+- `.adamantite/adamantite-lock.json` exists and is committed with the setup.
 - Doctor reports no findings, and its assessment warnings are recorded.
 - Existing scripts and configuration are preserved unless the task includes replacing them.

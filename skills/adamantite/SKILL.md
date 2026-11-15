@@ -80,8 +80,9 @@ findings. Report assessment warnings separately, because warnings alone also exi
 
 ## Update managed dependencies
 
-Run `adamantite update`. It updates managed dependencies and refreshes stale skill copies
-that `init` installed from the package. It reports remaining setup findings but can exit 0
+Run `adamantite update`. It updates managed dependencies, refreshes stale skill copies
+that `init` installed from the package, and writes `.adamantite/adamantite-lock.json`. In a
+project without a lockfile, it records the setup that the project files show. Commit the lockfile. It reports remaining setup findings but can exit 0
 with findings still present.
 
 Follow the repair step above. The update is complete when Doctor reports no findings and

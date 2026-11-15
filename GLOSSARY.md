@@ -122,6 +122,18 @@ comments. Adamantite owns the jobs in it, and the target project owns the rest o
 A target project has one managed block.
 _Avoid_: Managed workflow, Adamantite job
 
+**Selection**:
+What `init` was asked to set up in a target project: the lint presets, the TypeScript preset, the
+editors, the CI provider, the agent guidance, and the managed scripts. The lockfile records it, and
+Doctor checks each integration that it includes.
+_Avoid_: Options, config, setup flags
+
+**Lockfile**:
+`.adamantite/adamantite-lock.json` at the root of a target project, or at the workspace root of a
+monorepo. It records the selection, the Adamantite version that last wrote it, and the hash of each
+file that Adamantite wrote whole. Only `init` and `update` write it, and the project commits it.
+_Avoid_: Manifest, state file, `skills-lock.json`
+
 **Assessment**:
 A read-only classification of a managed integration against its latest supported state.
 _Avoid_: Check result, diagnostic

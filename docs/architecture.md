@@ -32,7 +32,8 @@ under Node.js. A packaged smoke test keeps Bun runtime compatibility covered.
 | `assessment`   | Register every managed integration, assess the project, and render the Markdown agent prompt.                                                     |
 | `hardening`    | Find the configs, rules folders, instructions, and Markdown files of the project, compute the rule facts, and render the prompt. Run rule trials. |
 | `integrations` | Detect supported tooling, editor, workspace, and CI state, and assess each one against the managed ideal.                                         |
-| `project`      | Read and write target-project files, install dependencies, and derive workspace state.                                                            |
+| `project`      | Read and write target-project files, install dependencies, derive workspace state, and read the lockfile.                                         |
+| `setup`        | Write the lockfile: infer the selection of a project from before the lockfile, and record the managed files that Adamantite wrote whole.          |
 | `shared`       | Define errors, filesystem helpers, and JSON helpers.                                                                                              |
 | `terminal`     | Prompt the user, render findings, show the resolution menu, and render the CLI title.                                                             |
 | `presets`      | Publish lint, format, analysis, and TypeScript configuration.                                                                                     |
@@ -57,7 +58,7 @@ A layer that the map does not connect to another layer is its sibling, so `proje
 target-project files and package state, but not integration types such as `Finding`. An import
 that breaks a map, or a folder that is not in its map, fails `pnpm run check`.
 
-`toolchain`, `assessment`, and `hardening` are siblings above `integrations`. The `check`,
+`toolchain`, `assessment`, `hardening`, and `setup` are siblings above `integrations`. The `check`,
 `fix`, and `analyze` commands call `toolchain/index.ts`, and `harden` calls its `check`
 operation after a handoff. Doctor calls `assessment`. The Oxlint integration and the Oxlint
 entry use one Oxlint runtime resolver. `hardening` starts the Oxlint entry through
@@ -100,9 +101,25 @@ comment reader is in `project/suppressions.ts`, and the shared Oxlint process op
 that it reaches, so the rule migration can read config keys without executing project code.
 
 An assessment reads the target project one time. `readProject` in `src/lib/project/project.ts`
-reads `package.json`, the workspace packages, the root `oxlint.config.ts`, and the custom rules
-that the Oxlint configs load, and each integration's `assess` takes that `Project`. A `Project`
-is a snapshot, so a reassessment after a handoff or an install reads a new one.
+reads `package.json`, the workspace packages, the root `oxlint.config.ts`, the lockfile, and the
+custom rules that the Oxlint configs load, and each integration's `assess` takes that `Project`. A
+`Project` is a snapshot, so a reassessment after a handoff or an install reads a new one.
+
+The lockfile is `.adamantite/adamantite-lock.json` at the project root, the workspace root in a
+monorepo. `Lockfile` and `Selection` in `src/lib/project/` are its Effect schemas. `readProject`
+decodes it once into `project.lockfile`, an `Option`, and the rest of the code trusts it. A
+lockfile with an unknown `schemaVersion` fails with `UnsupportedLockfile`, and one that does not
+decode fails with `InvalidLockfile`. Both name the file. With a lockfile, an integration applies
+when the selection includes it, so a selected integration whose file is missing gets a finding.
+Without one, each integration applies to the files that exist, and the assessment adds one
+`lockfile-missing` finding when any integration applies.
+
+Only `init` and `update` write the lockfile, through `recordLockfile` in `src/lib/setup/`, and
+`adamantite/import-owners` keeps `#lib/setup` and `writeLockfile` to them. `written` maps each
+managed file to the hash of its content when the file equals what this version writes, or when its
+hash equals the hash that the lockfile recorded. The Oxlint, Oxfmt, and Knip configs and
+`tsconfig.json` have renders. Each run computes `written` again, so a managed file that gets a
+render later enters `written` on the next `update` while it still equals the render.
 
 A command that reads the workspace outside an assessment reads it one time for each phase and
 passes the `Workspace` down. `harden` reads it before the session, and takes `project.workspace`
@@ -159,7 +176,8 @@ writing files.
   ([oxc#16118](https://github.com/oxc-project/oxc/issues/16118)).
 - `analyze` calls Toolchain to run Sherif in a detected monorepo, then Knip. `--only` selects
   one stage.
-- `init` creates selected integrations and managed scripts. When the user sets up coding agents, it
+- `init` creates selected integrations and managed scripts, then writes the lockfile with the
+  selection. A later `init` adds its options to the selection. When the user sets up coding agents, it
   writes the Adamantite skill to `.agents/skills` and to each other skill folder whose agent
   folder exists, such as `.claude/skills`. A build macro bundles `skills/adamantite/` into the CLI, so the
   copy matches the running Adamantite version without `node_modules` or the network.
@@ -181,7 +199,9 @@ writing files.
   a rule off, after a trial that turns the rule on again. The prompt shows both as data.
 - `update` updates managed dependencies, writes the Adamantite skill again to each skill folder
   whose copy differs from the bundled skill in any file, removes the `adamantite` entry from
-  `skills-lock.json`, then emits any remaining doctor findings. Doctor does not assess the skill: many CI projects do
+  `skills-lock.json`, writes the lockfile, then emits any remaining doctor findings. In a project
+  without a lockfile, `inferSelection` reads the selection from the same files that Doctor
+  applies the integrations to without one. Doctor does not assess the skill: many CI projects do
   not need it.
 - `rule add` writes only a custom rule stub. `rule ast` prints the AST that Oxlint rules visit.
   Agents use `RuleTester` from `adamantite/rules/testing` through stdin or a temporary file.
@@ -230,6 +250,7 @@ src/
     assessment/     integration registry, project assessment, agent prompt
     toolchain/      check, fix, and analyze operations
     hardening/      harden context, harden prompt, rule facts, and rule trials
+    setup/          lockfile writes: the inferred selection and the written hashes
   terminal/         status output, findings, resolution menu, and title output
   cli.ts            command definition
   index.ts          composition root and runtime boundary
@@ -245,9 +266,12 @@ in `src/lib/integrations/tooling` to match. Packages that belong to Oxlint sit u
 
 ## Lint presets
 
-`tooling/oxlint/presets.ts` holds `lintPresets`, the one list of the presets that a target
-project can select besides core. Each entry has the preset name, the init label, a hint that
-describes the rules, the presets it requires, and its managed plugin. Init builds its choices,
+`LINT_PRESETS` in `project/selection.ts` is the one list of the presets that a target project can
+select besides core, because the `Selection` schema needs it below the integrations.
+`tooling/oxlint/presets.ts` gives each one a definition, and `lintPresets` lists them in the order
+of `LINT_PRESETS`. The type checker rejects a preset without a definition. Each entry has the
+preset name, the init label, a hint that describes the rules, the presets it requires, and its
+managed plugin. Init builds its choices,
 its required-preset additions, and its `--preset` check from the list. `describeLintPreset`
 appends the plugin package and the required presets to the hint, so a written hint holds no
 setup text. A test fails when the list and the preset files in `presets/lint/` disagree.

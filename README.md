@@ -70,6 +70,33 @@ adamantite fix
 adamantite analyze
 ```
 
+Init records the setup in `.adamantite/adamantite-lock.json`, the lockfile. Commit it with the
+rest of the setup. In a monorepo, the lockfile sits at the workspace root.
+
+```json
+{
+  "schemaVersion": 1,
+  "selection": {
+    "agents": true,
+    "ci": "github",
+    "editors": ["vscode"],
+    "presets": ["core", "strict"],
+    "scripts": ["check", "fix", "analyze"],
+    "typescript": "typescript"
+  },
+  "version": "0.47.0",
+  "written": {
+    "oxlint.config.ts": "sha256-…"
+  }
+}
+```
+
+`selection` is what you asked init to set up. A later `init` adds its options to the selection.
+`version` is the Adamantite version that last wrote
+the lockfile. `written` maps each file that Adamantite wrote whole, by its path from the project
+root, to the hash of what it wrote. Doctor reads the selection, and only `init` and `update` write
+the lockfile.
+
 ## Non-interactive setup
 
 Use `--non-interactive` to configure a project entirely from flags. Specify at least one
@@ -213,7 +240,10 @@ adamantite analyze --only monorepo --fix -- --select highest
 ### `adamantite doctor`
 
 Assess every Adamantite-managed integration. Doctor is read-only. Each finding describes
-the current state, the goal state, and how to verify the repair. Doctor also checks that the
+the current state, the goal state, and how to verify the repair. Doctor checks each integration
+that the lockfile selects, so a selected integration whose file is missing or wrong gets a
+finding. A project without a lockfile gets one finding that says to run `adamantite update`, and
+Doctor checks the integrations whose files exist. Doctor also checks that the
 installed packages can run Oxlint: each declared package is installed, and `@effect/tsgo` has
 a build for the installed Oxlint, tsrs, and platform. It starts no tool for this check.
 
@@ -282,7 +312,12 @@ adamantite doctor
 
 `update` exits 0 when dependency updates succeed, even if doctor findings remain. Use
 `adamantite doctor` as the CI gate. It also refreshes each copy of the
-[Adamantite skill](#agent-skill) that differs from the skill of the installed Adamantite version.
+[Adamantite skill](#agent-skill) that differs from the skill of the installed Adamantite version,
+and writes the lockfile again with the installed version. In a project that an earlier version
+set up, `update` writes the lockfile one time with the setup that the project files show: the
+managed scripts, the presets that `oxlint.config.ts` imports, the TypeScript preset that a
+`tsconfig.json` extends, the editor settings and the workflow that exist, and the Adamantite
+section of `AGENTS.md`.
 
 ### `adamantite rule`
 

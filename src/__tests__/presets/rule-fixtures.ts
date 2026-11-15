@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process"
-import { cpSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  cpSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import process from "node:process"
@@ -25,10 +33,33 @@ export const FIXTURES_DIRECTORY = "fixtures"
 const OXLINT_VARIABLE = "ADAMANTITE_TEST_OXLINT"
 
 /**
+ * The Oxlint package folder that `ADAMANTITE_TEST_OXLINT` names, when it names one.
+ */
+function readOxlintOverride(): string | undefined {
+  const folder = process.env[OXLINT_VARIABLE]
+
+  return folder === "" ? undefined : folder
+}
+
+const OxlintPackageJson = Schema.Struct({ version: Schema.String })
+const decodeOxlintPackageJson = Schema.decodeUnknownSync(Schema.fromJsonString(OxlintPackageJson))
+
+/**
+ * The version of the Oxlint that lints the fixtures: the package that `ADAMANTITE_TEST_OXLINT`
+ * names, or the Oxlint of the repository.
+ */
+export function readFixtureOxlintVersion(): string {
+  const folder = readOxlintOverride() ?? join(REPO_ROOT, "node_modules/oxlint")
+
+  return decodeOxlintPackageJson(readFileSync(join(folder, "package.json"), "utf8")).version
+}
+
+/**
  * A preset's rule fixtures live in one directory, with one directory for each plugin namespace,
  * such as `antislop`, and one directory for each rule in it. Files in
  * `<fixturesDir>/<namespace>/<rule>/valid/` must not get a report from the rule. Files in
- * `<fixturesDir>/<namespace>/<rule>/invalid/` must get at least one report.
+ * `<fixturesDir>/<namespace>/<rule>/invalid/` must get at least one report. Each rule has at least
+ * one file of each kind, which `stacks.test.ts` checks.
  *
  * Keep one case per file, so a relaxed rule cannot hide behind another report in the same file, and
  * the file name tells which case changed.
@@ -50,7 +81,9 @@ export interface RuleFixtureOptions {
   readonly presetPath: string
 }
 
-export type RuleFixtureKind = "invalid" | "valid"
+export const RULE_FIXTURE_KINDS = ["invalid", "valid"] as const
+
+export type RuleFixtureKind = (typeof RULE_FIXTURE_KINDS)[number]
 
 export interface RuleFixture {
   /**
@@ -164,11 +197,11 @@ const FORMAT_PRESET = join(REPO_ROOT, "presets/format.ts")
  */
 export function createFixtureProject(options: FixtureTreeOptions): string {
   const project = mkdtempSync(join(tmpdir(), "adamantite-fixtures-"))
-  const oxlint = process.env[OXLINT_VARIABLE]
+  const oxlint = readOxlintOverride()
 
   linkFixturePackages(join(project, "node_modules"))
 
-  if (oxlint !== undefined && oxlint !== "") {
+  if (oxlint !== undefined) {
     // Take Oxlint from the named folder instead of the repository.
     rmSync(join(project, "node_modules/oxlint"))
     symlinkSync(oxlint, join(project, "node_modules/oxlint"))
@@ -281,10 +314,8 @@ export function lintFixtureTree(options: FixtureTreeOptions): FixtureReport[] {
  * use the result to declare its tests.
  */
 export function listRuleFixtures(fixturesDir: string): RuleFixture[] {
-  const kinds: RuleFixtureKind[] = ["valid", "invalid"]
-
   return listFixtureRules(fixturesDir).flatMap((rule) =>
-    kinds.flatMap((kind) =>
+    RULE_FIXTURE_KINDS.flatMap((kind) =>
       listDirectory(join(fixturesDir, rule, kind)).map((name) => ({
         file: `${rule}/${kind}/${name}`,
         kind,

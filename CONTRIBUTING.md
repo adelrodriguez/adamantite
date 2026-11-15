@@ -72,14 +72,15 @@ pnpm run format
 ```
 
 The first-party rules must work with each Oxlint version that `peerDependencies` allows. CI runs
-the RuleTester tests and the strict and effect preset fixtures with the minimum version. To do
+the RuleTester tests and the preset fixtures of every stack with the minimum version. To do
 that locally, install the version from `peerDependencies.oxlint` in a temporary folder, and name
 its package folder in `ADAMANTITE_TEST_OXLINT`:
 
 ```sh
 npm install --prefix /tmp/minimum-oxlint oxlint@<minimum version>
 ADAMANTITE_TEST_OXLINT=/tmp/minimum-oxlint/node_modules/oxlint pnpm exec vitest run \
-  src/__tests__/plugins src/__tests__/presets/strict.test.ts src/__tests__/presets/effect.test.ts
+  src/__tests__/plugins src/__tests__/presets/stacks.test.ts src/__tests__/presets/strict.test.ts \
+  src/__tests__/presets/effect.test.ts
 ```
 
 A fixture that imports a package, such as `vue`, needs the package in the fixture packages, not in

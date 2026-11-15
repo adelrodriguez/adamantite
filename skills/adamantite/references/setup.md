@@ -20,8 +20,8 @@ A project that already has ts-reset can delete its `reset.d.ts` files and the
 Adapt the selected options to the request. Omitted boolean flags are disabled.
 `--agents` writes `AGENTS.md` with the Adamantite instructions when the project has none, and
 writes this skill to `.agents/skills`, and to `.claude/skills` or `.grok/skills` when the project
-has `.claude/` or `.grok/`. Add the Adamantite section to an existing `AGENTS.md` by hand when
-Doctor reports it missing.
+has `.claude/` or `.grok/`. An existing `AGENTS.md` stays as it is, and Doctor reports the
+`missing-agents-section` finding when it has no Adamantite section.
 
 Before selecting `react-strict`, tell the user about its modified MIT license.
 The installed `oxlint-plugin-react-doctor` license requires written permission for use as

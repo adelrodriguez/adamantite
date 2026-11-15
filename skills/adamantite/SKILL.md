@@ -69,17 +69,17 @@ The task is complete when the affected checks exit 0 and you have read their out
 
 ## Repair managed setup
 
-Run `adamantite doctor --json`. It assesses managed integrations without changing files, prints
-the assessment as one JSON document, and exits 1 when findings remain. Each finding has its `id`,
+Run `adamantite doctor --json`. It assesses the integrations of the setup without changing files,
+prints the assessment as one JSON document, and exits 1 when findings remain. Each finding has its `id`,
 `currentState`, `goal`, and the optional `reference` and `notes`. Without `--json` and a terminal,
 Doctor prints the same findings as a Markdown repair prompt.
 Follow each finding's current state, goal, reference, and verification command.
-For a finding about the previous custom-rules API, use the migration step in
+For a finding that Oxlint cannot load the lint config, repair the config or the rule file that the
+error names. When it imports an Adamantite preset or a name that the installed package does not
+export, use the replacement that the
+[changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md) names for it. For
+a custom rule or a rules folder, use the repair step in
 [How to write and verify custom rules](references/custom-rules.md#repair-an-existing-rules-folder).
-For a finding that Oxlint cannot load the lint config, repair the config that the error names.
-When the config imports an Adamantite preset that the installed package does not export, use the
-replacement that the [changelog](https://github.com/adelrodriguez/adamantite/blob/main/CHANGELOG.md)
-names for it.
 
 Run `adamantite doctor --json` again after the repair. This step is complete when Doctor exits 0
 with no findings. Report the `warnings` separately, because warnings alone also exit 0.

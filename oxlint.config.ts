@@ -97,6 +97,10 @@ export default defineConfig({
         owners: ["src/lib", "src/commands/__tests__"],
       },
       {
+        import: "#lib/integrations/sherif",
+        owners: ["src/lib", "src/commands/__tests__"],
+      },
+      {
         import: "#lib/integrations/vscode",
         owners: ["src/lib"],
       },

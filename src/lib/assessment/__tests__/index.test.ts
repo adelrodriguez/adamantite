@@ -417,13 +417,13 @@ describe("assessProject", () => {
         "oxlint-custom",
         "@effect/tsgo",
         "@shadcn/lint",
-        "sherif",
         "tsrs",
         "tsconfig",
         "agents",
         "github",
         "oxfmt",
         "knip",
+        "sherif",
       ])
       expect(reads.filter((path) => path === `${ROOT}/pnpm-workspace.yaml`)).toHaveLength(1)
       // The project reads the root config, and custom rule discovery reads it as an Oxlint config.

@@ -51,7 +51,7 @@ export default {
       toKnipTsConfigContent(toKnipWorkspace(project, selection))
     ),
   name: "knip",
-  packages: (_selection: Selection) => [PACKAGE],
+  packages: (_project: Project, _selection: Selection) => [PACKAGE],
   prepare: (_project: Project) => Effect.void,
   selected: ({ scripts }: Selection) => checkRunsTool(scripts, "knip"),
 } satisfies Integration

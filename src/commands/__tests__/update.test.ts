@@ -13,7 +13,6 @@ import { PACKAGE as knip } from "#lib/integrations/knip/index.ts"
 import { toOxlintTsConfigContent } from "#lib/integrations/tooling/oxlint/config.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
 import { FailedToInstallDependency, UnsupportedLockfile } from "#lib/shared/errors.ts"
 import {
@@ -233,7 +232,7 @@ describe("update", () => {
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
         files: {
-          "package.json": manifest({ devDependencies: { adamantite: "0.0.1", sherif: "1.0.0" } }),
+          "package.json": manifest({ devDependencies: { adamantite: "0.0.1", oxlint: "1.0.0" } }),
         },
       })
 
@@ -248,10 +247,10 @@ describe("update", () => {
 
       expect(Exit.isSuccess(exit)).toBe(true)
       expect(installer.calls).toHaveLength(1)
-      expect(installer.calls[0]?.packages).toStrictEqual([`sherif@${sherif.version}`])
+      expect(installer.calls[0]?.packages).toStrictEqual([`oxlint@${oxlint.version}`])
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
-        `● Packages to install or update:\n  sherif: 1.0.0 → ${sherif.version}`,
+        `● Packages to install or update:\n  oxlint: 1.0.0 → ${oxlint.version}`,
         "✔ Dependencies updated.",
         "✅ Update finished.",
       ])
@@ -263,7 +262,7 @@ describe("update", () => {
       const files = createFileSystemTestContext({
         files: {
           "package.json": manifest({
-            devDependencies: { sherif: "1.0.0" },
+            devDependencies: { oxlint: "1.0.0" },
             workspaces: ["packages/*"],
           }),
         },
@@ -291,9 +290,9 @@ describe("update", () => {
       const files = createFileSystemTestContext({
         files: {
           "package.json": manifest({
-            devDependencies: { oxlint: "npm:oxlint@1", sherif: "catalog:" },
+            devDependencies: { oxlint: "catalog:", tsrs: "npm:tsrs@1" },
           }),
-          "pnpm-workspace.yaml": "catalog:\n  sherif: 0.0.1\n",
+          "pnpm-workspace.yaml": "catalog:\n  oxlint: 0.0.1\n",
         },
       })
 
@@ -310,8 +309,8 @@ describe("update", () => {
       expect(installer.calls).toStrictEqual([])
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
-        expect.stringMatching(/^▲ `oxlint` is declared as `npm:oxlint@1`/u),
-        expect.stringMatching(/^\n1\. Outdated sherif\n/u),
+        expect.stringMatching(/^▲ `tsrs` is declared as `npm:tsrs@1`/u),
+        expect.stringMatching(/^\n1\. Outdated oxlint\n/u),
         "● Run `adamantite doctor` for the remaining repairs and an agent prompt.",
         "✅ Update finished.",
       ])
@@ -377,13 +376,13 @@ describe("update", () => {
   it.effect("fail when dependency installation fails", () =>
     Effect.gen(function* () {
       const files = createFileSystemTestContext({
-        files: { "package.json": manifest({ devDependencies: { sherif: "1.0.0" } }) },
+        files: { "package.json": manifest({ devDependencies: { oxlint: "1.0.0" } }) },
       })
 
       const logLines: unknown[] = []
 
       const installer = createDependencyInstallerTestContext({
-        addDevDependenciesError: new FailedToInstallDependency({ packages: ["sherif"] }),
+        addDevDependenciesError: new FailedToInstallDependency({ packages: ["oxlint"] }),
       })
 
       const exit = yield* runCommand(updateCommand, [], {
@@ -395,7 +394,7 @@ describe("update", () => {
       expect(Exit.isFailure(exit)).toBe(true)
       expect(logLines).toStrictEqual([
         "💠 adamantite update",
-        `● Packages to install or update:\n  sherif: 1.0.0 → ${sherif.version}`,
+        `● Packages to install or update:\n  oxlint: 1.0.0 → ${oxlint.version}`,
         "❌ Update failed",
       ])
     })

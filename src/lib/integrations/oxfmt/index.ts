@@ -52,7 +52,7 @@ export default {
   files: ({ cwd }: Project, _selection: Selection) =>
     renderConfigFile(cwd, CONFIG, toOxfmtTsConfigContent()),
   name: "oxfmt",
-  packages: (_selection: Selection) => [PACKAGE],
+  packages: (_project: Project, _selection: Selection) => [PACKAGE],
   prepare: (_project: Project) => Effect.void,
   selected: ({ scripts }: Selection) => checkRunsTool(scripts, "oxfmt"),
 } satisfies Integration

@@ -18,8 +18,9 @@ const IndentedJsonText = Schema.fromJsonString(Schema.Unknown, { space: 2 })
 export const stringifyJson = Schema.encodeEffect(JsonText)
 
 /**
- * Encodes a value as JSON text with two-space indentation. `Setup.apply` formats a managed file with
- * the project's Oxfmt before it writes it. A value that JSON cannot hold fails with a `SchemaError`.
+ * Encodes a value as JSON text with two-space indentation. `Setup.apply` formats a managed file
+ * with the project's Oxfmt before it writes it. A value that JSON cannot hold fails with a
+ * `SchemaError`.
  */
 export const formatJson = Schema.encodeEffect(IndentedJsonText)
 

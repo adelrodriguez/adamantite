@@ -98,9 +98,10 @@ export interface Integration<E = unknown, R = unknown> {
   ) => Effect.Effect<readonly ManagedFile[], E, R>
   readonly name: string
   /**
-   * The packages to install, at the managed versions.
+   * The packages to install, at the managed versions. The project decides some, such as Sherif,
+   * which only a monorepo needs.
    */
-  readonly packages: (selection: Selection) => readonly ToolingPackage[]
+  readonly packages: (project: Project, selection: Selection) => readonly ToolingPackage[]
   /**
    * Builds what the integration needs outside the files that the project commits, after the
    * install, such as the Effect editor SDK in `node_modules`. A failure that `assess` reports as a

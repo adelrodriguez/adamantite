@@ -5,10 +5,7 @@ import * as Order from "effect/Order"
 import { describe, expect, it } from "vitest"
 import * as oxlintCommands from "#lib/integrations/tooling/oxlint/command.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import * as sherifCommands from "#lib/integrations/tooling/sherif/command.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import oxlintIndex from "../oxlint/index.ts?raw"
-import sherifIndex from "../sherif/index.ts?raw"
 
 const toolFolders = readdirSync(join(import.meta.dirname, ".."), { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name !== "__tests__")
@@ -16,7 +13,6 @@ const toolFolders = readdirSync(join(import.meta.dirname, ".."), { withFileTypes
 
 const tools = [
   { commands: { ...oxlintCommands }, index: oxlintIndex, integration: oxlint, name: "oxlint" },
-  { commands: { ...sherifCommands }, index: sherifIndex, integration: sherif, name: "sherif" },
 ]
 
 describe("command builders", () => {

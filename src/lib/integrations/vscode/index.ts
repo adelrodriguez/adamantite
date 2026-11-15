@@ -333,7 +333,7 @@ export default {
       ]
     }),
   name: "vscode",
-  packages: (_selection: Selection): readonly ToolingPackage[] => [],
+  packages: (_project: Project, _selection: Selection): readonly ToolingPackage[] => [],
   // A project without a matching Effect build gets the `vscode-effect-sdk` finding instead.
   prepare: ({ cwd }: Project) =>
     readEffectEditor(cwd).pipe(

@@ -7,11 +7,10 @@ import * as Predicate from "effect/Predicate"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { DependencyInstaller } from "#lib/project/dependency-installer.ts"
 import { LOCKFILE_PATH, readLockfile } from "#lib/project/lockfile.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
-import { readPackageJson, checkRunsTool, SCRIPT_ORDER } from "#lib/project/package-json.ts"
+import { readPackageJson, SCRIPT_ORDER } from "#lib/project/package-json.ts"
 import { readProject } from "#lib/project/project.ts"
 import {
   addSelection,
@@ -149,9 +148,6 @@ export default Command.make("init", initCommandOptions).pipe(
         onSome: (setup) => setup.presets,
       })
 
-      // `adamantite analyze` runs Sherif in a monorepo.
-      const hasSherif = checkRunsTool(selectedScripts, "sherif") && isMonorepo
-
       const packageJson = yield* readPackageJson(cwd)
 
       // A project that already depends on Adamantite keeps the version or source that it chose.
@@ -172,17 +168,11 @@ export default Command.make("init", initCommandOptions).pipe(
         )
       }
 
-      if (hasSherif) {
-        dependencies.push(`${sherif.name}@${sherif.version}`)
-      }
-
-
       yield* installDependencies(cwd, dependencies)
 
       if (Option.isSome(lint)) {
         yield* setupToolConfig(cwd, oxlint, oxlint.create(cwd, presets))
       }
-
 
       const managedScripts = yield* addScripts(cwd, selectedScripts, {
         nonInteractive: options.nonInteractive,

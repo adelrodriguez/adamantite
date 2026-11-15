@@ -15,7 +15,6 @@ import oxlintCustom from "#lib/integrations/tooling/oxlint/custom.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
 import { managedPlugins } from "#lib/integrations/tooling/oxlint/plugins/managed.ts"
 import tsrs from "#lib/integrations/tooling/oxlint/tsrs.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import agents from "#lib/integrations/workspace/agents.ts"
 import tsconfig from "#lib/integrations/workspace/tsconfig.ts"
 import { LOCKFILE_PATH } from "#lib/project/lockfile.ts"
@@ -33,7 +32,6 @@ const managedIntegrations = [
   oxlint,
   oxlintCustom,
   ...managedPlugins,
-  sherif,
   tsrs,
   tsconfig,
   agents,

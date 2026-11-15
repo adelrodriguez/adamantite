@@ -308,7 +308,7 @@ const makeFormatter = Effect.fn("makeFormatter")(function* (cwd: string) {
 export const apply = Effect.fn("Setup.apply")(function* (project: Project, selection: Selection) {
   const { cwd } = project
   const selected = integrations.filter((integration) => integration.selected(selection))
-  const packages = selected.flatMap((integration) => integration.packages(selection))
+  const packages = selected.flatMap((integration) => integration.packages(project, selection))
 
   if (packages.length > 0) {
     yield* addRootDevDependencies(

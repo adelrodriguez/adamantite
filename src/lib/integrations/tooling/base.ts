@@ -406,8 +406,8 @@ function checkHasSelectedScript(project: Project, scripts: readonly Script[]) {
 }
 
 /**
- * A tooling integration that only manages a package version, with no config file (Sherif and
- * Tsgolint). Oxlint's managed plugins build on it through `defineManagedPlugin`.
+ * A tooling integration that only manages a package version, with no config file, such as
+ * tsrs. Oxlint's managed plugins build on it through `defineManagedPlugin`.
  */
 export function definePackageTooling(options: {
   /**
@@ -419,10 +419,6 @@ export function definePackageTooling(options: {
    * An extra condition for requiring the package, checked after the managed scripts.
    */
   readonly isRequired?: (project: Project) => boolean
-  /**
-   * Whether the package is required only in a detected monorepo.
-   */
-  readonly monorepoOnly?: boolean
   readonly name: string
   readonly purpose: string
   readonly scripts: readonly Script[]
@@ -435,7 +431,6 @@ export function definePackageTooling(options: {
 
         const isApplicable =
           checkHasSelectedScript(project, options.scripts)
-          && (!options.monorepoOnly || project.workspace.isMonorepo)
           && (options.isRequired === undefined || options.isRequired(project))
 
         const legacyFindings = options.legacyFindings?.(packageJson) ?? []

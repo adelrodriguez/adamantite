@@ -6,8 +6,8 @@ import type { FixLevel } from "#lib/integrations/tooling/oxlint/command.ts"
 import { CommandRunner } from "#lib/execution/command-runner.ts"
 import * as knip from "#lib/integrations/knip/command.ts"
 import * as oxfmt from "#lib/integrations/oxfmt/command.ts"
+import * as sherif from "#lib/integrations/sherif/command.ts"
 import oxlint from "#lib/integrations/tooling/oxlint/index.ts"
-import sherif from "#lib/integrations/tooling/sherif/index.ts"
 import { checkIsMonorepo } from "#lib/project/monorepo.ts"
 import {
   CliNotFound,
@@ -186,7 +186,7 @@ export const analyze = Effect.fn("Toolchain.analyze")(function* ({
   // dependency graph.
   yield* (fix ? runner.runUntilFailure(steps) : runner.runAll(steps)).pipe(
     Effect.mapError((error) =>
-      Predicate.isTagged(error, "CliNotFound") && error.command === sherif.name
+      Predicate.isTagged(error, "CliNotFound") && error.command === stages.monorepo.command
         ? new CliNotFound({
             command: error.command,
             hint: "Run `adamantite update` to install it.",
